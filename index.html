@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Setlist arrangement for worship songs">
+    <title>Setalight</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <header>
+            <h1>Setalight</h1>
+            <div class="setlist-info">
+                <span class="date" id="setlist-date"></span>
+            </div>
+        </header>
+
+        <main id="main-content">
+            <div class="song-container">
+                <!-- Song content will be rendered here -->
+            </div>
+        </main>
+
+        <nav class="controls">
+            <button id="prev-song" aria-label="Previous song">←</button>
+            <span class="song-position" id="song-position">1 / 5</span>
+            <button id="next-song" aria-label="Next song">→</button>
+        </nav>
+    </div>
+
+    <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,225 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --bg-color: #ffffff;
+    --text-color: #1a1a1a;
+    --header-bg: #2c3e50;
+    --header-text: #ecf0f1;
+    --button-bg: #3498db;
+    --button-hover: #2980b9;
+}
+
+body {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    line-height: 1.6;
+    overflow: hidden;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+}
+
+header {
+    background-color: var(--header-bg);
+    color: var(--header-text);
+    padding: 1rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.setlist-info {
+    font-size: 0.9rem;
+}
+
+#main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2rem;
+}
+
+.song-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    font-size: 1.2rem;
+}
+
+.song {
+    margin-bottom: 2rem;
+}
+
+.song-title {
+    font-size: 2rem;
+    margin-bottom: 1.5rem;
+    color: var(--header-bg);
+}
+
+/* Custom ChordPro styling */
+.song-content .song-header {
+    margin-bottom: 2rem;
+    border-bottom: 2px solid #ecf0f1;
+    padding-bottom: 1rem;
+}
+
+.song-content .song-title {
+    font-size: 2rem;
+    font-weight: 600;
+    color: var(--header-bg);
+    margin-bottom: 0.5rem;
+}
+
+.song-content .song-artist {
+    font-size: 1rem;
+    color: #7f8c8d;
+    margin-bottom: 0.5rem;
+}
+
+.song-content .song-meta {
+    font-size: 0.9rem;
+    color: #95a5a6;
+    display: flex;
+    gap: 1.5rem;
+    margin-top: 0.5rem;
+}
+
+.song-content .song-ccli {
+    font-size: 0.85rem;
+    color: #bdc3c7;
+    margin-top: 0.5rem;
+}
+
+.song-content .song-section {
+    margin-bottom: 2rem;
+}
+
+.song-content .section-label {
+    color: #7f8c8d;
+    font-weight: bold;
+    font-style: italic;
+    margin-bottom: 0.75rem;
+    font-size: 1.1rem;
+}
+
+.song-content .chord-line {
+    display: flex;
+    margin-bottom: 0.25rem;
+    line-height: 1.8em;
+}
+
+.song-content .bar-group {
+    margin-bottom: 1rem;
+    display: grid;
+    width: fit-content;
+    gap: 0;
+}
+
+.song-content .bar-group .chord-line {
+    display: contents;
+}
+
+.song-content .measure {
+    display: flex;
+    align-items: flex-start;
+}
+
+.song-content .measure.first-measure .bar-marker {
+    margin-left: 0;
+}
+
+.song-content .measure.last-measure .bar-marker {
+    margin-left: auto;
+}
+
+.song-content .measure:not(.first-measure):not(.last-measure) .bar-marker {
+    margin-left: auto;
+}
+
+.song-content .chord-segment {
+    display: inline-flex;
+    flex-direction: column;
+    white-space: pre;
+}
+
+.song-content .chord-segment.chord-only {
+    padding-right: 1em;
+}
+
+.song-content .chord {
+    color: #2980b9;
+    font-weight: bold;
+    font-size: 0.85em;
+    min-height: 1.2em;
+    line-height: 1.2em;
+    padding-right: 0.5em;
+}
+
+.song-content .chord.bar {
+    color: #95a5a6;
+    font-weight: normal;
+}
+
+.song-content .lyrics {
+    line-height: 1.6em;
+    padding: 0;
+    margin: 0;
+}
+
+.controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem;
+    background-color: var(--header-bg);
+    flex-shrink: 0;
+}
+
+.controls button {
+    background-color: var(--button-bg);
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.controls button:hover {
+    background-color: var(--button-hover);
+}
+
+.controls button:active {
+    transform: scale(0.98);
+}
+
+.song-position {
+    color: var(--header-text);
+    font-weight: 500;
+}
+
+/* Touch-friendly spacing */
+@media (max-width: 768px) {
+    #main-content {
+        padding: 1rem;
+    }
+
+    .controls button {
+        padding: 1rem 2rem;
+        font-size: 1.5rem;
+    }
+}
