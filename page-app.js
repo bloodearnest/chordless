@@ -215,7 +215,10 @@ class PageApp {
                 return {
                     title: parsed.metadata.title || `Song ${index + 1}`,
                     htmlContent: htmlContent,
-                    metadata: parsed.metadata
+                    metadata: parsed.metadata, // Original metadata (never modified)
+                    // Current key/tempo that can be modified
+                    currentKey: parsed.metadata.key,
+                    currentBPM: parsed.metadata.tempo
                 };
             });
 
@@ -273,6 +276,9 @@ class PageApp {
 
                 // Apply saved state to sections
                 this.applySectionState();
+
+                // Set up key selector
+                this.setupKeySelector();
             });
 
         } catch (error) {
@@ -345,34 +351,39 @@ class PageApp {
 
     showOverview(instant = false) {
         this.scrollToSection('overview', -1, instant);
-        document.getElementById('song-position').textContent = 'Setlist';
         this.updateHeader(null);
-        this.updateNavigationForOverview();
     }
 
     showSong(index, instant = false) {
         this.scrollToSection(`song-${index}`, index, instant);
-        document.getElementById('song-position').textContent = `${index + 1} / ${this.songs.length}`;
         this.updateHeader(this.songs[index]);
-        this.updateNavigationForSong(index);
     }
 
     updateHeader(song) {
         const titleEl = document.getElementById('song-title-header');
         const metaEl = document.getElementById('song-meta-header');
         const infoButton = document.getElementById('info-button');
+        const keySelector = document.getElementById('key-selector');
+        const keyValueDisplay = document.getElementById('key-value-display');
 
         if (song) {
             // Update title
             titleEl.textContent = song.title;
 
-            // Update metadata
-            const meta = [];
-            if (song.metadata.key) {
-                meta.push(`<span class="meta-item"><span class="meta-label">Key:</span> ${this.escapeHtml(song.metadata.key)}</span>`);
+            // Update key display (for normal mode) - use current key
+            if (keyValueDisplay) {
+                keyValueDisplay.textContent = song.currentKey || '-';
             }
-            if (song.metadata.tempo) {
-                meta.push(`<span class="meta-item"><span class="meta-label">BPM:</span> ${this.escapeHtml(song.metadata.tempo)}</span>`);
+
+            // Update key selector (for edit mode) - use current key
+            if (keySelector && song.currentKey) {
+                keySelector.value = song.currentKey;
+            }
+
+            // Update metadata - only show BPM (key is in separate wrapper now) - use current BPM
+            const meta = [];
+            if (song.currentBPM) {
+                meta.push(`<span class="meta-item"><span class="meta-label">BPM:</span> ${this.escapeHtml(song.currentBPM)}</span>`);
             }
             metaEl.innerHTML = meta.join('');
 
@@ -384,6 +395,14 @@ class PageApp {
             titleEl.textContent = this.currentSetlistId ? this.formatSetlistName(this.currentSetlistId) : 'Setlist';
             metaEl.innerHTML = '';
             infoButton.style.display = 'none';
+
+            if (keyValueDisplay) {
+                keyValueDisplay.textContent = '-';
+            }
+            if (keySelector) {
+                // Reset to first valid key option
+                keySelector.selectedIndex = 0;
+            }
         }
     }
 
@@ -403,15 +422,15 @@ class PageApp {
 
         if (song.metadata.key) {
             html += `<div class="modal-info-item">
-                <div class="modal-info-label">Key</div>
+                <div class="modal-info-label">Original Key</div>
                 <div class="modal-info-value">${this.escapeHtml(song.metadata.key)}</div>
             </div>`;
         }
 
         if (song.metadata.tempo) {
             html += `<div class="modal-info-item">
-                <div class="modal-info-label">Tempo</div>
-                <div class="modal-info-value">${this.escapeHtml(song.metadata.tempo)} BPM</div>
+                <div class="modal-info-label">Original BPM</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.tempo)}</div>
             </div>`;
         }
 
@@ -497,56 +516,6 @@ class PageApp {
         });
 
         console.log('Hash navigation setup complete for', totalSongs, 'songs');
-    }
-
-    updateNavigationForOverview() {
-        const prevButton = document.getElementById('prev-song');
-        const nextButton = document.getElementById('next-song');
-
-        if (prevButton) prevButton.disabled = true;
-
-        if (nextButton && this.songs.length > 0) {
-            nextButton.disabled = false;
-            nextButton.onclick = (e) => {
-                e.preventDefault();
-                this.navigateToHash('song-0');
-            };
-        }
-    }
-
-    updateNavigationForSong(index) {
-        const prevButton = document.getElementById('prev-song');
-        const nextButton = document.getElementById('next-song');
-
-        // Previous button
-        if (prevButton) {
-            if (index > 0) {
-                prevButton.disabled = false;
-                prevButton.onclick = (e) => {
-                    e.preventDefault();
-                    this.navigateToHash(`song-${index - 1}`);
-                };
-            } else {
-                prevButton.disabled = false;
-                prevButton.onclick = (e) => {
-                    e.preventDefault();
-                    this.navigateToHash('overview');
-                };
-            }
-        }
-
-        // Next button
-        if (nextButton) {
-            if (index < this.songs.length - 1) {
-                nextButton.disabled = false;
-                nextButton.onclick = (e) => {
-                    e.preventDefault();
-                    this.navigateToHash(`song-${index + 1}`);
-                };
-            } else {
-                nextButton.disabled = true;
-            }
-        }
     }
 
     navigateToHash(hash) {
@@ -693,6 +662,55 @@ class PageApp {
         });
     }
 
+    setupKeySelector() {
+        const keySelector = document.getElementById('key-selector');
+        if (!keySelector) return;
+
+        // All possible keys (major and minor)
+        const keys = [
+            'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B',
+            'Cm', 'C#m', 'Dbm', 'Dm', 'D#m', 'Ebm', 'Em', 'Fm', 'F#m', 'Gbm', 'Gm', 'G#m', 'Abm', 'Am', 'A#m', 'Bbm', 'Bm'
+        ];
+
+        // Clear existing options and populate with all keys
+        keySelector.innerHTML = '';
+
+        // Add all keys as options
+        keys.forEach(key => {
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = key;
+            keySelector.appendChild(option);
+        });
+
+        // Set initial value to current song's key if we're on a song
+        if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
+            const currentKey = this.songs[this.currentSongIndex].currentKey;
+            if (currentKey) {
+                keySelector.value = currentKey;
+            }
+        }
+
+        // Add change event listener (transposition logic will be added later)
+        keySelector.addEventListener('change', (e) => {
+            const newKey = e.target.value;
+            if (newKey && this.currentSongIndex >= 0) {
+                console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
+
+                // Update the displayed key value
+                const keyValueDisplay = document.getElementById('key-value-display');
+                if (keyValueDisplay) {
+                    keyValueDisplay.textContent = newKey;
+                }
+
+                // Update the current key (not the original metadata)
+                this.songs[this.currentSongIndex].currentKey = newKey;
+
+                // TODO: Implement transposition logic here
+            }
+        });
+    }
+
     escapeHtml(text) {
         const map = {
             '&': '&amp;',
@@ -709,26 +727,43 @@ class PageApp {
         if (route.type === 'home') return;
 
         document.addEventListener('keydown', (e) => {
+            // Handle Escape key to exit edit mode
+            if (e.key === 'Escape') {
+                const isEditMode = document.body.classList.contains('edit-mode');
+                if (isEditMode) {
+                    e.preventDefault();
+                    const editToggle = document.getElementById('edit-mode-toggle');
+                    if (editToggle) {
+                        editToggle.click();
+                    }
+                }
+                return;
+            }
+
             // Don't intercept if modifier keys are pressed (Alt, Ctrl, Meta)
             // This allows browser shortcuts like Alt+Left/Right to work
             if (e.altKey || e.ctrlKey || e.metaKey) {
                 return;
             }
 
-            const prevButton = document.getElementById('prev-song');
-            const nextButton = document.getElementById('next-song');
-
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
-                    if (prevButton && !prevButton.disabled) {
-                        prevButton.click();
+                    // Navigate to previous song or overview
+                    if (this.currentSongIndex > 0) {
+                        this.navigateToHash(`song-${this.currentSongIndex - 1}`);
+                    } else if (this.currentSongIndex === 0) {
+                        this.navigateToHash('overview');
                     }
                     break;
                 case 'ArrowRight':
                     e.preventDefault();
-                    if (nextButton && !nextButton.disabled) {
-                        nextButton.click();
+                    // Navigate to next song
+                    if (this.currentSongIndex < 0 && this.songs.length > 0) {
+                        // From overview to first song
+                        this.navigateToHash('song-0');
+                    } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
+                        this.navigateToHash(`song-${this.currentSongIndex + 1}`);
                     }
                     break;
                 case 'ArrowUp':
@@ -769,13 +804,20 @@ class PageApp {
 
             // Horizontal swipe (song navigation)
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-                const prevButton = document.getElementById('prev-song');
-                const nextButton = document.getElementById('next-song');
-
-                if (deltaX > 0 && prevButton && !prevButton.disabled) {
-                    prevButton.click();
-                } else if (deltaX < 0 && nextButton && !nextButton.disabled) {
-                    nextButton.click();
+                if (deltaX > 0) {
+                    // Swipe right - go to previous
+                    if (this.currentSongIndex > 0) {
+                        this.navigateToHash(`song-${this.currentSongIndex - 1}`);
+                    } else if (this.currentSongIndex === 0) {
+                        this.navigateToHash('overview');
+                    }
+                } else if (deltaX < 0) {
+                    // Swipe left - go to next
+                    if (this.currentSongIndex < 0 && this.songs.length > 0) {
+                        this.navigateToHash('song-0');
+                    } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
+                        this.navigateToHash(`song-${this.currentSongIndex + 1}`);
+                    }
                 }
             }
         });

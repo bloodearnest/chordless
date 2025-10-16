@@ -229,7 +229,7 @@ header {
     display: flex;
     align-items: center;
     gap: 1rem;
-    font-size: 1.1rem;
+    font-size: 1.3rem;
     white-space: nowrap;
 }
 
@@ -241,30 +241,78 @@ header {
 
 .meta-label {
     opacity: 0.8;
-    font-size: 1rem;
+    font-size: 1.3rem;
 }
 
-.transpose-controls {
+/* Key display wrapper - holds both normal display and edit mode dropdown */
+.key-display-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.25rem;
 }
 
-.transpose-controls button {
+/* Key display - shown in normal mode, hidden in edit mode */
+.key-meta-display {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1.3rem;
+    white-space: nowrap;
+}
+
+.key-meta-display .meta-label {
+    font-size: 1.3rem;
+}
+
+body.edit-mode .key-meta-display {
+    display: none;
+}
+
+/* Key selector controls - hidden in normal mode, shown in edit mode */
+.key-selector-controls {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+body.edit-mode .key-selector-controls {
+    display: flex;
+}
+
+.key-selector-label {
+    font-size: 1.3rem;
+    font-weight: normal;
+    color: var(--header-text);
+    opacity: 0.8;
+}
+
+.key-selector {
     background-color: rgba(255, 255, 255, 0.2);
     color: var(--header-text);
-    border: none;
+    border: 2px solid rgba(255, 255, 255, 0.3);
     padding: 0.5rem 0.75rem;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     border-radius: 4px;
     cursor: pointer;
-    transition: background-color 0.2s;
-    min-width: 44px;
+    transition: all 0.2s;
+    min-width: 80px;
     min-height: 44px;
+    font-weight: 600;
 }
 
-.transpose-controls button:hover {
+.key-selector:hover {
     background-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.key-selector:focus {
+    outline: none;
+    background-color: rgba(255, 255, 255, 0.3);
+    border-color: var(--header-text);
+}
+
+.key-selector option {
+    background-color: var(--header-bg);
+    color: var(--header-text);
 }
 
 .edit-mode-toggle {
@@ -284,13 +332,21 @@ header {
 }
 
 .edit-mode-toggle:hover {
-    background-color: var(--header-text);
-    color: var(--header-bg);
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
 }
 
 .edit-mode-toggle.active {
-    background-color: var(--header-text);
-    color: var(--header-bg);
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+}
+
+.edit-mode-toggle.active:hover {
+    background-color: var(--button-hover);
+    border-color: var(--button-hover);
+    transform: scale(1.05);
 }
 
 .info-button {
@@ -310,8 +366,21 @@ header {
 }
 
 .info-button:hover {
-    background-color: var(--header-text);
-    color: var(--header-bg);
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.info-button.active {
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
+    color: white;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+}
+
+.info-button.active:hover {
+    background-color: var(--button-hover);
+    border-color: var(--button-hover);
+    transform: scale(1.05);
 }
 
 #main-content {
@@ -451,24 +520,32 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
 }
 
 .song-content .section-control-btn:hover {
-    background-color: #7f8c8d;
-    color: white;
+    background-color: rgba(127, 140, 141, 0.1);
+    transform: scale(1.02);
 }
 
 .song-content .section-control-btn:hover .control-icon,
 .song-content .section-control-btn:hover .control-label {
-    color: white;
+    color: #7f8c8d;
 }
 
 /* Active state for buttons when their feature is enabled */
 .song-content .section-control-btn.active {
-    background-color: #7f8c8d;
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
     color: white;
+    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
 }
 
 .song-content .section-control-btn.active .control-icon,
 .song-content .section-control-btn.active .control-label {
     color: white;
+}
+
+.song-content .section-control-btn.active:hover {
+    background-color: var(--button-hover);
+    border-color: var(--button-hover);
+    transform: scale(1.02);
 }
 
 .song-content .section-control-btn .control-icon {
@@ -635,42 +712,6 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     color: #7f8c8d;
 }
 
-.controls {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
-    background-color: var(--header-bg);
-    flex-shrink: 0;
-}
-
-.controls button {
-    background-color: var(--button-bg);
-    color: white;
-    border: none;
-    padding: 1rem 2rem;
-    font-size: 1.8rem;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    min-width: 80px;
-    min-height: 60px;
-}
-
-.controls button:hover {
-    background-color: var(--button-hover);
-}
-
-.controls button:active {
-    transform: scale(0.98);
-}
-
-.song-position {
-    color: var(--header-text);
-    font-weight: 500;
-    font-size: 1.3rem;
-}
-
 /* Horizontal scroll-based navigation */
 .song-container {
     display: flex;
@@ -717,7 +758,8 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     color: var(--text-color);
     border-radius: 12px;
     padding: 3rem;
-    max-width: 700px;
+    width: 90%;
+    max-width: 90%;
     max-height: 80vh;
     overflow-y: auto;
     position: relative;

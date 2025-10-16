@@ -182,11 +182,20 @@ async function generateSetlistPage(setlistId) {
                     <div class="song-title-compact" id="song-title-header">Loading...</div>
                 </div>
                 <div class="header-center">
-                    <div class="song-meta-compact" id="song-meta-header"></div>
-                    <div class="transpose-controls">
-                        <button id="transpose-down" title="Transpose down">♭</button>
-                        <button id="transpose-up" title="Transpose up">♯</button>
+                    <!-- Key display (normal mode) and key selector (edit mode) in same position -->
+                    <div class="key-display-wrapper">
+                        <span class="meta-item key-meta-display" id="key-meta-display">
+                            <span class="meta-label">Key:</span>
+                            <span id="key-value-display">-</span>
+                        </span>
+                        <div class="key-selector-controls">
+                            <label for="key-selector" class="key-selector-label">Key:</label>
+                            <select id="key-selector" class="key-selector">
+                                <!-- Options populated by JavaScript -->
+                            </select>
+                        </div>
                     </div>
+                    <div class="song-meta-compact" id="song-meta-header"></div>
                 </div>
                 <div class="header-right">
                     <button class="edit-mode-toggle" id="edit-mode-toggle" aria-label="Toggle edit mode">✎</button>
@@ -199,12 +208,6 @@ async function generateSetlistPage(setlistId) {
                     <p>Loading setlist...</p>
                 </div>
             </main>
-
-            <nav class="controls">
-                <button id="prev-song" aria-label="Previous">←</button>
-                <span class="song-position" id="song-position">Setlist</span>
-                <button id="next-song" aria-label="Next">→</button>
-            </nav>
         </div>
 
         <!-- Song info modal -->
