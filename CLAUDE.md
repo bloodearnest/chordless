@@ -43,3 +43,4 @@ A setlist has the following properties
 - Only use vanilla js. There should be no build step at all, ever.
 - Only use js libraries that can be hosted locally within the project and loaded as modules
 - Use modern HTML/CSS/JS. Do not care about old browser support
+- Always try to use browser native features as much as possible

@@ -859,6 +859,12 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     scroll-snap-stop: always;
     overflow-y: auto;
     padding: 0;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+}
+
+.section::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
 }
 
 .section .song-content {
