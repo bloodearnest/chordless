@@ -315,6 +315,68 @@ body.edit-mode .key-selector-controls {
     color: var(--header-text);
 }
 
+.font-size-controls {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+body.edit-mode .font-size-controls {
+    display: flex;
+}
+
+.font-size-btn {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.font-size-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.font-size-btn:active {
+    background-color: var(--button-bg);
+    border-color: var(--button-bg);
+    color: white;
+}
+
+.reset-button {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.5rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+body.edit-mode .reset-button {
+    display: flex;
+}
+
+.reset-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
 .edit-mode-toggle {
     background: none;
     border: 2px solid var(--header-text);
@@ -440,20 +502,30 @@ body.edit-mode .key-selector-controls {
 }
 
 .song-content .song-section-wrapper {
+    padding: 0.75rem;
+    padding-top: 0.125rem;
+    padding-bottom: 0.125rem;
+    margin: 0.75rem;
+    margin-top: 0.125rem;
     margin-bottom: 0.25rem;
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 1rem;
-    align-items: start;
+    border: 2px solid transparent;
+    border-radius: 8px;
 }
 
 /* Visual grouping in edit mode */
 body.edit-mode .song-content .song-section-wrapper {
-    border: 2px dotted #bdc3c7;
-    border-radius: 8px;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
+    border-color: #bdc3c7;
+    border-style: dotted;
     background-color: #f9f9f9;
+}
+
+.song-content .section-header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 0;
+    min-height: 0;
+    position: relative;
 }
 
 .song-content .song-section {
@@ -461,18 +533,45 @@ body.edit-mode .song-content .song-section-wrapper {
 }
 
 .song-content details.song-section summary.section-label {
-    font-size: 1.6rem;
-    margin-bottom: 0.5rem;
     cursor: pointer;
     list-style: none;
-    color: #7f8c8d;
-    font-weight: bold;
-    font-style: italic;
     user-select: none;
+    margin-bottom: 0;
+    outline: none;
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
+    overflow: visible;
+    line-height: 1.6rem;
+    padding-top: 0.2rem;
+    padding-bottom: 0.2rem;
 }
 
 .song-content details.song-section summary.section-label::-webkit-details-marker {
     display: none;
+}
+
+.song-content details.song-section summary.section-label:focus {
+    outline: none;
+}
+
+.song-content details.song-section summary.section-label:focus-visible {
+    outline: none;
+}
+
+.song-content details.song-section summary.section-label:active {
+    background: none;
+}
+
+.song-content .section-header {
+    -webkit-tap-highlight-color: transparent;
+    tap-highlight-color: transparent;
+}
+
+.song-content .section-title {
+    font-size: 1.6rem;
+    color: #7f8c8d;
+    font-weight: bold;
+    font-style: italic;
 }
 
 .song-content .section-content {
@@ -482,14 +581,12 @@ body.edit-mode .song-content .song-section-wrapper {
 /* Section controls panel - hidden by default */
 .song-content .section-controls {
     display: none;
-    flex-direction: column;
+    flex-direction: row;
     gap: 0.5rem;
-    background-color: white;
-    border: 2px solid #7f8c8d;
-    border-radius: 8px;
-    padding: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    flex-shrink: 0;
+    align-items: center;
+    position: absolute;
+    right: 0;
+    top: -1px;
 }
 
 /* Show controls when in edit mode */
@@ -497,9 +594,26 @@ body.edit-mode .song-content .section-controls {
     display: flex;
 }
 
-/* Strike-through section text when marked as hidden in edit mode */
-body.edit-mode .song-content .song-section-wrapper.section-hidden .lyrics,
-body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
+/* Collapsed section - hide content in both normal and edit mode */
+.song-content .song-section-wrapper.section-collapsed .section-content {
+    display: none;
+}
+
+/* Hide entire section when marked as hidden */
+.song-content .song-section-wrapper.section-hidden {
+    display: none;
+}
+
+/* In edit mode, show hidden sections with collapsed content and strike-through title */
+body.edit-mode .song-content .song-section-wrapper.section-hidden {
+    display: block;
+}
+
+body.edit-mode .song-content .song-section-wrapper.section-hidden .section-content {
+    display: none;
+}
+
+body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title {
     text-decoration: line-through;
     opacity: 0.6;
 }
@@ -507,16 +621,19 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
 .song-content .section-control-btn {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
-    background-color: white;
+    justify-content: center;
+    gap: 0.3rem;
+    padding: 0.25rem;
+    background-color: rgba(255, 255, 255, 0.95);
     border: 2px solid #7f8c8d;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 1.1rem;
+    font-size: 1rem;
     color: #7f8c8d;
     white-space: nowrap;
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.15);
+    backdrop-filter: blur(4px);
 }
 
 .song-content .section-control-btn:hover {
@@ -534,7 +651,7 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     background-color: var(--button-bg);
     border-color: var(--button-bg);
     color: white;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.15), 0 0 0 3px rgba(52, 152, 219, 0.3);
 }
 
 .song-content .section-control-btn.active .control-icon,
@@ -549,13 +666,14 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
 }
 
 .song-content .section-control-btn .control-icon {
-    font-size: 1.3rem;
-    min-width: 1.5rem;
+    font-size: 1.1rem;
+    min-width: 1.1rem;
     text-align: center;
 }
 
 .song-content .section-control-btn .control-label {
     font-weight: 600;
+    font-size: 0.9rem;
 }
 
 /* Hide chords when active */
@@ -636,6 +754,18 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     line-height: 1.4em;
     padding: 0;
     margin: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.song-content .chord-line {
+    flex-wrap: wrap;
+}
+
+.song-content .section-content {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
 }
 
 /* Setlist overview */
@@ -728,7 +858,7 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     scroll-snap-align: start;
     scroll-snap-stop: always;
     overflow-y: auto;
-    padding: 1.5rem;
+    padding: 0;
 }
 
 .section .song-content {
@@ -822,6 +952,52 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
     font-size: 1.1rem;
     color: #7f8c8d;
     white-space: pre-wrap;
+}
+
+.modal-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+    justify-content: flex-end;
+}
+
+.modal-btn {
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 100px;
+}
+
+.modal-btn-cancel {
+    background-color: #ecf0f1;
+    color: var(--text-color);
+}
+
+.modal-btn-cancel:hover {
+    background-color: #d5dbdb;
+}
+
+.modal-btn-confirm {
+    background-color: #e74c3c;
+    color: white;
+}
+
+.modal-btn-confirm:hover {
+    background-color: #c0392b;
+}
+
+#reset-confirm-modal .modal-content {
+    max-width: 500px;
+}
+
+#reset-confirm-modal p {
+    margin: 1.5rem 0;
+    line-height: 1.6;
+    color: #7f8c8d;
 }
 
 /* Touch-friendly spacing */

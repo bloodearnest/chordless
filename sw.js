@@ -182,6 +182,11 @@ async function generateSetlistPage(setlistId) {
                     <div class="song-title-compact" id="song-title-header">Loading...</div>
                 </div>
                 <div class="header-center">
+                    <button class="reset-button" id="reset-button" aria-label="Reset song">↺</button>
+                    <div class="font-size-controls">
+                        <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
+                        <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">A+</button>
+                    </div>
                     <!-- Key display (normal mode) and key selector (edit mode) in same position -->
                     <div class="key-display-wrapper">
                         <span class="meta-item key-meta-display" id="key-meta-display">
@@ -215,6 +220,18 @@ async function generateSetlistPage(setlistId) {
             <div class="modal-content">
                 <button class="modal-close" id="modal-close">&times;</button>
                 <div id="modal-body"></div>
+            </div>
+        </div>
+
+        <!-- Reset confirmation modal -->
+        <div class="modal-overlay" id="reset-confirm-modal">
+            <div class="modal-content">
+                <h2>Reset Song?</h2>
+                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="reset-cancel">Cancel</button>
+                    <button class="modal-btn modal-btn-confirm" id="reset-confirm">Reset</button>
+                </div>
             </div>
         </div>
     </div>

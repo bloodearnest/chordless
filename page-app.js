@@ -218,7 +218,8 @@ class PageApp {
                     metadata: parsed.metadata, // Original metadata (never modified)
                     // Current key/tempo that can be modified
                     currentKey: parsed.metadata.key,
-                    currentBPM: parsed.metadata.tempo
+                    currentBPM: parsed.metadata.tempo,
+                    currentFontSize: 1.6 // Default font size in rem
                 };
             });
 
@@ -279,6 +280,12 @@ class PageApp {
 
                 // Set up key selector
                 this.setupKeySelector();
+
+                // Set up font size controls
+                this.setupFontSizeControls();
+
+                // Set up reset button
+                this.setupResetButton();
             });
 
         } catch (error) {
@@ -352,11 +359,32 @@ class PageApp {
     showOverview(instant = false) {
         this.scrollToSection('overview', -1, instant);
         this.updateHeader(null);
+        this.exitEditMode();
     }
 
     showSong(index, instant = false) {
         this.scrollToSection(`song-${index}`, index, instant);
         this.updateHeader(this.songs[index]);
+        this.applyFontSize(index);
+        this.exitEditMode();
+    }
+
+    exitEditMode() {
+        const isEditMode = document.body.classList.contains('edit-mode');
+        if (isEditMode) {
+            const editToggle = document.getElementById('edit-mode-toggle');
+            document.body.classList.remove('edit-mode');
+            if (editToggle) {
+                editToggle.classList.remove('active');
+            }
+
+            // Update all sections to reflect non-edit mode
+            document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
+                const songIndex = parseInt(wrapper.dataset.songIndex);
+                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                this.updateSectionDOM(songIndex, sectionIndex);
+            });
+        }
     }
 
     updateHeader(song) {
@@ -365,6 +393,8 @@ class PageApp {
         const infoButton = document.getElementById('info-button');
         const keySelector = document.getElementById('key-selector');
         const keyValueDisplay = document.getElementById('key-value-display');
+        const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
+        const editToggle = document.getElementById('edit-mode-toggle');
 
         if (song) {
             // Update title
@@ -387,6 +417,10 @@ class PageApp {
             }
             metaEl.innerHTML = meta.join('');
 
+            // Show key display and edit button
+            if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'flex';
+            if (editToggle) editToggle.style.display = 'flex';
+
             // Enable info button
             infoButton.style.display = 'flex';
             infoButton.onclick = () => this.showSongInfo(song);
@@ -394,6 +428,10 @@ class PageApp {
             // Overview
             titleEl.textContent = this.currentSetlistId ? this.formatSetlistName(this.currentSetlistId) : 'Setlist';
             metaEl.innerHTML = '';
+
+            // Hide key display, edit button, and info button on overview
+            if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
+            if (editToggle) editToggle.style.display = 'none';
             infoButton.style.display = 'none';
 
             if (keyValueDisplay) {
@@ -558,7 +596,9 @@ class PageApp {
         }
         if (!this.sectionState[songIndex][sectionIndex]) {
             this.sectionState[songIndex][sectionIndex] = {
-                hideMode: 'none' // 'none', 'section', 'chords', 'lyrics'
+                hideMode: 'none', // 'none', 'collapse', 'chords', 'lyrics', 'hide'
+                isCollapsed: false,
+                isHidden: false
             };
         }
         return this.sectionState[songIndex][sectionIndex];
@@ -566,8 +606,45 @@ class PageApp {
 
     setSectionHideMode(songIndex, sectionIndex, mode) {
         const state = this.getSectionState(songIndex, sectionIndex);
-        // Toggle: if clicking the same mode, turn it off
-        state.hideMode = (state.hideMode === mode) ? 'none' : mode;
+
+        if (mode === 'hide') {
+            // Toggle hide state - mutually exclusive with all others
+            state.isHidden = !state.isHidden;
+            if (state.isHidden) {
+                // Clear other modes when hiding entire section
+                state.hideMode = 'hide';
+                state.isCollapsed = false;
+            } else {
+                state.hideMode = 'none';
+            }
+        } else if (mode === 'collapse') {
+            // Toggle collapse state - mutually exclusive with all others
+            if (state.isHidden) {
+                // If entire section is hidden, unhide it first
+                state.isHidden = false;
+            }
+            // Toggle: if clicking the same mode, turn it off
+            if (state.hideMode === 'collapse') {
+                state.hideMode = 'none';
+                state.isCollapsed = false;
+            } else {
+                state.hideMode = 'collapse';
+                state.isCollapsed = true;
+            }
+        } else {
+            // chords or lyrics mode - mutually exclusive with all others
+            if (state.isHidden) {
+                // If entire section is hidden, unhide it first
+                state.isHidden = false;
+            }
+            if (state.isCollapsed) {
+                // If collapsed, uncollapse it first
+                state.isCollapsed = false;
+            }
+            // Toggle: if clicking the same mode, turn it off
+            state.hideMode = (state.hideMode === mode) ? 'none' : mode;
+        }
+
         this.saveState();
         this.updateSectionDOM(songIndex, sectionIndex);
     }
@@ -580,16 +657,17 @@ class PageApp {
         const details = wrapper.querySelector('.song-section');
 
         // Update classes based on hideMode
-        wrapper.classList.toggle('section-hidden', state.hideMode === 'section');
+        wrapper.classList.toggle('section-hidden', state.isHidden);
+        wrapper.classList.toggle('section-collapsed', state.hideMode === 'collapse');
         wrapper.classList.toggle('chords-hidden', state.hideMode === 'chords');
         wrapper.classList.toggle('lyrics-hidden', state.hideMode === 'lyrics');
 
-        // Update details open/closed based on edit mode and hidden state
+        // Update details open/closed based on edit mode and collapsed state
         const isEditMode = document.body.classList.contains('edit-mode');
         if (isEditMode) {
             details.open = true; // Always open in edit mode
         } else {
-            details.open = state.hideMode !== 'section'; // Closed if section is hidden, when not in edit mode
+            details.open = !state.isCollapsed; // Closed if section is collapsed, when not in edit mode
         }
 
         // Update button states (active/inactive)
@@ -597,18 +675,22 @@ class PageApp {
     }
 
     updateButtonStates(wrapper, state) {
-        const toggleBtn = wrapper.querySelector('.section-toggle-btn');
+        const collapseBtn = wrapper.querySelector('.section-collapse-btn');
         const chordsBtn = wrapper.querySelector('.chords-toggle-btn');
         const lyricsBtn = wrapper.querySelector('.lyrics-toggle-btn');
+        const hideBtn = wrapper.querySelector('.section-hide-btn');
 
-        if (toggleBtn) {
-            toggleBtn.classList.toggle('active', state.hideMode === 'section');
+        if (collapseBtn) {
+            collapseBtn.classList.toggle('active', state.hideMode === 'collapse');
         }
         if (chordsBtn) {
             chordsBtn.classList.toggle('active', state.hideMode === 'chords');
         }
         if (lyricsBtn) {
             lyricsBtn.classList.toggle('active', state.hideMode === 'lyrics');
+        }
+        if (hideBtn) {
+            hideBtn.classList.toggle('active', state.isHidden);
         }
     }
 
@@ -650,14 +732,39 @@ class PageApp {
                 const songIndex = parseInt(wrapper.dataset.songIndex);
                 const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
 
-                // Map action to hideMode
-                const modeMap = {
-                    'toggle': 'section',
-                    'chords': 'chords',
-                    'lyrics': 'lyrics'
-                };
+                // Pass action directly (collapse, chords, lyrics, hide)
+                this.setSectionHideMode(songIndex, sectionIndex, action);
+            });
+        });
 
-                this.setSectionHideMode(songIndex, sectionIndex, modeMap[action]);
+        // Listen to native details toggle events
+        document.querySelectorAll('.song-section-wrapper .song-section').forEach(details => {
+            details.addEventListener('toggle', (e) => {
+                const wrapper = details.closest('.song-section-wrapper');
+                if (!wrapper) return;
+
+                const songIndex = parseInt(wrapper.dataset.songIndex);
+                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+
+                // Only sync state in normal mode (not in edit mode, where details is always open)
+                const isEditMode = document.body.classList.contains('edit-mode');
+                if (!isEditMode) {
+                    const state = this.getSectionState(songIndex, sectionIndex);
+
+                    // Update state based on details open/closed
+                    if (details.open) {
+                        // Details is now open - uncollapse
+                        state.isCollapsed = false;
+                        state.hideMode = 'none';
+                    } else {
+                        // Details is now closed - collapse
+                        state.isCollapsed = true;
+                        state.hideMode = 'collapse';
+                    }
+
+                    this.saveState();
+                    this.updateButtonStates(wrapper, state);
+                }
             });
         });
     }
@@ -709,6 +816,117 @@ class PageApp {
                 // TODO: Implement transposition logic here
             }
         });
+    }
+
+    setupFontSizeControls() {
+        const decreaseBtn = document.getElementById('font-size-decrease');
+        const increaseBtn = document.getElementById('font-size-increase');
+
+        if (!decreaseBtn || !increaseBtn) return;
+
+        decreaseBtn.addEventListener('click', () => {
+            if (this.currentSongIndex >= 0) {
+                const song = this.songs[this.currentSongIndex];
+                // Decrease by 0.1rem, minimum 0.8rem
+                song.currentFontSize = Math.max(0.8, song.currentFontSize - 0.1);
+                this.applyFontSize(this.currentSongIndex);
+            }
+        });
+
+        increaseBtn.addEventListener('click', () => {
+            if (this.currentSongIndex >= 0) {
+                const song = this.songs[this.currentSongIndex];
+                // Increase by 0.1rem, maximum 3.0rem
+                song.currentFontSize = Math.min(3.0, song.currentFontSize + 0.1);
+                this.applyFontSize(this.currentSongIndex);
+            }
+        });
+    }
+
+    applyFontSize(songIndex) {
+        if (songIndex < 0 || songIndex >= this.songs.length) return;
+
+        const song = this.songs[songIndex];
+        const songSection = document.getElementById(`song-${songIndex}`);
+
+        if (songSection) {
+            const songContainer = songSection.querySelector('.song-content');
+            if (songContainer) {
+                songContainer.style.fontSize = `${song.currentFontSize}rem`;
+            }
+        }
+    }
+
+    setupResetButton() {
+        const resetButton = document.getElementById('reset-button');
+        const resetModal = document.getElementById('reset-confirm-modal');
+        const cancelButton = document.getElementById('reset-cancel');
+        const confirmButton = document.getElementById('reset-confirm');
+
+        if (!resetButton || !resetModal) return;
+
+        // Show confirmation modal when reset button is clicked
+        resetButton.addEventListener('click', () => {
+            resetModal.classList.add('active');
+        });
+
+        // Cancel - close modal
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                resetModal.classList.remove('active');
+            });
+        }
+
+        // Close modal when clicking outside
+        resetModal.addEventListener('click', (e) => {
+            if (e.target === resetModal) {
+                resetModal.classList.remove('active');
+            }
+        });
+
+        // Confirm - reset everything
+        if (confirmButton) {
+            confirmButton.addEventListener('click', () => {
+                this.resetCurrentSong();
+                resetModal.classList.remove('active');
+            });
+        }
+    }
+
+    resetCurrentSong() {
+        if (this.currentSongIndex < 0 || this.currentSongIndex >= this.songs.length) return;
+
+        const song = this.songs[this.currentSongIndex];
+
+        // Reset key to original
+        song.currentKey = song.metadata.key;
+
+        // Reset BPM to original
+        song.currentBPM = song.metadata.tempo;
+
+        // Reset font size to default
+        song.currentFontSize = 1.6;
+
+        // Reset all section states for this song
+        if (this.sectionState[this.currentSongIndex]) {
+            delete this.sectionState[this.currentSongIndex];
+        }
+
+        // Save state
+        this.saveState();
+
+        // Update UI
+        this.updateHeader(song);
+        this.applyFontSize(this.currentSongIndex);
+
+        // Update key selector
+        const keySelector = document.getElementById('key-selector');
+        if (keySelector && song.currentKey) {
+            keySelector.value = song.currentKey;
+        }
+
+        // Reapply section states (all back to default)
+        this.applySectionState();
     }
 
     escapeHtml(text) {
