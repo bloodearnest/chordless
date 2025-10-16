@@ -81,7 +81,7 @@ export class ChordProParser {
 
         // Add trailer to metadata
         if (trailerLines.length > 0) {
-            metadata.trailer = trailerLines.join('\n');
+            metadata.ccliTrailer = trailerLines.join('\n');
         }
 
         return { metadata, sections };
@@ -128,7 +128,7 @@ export class ChordProParser {
         return { segments };
     }
 
-    toHTML(parsed) {
+    toHTML(parsed, songIndex = 0) {
         let html = '';
 
         // Add title
@@ -161,17 +161,36 @@ export class ChordProParser {
         }
 
         // Add sections
-        for (const section of parsed.sections) {
-            html += `<div class="song-section">`;
+        for (let i = 0; i < parsed.sections.length; i++) {
+            const section = parsed.sections[i];
 
             if (section.label) {
-                html += `<div class="section-label">${this.escapeHtml(section.label)}</div>`;
+                html += `<div class="song-section-wrapper" data-song-index="${songIndex}" data-section-index="${i}">`;
+                html += `<details class="song-section" open>`;
+                html += `<summary class="section-label">${this.escapeHtml(section.label)}</summary>`;
+                html += `<div class="section-content">`;
+                html += this.renderLines(section.lines);
+                html += `</div>`;
+                html += `</details>`;
+                html += `<div class="section-controls">`;
+                html += `<button class="section-control-btn section-toggle-btn" data-action="toggle">`;
+                html += `<span class="control-icon">👁</span><span class="control-label">Section</span>`;
+                html += `</button>`;
+                html += `<button class="section-control-btn chords-toggle-btn" data-action="chords">`;
+                html += `<span class="control-icon">♯</span><span class="control-label">Chords</span>`;
+                html += `</button>`;
+                html += `<button class="section-control-btn lyrics-toggle-btn" data-action="lyrics">`;
+                html += `<span class="control-icon">A</span><span class="control-label">Lyrics</span>`;
+                html += `</button>`;
+                html += `</div>`;
+                html += `</div>`;
+            } else {
+                html += `<div class="song-section" data-song-index="${songIndex}" data-section-index="${i}">`;
+                html += `<div class="section-content">`;
+                html += this.renderLines(section.lines);
+                html += `</div>`;
+                html += `</div>`;
             }
-
-            // Process lines in groups to detect bar-aligned blocks
-            html += this.renderLines(section.lines);
-
-            html += `</div>`;
         }
 
         return html;

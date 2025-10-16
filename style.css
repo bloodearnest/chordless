@@ -19,6 +19,7 @@ body {
     color: var(--text-color);
     line-height: 1.6;
     overflow: hidden;
+    font-size: 20px; /* Base font size for tablets */
 }
 
 /* View Transitions */
@@ -69,20 +70,20 @@ body {
 .home-content {
     flex: 1;
     overflow-y: auto;
-    padding: 2rem;
+    padding: 3rem;
 }
 
 .home-content h2 {
-    font-size: 1.5rem;
-    margin-bottom: 1.5rem;
+    font-size: 2rem;
+    margin-bottom: 2rem;
     color: var(--header-bg);
 }
 
 .setlist-list {
     display: flex;
     flex-direction: column;
-    gap: 1.5rem;
-    max-width: 600px;
+    gap: 2rem;
+    max-width: 800px;
 }
 
 /* Year sections */
@@ -94,17 +95,18 @@ body {
 
 .year-header {
     width: 100%;
-    padding: 1rem 1.5rem;
+    padding: 1.5rem 2rem;
     background-color: var(--header-bg);
     color: var(--header-text);
     border: none;
-    font-size: 1.3rem;
+    font-size: 1.8rem;
     font-weight: 600;
     cursor: pointer;
     text-align: left;
     display: flex;
     align-items: center;
     transition: background-color 0.2s;
+    min-height: 70px;
 }
 
 .year-header:hover {
@@ -134,16 +136,17 @@ body {
 
 .setlist-button {
     display: block;
-    padding: 1rem 1.5rem;
+    padding: 1.5rem 2rem;
     background-color: white;
     border: none;
     border-bottom: 1px solid #ecf0f1;
-    font-size: 1rem;
+    font-size: 1.3rem;
     color: var(--text-color);
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
     text-decoration: none;
+    min-height: 70px;
 }
 
 .setlist-button:last-child {
@@ -167,10 +170,10 @@ body {
 .home-button {
     background: none;
     border: none;
-    font-size: 1.5rem;
+    font-size: 2rem;
     cursor: pointer;
-    padding: 0.5rem;
-    margin-right: 1rem;
+    padding: 0.75rem;
+    margin-right: 0.5rem;
     transition: transform 0.2s;
 }
 
@@ -185,32 +188,144 @@ body {
 header {
     background-color: var(--header-bg);
     color: var(--header-text);
-    padding: 1rem;
+    padding: 0.5rem 1.5rem;
     display: flex;
     justify-content: space-between;
     align-items: center;
     flex-shrink: 0;
+    gap: 1.5rem;
 }
 
-header h1 {
-    font-size: 1.5rem;
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.header-center {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex: 0 1 auto;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.song-title-compact {
+    font-size: 1.4rem;
     font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.setlist-info {
-    font-size: 0.9rem;
+.song-meta-compact {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1.1rem;
+    white-space: nowrap;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.meta-label {
+    opacity: 0.8;
+    font-size: 1rem;
+}
+
+.transpose-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+.transpose-controls button {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: var(--header-text);
+    border: none;
+    padding: 0.5rem 0.75rem;
+    font-size: 1.2rem;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.transpose-controls button:hover {
+    background-color: rgba(255, 255, 255, 0.3);
+}
+
+.edit-mode-toggle {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.edit-mode-toggle:hover {
+    background-color: var(--header-text);
+    color: var(--header-bg);
+}
+
+.edit-mode-toggle.active {
+    background-color: var(--header-text);
+    color: var(--header-bg);
+}
+
+.info-button {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 1.3rem;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.info-button:hover {
+    background-color: var(--header-text);
+    color: var(--header-bg);
 }
 
 #main-content {
     flex: 1;
     overflow-y: auto;
-    padding: 2rem;
+    padding: 0;
+    position: relative;
 }
 
 .song-container {
-    max-width: 1200px;
     margin: 0 auto;
-    font-size: 1.2rem;
+    font-size: 1.6rem;
+    height: 100%;
+    width: 100%;
 }
 
 .song {
@@ -225,9 +340,7 @@ header h1 {
 
 /* Custom ChordPro styling */
 .song-content .song-header {
-    margin-bottom: 2rem;
-    border-bottom: 2px solid #ecf0f1;
-    padding-bottom: 1rem;
+    display: none; /* Hidden - info now in compact header */
 }
 
 .song-content .song-title {
@@ -257,26 +370,141 @@ header h1 {
     margin-top: 0.5rem;
 }
 
-.song-content .song-section {
-    margin-bottom: 2rem;
+.song-content .song-section-wrapper {
+    margin-bottom: 0.25rem;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 1rem;
+    align-items: start;
 }
 
-.song-content .section-label {
+/* Visual grouping in edit mode */
+body.edit-mode .song-content .song-section-wrapper {
+    border: 2px dotted #bdc3c7;
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    background-color: #f9f9f9;
+}
+
+.song-content .song-section {
+    margin-bottom: 0;
+}
+
+.song-content details.song-section summary.section-label {
+    font-size: 1.6rem;
+    margin-bottom: 0.5rem;
+    cursor: pointer;
+    list-style: none;
     color: #7f8c8d;
     font-weight: bold;
     font-style: italic;
-    margin-bottom: 0.75rem;
+    user-select: none;
+}
+
+.song-content details.song-section summary.section-label::-webkit-details-marker {
+    display: none;
+}
+
+.song-content .section-content {
+    margin-top: 0;
+}
+
+/* Section controls panel - hidden by default */
+.song-content .section-controls {
+    display: none;
+    flex-direction: column;
+    gap: 0.5rem;
+    background-color: white;
+    border: 2px solid #7f8c8d;
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
+}
+
+/* Show controls when in edit mode */
+body.edit-mode .song-content .section-controls {
+    display: flex;
+}
+
+/* Strike-through section text when marked as hidden in edit mode */
+body.edit-mode .song-content .song-section-wrapper.section-hidden .lyrics,
+body.edit-mode .song-content .song-section-wrapper.section-hidden .chord {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
+.song-content .section-control-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    background-color: white;
+    border: 2px solid #7f8c8d;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
     font-size: 1.1rem;
+    color: #7f8c8d;
+    white-space: nowrap;
+}
+
+.song-content .section-control-btn:hover {
+    background-color: #7f8c8d;
+    color: white;
+}
+
+.song-content .section-control-btn:hover .control-icon,
+.song-content .section-control-btn:hover .control-label {
+    color: white;
+}
+
+/* Active state for buttons when their feature is enabled */
+.song-content .section-control-btn.active {
+    background-color: #7f8c8d;
+    color: white;
+}
+
+.song-content .section-control-btn.active .control-icon,
+.song-content .section-control-btn.active .control-label {
+    color: white;
+}
+
+.song-content .section-control-btn .control-icon {
+    font-size: 1.3rem;
+    min-width: 1.5rem;
+    text-align: center;
+}
+
+.song-content .section-control-btn .control-label {
+    font-weight: 600;
+}
+
+/* Hide chords when active */
+.song-content .song-section-wrapper.chords-hidden .chord {
+    display: none;
+}
+
+/* Hide lyrics when active */
+.song-content .song-section-wrapper.lyrics-hidden .lyrics {
+    display: none;
+}
+
+/* Button labels are now managed dynamically in JavaScript */
+
+.song-content .section-content {
+    margin-top: 0;
 }
 
 .song-content .chord-line {
     display: flex;
-    margin-bottom: 0.25rem;
-    line-height: 1.8em;
+    margin-bottom: 0.2rem;
+    line-height: 1.5em;
 }
 
 .song-content .bar-group {
-    margin-bottom: 1rem;
+    margin-bottom: 0.5rem;
     display: grid;
     width: fit-content;
     gap: 0;
@@ -310,16 +538,16 @@ header h1 {
 }
 
 .song-content .chord-segment.chord-only {
-    padding-right: 1em;
+    padding-right: 0.5em;
 }
 
 .song-content .chord {
     color: #2980b9;
     font-weight: bold;
-    font-size: 0.85em;
-    min-height: 1.2em;
-    line-height: 1.2em;
-    padding-right: 0.5em;
+    font-size: 0.9em;
+    min-height: 1.1em;
+    line-height: 1.1em;
+    padding-right: 0.25em;
 }
 
 .song-content .chord.bar {
@@ -328,21 +556,21 @@ header h1 {
 }
 
 .song-content .lyrics {
-    line-height: 1.6em;
+    line-height: 1.4em;
     padding: 0;
     margin: 0;
 }
 
 /* Setlist overview */
 .setlist-overview {
-    padding: 2rem 0;
+    padding: 1.5rem 0;
 }
 
 .overview-title {
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: 600;
     color: var(--header-bg);
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     text-align: center;
 }
 
@@ -350,23 +578,24 @@ header h1 {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-    max-width: 800px;
+    max-width: 900px;
     margin: 0 auto;
 }
 
 .overview-song-button {
     display: flex;
     align-items: center;
-    gap: 1.5rem;
-    padding: 1.25rem 1.5rem;
+    gap: 2rem;
+    padding: 1rem 2rem;
     background-color: white;
     border: 2px solid #ecf0f1;
-    border-radius: 8px;
+    border-radius: 12px;
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
     text-decoration: none;
     color: inherit;
+    min-height: 70px;
 }
 
 .overview-song-button:hover {
@@ -380,10 +609,10 @@ header h1 {
 }
 
 .overview-song-number {
-    font-size: 1.5rem;
+    font-size: 2rem;
     font-weight: bold;
     color: var(--button-bg);
-    min-width: 2rem;
+    min-width: 3rem;
     text-align: center;
     flex-shrink: 0;
 }
@@ -396,13 +625,13 @@ header h1 {
 }
 
 .overview-song-title {
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     color: var(--text-color);
     font-weight: 500;
 }
 
 .overview-song-meta {
-    font-size: 0.9rem;
+    font-size: 1.1rem;
     color: #7f8c8d;
 }
 
@@ -410,7 +639,7 @@ header h1 {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1rem;
+    padding: 0.75rem;
     background-color: var(--header-bg);
     flex-shrink: 0;
 }
@@ -419,11 +648,13 @@ header h1 {
     background-color: var(--button-bg);
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem;
-    font-size: 1.2rem;
-    border-radius: 4px;
+    padding: 1rem 2rem;
+    font-size: 1.8rem;
+    border-radius: 8px;
     cursor: pointer;
     transition: background-color 0.2s;
+    min-width: 80px;
+    min-height: 60px;
 }
 
 .controls button:hover {
@@ -437,22 +668,118 @@ header h1 {
 .song-position {
     color: var(--header-text);
     font-weight: 500;
+    font-size: 1.3rem;
 }
 
 /* Horizontal scroll-based navigation */
 .song-container {
     display: flex;
     overflow-x: hidden;
-    overflow-y: visible;
+    overflow-y: hidden;
     scroll-snap-type: x mandatory;
 }
 
 .section {
     min-width: 100%;
     width: 100%;
+    height: 100%;
     flex-shrink: 0;
     scroll-snap-align: start;
     scroll-snap-stop: always;
+    overflow-y: auto;
+    padding: 1.5rem;
+}
+
+.section .song-content {
+    flex-shrink: 0;
+}
+
+/* Song info modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-overlay.active {
+    display: flex;
+}
+
+.modal-content {
+    background-color: white;
+    color: var(--text-color);
+    border-radius: 12px;
+    padding: 3rem;
+    max-width: 700px;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.modal-close {
+    position: absolute;
+    top: 1.5rem;
+    right: 1.5rem;
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: var(--text-color);
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.modal-close:hover {
+    opacity: 1;
+}
+
+.modal-content h2 {
+    margin-top: 0;
+    color: var(--header-bg);
+    font-size: 2rem;
+}
+
+.modal-info-grid {
+    display: grid;
+    gap: 1.5rem;
+    margin-top: 2rem;
+}
+
+.modal-info-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.modal-info-label {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #7f8c8d;
+    text-transform: uppercase;
+}
+
+.modal-info-value {
+    font-size: 1.3rem;
+    color: var(--text-color);
+}
+
+.modal-ccli {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px solid #ecf0f1;
+    font-size: 1.1rem;
+    color: #7f8c8d;
+    white-space: pre-wrap;
 }
 
 /* Touch-friendly spacing */
@@ -464,5 +791,10 @@ header h1 {
     .controls button {
         padding: 1rem 2rem;
         font-size: 1.5rem;
+    }
+
+    .modal-content {
+        margin: 1rem;
+        max-width: calc(100% - 2rem);
     }
 }

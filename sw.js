@@ -1,7 +1,8 @@
 // Service Worker for Setalight
 // Handles routing and generates pages for offline-first operation
 
-const CACHE_NAME = 'setalight-v3';
+const DEV_MODE = true; // Set to false for production
+const CACHE_NAME = 'setalight-v4';
 const ASSETS = [
     '/',
     '/style.css',
@@ -52,21 +53,38 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // Static assets - network first (for development), fallback to cache
+    // Static assets - behavior depends on dev mode
     if (url.pathname.match(/\.(css|js)$/)) {
-        event.respondWith(
-            fetch(event.request).then((response) => {
-                // Clone the response and cache it
-                const responseToCache = response.clone();
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                });
-                return response;
-            }).catch(() => {
-                // If network fails, try cache
-                return caches.match(event.request);
-            })
-        );
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            event.respondWith(
+                fetch(event.request, { cache: 'no-cache' }).then((response) => {
+                    // Clone the response and cache it as backup
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => {
+                        cache.put(event.request, responseToCache);
+                    });
+                    return response;
+                }).catch(() => {
+                    // If network fails, serve stale from cache
+                    return caches.match(event.request);
+                })
+            );
+        } else {
+            // Production mode: Cache first, update in background
+            event.respondWith(
+                caches.match(event.request).then((cached) => {
+                    const fetchPromise = fetch(event.request).then((response) => {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                        return response;
+                    });
+                    return cached || fetchPromise;
+                })
+            );
+        }
         return;
     }
 
@@ -159,10 +177,20 @@ async function generateSetlistPage(setlistId) {
     <div class="app-container">
         <div id="song-view" class="view">
             <header>
-                <a href="/" class="home-button" aria-label="Home">🏠</a>
-                <h1>Setalight</h1>
-                <div class="setlist-info">
-                    <span class="date" id="setlist-date"></span>
+                <div class="header-left">
+                    <a href="/" class="home-button" aria-label="Home">🏠</a>
+                    <div class="song-title-compact" id="song-title-header">Loading...</div>
+                </div>
+                <div class="header-center">
+                    <div class="song-meta-compact" id="song-meta-header"></div>
+                    <div class="transpose-controls">
+                        <button id="transpose-down" title="Transpose down">♭</button>
+                        <button id="transpose-up" title="Transpose up">♯</button>
+                    </div>
+                </div>
+                <div class="header-right">
+                    <button class="edit-mode-toggle" id="edit-mode-toggle" aria-label="Toggle edit mode">✎</button>
+                    <button class="info-button" id="info-button" aria-label="Song info">i</button>
                 </div>
             </header>
 
@@ -177,6 +205,14 @@ async function generateSetlistPage(setlistId) {
                 <span class="song-position" id="song-position">Setlist</span>
                 <button id="next-song" aria-label="Next">→</button>
             </nav>
+        </div>
+
+        <!-- Song info modal -->
+        <div class="modal-overlay" id="song-info-modal">
+            <div class="modal-content">
+                <button class="modal-close" id="modal-close">&times;</button>
+                <div id="modal-body"></div>
+            </div>
         </div>
     </div>
 

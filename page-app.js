@@ -11,6 +11,8 @@ class PageApp {
         this.currentSongIndex = undefined;
         this.songs = [];
         this.currentSetlistId = null;
+        // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
+        this.sectionState = {};
         this.init();
     }
 
@@ -193,9 +195,6 @@ class PageApp {
     async renderSetlist(setlistId) {
         console.log('renderSetlist called with:', setlistId);
         try {
-            // Set date in header
-            document.getElementById('setlist-date').textContent = this.formatDate(setlistId);
-
             // Get list of songs
             const songList = await this.db.getSongs(setlistId);
             console.log('Loaded songs:', songList.length);
@@ -211,7 +210,7 @@ class PageApp {
 
             const songs = songContents.map((content, index) => {
                 const parsed = this.parser.parse(content);
-                const htmlContent = this.parser.toHTML(parsed);
+                const htmlContent = this.parser.toHTML(parsed, index);
 
                 return {
                     title: parsed.metadata.title || `Song ${index + 1}`,
@@ -225,6 +224,9 @@ class PageApp {
             // Store songs for navigation
             this.songs = songs;
             this.currentSetlistId = setlistId;
+
+            // Load state from localStorage
+            this.loadState();
 
             // Render all songs on one page
             const container = document.querySelector('.song-container');
@@ -262,6 +264,15 @@ class PageApp {
                         this.navigateToHash(`song-${songIndex}`);
                     });
                 });
+
+                // Set up edit mode toggle
+                this.setupEditMode();
+
+                // Set up section control buttons
+                this.setupSectionControls();
+
+                // Apply saved state to sections
+                this.applySectionState();
             });
 
         } catch (error) {
@@ -335,13 +346,110 @@ class PageApp {
     showOverview(instant = false) {
         this.scrollToSection('overview', -1, instant);
         document.getElementById('song-position').textContent = 'Setlist';
+        this.updateHeader(null);
         this.updateNavigationForOverview();
     }
 
     showSong(index, instant = false) {
         this.scrollToSection(`song-${index}`, index, instant);
         document.getElementById('song-position').textContent = `${index + 1} / ${this.songs.length}`;
+        this.updateHeader(this.songs[index]);
         this.updateNavigationForSong(index);
+    }
+
+    updateHeader(song) {
+        const titleEl = document.getElementById('song-title-header');
+        const metaEl = document.getElementById('song-meta-header');
+        const infoButton = document.getElementById('info-button');
+
+        if (song) {
+            // Update title
+            titleEl.textContent = song.title;
+
+            // Update metadata
+            const meta = [];
+            if (song.metadata.key) {
+                meta.push(`<span class="meta-item"><span class="meta-label">Key:</span> ${this.escapeHtml(song.metadata.key)}</span>`);
+            }
+            if (song.metadata.tempo) {
+                meta.push(`<span class="meta-item"><span class="meta-label">BPM:</span> ${this.escapeHtml(song.metadata.tempo)}</span>`);
+            }
+            metaEl.innerHTML = meta.join('');
+
+            // Enable info button
+            infoButton.style.display = 'flex';
+            infoButton.onclick = () => this.showSongInfo(song);
+        } else {
+            // Overview
+            titleEl.textContent = this.currentSetlistId ? this.formatSetlistName(this.currentSetlistId) : 'Setlist';
+            metaEl.innerHTML = '';
+            infoButton.style.display = 'none';
+        }
+    }
+
+    showSongInfo(song) {
+        const modal = document.getElementById('song-info-modal');
+        const modalBody = document.getElementById('modal-body');
+
+        let html = `<h2>${this.escapeHtml(song.title)}</h2>`;
+        html += '<div class="modal-info-grid">';
+
+        if (song.metadata.artist) {
+            html += `<div class="modal-info-item">
+                <div class="modal-info-label">Artist</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.artist)}</div>
+            </div>`;
+        }
+
+        if (song.metadata.key) {
+            html += `<div class="modal-info-item">
+                <div class="modal-info-label">Key</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.key)}</div>
+            </div>`;
+        }
+
+        if (song.metadata.tempo) {
+            html += `<div class="modal-info-item">
+                <div class="modal-info-label">Tempo</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.tempo)} BPM</div>
+            </div>`;
+        }
+
+        if (song.metadata.time) {
+            html += `<div class="modal-info-item">
+                <div class="modal-info-label">Time Signature</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.time)}</div>
+            </div>`;
+        }
+
+        if (song.metadata.ccli) {
+            html += `<div class="modal-info-item">
+                <div class="modal-info-label">CCLI Number</div>
+                <div class="modal-info-value">${this.escapeHtml(song.metadata.ccli)}</div>
+            </div>`;
+        }
+
+        html += '</div>';
+
+        if (song.metadata.copyright) {
+            html += `<div class="modal-ccli">${this.escapeHtml(song.metadata.copyright)}</div>`;
+        }
+
+        if (song.metadata.ccliTrailer) {
+            html += `<div class="modal-ccli">${this.escapeHtml(song.metadata.ccliTrailer)}</div>`;
+        }
+
+        modalBody.innerHTML = html;
+        modal.classList.add('active');
+
+        // Close modal handlers
+        const closeBtn = document.getElementById('modal-close');
+        closeBtn.onclick = () => modal.classList.remove('active');
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        };
     }
 
     scrollToSection(sectionId, newIndex, instant = false) {
@@ -366,8 +474,8 @@ class PageApp {
             });
         }
 
-        // Reset vertical scroll to top
-        document.getElementById('main-content').scrollTop = 0;
+        // Reset vertical scroll to top of the section
+        section.scrollTop = 0;
 
         this.currentSongIndex = newIndex;
     }
@@ -455,6 +563,136 @@ class PageApp {
         }
     }
 
+    loadState() {
+        const stateKey = `setalight-state-${this.currentSetlistId}`;
+        const savedState = localStorage.getItem(stateKey);
+        if (savedState) {
+            try {
+                this.sectionState = JSON.parse(savedState);
+            } catch (e) {
+                console.error('Failed to parse saved state:', e);
+                this.sectionState = {};
+            }
+        } else {
+            this.sectionState = {};
+        }
+    }
+
+    saveState() {
+        const stateKey = `setalight-state-${this.currentSetlistId}`;
+        localStorage.setItem(stateKey, JSON.stringify(this.sectionState));
+    }
+
+    getSectionState(songIndex, sectionIndex) {
+        if (!this.sectionState[songIndex]) {
+            this.sectionState[songIndex] = {};
+        }
+        if (!this.sectionState[songIndex][sectionIndex]) {
+            this.sectionState[songIndex][sectionIndex] = {
+                hideMode: 'none' // 'none', 'section', 'chords', 'lyrics'
+            };
+        }
+        return this.sectionState[songIndex][sectionIndex];
+    }
+
+    setSectionHideMode(songIndex, sectionIndex, mode) {
+        const state = this.getSectionState(songIndex, sectionIndex);
+        // Toggle: if clicking the same mode, turn it off
+        state.hideMode = (state.hideMode === mode) ? 'none' : mode;
+        this.saveState();
+        this.updateSectionDOM(songIndex, sectionIndex);
+    }
+
+    updateSectionDOM(songIndex, sectionIndex) {
+        const wrapper = document.querySelector(`.song-section-wrapper[data-song-index="${songIndex}"][data-section-index="${sectionIndex}"]`);
+        if (!wrapper) return;
+
+        const state = this.getSectionState(songIndex, sectionIndex);
+        const details = wrapper.querySelector('.song-section');
+
+        // Update classes based on hideMode
+        wrapper.classList.toggle('section-hidden', state.hideMode === 'section');
+        wrapper.classList.toggle('chords-hidden', state.hideMode === 'chords');
+        wrapper.classList.toggle('lyrics-hidden', state.hideMode === 'lyrics');
+
+        // Update details open/closed based on edit mode and hidden state
+        const isEditMode = document.body.classList.contains('edit-mode');
+        if (isEditMode) {
+            details.open = true; // Always open in edit mode
+        } else {
+            details.open = state.hideMode !== 'section'; // Closed if section is hidden, when not in edit mode
+        }
+
+        // Update button states (active/inactive)
+        this.updateButtonStates(wrapper, state);
+    }
+
+    updateButtonStates(wrapper, state) {
+        const toggleBtn = wrapper.querySelector('.section-toggle-btn');
+        const chordsBtn = wrapper.querySelector('.chords-toggle-btn');
+        const lyricsBtn = wrapper.querySelector('.lyrics-toggle-btn');
+
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', state.hideMode === 'section');
+        }
+        if (chordsBtn) {
+            chordsBtn.classList.toggle('active', state.hideMode === 'chords');
+        }
+        if (lyricsBtn) {
+            lyricsBtn.classList.toggle('active', state.hideMode === 'lyrics');
+        }
+    }
+
+    applySectionState() {
+        // Apply all saved state to DOM
+        document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
+            const songIndex = parseInt(wrapper.dataset.songIndex);
+            const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+            this.updateSectionDOM(songIndex, sectionIndex);
+        });
+    }
+
+    setupEditMode() {
+        const editToggle = document.getElementById('edit-mode-toggle');
+        if (!editToggle) return;
+
+        editToggle.addEventListener('click', () => {
+            const isEnteringEditMode = !document.body.classList.contains('edit-mode');
+
+            document.body.classList.toggle('edit-mode');
+            editToggle.classList.toggle('active');
+
+            // Update all sections based on edit mode
+            document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
+                const songIndex = parseInt(wrapper.dataset.songIndex);
+                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                this.updateSectionDOM(songIndex, sectionIndex);
+            });
+        });
+    }
+
+    setupSectionControls() {
+        document.querySelectorAll('.section-control-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = button.dataset.action;
+                const wrapper = button.closest('.song-section-wrapper');
+
+                const songIndex = parseInt(wrapper.dataset.songIndex);
+                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+
+                // Map action to hideMode
+                const modeMap = {
+                    'toggle': 'section',
+                    'chords': 'chords',
+                    'lyrics': 'lyrics'
+                };
+
+                this.setSectionHideMode(songIndex, sectionIndex, modeMap[action]);
+            });
+        });
+    }
+
     escapeHtml(text) {
         const map = {
             '&': '&amp;',
@@ -495,11 +733,17 @@ class PageApp {
                     break;
                 case 'ArrowUp':
                     e.preventDefault();
-                    document.getElementById('main-content')?.scrollBy({ top: -200, behavior: 'smooth' });
+                    const currentSectionUp = this.currentSongIndex >= 0
+                        ? document.getElementById(`song-${this.currentSongIndex}`)
+                        : document.getElementById('overview');
+                    currentSectionUp?.scrollBy({ top: -200, behavior: 'smooth' });
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
-                    document.getElementById('main-content')?.scrollBy({ top: 200, behavior: 'smooth' });
+                    const currentSectionDown = this.currentSongIndex >= 0
+                        ? document.getElementById(`song-${this.currentSongIndex}`)
+                        : document.getElementById('overview');
+                    currentSectionDown?.scrollBy({ top: 200, behavior: 'smooth' });
                     break;
             }
         });
