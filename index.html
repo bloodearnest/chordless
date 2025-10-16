@@ -4,31 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Setlist arrangement for worship songs">
+    <meta name="view-transition" content="same-origin">
     <title>Setalight</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="app-container">
-        <header>
-            <h1>Setalight</h1>
-            <div class="setlist-info">
-                <span class="date" id="setlist-date"></span>
-            </div>
-        </header>
+        <div id="home-view" class="view">
+            <header>
+                <h1>Setalight</h1>
+            </header>
 
-        <main id="main-content">
-            <div class="song-container">
-                <!-- Song content will be rendered here -->
-            </div>
-        </main>
-
-        <nav class="controls">
-            <button id="prev-song" aria-label="Previous song">←</button>
-            <span class="song-position" id="song-position">1 / 5</span>
-            <button id="next-song" aria-label="Next song">→</button>
-        </nav>
+            <main class="home-content">
+                <h2>Select a Setlist</h2>
+                <div id="setlist-list" class="setlist-list">
+                    <p>Loading setlists...</p>
+                </div>
+            </main>
+        </div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js')
+                .then(registration => {
+                    console.log('Service Worker registered:', registration);
+
+                    // If no controller, this is first install - reload to activate
+                    if (!navigator.serviceWorker.controller) {
+                        console.log('First install - reloading page to activate Service Worker');
+                        // Set flag to avoid reload loop
+                        if (!sessionStorage.getItem('sw-reload')) {
+                            sessionStorage.setItem('sw-reload', '1');
+                            window.location.reload();
+                        }
+                    } else {
+                        console.log('Service Worker is active and controlling page');
+                    }
+                })
+                .catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        }
+    </script>
+    <script type="module" src="page-app.js"></script>
 </body>
 </html>
