@@ -3,6 +3,7 @@
 
 import { ChordProParser } from './chordpro-parser.js';
 import { SetalightDB } from './db.js';
+import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
 
 class PageApp {
     constructor() {
@@ -351,11 +352,15 @@ class PageApp {
                 // Generate HTML
                 const htmlContent = this.parser.toHTML(parsed, songEntry.order);
 
+                // Store original key for transposition reference
+                const originalKey = parsed.metadata.key;
+
                 // Create song object for runtime
                 songs.push({
                     title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
                     htmlContent: htmlContent,
                     metadata: parsed.metadata,
+                    originalKey: originalKey, // Immutable original
                     currentKey: parsed.metadata.key,
                     currentBPM: parsed.metadata.tempo,
                     currentFontSize: songEntry.modifications.fontSize || 1.6,
@@ -579,8 +584,8 @@ class PageApp {
             }
 
             // Update key selector (for edit mode) - use current key
-            if (keySelector && song.currentKey) {
-                keySelector.value = song.currentKey;
+            if (song.currentKey) {
+                this.populateKeySelector(song.currentKey);
             }
 
             // Update metadata - only show BPM (key is in separate wrapper now) - use current BPM
@@ -618,9 +623,10 @@ class PageApp {
             if (keyValueDisplay) {
                 keyValueDisplay.textContent = '-';
             }
-            if (keySelector) {
-                // Reset to first valid key option
-                keySelector.selectedIndex = 0;
+            // Clear key selector value when on overview
+            const keySelectorValue = document.getElementById('key-selector-value');
+            if (keySelectorValue) {
+                keySelectorValue.textContent = '-';
             }
         }
     }
@@ -967,54 +973,128 @@ class PageApp {
         });
     }
 
-    setupKeySelector() {
-        const keySelector = document.getElementById('key-selector');
-        if (!keySelector) return;
+    populateKeySelector(selectedKey) {
+        const keyOptionsList = document.getElementById('key-options-list');
+        const keySelectorValue = document.getElementById('key-selector-value');
+        if (!keyOptionsList || !keySelectorValue) return;
 
-        // All possible keys (major and minor)
-        const keys = [
-            'C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B',
-            'Cm', 'C#m', 'Dbm', 'Dm', 'D#m', 'Ebm', 'Em', 'Fm', 'F#m', 'Gbm', 'Gm', 'G#m', 'Abm', 'Am', 'A#m', 'Bbm', 'Bm'
-        ];
+        // Get available keys rotated around the selected key
+        const keys = getAvailableKeys(selectedKey);
 
-        // Clear existing options and populate with all keys
-        keySelector.innerHTML = '';
+        // Get original key from current song
+        let originalKey = null;
+        if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
+            originalKey = this.songs[this.currentSongIndex].originalKey;
+        }
 
-        // Add all keys as options
-        keys.forEach(key => {
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = key;
-            keySelector.appendChild(option);
+        // Clear existing options
+        keyOptionsList.innerHTML = '';
+
+        // Unicode superscript mapping for smaller offset numbers
+        const toSuperscript = (num) => {
+            const superscripts = {
+                '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
+                '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
+                '+': '⁺', '-': '⁻'
+            };
+            return String(num).split('').map(c => superscripts[c] || c).join('');
+        };
+
+        // Find the index of the current key in the list
+        const currentIndex = keys.indexOf(selectedKey);
+
+        // Add available keys as clickable items with offset indicators
+        keys.forEach((key, index) => {
+            const item = document.createElement('button');
+            item.className = 'key-option-item';
+            if (key === selectedKey) {
+                item.classList.add('selected');
+            }
+
+            // Calculate offset based on position in list
+            const positionOffset = currentIndex - index;
+
+            // Format key name with * suffix if original
+            let keyText = key === originalKey ? `${key}*` : key;
+
+            // Create key name span
+            const keyNameSpan = document.createElement('span');
+            keyNameSpan.className = 'key-name';
+            keyNameSpan.textContent = keyText;
+
+            // Create offset span
+            const offsetSpan = document.createElement('span');
+            offsetSpan.className = 'key-offset';
+            if (positionOffset !== 0) {
+                const sign = positionOffset > 0 ? '+' : '-';
+                offsetSpan.textContent = `${sign}${Math.abs(positionOffset)}`;
+            }
+
+            item.appendChild(keyNameSpan);
+            item.appendChild(offsetSpan);
+
+            // Click handler
+            item.addEventListener('click', async () => {
+                await this.selectKey(key);
+            });
+
+            keyOptionsList.appendChild(item);
         });
 
-        // Set initial value to current song's key if we're on a song
+        // Update button text to show selected key
+        keySelectorValue.textContent = selectedKey;
+    }
+
+    setupKeySelector() {
+        // Initialize with current song's key
         if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
             const currentKey = this.songs[this.currentSongIndex].currentKey;
             if (currentKey) {
-                keySelector.value = currentKey;
+                this.populateKeySelector(currentKey);
             }
         }
 
-        // Add change event listener
-        keySelector.addEventListener('change', async (e) => {
-            const newKey = e.target.value;
-            if (newKey && this.currentSongIndex >= 0) {
-                console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
+        // Set up popover positioning
+        const button = document.getElementById('key-selector-button');
+        const popover = document.getElementById('key-selector-popover');
 
-                // Update the displayed key value
-                const keyValueDisplay = document.getElementById('key-value-display');
-                if (keyValueDisplay) {
-                    keyValueDisplay.textContent = newKey;
+        if (button && popover) {
+            // Position popover when it opens
+            popover.addEventListener('toggle', (e) => {
+                if (e.newState === 'open') {
+                    const buttonRect = button.getBoundingClientRect();
+                    popover.style.top = `${buttonRect.bottom + 4}px`;
+                    popover.style.left = `${buttonRect.left}px`;
                 }
+            });
+        }
+    }
 
-                // Update modification in setlist
-                this.currentSetlist.songs[this.currentSongIndex].modifications.targetKey = newKey;
+    async selectKey(newKey) {
+        if (!newKey || this.currentSongIndex < 0) return;
 
-                // Re-render the song with transposition
-                await this.reRenderSong(this.currentSongIndex);
-            }
-        });
+        console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
+
+        // Close the popover
+        const popover = document.getElementById('key-selector-popover');
+        if (popover) {
+            popover.hidePopover();
+        }
+
+        // Update the displayed key value
+        const keyValueDisplay = document.getElementById('key-value-display');
+        if (keyValueDisplay) {
+            keyValueDisplay.textContent = newKey;
+        }
+
+        // Update modification in setlist
+        this.currentSetlist.songs[this.currentSongIndex].modifications.targetKey = newKey;
+
+        // Re-render the song with transposition
+        await this.reRenderSong(this.currentSongIndex);
+
+        // Repopulate the dropdown with the new key in the middle
+        this.populateKeySelector(newKey);
     }
 
     setupFontSizeControls() {
@@ -1119,9 +1199,8 @@ class PageApp {
         this.applyFontSize(this.currentSongIndex);
 
         // Update key selector
-        const keySelector = document.getElementById('key-selector');
-        if (keySelector && song.currentKey) {
-            keySelector.value = song.currentKey;
+        if (song.currentKey) {
+            this.populateKeySelector(song.currentKey);
         }
 
         // Reapply section states (all back to default)
@@ -1141,10 +1220,10 @@ class PageApp {
         const parsed = this.parser.parse(song.sourceText);
 
         // Apply transposition if targetKey is set
-        if (songEntry.modifications.targetKey) {
-            // TODO: Implement transposition
-            // For now, just update the displayed key
-            parsed.metadata.key = songEntry.modifications.targetKey;
+        const targetKey = songEntry.modifications.targetKey || song.originalKey;
+        if (targetKey && targetKey !== song.originalKey) {
+            transposeSong(parsed, song.originalKey, targetKey);
+            parsed.metadata.key = targetKey;
         }
 
         // Apply BPM override

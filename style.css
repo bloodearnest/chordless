@@ -310,9 +310,67 @@ body.edit-mode .key-selector-controls {
     border-color: var(--header-text);
 }
 
-.key-selector option {
+/* Popover container */
+.key-popover {
     background-color: var(--header-bg);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    padding: 0.5rem 0;
+    margin: 0;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    max-height: 70vh;
+    overflow-y: auto;
+    position: fixed;
+    inset: unset;
+}
+
+.key-popover::backdrop {
+    background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* Key options list */
+.key-options-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+}
+
+/* Individual key option */
+.key-option-item {
+    background-color: transparent;
     color: var(--header-text);
+    border: none;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.3rem;
+    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s;
+    min-height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    white-space: nowrap;
+}
+
+.key-option-item:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.key-option-item.selected {
+    background-color: rgba(255, 255, 255, 0.3);
+    font-weight: 700;
+}
+
+.key-option-item .key-name {
+    flex: 0 0 auto;
+}
+
+.key-option-item .key-offset {
+    flex: 0 0 auto;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-left: 1rem;
 }
 
 .font-size-controls {
@@ -748,6 +806,12 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
 .song-content .chord.bar {
     color: #95a5a6;
     font-weight: normal;
+}
+
+.song-content .chord.invalid {
+    color: #bdc3c7;
+    opacity: 0.5;
+    font-style: italic;
 }
 
 .song-content .lyrics {

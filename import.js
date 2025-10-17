@@ -28,6 +28,19 @@ export class SetlistImporter {
         this.songsCache.clear();
         console.log('[Import] Cleared existing data');
 
+        // Check if File System Access API is supported (Chromium-only)
+        if (window.showDirectoryPicker) {
+            return await this.importFromFilesystemModern(cutoffDate, progressCallback);
+        } else {
+            // Firefox/Safari fallback using traditional input element
+            return await this.importFromFilesystemFallback(cutoffDate, progressCallback);
+        }
+    }
+
+    /**
+     * Modern import using File System Access API (Chromium)
+     */
+    async importFromFilesystemModern(cutoffDate, progressCallback) {
         // Get directory handle for sets/
         let setsHandle;
         try {
@@ -118,6 +131,184 @@ export class SetlistImporter {
             setlists: importedSetlists.length,
             songs: this.songsCache.size
         };
+    }
+
+    /**
+     * Fallback import using traditional file input (Firefox/Safari)
+     */
+    async importFromFilesystemFallback(cutoffDate, progressCallback) {
+        // Create file input element
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.webkitdirectory = true;
+        input.directory = true;
+        input.multiple = true;
+
+        // Wait for user to select directory
+        const files = await new Promise((resolve, reject) => {
+            input.onchange = () => resolve(Array.from(input.files));
+            input.oncancel = () => resolve(null);
+            input.click();
+        });
+
+        if (!files) {
+            console.log('[Import] User cancelled directory picker');
+            return { cancelled: true };
+        }
+
+        if (progressCallback) progressCallback({ stage: 'scanning', message: 'Scanning directories...' });
+
+        // Group files by directory
+        const dirMap = new Map();
+        for (const file of files) {
+            // Extract directory path (webkitRelativePath format: "sets/2025-01-01/song.txt")
+            const pathParts = file.webkitRelativePath.split('/');
+            if (pathParts.length >= 2) {
+                const dirName = pathParts[pathParts.length - 2]; // Get parent directory name
+                const fileName = pathParts[pathParts.length - 1];
+
+                // Only process .txt files
+                if (fileName.endsWith('.txt')) {
+                    if (!dirMap.has(dirName)) {
+                        dirMap.set(dirName, []);
+                    }
+                    dirMap.get(dirName).push(file);
+                }
+            }
+        }
+
+        console.log(`[Import] Found ${dirMap.size} directories`);
+
+        // Filter and sort directories by date
+        const directories = [];
+        for (const [dirName, files] of dirMap.entries()) {
+            // Extract date from directory name
+            const dateMatch = dirName.match(/^(\d{4}-\d{2}-\d{2})/);
+            if (dateMatch) {
+                const date = dateMatch[1];
+                if (date >= cutoffDate) {
+                    directories.push({
+                        name: dirName,
+                        date: date,
+                        files: files
+                    });
+                }
+            }
+        }
+
+        console.log(`[Import] Found ${directories.length} directories after cutoff`);
+
+        // Sort by date
+        directories.sort((a, b) => a.date.localeCompare(b.date));
+
+        // Import each directory as a setlist
+        const importedSetlists = [];
+        for (let i = 0; i < directories.length; i++) {
+            const dir = directories[i];
+            if (progressCallback) {
+                progressCallback({
+                    stage: 'importing',
+                    message: `Importing ${dir.name}...`,
+                    current: i + 1,
+                    total: directories.length
+                });
+            }
+
+            try {
+                const setlist = await this.importSetlistFallback(dir);
+                importedSetlists.push(setlist);
+                console.log(`[Import] Imported setlist: ${dir.name}`);
+            } catch (err) {
+                console.error(`[Import] Failed to import ${dir.name}:`, err);
+            }
+        }
+
+        // Save all songs to database
+        if (progressCallback) progressCallback({ stage: 'saving', message: 'Saving songs to database...' });
+        for (const song of this.songsCache.values()) {
+            await this.db.saveSong(song);
+        }
+
+        console.log(`[Import] Complete! Imported ${importedSetlists.length} setlists, ${this.songsCache.size} unique songs`);
+
+        if (progressCallback) {
+            progressCallback({
+                stage: 'complete',
+                message: `Import complete! ${importedSetlists.length} setlists, ${this.songsCache.size} songs`,
+                setlists: importedSetlists.length,
+                songs: this.songsCache.size
+            });
+        }
+
+        return {
+            success: true,
+            setlists: importedSetlists.length,
+            songs: this.songsCache.size
+        };
+    }
+
+    /**
+     * Import a single setlist directory (fallback method)
+     */
+    async importSetlistFallback(dir) {
+        const setlistId = dir.name;
+        const songs = [];
+
+        console.log(`[Import] Importing setlist from directory: ${dir.name}`);
+
+        // Process all files
+        for (let order = 0; order < dir.files.length; order++) {
+            const file = dir.files[order];
+            console.log(`[Import] Processing file: ${file.name}`);
+
+            try {
+                const chordproText = await file.text();
+                console.log(`[Import] Read ${chordproText.length} chars from ${file.name}`);
+
+                // Parse the chordpro
+                const parsed = this.parser.parse(chordproText);
+                console.log(`[Import] Parsed song: ${parsed.metadata.title}`);
+
+                // Find or create song in collection
+                const songId = await this.findOrCreateSong(parsed, chordproText, setlistId, dir.date);
+                console.log(`[Import] Song ID: ${songId}`);
+
+                // Add to setlist
+                songs.push({
+                    order: order,
+                    songId: songId,
+                    chordproEdits: null,
+                    modifications: {
+                        targetKey: null,
+                        bpmOverride: null,
+                        fontSize: 1.6,
+                        sectionStates: {}
+                    }
+                });
+            } catch (err) {
+                console.error(`[Import] Failed to import song ${file.name}:`, err);
+            }
+        }
+
+        console.log(`[Import] Found ${songs.length} songs in ${dir.name}`);
+
+        // Sort songs by order
+        songs.sort((a, b) => a.order - b.order);
+
+        // Create setlist object
+        const setlist = {
+            id: setlistId,
+            date: dir.date,
+            name: this.extractSetlistName(dir.name),
+            songs: songs,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        // Save setlist to database
+        await this.db.saveSetlist(setlist);
+
+        return setlist;
     }
 
     /**

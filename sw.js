@@ -195,10 +195,15 @@ async function generateSetlistPage(setlistId) {
                             <span id="key-value-display">-</span>
                         </span>
                         <div class="key-selector-controls">
-                            <label for="key-selector" class="key-selector-label">Key:</label>
-                            <select id="key-selector" class="key-selector">
-                                <!-- Options populated by JavaScript -->
-                            </select>
+                            <label class="key-selector-label">Key:</label>
+                            <button id="key-selector-button" class="key-selector" popovertarget="key-selector-popover">
+                                <span id="key-selector-value">-</span>
+                            </button>
+                            <div id="key-selector-popover" class="key-popover" popover>
+                                <div id="key-options-list" class="key-options-list">
+                                    <!-- Options populated by JavaScript -->
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="song-meta-compact" id="song-meta-header"></div>

@@ -365,7 +365,10 @@ export class ChordProParser {
 
             if (segment.chord) {
                 const isBar = this.isBarLine(segment.chord);
-                const chordClass = isBar ? 'chord bar' : 'chord';
+                const isInvalid = segment.valid === false;
+                let chordClass = 'chord';
+                if (isBar) chordClass += ' bar';
+                if (isInvalid) chordClass += ' invalid';
                 html += `<span class="${chordClass}">${this.escapeHtml(segment.chord)}</span>`;
             } else {
                 html += `<span class="chord"></span>`;
