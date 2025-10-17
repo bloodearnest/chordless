@@ -2,11 +2,11 @@
 // Works with service worker routing and Navigation API
 
 import { ChordProParser } from './chordpro-parser.js';
-import { FileSystemSongsDB } from './songs-db.js';
+import { SetalightDB } from './db.js';
 
 class PageApp {
     constructor() {
-        this.db = new FileSystemSongsDB();
+        this.db = new SetalightDB();
         this.parser = new ChordProParser();
         this.currentSongIndex = undefined;
         this.songs = [];
@@ -17,6 +17,9 @@ class PageApp {
     }
 
     async init() {
+        // Initialize IndexedDB
+        await this.db.init();
+
         // Set up Navigation API with View Transitions
         this.setupNavigationAPI();
 
@@ -70,10 +73,19 @@ class PageApp {
         try {
             listContainer.innerHTML = '<p>Loading setlists...</p>';
 
-            const setlists = await this.db.getSetlists();
+            const setlists = await this.db.getAllSetlists();
 
             if (setlists.length === 0) {
-                listContainer.innerHTML = '<p>No setlists found.</p>';
+                // No setlists - show import button
+                listContainer.innerHTML = `
+                    <div style="text-align: center; padding: 2rem;">
+                        <p style="margin-bottom: 2rem;">No setlists found in database.</p>
+                        <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
+                            Import Setlists from Filesystem
+                        </button>
+                    </div>
+                `;
+                this.setupImportButton();
                 return;
             }
 
@@ -92,12 +104,27 @@ class PageApp {
             // Sort years descending
             const years = Object.keys(groupedByYear).sort((a, b) => b - a);
 
+            // Sort setlists within each year by date descending (newest first)
+            for (const year of years) {
+                groupedByYear[year].sort((a, b) => b.date.localeCompare(a.date));
+            }
+
+            // Render import button at top
+            listContainer.innerHTML = `
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
+                        Re-import Setlists
+                    </button>
+                </div>
+            `;
+
             // Render grouped setlists
-            listContainer.innerHTML = '';
             for (const year of years) {
                 const yearSection = this.createYearSection(year, groupedByYear[year], year == currentYear);
                 listContainer.appendChild(yearSection);
             }
+
+            this.setupImportButton();
         } catch (error) {
             console.error('Error loading setlists:', error);
             listContainer.innerHTML = '<p class="error">Error loading setlists. Please check the console.</p>';
@@ -127,7 +154,13 @@ class PageApp {
             const link = document.createElement('a');
             link.href = `/setlist/${setlist.id}`;
             link.className = 'setlist-button';
-            link.textContent = this.formatSetlistName(setlist.date);
+
+            // Format name: use custom name if present, otherwise format date
+            const displayName = setlist.name
+                ? `${this.formatSetlistName(setlist.date)} - ${setlist.name}`
+                : this.formatSetlistName(setlist.date);
+
+            link.textContent = displayName;
             list.appendChild(link);
         }
 
@@ -139,6 +172,71 @@ class PageApp {
         }
 
         return section;
+    }
+
+    setupImportButton() {
+        const importButton = document.getElementById('import-button');
+        if (!importButton) return;
+
+        importButton.addEventListener('click', async () => {
+            await this.runImport();
+        });
+    }
+
+    async runImport() {
+        // Dynamically import the importer
+        const { SetlistImporter } = await import('./import.js');
+        const importer = new SetlistImporter();
+        await importer.init();
+
+        // Show progress modal
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay active';
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2>Importing Setlists</h2>
+                <div id="import-progress" style="margin: 2rem 0;">
+                    <p id="import-message">Initializing...</p>
+                    <div style="background: #ecf0f1; border-radius: 4px; height: 20px; margin-top: 1rem; overflow: hidden;">
+                        <div id="import-progress-bar" style="background: var(--button-bg); height: 100%; width: 0%; transition: width 0.3s;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        const messageEl = document.getElementById('import-message');
+        const progressBar = document.getElementById('import-progress-bar');
+
+        try {
+            const result = await importer.importFromFilesystem('2025-01-01', (progress) => {
+                messageEl.textContent = progress.message;
+
+                if (progress.current && progress.total) {
+                    const percent = (progress.current / progress.total) * 100;
+                    progressBar.style.width = `${percent}%`;
+                }
+            });
+
+            if (result.cancelled) {
+                modal.remove();
+                return;
+            }
+
+            messageEl.textContent = `Import complete! ${result.setlists} setlists, ${result.songs} songs`;
+            progressBar.style.width = '100%';
+
+            // Wait a moment then reload
+            setTimeout(() => {
+                modal.remove();
+                window.location.reload();
+            }, 1500);
+
+        } catch (error) {
+            console.error('Import failed:', error);
+            messageEl.textContent = `Import failed: ${error.message}`;
+            messageEl.style.color = '#e74c3c';
+        }
     }
 
     formatSetlistName(dateStr) {
@@ -195,47 +293,100 @@ class PageApp {
     async renderSetlist(setlistId) {
         console.log('renderSetlist called with:', setlistId);
         try {
-            // Get list of songs
-            const songList = await this.db.getSongs(setlistId);
-            console.log('Loaded songs:', songList.length);
+            // Load setlist from IndexedDB
+            const setlist = await this.db.getSetlist(setlistId);
+            console.log('[DEBUG] Loaded setlist from DB:', setlist);
 
-            if (songList.length === 0) {
+            if (!setlist) {
+                console.error('[ERROR] Setlist not found in IndexedDB:', setlistId);
+                document.querySelector('.song-container').innerHTML = '<p>Setlist not found.</p>';
+                return;
+            }
+
+            if (setlist.songs.length === 0) {
+                console.warn('[WARN] Setlist has no songs');
                 document.querySelector('.song-container').innerHTML = '<p>No songs found in this setlist.</p>';
                 return;
             }
 
-            // Load all song contents
-            const loadPromises = songList.map(song => this.db.getSongContent(song.path));
-            const songContents = await Promise.all(loadPromises);
+            console.log('Loaded setlist:', setlist.date, setlist.songs.length, 'songs');
 
-            const songs = songContents.map((content, index) => {
-                const parsed = this.parser.parse(content);
-                const htmlContent = this.parser.toHTML(parsed, index);
+            // Parse each song on-demand
+            const songs = [];
+            for (const songEntry of setlist.songs) {
+                console.log('[DEBUG] Processing song entry:', songEntry);
 
-                return {
-                    title: parsed.metadata.title || `Song ${index + 1}`,
+                // Get source text (local edits or from Songs collection)
+                let sourceText;
+                if (songEntry.chordproEdits) {
+                    console.log('[DEBUG] Using local edits for song');
+                    sourceText = songEntry.chordproEdits;
+                } else {
+                    console.log('[DEBUG] Loading canonical song:', songEntry.songId);
+                    const canonicalSong = await this.db.getSong(songEntry.songId);
+                    console.log('[DEBUG] Canonical song loaded:', canonicalSong);
+
+                    if (!canonicalSong) {
+                        console.error('[ERROR] Song not found in DB:', songEntry.songId);
+                        continue;
+                    }
+                    sourceText = canonicalSong.chordproText;
+                }
+
+                // Parse the chordpro
+                const parsed = this.parser.parse(sourceText);
+
+                // Apply transposition if targetKey is set
+                if (songEntry.modifications.targetKey) {
+                    // TODO: Implement transposition
+                    // For now, just update the displayed key
+                    parsed.metadata.key = songEntry.modifications.targetKey;
+                }
+
+                // Apply BPM override
+                if (songEntry.modifications.bpmOverride) {
+                    parsed.metadata.tempo = songEntry.modifications.bpmOverride;
+                }
+
+                // Generate HTML
+                const htmlContent = this.parser.toHTML(parsed, songEntry.order);
+
+                // Create song object for runtime
+                songs.push({
+                    title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
                     htmlContent: htmlContent,
-                    metadata: parsed.metadata, // Original metadata (never modified)
-                    // Current key/tempo that can be modified
+                    metadata: parsed.metadata,
                     currentKey: parsed.metadata.key,
                     currentBPM: parsed.metadata.tempo,
-                    currentFontSize: 1.6 // Default font size in rem
-                };
-            });
+                    currentFontSize: songEntry.modifications.fontSize || 1.6,
+                    songId: songEntry.songId,
+                    sourceText: sourceText,
+                    hasLocalEdits: songEntry.chordproEdits !== null
+                });
+            }
 
             console.log('Parsed songs:', songs.length);
 
             // Store songs for navigation
             this.songs = songs;
             this.currentSetlistId = setlistId;
+            this.currentSetlist = setlist;
 
-            // Load state from localStorage
-            this.loadState();
+            // Load section states from setlist modifications (not localStorage anymore)
+            this.sectionState = {};
+            setlist.songs.forEach((songEntry, index) => {
+                if (songEntry.modifications.sectionStates) {
+                    this.sectionState[index] = {};
+                    for (const [sectionIdx, state] of Object.entries(songEntry.modifications.sectionStates)) {
+                        this.sectionState[index][parseInt(sectionIdx)] = state;
+                    }
+                }
+            });
 
             // Render all songs on one page
             const container = document.querySelector('.song-container');
             console.log('Rendering full setlist into container:', container);
-            container.innerHTML = this.renderFullSetlist(setlistId, songs);
+            container.innerHTML = this.renderFullSetlist(setlist, songs);
 
             // Set up navigation based on hash
             console.log('About to setup hash navigation');
@@ -311,14 +462,12 @@ class PageApp {
         }
     }
 
-    renderFullSetlist(setlistId, songs) {
+    renderFullSetlist(setlist, songs) {
         let html = '';
 
         // Render overview section
         html += '<div id="overview" class="section">';
         html += '<div class="song-content"><div class="setlist-overview">';
-        const setlistTitle = this.formatSetlistName(setlistId);
-        html += `<h2 class="overview-title">${this.escapeHtml(setlistTitle)}</h2>`;
         html += `<div class="overview-songs">`;
 
         songs.forEach((song, index) => {
@@ -369,7 +518,7 @@ class PageApp {
         this.exitEditMode();
     }
 
-    exitEditMode() {
+    async exitEditMode() {
         const isEditMode = document.body.classList.contains('edit-mode');
         if (isEditMode) {
             const editToggle = document.getElementById('edit-mode-toggle');
@@ -384,6 +533,30 @@ class PageApp {
                 const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
                 this.updateSectionDOM(songIndex, sectionIndex);
             });
+
+            // Save setlist to IndexedDB
+            if (this.currentSetlist) {
+                // Update modifications for each song
+                this.songs.forEach((song, index) => {
+                    this.currentSetlist.songs[index].modifications.fontSize = song.currentFontSize;
+
+                    // Save section states
+                    const sectionStates = {};
+                    if (this.sectionState[index]) {
+                        for (const [sectionIdx, state] of Object.entries(this.sectionState[index])) {
+                            sectionStates[sectionIdx] = state;
+                        }
+                    }
+                    this.currentSetlist.songs[index].modifications.sectionStates = sectionStates;
+                });
+
+                // Update timestamp
+                this.currentSetlist.updatedAt = new Date().toISOString();
+
+                // Save to database
+                await this.db.saveSetlist(this.currentSetlist);
+                console.log('[ExitEditMode] Saved setlist to IndexedDB');
+            }
         }
     }
 
@@ -425,8 +598,16 @@ class PageApp {
             infoButton.style.display = 'flex';
             infoButton.onclick = () => this.showSongInfo(song);
         } else {
-            // Overview
-            titleEl.textContent = this.currentSetlistId ? this.formatSetlistName(this.currentSetlistId) : 'Setlist';
+            // Overview - format date and name properly
+            if (this.currentSetlist) {
+                const formattedDate = this.formatSetlistName(this.currentSetlist.date);
+                const title = this.currentSetlist.name
+                    ? `${formattedDate} - ${this.currentSetlist.name}`
+                    : formattedDate;
+                titleEl.textContent = title;
+            } else {
+                titleEl.textContent = 'Setlist';
+            }
             metaEl.innerHTML = '';
 
             // Hide key display, edit button, and info button on overview
@@ -718,18 +899,24 @@ class PageApp {
         const editToggle = document.getElementById('edit-mode-toggle');
         if (!editToggle) return;
 
-        editToggle.addEventListener('click', () => {
+        editToggle.addEventListener('click', async () => {
             const isEnteringEditMode = !document.body.classList.contains('edit-mode');
 
-            document.body.classList.toggle('edit-mode');
-            editToggle.classList.toggle('active');
+            if (isEnteringEditMode) {
+                // Entering edit mode
+                document.body.classList.add('edit-mode');
+                editToggle.classList.add('active');
 
-            // Update all sections based on edit mode
-            document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
-                const songIndex = parseInt(wrapper.dataset.songIndex);
-                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-                this.updateSectionDOM(songIndex, sectionIndex);
-            });
+                // Update all sections based on edit mode
+                document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
+                    const songIndex = parseInt(wrapper.dataset.songIndex);
+                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                    this.updateSectionDOM(songIndex, sectionIndex);
+                });
+            } else {
+                // Exiting edit mode
+                await this.exitEditMode();
+            }
         });
     }
 
@@ -809,8 +996,8 @@ class PageApp {
             }
         }
 
-        // Add change event listener (transposition logic will be added later)
-        keySelector.addEventListener('change', (e) => {
+        // Add change event listener
+        keySelector.addEventListener('change', async (e) => {
             const newKey = e.target.value;
             if (newKey && this.currentSongIndex >= 0) {
                 console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
@@ -821,10 +1008,11 @@ class PageApp {
                     keyValueDisplay.textContent = newKey;
                 }
 
-                // Update the current key (not the original metadata)
-                this.songs[this.currentSongIndex].currentKey = newKey;
+                // Update modification in setlist
+                this.currentSetlist.songs[this.currentSongIndex].modifications.targetKey = newKey;
 
-                // TODO: Implement transposition logic here
+                // Re-render the song with transposition
+                await this.reRenderSong(this.currentSongIndex);
             }
         });
     }
@@ -938,6 +1126,86 @@ class PageApp {
 
         // Reapply section states (all back to default)
         this.applySectionState();
+    }
+
+    /**
+     * Re-render a song after key change or text edits
+     */
+    async reRenderSong(songIndex) {
+        if (songIndex < 0 || songIndex >= this.songs.length) return;
+
+        const song = this.songs[songIndex];
+        const songEntry = this.currentSetlist.songs[songIndex];
+
+        // Re-parse from source
+        const parsed = this.parser.parse(song.sourceText);
+
+        // Apply transposition if targetKey is set
+        if (songEntry.modifications.targetKey) {
+            // TODO: Implement transposition
+            // For now, just update the displayed key
+            parsed.metadata.key = songEntry.modifications.targetKey;
+        }
+
+        // Apply BPM override
+        if (songEntry.modifications.bpmOverride) {
+            parsed.metadata.tempo = songEntry.modifications.bpmOverride;
+        }
+
+        // Re-generate HTML
+        const htmlContent = this.parser.toHTML(parsed, songIndex);
+
+        // Update runtime song object
+        song.htmlContent = htmlContent;
+        song.metadata = parsed.metadata;
+        song.currentKey = parsed.metadata.key;
+        song.currentBPM = parsed.metadata.tempo;
+
+        // Update DOM
+        const songSection = document.getElementById(`song-${songIndex}`);
+        if (songSection) {
+            const songContent = songSection.querySelector('.song-content');
+            if (songContent) {
+                songContent.innerHTML = htmlContent;
+
+                // Re-apply section states
+                // First, restore section states from the modifications
+                const savedSectionStates = songEntry.modifications.sectionStates || {};
+                for (const [sectionIdx, state] of Object.entries(savedSectionStates)) {
+                    const idx = parseInt(sectionIdx);
+                    if (!this.sectionState[songIndex]) {
+                        this.sectionState[songIndex] = {};
+                    }
+                    this.sectionState[songIndex][idx] = state;
+                }
+
+                // Now apply to DOM
+                document.querySelectorAll(`.song-section-wrapper[data-song-index="${songIndex}"]`).forEach(wrapper => {
+                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                    this.updateSectionDOM(songIndex, sectionIndex);
+                });
+
+                // Re-setup section controls for this song
+                songContent.querySelectorAll('.section-control-btn').forEach(button => {
+                    button.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const action = button.dataset.action;
+                        const wrapper = button.closest('.song-section-wrapper');
+                        const si = parseInt(wrapper.dataset.songIndex);
+                        const sectionIdx = parseInt(wrapper.dataset.sectionIndex);
+                        this.setSectionHideMode(si, sectionIdx, action);
+                    });
+                });
+
+                // Re-apply font size
+                songContent.style.fontSize = `${song.currentFontSize}rem`;
+            }
+        }
+
+        // Update header
+        if (this.currentSongIndex === songIndex) {
+            this.updateHeader(song);
+        }
     }
 
     escapeHtml(text) {

@@ -2,12 +2,14 @@
 // Handles routing and generates pages for offline-first operation
 
 const DEV_MODE = true; // Set to false for production
-const CACHE_NAME = 'setalight-v4';
+const CACHE_NAME = 'setalight-v6';
 const ASSETS = [
     '/',
     '/style.css',
     '/chordpro-parser.js',
-    '/page-app.js'
+    '/page-app.js',
+    '/db.js',
+    '/import.js'
 ];
 
 // Install service worker and cache assets
@@ -111,7 +113,7 @@ async function handleRoute(url) {
         return generateHomePage();
     }
 
-    // Setlist page: /setlist/2025-10-12 (ignore hash)
+    // Setlist page: /setlist/{uuid} (ignore hash)
     const setlistMatch = path.match(/^\/setlist\/([^\/]+)$/);
     if (setlistMatch) {
         const setlistId = setlistMatch[1];
@@ -144,7 +146,6 @@ async function generateHomePage() {
             </header>
 
             <main class="home-content">
-                <h2>Select a Setlist</h2>
                 <div id="setlist-list" class="setlist-list">
                     <p>Loading setlists...</p>
                 </div>
