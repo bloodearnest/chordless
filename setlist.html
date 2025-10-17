@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Setlist arrangement for worship songs">
+    <meta name="view-transition" content="same-origin">
+    <title>Setlist - Setalight</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="song-view" class="view">
+            <header>
+                <div class="header-left">
+                    <a href="/" class="home-button" aria-label="Home">🏠</a>
+                    <div class="song-title-compact" id="song-title-header">Loading...</div>
+                </div>
+                <div class="header-center">
+                    <button class="reset-button" id="reset-button" aria-label="Reset song">↺</button>
+                    <div class="font-size-controls">
+                        <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
+                        <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">A+</button>
+                    </div>
+                    <!-- Key display (normal mode) and key selector (edit mode) in same position -->
+                    <div class="key-display-wrapper">
+                        <span class="meta-item key-meta-display" id="key-meta-display">
+                            <span class="meta-label">Key:</span>
+                            <span id="key-value-display">-</span>
+                        </span>
+                        <div class="key-selector-controls">
+                            <label class="key-selector-label">Key:</label>
+                            <button id="key-selector-button" class="key-selector" popovertarget="key-selector-popover">
+                                <span id="key-selector-value">-</span>
+                            </button>
+                            <div id="key-selector-popover" class="key-popover" popover>
+                                <div id="key-options-list" class="key-options-list">
+                                    <!-- Options populated by JavaScript -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="song-meta-compact" id="song-meta-header"></div>
+                </div>
+                <div class="header-right">
+                    <button class="edit-mode-toggle" id="edit-mode-toggle" aria-label="Toggle edit mode">✎</button>
+                    <button class="info-button" id="info-button" aria-label="Song info">i</button>
+                </div>
+            </header>
+
+            <main id="main-content">
+                <div class="song-container">
+                    <p>Loading setlist...</p>
+                </div>
+            </main>
+        </div>
+
+        <!-- Song info modal -->
+        <div class="modal-overlay" id="song-info-modal">
+            <div class="modal-content">
+                <button class="modal-close" id="modal-close">&times;</button>
+                <div id="modal-body"></div>
+            </div>
+        </div>
+
+        <!-- Reset confirmation modal -->
+        <div class="modal-overlay" id="reset-confirm-modal">
+            <div class="modal-content">
+                <h2>Reset Song?</h2>
+                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="reset-cancel">Cancel</button>
+                    <button class="modal-btn modal-btn-confirm" id="reset-confirm">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Template for key option item -->
+    <template id="key-option-template">
+        <button class="key-option-item">
+            <span class="key-name"></span>
+            <span class="key-offset"></span>
+        </button>
+    </template>
+
+    <!-- Template for overview song button -->
+    <template id="overview-song-button-template">
+        <button class="overview-song-button">
+            <span class="overview-song-number"></span>
+            <div class="overview-song-info">
+                <span class="overview-song-title"></span>
+                <span class="overview-song-meta"></span>
+            </div>
+        </button>
+    </template>
+
+    <!-- Template for song info modal item -->
+    <template id="song-info-item-template">
+        <div class="modal-info-item">
+            <div class="modal-info-label"></div>
+            <div class="modal-info-value"></div>
+        </div>
+    </template>
+
+    <!-- ChordPro rendering templates -->
+    <template id="song-header-template">
+        <div class="song-header">
+            <h2 class="song-title"></h2>
+            <div class="song-artist"></div>
+            <div class="song-meta">
+                <span class="song-key"></span>
+                <span class="song-tempo"></span>
+                <span class="song-time"></span>
+            </div>
+            <div class="song-ccli"></div>
+        </div>
+    </template>
+
+    <template id="section-with-label-template">
+        <div class="song-section-wrapper">
+            <details class="song-section" open>
+                <summary class="section-label">
+                    <div class="section-header">
+                        <span class="section-title"></span>
+                        <div class="section-controls">
+                            <button class="section-control-btn section-collapse-btn" data-action="collapse">
+                                <span class="control-icon">▼</span><span class="control-label">Collapse Section</span>
+                            </button>
+                            <button class="section-control-btn chords-toggle-btn" data-action="chords">
+                                <span class="control-icon">♯</span><span class="control-label">Hide Chords</span>
+                            </button>
+                            <button class="section-control-btn lyrics-toggle-btn" data-action="lyrics">
+                                <span class="control-icon">A</span><span class="control-label">Hide Lyrics</span>
+                            </button>
+                            <button class="section-control-btn section-hide-btn" data-action="hide">
+                                <span class="control-icon">✕</span><span class="control-label">Hide Entire Section</span>
+                            </button>
+                        </div>
+                    </div>
+                </summary>
+                <div class="section-content"></div>
+            </details>
+        </div>
+    </template>
+
+    <template id="section-without-label-template">
+        <div class="song-section">
+            <div class="section-content"></div>
+        </div>
+    </template>
+
+    <template id="chord-line-template">
+        <div class="chord-line"></div>
+    </template>
+
+    <template id="chord-segment-template">
+        <span class="chord-segment">
+            <span class="chord"></span>
+            <span class="lyrics"></span>
+        </span>
+    </template>
+
+    <template id="bar-group-template">
+        <div class="bar-group"></div>
+    </template>
+
+    <template id="measure-template">
+        <span class="measure"></span>
+    </template>
+
+    <script type="module" src="/page-app.js"></script>
+</body>
+</html>

@@ -72,20 +72,36 @@ class PageApp {
         const listContainer = document.getElementById('setlist-list');
 
         try {
-            listContainer.innerHTML = '<p>Loading setlists...</p>';
+            // Show loading message
+            listContainer.textContent = '';
+            const loadingMsg = document.createElement('p');
+            loadingMsg.textContent = 'Loading setlists...';
+            listContainer.appendChild(loadingMsg);
 
             const setlists = await this.db.getAllSetlists();
 
             if (setlists.length === 0) {
                 // No setlists - show import button
-                listContainer.innerHTML = `
-                    <div style="text-align: center; padding: 2rem;">
-                        <p style="margin-bottom: 2rem;">No setlists found in database.</p>
-                        <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
-                            Import Setlists from Filesystem
-                        </button>
-                    </div>
-                `;
+                listContainer.textContent = '';
+
+                const container = document.createElement('div');
+                container.style.textAlign = 'center';
+                container.style.padding = '2rem';
+
+                const message = document.createElement('p');
+                message.style.marginBottom = '2rem';
+                message.textContent = 'No setlists found in database.';
+                container.appendChild(message);
+
+                const importButton = document.createElement('button');
+                importButton.id = 'import-button';
+                importButton.className = 'setlist-button';
+                importButton.style.display = 'inline-block';
+                importButton.style.width = 'auto';
+                importButton.textContent = 'Import Setlists from Filesystem';
+                container.appendChild(importButton);
+
+                listContainer.appendChild(container);
                 this.setupImportButton();
                 return;
             }
@@ -110,14 +126,22 @@ class PageApp {
                 groupedByYear[year].sort((a, b) => b.date.localeCompare(a.date));
             }
 
-            // Render import button at top
-            listContainer.innerHTML = `
-                <div style="text-align: center; margin-bottom: 2rem;">
-                    <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
-                        Re-import Setlists
-                    </button>
-                </div>
-            `;
+            // Clear and render import button at top
+            listContainer.textContent = '';
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.textAlign = 'center';
+            buttonContainer.style.marginBottom = '2rem';
+
+            const importButton = document.createElement('button');
+            importButton.id = 'import-button';
+            importButton.className = 'setlist-button';
+            importButton.style.display = 'inline-block';
+            importButton.style.width = 'auto';
+            importButton.textContent = 'Re-import Setlists';
+            buttonContainer.appendChild(importButton);
+
+            listContainer.appendChild(buttonContainer);
 
             // Render grouped setlists
             for (const year of years) {
@@ -128,7 +152,11 @@ class PageApp {
             this.setupImportButton();
         } catch (error) {
             console.error('Error loading setlists:', error);
-            listContainer.innerHTML = '<p class="error">Error loading setlists. Please check the console.</p>';
+            listContainer.textContent = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'error';
+            errorMsg.textContent = 'Error loading setlists. Please check the console.';
+            listContainer.appendChild(errorMsg);
         }
     }
 
@@ -193,25 +221,48 @@ class PageApp {
         // Show progress modal
         const modal = document.createElement('div');
         modal.className = 'modal-overlay active';
-        modal.innerHTML = `
-            <div class="modal-content">
-                <h2>Importing Setlists</h2>
-                <div id="import-progress" style="margin: 2rem 0;">
-                    <p id="import-message">Initializing...</p>
-                    <div style="background: #ecf0f1; border-radius: 4px; height: 20px; margin-top: 1rem; overflow: hidden;">
-                        <div id="import-progress-bar" style="background: var(--button-bg); height: 100%; width: 0%; transition: width 0.3s;"></div>
-                    </div>
-                </div>
-            </div>
-        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+
+        const title = document.createElement('h2');
+        title.textContent = 'Importing Setlists';
+        modalContent.appendChild(title);
+
+        const progressContainer = document.createElement('div');
+        progressContainer.id = 'import-progress';
+        progressContainer.style.margin = '2rem 0';
+
+        const message = document.createElement('p');
+        message.id = 'import-message';
+        message.textContent = 'Initializing...';
+        progressContainer.appendChild(message);
+
+        const progressBarContainer = document.createElement('div');
+        progressBarContainer.style.background = '#ecf0f1';
+        progressBarContainer.style.borderRadius = '4px';
+        progressBarContainer.style.height = '20px';
+        progressBarContainer.style.marginTop = '1rem';
+        progressBarContainer.style.overflow = 'hidden';
+
+        const progressBar = document.createElement('div');
+        progressBar.id = 'import-progress-bar';
+        progressBar.style.background = 'var(--button-bg)';
+        progressBar.style.height = '100%';
+        progressBar.style.width = '0%';
+        progressBar.style.transition = 'width 0.3s';
+        progressBarContainer.appendChild(progressBar);
+
+        progressContainer.appendChild(progressBarContainer);
+        modalContent.appendChild(progressContainer);
+        modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
-        const messageEl = document.getElementById('import-message');
-        const progressBar = document.getElementById('import-progress-bar');
+        // progressBar and message are already defined above, no need to query DOM
 
         try {
             const result = await importer.importFromFilesystem('2025-01-01', (progress) => {
-                messageEl.textContent = progress.message;
+                message.textContent = progress.message;
 
                 if (progress.current && progress.total) {
                     const percent = (progress.current / progress.total) * 100;
@@ -224,7 +275,7 @@ class PageApp {
                 return;
             }
 
-            messageEl.textContent = `Import complete! ${result.setlists} setlists, ${result.songs} songs`;
+            message.textContent = `Import complete! ${result.setlists} setlists, ${result.songs} songs`;
             progressBar.style.width = '100%';
 
             // Wait a moment then reload
@@ -235,8 +286,8 @@ class PageApp {
 
         } catch (error) {
             console.error('Import failed:', error);
-            messageEl.textContent = `Import failed: ${error.message}`;
-            messageEl.style.color = '#e74c3c';
+            message.textContent = `Import failed: ${error.message}`;
+            message.style.color = '#e74c3c';
         }
     }
 
@@ -300,13 +351,21 @@ class PageApp {
 
             if (!setlist) {
                 console.error('[ERROR] Setlist not found in IndexedDB:', setlistId);
-                document.querySelector('.song-container').innerHTML = '<p>Setlist not found.</p>';
+                const container = document.querySelector('.song-container');
+                container.textContent = '';
+                const msg = document.createElement('p');
+                msg.textContent = 'Setlist not found.';
+                container.appendChild(msg);
                 return;
             }
 
             if (setlist.songs.length === 0) {
                 console.warn('[WARN] Setlist has no songs');
-                document.querySelector('.song-container').innerHTML = '<p>No songs found in this setlist.</p>';
+                const container = document.querySelector('.song-container');
+                container.textContent = '';
+                const msg = document.createElement('p');
+                msg.textContent = 'No songs found in this setlist.';
+                container.appendChild(msg);
                 return;
             }
 
@@ -391,7 +450,9 @@ class PageApp {
             // Render all songs on one page
             const container = document.querySelector('.song-container');
             console.log('Rendering full setlist into container:', container);
-            container.innerHTML = this.renderFullSetlist(setlist, songs);
+            // Clear container and append fragment
+            container.textContent = '';
+            container.appendChild(this.renderFullSetlist(setlist, songs));
 
             // Set up navigation based on hash
             console.log('About to setup hash navigation');
@@ -446,7 +507,11 @@ class PageApp {
 
         } catch (error) {
             console.error('Error loading setlist:', error);
-            document.querySelector('.song-container').innerHTML = '<p>Error loading songs. Please check the console.</p>';
+            const container = document.querySelector('.song-container');
+            container.textContent = '';
+            const msg = document.createElement('p');
+            msg.textContent = 'Error loading songs. Please check the console.';
+            container.appendChild(msg);
         }
     }
 
@@ -468,46 +533,75 @@ class PageApp {
     }
 
     renderFullSetlist(setlist, songs) {
-        let html = '';
+        const fragment = document.createDocumentFragment();
 
-        // Render overview section
-        html += '<div id="overview" class="section">';
-        html += '<div class="song-content"><div class="setlist-overview">';
-        html += `<div class="overview-songs">`;
+        // Create overview section
+        const overview = document.createElement('div');
+        overview.id = 'overview';
+        overview.className = 'section';
+
+        const songContentWrapper = document.createElement('div');
+        songContentWrapper.className = 'song-content';
+
+        const setlistOverview = document.createElement('div');
+        setlistOverview.className = 'setlist-overview';
+
+        const overviewSongs = document.createElement('div');
+        overviewSongs.className = 'overview-songs';
+
+        // Get template for overview song buttons
+        const buttonTemplate = document.getElementById('overview-song-button-template');
 
         songs.forEach((song, index) => {
-            html += `<button class="overview-song-button" data-song-index="${index}">`;
-            html += `<span class="overview-song-number">${index + 1}</span>`;
-            html += `<div class="overview-song-info">`;
-            html += `<span class="overview-song-title">${this.escapeHtml(song.title)}</span>`;
+            const clone = buttonTemplate.content.cloneNode(true);
+            const button = clone.querySelector('.overview-song-button');
+            button.dataset.songIndex = index;
 
+            const number = clone.querySelector('.overview-song-number');
+            number.textContent = index + 1;
+
+            const title = clone.querySelector('.overview-song-title');
+            title.textContent = song.title;
+
+            const metaSpan = clone.querySelector('.overview-song-meta');
             const metadata = [];
             if (song.metadata.key) {
-                metadata.push(`Key: ${this.escapeHtml(song.metadata.key)}`);
+                metadata.push(`Key: ${song.metadata.key}`);
             }
             if (song.metadata.tempo) {
-                metadata.push(`Tempo: ${this.escapeHtml(song.metadata.tempo)}`);
+                metadata.push(`Tempo: ${song.metadata.tempo}`);
             }
 
             if (metadata.length > 0) {
-                html += `<span class="overview-song-meta">${metadata.join(' • ')}</span>`;
+                metaSpan.textContent = metadata.join(' • ');
+            } else {
+                metaSpan.remove();
             }
 
-            html += `</div>`;
-            html += `</button>`;
+            overviewSongs.appendChild(clone);
         });
 
-        html += `</div></div></div>`;
-        html += '</div>';
+        setlistOverview.appendChild(overviewSongs);
+        songContentWrapper.appendChild(setlistOverview);
+        overview.appendChild(songContentWrapper);
+        fragment.appendChild(overview);
 
         // Render all songs
         songs.forEach((song, index) => {
-            html += `<div id="song-${index}" class="section">`;
-            html += `<div class="song-content">${song.htmlContent}</div>`;
-            html += `</div>`;
+            const songSection = document.createElement('div');
+            songSection.id = `song-${index}`;
+            songSection.className = 'section';
+
+            const songContent = document.createElement('div');
+            songContent.className = 'song-content';
+            // Parser returns DocumentFragment now
+            songContent.appendChild(song.htmlContent);
+
+            songSection.appendChild(songContent);
+            fragment.appendChild(songSection);
         });
 
-        return html;
+        return fragment;
     }
 
     showOverview(instant = false) {
@@ -589,11 +683,19 @@ class PageApp {
             }
 
             // Update metadata - only show BPM (key is in separate wrapper now) - use current BPM
-            const meta = [];
+            metaEl.textContent = '';
             if (song.currentBPM) {
-                meta.push(`<span class="meta-item"><span class="meta-label">BPM:</span> ${this.escapeHtml(song.currentBPM)}</span>`);
+                const metaItem = document.createElement('span');
+                metaItem.className = 'meta-item';
+
+                const label = document.createElement('span');
+                label.className = 'meta-label';
+                label.textContent = 'BPM:';
+                metaItem.appendChild(label);
+
+                metaItem.appendChild(document.createTextNode(' ' + song.currentBPM));
+                metaEl.appendChild(metaItem);
             }
-            metaEl.innerHTML = meta.join('');
 
             // Show key display and edit button
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'flex';
@@ -613,7 +715,7 @@ class PageApp {
             } else {
                 titleEl.textContent = 'Setlist';
             }
-            metaEl.innerHTML = '';
+            metaEl.textContent = '';
 
             // Hide key display, edit button, and info button on overview
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
@@ -635,68 +737,132 @@ class PageApp {
         const modal = document.getElementById('song-info-modal');
         const modalBody = document.getElementById('modal-body');
 
-        let html = `<h2>${this.escapeHtml(song.title)}</h2>`;
-        html += '<div class="modal-info-grid">';
+        // Clear previous content
+        modalBody.textContent = '';
 
+        // Create title
+        const title = document.createElement('h2');
+        title.textContent = song.title;
+        modalBody.appendChild(title);
+
+        // Create info grid
+        const infoGrid = document.createElement('div');
+        infoGrid.className = 'modal-info-grid';
+
+        // Get template for info items
+        const itemTemplate = document.getElementById('song-info-item-template');
+
+        // Helper function to add info items
+        const addInfoItem = (label, value) => {
+            const clone = itemTemplate.content.cloneNode(true);
+            const labelEl = clone.querySelector('.modal-info-label');
+            const valueEl = clone.querySelector('.modal-info-value');
+
+            labelEl.textContent = label;
+            valueEl.textContent = value;
+
+            infoGrid.appendChild(clone);
+        };
+
+        // Add metadata items
         if (song.metadata.artist) {
-            html += `<div class="modal-info-item">
-                <div class="modal-info-label">Artist</div>
-                <div class="modal-info-value">${this.escapeHtml(song.metadata.artist)}</div>
-            </div>`;
+            addInfoItem('Artist', song.metadata.artist);
         }
 
         if (song.metadata.key) {
-            html += `<div class="modal-info-item">
-                <div class="modal-info-label">Original Key</div>
-                <div class="modal-info-value">${this.escapeHtml(song.metadata.key)}</div>
-            </div>`;
+            addInfoItem('Original Key', song.metadata.key);
         }
 
         if (song.metadata.tempo) {
-            html += `<div class="modal-info-item">
-                <div class="modal-info-label">Original BPM</div>
-                <div class="modal-info-value">${this.escapeHtml(song.metadata.tempo)}</div>
-            </div>`;
+            addInfoItem('Original BPM', song.metadata.tempo);
         }
 
         if (song.metadata.time) {
-            html += `<div class="modal-info-item">
-                <div class="modal-info-label">Time Signature</div>
-                <div class="modal-info-value">${this.escapeHtml(song.metadata.time)}</div>
-            </div>`;
+            addInfoItem('Time Signature', song.metadata.time);
         }
 
         if (song.metadata.ccli || song.metadata.ccliSongNumber) {
-            html += `<div class="modal-info-item">
-                <div class="modal-info-label">CCLI Number</div>
-                <div class="modal-info-value" style="display: flex; align-items: center; gap: 1rem;">
-                    <span>${this.escapeHtml(song.metadata.ccli || song.metadata.ccliSongNumber)}</span>`;
+            const clone = itemTemplate.content.cloneNode(true);
+            const labelEl = clone.querySelector('.modal-info-label');
+            const valueEl = clone.querySelector('.modal-info-value');
+
+            labelEl.textContent = 'CCLI Number';
+            valueEl.style.display = 'flex';
+            valueEl.style.alignItems = 'center';
+            valueEl.style.gap = '1rem';
+
+            const ccliSpan = document.createElement('span');
+            ccliSpan.textContent = song.metadata.ccli || song.metadata.ccliSongNumber;
+            valueEl.appendChild(ccliSpan);
 
             if (song.metadata.ccliSongNumber) {
                 const songSelectUrl = `https://songselect.ccli.com/songs/${song.metadata.ccliSongNumber}/`;
-                html += `<a href="${songSelectUrl}" target="_blank" rel="noopener noreferrer" style="display: inline-flex; align-items: center; gap: 0.5rem; text-decoration: none; color: #00a3e0; font-size: 1.1rem; font-weight: 600; padding: 0.25rem 0.5rem; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='rgba(0,163,224,0.1)'" onmouseout="this.style.backgroundColor='transparent'">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 1000 1000">
-                        <rect fill="#00a3e0" y="0" width="1000" height="1000" rx="190.32" ry="190.32"></rect>
-                        <path fill="#fff" d="M758.53,231.15c1.6,1.57,1.61,4.18.02,5.76l-34.9,34.9c-1.54,1.54-4.02,1.53-5.59,0-122.98-119.9-319.88-118.95-441.69,2.86,0,0-97.82,97.82-129.96,129.96-2.86,2.86-7.71.08-6.67-3.83,16.27-61.04,48.19-118.82,96.06-166.7,144.17-144.17,377.31-145.16,522.7-2.96ZM558.62,556.91c-35.53,35.53-94,33.13-126.31-6.85-24.57-30.4-24.76-75.05-.46-105.67,31.36-39.52,88.32-42.93,124.1-10.23,1.59,1.46,4.02,1.47,5.54-.05l34.87-34.88c1.6-1.6,1.59-4.26-.05-5.81-55.76-52.66-143.67-51.7-198.26,2.89,0,0-.01.01-.02.02h0s-241.09,241.09-241.09,241.09c-1.17,1.17-1.52,2.93-.88,4.45,6.75,15.88,14.76,31.45,23.83,46.47,1.35,2.23,4.47,2.6,6.32.75l174.57-174.57c-1.36,30.21,14.69,60.44,37.27,83.03,55.57,55.57,144.88,56.09,201.19-.05.47-.47,218.59-218.58,241.07-241.06,1.15-1.15,1.46-2.85.83-4.34-6.78-15.98-14.86-31.58-23.97-46.66-1.35-2.23-4.47-2.6-6.32-.75l-252.21,252.22ZM357.4,355.89s.07-.07.1-.1c77.04-77.04,201.38-77.96,279.55-2.75,1.57,1.51,4.03,1.52,5.57-.02l34.89-34.89c1.59-1.59,1.58-4.22-.03-5.79-100.58-97.48-260.91-96.82-360.67,2.94l-188.7,188.7c-.79.79-1.23,1.87-1.2,2.99.56,21.22,2.94,42.57,7.13,63.46.63,3.13,4.56,4.28,6.82,2.02l216.54-216.54h0ZM357.5,638.14c-5.57-5.57-10.72-11.41-15.49-17.45-1.49-1.88-4.24-2.07-5.94-.37l-35.08,35.08c-1.47,1.47-1.6,3.83-.28,5.42,5.08,6.15,10.47,12.12,16.23,17.88,100.37,100.37,262.97,100.23,363.34-.14l188.96-188.96c.79-.79,1.23-1.89,1.2-3.01-.64-22.11-3.15-43.27-7.2-63.26-.63-3.13-4.55-4.25-6.81-1.99l-216.73,216.73c-77.97,77.93-204.24,78.03-282.19.07ZM276.38,719.26c-5.59-5.59-10.82-11.38-15.86-17.28-1.52-1.78-4.21-1.89-5.86-.24l-34.98,34.98c-1.5,1.5-1.59,3.9-.2,5.49,5.24,5.99,10.64,11.89,16.35,17.6,145.17,145.17,380.95,145.58,525.7,0,47.87-48.14,80.27-105.98,96.53-167.28,1.06-3.99-3.81-6.84-6.73-3.92l-130.5,130.5c-123.43,123.43-321.68,122.91-444.44.14ZM862.6,887.88c-6.72,0-13.01-1.28-18.93-3.82-5.9-2.54-11.08-6.07-15.57-10.54-4.47-4.47-7.98-9.68-10.54-15.57-2.54-5.9-3.82-12.22-3.82-18.93s1.28-13.03,3.82-18.93c2.56-5.9,6.07-11.1,10.54-15.57,4.49-4.47,9.68-8,15.57-10.54,5.92-2.54,12.22-3.82,18.93-3.82s13.12,1.28,19.02,3.82c5.92,2.54,11.1,6.07,15.57,10.54,4.49,4.47,7.98,9.68,10.49,15.57s3.78,12.22,3.78,18.93-1.26,13.03-3.78,18.93-6,11.1-10.49,15.57c-4.47,4.47-9.66,8-15.57,10.54-5.9,2.54-12.24,3.82-19.02,3.82ZM862.6,878.73c7.35,0,14-1.78,19.98-5.37,6-3.59,10.79-8.37,14.36-14.36,3.59-5.98,5.37-12.66,5.37-19.98s-1.78-14-5.37-19.98c-3.57-5.98-8.35-10.77-14.36-14.36-5.98-3.59-12.64-5.37-19.98-5.37s-13.92,1.78-19.94,5.37c-6,3.59-10.79,8.37-14.36,14.36-3.55,5.98-5.33,12.66-5.33,19.98s1.78,14,5.33,19.98c3.57,5.98,8.35,10.77,14.36,14.36,6.02,3.59,12.68,5.37,19.94,5.37ZM845.81,861.27v-45h21.66c2.31,0,4.53.55,6.72,1.64s3.99,2.67,5.37,4.74c1.41,2.08,2.1,4.62,2.1,7.64s-.71,5.73-2.14,7.93-3.25,3.92-5.5,5.12c-2.22,1.2-4.55,1.81-6.97,1.81h-16.71v-6.3h14.61c2.14,0,4.01-.73,5.63-2.22,1.64-1.49,2.43-3.59,2.43-6.34s-.8-4.81-2.43-6c-1.62-1.2-3.44-1.81-5.46-1.81h-11.25v38.79h-8.06ZM874.6,861.27l-11-20.99h8.73l11.17,20.99h-8.9Z"></path>
-                    </svg>
-                    <span>View on SongSelect</span>
-                </a>`;
+                const link = document.createElement('a');
+                link.href = songSelectUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.style.display = 'inline-flex';
+                link.style.alignItems = 'center';
+                link.style.gap = '0.5rem';
+                link.style.textDecoration = 'none';
+                link.style.color = '#00a3e0';
+                link.style.fontSize = '1.1rem';
+                link.style.fontWeight = '600';
+                link.style.padding = '0.25rem 0.5rem';
+                link.style.borderRadius = '4px';
+                link.style.transition = 'background-color 0.2s';
+                link.addEventListener('mouseover', () => link.style.backgroundColor = 'rgba(0,163,224,0.1)');
+                link.addEventListener('mouseout', () => link.style.backgroundColor = 'transparent');
+
+                // Create SVG icon
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '20');
+                svg.setAttribute('height', '20');
+                svg.setAttribute('viewBox', '0 0 1000 1000');
+
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('fill', '#00a3e0');
+                rect.setAttribute('y', '0');
+                rect.setAttribute('width', '1000');
+                rect.setAttribute('height', '1000');
+                rect.setAttribute('rx', '190.32');
+                rect.setAttribute('ry', '190.32');
+                svg.appendChild(rect);
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('fill', '#fff');
+                path.setAttribute('d', 'M758.53,231.15c1.6,1.57,1.61,4.18.02,5.76l-34.9,34.9c-1.54,1.54-4.02,1.53-5.59,0-122.98-119.9-319.88-118.95-441.69,2.86,0,0-97.82,97.82-129.96,129.96-2.86,2.86-7.71.08-6.67-3.83,16.27-61.04,48.19-118.82,96.06-166.7,144.17-144.17,377.31-145.16,522.7-2.96ZM558.62,556.91c-35.53,35.53-94,33.13-126.31-6.85-24.57-30.4-24.76-75.05-.46-105.67,31.36-39.52,88.32-42.93,124.1-10.23,1.59,1.46,4.02,1.47,5.54-.05l34.87-34.88c1.6-1.6,1.59-4.26-.05-5.81-55.76-52.66-143.67-51.7-198.26,2.89,0,0-.01.01-.02.02h0s-241.09,241.09-241.09,241.09c-1.17,1.17-1.52,2.93-.88,4.45,6.75,15.88,14.76,31.45,23.83,46.47,1.35,2.23,4.47,2.6,6.32.75l174.57-174.57c-1.36,30.21,14.69,60.44,37.27,83.03,55.57,55.57,144.88,56.09,201.19-.05.47-.47,218.59-218.58,241.07-241.06,1.15-1.15,1.46-2.85.83-4.34-6.78-15.98-14.86-31.58-23.97-46.66-1.35-2.23-4.47-2.6-6.32-.75l-252.21,252.22ZM357.4,355.89s.07-.07.1-.1c77.04-77.04,201.38-77.96,279.55-2.75,1.57,1.51,4.03,1.52,5.57-.02l34.89-34.89c1.59-1.59,1.58-4.22-.03-5.79-100.58-97.48-260.91-96.82-360.67,2.94l-188.7,188.7c-.79.79-1.23,1.87-1.2,2.99.56,21.22,2.94,42.57,7.13,63.46.63,3.13,4.56,4.28,6.82,2.02l216.54-216.54h0ZM357.5,638.14c-5.57-5.57-10.72-11.41-15.49-17.45-1.49-1.88-4.24-2.07-5.94-.37l-35.08,35.08c-1.47,1.47-1.6,3.83-.28,5.42,5.08,6.15,10.47,12.12,16.23,17.88,100.37,100.37,262.97,100.23,363.34-.14l188.96-188.96c.79-.79,1.23-1.89,1.2-3.01-.64-22.11-3.15-43.27-7.2-63.26-.63-3.13-4.55-4.25-6.81-1.99l-216.73,216.73c-77.97,77.93-204.24,78.03-282.19.07ZM276.38,719.26c-5.59-5.59-10.82-11.38-15.86-17.28-1.52-1.78-4.21-1.89-5.86-.24l-34.98,34.98c-1.5,1.5-1.59,3.9-.2,5.49,5.24,5.99,10.64,11.89,16.35,17.6,145.17,145.17,380.95,145.58,525.7,0,47.87-48.14,80.27-105.98,96.53-167.28,1.06-3.99-3.81-6.84-6.73-3.92l-130.5,130.5c-123.43,123.43-321.68,122.91-444.44.14ZM862.6,887.88c-6.72,0-13.01-1.28-18.93-3.82-5.9-2.54-11.08-6.07-15.57-10.54-4.47-4.47-7.98-9.68-10.54-15.57-2.54-5.9-3.82-12.22-3.82-18.93s1.28-13.03,3.82-18.93c2.56-5.9,6.07-11.1,10.54-15.57,4.49-4.47,9.68-8,15.57-10.54,5.92-2.54,12.22-3.82,18.93-3.82s13.12,1.28,19.02,3.82c5.92,2.54,11.1,6.07,15.57,10.54,4.49,4.47,7.98,9.68,10.49,15.57s3.78,12.22,3.78,18.93-1.26,13.03-3.78,18.93-6,11.1-10.49,15.57c-4.47,4.47-9.66,8-15.57,10.54-5.9,2.54-12.24,3.82-19.02,3.82ZM862.6,878.73c7.35,0,14-1.78,19.98-5.37,6-3.59,10.79-8.37,14.36-14.36,3.59-5.98,5.37-12.66,5.37-19.98s-1.78-14-5.37-19.98c-3.57-5.98-8.35-10.77-14.36-14.36-5.98-3.59-12.64-5.37-19.98-5.37s-13.92,1.78-19.94,5.37c-6,3.59-10.79,8.37-14.36,14.36-3.55,5.98-5.33,12.66-5.33,19.98s1.78,14,5.33,19.98c3.57,5.98,8.35,10.77,14.36,14.36,6.02,3.59,12.68,5.37,19.94,5.37ZM845.81,861.27v-45h21.66c2.31,0,4.53.55,6.72,1.64s3.99,2.67,5.37,4.74c1.41,2.08,2.1,4.62,2.1,7.64s-.71,5.73-2.14,7.93-3.25,3.92-5.5,5.12c-2.22,1.2-4.55,1.81-6.97,1.81h-16.71v-6.3h14.61c2.14,0,4.01-.73,5.63-2.22,1.64-1.49,2.43-3.59,2.43-6.34s-.8-4.81-2.43-6c-1.62-1.2-3.44-1.81-5.46-1.81h-11.25v38.79h-8.06ZM874.6,861.27l-11-20.99h8.73l11.17,20.99h-8.9Z');
+                svg.appendChild(path);
+
+                link.appendChild(svg);
+
+                const linkText = document.createElement('span');
+                linkText.textContent = 'View on SongSelect';
+                link.appendChild(linkText);
+
+                valueEl.appendChild(link);
             }
 
-            html += `</div></div>`;
+            infoGrid.appendChild(clone);
         }
 
-        html += '</div>';
+        modalBody.appendChild(infoGrid);
 
+        // Add copyright info
         if (song.metadata.copyright) {
-            html += `<div class="modal-ccli">${this.escapeHtml(song.metadata.copyright)}</div>`;
+            const copyright = document.createElement('div');
+            copyright.className = 'modal-ccli';
+            copyright.textContent = song.metadata.copyright;
+            modalBody.appendChild(copyright);
         }
 
         if (song.metadata.ccliTrailer) {
-            html += `<div class="modal-ccli">${this.escapeHtml(song.metadata.ccliTrailer)}</div>`;
+            const trailer = document.createElement('div');
+            trailer.className = 'modal-ccli';
+            trailer.textContent = song.metadata.ccliTrailer;
+            modalBody.appendChild(trailer);
         }
 
-        modalBody.innerHTML = html;
         modal.classList.add('active');
 
         // Close modal handlers
@@ -988,7 +1154,7 @@ class PageApp {
         }
 
         // Clear existing options
-        keyOptionsList.innerHTML = '';
+        keyOptionsList.textContent = '';
 
         // Unicode superscript mapping for smaller offset numbers
         const toSuperscript = (num) => {
@@ -1245,7 +1411,9 @@ class PageApp {
         if (songSection) {
             const songContent = songSection.querySelector('.song-content');
             if (songContent) {
-                songContent.innerHTML = htmlContent;
+                // Clear and append fragment
+                songContent.textContent = '';
+                songContent.appendChild(htmlContent);
 
                 // Re-apply section states
                 // First, restore section states from the modifications

@@ -2,7 +2,7 @@
 // Handles routing and generates pages for offline-first operation
 
 const DEV_MODE = true; // Set to false for production
-const CACHE_NAME = 'setalight-v6';
+const CACHE_NAME = 'setalight-v9';
 const ASSETS = [
     '/',
     '/style.css',
@@ -107,152 +107,52 @@ async function handleRoute(url) {
 
     console.log('[SW] handleRoute:', path);
 
+    // Test files - pass through to network
+    if (path.includes('-test.html') || path.includes('test-')) {
+        console.log('[SW] Test file - passing through');
+        return fetch(url);
+    }
+
     // Home page: /
     if (path === '/' || path === '/index.html') {
-        console.log('[SW] Generating home page');
-        return generateHomePage();
+        console.log('[SW] Serving index.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/index.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/index.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/index.html');
+            });
+        } else {
+            return fetch('/index.html');
+        }
     }
 
     // Setlist page: /setlist/{uuid} (ignore hash)
     const setlistMatch = path.match(/^\/setlist\/([^\/]+)$/);
     if (setlistMatch) {
-        const setlistId = setlistMatch[1];
-        console.log('[SW] Generating setlist page for:', setlistId);
-        return generateSetlistPage(setlistId);
+        console.log('[SW] Serving setlist.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/setlist.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/setlist.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/setlist.html');
+            });
+        } else {
+            return fetch('/setlist.html');
+        }
     }
 
     // 404
     console.log('[SW] 404 - not found');
     return new Response('Not Found', { status: 404 });
-}
-
-// Generate home page HTML
-async function generateHomePage() {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Setlist arrangement for worship songs">
-    <meta name="view-transition" content="same-origin">
-    <title>Setalight</title>
-    <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-    <div class="app-container">
-        <div id="home-view" class="view">
-            <header>
-                <h1>Setalight</h1>
-            </header>
-
-            <main class="home-content">
-                <div id="setlist-list" class="setlist-list">
-                    <p>Loading setlists...</p>
-                </div>
-            </main>
-        </div>
-    </div>
-
-    <script type="module" src="/page-app.js"></script>
-</body>
-</html>`;
-
-    return new Response(html, {
-        headers: { 'Content-Type': 'text/html' }
-    });
-}
-
-// Generate setlist overview page HTML
-async function generateSetlistPage(setlistId) {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Setlist arrangement for worship songs">
-    <meta name="view-transition" content="same-origin">
-    <title>Setlist - ${setlistId}</title>
-    <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-    <div class="app-container">
-        <div id="song-view" class="view">
-            <header>
-                <div class="header-left">
-                    <a href="/" class="home-button" aria-label="Home">🏠</a>
-                    <div class="song-title-compact" id="song-title-header">Loading...</div>
-                </div>
-                <div class="header-center">
-                    <button class="reset-button" id="reset-button" aria-label="Reset song">↺</button>
-                    <div class="font-size-controls">
-                        <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
-                        <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">A+</button>
-                    </div>
-                    <!-- Key display (normal mode) and key selector (edit mode) in same position -->
-                    <div class="key-display-wrapper">
-                        <span class="meta-item key-meta-display" id="key-meta-display">
-                            <span class="meta-label">Key:</span>
-                            <span id="key-value-display">-</span>
-                        </span>
-                        <div class="key-selector-controls">
-                            <label class="key-selector-label">Key:</label>
-                            <button id="key-selector-button" class="key-selector" popovertarget="key-selector-popover">
-                                <span id="key-selector-value">-</span>
-                            </button>
-                            <div id="key-selector-popover" class="key-popover" popover>
-                                <div id="key-options-list" class="key-options-list">
-                                    <!-- Options populated by JavaScript -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="song-meta-compact" id="song-meta-header"></div>
-                </div>
-                <div class="header-right">
-                    <button class="edit-mode-toggle" id="edit-mode-toggle" aria-label="Toggle edit mode">✎</button>
-                    <button class="info-button" id="info-button" aria-label="Song info">i</button>
-                </div>
-            </header>
-
-            <main id="main-content">
-                <div class="song-container">
-                    <p>Loading setlist...</p>
-                </div>
-            </main>
-        </div>
-
-        <!-- Song info modal -->
-        <div class="modal-overlay" id="song-info-modal">
-            <div class="modal-content">
-                <button class="modal-close" id="modal-close">&times;</button>
-                <div id="modal-body"></div>
-            </div>
-        </div>
-
-        <!-- Reset confirmation modal -->
-        <div class="modal-overlay" id="reset-confirm-modal">
-            <div class="modal-content">
-                <h2>Reset Song?</h2>
-                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
-                <div class="modal-actions">
-                    <button class="modal-btn modal-btn-cancel" id="reset-cancel">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" id="reset-confirm">Reset</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script type="module" src="/page-app.js"></script>
-    <script>
-        window.__ROUTE__ = {
-            type: 'setlist',
-            setlistId: '${setlistId}'
-        };
-    </script>
-</body>
-</html>`;
-
-    return new Response(html, {
-        headers: { 'Content-Type': 'text/html' }
-    });
 }

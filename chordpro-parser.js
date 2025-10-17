@@ -129,35 +129,57 @@ export class ChordProParser {
     }
 
     toHTML(parsed, songIndex = 0) {
-        let html = '';
+        const fragment = document.createDocumentFragment();
 
         // Add title
         if (parsed.metadata.title) {
-            html += `<div class="song-header">`;
-            html += `<h2 class="song-title">${this.escapeHtml(parsed.metadata.title)}</h2>`;
+            const headerTemplate = document.getElementById('song-header-template');
+            const headerClone = headerTemplate.content.cloneNode(true);
 
+            const title = headerClone.querySelector('.song-title');
+            title.textContent = parsed.metadata.title;
+
+            const artist = headerClone.querySelector('.song-artist');
             if (parsed.metadata.artist) {
-                html += `<div class="song-artist">${this.escapeHtml(parsed.metadata.artist)}</div>`;
+                artist.textContent = parsed.metadata.artist;
+            } else {
+                artist.remove();
             }
 
-            if (parsed.metadata.key) {
-                html += `<div class="song-meta">`;
-                html += `<span class="song-key">Key: ${this.escapeHtml(parsed.metadata.key)}</span>`;
+            const metaDiv = headerClone.querySelector('.song-meta');
+            if (parsed.metadata.key || parsed.metadata.tempo || parsed.metadata.time) {
+                const keySpan = headerClone.querySelector('.song-key');
+                if (parsed.metadata.key) {
+                    keySpan.textContent = `Key: ${parsed.metadata.key}`;
+                } else {
+                    keySpan.remove();
+                }
+
+                const tempoSpan = headerClone.querySelector('.song-tempo');
                 if (parsed.metadata.tempo) {
-                    html += `<span class="song-tempo">Tempo: ${this.escapeHtml(parsed.metadata.tempo)}</span>`;
+                    tempoSpan.textContent = `Tempo: ${parsed.metadata.tempo}`;
+                } else {
+                    tempoSpan.remove();
                 }
+
+                const timeSpan = headerClone.querySelector('.song-time');
                 if (parsed.metadata.time) {
-                    html += `<span class="song-time">Time: ${this.escapeHtml(parsed.metadata.time)}</span>`;
+                    timeSpan.textContent = `Time: ${parsed.metadata.time}`;
+                } else {
+                    timeSpan.remove();
                 }
-                html += `</div>`;
+            } else {
+                metaDiv.remove();
             }
 
-            // Add CCLI info if present
+            const ccliDiv = headerClone.querySelector('.song-ccli');
             if (parsed.metadata.ccliSongNumber) {
-                html += `<div class="song-ccli">CCLI Song # ${this.escapeHtml(parsed.metadata.ccliSongNumber)}</div>`;
+                ccliDiv.textContent = `CCLI Song # ${parsed.metadata.ccliSongNumber}`;
+            } else {
+                ccliDiv.remove();
             }
 
-            html += `</div>`;
+            fragment.appendChild(headerClone);
         }
 
         // Add sections
@@ -165,46 +187,40 @@ export class ChordProParser {
             const section = parsed.sections[i];
 
             if (section.label) {
-                html += `<div class="song-section-wrapper" data-song-index="${songIndex}" data-section-index="${i}">`;
-                html += `<details class="song-section" open>`;
-                html += `<summary class="section-label">`;
-                html += `<div class="section-header">`;
-                html += `<span class="section-title">${this.escapeHtml(section.label)}</span>`;
-                html += `<div class="section-controls">`;
-                html += `<button class="section-control-btn section-collapse-btn" data-action="collapse">`;
-                html += `<span class="control-icon">▼</span><span class="control-label">Collapse Section</span>`;
-                html += `</button>`;
-                html += `<button class="section-control-btn chords-toggle-btn" data-action="chords">`;
-                html += `<span class="control-icon">♯</span><span class="control-label">Hide Chords</span>`;
-                html += `</button>`;
-                html += `<button class="section-control-btn lyrics-toggle-btn" data-action="lyrics">`;
-                html += `<span class="control-icon">A</span><span class="control-label">Hide Lyrics</span>`;
-                html += `</button>`;
-                html += `<button class="section-control-btn section-hide-btn" data-action="hide">`;
-                html += `<span class="control-icon">✕</span><span class="control-label">Hide Entire Section</span>`;
-                html += `</button>`;
-                html += `</div>`;
-                html += `</div>`;
-                html += `</summary>`;
-                html += `<div class="section-content">`;
-                html += this.renderLines(section.lines);
-                html += `</div>`;
-                html += `</details>`;
-                html += `</div>`;
+                const sectionTemplate = document.getElementById('section-with-label-template');
+                const sectionClone = sectionTemplate.content.cloneNode(true);
+
+                const wrapper = sectionClone.querySelector('.song-section-wrapper');
+                wrapper.dataset.songIndex = songIndex;
+                wrapper.dataset.sectionIndex = i;
+
+                const sectionTitle = sectionClone.querySelector('.section-title');
+                sectionTitle.textContent = section.label;
+
+                const sectionContent = sectionClone.querySelector('.section-content');
+                sectionContent.appendChild(this.renderLines(section.lines));
+
+                fragment.appendChild(sectionClone);
             } else {
-                html += `<div class="song-section" data-song-index="${songIndex}" data-section-index="${i}">`;
-                html += `<div class="section-content">`;
-                html += this.renderLines(section.lines);
-                html += `</div>`;
-                html += `</div>`;
+                const sectionTemplate = document.getElementById('section-without-label-template');
+                const sectionClone = sectionTemplate.content.cloneNode(true);
+
+                const sectionDiv = sectionClone.querySelector('.song-section');
+                sectionDiv.dataset.songIndex = songIndex;
+                sectionDiv.dataset.sectionIndex = i;
+
+                const sectionContent = sectionClone.querySelector('.section-content');
+                sectionContent.appendChild(this.renderLines(section.lines));
+
+                fragment.appendChild(sectionClone);
             }
         }
 
-        return html;
+        return fragment;
     }
 
     renderLines(lines) {
-        let html = '';
+        const fragment = document.createDocumentFragment();
         let i = 0;
 
         while (i < lines.length) {
@@ -213,16 +229,19 @@ export class ChordProParser {
 
             if (barGroup.length > 1) {
                 // Render bar-aligned group
-                html += this.renderBarAlignedGroup(barGroup);
+                fragment.appendChild(this.renderBarAlignedGroup(barGroup));
                 i += barGroup.length;
             } else {
                 // Render single line normally
-                html += this.renderLine(lines[i]);
+                const lineElement = this.renderLine(lines[i]);
+                if (lineElement) {
+                    fragment.appendChild(lineElement);
+                }
                 i++;
             }
         }
 
-        return html;
+        return fragment;
     }
 
     findBarGroup(lines, startIndex) {
@@ -304,12 +323,16 @@ export class ChordProParser {
         const maxMeasures = Math.max(...allMeasures.map(m => m.length));
 
         // Create grid template with auto-sized columns
-        const gridTemplate = 'repeat(' + maxMeasures + ', auto)';
+        const gridTemplate = `repeat(${maxMeasures}, auto)`;
 
-        let html = `<div class="bar-group" style="grid-template-columns: ${gridTemplate}">`;
+        const barGroupTemplate = document.getElementById('bar-group-template');
+        const barGroupClone = barGroupTemplate.content.cloneNode(true);
+        const barGroup = barGroupClone.querySelector('.bar-group');
+        barGroup.style.gridTemplateColumns = gridTemplate;
 
         for (const measures of allMeasures) {
-            html += '<div class="chord-line bar-aligned">';
+            const chordLineDiv = document.createElement('div');
+            chordLineDiv.className = 'chord-line bar-aligned';
 
             // Render each measure
             for (let i = 0; i < maxMeasures; i++) {
@@ -317,72 +340,88 @@ export class ChordProParser {
                 const isFirstMeasure = i === 0;
                 const isLastMeasure = i === maxMeasures - 1;
 
-                if (measure) {
-                    let measureClass = 'measure';
-                    if (isFirstMeasure) measureClass += ' first-measure';
-                    if (isLastMeasure) measureClass += ' last-measure';
+                const measureTemplate = document.getElementById('measure-template');
+                const measureClone = measureTemplate.content.cloneNode(true);
+                const measureSpan = measureClone.querySelector('.measure');
 
-                    html += `<span class="${measureClass}">`;
+                if (measure) {
+                    if (isFirstMeasure) measureSpan.classList.add('first-measure');
+                    if (isLastMeasure) measureSpan.classList.add('last-measure');
 
                     // Render chords in this measure
                     for (const chord of measure.chords) {
-                        html += `<span class="chord-segment chord-only">`;
-                        html += `<span class="chord">${this.escapeHtml(chord)}</span>`;
-                        html += `</span>`;
+                        const segmentSpan = document.createElement('span');
+                        segmentSpan.className = 'chord-segment chord-only';
+
+                        const chordSpan = document.createElement('span');
+                        chordSpan.className = 'chord';
+                        chordSpan.textContent = chord;
+
+                        segmentSpan.appendChild(chordSpan);
+                        measureSpan.appendChild(segmentSpan);
                     }
 
                     // Render the bar if present
                     if (measure.bar) {
-                        html += `<span class="chord-segment chord-only bar-marker">`;
-                        html += `<span class="chord bar">${this.escapeHtml(measure.bar)}</span>`;
-                        html += `</span>`;
-                    }
+                        const segmentSpan = document.createElement('span');
+                        segmentSpan.className = 'chord-segment chord-only bar-marker';
 
-                    html += '</span>';
-                } else {
-                    // Empty measure to maintain grid alignment
-                    html += '<span class="measure"></span>';
+                        const chordSpan = document.createElement('span');
+                        chordSpan.className = 'chord bar';
+                        chordSpan.textContent = measure.bar;
+
+                        segmentSpan.appendChild(chordSpan);
+                        measureSpan.appendChild(segmentSpan);
+                    }
                 }
+
+                chordLineDiv.appendChild(measureClone);
             }
 
-            html += '</div>';
+            barGroup.appendChild(chordLineDiv);
         }
 
-        html += '</div>';
-        return html;
+        return barGroupClone;
     }
 
     renderLine(line) {
-        if (line.segments.length === 0) return '';
+        if (line.segments.length === 0) return null;
 
-        let html = '<div class="chord-line">';
+        const chordLineTemplate = document.getElementById('chord-line-template');
+        const chordLineClone = chordLineTemplate.content.cloneNode(true);
+        const chordLineDiv = chordLineClone.querySelector('.chord-line');
 
         for (const segment of line.segments) {
             const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0;
-            const segmentClass = hasLyrics ? 'chord-segment' : 'chord-segment chord-only';
 
-            html += `<span class="${segmentClass}">`;
+            const segmentTemplate = document.getElementById('chord-segment-template');
+            const segmentClone = segmentTemplate.content.cloneNode(true);
+            const segmentSpan = segmentClone.querySelector('.chord-segment');
 
+            if (!hasLyrics) {
+                segmentSpan.classList.add('chord-only');
+            }
+
+            const chordSpan = segmentClone.querySelector('.chord');
             if (segment.chord) {
                 const isBar = this.isBarLine(segment.chord);
                 const isInvalid = segment.valid === false;
-                let chordClass = 'chord';
-                if (isBar) chordClass += ' bar';
-                if (isInvalid) chordClass += ' invalid';
-                html += `<span class="${chordClass}">${this.escapeHtml(segment.chord)}</span>`;
-            } else {
-                html += `<span class="chord"></span>`;
+                if (isBar) chordSpan.classList.add('bar');
+                if (isInvalid) chordSpan.classList.add('invalid');
+                chordSpan.textContent = segment.chord;
             }
 
+            const lyricsSpan = segmentClone.querySelector('.lyrics');
             if (hasLyrics) {
-                html += `<span class="lyrics">${this.escapeHtml(segment.lyrics)}</span>`;
+                lyricsSpan.textContent = segment.lyrics;
+            } else {
+                lyricsSpan.remove();
             }
 
-            html += `</span>`;
+            chordLineDiv.appendChild(segmentClone);
         }
 
-        html += '</div>';
-        return html;
+        return chordLineClone;
     }
 
     isBarLine(chord) {
