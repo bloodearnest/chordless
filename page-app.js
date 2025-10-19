@@ -486,6 +486,9 @@ class PageApp {
                     });
                 });
 
+                // Set up drag-and-drop reordering for overview
+                this.setupOverviewDragDrop();
+
                 // Set up edit mode toggle
                 this.setupEditMode();
 
@@ -1371,6 +1374,475 @@ class PageApp {
 
         // Reapply section states (all back to default)
         this.applySectionState();
+    }
+
+    setupOverviewDragDrop() {
+        const overviewSongs = document.querySelector('.overview-songs');
+        if (!overviewSongs) return;
+
+        const buttons = Array.from(document.querySelectorAll('.overview-song-button'));
+        if (buttons.length === 0) return;
+
+        // Clean up any existing global event listeners
+        if (this._dragMouseMoveHandler) {
+            document.removeEventListener('mousemove', this._dragMouseMoveHandler);
+        }
+        if (this._dragMouseUpHandler) {
+            document.removeEventListener('mouseup', this._dragMouseUpHandler);
+        }
+
+        let dragState = {
+            active: false,
+            button: null,
+            startIndex: null,
+            currentIndex: null,
+            lastAcceptedIndex: null,
+            startY: 0,
+            currentY: 0,
+            buttonInitialTop: 0,
+            longPressTimer: null,
+            rafId: null,
+            mouseDownPending: false
+        };
+
+        const LONG_PRESS_DURATION = 500; // ms
+        const POSITION_THRESHOLD = 20; // px - minimum movement to change target position
+
+        const startDrag = (button, clientY) => {
+            dragState.active = true;
+            dragState.button = button;
+            dragState.startIndex = parseInt(button.dataset.songIndex);
+            dragState.currentIndex = dragState.startIndex;
+            dragState.lastAcceptedIndex = dragState.startIndex;
+            dragState.startY = clientY;
+            dragState.currentY = clientY;
+
+            // Store initial button position
+            const rect = button.getBoundingClientRect();
+            dragState.buttonInitialTop = rect.top;
+
+            // Add visual feedback
+            button.classList.add('dragging');
+            overviewSongs.classList.add('reordering');
+
+            // Prevent text selection during drag
+            document.body.style.userSelect = 'none';
+
+            // Show initial drop indicator at original position
+            performDragUpdate();
+        };
+
+        const updateDrag = (clientY) => {
+            if (!dragState.active) return;
+
+            dragState.currentY = clientY;
+
+            // Update dragged button position IMMEDIATELY (no throttling for smooth following)
+            const offsetY = clientY - dragState.startY;
+            dragState.button.style.transform = `scale(1.05) translateY(${offsetY}px)`;
+
+            // Throttle drop target calculations with requestAnimationFrame
+            if (dragState.rafId) return;
+
+            dragState.rafId = requestAnimationFrame(() => {
+                dragState.rafId = null;
+                performDragUpdate();
+            });
+        };
+
+        const performDragUpdate = () => {
+            if (!dragState.active) return;
+
+            const clientY = dragState.currentY;
+
+            // Find which button is being hovered over
+            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+            let proposedIndex = null;
+
+            for (let i = 0; i < buttonsArray.length; i++) {
+                const btn = buttonsArray[i];
+                if (btn === dragState.button) continue;
+
+                const rect = btn.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+
+                if (clientY < midY && clientY >= rect.top) {
+                    // Insert before this button
+                    proposedIndex = parseInt(btn.dataset.songIndex);
+                    break;
+                } else if (clientY >= midY && clientY < rect.bottom) {
+                    // Insert after this button
+                    proposedIndex = parseInt(btn.dataset.songIndex) + 1;
+                    break;
+                }
+            }
+
+            // If no specific target, determine from position
+            if (proposedIndex === null) {
+                const firstRect = buttonsArray[0]?.getBoundingClientRect();
+                const lastRect = buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect();
+
+                if (firstRect && clientY < firstRect.top) {
+                    proposedIndex = 0;
+                } else if (lastRect && clientY > lastRect.bottom) {
+                    proposedIndex = buttonsArray.length;
+                } else {
+                    proposedIndex = dragState.lastAcceptedIndex;
+                }
+            }
+
+            // Apply hysteresis: only accept new position if sufficiently different
+            // Calculate if we need to switch positions
+            let shouldUpdatePosition = false;
+
+            if (proposedIndex !== dragState.lastAcceptedIndex) {
+                // Find Y position of the proposed target
+                let targetY;
+                if (proposedIndex === 0) {
+                    targetY = buttonsArray[0]?.getBoundingClientRect().top || 0;
+                } else if (proposedIndex >= buttonsArray.length) {
+                    targetY = buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect().bottom || clientY;
+                } else {
+                    targetY = buttonsArray[proposedIndex]?.getBoundingClientRect().top || clientY;
+                }
+
+                // Find Y position of current accepted target
+                let currentY;
+                if (dragState.lastAcceptedIndex === 0) {
+                    currentY = buttonsArray[0]?.getBoundingClientRect().top || 0;
+                } else if (dragState.lastAcceptedIndex >= buttonsArray.length) {
+                    currentY = buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect().bottom || clientY;
+                } else {
+                    currentY = buttonsArray[dragState.lastAcceptedIndex]?.getBoundingClientRect().top || clientY;
+                }
+
+                // Only switch if we've moved past the threshold
+                const distance = Math.abs(clientY - currentY);
+                if (distance > POSITION_THRESHOLD) {
+                    shouldUpdatePosition = true;
+                }
+            }
+
+            // Update accepted position if threshold met
+            if (shouldUpdatePosition) {
+                dragState.lastAcceptedIndex = proposedIndex;
+            }
+
+            const targetIndex = dragState.lastAcceptedIndex;
+
+            // Clear all drop indicators
+            buttonsArray.forEach(btn => {
+                btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
+            });
+
+            // Apply drop indicator - always show where it will land
+            if (targetIndex !== null) {
+                // Determine which button to show the indicator on
+                let indicatorButton = null;
+                let indicatorClass = null;
+
+                if (targetIndex === dragState.startIndex) {
+                    // At original position - show placeholder where it was
+                    // Use the button immediately after (or before if last)
+                    if (dragState.startIndex < buttonsArray.length - 1) {
+                        // Not the last button - show above the next button
+                        indicatorButton = buttonsArray[dragState.startIndex + 1];
+                        indicatorClass = 'drag-over-above';
+                    } else if (dragState.startIndex > 0) {
+                        // Last button - show below the previous button
+                        indicatorButton = buttonsArray[dragState.startIndex - 1];
+                        indicatorClass = 'drag-over-below';
+                    }
+                } else if (targetIndex === dragState.startIndex + 1) {
+                    // Adjacent to original - same as original position
+                    if (dragState.startIndex < buttonsArray.length - 1) {
+                        indicatorButton = buttonsArray[dragState.startIndex + 1];
+                        indicatorClass = 'drag-over-above';
+                    } else if (dragState.startIndex > 0) {
+                        indicatorButton = buttonsArray[dragState.startIndex - 1];
+                        indicatorClass = 'drag-over-below';
+                    }
+                } else if (targetIndex < dragState.startIndex) {
+                    // Moving up - show above the target position
+                    indicatorButton = buttonsArray[targetIndex];
+                    indicatorClass = 'drag-over-above';
+                } else {
+                    // Moving down - show below the button before the target
+                    indicatorButton = buttonsArray[targetIndex - 1];
+                    indicatorClass = 'drag-over-below';
+                }
+
+                // Apply the indicator class (never on the dragged button)
+                if (indicatorButton && indicatorButton !== dragState.button) {
+                    indicatorButton.classList.add(indicatorClass);
+                }
+
+                // Apply preview animations only if position actually changes
+                if (targetIndex !== dragState.startIndex && targetIndex !== dragState.startIndex + 1) {
+                    buttonsArray.forEach((btn, i) => {
+                        const btnIndex = parseInt(btn.dataset.songIndex);
+                        if (btnIndex === dragState.startIndex) return; // Skip dragged item
+
+                        if (targetIndex < dragState.startIndex) {
+                            // Moving up in list
+                            if (btnIndex >= targetIndex && btnIndex < dragState.startIndex) {
+                                btn.classList.add('will-move-down');
+                            }
+                        } else {
+                            // Moving down in list
+                            if (btnIndex > dragState.startIndex && btnIndex < targetIndex) {
+                                btn.classList.add('will-move-up');
+                            }
+                        }
+                    });
+                }
+            }
+
+            dragState.currentIndex = targetIndex;
+        };
+
+        const endDrag = async () => {
+            if (!dragState.active) return;
+
+            const button = dragState.button;
+            const startIndex = dragState.startIndex;
+            const targetIndex = dragState.currentIndex;
+
+            // Clean up visual state
+            button.classList.remove('dragging');
+            button.style.transform = ''; // Reset transform
+            overviewSongs.classList.remove('reordering');
+            document.body.style.userSelect = '';
+
+            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+            buttonsArray.forEach(btn => {
+                btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
+            });
+
+            // Reorder if position changed
+            if (targetIndex !== null && targetIndex !== startIndex && targetIndex !== startIndex + 1) {
+                // Calculate actual new index (accounting for removal of old position)
+                let newIndex = targetIndex > startIndex ? targetIndex - 1 : targetIndex;
+
+                // Reorder songs in the setlist
+                const movedSong = this.currentSetlist.songs.splice(startIndex, 1)[0];
+                this.currentSetlist.songs.splice(newIndex, 0, movedSong);
+
+                // Update order field for each song
+                this.currentSetlist.songs.forEach((song, index) => {
+                    song.order = index;
+                });
+
+                // Reorder runtime songs array
+                const movedRuntimeSong = this.songs.splice(startIndex, 1)[0];
+                this.songs.splice(newIndex, 0, movedRuntimeSong);
+
+                // Save to database
+                this.currentSetlist.updatedAt = new Date().toISOString();
+                await this.db.saveSetlist(this.currentSetlist);
+
+                // Re-render the overview to reflect new order
+                const overviewContainer = document.querySelector('.overview-songs');
+                if (overviewContainer) {
+                    overviewContainer.textContent = '';
+
+                    const buttonTemplate = document.getElementById('overview-song-button-template');
+                    this.songs.forEach((song, index) => {
+                        const clone = buttonTemplate.content.cloneNode(true);
+                        const btn = clone.querySelector('.overview-song-button');
+                        btn.dataset.songIndex = index;
+
+                        const number = clone.querySelector('.overview-song-number');
+                        number.textContent = index + 1;
+
+                        const title = clone.querySelector('.overview-song-title');
+                        title.textContent = song.title;
+
+                        const metaSpan = clone.querySelector('.overview-song-meta');
+                        const metadata = [];
+                        if (song.metadata.key) {
+                            metadata.push(`Key: ${song.metadata.key}`);
+                        }
+                        if (song.metadata.tempo) {
+                            metadata.push(`Tempo: ${song.metadata.tempo}`);
+                        }
+
+                        if (metadata.length > 0) {
+                            metaSpan.textContent = metadata.join(' • ');
+                        } else {
+                            metaSpan.remove();
+                        }
+
+                        overviewContainer.appendChild(clone);
+                    });
+
+                    // Re-setup click handlers and drag-drop
+                    document.querySelectorAll('.overview-song-button').forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const songIndex = parseInt(btn.dataset.songIndex);
+                            this.navigateToHash(`song-${songIndex}`);
+                        });
+                    });
+
+                    this.setupOverviewDragDrop();
+                }
+
+                // Update song section IDs in the DOM
+                const songSections = document.querySelectorAll('.section[id^="song-"]');
+                songSections.forEach((section, index) => {
+                    section.id = `song-${index}`;
+                });
+            }
+
+            // Cancel any pending animation frame
+            if (dragState.rafId) {
+                cancelAnimationFrame(dragState.rafId);
+            }
+
+            // Reset drag state
+            dragState = {
+                active: false,
+                button: null,
+                startIndex: null,
+                currentIndex: null,
+                lastAcceptedIndex: null,
+                startY: 0,
+                currentY: 0,
+                buttonInitialTop: 0,
+                longPressTimer: null,
+                rafId: null,
+                mouseDownPending: false
+            };
+        };
+
+        const cancelDrag = () => {
+            if (dragState.longPressTimer) {
+                clearTimeout(dragState.longPressTimer);
+                dragState.longPressTimer = null;
+            }
+
+            if (dragState.rafId) {
+                cancelAnimationFrame(dragState.rafId);
+            }
+
+            if (dragState.active) {
+                // Clean up visual state without reordering
+                if (dragState.button) {
+                    dragState.button.classList.remove('dragging');
+                    dragState.button.style.transform = ''; // Reset transform
+                }
+                overviewSongs.classList.remove('reordering');
+                document.body.style.userSelect = '';
+
+                const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+                buttonsArray.forEach(btn => {
+                    btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
+                });
+            }
+
+            dragState = {
+                active: false,
+                button: null,
+                startIndex: null,
+                currentIndex: null,
+                lastAcceptedIndex: null,
+                startY: 0,
+                currentY: 0,
+                buttonInitialTop: 0,
+                longPressTimer: null,
+                rafId: null,
+                mouseDownPending: false
+            };
+        };
+
+        // Touch events - require long press
+        buttons.forEach(button => {
+            let touchIdentifier = null;
+
+            button.addEventListener('touchstart', (e) => {
+                // Don't start drag if already dragging
+                if (dragState.active) return;
+
+                const touch = e.touches[0];
+                touchIdentifier = touch.identifier;
+
+                dragState.longPressTimer = setTimeout(() => {
+                    startDrag(button, touch.clientY);
+                }, LONG_PRESS_DURATION);
+
+                // Track initial position for canceling if moved too much during long press
+                dragState.startY = touch.clientY;
+            });
+
+            button.addEventListener('touchmove', (e) => {
+                const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
+                if (!touch) return;
+
+                if (!dragState.active) {
+                    // Check if moved too much before long press completed
+                    if (Math.abs(touch.clientY - dragState.startY) > 10) {
+                        cancelDrag();
+                    }
+                } else {
+                    e.preventDefault(); // Prevent scrolling while dragging
+                    updateDrag(touch.clientY);
+                }
+            });
+
+            button.addEventListener('touchend', (e) => {
+                if (dragState.longPressTimer) {
+                    clearTimeout(dragState.longPressTimer);
+                    dragState.longPressTimer = null;
+                }
+
+                if (dragState.active) {
+                    e.preventDefault(); // Prevent click event
+                    endDrag();
+                }
+            });
+
+            button.addEventListener('touchcancel', () => {
+                cancelDrag();
+            });
+
+            // Mouse events - start drag only on movement
+            button.addEventListener('mousedown', (e) => {
+                if (dragState.active) return;
+
+                // Track mouse down position but don't start drag yet
+                dragState.button = button;
+                dragState.startY = e.clientY;
+                dragState.mouseDownPending = true;
+            });
+        });
+
+        // Global mouse events for desktop dragging
+        this._dragMouseMoveHandler = (e) => {
+            // Check if we should start dragging
+            if (dragState.mouseDownPending && !dragState.active) {
+                const deltaY = Math.abs(e.clientY - dragState.startY);
+                if (deltaY > 5) { // 5px threshold before starting drag
+                    dragState.mouseDownPending = false;
+                    startDrag(dragState.button, dragState.startY);
+                    updateDrag(e.clientY);
+                }
+            } else if (dragState.active) {
+                updateDrag(e.clientY);
+            }
+        };
+
+        this._dragMouseUpHandler = () => {
+            if (dragState.active) {
+                endDrag();
+            } else if (dragState.mouseDownPending) {
+                // Mouse up without drag - this is a click, let it through
+                dragState.mouseDownPending = false;
+                dragState.button = null;
+            }
+        };
+
+        document.addEventListener('mousemove', this._dragMouseMoveHandler);
+        document.addEventListener('mouseup', this._dragMouseUpHandler);
     }
 
     /**

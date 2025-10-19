@@ -862,30 +862,67 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     border: 2px solid #ecf0f1;
     border-radius: 12px;
     cursor: pointer;
-    transition: all 0.2s;
     text-align: left;
     text-decoration: none;
     color: inherit;
     min-height: 70px;
+    position: relative; /* Needed for absolutely positioned pseudo-elements */
 }
 
-.overview-song-button:hover {
+/* Drag and drop states */
+.overview-song-button.dragging {
+    opacity: 0.9;
     background-color: #ecf0f1;
     border-color: var(--button-bg);
-    transform: translateX(8px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    cursor: grabbing;
+    pointer-events: none;
+    position: relative;
+    /* transform is applied via JS to follow cursor */
 }
 
-.overview-song-button:active {
-    transform: translateX(8px) scale(0.98);
+.overview-song-button.drag-over-above::before,
+.overview-song-button.drag-over-below::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: calc(70px + 0.5rem); /* Match button min-height + gap */
+    background-color: #d5dbdb;
+    border: 2px dashed #95a5a6;
+    border-radius: 12px;
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.overview-song-button.drag-over-above::before {
+    top: calc(-70px - 1rem); /* Position above with gap */
+}
+
+.overview-song-button.drag-over-below::after {
+    bottom: calc(-70px - 1rem); /* Position below with gap */
+}
+
+.overview-songs.reordering .overview-song-button {
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Remove transition from dragged button so it follows cursor immediately */
+.overview-songs.reordering .overview-song-button.dragging {
+    transition: none;
+}
+
+.overview-song-button.will-move-down {
+    transform: translateY(calc(100% + 0.5rem));
+}
+
+.overview-song-button.will-move-up {
+    transform: translateY(calc(-100% - 0.5rem));
 }
 
 .overview-song-number {
-    font-size: 2rem;
-    font-weight: bold;
-    color: var(--button-bg);
-    min-width: 3rem;
-    text-align: center;
-    flex-shrink: 0;
+    display: none;
 }
 
 .overview-song-info {
