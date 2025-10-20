@@ -468,14 +468,21 @@ class PageApp {
                     const hashValue = hash.substring(1);
                     if (hashValue === 'overview') {
                         this.showOverview(true); // true = instant, no animation
+                        // Set initial history state
+                        history.replaceState({ view: 'overview' }, '', window.location.href);
                     } else if (hashValue.startsWith('song-')) {
                         const index = parseInt(hashValue.split('-')[1]);
                         this.showSong(index, true); // true = instant, no animation
+                        // Set initial history state (without fromOverview since we loaded directly)
+                        history.replaceState({ view: 'song', index: index }, '', window.location.href);
                     }
                 } else {
                     // Default to overview
                     console.log('No hash, showing overview');
                     this.showOverview(true); // true = instant, no animation
+                    // Set initial history state and add hash
+                    const overviewUrl = `${window.location.pathname}#overview`;
+                    history.replaceState({ view: 'overview' }, '', overviewUrl);
                 }
 
                 // Set up click handlers for overview song buttons
@@ -905,35 +912,62 @@ class PageApp {
     }
 
     setupHashNavigation(setlistId, totalSongs) {
-        // Listen for hash changes
-        window.addEventListener('hashchange', () => {
-            const hash = window.location.hash.substring(1);
-            console.log('Hash changed to:', hash);
+        // Listen for popstate (back/forward button)
+        window.addEventListener('popstate', (event) => {
+            const hash = window.location.hash.substring(1) || 'overview';
+            console.log('Popstate to:', hash, 'state:', event.state);
+
             if (hash === 'overview' || !hash) {
-                this.showOverview();
+                this.showOverview(false);
             } else if (hash.startsWith('song-')) {
                 const index = parseInt(hash.split('-')[1]);
-                console.log('Navigating to song index:', index);
                 if (index >= 0 && index < totalSongs) {
-                    this.showSong(index);
+                    this.showSong(index, false);
                 }
             }
         });
 
-        console.log('Hash navigation setup complete for', totalSongs, 'songs');
+        console.log('History navigation setup complete for', totalSongs, 'songs');
     }
 
     navigateToHash(hash) {
-        // Replace the hash without adding to history
-        const newUrl = `${window.location.pathname}#${hash}`;
-        history.replaceState(null, '', newUrl);
+        const targetIsSong = hash.startsWith('song-');
+        const targetIsOverview = hash === 'overview';
+        const currentIsSong = this.currentSongIndex >= 0;
+        const currentIsOverview = this.currentSongIndex < 0;
 
-        // Manually trigger the navigation
-        if (hash === 'overview') {
-            this.showOverview(false);
-        } else if (hash.startsWith('song-')) {
-            const index = parseInt(hash.split('-')[1]);
-            this.showSong(index, false);
+        const newUrl = `${window.location.pathname}#${hash}`;
+
+        // Determine navigation action based on current and target
+        if (currentIsOverview && targetIsSong) {
+            // Overview → Song: PUSH (going deeper into the app)
+            const songIndex = parseInt(hash.split('-')[1]);
+            history.pushState({ fromOverview: true, view: 'song', index: songIndex }, '', newUrl);
+            this.showSong(songIndex, false);
+        } else if (currentIsSong && targetIsSong) {
+            // Song → Song: REPLACE (lateral navigation within same level)
+            const songIndex = parseInt(hash.split('-')[1]);
+            // Preserve fromOverview flag if it exists
+            const fromOverview = history.state?.fromOverview || false;
+            history.replaceState({ fromOverview, view: 'song', index: songIndex }, '', newUrl);
+            this.showSong(songIndex, false);
+        } else if (currentIsSong && targetIsOverview) {
+            // Song → Overview: Try to go back if we came from overview
+            if (history.state && history.state.fromOverview) {
+                // We pushed from overview, so we can safely go back
+                // The popstate handler will call showOverview()
+                history.back();
+            } else {
+                // We didn't come from overview (e.g., direct link), so replace
+                history.replaceState({ view: 'overview' }, '', newUrl);
+                this.showOverview(false);
+            }
+        } else {
+            // Overview → Overview or other edge cases: REPLACE
+            history.replaceState({ view: 'overview' }, '', newUrl);
+            if (targetIsOverview) {
+                this.showOverview(false);
+            }
         }
     }
 
