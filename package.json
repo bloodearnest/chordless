@@ -1,0 +1,17 @@
+{
+  "name": "setalight",
+  "version": "1.0.0",
+  "description": "Worship setlist management app",
+  "type": "module",
+  "scripts": {
+    "test:browser": "playwright test",
+    "test:browser:ui": "playwright test --ui",
+    "test:browser:headed": "playwright test --headed"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -110,12 +110,23 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Loading...</title>
     <script>
-        // Register service worker and reload
+        // Register service worker and reload (only if not already controlling)
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').then(() => {
-                // Reload to let service worker handle the request
-                window.location.reload();
-            });
+            // Check if SW is already controlling this page
+            if (navigator.serviceWorker.controller) {
+                // SW is already controlling but still served this shell - something is wrong
+                // This shouldn't happen in normal operation
+                console.error('Service worker is controlling but still got app shell');
+            } else {
+                // Register SW and reload
+                navigator.serviceWorker.register('/service-worker.js').then(() => {
+                    // Wait for SW to be ready before reloading
+                    return navigator.serviceWorker.ready;
+                }).then(() => {
+                    // Reload to let service worker handle the request
+                    window.location.reload();
+                });
+            }
         } else {
             document.body.innerHTML = '<p>Service Worker not supported. Please use a modern browser.</p>';
         }

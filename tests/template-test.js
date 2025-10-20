@@ -44,7 +44,7 @@ async function runTests() {
     // ===== Test index.html templates =====
     console.log('=== Testing index.html ===');
 
-    const indexDoc = await loadHTMLContent('index.html');
+    const indexDoc = await loadHTMLContent('/index.html');
 
     // Test setlist item template exists
     const setlistItemTemplate = indexDoc.getElementById('setlist-item-template');
@@ -93,7 +93,7 @@ async function runTests() {
     // ===== Test setlist.html templates =====
     console.log('\n=== Testing setlist.html ===');
 
-    const setlistDoc = await loadHTMLContent('setlist.html');
+    const setlistDoc = await loadHTMLContent('/setlist.html');
 
     // Test key option template exists
     const keyOptionTemplate = setlistDoc.getElementById('key-option-template');

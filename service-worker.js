@@ -2,7 +2,7 @@
 // Handles routing and generates pages for offline-first operation
 
 const DEV_MODE = true; // Set to false for production
-const CACHE_NAME = 'setalight-v10';
+const CACHE_NAME = 'setalight-v11';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -88,6 +88,13 @@ self.addEventListener('fetch', (event) => {
                 })
             );
         }
+        return;
+    }
+
+    // Direct HTML file requests - pass through to network
+    if (url.pathname.endsWith('.html')) {
+        console.log('[SW] Direct HTML file request, passing through:', url.pathname);
+        event.respondWith(fetch(event.request));
         return;
     }
 
