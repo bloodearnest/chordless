@@ -1,0 +1,40 @@
+
+
+management
+- create setlist
+- add song to set list from library
+- chrome extension to import song
+- browse library
+
+storage
+- oauth
+- gdrive as source of truth
+ - syncing
+
+sharing
+- bundle?
+- email media team
+
+UI
+- autoscaling font
+- fix home button
+- logo
+
+editing
+- edit chordpro
+- song notes/stickies
+
+live
+ - simple sharing
+ - websocket sync
+
+settings
+ - preferences
+   - vocalist?
+   - darkmode
+
+library
+ - browse
+ - ccli report nag
+ - show when we last sang song
+
