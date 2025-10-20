@@ -15,12 +15,12 @@ export class SetlistImporter {
     }
 
     /**
-     * Import all setlists from filesystem into IndexedDB
+     * Import all setlists from server into IndexedDB
      * @param {string} cutoffDate - ISO date string (e.g. "2025-01-01")
      * @param {Function} progressCallback - Optional callback for progress updates
      */
-    async importFromFilesystem(cutoffDate = '2025-01-01', progressCallback = null) {
-        console.log('[Import] Starting import with cutoff date:', cutoffDate);
+    async importFromServer(cutoffDate = '2025-01-01', progressCallback = null) {
+        console.log('[Import] Starting import from server with cutoff date:', cutoffDate);
 
         // Clear existing data
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
@@ -28,17 +28,139 @@ export class SetlistImporter {
         this.songsCache.clear();
         console.log('[Import] Cleared existing data');
 
-        // Check if File System Access API is supported (Chromium-only)
-        if (window.showDirectoryPicker) {
-            return await this.importFromFilesystemModern(cutoffDate, progressCallback);
-        } else {
-            // Firefox/Safari fallback using traditional input element
-            return await this.importFromFilesystemFallback(cutoffDate, progressCallback);
+        if (progressCallback) progressCallback({ stage: 'fetching', message: 'Fetching setlists from server...' });
+
+        try {
+            // Fetch all setlists from the API
+            const response = await fetch(`/api/import?cutoff=${encodeURIComponent(cutoffDate)}`);
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            }
+
+            const setlists = await response.json();
+            console.log(`[Import] Received ${setlists.length} setlists from server`);
+
+            // Import each setlist
+            const importedSetlists = [];
+            for (let i = 0; i < setlists.length; i++) {
+                const setlistData = setlists[i];
+                if (progressCallback) {
+                    progressCallback({
+                        stage: 'importing',
+                        message: `Importing ${setlistData.id}...`,
+                        current: i + 1,
+                        total: setlists.length
+                    });
+                }
+
+                try {
+                    const setlist = await this.importSetlistFromServer(setlistData);
+                    importedSetlists.push(setlist);
+                    console.log(`[Import] Imported setlist: ${setlistData.id}`);
+                } catch (err) {
+                    console.error(`[Import] Failed to import ${setlistData.id}:`, err);
+                }
+            }
+
+            // Save all songs to database
+            if (progressCallback) progressCallback({ stage: 'saving', message: 'Saving songs to database...' });
+            for (const song of this.songsCache.values()) {
+                await this.db.saveSong(song);
+            }
+
+            console.log(`[Import] Complete! Imported ${importedSetlists.length} setlists, ${this.songsCache.size} unique songs`);
+
+            if (progressCallback) {
+                progressCallback({
+                    stage: 'complete',
+                    message: `Import complete! ${importedSetlists.length} setlists, ${this.songsCache.size} songs`,
+                    setlists: importedSetlists.length,
+                    songs: this.songsCache.size
+                });
+            }
+
+            return {
+                success: true,
+                setlists: importedSetlists.length,
+                songs: this.songsCache.size
+            };
+        } catch (error) {
+            console.error('[Import] Import failed:', error);
+            if (progressCallback) {
+                progressCallback({
+                    stage: 'error',
+                    message: `Import failed: ${error.message}`
+                });
+            }
+            throw error;
         }
     }
 
     /**
-     * Modern import using File System Access API (Chromium)
+     * Import a single setlist from server data
+     */
+    async importSetlistFromServer(setlistData) {
+        const songs = [];
+
+        console.log(`[Import] Importing setlist: ${setlistData.id} with ${setlistData.songs.length} songs`);
+
+        // Process each song
+        for (let order = 0; order < setlistData.songs.length; order++) {
+            const songData = setlistData.songs[order];
+            console.log(`[Import] Processing song: ${songData.filename}`);
+
+            try {
+                const chordproText = songData.content;
+                console.log(`[Import] Read ${chordproText.length} chars from ${songData.filename}`);
+
+                // Parse the chordpro
+                const parsed = this.parser.parse(chordproText);
+                console.log(`[Import] Parsed song: ${parsed.metadata.title}`);
+
+                // Find or create song in collection
+                const songId = await this.findOrCreateSong(parsed, chordproText, setlistData.id, setlistData.date);
+                console.log(`[Import] Song ID: ${songId}`);
+
+                // Add to setlist
+                songs.push({
+                    order: order,
+                    songId: songId,
+                    chordproEdits: null,
+                    modifications: {
+                        targetKey: null,
+                        bpmOverride: null,
+                        fontSize: 1.6,
+                        sectionStates: {}
+                    }
+                });
+            } catch (err) {
+                console.error(`[Import] Failed to import song ${songData.filename}:`, err);
+            }
+        }
+
+        console.log(`[Import] Found ${songs.length} songs in ${setlistData.id}`);
+
+        // Sort songs by order
+        songs.sort((a, b) => a.order - b.order);
+
+        // Create setlist object
+        const setlist = {
+            id: setlistData.id,
+            date: setlistData.date,
+            name: this.extractSetlistName(setlistData.id),
+            songs: songs,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+
+        // Save setlist to database
+        await this.db.saveSetlist(setlist);
+
+        return setlist;
+    }
+
+    /**
+     * Modern import using File System Access API (Chromium) - DEPRECATED
      */
     async importFromFilesystemModern(cutoffDate, progressCallback) {
         // Get directory handle for sets/

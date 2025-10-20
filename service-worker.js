@@ -2,7 +2,7 @@
 // Handles routing and generates pages for offline-first operation
 
 const DEV_MODE = true; // Set to false for production
-const CACHE_NAME = 'setalight-v11';
+const CACHE_NAME = 'setalight-v12';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -37,6 +37,14 @@ self.addEventListener('activate', (event) => {
         })
     );
     self.clients.claim();
+});
+
+// Handle messages from clients
+self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        console.log('[SW] Received SKIP_WAITING message');
+        self.skipWaiting();
+    }
 });
 
 // Fetch event handler - routes requests

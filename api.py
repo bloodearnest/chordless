@@ -37,9 +37,16 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
                 self.handle_songs(setlist)
             else:
                 self.send_error(400, 'Missing setlist parameter')
-        # App routes - return a shell HTML that registers the service worker
-        elif path.startswith('/setlist/'):
-            self.serve_app_shell()
+        # API endpoint to import all setlists with full song content
+        elif path == '/api/import':
+            query = parse_qs(parsed_path.query)
+            cutoff_date = query.get('cutoff', ['2025-01-01'])[0]
+            self.handle_import(cutoff_date)
+        # Setlist routes - serve setlist.html directly
+        elif path.startswith('/setlist/') and not path.endswith('.html'):
+            # Serve setlist.html for all /setlist/* routes
+            self.path = '/setlist.html'
+            super().do_GET()
         elif path == '/':
             self.path = '/index.html'
             super().do_GET()
@@ -81,10 +88,8 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
                 self.send_error(404, 'Setlist not found')
                 return
 
-            # Find all .txt files (excluding non-song files)
+            # Find all .txt files
             song_files = glob.glob(f'{setlist_path}/*.txt')
-            # Filter out non-song files
-            song_files = [f for f in song_files if os.path.basename(f)[0].isdigit()]
             song_files.sort()
 
             songs = []
@@ -98,6 +103,58 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps(songs).encode())
+        except Exception as e:
+            self.send_error(500, str(e))
+
+    def handle_import(self, cutoff_date):
+        """Return all setlists with full song content for import"""
+        try:
+            # Find all directories in sets/
+            setlist_dirs = glob.glob('sets/*/')
+            setlists = []
+
+            for dir_path in setlist_dirs:
+                # Extract date from directory name (format: sets/YYYY-MM-DD/)
+                date_str = os.path.basename(dir_path.rstrip('/'))
+
+                # Extract date from directory name (format: YYYY-MM-DD or YYYY-MM-DD-event-name)
+                date_match = date_str.split('-')
+                if len(date_match) >= 3:
+                    date = f'{date_match[0]}-{date_match[1]}-{date_match[2]}'
+
+                    # Filter by cutoff date
+                    if date >= cutoff_date:
+                        # Find all .txt song files
+                        song_files = glob.glob(f'{dir_path}/*.txt')
+                        song_files.sort()
+
+                        songs = []
+                        for song_file in song_files:
+                            try:
+                                with open(song_file, 'r', encoding='utf-8') as f:
+                                    content = f.read()
+                                    songs.append({
+                                        'filename': os.path.basename(song_file),
+                                        'content': content
+                                    })
+                            except Exception as e:
+                                print(f'Error reading {song_file}: {e}')
+
+                        if songs:  # Only include setlists with songs
+                            setlists.append({
+                                'id': date_str,
+                                'date': date,
+                                'name': date_str,
+                                'songs': songs
+                            })
+
+            # Sort by date, oldest first for consistent ordering
+            setlists.sort(key=lambda x: x['date'])
+
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(setlists).encode())
         except Exception as e:
             self.send_error(500, str(e))
 
