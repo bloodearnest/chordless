@@ -131,9 +131,21 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
         self.wfile.write(html.encode())
 
 def run_server(port=8000):
-    server_address = ('', port)
+    server_address = ('0.0.0.0', port)
     httpd = HTTPServer(server_address, SetalightAPIHandler)
-    print(f'Starting Setalight server on http://localhost:{port}')
+
+    # Get local IP for easier tablet access
+    import socket
+    hostname = socket.gethostname()
+    try:
+        local_ip = socket.gethostbyname(hostname)
+    except:
+        local_ip = '127.0.0.1'
+
+    print(f'Starting Setalight server on:')
+    print(f'  Local:   http://localhost:{port}')
+    print(f'  Network: http://{local_ip}:{port}')
+    print(f'  All interfaces: http://0.0.0.0:{port}')
     print('Press Ctrl+C to stop')
     httpd.serve_forever()
 
