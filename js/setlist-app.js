@@ -1721,11 +1721,61 @@ class PageApp {
                     this.setupOverviewDragDrop();
                 }
 
-                // Update song section IDs in the DOM
-                const songSections = document.querySelectorAll('.section[id^="song-"]');
-                songSections.forEach((section, index) => {
-                    section.id = `song-${index}`;
-                });
+                // Re-order song sections in the DOM to match new order
+                const container = document.querySelector('.song-container');
+
+                // Get all song sections in their current DOM order
+                const songSections = Array.from(document.querySelectorAll('.section[id^="song-"]'));
+
+                // The section that was at startIndex moved to newIndex
+                // We need to physically move that DOM section
+                const sectionToMove = songSections[startIndex];
+
+                if (sectionToMove) {
+                    // Remove the section from its current position
+                    sectionToMove.remove();
+
+                    // Insert at the new position
+                    if (newIndex === 0) {
+                        // Insert at the beginning (after overview)
+                        const overview = document.getElementById('overview');
+                        if (overview.nextSibling) {
+                            container.insertBefore(sectionToMove, overview.nextSibling);
+                        } else {
+                            container.appendChild(sectionToMove);
+                        }
+                    } else if (newIndex >= songSections.length - 1) {
+                        // Insert at the end
+                        container.appendChild(sectionToMove);
+                    } else {
+                        // Insert before the section that's currently at newIndex
+                        // Account for the removal when finding the target
+                        const targetIndex = newIndex > startIndex ? newIndex : newIndex + 1;
+                        const targetSection = songSections[targetIndex];
+                        if (targetSection) {
+                            container.insertBefore(sectionToMove, targetSection);
+                        }
+                    }
+
+                    // Now update all section IDs and data-song-index attributes to match new order
+                    const updatedSections = Array.from(document.querySelectorAll('.section[id^="song-"]'));
+                    updatedSections.forEach((section, index) => {
+                        section.id = `song-${index}`;
+
+                        // Update data-song-index on all wrappers inside this section
+                        section.querySelectorAll('[data-song-index]').forEach(el => {
+                            el.dataset.songIndex = index;
+                        });
+                    });
+
+                    // Re-apply section states with new indices
+                    this.applySectionState();
+
+                    // Re-apply font sizes
+                    this.songs.forEach((song, index) => {
+                        this.applyFontSize(index);
+                    });
+                }
             }
 
             // Cancel any pending animation frame
