@@ -6,7 +6,7 @@
     <meta name="description" content="Setlist arrangement for worship songs">
     <meta name="view-transition" content="same-origin">
     <title>Setalight</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <div class="app-container">
@@ -43,7 +43,7 @@
     <script>
         // Register service worker
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js')
+            navigator.serviceWorker.register('/service-worker.js')
                 .then(registration => {
                     console.log('Service Worker registered:', registration);
 
@@ -64,6 +64,6 @@
                 });
         }
     </script>
-    <script type="module" src="page-app.js"></script>
+    <script type="module" src="js/setlist-app.js"></script>
 </body>
 </html>

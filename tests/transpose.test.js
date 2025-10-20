@@ -8,7 +8,7 @@ import {
     transposeChord,
     getAvailableKeys,
     getKeyOffset
-} from './transpose.js';
+} from '../js/transpose.js';
 
 // Simple test framework
 let testCount = 0;

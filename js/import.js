@@ -1,6 +1,6 @@
 // Import tool for migrating filesystem data to IndexedDB
 
-import { ChordProParser } from './chordpro-parser.js';
+import { ChordProParser } from './parser.js';
 import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText } from './db.js';
 
 export class SetlistImporter {

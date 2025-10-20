@@ -1,7 +1,7 @@
 // Page-based application logic for Setalight
 // Works with service worker routing and Navigation API
 
-import { ChordProParser } from './chordpro-parser.js';
+import { ChordProParser } from './parser.js';
 import { SetalightDB } from './db.js';
 import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
 

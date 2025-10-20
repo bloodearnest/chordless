@@ -2,14 +2,15 @@
 // Handles routing and generates pages for offline-first operation
 
 const DEV_MODE = true; // Set to false for production
-const CACHE_NAME = 'setalight-v9';
+const CACHE_NAME = 'setalight-v10';
 const ASSETS = [
     '/',
-    '/style.css',
-    '/chordpro-parser.js',
-    '/page-app.js',
-    '/db.js',
-    '/import.js'
+    '/css/style.css',
+    '/js/parser.js',
+    '/js/setlist-app.js',
+    '/js/db.js',
+    '/js/import.js',
+    '/js/transpose.js'
 ];
 
 // Install service worker and cache assets
