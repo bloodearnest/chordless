@@ -224,6 +224,7 @@ header {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    transition: opacity 0.2s ease-in-out;
 }
 
 .song-meta-compact {

@@ -710,8 +710,18 @@ class PageApp {
         const editToggle = document.getElementById('edit-mode-toggle');
 
         if (song) {
-            // Update title
-            titleEl.textContent = song.title;
+            // Crossfade title if it's changing
+            const newTitle = song.title;
+            if (titleEl.textContent !== newTitle) {
+                // Fade out
+                titleEl.style.opacity = '0';
+
+                // Wait for fade out, then update and fade in
+                setTimeout(() => {
+                    titleEl.textContent = newTitle;
+                    titleEl.style.opacity = '1';
+                }, 200);
+            }
 
             // Update key display (for normal mode) - use current key
             if (keyValueDisplay) {
@@ -747,15 +757,28 @@ class PageApp {
             infoButton.onclick = () => this.showSongInfo(song);
         } else {
             // Overview - format date and name properly
+            let newTitle;
             if (this.currentSetlist) {
                 const formattedDate = this.formatSetlistName(this.currentSetlist.date);
-                const title = this.currentSetlist.name
+                newTitle = this.currentSetlist.name
                     ? `${formattedDate} - ${this.currentSetlist.name}`
                     : formattedDate;
-                titleEl.textContent = title;
             } else {
-                titleEl.textContent = 'Setlist';
+                newTitle = 'Setlist';
             }
+
+            // Crossfade title if it's changing
+            if (titleEl.textContent !== newTitle) {
+                // Fade out
+                titleEl.style.opacity = '0';
+
+                // Wait for fade out, then update and fade in
+                setTimeout(() => {
+                    titleEl.textContent = newTitle;
+                    titleEl.style.opacity = '1';
+                }, 200);
+            }
+
             metaEl.textContent = '';
 
             // Hide key display, edit button, and info button on overview
