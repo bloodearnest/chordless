@@ -581,10 +581,11 @@ body.edit-mode .song-content .song-section-wrapper {
 .song-content .section-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: 1rem;
     margin-bottom: 0;
-    min-height: 0;
-    position: relative;
+    min-height: 2rem;
+    width: 100%;
 }
 
 .song-content .song-section {
@@ -603,6 +604,10 @@ body.edit-mode .song-content .song-section-wrapper {
     line-height: 1.6rem;
     padding-top: 0.2rem;
     padding-bottom: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
 }
 
 .song-content details.song-section summary.section-label::-webkit-details-marker {
@@ -631,6 +636,8 @@ body.edit-mode .song-content .song-section-wrapper {
     color: #7f8c8d;
     font-weight: bold;
     font-style: italic;
+    flex: 0 1 auto;
+    min-width: 0;
 }
 
 .song-content .section-content {
@@ -641,11 +648,10 @@ body.edit-mode .song-content .song-section-wrapper {
 .song-content .section-controls {
     display: none;
     flex-direction: row;
-    gap: 0.5rem;
+    gap: 0.3rem;
     align-items: center;
-    position: absolute;
-    right: 0;
-    top: -1px;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 /* Show controls when in edit mode */
@@ -681,18 +687,19 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 0.3rem;
-    padding: 0.25rem;
+    gap: 0.2rem;
+    padding: 0.2rem 0.3rem;
     background-color: rgba(255, 255, 255, 0.95);
-    border: 2px solid #7f8c8d;
-    border-radius: 6px;
+    border: 1.5px solid #7f8c8d;
+    border-radius: 4px;
     cursor: pointer;
     transition: all 0.2s;
-    font-size: 1rem;
+    font-size: 0.85rem;
     color: #7f8c8d;
     white-space: nowrap;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
     backdrop-filter: blur(4px);
+    min-height: 1.8rem;
 }
 
 .song-content .section-control-btn:hover {
@@ -710,7 +717,7 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     background-color: var(--button-bg);
     border-color: var(--button-bg);
     color: white;
-    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 6px 20px rgba(0, 0, 0, 0.15), 0 0 0 3px rgba(52, 152, 219, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(52, 152, 219, 0.3);
 }
 
 .song-content .section-control-btn.active .control-icon,
@@ -725,14 +732,14 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
 }
 
 .song-content .section-control-btn .control-icon {
-    font-size: 1.1rem;
-    min-width: 1.1rem;
+    font-size: 0.9rem;
+    min-width: 0.9rem;
     text-align: center;
 }
 
 .song-content .section-control-btn .control-label {
     font-weight: 600;
-    font-size: 0.9rem;
+    font-size: 0.75rem;
 }
 
 /* Hide chords when active */
