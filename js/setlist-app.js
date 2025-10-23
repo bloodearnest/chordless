@@ -723,12 +723,7 @@ class PageApp {
                 }, 200);
             }
 
-            // Update key display (for normal mode) - use current key
-            if (keyValueDisplay) {
-                keyValueDisplay.textContent = song.currentKey || '-';
-            }
-
-            // Update key selector (for edit mode) - use current key
+            // Update key selector value (used in both modes) - use current key
             if (song.currentKey) {
                 this.populateKeySelector(song.currentKey);
             }
@@ -1286,9 +1281,28 @@ class PageApp {
             const isEnteringEditMode = !document.body.classList.contains('edit-mode');
 
             if (isEnteringEditMode) {
-                // Entering edit mode
+                // Entering edit mode - fade out normal controls, fade in edit controls
                 document.body.classList.add('edit-mode');
                 editToggle.classList.add('active');
+
+                // Clear inline display:none if it was set during previous exit
+                document.querySelectorAll('.edit-mode-control').forEach(el => {
+                    el.style.display = '';
+                });
+
+                // Trigger fade-in for all edit mode controls after a frame
+                requestAnimationFrame(() => {
+                    document.querySelectorAll('.edit-mode-control').forEach(el => {
+                        el.classList.add('fade-in');
+                    });
+                });
+
+                // After fade completes, mark normal controls as fade-complete
+                setTimeout(() => {
+                    document.querySelectorAll('.normal-mode-control').forEach(el => {
+                        el.classList.add('fade-complete');
+                    });
+                }, 250);
 
                 // Update all sections based on edit mode
                 document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
@@ -1297,8 +1311,60 @@ class PageApp {
                     this.updateSectionDOM(songIndex, sectionIndex);
                 });
             } else {
-                // Exiting edit mode
-                await this.exitEditMode();
+                // Exiting edit mode - fade everything simultaneously
+                // Remove edit mode class immediately to trigger all fades
+                document.body.classList.remove('edit-mode');
+                editToggle.classList.remove('active');
+
+                // Remove fade-in classes from edit controls (triggers fade out)
+                document.querySelectorAll('.edit-mode-control').forEach(el => {
+                    el.classList.remove('fade-in');
+                });
+
+                // Remove fade-complete from normal controls (makes them visible again)
+                document.querySelectorAll('.normal-mode-control').forEach(el => {
+                    el.classList.remove('fade-complete');
+                });
+
+                // Wait for fade to complete, then save and cleanup
+                setTimeout(async () => {
+                    // Hide edit controls completely now that fade is done
+                    document.querySelectorAll('.edit-mode-control').forEach(el => {
+                        el.style.display = 'none';
+                    });
+
+                    // Update all sections to reflect non-edit mode (apply collapsed/open states to <details>)
+                    // This must happen AFTER removing edit-mode class so details elements get the right state
+                    document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
+                        const songIndex = parseInt(wrapper.dataset.songIndex);
+                        const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                        this.updateSectionDOM(songIndex, sectionIndex);
+                    });
+
+                    // Save setlist to IndexedDB
+                    if (this.currentSetlist) {
+                        // Update modifications for each song
+                        this.songs.forEach((song, index) => {
+                            this.currentSetlist.songs[index].modifications.fontSize = song.currentFontSize;
+
+                            // Save section states
+                            const sectionStates = {};
+                            if (this.sectionState[index]) {
+                                for (const [sectionIdx, state] of Object.entries(this.sectionState[index])) {
+                                    sectionStates[sectionIdx] = state;
+                                }
+                            }
+                            this.currentSetlist.songs[index].modifications.sectionStates = sectionStates;
+                        });
+
+                        // Update timestamp
+                        this.currentSetlist.updatedAt = new Date().toISOString();
+
+                        // Save to database
+                        await this.db.saveSetlist(this.currentSetlist);
+                        console.log('[ExitEditMode] Saved setlist to IndexedDB');
+                    }
+                }, 250);
             }
         });
     }

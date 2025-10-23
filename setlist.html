@@ -17,26 +17,20 @@
                     <div class="song-title-compact" id="song-title-header">Loading...</div>
                 </div>
                 <div class="header-center">
-                    <button class="reset-button" id="reset-button" aria-label="Reset song">↺</button>
-                    <div class="font-size-controls">
+                    <button class="reset-button edit-mode-control" id="reset-button" aria-label="Reset song">↺</button>
+                    <div class="font-size-controls edit-mode-control">
                         <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
                         <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">A+</button>
                     </div>
-                    <!-- Key display (normal mode) and key selector (edit mode) in same position -->
+                    <!-- Key display/selector (same button for both modes) -->
                     <div class="key-display-wrapper">
-                        <span class="meta-item key-meta-display" id="key-meta-display">
-                            <span class="meta-label">Key:</span>
-                            <span id="key-value-display">-</span>
-                        </span>
-                        <div class="key-selector-controls">
-                            <label class="key-selector-label">Key:</label>
-                            <button id="key-selector-button" class="key-selector" popovertarget="key-selector-popover">
-                                <span id="key-selector-value">-</span>
-                            </button>
-                            <div id="key-selector-popover" class="key-popover" popover>
-                                <div id="key-options-list" class="key-options-list">
-                                    <!-- Options populated by JavaScript -->
-                                </div>
+                        <label class="meta-label">Key:</label>
+                        <button id="key-selector-button" class="key-selector" popovertarget="key-selector-popover">
+                            <span id="key-selector-value">-</span>
+                        </button>
+                        <div id="key-selector-popover" class="key-popover" popover>
+                            <div id="key-options-list" class="key-options-list">
+                                <!-- Options populated by JavaScript -->
                             </div>
                         </div>
                     </div>

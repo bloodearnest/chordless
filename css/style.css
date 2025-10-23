@@ -208,8 +208,9 @@ header {
 .header-center {
     display: flex;
     align-items: center;
-    gap: 1rem;
-    flex: 0 1 auto;
+    gap: 0.5rem;
+    flex: 0 0 auto;
+    justify-content: flex-end;
 }
 
 .header-right {
@@ -230,7 +231,7 @@ header {
 .song-meta-compact {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.5rem;
     font-size: 1.3rem;
     white-space: nowrap;
 }
@@ -238,7 +239,7 @@ header {
 .meta-item {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.3rem;
 }
 
 .meta-label {
@@ -246,75 +247,95 @@ header {
     font-size: 1.3rem;
 }
 
-/* Key display wrapper - holds both normal display and edit mode dropdown */
+
+/* Edit mode control visibility system */
+/* Controls visible in normal mode, hidden in edit mode */
+.normal-mode-control {
+    opacity: 1;
+    transition: opacity 0.25s ease-in-out;
+}
+
+body.edit-mode .normal-mode-control {
+    opacity: 0;
+    transition: opacity 0.25s ease-in-out;
+}
+
+body.edit-mode .normal-mode-control.fade-complete {
+    display: none;
+}
+
+/* Controls hidden in normal mode, visible in edit mode */
+.edit-mode-control {
+    display: none;
+    opacity: 0;
+}
+
+/* When entering edit mode, show controls but keep opacity 0 initially */
+body.edit-mode .edit-mode-control {
+    opacity: 0;
+    transition: opacity 0.25s ease-in-out;
+}
+
+/* For flex containers (divs, buttons with flex layout) */
+body.edit-mode .font-size-controls,
+body.edit-mode .reset-button {
+    display: flex;
+}
+
+/* Fade in when class is added */
+body.edit-mode .edit-mode-control.fade-in {
+    opacity: 1;
+}
+
+/* When exiting edit mode - keep visible during fade out */
+.edit-mode-control:not(.fade-in) {
+    transition: opacity 0.25s ease-in-out;
+}
+
+/* For flex containers during fade out */
+.font-size-controls:not(.fade-in),
+.reset-button:not(.fade-in) {
+    display: flex;
+}
+
+/* Key display wrapper - shared label between modes */
 .key-display-wrapper {
     display: flex;
     align-items: center;
+    gap: 0.3rem;
 }
 
-/* Key display - shown in normal mode, hidden in edit mode */
-.key-meta-display {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.3rem;
-    white-space: nowrap;
-    opacity: 1;
-    pointer-events: auto;
-    transition: opacity 0.25s ease-in-out;
-}
-
-.key-meta-display .meta-label {
-    font-size: 1.3rem;
-}
-
-body.edit-mode .key-meta-display {
-    opacity: 0;
-    pointer-events: none;
-}
-
-/* Key selector controls - hidden in normal mode, shown in edit mode */
-.key-selector-controls {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease-in-out;
-}
-
-body.edit-mode .key-selector-controls {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.key-selector-label {
-    font-size: 1.3rem;
-    font-weight: normal;
-    color: var(--header-text);
-    opacity: 0.8;
-}
-
+/* Key selector - appears as plain text in normal mode, interactive button in edit mode */
 .key-selector {
-    background-color: rgba(255, 255, 255, 0.2);
+    background: transparent;
     color: var(--header-text);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    padding: 0.5rem 0.75rem;
-    font-size: 1.1rem;
+    border: 2px solid transparent;
+    padding: 0.25rem 0.3rem;
+    font-size: 1.3rem;
     border-radius: 4px;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-width: 80px;
+    cursor: default;
+    transition: all 0.25s ease-in-out;
+    min-width: 3rem;
     min-height: 44px;
-    font-weight: 600;
+    font-weight: normal;
+    text-align: center;
+    pointer-events: none;
 }
 
-.key-selector:hover {
+/* In edit mode, make it look and behave like a button */
+body.edit-mode .key-selector {
+    background-color: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+body.edit-mode .key-selector:hover {
     background-color: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-.key-selector:focus {
+body.edit-mode .key-selector:focus {
     outline: none;
     background-color: rgba(255, 255, 255, 0.3);
     border-color: var(--header-text);
@@ -350,9 +371,10 @@ body.edit-mode .key-selector-controls {
     background-color: transparent;
     color: var(--header-text);
     border: none;
-    padding: 0.75rem 1.5rem;
-    font-size: 1.3rem;
-    font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+    padding: 0.5rem 1rem;
+    font-size: 1.5rem;
+    font-family: inherit;
+    font-weight: normal;
     cursor: pointer;
     text-align: left;
     transition: background-color 0.2s;
@@ -369,7 +391,6 @@ body.edit-mode .key-selector-controls {
 
 .key-option-item.selected {
     background-color: rgba(255, 255, 255, 0.3);
-    font-weight: 700;
 }
 
 .key-option-item .key-name {
@@ -384,17 +405,8 @@ body.edit-mode .key-selector-controls {
 }
 
 .font-size-controls {
-    display: flex;
     align-items: center;
-    gap: 0.5rem;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease-in-out;
-}
-
-body.edit-mode .font-size-controls {
-    opacity: 1;
-    pointer-events: auto;
+    gap: 0.3rem;
 }
 
 .font-size-btn {
@@ -410,7 +422,7 @@ body.edit-mode .font-size-controls {
     cursor: pointer;
     font-size: 1rem;
     font-weight: bold;
-    transition: all 0.2s;
+    transition: opacity 0.25s ease-in-out, background-color 0.2s, transform 0.2s, border-color 0.2s, color 0.2s;
 }
 
 .font-size-btn:hover {
@@ -431,20 +443,12 @@ body.edit-mode .font-size-controls {
     width: 2.5rem;
     height: 2.5rem;
     border-radius: 50%;
-    display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 1.5rem;
     font-weight: bold;
-    opacity: 0;
-    pointer-events: none;
     transition: opacity 0.25s ease-in-out, background-color 0.2s, transform 0.2s;
-}
-
-body.edit-mode .reset-button {
-    opacity: 1;
-    pointer-events: auto;
 }
 
 .reset-button:hover {
@@ -683,8 +687,10 @@ body.edit-mode .song-content .section-controls {
     pointer-events: auto;
 }
 
-/* In edit mode, force collapsed sections to hide content (since details is always open) */
-body.edit-mode .song-content .song-section-wrapper.section-collapsed .section-content {
+/* Force collapsed sections to hide content when marked as collapsed */
+/* In edit mode: details is always open, so we need this to hide content */
+/* When exiting edit mode: this keeps content hidden during transition until details.open is set */
+.song-content .song-section-wrapper.section-collapsed .section-content {
     display: none;
 }
 
