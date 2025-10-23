@@ -258,6 +258,9 @@ header {
     gap: 0.5rem;
     font-size: 1.3rem;
     white-space: nowrap;
+    opacity: 1;
+    pointer-events: auto;
+    transition: opacity 0.25s ease-in-out;
 }
 
 .key-meta-display .meta-label {
@@ -265,18 +268,23 @@ header {
 }
 
 body.edit-mode .key-meta-display {
-    display: none;
+    opacity: 0;
+    pointer-events: none;
 }
 
 /* Key selector controls - hidden in normal mode, shown in edit mode */
 .key-selector-controls {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease-in-out;
 }
 
 body.edit-mode .key-selector-controls {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .key-selector-label {
@@ -375,13 +383,17 @@ body.edit-mode .key-selector-controls {
 }
 
 .font-size-controls {
-    display: none;
+    display: flex;
     align-items: center;
     gap: 0.5rem;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease-in-out;
 }
 
 body.edit-mode .font-size-controls {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .font-size-btn {
@@ -418,17 +430,20 @@ body.edit-mode .font-size-controls {
     width: 2.5rem;
     height: 2.5rem;
     border-radius: 50%;
-    display: none;
+    display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 1.5rem;
     font-weight: bold;
-    transition: all 0.2s;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease-in-out, background-color 0.2s, transform 0.2s;
 }
 
 body.edit-mode .reset-button {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 .reset-button:hover {
@@ -572,6 +587,10 @@ body.edit-mode .reset-button {
 }
 
 /* Visual grouping in edit mode */
+.song-content .song-section-wrapper {
+    transition: border-color 0.25s ease-in-out, background-color 0.25s ease-in-out;
+}
+
 body.edit-mode .song-content .song-section-wrapper {
     border-color: #bdc3c7;
     border-style: dotted;
@@ -646,17 +665,21 @@ body.edit-mode .song-content .song-section-wrapper {
 
 /* Section controls panel - hidden by default */
 .song-content .section-controls {
-    display: none;
+    display: flex;
     flex-direction: row;
     gap: 0.3rem;
     align-items: center;
     flex-shrink: 0;
     margin-left: auto;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease-in-out;
 }
 
 /* Show controls when in edit mode */
 body.edit-mode .song-content .section-controls {
-    display: flex;
+    opacity: 1;
+    pointer-events: auto;
 }
 
 /* In edit mode, force collapsed sections to hide content (since details is always open) */
@@ -693,7 +716,7 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     border: 1.5px solid #7f8c8d;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: background-color 0.2s, transform 0.2s, border-color 0.2s, box-shadow 0.2s;
     font-size: 0.85rem;
     color: #7f8c8d;
     white-space: nowrap;
