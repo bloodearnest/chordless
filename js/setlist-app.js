@@ -1091,19 +1091,16 @@ class PageApp {
             } else {
                 state.hideMode = 'none';
             }
+            this.saveState();
+            this.updateSectionDOM(songIndex, sectionIndex);
         } else if (mode === 'collapse') {
-            // Toggle collapse state - mutually exclusive with all others
-            if (state.isHidden) {
-                // If entire section is hidden, unhide it first
-                state.isHidden = false;
-            }
-            // Toggle: if clicking the same mode, turn it off
-            if (state.hideMode === 'collapse') {
-                state.hideMode = 'none';
-                state.isCollapsed = false;
-            } else {
-                state.hideMode = 'collapse';
-                state.isCollapsed = true;
+            // Simulate clicking the section heading (same behavior as normal mode)
+            const wrapper = document.querySelector(`.song-section-wrapper[data-song-index="${songIndex}"][data-section-index="${sectionIndex}"]`);
+            if (wrapper) {
+                const summary = wrapper.querySelector('.section-label');
+                if (summary) {
+                    summary.click();
+                }
             }
         } else {
             // chords or lyrics mode - mutually exclusive with all others
@@ -1117,10 +1114,91 @@ class PageApp {
             }
             // Toggle: if clicking the same mode, turn it off
             state.hideMode = (state.hideMode === mode) ? 'none' : mode;
+            this.saveState();
+            this.updateSectionDOM(songIndex, sectionIndex);
         }
+    }
 
-        this.saveState();
-        this.updateSectionDOM(songIndex, sectionIndex);
+    animateSectionToggle(songIndex, sectionIndex, details) {
+        const state = this.getSectionState(songIndex, sectionIndex);
+        const content = details.querySelector('.section-content');
+        const wrapper = details.closest('.song-section-wrapper');
+        if (!content) return;
+
+        const isEditMode = document.body.classList.contains('edit-mode');
+
+        // Determine if we're opening or closing based on current state
+        const isCurrentlyCollapsed = state.isCollapsed;
+        const isOpening = isCurrentlyCollapsed;
+
+        if (isOpening) {
+            // Opening: update state first
+            state.isCollapsed = false;
+            state.hideMode = 'none';
+            this.saveState();
+
+            // Update wrapper classes
+            wrapper.classList.remove('section-collapsed');
+            this.updateButtonStates(wrapper, state);
+
+            // In normal mode, open details; in edit mode it's always open
+            if (!isEditMode) {
+                details.open = true;
+            }
+
+            // Get the natural height
+            const startHeight = 0;
+            const endHeight = content.scrollHeight;
+
+            // Animate from 0 to full height
+            content.style.height = startHeight + 'px';
+            content.style.overflow = 'hidden';
+
+            requestAnimationFrame(() => {
+                content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+                content.style.height = endHeight + 'px';
+
+                // Clean up after animation
+                setTimeout(() => {
+                    content.style.height = '';
+                    content.style.overflow = '';
+                    content.style.transition = '';
+                }, 350);
+            });
+        } else {
+            // Closing: animate first, then update state
+            const startHeight = content.scrollHeight;
+            const endHeight = 0;
+
+            // Set explicit height
+            content.style.height = startHeight + 'px';
+            content.style.overflow = 'hidden';
+
+            requestAnimationFrame(() => {
+                content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)';
+                content.style.height = endHeight + 'px';
+
+                // After animation completes, update state
+                setTimeout(() => {
+                    state.isCollapsed = true;
+                    state.hideMode = 'collapse';
+                    this.saveState();
+
+                    // Update wrapper classes (adds section-collapsed)
+                    wrapper.classList.add('section-collapsed');
+                    this.updateButtonStates(wrapper, state);
+
+                    // In normal mode, close details; in edit mode keep it open
+                    if (!isEditMode) {
+                        details.open = false;
+                    }
+
+                    content.style.height = '';
+                    content.style.overflow = '';
+                    content.style.transition = '';
+                }, 350);
+            });
+        }
     }
 
     updateSectionDOM(songIndex, sectionIndex) {
@@ -1217,36 +1295,23 @@ class PageApp {
             });
         });
 
-        // Listen to native details toggle events
+        // Listen to native details toggle events with animation
         document.querySelectorAll('.song-section-wrapper .song-section').forEach(details => {
-            details.addEventListener('toggle', (e) => {
-                const wrapper = details.closest('.song-section-wrapper');
-                if (!wrapper) return;
+            // Click handler for summary to animate the toggle
+            const summary = details.querySelector('.section-label');
+            if (summary) {
+                summary.addEventListener('click', (e) => {
+                    const wrapper = details.closest('.song-section-wrapper');
+                    if (!wrapper) return;
 
-                const songIndex = parseInt(wrapper.dataset.songIndex);
-                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
+                    const songIndex = parseInt(wrapper.dataset.songIndex);
+                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
 
-                // Only sync state in normal mode (not in edit mode, where details is always open)
-                const isEditMode = document.body.classList.contains('edit-mode');
-                if (!isEditMode) {
-                    const state = this.getSectionState(songIndex, sectionIndex);
-
-                    // Update state based on details open/closed
-                    if (details.open) {
-                        // Details is now open - uncollapse
-                        state.isCollapsed = false;
-                        state.hideMode = 'none';
-                    } else {
-                        // Details is now closed - collapse
-                        state.isCollapsed = true;
-                        state.hideMode = 'collapse';
-                    }
-
-                    this.saveState();
-                    // Update the DOM to reflect the new state
-                    this.updateSectionDOM(songIndex, sectionIndex);
-                }
-            });
+                    // Always prevent default and use our animation
+                    e.preventDefault();
+                    this.animateSectionToggle(songIndex, sectionIndex, details);
+                });
+            }
         });
     }
 

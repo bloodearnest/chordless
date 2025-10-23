@@ -653,8 +653,8 @@ body.edit-mode .song-content .section-controls {
     display: flex;
 }
 
-/* Collapsed section - hide content in both normal and edit mode */
-.song-content .song-section-wrapper.section-collapsed .section-content {
+/* In edit mode, force collapsed sections to hide content (since details is always open) */
+body.edit-mode .song-content .song-section-wrapper.section-collapsed .section-content {
     display: none;
 }
 
