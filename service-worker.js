@@ -1,7 +1,13 @@
 // Service Worker for Setalight
 // Handles routing and generates pages for offline-first operation
 
-const DEV_MODE = true; // Set to false for production
+// Auto-detect development mode based on hostname
+const DEV_MODE = self.location.hostname === 'localhost'
+    || self.location.hostname === '127.0.0.1'
+    || self.location.hostname.startsWith('192.168.')
+    || self.location.hostname.startsWith('10.')
+    || self.location.hostname.endsWith('.local');
+
 const CACHE_NAME = 'setalight-v12';
 const ASSETS = [
     '/',

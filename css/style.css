@@ -84,6 +84,7 @@ body {
     flex-direction: column;
     gap: 2rem;
     max-width: 800px;
+    margin: 0 auto;
 }
 
 /* Year sections */

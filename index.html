@@ -47,49 +47,23 @@
                 .then(registration => {
                     console.log('Service Worker registered:', registration);
 
-                    // Check for updates
-                    registration.update();
-
-                    // If there's a waiting service worker, activate it immediately
-                    if (registration.waiting) {
-                        console.log('New service worker waiting, activating now');
-                        registration.waiting.postMessage({ type: 'SKIP_WAITING' });
-                    }
-
-                    // Listen for new service workers installing
-                    registration.addEventListener('updatefound', () => {
-                        const newWorker = registration.installing;
-                        console.log('New service worker installing');
-
-                        newWorker.addEventListener('statechange', () => {
-                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                console.log('New service worker installed, activating');
-                                newWorker.postMessage({ type: 'SKIP_WAITING' });
-                            }
-                        });
-                    });
-
-                    // If no controller, this is first install - reload to activate
+                    // If no controller, this is first install - reload once to activate
                     if (!navigator.serviceWorker.controller) {
                         console.log('First install - reloading page to activate Service Worker');
                         // Set flag to avoid reload loop
-                        if (!sessionStorage.getItem('sw-reload')) {
-                            sessionStorage.setItem('sw-reload', '1');
+                        if (!sessionStorage.getItem('sw-first-load')) {
+                            sessionStorage.setItem('sw-first-load', '1');
                             window.location.reload();
                         }
                     } else {
                         console.log('Service Worker is active and controlling page');
+                        // Clear the first load flag since we have a controller now
+                        sessionStorage.removeItem('sw-first-load');
                     }
                 })
                 .catch(error => {
                     console.error('Service Worker registration failed:', error);
                 });
-
-            // Reload when a new service worker takes control
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                console.log('New service worker activated, reloading page');
-                window.location.reload();
-            });
         }
     </script>
     <script type="module" src="js/setlist-app.js"></script>

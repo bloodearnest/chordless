@@ -5,6 +5,33 @@ import { ChordProParser } from './parser.js';
 import { SetalightDB } from './db.js';
 import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
 
+// Configuration constants
+const CONFIG = {
+    // Font sizes
+    DEFAULT_FONT_SIZE: 1.6,      // rem
+    MIN_FONT_SIZE: 0.8,          // rem
+    MAX_FONT_SIZE: 3.0,          // rem
+    FONT_SIZE_STEP: 0.1,         // rem
+
+    // Drag and drop
+    LONG_PRESS_DURATION: 500,    // ms
+    POSITION_THRESHOLD: 20,      // px - minimum movement to change target position
+    DRAG_START_THRESHOLD: 5,     // px - movement before starting drag
+
+    // Touch gestures
+    SWIPE_THRESHOLD: 50,         // px - minimum swipe distance
+    SWIPE_CANCEL_THRESHOLD: 10,  // px - movement before canceling long press
+
+    // Scrolling
+    KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
+
+    // Intersection Observer
+    VISIBILITY_THRESHOLD: 0.5,   // 50% - section must be this visible to be considered "current"
+
+    // Import
+    DEFAULT_IMPORT_CUTOFF: '2000-01-01' // Default date for importing setlists (imports all)
+};
+
 class PageApp {
     constructor() {
         this.db = new SetalightDB();
@@ -14,6 +41,7 @@ class PageApp {
         this.currentSetlistId = null;
         // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
         this.sectionState = {};
+        this.sectionObserver = null;
         this.init();
     }
 
@@ -143,7 +171,7 @@ class PageApp {
 
             listContainer.appendChild(buttonContainer);
 
-            // Render grouped setlists
+            // Render grouped setlists (only current year expanded by default)
             for (const year of years) {
                 const yearSection = this.createYearSection(year, groupedByYear[year], year == currentYear);
                 listContainer.appendChild(yearSection);
@@ -261,7 +289,7 @@ class PageApp {
         // progressBar and message are already defined above, no need to query DOM
 
         try {
-            const result = await importer.importFromServer('2025-01-01', (progress) => {
+            const result = await importer.importFromServer(CONFIG.DEFAULT_IMPORT_CUTOFF, (progress) => {
                 message.textContent = progress.message;
 
                 if (progress.current && progress.total) {
@@ -422,7 +450,7 @@ class PageApp {
                     originalKey: originalKey, // Immutable original
                     currentKey: parsed.metadata.key,
                     currentBPM: parsed.metadata.tempo,
-                    currentFontSize: songEntry.modifications.fontSize || 1.6,
+                    currentFontSize: songEntry.modifications.fontSize || CONFIG.DEFAULT_FONT_SIZE,
                     songId: songEntry.songId,
                     sourceText: sourceText,
                     hasLocalEdits: songEntry.chordproEdits !== null
@@ -513,6 +541,9 @@ class PageApp {
 
                 // Set up reset button
                 this.setupResetButton();
+
+                // Set up Intersection Observer to auto-detect current song
+                this.setupSectionObserver();
             });
 
         } catch (error) {
@@ -907,8 +938,50 @@ class PageApp {
             });
         }
 
-        // Browser naturally maintains each section's scroll position
+        // Note: currentSongIndex is now automatically tracked by Intersection Observer
+        // but we set it here for immediate feedback before observer fires
         this.currentSongIndex = newIndex;
+    }
+
+    setupSectionObserver() {
+        // Clean up existing observer if any
+        if (this.sectionObserver) {
+            this.sectionObserver.disconnect();
+        }
+
+        const container = document.querySelector('.song-container');
+        if (!container) return;
+
+        // Observer watches which section is currently in view
+        this.sectionObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                // Only act on the section that's becoming visible (>50% visible)
+                if (entry.isIntersecting && entry.intersectionRatio > CONFIG.VISIBILITY_THRESHOLD) {
+                    const sectionId = entry.target.id;
+
+                    if (sectionId === 'overview') {
+                        this.currentSongIndex = -1;
+                        this.updateHeader(null);
+                    } else if (sectionId.startsWith('song-')) {
+                        const index = parseInt(sectionId.split('-')[1]);
+                        if (index >= 0 && index < this.songs.length) {
+                            this.currentSongIndex = index;
+                            this.updateHeader(this.songs[index]);
+                            this.applyFontSize(index);
+                        }
+                    }
+                }
+            });
+        }, {
+            root: container,
+            threshold: [0, 0.5, 1], // Trigger at 0%, 50%, and 100% visibility
+            rootMargin: '0px'
+        });
+
+        // Observe all sections (overview + all songs)
+        document.querySelectorAll('.section').forEach(section => {
+            this.sectionObserver.observe(section);
+        });
     }
 
     setupHashNavigation(setlistId, totalSongs) {
@@ -1170,7 +1243,8 @@ class PageApp {
                     }
 
                     this.saveState();
-                    this.updateButtonStates(wrapper, state);
+                    // Update the DOM to reflect the new state
+                    this.updateSectionDOM(songIndex, sectionIndex);
                 }
             });
         });
@@ -1309,8 +1383,7 @@ class PageApp {
         decreaseBtn.addEventListener('click', () => {
             if (this.currentSongIndex >= 0) {
                 const song = this.songs[this.currentSongIndex];
-                // Decrease by 0.1rem, minimum 0.8rem
-                song.currentFontSize = Math.max(0.8, song.currentFontSize - 0.1);
+                song.currentFontSize = Math.max(CONFIG.MIN_FONT_SIZE, song.currentFontSize - CONFIG.FONT_SIZE_STEP);
                 this.applyFontSize(this.currentSongIndex);
             }
         });
@@ -1318,8 +1391,7 @@ class PageApp {
         increaseBtn.addEventListener('click', () => {
             if (this.currentSongIndex >= 0) {
                 const song = this.songs[this.currentSongIndex];
-                // Increase by 0.1rem, maximum 3.0rem
-                song.currentFontSize = Math.min(3.0, song.currentFontSize + 0.1);
+                song.currentFontSize = Math.min(CONFIG.MAX_FONT_SIZE, song.currentFontSize + CONFIG.FONT_SIZE_STEP);
                 this.applyFontSize(this.currentSongIndex);
             }
         });
@@ -1387,7 +1459,7 @@ class PageApp {
         song.currentBPM = song.metadata.tempo;
 
         // Reset font size to default
-        song.currentFontSize = 1.6;
+        song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE;
 
         // Reset all section states for this song
         if (this.sectionState[this.currentSongIndex]) {
@@ -1438,9 +1510,6 @@ class PageApp {
             rafId: null,
             mouseDownPending: false
         };
-
-        const LONG_PRESS_DURATION = 500; // ms
-        const POSITION_THRESHOLD = 20; // px - minimum movement to change target position
 
         const startDrag = (button, clientY) => {
             dragState.active = true;
@@ -1552,7 +1621,7 @@ class PageApp {
 
                 // Only switch if we've moved past the threshold
                 const distance = Math.abs(clientY - currentY);
-                if (distance > POSITION_THRESHOLD) {
+                if (distance > CONFIG.POSITION_THRESHOLD) {
                     shouldUpdatePosition = true;
                 }
             }
@@ -1852,7 +1921,7 @@ class PageApp {
 
                 dragState.longPressTimer = setTimeout(() => {
                     startDrag(button, touch.clientY);
-                }, LONG_PRESS_DURATION);
+                }, CONFIG.LONG_PRESS_DURATION);
 
                 // Track initial position for canceling if moved too much during long press
                 dragState.startY = touch.clientY;
@@ -1864,7 +1933,7 @@ class PageApp {
 
                 if (!dragState.active) {
                     // Check if moved too much before long press completed
-                    if (Math.abs(touch.clientY - dragState.startY) > 10) {
+                    if (Math.abs(touch.clientY - dragState.startY) > CONFIG.SWIPE_CANCEL_THRESHOLD) {
                         cancelDrag();
                     }
                 } else {
@@ -1905,7 +1974,7 @@ class PageApp {
             // Check if we should start dragging
             if (dragState.mouseDownPending && !dragState.active) {
                 const deltaY = Math.abs(e.clientY - dragState.startY);
-                if (deltaY > 5) { // 5px threshold before starting drag
+                if (deltaY > CONFIG.DRAG_START_THRESHOLD) {
                     dragState.mouseDownPending = false;
                     startDrag(dragState.button, dragState.startY);
                     updateDrag(e.clientY);
@@ -2071,14 +2140,14 @@ class PageApp {
                     const currentSectionUp = this.currentSongIndex >= 0
                         ? document.getElementById(`song-${this.currentSongIndex}`)
                         : document.getElementById('overview');
-                    currentSectionUp?.scrollBy({ top: -200, behavior: 'smooth' });
+                    currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' });
                     break;
                 case 'ArrowDown':
                     e.preventDefault();
                     const currentSectionDown = this.currentSongIndex >= 0
                         ? document.getElementById(`song-${this.currentSongIndex}`)
                         : document.getElementById('overview');
-                    currentSectionDown?.scrollBy({ top: 200, behavior: 'smooth' });
+                    currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' });
                     break;
             }
         });
@@ -2103,7 +2172,7 @@ class PageApp {
             const deltaY = touchEndY - touchStartY;
 
             // Horizontal swipe (song navigation)
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > CONFIG.SWIPE_THRESHOLD) {
                 if (deltaX > 0) {
                     // Swipe right - go to previous
                     if (this.currentSongIndex > 0) {
