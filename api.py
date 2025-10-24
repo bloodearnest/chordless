@@ -47,6 +47,10 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
             # Serve setlist.html for all /setlist/* routes
             self.path = '/setlist.html'
             super().do_GET()
+        # Songs library route - serve songs.html for /songs and /songs/{id}
+        elif path == '/songs' or path == '/songs/' or (path.startswith('/songs/') and not path.endswith('.html')):
+            self.path = '/songs.html'
+            super().do_GET()
         elif path == '/':
             self.path = '/index.html'
             super().do_GET()

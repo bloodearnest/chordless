@@ -78,89 +78,12 @@
         </button>
     </template>
 
-    <!-- Template for overview song button -->
-    <template id="overview-song-button-template">
-        <button class="overview-song-button">
-            <span class="overview-song-number"></span>
-            <div class="overview-song-info">
-                <span class="overview-song-title"></span>
-                <span class="overview-song-meta"></span>
-            </div>
-        </button>
-    </template>
-
     <!-- Template for song info modal item -->
     <template id="song-info-item-template">
         <div class="modal-info-item">
             <div class="modal-info-label"></div>
             <div class="modal-info-value"></div>
         </div>
-    </template>
-
-    <!-- ChordPro rendering templates -->
-    <template id="song-header-template">
-        <div class="song-header">
-            <h2 class="song-title"></h2>
-            <div class="song-artist"></div>
-            <div class="song-meta">
-                <span class="song-key"></span>
-                <span class="song-tempo"></span>
-                <span class="song-time"></span>
-            </div>
-            <div class="song-ccli"></div>
-        </div>
-    </template>
-
-    <template id="section-with-label-template">
-        <div class="song-section-wrapper">
-            <details class="song-section" open>
-                <summary class="section-label">
-                    <div class="section-header">
-                        <span class="section-title"></span>
-                        <div class="section-controls">
-                            <button class="section-control-btn section-collapse-btn" data-action="collapse">
-                                <span class="control-icon">▼</span><span class="control-label">Collapse Section</span>
-                            </button>
-                            <button class="section-control-btn chords-toggle-btn" data-action="chords">
-                                <span class="control-icon">♯</span><span class="control-label">Hide Chords</span>
-                            </button>
-                            <button class="section-control-btn lyrics-toggle-btn" data-action="lyrics">
-                                <span class="control-icon">A</span><span class="control-label">Hide Lyrics</span>
-                            </button>
-                            <button class="section-control-btn section-hide-btn" data-action="hide">
-                                <span class="control-icon">✕</span><span class="control-label">Hide Entire Section</span>
-                            </button>
-                        </div>
-                    </div>
-                </summary>
-                <div class="section-content"></div>
-            </details>
-        </div>
-    </template>
-
-    <template id="section-without-label-template">
-        <div class="song-section">
-            <div class="section-content"></div>
-        </div>
-    </template>
-
-    <template id="chord-line-template">
-        <div class="chord-line"></div>
-    </template>
-
-    <template id="chord-segment-template">
-        <span class="chord-segment">
-            <span class="chord"></span>
-            <span class="lyrics"></span>
-        </span>
-    </template>
-
-    <template id="bar-group-template">
-        <div class="bar-group"></div>
-    </template>
-
-    <template id="measure-template">
-        <span class="measure"></span>
     </template>
 
     <script type="module" src="/js/setlist-app.js"></script>

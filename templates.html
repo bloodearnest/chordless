@@ -1,0 +1,99 @@
+<!-- Shared templates for ChordPro rendering -->
+
+<!-- Template for song card (used in setlist overview and song library) -->
+<template id="song-card-template">
+    <div class="song-card">
+        <div class="song-card-info">
+            <div class="song-card-title"></div>
+            <div class="song-card-meta"></div>
+        </div>
+    </div>
+</template>
+
+<!-- Template for song header -->
+<template id="song-header-template">
+    <div class="song-header">
+        <h2 class="song-title"></h2>
+        <div class="song-artist"></div>
+        <div class="song-meta">
+            <span class="song-key"></span>
+            <span class="song-tempo"></span>
+            <span class="song-time"></span>
+        </div>
+        <div class="song-ccli"></div>
+    </div>
+</template>
+
+<!-- Template for section with label -->
+<template id="section-with-label-template">
+    <div class="song-section-wrapper">
+        <details class="song-section" open>
+            <summary class="section-label">
+                <div class="section-header">
+                    <span class="section-title"></span>
+                    <div class="section-controls">
+                        <button class="section-control-btn section-collapse-btn" data-action="collapse">
+                            <span class="control-icon">▼</span><span class="control-label">Collapse Section</span>
+                        </button>
+                        <button class="section-control-btn chords-toggle-btn" data-action="chords">
+                            <span class="control-icon">♯</span><span class="control-label">Hide Chords</span>
+                        </button>
+                        <button class="section-control-btn lyrics-toggle-btn" data-action="lyrics">
+                            <span class="control-icon">A</span><span class="control-label">Hide Lyrics</span>
+                        </button>
+                        <button class="section-control-btn section-hide-btn" data-action="hide">
+                            <span class="control-icon">✕</span><span class="control-label">Hide Entire Section</span>
+                        </button>
+                    </div>
+                </div>
+            </summary>
+            <div class="section-content"></div>
+        </details>
+    </div>
+</template>
+
+<!-- Template for section without label -->
+<template id="section-without-label-template">
+    <div class="song-section">
+        <div class="section-content"></div>
+    </div>
+</template>
+
+<!-- Template for chord line -->
+<template id="chord-line-template">
+    <div class="chord-line"></div>
+</template>
+
+<!-- Template for chord segment -->
+<template id="chord-segment-template">
+    <span class="chord-segment">
+        <span class="chord"></span>
+        <span class="lyrics"></span>
+    </span>
+</template>
+
+<!-- Template for bar group -->
+<template id="bar-group-template">
+    <div class="bar-group"></div>
+</template>
+
+<!-- Template for measure -->
+<template id="measure-template">
+    <span class="measure"></span>
+</template>
+
+<!-- Template for song info modal item -->
+<template id="song-info-item-template">
+    <div class="modal-info-item">
+        <div class="modal-info-label"></div>
+        <div class="modal-info-value"></div>
+    </div>
+</template>
+
+<!-- Template for key option item -->
+<template id="key-option-template">
+    <button class="key-option-item">
+        <span class="key-name"></span>
+        <span class="key-offset"></span>
+    </button>
+</template>

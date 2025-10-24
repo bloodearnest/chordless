@@ -154,6 +154,26 @@ async function handleRoute(url) {
         }
     }
 
+    // Songs library page: /songs or /songs/ or /songs/{id}
+    const songsMatch = path.match(/^\/songs(\/([^\/]+))?$/);
+    if (songsMatch || path === '/songs.html') {
+        console.log('[SW] Serving songs.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/songs.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/songs.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/songs.html');
+            });
+        } else {
+            return fetch('/songs.html');
+        }
+    }
+
     // Setlist page: /setlist/{uuid} (ignore hash)
     const setlistMatch = path.match(/^\/setlist\/([^\/]+)$/);
     if (setlistMatch) {

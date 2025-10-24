@@ -79,6 +79,69 @@ body {
     color: var(--header-bg);
 }
 
+/* Container for sliding between library and song view */
+.home-content-container,
+.songs-content-container {
+    display: flex;
+    height: 100%;
+    width: 200%;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-content-container.viewing-song,
+.songs-content-container.viewing-song {
+    transform: translateX(-50%);
+}
+
+/* Songs page main content */
+.songs-main {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.library-view {
+    width: 50%;
+    flex-shrink: 0;
+    overflow-y: auto;
+    padding: 3rem;
+}
+
+.library-song-view {
+    width: 50%;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-color);
+}
+
+.back-button {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.back-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.back-button:active {
+    transform: scale(0.95);
+}
+
+.library-song-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0;
+}
+
 .setlist-list {
     display: flex;
     flex-direction: column;
@@ -197,6 +260,31 @@ header {
     gap: 1.5rem;
 }
 
+/* Songs library link button */
+.songs-link-button {
+    background: none;
+    border: 2px solid var(--header-text);
+    color: var(--header-text);
+    padding: 0.5rem 1rem;
+    font-size: 1.2rem;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+}
+
+.songs-link-button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+}
+
+.songs-link-button:active {
+    transform: scale(0.95);
+}
+
 .header-left {
     display: flex;
     align-items: center;
@@ -255,12 +343,14 @@ header {
     transition: opacity 0.25s ease-in-out;
 }
 
-body.edit-mode .normal-mode-control {
+body.edit-mode .normal-mode-control,
+body.library-edit-mode .normal-mode-control {
     opacity: 0;
     transition: opacity 0.25s ease-in-out;
 }
 
-body.edit-mode .normal-mode-control.fade-complete {
+body.edit-mode .normal-mode-control.fade-complete,
+body.library-edit-mode .normal-mode-control.fade-complete {
     display: none;
 }
 
@@ -271,19 +361,23 @@ body.edit-mode .normal-mode-control.fade-complete {
 }
 
 /* When entering edit mode, show controls but keep opacity 0 initially */
-body.edit-mode .edit-mode-control {
+body.edit-mode .edit-mode-control,
+body.library-edit-mode .edit-mode-control {
     opacity: 0;
     transition: opacity 0.25s ease-in-out;
 }
 
 /* For flex containers (divs, buttons with flex layout) */
 body.edit-mode .font-size-controls,
-body.edit-mode .reset-button {
+body.edit-mode .reset-button,
+body.library-edit-mode .font-size-controls,
+body.library-edit-mode .reset-button {
     display: flex;
 }
 
 /* Fade in when class is added */
-body.edit-mode .edit-mode-control.fade-in {
+body.edit-mode .edit-mode-control.fade-in,
+body.library-edit-mode .edit-mode-control.fade-in {
     opacity: 1;
 }
 
@@ -323,19 +417,22 @@ body.edit-mode .edit-mode-control.fade-in {
 }
 
 /* In edit mode, make it look and behave like a button */
-body.edit-mode .key-selector {
+body.edit-mode .key-selector,
+body.library-edit-mode .key-selector {
     background-color: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
     pointer-events: auto;
 }
 
-body.edit-mode .key-selector:hover {
+body.edit-mode .key-selector:hover,
+body.library-edit-mode .key-selector:hover {
     background-color: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-body.edit-mode .key-selector:focus {
+body.edit-mode .key-selector:focus,
+body.library-edit-mode .key-selector:focus {
     outline: none;
     background-color: rgba(255, 255, 255, 0.3);
     border-color: var(--header-text);
@@ -596,7 +693,8 @@ body.edit-mode .key-selector:focus {
     transition: border-color 0.25s ease-in-out, background-color 0.25s ease-in-out;
 }
 
-body.edit-mode .song-content .song-section-wrapper {
+body.edit-mode .song-content .song-section-wrapper,
+body.library-edit-mode .song-content .song-section-wrapper {
     border-color: #bdc3c7;
     border-style: dotted;
     background-color: #f9f9f9;
@@ -682,7 +780,8 @@ body.edit-mode .song-content .song-section-wrapper {
 }
 
 /* Show controls when in edit mode */
-body.edit-mode .song-content .section-controls {
+body.edit-mode .song-content .section-controls,
+body.library-edit-mode .song-content .section-controls {
     opacity: 1;
     pointer-events: auto;
 }
@@ -700,15 +799,18 @@ body.edit-mode .song-content .section-controls {
 }
 
 /* In edit mode, show hidden sections with collapsed content and strike-through title */
-body.edit-mode .song-content .song-section-wrapper.section-hidden {
+body.edit-mode .song-content .song-section-wrapper.section-hidden,
+body.library-edit-mode .song-content .song-section-wrapper.section-hidden {
     display: block;
 }
 
-body.edit-mode .song-content .song-section-wrapper.section-hidden .section-content {
+body.edit-mode .song-content .song-section-wrapper.section-hidden .section-content,
+body.library-edit-mode .song-content .song-section-wrapper.section-hidden .section-content {
     display: none;
 }
 
-body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title {
+body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title,
+body.library-edit-mode .song-content .song-section-wrapper.section-hidden .section-title {
     text-decoration: line-through;
     opacity: 0.6;
 }
@@ -891,24 +993,13 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     margin: 0 auto;
 }
 
-.overview-song-button {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 1rem 2rem;
-    background-color: white;
-    border: 2px solid #ecf0f1;
-    border-radius: 12px;
-    cursor: pointer;
-    text-align: left;
-    text-decoration: none;
-    color: inherit;
-    min-height: 70px;
-    position: relative; /* Needed for absolutely positioned pseudo-elements */
+/* Override song card styles for setlist overview context */
+.overview-song-card {
+    position: relative; /* Needed for drag and drop pseudo-elements */
 }
 
 /* Drag and drop states */
-.overview-song-button.dragging {
+.overview-song-card.dragging {
     opacity: 0.9;
     background-color: #ecf0f1;
     border-color: var(--button-bg);
@@ -920,13 +1011,13 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     /* transform is applied via JS to follow cursor */
 }
 
-.overview-song-button.drag-over-above::before,
-.overview-song-button.drag-over-below::after {
+.overview-song-card.drag-over-above::before,
+.overview-song-card.drag-over-below::after {
     content: '';
     position: absolute;
     left: 0;
     right: 0;
-    height: calc(70px + 0.5rem); /* Match button min-height + gap */
+    height: calc(70px + 0.5rem); /* Match card min-height + gap */
     background-color: #d5dbdb;
     border: 2px dashed #95a5a6;
     border-radius: 12px;
@@ -934,51 +1025,29 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     pointer-events: none;
 }
 
-.overview-song-button.drag-over-above::before {
+.overview-song-card.drag-over-above::before {
     top: calc(-70px - 1rem); /* Position above with gap */
 }
 
-.overview-song-button.drag-over-below::after {
+.overview-song-card.drag-over-below::after {
     bottom: calc(-70px - 1rem); /* Position below with gap */
 }
 
-.overview-songs.reordering .overview-song-button {
+.overview-songs.reordering .overview-song-card {
     transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Remove transition from dragged button so it follows cursor immediately */
-.overview-songs.reordering .overview-song-button.dragging {
+/* Remove transition from dragged card so it follows cursor immediately */
+.overview-songs.reordering .overview-song-card.dragging {
     transition: none;
 }
 
-.overview-song-button.will-move-down {
+.overview-song-card.will-move-down {
     transform: translateY(calc(100% + 0.5rem));
 }
 
-.overview-song-button.will-move-up {
+.overview-song-card.will-move-up {
     transform: translateY(calc(-100% - 0.5rem));
-}
-
-.overview-song-number {
-    display: none;
-}
-
-.overview-song-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-}
-
-.overview-song-title {
-    font-size: 1.5rem;
-    color: var(--text-color);
-    font-weight: 500;
-}
-
-.overview-song-meta {
-    font-size: 1.1rem;
-    color: #7f8c8d;
 }
 
 /* Horizontal scroll-based navigation */
@@ -1143,6 +1212,135 @@ body.edit-mode .song-content .song-section-wrapper.section-hidden .section-title
     margin: 1.5rem 0;
     line-height: 1.6;
     color: #7f8c8d;
+}
+
+/* Home page tabs */
+.home-tabs {
+    display: flex;
+    gap: 0;
+    background-color: #ecf0f1;
+    border-bottom: 3px solid var(--header-bg);
+}
+
+.tab-button {
+    flex: 1;
+    padding: 1.2rem 2rem;
+    background-color: transparent;
+    border: none;
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #7f8c8d;
+    cursor: pointer;
+    transition: all 0.2s;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -3px;
+    min-height: 60px;
+}
+
+.tab-button:hover {
+    background-color: rgba(44, 62, 80, 0.05);
+    color: var(--header-bg);
+}
+
+.tab-button.active {
+    color: var(--header-bg);
+    background-color: white;
+    border-bottom-color: var(--button-bg);
+}
+
+/* Tab content */
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Unified song card component (used in both setlist overview and song library) */
+.song-card {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    padding: 1.2rem 2rem;
+    background-color: white;
+    border: 2px solid #ecf0f1;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    text-decoration: none;
+    color: inherit;
+    min-height: 70px;
+    transition: all 0.2s;
+}
+
+.song-card:hover {
+    background-color: #f8f9fa;
+    border-color: var(--button-bg);
+    transform: translateX(5px);
+}
+
+.song-card:active {
+    transform: scale(0.98);
+}
+
+.song-card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+    min-width: 0;
+}
+
+.song-card-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--text-color);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.song-card-meta {
+    font-size: 1.1rem;
+    color: #7f8c8d;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Song library */
+.song-library-header {
+    max-width: 800px;
+    margin: 0 auto 2rem auto;
+}
+
+.song-search-input {
+    width: 100%;
+    padding: 1rem 1.5rem;
+    font-size: 1.3rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 8px;
+    background-color: white;
+    color: var(--text-color);
+    transition: border-color 0.2s;
+}
+
+.song-search-input:focus {
+    outline: none;
+    border-color: var(--button-bg);
+}
+
+.song-search-input::placeholder {
+    color: #95a5a6;
+}
+
+.song-library-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    max-width: 800px;
+    margin: 0 auto;
 }
 
 /* Touch-friendly spacing */

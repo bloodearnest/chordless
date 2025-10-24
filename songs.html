@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Song library for worship songs">
+    <meta name="view-transition" content="same-origin">
+    <title>Song Library - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="songs-view" class="view">
+            <header>
+                <div class="header-left">
+                    <a href="/" class="home-button" aria-label="Home">🏠</a>
+                    <button class="back-button normal-mode-control" id="library-back-button" aria-label="Back to library" style="display: none;">← Back</button>
+                    <div class="song-title-compact" id="library-song-title">Song Library</div>
+                </div>
+                <div class="header-center">
+                    <button class="reset-button edit-mode-control" id="library-reset-button" aria-label="Reset song" style="display: none;">↺</button>
+                    <div class="font-size-controls edit-mode-control" id="library-font-size-controls" style="display: none;">
+                        <button class="font-size-btn" id="library-font-size-decrease" aria-label="Decrease font size">A−</button>
+                        <button class="font-size-btn" id="library-font-size-increase" aria-label="Increase font size">A+</button>
+                    </div>
+                    <!-- Key display/selector -->
+                    <div class="key-display-wrapper" id="library-key-display" style="display: none;">
+                        <label class="meta-label">Key:</label>
+                        <button id="library-key-selector-button" class="key-selector" popovertarget="library-key-selector-popover">
+                            <span id="library-key-selector-value">-</span>
+                        </button>
+                        <div id="library-key-selector-popover" class="key-popover" popover>
+                            <div id="library-key-options-list" class="key-options-list">
+                                <!-- Options populated by JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+                    <div class="song-meta-compact" id="library-song-meta-header" style="display: none;"></div>
+                </div>
+                <div class="header-right">
+                    <button class="edit-mode-toggle" id="library-edit-toggle" aria-label="Toggle edit mode" style="display: none;">✎</button>
+                    <button class="info-button" id="library-info-button" aria-label="Song info" style="display: none;">i</button>
+                </div>
+            </header>
+
+            <main class="songs-main">
+                <div class="songs-content-container">
+                    <!-- Library view (slides left when viewing song) -->
+                    <div class="library-view">
+                        <div class="song-library-header">
+                            <input type="search" id="song-search" class="song-search-input" placeholder="Search songs by title, artist, or lyrics..." />
+                        </div>
+                        <div id="song-library-list" class="song-library-list">
+                            <p>Loading songs...</p>
+                        </div>
+                    </div>
+
+                    <!-- Single song view (slides in from right) -->
+                    <div id="library-song-view" class="library-song-view">
+                        <div id="library-song-content" class="library-song-content">
+                            <p>Select a song to view</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Song info modal -->
+        <div class="modal-overlay" id="library-song-info-modal">
+            <div class="modal-content">
+                <button class="modal-close" id="library-modal-close">&times;</button>
+                <div id="library-modal-body"></div>
+            </div>
+        </div>
+
+        <!-- Reset confirmation modal -->
+        <div class="modal-overlay" id="library-reset-confirm-modal">
+            <div class="modal-content">
+                <h2>Reset Song?</h2>
+                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
+                <div class="modal-actions">
+                    <button class="modal-btn modal-btn-cancel" id="library-reset-cancel">Cancel</button>
+                    <button class="modal-btn modal-btn-confirm" id="library-reset-confirm">Reset</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(registration => {
+                    console.log('Service Worker registered:', registration);
+
+                    // If no controller, this is first install - reload once to activate
+                    if (!navigator.serviceWorker.controller) {
+                        console.log('First install - reloading page to activate Service Worker');
+                        // Set flag to avoid reload loop
+                        if (!sessionStorage.getItem('sw-first-load')) {
+                            sessionStorage.setItem('sw-first-load', '1');
+                            window.location.reload();
+                        }
+                    } else {
+                        console.log('Service Worker is active and controlling page');
+                        // Clear the first load flag since we have a controller now
+                        sessionStorage.removeItem('sw-first-load');
+                    }
+                })
+                .catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        }
+    </script>
+    <script type="module" src="/js/setlist-app.js"></script>
+</body>
+</html>

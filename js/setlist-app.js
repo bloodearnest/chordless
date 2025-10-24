@@ -45,7 +45,37 @@ class PageApp {
         this.init();
     }
 
+    async loadTemplates() {
+        // Load shared templates if they don't exist yet
+        if (document.getElementById('song-header-template')) {
+            console.log('Templates already loaded');
+            return;
+        }
+
+        try {
+            const response = await fetch('/templates.html');
+            const html = await response.text();
+
+            // Create a temporary container
+            const temp = document.createElement('div');
+            temp.innerHTML = html;
+
+            // Append all templates to the body
+            const templates = temp.querySelectorAll('template');
+            templates.forEach(template => {
+                document.body.appendChild(template);
+            });
+
+            console.log('Loaded', templates.length, 'templates');
+        } catch (error) {
+            console.error('Failed to load templates:', error);
+        }
+    }
+
     async init() {
+        // Load templates first
+        await this.loadTemplates();
+
         // Initialize IndexedDB
         await this.db.init();
 
@@ -58,6 +88,10 @@ class PageApp {
         // Render based on route
         if (route.type === 'home') {
             await this.renderHome();
+        } else if (route.type === 'songs') {
+            await this.renderSongsPage();
+        } else if (route.type === 'librarySong') {
+            await this.renderSongsPage(route.songId);
         } else if (route.type === 'setlist') {
             await this.renderSetlist(route.setlistId);
         }
@@ -72,6 +106,16 @@ class PageApp {
     parseRoute(pathname) {
         if (pathname === '/' || pathname === '/index.html') {
             return { type: 'home' };
+        }
+
+        if (pathname === '/songs' || pathname === '/songs/' || pathname === '/songs.html') {
+            return { type: 'songs' };
+        }
+
+        // Match /songs/{id}
+        const librarySongMatch = pathname.match(/^\/songs\/([^\/]+)$/);
+        if (librarySongMatch) {
+            return { type: 'librarySong', songId: librarySongMatch[1] };
         }
 
         const setlistMatch = pathname.match(/^\/setlist\/([^\/]+)$/);
@@ -97,6 +141,79 @@ class PageApp {
     }
 
     async renderHome() {
+        // Just render the setlist list
+        await this.renderSetlistsTab();
+    }
+
+    async renderSongsPage(songId = null) {
+        // Render the standalone songs page
+        await this.renderSongLibraryTab();
+        this.setupLibrarySongBackButton();
+
+        // Set up popstate handler for browser back/forward
+        this.setupLibraryPopstateHandler();
+
+        // If songId is provided, load that song
+        if (songId) {
+            const song = await this.db.getSong(songId);
+            if (song) {
+                await this.viewLibrarySong(song, false); // false = don't push state (we're already at the URL)
+            } else {
+                console.error('Song not found:', songId);
+                // Navigate back to /songs if song not found
+                window.history.replaceState({}, '', '/songs');
+            }
+        }
+    }
+
+    setupLibraryPopstateHandler() {
+        // Remove old handler if exists
+        if (this.libraryPopstateHandler) {
+            window.removeEventListener('popstate', this.libraryPopstateHandler);
+        }
+
+        // Create new handler
+        this.libraryPopstateHandler = async (event) => {
+            const route = this.parseRoute(window.location.pathname);
+
+            if (route.type === 'songs') {
+                // Navigate back to song list
+                this.closeLibrarySongView(false); // false = don't update URL (already changed)
+            } else if (route.type === 'librarySong') {
+                // Navigate to a specific song
+                const song = await this.db.getSong(route.songId);
+                if (song) {
+                    await this.viewLibrarySong(song, false); // false = don't push state
+                }
+            }
+        };
+
+        window.addEventListener('popstate', this.libraryPopstateHandler);
+    }
+
+    setupTabs() {
+        const tabButtons = document.querySelectorAll('.tab-button');
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const tabName = button.dataset.tab;
+                this.switchTab(tabName);
+            });
+        });
+    }
+
+    switchTab(tabName) {
+        // Update button states
+        document.querySelectorAll('.tab-button').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
+        });
+
+        // Update tab content visibility
+        document.querySelectorAll('.tab-content').forEach(content => {
+            content.classList.toggle('active', content.id === `${tabName}-tab`);
+        });
+    }
+
+    async renderSetlistsTab() {
         const listContainer = document.getElementById('setlist-list');
 
         try {
@@ -186,6 +303,756 @@ class PageApp {
             errorMsg.textContent = 'Error loading setlists. Please check the console.';
             listContainer.appendChild(errorMsg);
         }
+    }
+
+    async renderSongLibraryTab() {
+        const libraryContainer = document.getElementById('song-library-list');
+        const searchInput = document.getElementById('song-search');
+
+        try {
+            // Show loading message
+            libraryContainer.textContent = '';
+            const loadingMsg = document.createElement('p');
+            loadingMsg.textContent = 'Loading songs...';
+            libraryContainer.appendChild(loadingMsg);
+
+            const songs = await this.db.getAllSongs();
+            console.log('Loaded songs:', songs.length, songs);
+
+            if (songs.length === 0) {
+                libraryContainer.textContent = '';
+                const message = document.createElement('p');
+                message.style.textAlign = 'center';
+                message.style.color = '#7f8c8d';
+                message.textContent = 'No songs in library. Import setlists to populate the song library.';
+                libraryContainer.appendChild(message);
+                return;
+            }
+
+            // Sort songs alphabetically by title
+            songs.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
+
+            // Store all songs for search filtering
+            this.allSongs = songs;
+
+            // Setup search
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    this.filterSongs(e.target.value);
+                });
+            }
+
+            // Initial render with all songs
+            this.renderSongList(songs);
+
+        } catch (error) {
+            console.error('Error loading songs:', error);
+            libraryContainer.textContent = '';
+            const errorMsg = document.createElement('p');
+            errorMsg.className = 'error';
+            errorMsg.textContent = 'Error loading songs. Please check the console.';
+            libraryContainer.appendChild(errorMsg);
+        }
+    }
+
+    filterSongs(searchTerm) {
+        if (!this.allSongs) return;
+
+        const term = searchTerm.toLowerCase().trim();
+
+        if (!term) {
+            // Show all songs if search is empty
+            this.renderSongList(this.allSongs);
+            return;
+        }
+
+        // Filter songs by title, artist, or lyrics
+        const filtered = this.allSongs.filter(song => {
+            const title = (song.title || '').toLowerCase();
+            const artist = (song.artist || '').toLowerCase();
+            const lyricsText = (song.lyricsText || '').toLowerCase();
+
+            return title.includes(term) ||
+                   artist.includes(term) ||
+                   lyricsText.includes(term);
+        });
+
+        this.renderSongList(filtered);
+    }
+
+    renderSongList(songs) {
+        const libraryContainer = document.getElementById('song-library-list');
+        const template = document.getElementById('song-card-template');
+
+        console.log('renderSongList called with', songs.length, 'songs');
+        console.log('libraryContainer:', libraryContainer);
+        console.log('template:', template);
+
+        libraryContainer.textContent = '';
+
+        if (songs.length === 0) {
+            const message = document.createElement('p');
+            message.style.textAlign = 'center';
+            message.style.color = '#7f8c8d';
+            message.textContent = 'No songs match your search.';
+            libraryContainer.appendChild(message);
+            return;
+        }
+
+        for (const song of songs) {
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.song-card');
+            const title = clone.querySelector('.song-card-title');
+            const meta = clone.querySelector('.song-card-meta');
+
+            title.textContent = song.title || 'Untitled';
+
+            // Build metadata string
+            const metadata = [];
+            if (song.artist) {
+                metadata.push(song.artist);
+            }
+            if (song.metadata?.key) {
+                metadata.push(song.metadata.key);
+            }
+            if (song.metadata?.tempo) {
+                metadata.push(`${song.metadata.tempo} BPM`);
+            }
+
+            meta.textContent = metadata.join(' • ');
+
+            // Make card clickable - view and edit song
+            card.addEventListener('click', (e) => {
+                console.log('Song clicked:', song.title, song);
+                console.log('Event:', e);
+                this.viewLibrarySong(song);
+            });
+
+            libraryContainer.appendChild(clone);
+        }
+        console.log('Finished rendering', songs.length, 'songs');
+    }
+
+    async viewLibrarySong(song, pushState = true) {
+        console.log('viewLibrarySong called with:', song);
+
+        // Store the current library song for editing
+        this.currentLibrarySong = song;
+        this.currentLibrarySongId = song.id;
+
+        // Update URL if requested
+        if (pushState) {
+            const newUrl = `/songs/${song.id}`;
+            window.history.pushState({ songId: song.id }, '', newUrl);
+        }
+
+        // Parse the song (note: field is chordproText with lowercase 'p')
+        console.log('Parsing song:', song.chordproText);
+        const parsed = this.parser.parse(song.chordproText);
+
+        // Store parsed song for library context
+        this.currentLibraryParsedSong = parsed;
+        this.currentLibraryKey = parsed.metadata.key;
+
+        // Update title in header
+        const titleElement = document.getElementById('library-song-title');
+        if (titleElement) {
+            titleElement.textContent = parsed.metadata.title || 'Untitled';
+        }
+
+        // Show all header controls
+        const backButton = document.getElementById('library-back-button');
+        const editToggle = document.getElementById('library-edit-toggle');
+        const infoButton = document.getElementById('library-info-button');
+        const keyDisplay = document.getElementById('library-key-display');
+        const metaHeader = document.getElementById('library-song-meta-header');
+
+        if (backButton) backButton.style.display = 'inline-flex';
+        if (editToggle) editToggle.style.display = 'flex';
+        if (infoButton) infoButton.style.display = 'flex';
+        if (keyDisplay) keyDisplay.style.display = 'flex';
+        if (metaHeader) metaHeader.style.display = 'flex';
+
+        // Update key display
+        const keyValue = document.getElementById('library-key-selector-value');
+        if (keyValue) {
+            keyValue.textContent = parsed.metadata.key || '-';
+        }
+
+        // Update meta display (tempo, time signature)
+        if (metaHeader) {
+            const metaParts = [];
+            if (parsed.metadata.tempo) {
+                metaParts.push(`${parsed.metadata.tempo} BPM`);
+            }
+            if (parsed.metadata.time) {
+                metaParts.push(parsed.metadata.time);
+            }
+            metaHeader.textContent = metaParts.join(' • ');
+        }
+
+        // Render the song content
+        const contentElement = document.getElementById('library-song-content');
+        contentElement.innerHTML = '';
+
+        const songContent = document.createElement('div');
+        songContent.className = 'song-content library-single-song';
+        // Use toHTML method (returns DocumentFragment, not HTML string)
+        const fragment = this.parser.toHTML(parsed, 0);
+        songContent.appendChild(fragment);
+        contentElement.appendChild(songContent);
+
+        // Setup edit mode for library song
+        this.setupLibrarySongEditMode();
+
+        // Setup key selector for library
+        this.setupLibraryKeySelector(parsed);
+
+        // Setup info button for library
+        this.setupLibraryInfoButton(parsed, song);
+
+        // Setup font size controls
+        this.setupLibraryFontSizeControls();
+
+        // Setup reset button
+        this.setupLibraryResetButton();
+
+        // Apply initial font size
+        if (!this.currentLibraryFontSize) {
+            this.currentLibraryFontSize = CONFIG.DEFAULT_FONT_SIZE;
+        }
+        this.applyLibraryFontSize();
+
+        // Slide to song view
+        const container = document.querySelector('.home-content-container, .songs-content-container');
+        if (container) {
+            container.classList.add('viewing-song');
+        }
+
+        // Setup back button
+        if (backButton) {
+            backButton.onclick = () => {
+                this.closeLibrarySongView();
+            };
+        }
+    }
+
+    closeLibrarySongView(updateUrl = true) {
+        const container = document.querySelector('.home-content-container, .songs-content-container');
+        if (container) {
+            container.classList.remove('viewing-song');
+        }
+
+        // Hide all header controls
+        const backButton = document.getElementById('library-back-button');
+        const editToggle = document.getElementById('library-edit-toggle');
+        const infoButton = document.getElementById('library-info-button');
+        const keyDisplay = document.getElementById('library-key-display');
+        const metaHeader = document.getElementById('library-song-meta-header');
+        const resetButton = document.getElementById('library-reset-button');
+        const fontSizeControls = document.getElementById('library-font-size-controls');
+
+        if (backButton) backButton.style.display = 'none';
+        if (editToggle) editToggle.style.display = 'none';
+        if (infoButton) infoButton.style.display = 'none';
+        if (keyDisplay) keyDisplay.style.display = 'none';
+        if (metaHeader) metaHeader.style.display = 'none';
+        if (resetButton) resetButton.style.display = 'none';
+        if (fontSizeControls) fontSizeControls.style.display = 'none';
+
+        // Restore "Song Library" title
+        const titleElement = document.getElementById('library-song-title');
+        if (titleElement) {
+            titleElement.textContent = 'Song Library';
+        }
+
+        // Clear edit mode state
+        if (editToggle && editToggle.classList.contains('active')) {
+            editToggle.click(); // Exit edit mode if active
+        }
+
+        this.currentLibrarySong = null;
+        this.currentLibrarySongId = null;
+
+        // Navigate back to /songs
+        if (updateUrl) {
+            window.history.pushState({}, '', '/songs');
+        }
+    }
+
+    setupLibrarySongBackButton() {
+        const backButton = document.getElementById('library-back-button');
+        if (backButton) {
+            backButton.onclick = () => {
+                this.closeLibrarySongView();
+            };
+        }
+    }
+
+    setupLibrarySongEditMode() {
+        const editToggle = document.getElementById('library-edit-toggle');
+        if (!editToggle) return;
+
+        // Remove old listeners by cloning
+        const newEditToggle = editToggle.cloneNode(true);
+        editToggle.parentNode.replaceChild(newEditToggle, editToggle);
+
+        newEditToggle.addEventListener('click', () => {
+            const isEnteringEditMode = !document.body.classList.contains('library-edit-mode');
+
+            if (isEnteringEditMode) {
+                // Enter edit mode
+                document.body.classList.add('library-edit-mode');
+                newEditToggle.classList.add('active');
+
+                console.log('Entered library edit mode - changes will save to global songs database');
+            } else {
+                // Exit edit mode - save to global database
+                document.body.classList.remove('library-edit-mode');
+                newEditToggle.classList.remove('active');
+
+                this.saveLibrarySongToDatabase();
+            }
+        });
+    }
+
+    async saveLibrarySongToDatabase() {
+        if (!this.currentLibrarySong || !this.currentLibrarySongId) {
+            console.warn('No current library song to save');
+            return;
+        }
+
+        try {
+            // Get the updated song from database (in case it was modified)
+            const song = await this.db.getSong(this.currentLibrarySongId);
+
+            if (!song) {
+                console.error('Song not found in database');
+                return;
+            }
+
+            // Update the timestamp
+            song.updatedAt = new Date().toISOString();
+
+            // Save back to global songs database
+            await this.db.saveSong(song);
+
+            console.log('Saved song to global database:', song.title);
+
+            // Refresh the library song view with updated data
+            this.currentLibrarySong = song;
+            await this.viewLibrarySong(song);
+
+        } catch (error) {
+            console.error('Error saving library song:', error);
+        }
+    }
+
+    setupLibraryKeySelector(parsed) {
+        const keyValue = document.getElementById('library-key-selector-value');
+        const keyOptionsList = document.getElementById('library-key-options-list');
+        const popover = document.getElementById('library-key-selector-popover');
+        const button = document.getElementById('library-key-selector-button');
+
+        if (!keyValue || !keyOptionsList) return;
+
+        // Populate key selector with current key
+        const currentKey = parsed.metadata.key || this.currentLibraryKey;
+        if (currentKey) {
+            this.populateLibraryKeySelector(currentKey);
+        }
+
+        // Set up popover positioning
+        if (button && popover) {
+            const toggleHandler = (e) => {
+                if (e.newState === 'open') {
+                    const buttonRect = button.getBoundingClientRect();
+                    popover.style.top = `${buttonRect.bottom + 4}px`;
+                    popover.style.left = `${buttonRect.left}px`;
+                }
+            };
+
+            // Remove old listener if exists
+            popover.removeEventListener('toggle', toggleHandler);
+            popover.addEventListener('toggle', toggleHandler);
+        }
+    }
+
+    populateLibraryKeySelector(selectedKey) {
+        const keyOptionsList = document.getElementById('library-key-options-list');
+        const keySelectorValue = document.getElementById('library-key-selector-value');
+        if (!keyOptionsList || !keySelectorValue) return;
+
+        // Get available keys rotated around the selected key
+        const keys = getAvailableKeys(selectedKey);
+
+        // Get original key from current song
+        const originalKey = this.currentLibraryParsedSong?.metadata?.key;
+
+        // Clear existing options
+        keyOptionsList.textContent = '';
+
+        // Find the index of the current key in the list
+        const currentIndex = keys.indexOf(selectedKey);
+
+        // Add available keys as clickable items with offset indicators
+        keys.forEach((key, index) => {
+            const item = document.createElement('button');
+            item.className = 'key-option-item';
+            if (key === selectedKey) {
+                item.classList.add('selected');
+            }
+
+            // Calculate offset based on position in list
+            const positionOffset = currentIndex - index;
+
+            // Format key name with * suffix if original
+            let keyText = key === originalKey ? `${key}*` : key;
+
+            // Create key name span
+            const keyNameSpan = document.createElement('span');
+            keyNameSpan.className = 'key-name';
+            keyNameSpan.textContent = keyText;
+
+            // Create offset span
+            const offsetSpan = document.createElement('span');
+            offsetSpan.className = 'key-offset';
+            if (positionOffset !== 0) {
+                const sign = positionOffset > 0 ? '+' : '-';
+                offsetSpan.textContent = `${sign}${Math.abs(positionOffset)}`;
+            }
+
+            item.appendChild(keyNameSpan);
+            item.appendChild(offsetSpan);
+
+            // Click handler
+            item.addEventListener('click', async () => {
+                await this.selectLibraryKey(key);
+            });
+
+            keyOptionsList.appendChild(item);
+        });
+
+        // Update button text to show selected key
+        keySelectorValue.textContent = selectedKey;
+    }
+
+    async selectLibraryKey(newKey) {
+        if (!newKey || !this.currentLibraryParsedSong) return;
+
+        console.log(`Library key changed to: ${newKey}`);
+
+        // Close the popover
+        const popover = document.getElementById('library-key-selector-popover');
+        if (popover) {
+            popover.hidePopover();
+        }
+
+        // Update the displayed key value
+        const keyValueDisplay = document.getElementById('library-key-selector-value');
+        if (keyValueDisplay) {
+            keyValueDisplay.textContent = newKey;
+        }
+
+        // Update current key
+        this.currentLibraryKey = newKey;
+
+        // Re-render the song with transposition
+        await this.reRenderLibrarySong(newKey);
+
+        // Repopulate the dropdown with the new key in the middle
+        this.populateLibraryKeySelector(newKey);
+    }
+
+    async reRenderLibrarySong(targetKey) {
+        if (!this.currentLibraryParsedSong) return;
+
+        const contentElement = document.getElementById('library-song-content');
+        if (!contentElement) return;
+
+        // Calculate semitone offset
+        const originalKey = this.currentLibraryParsedSong.metadata.key;
+        const offset = calculateTransposeOffset(originalKey, targetKey);
+
+        // Re-render with transposition
+        contentElement.innerHTML = '';
+        const songContent = document.createElement('div');
+        songContent.className = 'song-content library-single-song';
+        const fragment = this.parser.toHTML(this.currentLibraryParsedSong, offset);
+        songContent.appendChild(fragment);
+        contentElement.appendChild(songContent);
+    }
+
+    setupLibraryInfoButton(parsed, song) {
+        const infoButton = document.getElementById('library-info-button');
+        if (!infoButton) return;
+
+        // Remove old listener by cloning
+        const newInfoButton = infoButton.cloneNode(true);
+        infoButton.parentNode.replaceChild(newInfoButton, infoButton);
+
+        newInfoButton.onclick = () => this.showLibrarySongInfo(parsed, song);
+    }
+
+    showLibrarySongInfo(parsed, song) {
+        const modal = document.getElementById('library-song-info-modal');
+        const modalBody = document.getElementById('library-modal-body');
+
+        if (!modal || !modalBody) return;
+
+        // Clear previous content
+        modalBody.textContent = '';
+
+        // Create title
+        const title = document.createElement('h2');
+        title.textContent = parsed.metadata.title || 'Untitled';
+        modalBody.appendChild(title);
+
+        // Create info grid
+        const infoGrid = document.createElement('div');
+        infoGrid.className = 'modal-info-grid';
+
+        // Get template for info items
+        const itemTemplate = document.getElementById('song-info-item-template');
+
+        // Helper function to add info items
+        const addInfoItem = (label, value) => {
+            const clone = itemTemplate.content.cloneNode(true);
+            const labelEl = clone.querySelector('.modal-info-label');
+            const valueEl = clone.querySelector('.modal-info-value');
+
+            labelEl.textContent = label;
+            valueEl.textContent = value;
+
+            infoGrid.appendChild(clone);
+        };
+
+        // Add metadata items
+        if (parsed.metadata.artist) {
+            addInfoItem('Artist', parsed.metadata.artist);
+        }
+
+        if (parsed.metadata.key) {
+            addInfoItem('Original Key', parsed.metadata.key);
+        }
+
+        if (parsed.metadata.tempo) {
+            addInfoItem('Original BPM', parsed.metadata.tempo);
+        }
+
+        if (parsed.metadata.time) {
+            addInfoItem('Time Signature', parsed.metadata.time);
+        }
+
+        if (parsed.metadata.ccli || parsed.metadata.ccliSongNumber) {
+            const clone = itemTemplate.content.cloneNode(true);
+            const labelEl = clone.querySelector('.modal-info-label');
+            const valueEl = clone.querySelector('.modal-info-value');
+
+            labelEl.textContent = 'CCLI Number';
+            valueEl.style.display = 'flex';
+            valueEl.style.alignItems = 'center';
+            valueEl.style.gap = '1rem';
+
+            const ccliSpan = document.createElement('span');
+            ccliSpan.textContent = parsed.metadata.ccli || parsed.metadata.ccliSongNumber;
+            valueEl.appendChild(ccliSpan);
+
+            if (parsed.metadata.ccliSongNumber) {
+                const songSelectUrl = `https://songselect.ccli.com/songs/${parsed.metadata.ccliSongNumber}/`;
+                const link = document.createElement('a');
+                link.href = songSelectUrl;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.style.display = 'inline-flex';
+                link.style.alignItems = 'center';
+                link.style.gap = '0.5rem';
+                link.style.textDecoration = 'none';
+                link.style.color = '#00a3e0';
+                link.style.fontSize = '1.1rem';
+                link.style.fontWeight = '600';
+                link.style.padding = '0.25rem 0.5rem';
+                link.style.borderRadius = '4px';
+                link.style.transition = 'background-color 0.2s';
+                link.addEventListener('mouseover', () => link.style.backgroundColor = 'rgba(0,163,224,0.1)');
+                link.addEventListener('mouseout', () => link.style.backgroundColor = 'transparent');
+
+                // Create SVG icon
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('width', '20');
+                svg.setAttribute('height', '20');
+                svg.setAttribute('viewBox', '0 0 1000 1000');
+
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('fill', '#00a3e0');
+                rect.setAttribute('y', '0');
+                rect.setAttribute('width', '1000');
+                rect.setAttribute('height', '1000');
+                rect.setAttribute('rx', '190.32');
+                rect.setAttribute('ry', '190.32');
+                svg.appendChild(rect);
+
+                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                path.setAttribute('fill', '#fff');
+                path.setAttribute('d', 'M758.53,231.15c1.6,1.57,1.61,4.18.02,5.76l-34.9,34.9c-1.54,1.54-4.02,1.53-5.59,0-122.98-119.9-319.88-118.95-441.69,2.86,0,0-97.82,97.82-129.96,129.96-2.86,2.86-7.71.08-6.67-3.83,16.27-61.04,48.19-118.82,96.06-166.7,144.17-144.17,377.31-145.16,522.7-2.96ZM558.62,556.91c-35.53,35.53-94,33.13-126.31-6.85-24.57-30.4-24.76-75.05-.46-105.67,31.36-39.52,88.32-42.93,124.1-10.23,1.59,1.46,4.02,1.47,5.54-.05l34.87-34.88c1.6-1.6,1.59-4.26-.05-5.81-55.76-52.66-143.67-51.7-198.26,2.89,0,0-.01.01-.02.02h0s-241.09,241.09-241.09,241.09c-1.17,1.17-1.52,2.93-.88,4.45,6.75,15.88,14.76,31.45,23.83,46.47,1.35,2.23,4.47,2.6,6.32.75l174.57-174.57c-1.36,30.21,14.69,60.44,37.27,83.03,55.57,55.57,144.88,56.09,201.19-.05.47-.47,218.59-218.58,241.07-241.06,1.15-1.15,1.46-2.85.83-4.34-6.78-15.98-14.86-31.58-23.97-46.66-1.35-2.23-4.47-2.6-6.32-.75l-252.21,252.22ZM357.4,355.89s.07-.07.1-.1c77.04-77.04,201.38-77.96,279.55-2.75,1.57,1.51,4.03,1.52,5.57-.02l34.89-34.89c1.59-1.59,1.58-4.22-.03-5.79-100.58-97.48-260.91-96.82-360.67,2.94l-188.7,188.7c-.79.79-1.23,1.87-1.2,2.99.56,21.22,2.94,42.57,7.13,63.46.63,3.13,4.56,4.28,6.82,2.02l216.54-216.54h0ZM357.5,638.14c-5.57-5.57-10.72-11.41-15.49-17.45-1.49-1.88-4.24-2.07-5.94-.37l-35.08,35.08c-1.47,1.47-1.6,3.83-.28,5.42,5.08,6.15,10.47,12.12,16.23,17.88,100.37,100.37,262.97,100.23,363.34-.14l188.96-188.96c.79-.79,1.23-1.89,1.2-3.01-.64-22.11-3.15-43.27-7.2-63.26-.63-3.13-4.55-4.25-6.81-1.99l-216.73,216.73c-77.97,77.93-204.24,78.03-282.19.07ZM276.38,719.26c-5.59-5.59-10.82-11.38-15.86-17.28-1.52-1.78-4.21-1.89-5.86-.24l-34.98,34.98c-1.5,1.5-1.59,3.9-.2,5.49,5.24,5.99,10.64,11.89,16.35,17.6,145.17,145.17,380.95,145.58,525.7,0,47.87-48.14,80.27-105.98,96.53-167.28,1.06-3.99-3.81-6.84-6.73-3.92l-130.5,130.5c-123.43,123.43-321.68,122.91-444.44.14ZM862.6,887.88c-6.72,0-13.01-1.28-18.93-3.82-5.9-2.54-11.08-6.07-15.57-10.54-4.47-4.47-7.98-9.68-10.54-15.57-2.54-5.9-3.82-12.22-3.82-18.93s1.28-13.03,3.82-18.93c2.56-5.9,6.07-11.1,10.54-15.57,4.49-4.47,9.68-8,15.57-10.54,5.92-2.54,12.22-3.82,18.93-3.82s13.12,1.28,19.02,3.82c5.92,2.54,11.1,6.07,15.57,10.54,4.49,4.47,7.98,9.68,10.49,15.57s3.78,12.22,3.78,18.93-1.26,13.03-3.78,18.93-6,11.1-10.49,15.57c-4.47,4.47-9.66,8-15.57,10.54-5.9,2.54-12.24,3.82-19.02,3.82ZM862.6,878.73c7.35,0,14-1.78,19.98-5.37,6-3.59,10.79-8.37,14.36-14.36,3.59-5.98,5.37-12.66,5.37-19.98s-1.78-14-5.37-19.98c-3.57-5.98-8.35-10.77-14.36-14.36-5.98-3.59-12.64-5.37-19.98-5.37s-13.92,1.78-19.94,5.37c-6,3.59-10.79,8.37-14.36,14.36-3.55,5.98-5.33,12.66-5.33,19.98s1.78,14,5.33,19.98c3.57,5.98,8.35,10.77,14.36,14.36,6.02,3.59,12.68,5.37,19.94,5.37ZM845.81,861.27v-45h21.66c2.31,0,4.53.55,6.72,1.64s3.99,2.67,5.37,4.74c1.41,2.08,2.1,4.62,2.1,7.64s-.71,5.73-2.14,7.93-3.25,3.92-5.5,5.12c-2.22,1.2-4.55,1.81-6.97,1.81h-16.71v-6.3h14.61c2.14,0,4.01-.73,5.63-2.22,1.64-1.49,2.43-3.59,2.43-6.34s-.8-4.81-2.43-6c-1.62-1.2-3.44-1.81-5.46-1.81h-11.25v38.79h-8.06ZM874.6,861.27l-11-20.99h8.73l11.17,20.99h-8.9Z');
+                svg.appendChild(path);
+
+                link.appendChild(svg);
+
+                const linkText = document.createElement('span');
+                linkText.textContent = 'View on SongSelect';
+                link.appendChild(linkText);
+
+                valueEl.appendChild(link);
+            }
+
+            infoGrid.appendChild(clone);
+        }
+
+        modalBody.appendChild(infoGrid);
+
+        // Add copyright info
+        if (parsed.metadata.copyright) {
+            const copyright = document.createElement('div');
+            copyright.className = 'modal-ccli';
+            copyright.textContent = parsed.metadata.copyright;
+            modalBody.appendChild(copyright);
+        }
+
+        if (parsed.metadata.ccliTrailer) {
+            const trailer = document.createElement('div');
+            trailer.className = 'modal-ccli';
+            trailer.textContent = parsed.metadata.ccliTrailer;
+            modalBody.appendChild(trailer);
+        }
+
+        // Show modal
+        modal.classList.add('active');
+
+        // Setup close button
+        const closeButton = document.getElementById('library-modal-close');
+        if (closeButton) {
+            closeButton.onclick = () => {
+                modal.classList.remove('active');
+            };
+        }
+
+        // Close on overlay click
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        };
+    }
+
+    setupLibraryFontSizeControls() {
+        const decreaseBtn = document.getElementById('library-font-size-decrease');
+        const increaseBtn = document.getElementById('library-font-size-increase');
+
+        if (!decreaseBtn || !increaseBtn) return;
+
+        // Remove old listeners
+        const newDecreaseBtn = decreaseBtn.cloneNode(true);
+        const newIncreaseBtn = increaseBtn.cloneNode(true);
+        decreaseBtn.parentNode.replaceChild(newDecreaseBtn, decreaseBtn);
+        increaseBtn.parentNode.replaceChild(newIncreaseBtn, increaseBtn);
+
+        if (!this.currentLibraryFontSize) {
+            this.currentLibraryFontSize = CONFIG.DEFAULT_FONT_SIZE;
+        }
+
+        newDecreaseBtn.addEventListener('click', () => {
+            this.currentLibraryFontSize = Math.max(CONFIG.MIN_FONT_SIZE, this.currentLibraryFontSize - CONFIG.FONT_SIZE_STEP);
+            this.applyLibraryFontSize();
+        });
+
+        newIncreaseBtn.addEventListener('click', () => {
+            this.currentLibraryFontSize = Math.min(CONFIG.MAX_FONT_SIZE, this.currentLibraryFontSize + CONFIG.FONT_SIZE_STEP);
+            this.applyLibraryFontSize();
+        });
+    }
+
+    applyLibraryFontSize() {
+        const contentElement = document.getElementById('library-song-content');
+        if (!contentElement) return;
+
+        const songContent = contentElement.querySelector('.song-content');
+        if (songContent) {
+            songContent.style.fontSize = `${this.currentLibraryFontSize}rem`;
+        }
+    }
+
+    setupLibraryResetButton() {
+        const resetButton = document.getElementById('library-reset-button');
+        const resetModal = document.getElementById('library-reset-confirm-modal');
+        const cancelButton = document.getElementById('library-reset-cancel');
+        const confirmButton = document.getElementById('library-reset-confirm');
+
+        if (!resetButton || !resetModal) return;
+
+        // Remove old listener
+        const newResetButton = resetButton.cloneNode(true);
+        resetButton.parentNode.replaceChild(newResetButton, resetButton);
+
+        // Show confirmation modal when reset button is clicked
+        newResetButton.addEventListener('click', () => {
+            resetModal.classList.add('active');
+        });
+
+        // Cancel - close modal
+        if (cancelButton) {
+            cancelButton.onclick = () => {
+                resetModal.classList.remove('active');
+            };
+        }
+
+        // Close modal when clicking outside
+        resetModal.onclick = (e) => {
+            if (e.target === resetModal) {
+                resetModal.classList.remove('active');
+            }
+        };
+
+        // Confirm - reset everything
+        if (confirmButton) {
+            confirmButton.onclick = () => {
+                this.resetLibrarySong();
+                resetModal.classList.remove('active');
+            };
+        }
+    }
+
+    async resetLibrarySong() {
+        if (!this.currentLibraryParsedSong) return;
+
+        // Reset key to original
+        this.currentLibraryKey = this.currentLibraryParsedSong.metadata.key;
+
+        // Reset font size to default
+        this.currentLibraryFontSize = CONFIG.DEFAULT_FONT_SIZE;
+
+        // Re-render with original key
+        await this.reRenderLibrarySong(this.currentLibraryKey);
+
+        // Update key display
+        const keyValue = document.getElementById('library-key-selector-value');
+        if (keyValue) {
+            keyValue.textContent = this.currentLibraryKey || '-';
+        }
+
+        // Update key selector
+        if (this.currentLibraryKey) {
+            this.populateLibraryKeySelector(this.currentLibraryKey);
+        }
+
+        // Apply font size
+        this.applyLibraryFontSize();
+
+        console.log('Library song reset to defaults');
     }
 
     extractYear(dateStr) {
@@ -514,7 +1381,7 @@ class PageApp {
                 }
 
                 // Set up click handlers for overview song buttons
-                document.querySelectorAll('.overview-song-button').forEach(button => {
+                document.querySelectorAll('.overview-song-card').forEach(button => {
                     button.addEventListener('click', () => {
                         const songIndex = parseInt(button.dataset.songIndex);
                         this.navigateToHash(`song-${songIndex}`);
@@ -590,34 +1457,33 @@ class PageApp {
         const overviewSongs = document.createElement('div');
         overviewSongs.className = 'overview-songs';
 
-        // Get template for overview song buttons
-        const buttonTemplate = document.getElementById('overview-song-button-template');
+        // Get template for song cards
+        const cardTemplate = document.getElementById('song-card-template');
 
         songs.forEach((song, index) => {
-            const clone = buttonTemplate.content.cloneNode(true);
-            const button = clone.querySelector('.overview-song-button');
-            button.dataset.songIndex = index;
+            const clone = cardTemplate.content.cloneNode(true);
+            const card = clone.querySelector('.song-card');
 
-            const number = clone.querySelector('.overview-song-number');
-            number.textContent = index + 1;
+            // Make it a button and add song index
+            card.classList.add('overview-song-card');
+            card.dataset.songIndex = index;
 
-            const title = clone.querySelector('.overview-song-title');
+            const title = clone.querySelector('.song-card-title');
             title.textContent = song.title;
 
-            const metaSpan = clone.querySelector('.overview-song-meta');
+            const metaSpan = clone.querySelector('.song-card-meta');
             const metadata = [];
+            if (song.artist) {
+                metadata.push(song.artist);
+            }
             if (song.metadata.key) {
-                metadata.push(`Key: ${song.metadata.key}`);
+                metadata.push(song.metadata.key);
             }
             if (song.metadata.tempo) {
-                metadata.push(`Tempo: ${song.metadata.tempo}`);
+                metadata.push(`${song.metadata.tempo} BPM`);
             }
 
-            if (metadata.length > 0) {
-                metaSpan.textContent = metadata.join(' • ');
-            } else {
-                metaSpan.remove();
-            }
+            metaSpan.textContent = metadata.join(' • ');
 
             overviewSongs.appendChild(clone);
         });
@@ -1640,7 +2506,7 @@ class PageApp {
         const overviewSongs = document.querySelector('.overview-songs');
         if (!overviewSongs) return;
 
-        const buttons = Array.from(document.querySelectorAll('.overview-song-button'));
+        const buttons = Array.from(document.querySelectorAll('.overview-song-card'));
         if (buttons.length === 0) return;
 
         // Clean up any existing global event listeners
@@ -1713,7 +2579,7 @@ class PageApp {
             const clientY = dragState.currentY;
 
             // Find which button is being hovered over
-            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'));
             let proposedIndex = null;
 
             for (let i = 0; i < buttonsArray.length; i++) {
@@ -1871,7 +2737,7 @@ class PageApp {
             overviewSongs.classList.remove('reordering');
             document.body.style.userSelect = '';
 
-            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+            const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'));
             buttonsArray.forEach(btn => {
                 btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
             });
@@ -1903,38 +2769,35 @@ class PageApp {
                 if (overviewContainer) {
                     overviewContainer.textContent = '';
 
-                    const buttonTemplate = document.getElementById('overview-song-button-template');
+                    const cardTemplate = document.getElementById('song-card-template');
                     this.songs.forEach((song, index) => {
-                        const clone = buttonTemplate.content.cloneNode(true);
-                        const btn = clone.querySelector('.overview-song-button');
-                        btn.dataset.songIndex = index;
+                        const clone = cardTemplate.content.cloneNode(true);
+                        const card = clone.querySelector('.song-card');
+                        card.classList.add('overview-song-card');
+                        card.dataset.songIndex = index;
 
-                        const number = clone.querySelector('.overview-song-number');
-                        number.textContent = index + 1;
-
-                        const title = clone.querySelector('.overview-song-title');
+                        const title = clone.querySelector('.song-card-title');
                         title.textContent = song.title;
 
-                        const metaSpan = clone.querySelector('.overview-song-meta');
+                        const metaSpan = clone.querySelector('.song-card-meta');
                         const metadata = [];
+                        if (song.artist) {
+                            metadata.push(song.artist);
+                        }
                         if (song.metadata.key) {
-                            metadata.push(`Key: ${song.metadata.key}`);
+                            metadata.push(song.metadata.key);
                         }
                         if (song.metadata.tempo) {
-                            metadata.push(`Tempo: ${song.metadata.tempo}`);
+                            metadata.push(`${song.metadata.tempo} BPM`);
                         }
 
-                        if (metadata.length > 0) {
-                            metaSpan.textContent = metadata.join(' • ');
-                        } else {
-                            metaSpan.remove();
-                        }
+                        metaSpan.textContent = metadata.join(' • ');
 
                         overviewContainer.appendChild(clone);
                     });
 
                     // Re-setup click handlers and drag-drop
-                    document.querySelectorAll('.overview-song-button').forEach(btn => {
+                    document.querySelectorAll('.overview-song-card').forEach(btn => {
                         btn.addEventListener('click', () => {
                             const songIndex = parseInt(btn.dataset.songIndex);
                             this.navigateToHash(`song-${songIndex}`);
@@ -2041,7 +2904,7 @@ class PageApp {
                 overviewSongs.classList.remove('reordering');
                 document.body.style.userSelect = '';
 
-                const buttonsArray = Array.from(document.querySelectorAll('.overview-song-button'));
+                const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'));
                 buttonsArray.forEach(btn => {
                     btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
                 });
