@@ -117,22 +117,42 @@ export class SetlistImporter {
                 const parsed = this.parser.parse(chordproText);
                 console.log(`[Import] Parsed song: ${parsed.metadata.title}`);
 
-                // Find or create song in collection
-                const songId = await this.findOrCreateSong(parsed, chordproText, setlistData.id, setlistData.date);
-                console.log(`[Import] Song ID: ${songId}`);
+                // Check if song has at least one section (not just a title)
+                const hasSections = parsed.sections && parsed.sections.length > 0;
 
-                // Add to setlist
-                songs.push({
-                    order: order,
-                    songId: songId,
-                    chordproEdits: null,
-                    modifications: {
-                        targetKey: null,
-                        bpmOverride: null,
-                        fontSize: 1.6,
-                        sectionStates: {}
-                    }
-                });
+                if (!hasSections) {
+                    console.log(`[Import] Skipping song without sections: ${parsed.metadata.title}`);
+                    // Keep in setlist but don't add to song database
+                    // Use a placeholder songId and store text inline
+                    songs.push({
+                        order: order,
+                        songId: `placeholder-${hashText(songData.filename)}`,
+                        chordproEdits: chordproText, // Store inline since not in DB
+                        modifications: {
+                            targetKey: null,
+                            bpmOverride: null,
+                            fontSize: 1.6,
+                            sectionStates: {}
+                        }
+                    });
+                } else {
+                    // Find or create song in collection
+                    const songId = await this.findOrCreateSong(parsed, chordproText, setlistData.id, setlistData.date);
+                    console.log(`[Import] Song ID: ${songId}`);
+
+                    // Add to setlist
+                    songs.push({
+                        order: order,
+                        songId: songId,
+                        chordproEdits: null,
+                        modifications: {
+                            targetKey: null,
+                            bpmOverride: null,
+                            fontSize: 1.6,
+                            sectionStates: {}
+                        }
+                    });
+                }
             } catch (err) {
                 console.error(`[Import] Failed to import song ${songData.filename}:`, err);
             }

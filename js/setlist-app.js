@@ -90,10 +90,10 @@ class PageApp {
             await this.renderHome();
         } else if (route.type === 'songs') {
             await this.renderSongsPage();
-        } else if (route.type === 'librarySong') {
-            await this.renderSongsPage(route.songId);
         } else if (route.type === 'setlist') {
             await this.renderSetlist(route.setlistId);
+        } else if (route.type === 'settings') {
+            await this.renderSettings();
         }
 
         // Set up keyboard navigation
@@ -101,6 +101,9 @@ class PageApp {
 
         // Set up touch/swipe support
         this.setupTouchSupport(route);
+
+        // Set up navigation menu
+        this.setupNavigationMenu(route);
     }
 
     parseRoute(pathname) {
@@ -112,10 +115,8 @@ class PageApp {
             return { type: 'songs' };
         }
 
-        // Match /songs/{id}
-        const librarySongMatch = pathname.match(/^\/songs\/([^\/]+)$/);
-        if (librarySongMatch) {
-            return { type: 'librarySong', songId: librarySongMatch[1] };
+        if (pathname === '/settings' || pathname === '/settings/' || pathname === '/settings.html') {
+            return { type: 'settings' };
         }
 
         const setlistMatch = pathname.match(/^\/setlist\/([^\/]+)$/);
@@ -145,50 +146,65 @@ class PageApp {
         await this.renderSetlistsTab();
     }
 
-    async renderSongsPage(songId = null) {
+    async renderSongsPage() {
+        // Check if there's a hash indicating a specific song
+        const hash = window.location.hash.substring(1); // Remove the #
+
         // Render the standalone songs page
         await this.renderSongLibraryTab();
-        this.setupLibrarySongBackButton();
 
-        // Set up popstate handler for browser back/forward
-        this.setupLibraryPopstateHandler();
+        // Set up hash change handler for navigation
+        this.setupLibraryHashNavigation();
 
-        // If songId is provided, load that song
-        if (songId) {
-            const song = await this.db.getSong(songId);
+        // If hash is provided, load that song
+        if (hash) {
+            const song = await this.db.getSong(hash);
             if (song) {
-                await this.viewLibrarySong(song, false); // false = don't push state (we're already at the URL)
+                await this.viewLibrarySong(song, false); // false = don't update URL (we're already there)
             } else {
-                console.error('Song not found:', songId);
-                // Navigate back to /songs if song not found
+                console.error('Song not found:', hash);
+                // Clear the hash if song not found
                 window.history.replaceState({}, '', '/songs');
+                // Remove the viewing-song class since we're not showing a song
+                const container = document.querySelector('.home-content-container, .songs-content-container');
+                if (container) {
+                    container.classList.remove('viewing-song');
+                }
             }
         }
     }
 
-    setupLibraryPopstateHandler() {
+    async renderSettings() {
+        // Setup the import button on the settings page
+        this.setupImportButton();
+    }
+
+    setupLibraryHashNavigation() {
         // Remove old handler if exists
-        if (this.libraryPopstateHandler) {
-            window.removeEventListener('popstate', this.libraryPopstateHandler);
+        if (this.libraryHashHandler) {
+            window.removeEventListener('hashchange', this.libraryHashHandler);
         }
 
         // Create new handler
-        this.libraryPopstateHandler = async (event) => {
-            const route = this.parseRoute(window.location.pathname);
+        this.libraryHashHandler = async (event) => {
+            const hash = window.location.hash.substring(1);
 
-            if (route.type === 'songs') {
-                // Navigate back to song list
+            if (!hash) {
+                // No hash = show library list
                 this.closeLibrarySongView(false); // false = don't update URL (already changed)
-            } else if (route.type === 'librarySong') {
-                // Navigate to a specific song
-                const song = await this.db.getSong(route.songId);
+            } else {
+                // Hash present = show specific song
+                const song = await this.db.getSong(hash);
                 if (song) {
-                    await this.viewLibrarySong(song, false); // false = don't push state
+                    await this.viewLibrarySong(song, false); // false = don't update URL
+                } else {
+                    // Song not found, go back to library
+                    window.location.hash = '';
                 }
             }
         };
 
-        window.addEventListener('popstate', this.libraryPopstateHandler);
+        window.addEventListener('hashchange', this.libraryHashHandler);
     }
 
     setupTabs() {
@@ -235,19 +251,10 @@ class PageApp {
 
                 const message = document.createElement('p');
                 message.style.marginBottom = '2rem';
-                message.textContent = 'No setlists found in database.';
+                message.textContent = 'No setlists found in database. Go to Settings to import setlists.';
                 container.appendChild(message);
 
-                const importButton = document.createElement('button');
-                importButton.id = 'import-button';
-                importButton.className = 'setlist-button';
-                importButton.style.display = 'inline-block';
-                importButton.style.width = 'auto';
-                importButton.textContent = 'Import Setlists from Filesystem';
-                container.appendChild(importButton);
-
                 listContainer.appendChild(container);
-                this.setupImportButton();
                 return;
             }
 
@@ -271,30 +278,14 @@ class PageApp {
                 groupedByYear[year].sort((a, b) => b.date.localeCompare(a.date));
             }
 
-            // Clear and render import button at top
+            // Clear and render setlists
             listContainer.textContent = '';
-
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.textAlign = 'center';
-            buttonContainer.style.marginBottom = '2rem';
-
-            const importButton = document.createElement('button');
-            importButton.id = 'import-button';
-            importButton.className = 'setlist-button';
-            importButton.style.display = 'inline-block';
-            importButton.style.width = 'auto';
-            importButton.textContent = 'Re-import Setlists';
-            buttonContainer.appendChild(importButton);
-
-            listContainer.appendChild(buttonContainer);
 
             // Render grouped setlists (only current year expanded by default)
             for (const year of years) {
                 const yearSection = this.createYearSection(year, groupedByYear[year], year == currentYear);
                 listContainer.appendChild(yearSection);
             }
-
-            this.setupImportButton();
         } catch (error) {
             console.error('Error loading setlists:', error);
             listContainer.textContent = '';
@@ -407,6 +398,7 @@ class PageApp {
             const clone = template.content.cloneNode(true);
             const card = clone.querySelector('.song-card');
             const title = clone.querySelector('.song-card-title');
+            const lastPlayed = clone.querySelector('.song-card-last-played');
             const meta = clone.querySelector('.song-card-meta');
 
             title.textContent = song.title || 'Untitled';
@@ -425,6 +417,17 @@ class PageApp {
 
             meta.textContent = metadata.join(' • ');
 
+            // Add last played information (on same line as title, flush right)
+            if (lastPlayed && song.appearances && song.appearances.length > 0) {
+                // Find most recent appearance
+                const sortedAppearances = [...song.appearances].sort((a, b) =>
+                    b.date.localeCompare(a.date)
+                );
+                const lastPlayedDate = sortedAppearances[0].date;
+                const weeksAgo = this.getWeeksAgo(lastPlayedDate);
+                lastPlayed.textContent = `Last played ${weeksAgo}`;
+            }
+
             // Make card clickable - view and edit song
             card.addEventListener('click', (e) => {
                 console.log('Song clicked:', song.title, song);
@@ -437,18 +440,20 @@ class PageApp {
         console.log('Finished rendering', songs.length, 'songs');
     }
 
-    async viewLibrarySong(song, pushState = true) {
+    async viewLibrarySong(song, updateHash = true) {
         console.log('viewLibrarySong called with:', song);
 
         // Store the current library song for editing
         this.currentLibrarySong = song;
         this.currentLibrarySongId = song.id;
 
-        // Update URL if requested
-        if (pushState) {
-            const newUrl = `/songs/${song.id}`;
-            window.history.pushState({ songId: song.id }, '', newUrl);
+        // Update URL hash if requested
+        if (updateHash) {
+            window.location.hash = song.id;
         }
+
+        // Update navigation menu for library song context
+        this.updateNavigationMenu({ type: 'librarySong', songId: song.id });
 
         // Parse the song (note: field is chordproText with lowercase 'p')
         console.log('Parsing song:', song.chordproText);
@@ -465,13 +470,11 @@ class PageApp {
         }
 
         // Show all header controls
-        const backButton = document.getElementById('library-back-button');
         const editToggle = document.getElementById('library-edit-toggle');
         const infoButton = document.getElementById('library-info-button');
         const keyDisplay = document.getElementById('library-key-display');
         const metaHeader = document.getElementById('library-song-meta-header');
 
-        if (backButton) backButton.style.display = 'inline-flex';
         if (editToggle) editToggle.style.display = 'flex';
         if (infoButton) infoButton.style.display = 'flex';
         if (keyDisplay) keyDisplay.style.display = 'flex';
@@ -532,13 +535,6 @@ class PageApp {
         if (container) {
             container.classList.add('viewing-song');
         }
-
-        // Setup back button
-        if (backButton) {
-            backButton.onclick = () => {
-                this.closeLibrarySongView();
-            };
-        }
     }
 
     closeLibrarySongView(updateUrl = true) {
@@ -548,7 +544,6 @@ class PageApp {
         }
 
         // Hide all header controls
-        const backButton = document.getElementById('library-back-button');
         const editToggle = document.getElementById('library-edit-toggle');
         const infoButton = document.getElementById('library-info-button');
         const keyDisplay = document.getElementById('library-key-display');
@@ -556,7 +551,6 @@ class PageApp {
         const resetButton = document.getElementById('library-reset-button');
         const fontSizeControls = document.getElementById('library-font-size-controls');
 
-        if (backButton) backButton.style.display = 'none';
         if (editToggle) editToggle.style.display = 'none';
         if (infoButton) infoButton.style.display = 'none';
         if (keyDisplay) keyDisplay.style.display = 'none';
@@ -578,19 +572,13 @@ class PageApp {
         this.currentLibrarySong = null;
         this.currentLibrarySongId = null;
 
-        // Navigate back to /songs
+        // Clear the hash to go back to library list
         if (updateUrl) {
-            window.history.pushState({}, '', '/songs');
+            window.location.hash = '';
         }
-    }
 
-    setupLibrarySongBackButton() {
-        const backButton = document.getElementById('library-back-button');
-        if (backButton) {
-            backButton.onclick = () => {
-                this.closeLibrarySongView();
-            };
-        }
+        // Update navigation menu for songs library context
+        this.updateNavigationMenu({ type: 'songs' });
     }
 
     setupLibrarySongEditMode() {
@@ -812,15 +800,19 @@ class PageApp {
         title.textContent = parsed.metadata.title || 'Untitled';
         modalBody.appendChild(title);
 
-        // Create info grid
-        const infoGrid = document.createElement('div');
-        infoGrid.className = 'modal-info-grid';
+        // Create two-column container
+        const columnsContainer = document.createElement('div');
+        columnsContainer.className = 'modal-columns-container';
+
+        // Left column with metadata
+        const leftColumn = document.createElement('div');
+        leftColumn.className = 'modal-info-grid modal-left-column';
 
         // Get template for info items
         const itemTemplate = document.getElementById('song-info-item-template');
 
         // Helper function to add info items
-        const addInfoItem = (label, value) => {
+        const addInfoItem = (label, value, tooltip = null) => {
             const clone = itemTemplate.content.cloneNode(true);
             const labelEl = clone.querySelector('.modal-info-label');
             const valueEl = clone.querySelector('.modal-info-value');
@@ -828,7 +820,32 @@ class PageApp {
             labelEl.textContent = label;
             valueEl.textContent = value;
 
-            infoGrid.appendChild(clone);
+            // Add tooltip if provided
+            if (tooltip) {
+                const tooltipWrapper = document.createElement('span');
+                tooltipWrapper.className = 'info-tooltip-wrapper';
+
+                const tooltipIcon = document.createElement('span');
+                tooltipIcon.className = 'info-tooltip-icon';
+                tooltipIcon.textContent = 'ⓘ';
+
+                const tooltipText = document.createElement('span');
+                tooltipText.className = 'info-tooltip-text';
+                tooltipText.textContent = tooltip;
+
+                tooltipWrapper.appendChild(tooltipIcon);
+                tooltipWrapper.appendChild(tooltipText);
+
+                // Toggle tooltip on click
+                tooltipIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tooltipWrapper.classList.toggle('active');
+                });
+
+                labelEl.appendChild(tooltipWrapper);
+            }
+
+            leftColumn.appendChild(clone);
         };
 
         // Add metadata items
@@ -836,18 +853,64 @@ class PageApp {
             addInfoItem('Artist', parsed.metadata.artist);
         }
 
-        if (parsed.metadata.key) {
-            addInfoItem('Original Key', parsed.metadata.key);
-        }
+        // Merge key and tempo on one line
+        if (parsed.metadata.key || parsed.metadata.tempo) {
+            const keyTempo = [];
+            if (parsed.metadata.key) keyTempo.push(`Key: ${parsed.metadata.key}`);
+            if (parsed.metadata.tempo) keyTempo.push(`${parsed.metadata.tempo} BPM`);
 
-        if (parsed.metadata.tempo) {
-            addInfoItem('Original BPM', parsed.metadata.tempo);
+            addInfoItem(
+                'Original Key / Tempo',
+                keyTempo.join(' • '),
+                'This is the key/tempo from when the song was first imported, and may not reflect the original CCLI key.'
+            );
         }
 
         if (parsed.metadata.time) {
             addInfoItem('Time Signature', parsed.metadata.time);
         }
 
+        // Add appearance statistics
+        const stats = this.calculateAppearanceStats(song);
+        if (stats.totalAppearances > 0) {
+            addInfoItem('Times Played (Total)', stats.totalAppearances.toString());
+        }
+
+        // Right column with recent appearances
+        const rightColumn = document.createElement('div');
+        rightColumn.className = 'modal-right-column';
+
+        const recentAppearances = this.getRecentAppearances(song);
+        if (recentAppearances.length > 0) {
+            const appearancesTitle = document.createElement('div');
+            appearancesTitle.className = 'modal-appearances-title';
+            appearancesTitle.textContent = 'Played in Last Year';
+            rightColumn.appendChild(appearancesTitle);
+
+            const appearancesList = document.createElement('div');
+            appearancesList.className = 'modal-appearances-list';
+
+            recentAppearances.forEach(appearance => {
+                const item = document.createElement('div');
+                item.className = 'modal-appearance-item';
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'appearance-date';
+                dateSpan.textContent = appearance.formattedDate;
+
+                const relativeSpan = document.createElement('span');
+                relativeSpan.className = 'appearance-relative';
+                relativeSpan.textContent = appearance.weeksAgo;
+
+                item.appendChild(dateSpan);
+                item.appendChild(relativeSpan);
+                appearancesList.appendChild(item);
+            });
+
+            rightColumn.appendChild(appearancesList);
+        }
+
+        // Add CCLI to left column
         if (parsed.metadata.ccli || parsed.metadata.ccliSongNumber) {
             const clone = itemTemplate.content.cloneNode(true);
             const labelEl = clone.querySelector('.modal-info-label');
@@ -910,10 +973,18 @@ class PageApp {
                 valueEl.appendChild(link);
             }
 
-            infoGrid.appendChild(clone);
+            leftColumn.appendChild(clone);
         }
 
-        modalBody.appendChild(infoGrid);
+        columnsContainer.appendChild(leftColumn);
+        columnsContainer.appendChild(rightColumn);
+        modalBody.appendChild(columnsContainer);
+
+        // Close tooltips when clicking elsewhere in modal
+        modalBody.addEventListener('click', () => {
+            const activeTooltips = modalBody.querySelectorAll('.info-tooltip-wrapper.active');
+            activeTooltips.forEach(tooltip => tooltip.classList.remove('active'));
+        });
 
         // Add copyright info
         if (parsed.metadata.copyright) {
@@ -1060,6 +1131,88 @@ class PageApp {
         return match ? match[1] : 'Unknown';
     }
 
+    calculateAppearanceStats(song) {
+        if (!song.appearances || song.appearances.length === 0) {
+            return {
+                totalAppearances: 0,
+                last12MonthsAppearances: 0,
+                lastPlayedDate: null
+            };
+        }
+
+        const totalAppearances = song.appearances.length;
+
+        // Calculate date 12 months ago
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+        // Filter appearances in last 12 months
+        const last12MonthsAppearances = song.appearances.filter(appearance => {
+            const appearanceDate = new Date(appearance.date);
+            return appearanceDate >= twelveMonthsAgo;
+        }).length;
+
+        // Find most recent appearance date
+        const sortedAppearances = [...song.appearances].sort((a, b) =>
+            b.date.localeCompare(a.date)
+        );
+        const lastPlayedDate = sortedAppearances[0].date;
+
+        return {
+            totalAppearances,
+            last12MonthsAppearances,
+            lastPlayedDate
+        };
+    }
+
+    formatDate(dateStr) {
+        // Parse YYYY-MM-DD format and convert to readable format
+        const date = new Date(dateStr);
+        return date.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    }
+
+    getWeeksAgo(dateStr) {
+        const date = new Date(dateStr);
+        const now = new Date();
+        const diffTime = now - date;
+        const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7));
+
+        if (diffWeeks === 0) {
+            return 'This week';
+        } else if (diffWeeks === 1) {
+            return '1 week ago';
+        } else {
+            return `${diffWeeks} weeks ago`;
+        }
+    }
+
+    getRecentAppearances(song) {
+        if (!song.appearances || song.appearances.length === 0) {
+            return [];
+        }
+
+        // Calculate date 12 months ago
+        const twelveMonthsAgo = new Date();
+        twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+        // Filter and sort appearances in last 12 months (most recent first)
+        return song.appearances
+            .filter(appearance => {
+                const appearanceDate = new Date(appearance.date);
+                return appearanceDate >= twelveMonthsAgo;
+            })
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .map(appearance => ({
+                date: appearance.date,
+                formattedDate: this.formatDate(appearance.date),
+                weeksAgo: this.getWeeksAgo(appearance.date)
+            }));
+    }
+
     createYearSection(year, setlists, expanded = false) {
         const section = document.createElement('div');
         section.className = 'year-section';
@@ -1084,7 +1237,18 @@ class PageApp {
                 ? `${this.formatSetlistName(setlist.date)} - ${setlist.name}`
                 : this.formatSetlistName(setlist.date);
 
-            link.textContent = displayName;
+            // Create content wrapper with name and song count
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'setlist-name';
+            nameSpan.textContent = displayName;
+
+            const countSpan = document.createElement('span');
+            countSpan.className = 'setlist-song-count';
+            const songCount = setlist.songs ? setlist.songs.length : 0;
+            countSpan.textContent = `${songCount} song${songCount !== 1 ? 's' : ''}`;
+
+            link.appendChild(nameSpan);
+            link.appendChild(countSpan);
             list.appendChild(link);
         }
 
@@ -1173,10 +1337,10 @@ class PageApp {
             message.textContent = `Import complete! ${result.setlists} setlists, ${result.songs} songs`;
             progressBar.style.width = '100%';
 
-            // Wait a moment then reload
+            // Wait a moment then navigate to home to see imported setlists
             setTimeout(() => {
                 modal.remove();
-                window.location.reload();
+                window.location.href = '/';
             }, 1500);
 
         } catch (error) {
@@ -1658,27 +1822,46 @@ class PageApp {
         }
     }
 
-    showSongInfo(song) {
+    async showSongInfo(song) {
         const modal = document.getElementById('song-info-modal');
         const modalBody = document.getElementById('modal-body');
 
         // Clear previous content
         modalBody.textContent = '';
 
+        // Load full song data from database to get appearances
+        const fullSong = await this.db.getSong(song.songId);
+        if (!fullSong) {
+            console.error('Could not load full song data for:', song.songId);
+            modalBody.textContent = 'Error loading song information.';
+            return;
+        }
+
+        // Merge the display song data with the full database song data
+        const songData = {
+            ...fullSong,
+            title: song.title,
+            metadata: song.metadata
+        };
+
         // Create title
         const title = document.createElement('h2');
-        title.textContent = song.title;
+        title.textContent = songData.title;
         modalBody.appendChild(title);
 
-        // Create info grid
-        const infoGrid = document.createElement('div');
-        infoGrid.className = 'modal-info-grid';
+        // Create two-column container
+        const columnsContainer = document.createElement('div');
+        columnsContainer.className = 'modal-columns-container';
+
+        // Left column with metadata
+        const leftColumn = document.createElement('div');
+        leftColumn.className = 'modal-info-grid modal-left-column';
 
         // Get template for info items
         const itemTemplate = document.getElementById('song-info-item-template');
 
         // Helper function to add info items
-        const addInfoItem = (label, value) => {
+        const addInfoItem = (label, value, tooltip = null) => {
             const clone = itemTemplate.content.cloneNode(true);
             const labelEl = clone.querySelector('.modal-info-label');
             const valueEl = clone.querySelector('.modal-info-value');
@@ -1686,27 +1869,98 @@ class PageApp {
             labelEl.textContent = label;
             valueEl.textContent = value;
 
-            infoGrid.appendChild(clone);
+            // Add tooltip if provided
+            if (tooltip) {
+                const tooltipWrapper = document.createElement('span');
+                tooltipWrapper.className = 'info-tooltip-wrapper';
+
+                const tooltipIcon = document.createElement('span');
+                tooltipIcon.className = 'info-tooltip-icon';
+                tooltipIcon.textContent = 'ⓘ';
+
+                const tooltipText = document.createElement('span');
+                tooltipText.className = 'info-tooltip-text';
+                tooltipText.textContent = tooltip;
+
+                tooltipWrapper.appendChild(tooltipIcon);
+                tooltipWrapper.appendChild(tooltipText);
+
+                // Toggle tooltip on click
+                tooltipIcon.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    tooltipWrapper.classList.toggle('active');
+                });
+
+                labelEl.appendChild(tooltipWrapper);
+            }
+
+            leftColumn.appendChild(clone);
         };
 
         // Add metadata items
-        if (song.metadata.artist) {
-            addInfoItem('Artist', song.metadata.artist);
+        if (songData.metadata.artist) {
+            addInfoItem('Artist', songData.metadata.artist);
         }
 
-        if (song.metadata.key) {
-            addInfoItem('Original Key', song.metadata.key);
+        // Merge key and tempo on one line
+        if (songData.metadata.key || songData.metadata.tempo) {
+            const keyTempo = [];
+            if (songData.metadata.key) keyTempo.push(`Key: ${songData.metadata.key}`);
+            if (songData.metadata.tempo) keyTempo.push(`${songData.metadata.tempo} BPM`);
+
+            addInfoItem(
+                'Original Key / Tempo',
+                keyTempo.join(' • '),
+                'This is the key/tempo from when the song was first imported, and may not reflect the original CCLI key.'
+            );
         }
 
-        if (song.metadata.tempo) {
-            addInfoItem('Original BPM', song.metadata.tempo);
+        if (songData.metadata.time) {
+            addInfoItem('Time Signature', songData.metadata.time);
         }
 
-        if (song.metadata.time) {
-            addInfoItem('Time Signature', song.metadata.time);
+        // Add appearance statistics
+        const stats = this.calculateAppearanceStats(songData);
+        if (stats.totalAppearances > 0) {
+            addInfoItem('Times Played (Total)', stats.totalAppearances.toString());
         }
 
-        if (song.metadata.ccli || song.metadata.ccliSongNumber) {
+        // Right column with recent appearances
+        const rightColumn = document.createElement('div');
+        rightColumn.className = 'modal-right-column';
+
+        const recentAppearances = this.getRecentAppearances(songData);
+        if (recentAppearances.length > 0) {
+            const appearancesTitle = document.createElement('div');
+            appearancesTitle.className = 'modal-appearances-title';
+            appearancesTitle.textContent = 'Played in Last Year';
+            rightColumn.appendChild(appearancesTitle);
+
+            const appearancesList = document.createElement('div');
+            appearancesList.className = 'modal-appearances-list';
+
+            recentAppearances.forEach(appearance => {
+                const item = document.createElement('div');
+                item.className = 'modal-appearance-item';
+
+                const dateSpan = document.createElement('span');
+                dateSpan.className = 'appearance-date';
+                dateSpan.textContent = appearance.formattedDate;
+
+                const relativeSpan = document.createElement('span');
+                relativeSpan.className = 'appearance-relative';
+                relativeSpan.textContent = appearance.weeksAgo;
+
+                item.appendChild(dateSpan);
+                item.appendChild(relativeSpan);
+                appearancesList.appendChild(item);
+            });
+
+            rightColumn.appendChild(appearancesList);
+        }
+
+        // Add CCLI to left column
+        if (songData.metadata.ccli || songData.metadata.ccliSongNumber) {
             const clone = itemTemplate.content.cloneNode(true);
             const labelEl = clone.querySelector('.modal-info-label');
             const valueEl = clone.querySelector('.modal-info-value');
@@ -1717,11 +1971,11 @@ class PageApp {
             valueEl.style.gap = '1rem';
 
             const ccliSpan = document.createElement('span');
-            ccliSpan.textContent = song.metadata.ccli || song.metadata.ccliSongNumber;
+            ccliSpan.textContent = songData.metadata.ccli || songData.metadata.ccliSongNumber;
             valueEl.appendChild(ccliSpan);
 
-            if (song.metadata.ccliSongNumber) {
-                const songSelectUrl = `https://songselect.ccli.com/songs/${song.metadata.ccliSongNumber}/`;
+            if (songData.metadata.ccliSongNumber) {
+                const songSelectUrl = `https://songselect.ccli.com/songs/${songData.metadata.ccliSongNumber}/`;
                 const link = document.createElement('a');
                 link.href = songSelectUrl;
                 link.target = '_blank';
@@ -1768,23 +2022,31 @@ class PageApp {
                 valueEl.appendChild(link);
             }
 
-            infoGrid.appendChild(clone);
+            leftColumn.appendChild(clone);
         }
 
-        modalBody.appendChild(infoGrid);
+        columnsContainer.appendChild(leftColumn);
+        columnsContainer.appendChild(rightColumn);
+        modalBody.appendChild(columnsContainer);
+
+        // Close tooltips when clicking elsewhere in modal
+        modalBody.addEventListener('click', () => {
+            const activeTooltips = modalBody.querySelectorAll('.info-tooltip-wrapper.active');
+            activeTooltips.forEach(tooltip => tooltip.classList.remove('active'));
+        });
 
         // Add copyright info
-        if (song.metadata.copyright) {
+        if (songData.metadata.copyright) {
             const copyright = document.createElement('div');
             copyright.className = 'modal-ccli';
-            copyright.textContent = song.metadata.copyright;
+            copyright.textContent = songData.metadata.copyright;
             modalBody.appendChild(copyright);
         }
 
-        if (song.metadata.ccliTrailer) {
+        if (songData.metadata.ccliTrailer) {
             const trailer = document.createElement('div');
             trailer.className = 'modal-ccli';
-            trailer.textContent = song.metadata.ccliTrailer;
+            trailer.textContent = songData.metadata.ccliTrailer;
             modalBody.appendChild(trailer);
         }
 
@@ -3207,6 +3469,65 @@ class PageApp {
                 }
             }
         });
+    }
+
+    setupNavigationMenu(route) {
+        const navButton = document.getElementById('nav-menu-button');
+        const navPopover = document.getElementById('nav-menu-popover');
+        const navBackButton = document.getElementById('nav-back-button');
+
+        if (!navButton || !navPopover) return;
+
+        // Position popover when it opens
+        navPopover.addEventListener('toggle', (e) => {
+            if (e.newState === 'open') {
+                const buttonRect = navButton.getBoundingClientRect();
+                navPopover.style.top = `${buttonRect.bottom + 4}px`;
+                navPopover.style.left = `${buttonRect.left}px`;
+            }
+        });
+
+        // Setup back button with single click handler
+        if (navBackButton) {
+            navBackButton.addEventListener('click', () => {
+                navPopover.hidePopover();
+                if (this.navBackAction) {
+                    this.navBackAction();
+                }
+            });
+        }
+
+        // Set initial back button state
+        this.updateNavigationMenu(route);
+    }
+
+    updateNavigationMenu(route) {
+        const navBackLabel = document.getElementById('nav-back-label');
+
+        // Determine back button label and action based on route
+        let backLabel = 'Back';
+        let backAction = () => window.history.back();
+
+        if (route.type === 'setlist') {
+            backLabel = 'Back to Setlists';
+            backAction = () => window.location.href = '/';
+        } else if (route.type === 'librarySong') {
+            backLabel = 'Back to Song Library';
+            backAction = () => this.closeLibrarySongView();
+        } else if (route.type === 'songs') {
+            backLabel = 'Back to Home';
+            backAction = () => window.location.href = '/';
+        } else if (route.type === 'settings') {
+            backLabel = 'Back to Home';
+            backAction = () => window.location.href = '/';
+        }
+
+        if (navBackLabel) {
+            navBackLabel.textContent = backLabel;
+        }
+
+        // Store action for the click handler
+        this.navBackAction = backAction;
     }
 }
 

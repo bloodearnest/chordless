@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Setlist arrangement for worship songs">
+    <meta name="description" content="Settings for Setalight">
     <meta name="view-transition" content="same-origin">
-    <title>Setalight</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Settings - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
     <div class="app-container">
-        <div id="home-view" class="view">
+        <div id="settings-view" class="view">
             <header>
                 <button class="nav-menu-button" id="nav-menu-button" popovertarget="nav-menu-popover" aria-label="Navigation menu">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -19,12 +19,20 @@
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
-                <h1>Setalight</h1>
+                <h1>Settings</h1>
+                <div></div>
             </header>
 
             <!-- Navigation menu popover -->
             <div id="nav-menu-popover" class="nav-menu-popover" popover>
                 <nav class="nav-menu">
+                    <button class="nav-menu-item" id="nav-back-button">
+                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="19" y1="12" x2="5" y2="12"></line>
+                            <polyline points="12 19 5 12 12 5"></polyline>
+                        </svg>
+                        <span id="nav-back-label">Back to Home</span>
+                    </button>
                     <a href="/" class="nav-menu-item">
                         <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
@@ -54,29 +62,29 @@
             </div>
 
             <main class="home-content">
-                <div id="setlist-list" class="setlist-list">
-                    <p>Loading setlists...</p>
+                <div class="settings-content">
+                    <h2>Settings</h2>
+
+                    <div class="settings-section">
+                        <h3 style="font-size: 1.6rem; margin-top: 2rem; margin-bottom: 1rem; color: var(--header-bg);">Data Management</h3>
+                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                            Import setlists and songs from the filesystem. This will scan the sets/ directory and add all found setlists to the database.
+                        </p>
+                        <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
+                            Import Setlists from Filesystem
+                        </button>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">App Settings</h3>
+                        <p style="color: #7f8c8d; font-size: 1.1rem;">
+                            Additional settings coming soon...
+                        </p>
+                    </div>
                 </div>
             </main>
         </div>
     </div>
-
-    <!-- Template for setlist item -->
-    <template id="setlist-item-template">
-        <div class="setlist-item">
-            <div class="setlist-date"></div>
-            <div class="setlist-name"></div>
-            <div class="setlist-song-count"></div>
-        </div>
-    </template>
-
-    <!-- Template for year section -->
-    <template id="year-section-template">
-        <div class="year-section">
-            <button class="year-header"></button>
-            <div class="year-list"></div>
-        </div>
-    </template>
 
     <script>
         // Register service worker
@@ -104,6 +112,6 @@
                 });
         }
     </script>
-    <script type="module" src="js/setlist-app.js"></script>
+    <script type="module" src="/js/setlist-app.js"></script>
 </body>
 </html>

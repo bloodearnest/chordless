@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v12';
+const CACHE_NAME = 'setalight-v15';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -154,9 +154,8 @@ async function handleRoute(url) {
         }
     }
 
-    // Songs library page: /songs or /songs/ or /songs/{id}
-    const songsMatch = path.match(/^\/songs(\/([^\/]+))?$/);
-    if (songsMatch || path === '/songs.html') {
+    // Songs library page: /songs or /songs/
+    if (path === '/songs' || path === '/songs/' || path === '/songs.html') {
         console.log('[SW] Serving songs.html');
         if (DEV_MODE) {
             // Dev mode: Always fetch fresh, fallback to cache on failure
@@ -171,6 +170,25 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/songs.html');
+        }
+    }
+
+    // Settings page: /settings
+    if (path === '/settings' || path === '/settings/' || path === '/settings.html') {
+        console.log('[SW] Serving settings.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/settings.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/settings.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/settings.html');
+            });
+        } else {
+            return fetch('/settings.html');
         }
     }
 

@@ -51,6 +51,10 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
         elif path == '/songs' or path == '/songs/' or (path.startswith('/songs/') and not path.endswith('.html')):
             self.path = '/songs.html'
             super().do_GET()
+        # Settings page route - serve settings.html
+        elif path == '/settings' or path == '/settings/':
+            self.path = '/settings.html'
+            super().do_GET()
         elif path == '/':
             self.path = '/index.html'
             super().do_GET()
