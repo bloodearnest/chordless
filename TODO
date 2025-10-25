@@ -1,11 +1,5 @@
 
 
-management
-- create setlist
-- add song to set list from library
-- chrome extension to import song
-- browse library
-
 storage
 - oauth
 - gdrive as source of truth

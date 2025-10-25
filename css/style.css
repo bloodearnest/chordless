@@ -1198,6 +1198,60 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
+/* Add Song modal - nearly fullscreen */
+.add-song-modal-content {
+    width: 98%;
+    max-width: 98vw;
+    height: 95vh;
+    max-height: 95vh;
+    display: flex;
+    flex-direction: column;
+    padding: 2rem 0;
+}
+
+.add-song-modal-content h2 {
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+    max-width: 800px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 2rem;
+}
+
+.add-song-modal-content .song-library-header {
+    margin-bottom: 1.5rem;
+    flex-shrink: 0;
+    max-width: 800px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 2rem;
+}
+
+.add-song-modal-content #add-song-results {
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.add-song-modal-content #add-song-results .song-card {
+    padding: 1.2rem 2rem;
+    min-height: 70px;
+}
+
+.add-song-modal-content .modal-close {
+    top: 1rem;
+    right: 1rem;
+}
+
 .modal-close {
     position: absolute;
     top: 1.5rem;
@@ -1414,8 +1468,79 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     background-color: #c0392b;
 }
 
+.modal-btn-primary {
+    background-color: var(--header-bg);
+    color: white;
+}
+
+.modal-btn-primary:hover {
+    background-color: #5a6c8a;
+}
+
 #reset-confirm-modal .modal-content {
     max-width: 500px;
+}
+
+#create-setlist-modal .modal-content {
+    max-width: 500px;
+}
+
+/* Form styles */
+.form-field {
+    margin-bottom: 1.5rem;
+}
+
+.form-field label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: var(--text-color);
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.form-field input[type="date"],
+.form-field input[type="time"],
+.form-field input[type="text"],
+.form-field select {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: inherit;
+    background-color: white;
+    color: var(--text-color);
+    transition: border-color 0.2s ease;
+}
+
+.form-field input[type="date"]:focus,
+.form-field input[type="time"]:focus,
+.form-field input[type="text"]:focus,
+.form-field select:focus {
+    outline: none;
+    border-color: var(--header-bg);
+}
+
+.form-field input::placeholder {
+    color: #95a5a6;
+}
+
+/* Create setlist button in header */
+.create-setlist-button {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: background-color 0.2s ease;
+}
+
+.create-setlist-button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 #reset-confirm-modal p {
@@ -1482,6 +1607,9 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     color: inherit;
     min-height: 70px;
     transition: all 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
 }
 
 .song-card:hover {
@@ -1534,6 +1662,24 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* Add Song button */
+.add-song-button {
+    margin-top: 1.5rem;
+    border: 2px dashed #bdc3c7 !important;
+    background-color: #f8f9fa !important;
+    color: #7f8c8d;
+}
+
+.add-song-button:hover {
+    background-color: white !important;
+    border-color: var(--button-bg) !important;
+    color: var(--button-bg);
+}
+
+.add-song-button .song-card-title {
+    color: inherit;
 }
 
 /* Song library */

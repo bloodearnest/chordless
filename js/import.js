@@ -1,7 +1,7 @@
 // Import tool for migrating filesystem data to IndexedDB
 
 import { ChordProParser } from './parser.js';
-import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText } from './db.js';
+import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText, determineSetlistType } from './db.js';
 
 export class SetlistImporter {
     constructor() {
@@ -163,11 +163,17 @@ export class SetlistImporter {
         // Sort songs by order
         songs.sort((a, b) => a.order - b.order);
 
-        // Create setlist object
+        // Extract name from setlist ID
+        const name = this.extractSetlistName(setlistData.id);
+
+        // Create setlist object with new fields
         const setlist = {
             id: setlistData.id,
             date: setlistData.date,
-            name: this.extractSetlistName(setlistData.id),
+            time: '10:30', // Default time
+            type: determineSetlistType(setlistData.date, name),
+            name: name || '',
+            leader: '', // Will be populated with user details later
             songs: songs,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()

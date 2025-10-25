@@ -1429,11 +1429,26 @@ class PageApp {
 
             if (setlist.songs.length === 0) {
                 console.warn('[WARN] Setlist has no songs');
+
+                // Set instance variables for empty setlist
+                this.songs = [];
+                this.currentSetlistId = setlistId;
+                this.currentSetlist = setlist;
+
+                // Update header to show setlist info
+                this.updateHeader(null, true);
+
+                // Clear container (will show Add Song button via overview)
                 const container = document.querySelector('.song-container');
                 container.textContent = '';
-                const msg = document.createElement('p');
-                msg.textContent = 'No songs found in this setlist.';
-                container.appendChild(msg);
+                container.appendChild(this.renderFullSetlist(setlist, []));
+
+                // Show overview immediately
+                requestAnimationFrame(() => {
+                    this.showOverview(true);
+                    history.replaceState({ view: 'overview' }, '', window.location.href);
+                });
+
                 return;
             }
 
@@ -1658,8 +1673,33 @@ class PageApp {
 
             metaSpan.textContent = metadata.join(' • ');
 
+            // Add long press to delete
+            this.setupLongPressDelete(card, index, song);
+
             overviewSongs.appendChild(clone);
         });
+
+        // Add "Add Song" button
+        const addSongButton = document.createElement('button');
+        addSongButton.className = 'song-card add-song-button';
+        addSongButton.innerHTML = `
+            <div class="song-card-info">
+                <div class="song-card-title-row">
+                    <div class="song-card-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Add Song
+                    </div>
+                </div>
+            </div>
+        `;
+        addSongButton.addEventListener('click', () => {
+            this.openAddSongModal();
+        });
+
+        overviewSongs.appendChild(addSongButton);
 
         setlistOverview.appendChild(overviewSongs);
         songContentWrapper.appendChild(setlistOverview);
@@ -1686,13 +1726,13 @@ class PageApp {
 
     showOverview(instant = false) {
         this.scrollToSection('overview', -1, instant);
-        this.updateHeader(null);
+        this.updateHeader(null, instant);
         this.exitEditMode();
     }
 
     showSong(index, instant = false) {
         this.scrollToSection(`song-${index}`, index, instant);
-        this.updateHeader(this.songs[index]);
+        this.updateHeader(this.songs[index], instant);
         this.applyFontSize(index);
         this.exitEditMode();
     }
@@ -1739,7 +1779,7 @@ class PageApp {
         }
     }
 
-    updateHeader(song) {
+    updateHeader(song, instant = false) {
         const titleEl = document.getElementById('song-title-header');
         const metaEl = document.getElementById('song-meta-header');
         const infoButton = document.getElementById('info-button');
@@ -1747,19 +1787,27 @@ class PageApp {
         const keyValueDisplay = document.getElementById('key-value-display');
         const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
         const editToggle = document.getElementById('edit-mode-toggle');
+        const resetButton = document.getElementById('reset-button');
+        const fontSizeControls = document.querySelector('.font-size-controls');
 
         if (song) {
-            // Crossfade title if it's changing
+            // Update title with crossfade animation (or instant if specified)
             const newTitle = song.title;
             if (titleEl.textContent !== newTitle) {
-                // Fade out
-                titleEl.style.opacity = '0';
-
-                // Wait for fade out, then update and fade in
-                setTimeout(() => {
+                if (instant) {
+                    // Instant update without animation
                     titleEl.textContent = newTitle;
                     titleEl.style.opacity = '1';
-                }, 200);
+                } else {
+                    // Fade out
+                    titleEl.style.opacity = '0';
+
+                    // Wait for fade out, then update and fade in
+                    setTimeout(() => {
+                        titleEl.textContent = newTitle;
+                        titleEl.style.opacity = '1';
+                    }, 200);
+                }
             }
 
             // Update key selector value (used in both modes) - use current key
@@ -1782,15 +1830,17 @@ class PageApp {
                 metaEl.appendChild(metaItem);
             }
 
-            // Show key display and edit button
+            // Show song-specific controls
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'flex';
             if (editToggle) editToggle.style.display = 'flex';
+            if (resetButton) resetButton.style.display = 'block';
+            if (fontSizeControls) fontSizeControls.style.display = 'flex';
 
             // Enable info button
             infoButton.style.display = 'flex';
             infoButton.onclick = () => this.showSongInfo(song);
         } else {
-            // Overview - format date and name properly
+            // Overview - show setlist metadata
             let newTitle;
             if (this.currentSetlist) {
                 const formattedDate = this.formatSetlistName(this.currentSetlist.date);
@@ -1801,23 +1851,38 @@ class PageApp {
                 newTitle = 'Setlist';
             }
 
-            // Crossfade title if it's changing
+            // Update title with crossfade animation (or instant if specified)
             if (titleEl.textContent !== newTitle) {
-                // Fade out
-                titleEl.style.opacity = '0';
-
-                // Wait for fade out, then update and fade in
-                setTimeout(() => {
+                if (instant) {
+                    // Instant update without animation
                     titleEl.textContent = newTitle;
                     titleEl.style.opacity = '1';
-                }, 200);
+                } else {
+                    // Fade out
+                    titleEl.style.opacity = '0';
+
+                    // Wait for fade out, then update and fade in
+                    setTimeout(() => {
+                        titleEl.textContent = newTitle;
+                        titleEl.style.opacity = '1';
+                    }, 200);
+                }
             }
 
+            // Show setlist type in metadata
             metaEl.textContent = '';
+            if (this.currentSetlist && this.currentSetlist.type) {
+                const typeSpan = document.createElement('span');
+                typeSpan.className = 'meta-item';
+                typeSpan.textContent = this.currentSetlist.type;
+                metaEl.appendChild(typeSpan);
+            }
 
-            // Hide key display, edit button, and info button on overview
+            // Hide all song-specific controls on overview
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
             if (editToggle) editToggle.style.display = 'none';
+            if (resetButton) resetButton.style.display = 'none';
+            if (fontSizeControls) fontSizeControls.style.display = 'none';
             infoButton.style.display = 'none';
 
             if (keyValueDisplay) {
@@ -3537,6 +3602,315 @@ class PageApp {
 
         // Store action for the click handler
         this.navBackAction = backAction;
+    }
+
+    async openAddSongModal() {
+        console.log('[Add Song Modal] Opening modal');
+        const modal = document.getElementById('add-song-modal');
+        const searchInput = document.getElementById('add-song-search-input');
+        const resultsContainer = document.getElementById('add-song-results');
+        const closeBtn = document.getElementById('add-song-modal-close');
+
+        console.log('[Add Song Modal] Elements:', { modal, searchInput, resultsContainer, closeBtn });
+
+        // Load all songs for searching
+        try {
+            resultsContainer.innerHTML = '<p style="text-align: center; color: #95a5a6;">Loading songs...</p>';
+
+            const songs = await this.db.getAllSongs();
+            console.log('[Add Song Modal] Loaded songs:', songs.length);
+
+            if (songs.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
+                        <p style="font-size: 1.3rem; margin-bottom: 1rem;">No songs in library</p>
+                        <p>Import setlists from the Settings page to populate the song library.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // Sort songs alphabetically by title
+            songs.sort((a, b) => {
+                const titleA = (a.title || '').toLowerCase();
+                const titleB = (b.title || '').toLowerCase();
+                return titleA.localeCompare(titleB);
+            });
+
+            // Store for filtering
+            this.addSongModalSongs = songs;
+
+            // Clear search and show all songs initially
+            searchInput.value = '';
+            this.renderAddSongResults(songs, resultsContainer);
+
+        } catch (error) {
+            console.error('[Add Song Modal] Error loading songs:', error);
+            resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error loading songs. Please try again.</p>';
+        }
+
+        // Show modal
+        modal.classList.add('active');
+
+        // Focus search input
+        setTimeout(() => searchInput.focus(), 100);
+
+        // Setup search handler - same pattern as song library
+        const handleSearch = (e) => {
+            this.filterAddSongResults(e.target.value, resultsContainer);
+        };
+
+        searchInput.addEventListener('input', handleSearch);
+
+        // Setup close handlers
+        const closeModal = () => {
+            modal.classList.remove('active');
+            searchInput.removeEventListener('input', handleSearch);
+            this.addSongModalSongs = null;
+        };
+
+        closeBtn.onclick = closeModal;
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+    }
+
+    filterAddSongResults(searchTerm, resultsContainer) {
+        if (!this.addSongModalSongs) return;
+
+        const term = searchTerm.toLowerCase().trim();
+
+        if (!term) {
+            // Show all songs if search is empty
+            this.renderAddSongResults(this.addSongModalSongs, resultsContainer);
+            return;
+        }
+
+        // Filter songs by title, artist, or lyrics - same as song library
+        const filtered = this.addSongModalSongs.filter(song => {
+            const title = (song.title || '').toLowerCase();
+            const artist = (song.artist || '').toLowerCase();
+            const lyricsText = (song.lyricsText || '').toLowerCase();
+
+            return title.includes(term) ||
+                   artist.includes(term) ||
+                   lyricsText.includes(term);
+        });
+
+        this.renderAddSongResults(filtered, resultsContainer);
+    }
+
+    renderAddSongResults(songs, resultsContainer) {
+        console.log('[Add Song Modal] renderAddSongResults called with', songs.length, 'songs');
+        const template = document.getElementById('song-card-template');
+        console.log('[Add Song Modal] Template:', template);
+
+        resultsContainer.textContent = '';
+
+        if (songs.length === 0) {
+            console.log('[Add Song Modal] No songs to display');
+            const message = document.createElement('p');
+            message.style.textAlign = 'center';
+            message.style.color = '#95a5a6';
+            message.textContent = 'No songs match your search.';
+            resultsContainer.appendChild(message);
+            return;
+        }
+
+        if (!template) {
+            console.error('[Add Song Modal] song-card-template not found!');
+            resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error: Template not found. Please refresh the page.</p>';
+            return;
+        }
+
+        for (const song of songs) {
+            const clone = template.content.cloneNode(true);
+            const card = clone.querySelector('.song-card');
+            const title = clone.querySelector('.song-card-title');
+            const lastPlayed = clone.querySelector('.song-card-last-played');
+            const meta = clone.querySelector('.song-card-meta');
+
+            title.textContent = song.title || 'Untitled';
+
+            // Build metadata string
+            const metadata = [];
+            if (song.artist) {
+                metadata.push(song.artist);
+            }
+            if (song.metadata?.key) {
+                metadata.push(song.metadata.key);
+            }
+            if (song.metadata?.tempo) {
+                metadata.push(`${song.metadata.tempo} BPM`);
+            }
+
+            meta.textContent = metadata.join(' • ');
+
+            // Add last played information (same as song library)
+            if (lastPlayed && song.appearances && song.appearances.length > 0) {
+                // Find most recent appearance
+                const sortedAppearances = [...song.appearances].sort((a, b) =>
+                    b.date.localeCompare(a.date)
+                );
+                const lastPlayedDate = sortedAppearances[0].date;
+                const weeksAgo = this.getWeeksAgo(lastPlayedDate);
+                lastPlayed.textContent = `Last played ${weeksAgo}`;
+            }
+
+            // Make card clickable
+            card.addEventListener('click', () => {
+                this.addSongToSetlist(song);
+            });
+
+            resultsContainer.appendChild(clone);
+        }
+        console.log('[Add Song Modal] Finished rendering', songs.length, 'songs');
+    }
+
+    async addSongToSetlist(song) {
+        try {
+            // Get current setlist
+            const setlist = this.currentSetlist;
+            if (!setlist) {
+                console.error('No current setlist');
+                return;
+            }
+
+            // Create new song entry
+            const newSongEntry = {
+                order: setlist.songs.length,
+                songId: song.id,
+                chordproEdits: null,
+                modifications: {
+                    targetKey: null,
+                    bpmOverride: null,
+                    fontSize: 1.6,
+                    sectionStates: {}
+                }
+            };
+
+            // Add to setlist
+            setlist.songs.push(newSongEntry);
+            setlist.updatedAt = new Date().toISOString();
+
+            // Save to database
+            await this.db.saveSetlist(setlist);
+
+            console.log('Added song to setlist:', song.title);
+
+            // Close modal
+            const modal = document.getElementById('add-song-modal');
+            modal.classList.remove('active');
+
+            // Reload the setlist to show the new song
+            await this.renderSetlist(setlist.id);
+        } catch (error) {
+            console.error('Error adding song to setlist:', error);
+            alert('Failed to add song to setlist. Please try again.');
+        }
+    }
+
+    setupLongPressDelete(card, index, song) {
+        let longPressTimer;
+        let touchStarted = false;
+
+        const startLongPress = (e) => {
+            touchStarted = true;
+            longPressTimer = setTimeout(() => {
+                if (touchStarted) {
+                    // Trigger long press - show delete confirmation
+                    this.showDeleteSongConfirmation(index, song);
+                    // Add visual feedback
+                    card.style.backgroundColor = '#ffebee';
+                }
+            }, 600); // 600ms long press
+        };
+
+        const cancelLongPress = (e) => {
+            touchStarted = false;
+            clearTimeout(longPressTimer);
+            card.style.backgroundColor = '';
+        };
+
+        // Prevent default context menu on long press
+        const preventContext = (e) => {
+            e.preventDefault();
+        };
+
+        // Touch events for mobile
+        card.addEventListener('touchstart', startLongPress, { passive: false });
+        card.addEventListener('touchend', cancelLongPress);
+        card.addEventListener('touchcancel', cancelLongPress);
+        card.addEventListener('touchmove', cancelLongPress);
+
+        // Mouse events for desktop
+        card.addEventListener('mousedown', startLongPress);
+        card.addEventListener('mouseup', cancelLongPress);
+        card.addEventListener('mouseleave', cancelLongPress);
+
+        // Prevent context menu
+        card.addEventListener('contextmenu', preventContext);
+    }
+
+    showDeleteSongConfirmation(index, song) {
+        const modal = document.getElementById('delete-song-modal');
+        const songTitleEl = document.getElementById('delete-song-title');
+        const confirmBtn = document.getElementById('delete-song-confirm');
+        const cancelBtn = document.getElementById('delete-song-cancel');
+
+        songTitleEl.textContent = song.title;
+
+        modal.classList.add('active');
+
+        const handleConfirm = async () => {
+            modal.classList.remove('active');
+            await this.deleteSongFromSetlist(index);
+            cleanup();
+        };
+
+        const handleCancel = () => {
+            modal.classList.remove('active');
+            cleanup();
+        };
+
+        const cleanup = () => {
+            confirmBtn.removeEventListener('click', handleConfirm);
+            cancelBtn.removeEventListener('click', handleCancel);
+        };
+
+        confirmBtn.addEventListener('click', handleConfirm);
+        cancelBtn.addEventListener('click', handleCancel);
+    }
+
+    async deleteSongFromSetlist(index) {
+        try {
+            const setlist = this.currentSetlist;
+            if (!setlist) {
+                console.error('No current setlist');
+                return;
+            }
+
+            // Remove song from array
+            setlist.songs.splice(index, 1);
+
+            // Update order for remaining songs
+            setlist.songs.forEach((song, i) => {
+                song.order = i;
+            });
+
+            setlist.updatedAt = new Date().toISOString();
+
+            // Save to database
+            await this.db.saveSetlist(setlist);
+
+            console.log('Deleted song from setlist at index:', index);
+
+            // Reload the setlist
+            await this.renderSetlist(setlist.id);
+        } catch (error) {
+            console.error('Error deleting song from setlist:', error);
+            alert('Failed to delete song. Please try again.');
+        }
     }
 }
 

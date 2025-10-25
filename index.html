@@ -20,6 +20,12 @@
                     </svg>
                 </button>
                 <h1>Setalight</h1>
+                <button class="create-setlist-button" id="create-setlist-button" aria-label="Create new setlist">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="12" y1="5" x2="12" y2="19"></line>
+                        <line x1="5" y1="12" x2="19" y2="12"></line>
+                    </svg>
+                </button>
             </header>
 
             <!-- Navigation menu popover -->
@@ -64,6 +70,45 @@
                     <p>Loading setlists...</p>
                 </div>
             </main>
+        </div>
+
+        <!-- Create Setlist Modal -->
+        <div class="modal-overlay" id="create-setlist-modal">
+            <div class="modal-content">
+                <button class="modal-close" id="create-modal-close">&times;</button>
+                <h2>Create New Setlist</h2>
+                <form id="create-setlist-form">
+                    <div class="form-field">
+                        <label for="setlist-date">Date</label>
+                        <input type="date" id="setlist-date" name="date" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="setlist-time">Time</label>
+                        <input type="time" id="setlist-time" name="time" value="10:30" required>
+                    </div>
+                    <div class="form-field">
+                        <label for="setlist-type">Type</label>
+                        <select id="setlist-type" name="type" required>
+                            <option value="Church Service">Church Service</option>
+                            <option value="Prayer Meeting">Prayer Meeting</option>
+                            <option value="Event">Event</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-field">
+                        <label for="setlist-name">Name (optional)</label>
+                        <input type="text" id="setlist-name" name="name" placeholder="e.g. Youth Service, Christmas Special">
+                    </div>
+                    <div class="form-field">
+                        <label for="setlist-leader">Leader (optional)</label>
+                        <input type="text" id="setlist-leader" name="leader" placeholder="e.g. John Smith">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="modal-btn modal-btn-cancel" id="create-cancel">Cancel</button>
+                        <button type="submit" class="modal-btn modal-btn-primary">Create Setlist</button>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
 
@@ -114,6 +159,7 @@
         }
     </script>
     <script type="module" src="js/import-handler.js"></script>
+    <script type="module" src="js/create-setlist.js"></script>
     <script type="module" src="js/setlist-app.js"></script>
 </body>
 </html>
