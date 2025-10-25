@@ -84,38 +84,56 @@
         return chordproText;
     }
 
-    // Send to Setalight
+    // Send to Setalight via window and postMessage
     async function sendToSetalight(chordproText, metadata) {
-        try {
-            const response = await fetch(`${SETALIGHT_URL}/api/import-song`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    chordproText: chordproText,
-                    metadata: metadata,
-                    source: 'songselect'
-                })
-            });
+        // Try to reuse existing Setalight window or open new one
+        let setalightWindow = window.open('', 'setalight');
 
-            if (!response.ok) {
-                throw new Error(`Import API failed: ${response.status}`);
-            }
-
-            return await response.json();
-        } catch (error) {
-            // Fallback: download locally
-            const blob = new Blob([chordproText], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${metadata.title || metadata.ccliNumber || 'song'}.chordpro`;
-            a.click();
-            URL.revokeObjectURL(url);
-
-            throw new Error('Could not connect to Setalight. File downloaded instead.');
+        // If no window exists or it's closed, open new one
+        if (!setalightWindow || setalightWindow.closed) {
+            setalightWindow = window.open(`${SETALIGHT_URL}/import-song`, 'setalight');
+        } else {
+            // Reuse existing window - navigate to import page
+            setalightWindow.location.href = `${SETALIGHT_URL}/import-song`;
         }
+
+        if (!setalightWindow) {
+            throw new Error('Could not open Setalight window. Please check popup blockers.');
+        }
+
+        // Wait for the window to signal it's ready
+        return new Promise((resolve, reject) => {
+            const timeout = setTimeout(() => {
+                reject(new Error('Timeout waiting for Setalight window'));
+            }, 10000);
+
+            const messageHandler = (event) => {
+                // Verify origin
+                if (event.origin !== SETALIGHT_URL) {
+                    return;
+                }
+
+                if (event.data && event.data.type === 'SETALIGHT_READY') {
+                    console.log('[Bookmarklet] Setalight window is ready');
+                    clearTimeout(timeout);
+                    window.removeEventListener('message', messageHandler);
+
+                    // Send the song data
+                    setalightWindow.postMessage({
+                        type: 'SETALIGHT_IMPORT',
+                        data: {
+                            chordproText: chordproText,
+                            metadata: metadata,
+                            source: 'songselect'
+                        }
+                    }, SETALIGHT_URL);
+
+                    resolve();
+                }
+            };
+
+            window.addEventListener('message', messageHandler);
+        });
     }
 
     // Main execution

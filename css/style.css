@@ -1252,6 +1252,81 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     right: 1rem;
 }
 
+/* Import Song Choice Buttons */
+.choice-button {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    padding: 1.5rem;
+    background: white;
+    border: 2px solid #ecf0f1;
+    border-radius: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s;
+    width: 100%;
+}
+
+.choice-button:hover {
+    background: #f8f9fa;
+    border-color: var(--button-bg);
+    transform: translateX(5px);
+}
+
+.choice-button:active {
+    transform: scale(0.98);
+}
+
+.choice-button-icon {
+    font-size: 2rem;
+    flex-shrink: 0;
+}
+
+.choice-button-content {
+    flex: 1;
+}
+
+.choice-button-title {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: var(--text-color);
+    margin-bottom: 0.25rem;
+}
+
+.choice-button-subtitle {
+    font-size: 1rem;
+    color: #7f8c8d;
+}
+
+/* Recent setlist dropdown inline */
+.recent-setlist-select-inline {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
+    font-size: 1rem;
+    border: 2px solid #ecf0f1;
+    border-radius: 6px;
+    background-color: #f8f9fa;
+    color: var(--text-color);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.recent-setlist-select-inline:hover {
+    border-color: var(--button-bg);
+    background-color: white;
+}
+
+.recent-setlist-select-inline:focus {
+    outline: none;
+    border-color: var(--button-bg);
+    background-color: white;
+}
+
+.choice-button-with-select:hover .recent-setlist-select-inline {
+    border-color: var(--button-bg);
+}
+
 .modal-close {
     position: absolute;
     top: 1.5rem;

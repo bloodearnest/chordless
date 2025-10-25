@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v30';
+const CACHE_NAME = 'setalight-v36';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -208,6 +208,25 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/bookmarklet-install.html');
+        }
+    }
+
+    // Import song page: /import-song
+    if (path === '/import-song' || path === '/import-song/' || path === '/import-song.html') {
+        console.log('[SW] Serving import-song.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/import-song.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/import-song.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/import-song.html');
+            });
+        } else {
+            return fetch('/import-song.html');
         }
     }
 
