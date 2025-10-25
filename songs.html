@@ -83,6 +83,12 @@
                         </svg>
                         <span>Settings</span>
                     </a>
+                    <a href="/bookmarklet" class="nav-menu-item">
+                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Bookmarklet</span>
+                    </a>
                 </nav>
             </div>
 
@@ -150,6 +156,9 @@
 
 
     <script>
+        // Set window name so bookmarklet can find and reuse this tab
+        window.name = 'setalight';
+
         // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js')

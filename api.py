@@ -12,13 +12,55 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
     def end_headers(self):
         # Add CORS headers
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         super().end_headers()
 
     def do_OPTIONS(self):
         self.send_response(200)
         self.end_headers()
+
+    def do_POST(self):
+        parsed_path = urlparse(self.path)
+        path = parsed_path.path
+
+        # API endpoint to import a song
+        if path == '/api/import-song':
+            self.handle_import_song()
+        else:
+            self.send_error(404, 'Not Found')
+
+    def handle_import_song(self):
+        """Handle song import from bookmarklet"""
+        try:
+            # Read the POST body
+            content_length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(content_length).decode('utf-8')
+            data = json.loads(body)
+
+            chordpro_text = data.get('chordproText')
+            metadata = data.get('metadata', {})
+            source = data.get('source', 'unknown')
+
+            print(f'[API] Importing song: {metadata.get("title", "Untitled")}')
+            print(f'[API] Source: {source}')
+            print(f'[API] ChordPro length: {len(chordpro_text) if chordpro_text else 0}')
+
+            # For now, just acknowledge receipt
+            # You can add file saving logic here later
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.end_headers()
+            response = {
+                'success': True,
+                'message': 'Song imported successfully',
+                'metadata': metadata
+            }
+            self.wfile.write(json.dumps(response).encode())
+
+        except Exception as e:
+            print(f'[API] Import error: {e}')
+            self.send_error(500, str(e))
 
     def do_GET(self):
         parsed_path = urlparse(self.path)
@@ -54,6 +96,10 @@ class SetalightAPIHandler(SimpleHTTPRequestHandler):
         # Settings page route - serve settings.html
         elif path == '/settings' or path == '/settings/':
             self.path = '/settings.html'
+            super().do_GET()
+        # Bookmarklet installation page
+        elif path == '/bookmarklet' or path == '/bookmarklet/':
+            self.path = '/bookmarklet-install.html'
             super().do_GET()
         elif path == '/':
             self.path = '/index.html'

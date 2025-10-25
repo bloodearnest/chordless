@@ -455,9 +455,18 @@ class PageApp {
         // Update navigation menu for library song context
         this.updateNavigationMenu({ type: 'librarySong', songId: song.id });
 
+        // Debug: log the song object to see what fields it has
+        console.log('Song object:', song);
+        console.log('Available fields:', Object.keys(song));
+
         // Parse the song (note: field is chordproText with lowercase 'p')
-        console.log('Parsing song:', song.chordproText);
-        const parsed = this.parser.parse(song.chordproText);
+        const chordproContent = song.chordproText || song.rawChordPro;
+        if (!chordproContent) {
+            console.error('Song has no ChordPro content!', song);
+            throw new Error('Song has no ChordPro content');
+        }
+        console.log('Parsing song:', chordproContent.substring(0, 100));
+        const parsed = this.parser.parse(chordproContent);
 
         // Store parsed song for library context
         this.currentLibraryParsedSong = parsed;

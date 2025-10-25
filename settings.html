@@ -58,6 +58,12 @@
                         </svg>
                         <span>Settings</span>
                     </a>
+                    <a href="/bookmarklet" class="nav-menu-item">
+                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+                        </svg>
+                        <span>Bookmarklet</span>
+                    </a>
                 </nav>
             </div>
 
@@ -73,6 +79,38 @@
                         <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
                             Import Setlists from Filesystem
                         </button>
+
+                        <h4 style="font-size: 1.4rem; margin-top: 2rem; margin-bottom: 1rem; color: #e74c3c;">Danger Zone</h4>
+                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                            Clear all data from IndexedDB and localStorage. This action cannot be undone!
+                        </p>
+                        <button id="clear-db-button" class="setlist-button" style="display: inline-block; width: auto; background-color: #e74c3c; border-color: #c0392b;">
+                            Clear Database
+                        </button>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">CCLI Bookmarklet</h3>
+                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                            Import songs directly from SongSelect with a single click using the bookmarklet.
+                        </p>
+                        <a href="/bookmarklet" class="setlist-button" style="display: inline-block; width: auto; text-decoration: none;">
+                            Install Bookmarklet
+                        </a>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">CCLI Extension Imports</h3>
+                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                            Songs imported from SongSelect using the Chrome extension will appear here. Process them to add to your library.
+                        </p>
+                        <button id="check-imports-button" class="setlist-button" style="display: inline-block; width: auto; margin-right: 1rem;">
+                            Check for Pending Imports
+                        </button>
+                        <div id="pending-imports-list" style="margin-top: 2rem; display: none;">
+                            <h4 style="font-size: 1.4rem; margin-bottom: 1rem; color: var(--header-bg);">Pending Imports</h4>
+                            <div id="imports-container"></div>
+                        </div>
                     </div>
 
                     <div class="settings-section">
@@ -86,7 +124,12 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { SetalightDB } from '/js/db.js';
+
+        // Set window name for bookmarklet
+        window.name = 'setalight';
+
         // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/service-worker.js')
@@ -111,7 +154,36 @@
                     console.error('Service Worker registration failed:', error);
                 });
         }
+
+        // Handle clear database button
+        document.getElementById('clear-db-button').addEventListener('click', async () => {
+            const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
+
+            if (!confirmed) return;
+
+            try {
+                // Clear IndexedDB
+                const db = new SetalightDB();
+                await db.init();
+                await db.clearAll();
+
+                // Clear localStorage
+                localStorage.clear();
+
+                // Clear sessionStorage
+                sessionStorage.clear();
+
+                alert('✅ Database cleared successfully!\n\nThe page will now reload.');
+
+                // Reload the page
+                window.location.reload();
+            } catch (error) {
+                console.error('Failed to clear database:', error);
+                alert('❌ Failed to clear database: ' + error.message);
+            }
+        });
     </script>
     <script type="module" src="/js/setlist-app.js"></script>
+    <script type="module" src="/js/ccli-imports.js"></script>
 </body>
 </html>

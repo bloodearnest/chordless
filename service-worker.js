@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v15';
+const CACHE_NAME = 'setalight-v16';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -189,6 +189,25 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/settings.html');
+        }
+    }
+
+    // Bookmarklet page: /bookmarklet
+    if (path === '/bookmarklet' || path === '/bookmarklet/' || path === '/bookmarklet-install.html') {
+        console.log('[SW] Serving bookmarklet-install.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/bookmarklet-install.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/bookmarklet-install.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/bookmarklet-install.html');
+            });
+        } else {
+            return fetch('/bookmarklet-install.html');
         }
     }
 
