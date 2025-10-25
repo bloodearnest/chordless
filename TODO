@@ -1,17 +1,21 @@
 
 
+
+import
+ - don't go back to import page (history)
+ - adding the same song twice to set lists
+
+sharing
+- tempoary sharing
+- email media team
+
 storage
 - oauth
 - gdrive as source of truth
  - syncing
 
-sharing
-- bundle?
-- email media team
-
 UI
 - autoscaling font
-- fix home button
 - logo
 
 editing
@@ -29,7 +33,5 @@ settings
    - darkmode
 
 library
- - browse
  - ccli report nag
- - show when we last sang song
 
