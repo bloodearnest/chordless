@@ -377,11 +377,9 @@ class PageApp {
 
     renderSongList(songs) {
         const libraryContainer = document.getElementById('song-library-list');
-        const template = document.getElementById('song-card-template');
 
         console.log('renderSongList called with', songs.length, 'songs');
         console.log('libraryContainer:', libraryContainer);
-        console.log('template:', template);
 
         libraryContainer.textContent = '';
 
@@ -395,47 +393,22 @@ class PageApp {
         }
 
         for (const song of songs) {
-            const clone = template.content.cloneNode(true);
-            const card = clone.querySelector('.song-card');
-            const title = clone.querySelector('.song-card-title');
-            const lastPlayed = clone.querySelector('.song-card-last-played');
-            const meta = clone.querySelector('.song-card-meta');
+            // Create the Lit song-card component
+            const songCard = document.createElement('song-card');
+            songCard.song = song;
+            songCard.variant = 'library';
 
-            title.textContent = song.title || 'Untitled';
-
-            // Build metadata string
-            const metadata = [];
-            if (song.artist) {
-                metadata.push(song.artist);
-            }
-            if (song.metadata?.key) {
-                metadata.push(song.metadata.key);
-            }
-            if (song.metadata?.tempo) {
-                metadata.push(`${song.metadata.tempo} BPM`);
-            }
-
-            meta.textContent = metadata.join(' • ');
-
-            // Add last played information (on same line as title, flush right)
-            if (lastPlayed && song.appearances && song.appearances.length > 0) {
-                // Find most recent appearance
-                const sortedAppearances = [...song.appearances].sort((a, b) =>
-                    b.date.localeCompare(a.date)
-                );
-                const lastPlayedDate = sortedAppearances[0].date;
-                const weeksAgo = this.getWeeksAgo(lastPlayedDate);
-                lastPlayed.textContent = `Last played ${weeksAgo}`;
-            }
+            // Add some bottom margin
+            songCard.style.marginBottom = '1rem';
 
             // Make card clickable - view and edit song
-            card.addEventListener('click', (e) => {
+            songCard.addEventListener('song-click', (e) => {
                 console.log('Song clicked:', song.title, song);
                 console.log('Event:', e);
                 this.viewLibrarySong(song);
             });
 
-            libraryContainer.appendChild(clone);
+            libraryContainer.appendChild(songCard);
         }
         console.log('Finished rendering', songs.length, 'songs');
     }
@@ -1645,38 +1618,34 @@ class PageApp {
         const overviewSongs = document.createElement('div');
         overviewSongs.className = 'overview-songs';
 
-        // Get template for song cards
-        const cardTemplate = document.getElementById('song-card-template');
-
         songs.forEach((song, index) => {
-            const clone = cardTemplate.content.cloneNode(true);
-            const card = clone.querySelector('.song-card');
-
-            // Make it a button and add song index
+            // Create the Lit song-card component
+            const card = document.createElement('song-card');
+            card.song = song;
+            card.variant = 'setlist';
             card.classList.add('overview-song-card');
             card.dataset.songIndex = index;
 
-            const title = clone.querySelector('.song-card-title');
-            title.textContent = song.title;
+            // Add click handler to navigate to song
+            card.addEventListener('song-click', () => {
+                this.goToSong(index);
+            });
 
-            const metaSpan = clone.querySelector('.song-card-meta');
-            const metadata = [];
-            if (song.artist) {
-                metadata.push(song.artist);
-            }
-            if (song.metadata.key) {
-                metadata.push(song.metadata.key);
-            }
-            if (song.metadata.tempo) {
-                metadata.push(`${song.metadata.tempo} BPM`);
-            }
+            // Add long press handler - show delete modal OR start drag
+            card.addEventListener('song-long-press', (e) => {
+                // If we have a drag pending (touch/pen), start the drag instead of showing delete
+                // Check if this matches the current drag state
+                const dragState = this._currentDragState;
+                if (dragState && dragState.waitingForLongPress && dragState.button === card) {
+                    dragState.waitingForLongPress = false;
+                    this._startDragFromLongPress(card, dragState.startY);
+                } else {
+                    // Otherwise, show delete confirmation
+                    this.showDeleteSongConfirmation(index, song);
+                }
+            });
 
-            metaSpan.textContent = metadata.join(' • ');
-
-            // Add long press to delete
-            this.setupLongPressDelete(card, index, song);
-
-            overviewSongs.appendChild(clone);
+            overviewSongs.appendChild(card);
         });
 
         // Add "Add Song" button
@@ -2846,11 +2815,14 @@ class PageApp {
         if (buttons.length === 0) return;
 
         // Clean up any existing global event listeners
-        if (this._dragMouseMoveHandler) {
-            document.removeEventListener('mousemove', this._dragMouseMoveHandler);
+        if (this._dragPointerMoveHandler) {
+            document.removeEventListener('pointermove', this._dragPointerMoveHandler);
         }
-        if (this._dragMouseUpHandler) {
-            document.removeEventListener('mouseup', this._dragMouseUpHandler);
+        if (this._dragPointerUpHandler) {
+            document.removeEventListener('pointerup', this._dragPointerUpHandler);
+        }
+        if (this._dragPointerCancelHandler) {
+            document.removeEventListener('pointercancel', this._dragPointerCancelHandler);
         }
 
         let dragState = {
@@ -2862,13 +2834,19 @@ class PageApp {
             startY: 0,
             currentY: 0,
             buttonInitialTop: 0,
-            longPressTimer: null,
+            buttonHeight: 0,
             rafId: null,
-            mouseDownPending: false
+            mouseDownPending: false,
+            waitingForLongPress: false,
+            pointerId: null
         };
+
+        // Store reference on instance so song-long-press handler can access it
+        this._currentDragState = dragState;
 
         const startDrag = (button, clientY) => {
             dragState.active = true;
+            dragState.waitingForLongPress = false;
             dragState.button = button;
             dragState.startIndex = parseInt(button.dataset.songIndex);
             dragState.currentIndex = dragState.startIndex;
@@ -2876,9 +2854,10 @@ class PageApp {
             dragState.startY = clientY;
             dragState.currentY = clientY;
 
-            // Store initial button position
+            // Store initial button position and height
             const rect = button.getBoundingClientRect();
             dragState.buttonInitialTop = rect.top;
+            dragState.buttonHeight = rect.height;
 
             // Add visual feedback
             button.classList.add('dragging');
@@ -2889,6 +2868,11 @@ class PageApp {
 
             // Show initial drop indicator at original position
             performDragUpdate();
+        };
+
+        // Helper to start drag from long-press event
+        this._startDragFromLongPress = (button, clientY) => {
+            startDrag(button, clientY);
         };
 
         const updateDrag = (clientY) => {
@@ -2992,6 +2976,7 @@ class PageApp {
             // Clear all drop indicators
             buttonsArray.forEach(btn => {
                 btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
+                btn.style.removeProperty('--drag-card-height');
             });
 
             // Apply drop indicator - always show where it will land
@@ -3034,6 +3019,8 @@ class PageApp {
                 // Apply the indicator class (never on the dragged button)
                 if (indicatorButton && indicatorButton !== dragState.button) {
                     indicatorButton.classList.add(indicatorClass);
+                    // Set the drop indicator height to match the dragged card
+                    indicatorButton.style.setProperty('--drag-card-height', `${dragState.buttonHeight}px`);
                 }
 
                 // Apply preview animations only if position actually changes
@@ -3076,6 +3063,7 @@ class PageApp {
             const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'));
             buttonsArray.forEach(btn => {
                 btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down');
+                btn.style.removeProperty('--drag-card-height');
             });
 
             // Reorder if position changed
@@ -3105,39 +3093,25 @@ class PageApp {
                 if (overviewContainer) {
                     overviewContainer.textContent = '';
 
-                    const cardTemplate = document.getElementById('song-card-template');
                     this.songs.forEach((song, index) => {
-                        const clone = cardTemplate.content.cloneNode(true);
-                        const card = clone.querySelector('.song-card');
+                        // Create the Lit song-card component
+                        const card = document.createElement('song-card');
+                        card.song = song;
+                        card.variant = 'setlist';
                         card.classList.add('overview-song-card');
                         card.dataset.songIndex = index;
 
-                        const title = clone.querySelector('.song-card-title');
-                        title.textContent = song.title;
-
-                        const metaSpan = clone.querySelector('.song-card-meta');
-                        const metadata = [];
-                        if (song.artist) {
-                            metadata.push(song.artist);
-                        }
-                        if (song.metadata.key) {
-                            metadata.push(song.metadata.key);
-                        }
-                        if (song.metadata.tempo) {
-                            metadata.push(`${song.metadata.tempo} BPM`);
-                        }
-
-                        metaSpan.textContent = metadata.join(' • ');
-
-                        overviewContainer.appendChild(clone);
-                    });
-
-                    // Re-setup click handlers and drag-drop
-                    document.querySelectorAll('.overview-song-card').forEach(btn => {
-                        btn.addEventListener('click', () => {
-                            const songIndex = parseInt(btn.dataset.songIndex);
-                            this.navigateToHash(`song-${songIndex}`);
+                        // Add click handler to navigate to song
+                        card.addEventListener('song-click', () => {
+                            this.goToSong(index);
                         });
+
+                        // Add long press handler for deletion
+                        card.addEventListener('song-long-press', () => {
+                            this.showDeleteSongConfirmation(index, song);
+                        });
+
+                        overviewContainer.appendChild(card);
                     });
 
                     this.setupOverviewDragDrop();
@@ -3215,18 +3189,16 @@ class PageApp {
                 startY: 0,
                 currentY: 0,
                 buttonInitialTop: 0,
-                longPressTimer: null,
+                buttonHeight: 0,
                 rafId: null,
-                mouseDownPending: false
+                mouseDownPending: false,
+                waitingForLongPress: false,
+                pointerId: null
             };
+            this._currentDragState = dragState;
         };
 
         const cancelDrag = () => {
-            if (dragState.longPressTimer) {
-                clearTimeout(dragState.longPressTimer);
-                dragState.longPressTimer = null;
-            }
-
             if (dragState.rafId) {
                 cancelAnimationFrame(dragState.rafId);
             }
@@ -3255,100 +3227,94 @@ class PageApp {
                 startY: 0,
                 currentY: 0,
                 buttonInitialTop: 0,
-                longPressTimer: null,
+                buttonHeight: 0,
                 rafId: null,
-                mouseDownPending: false
+                mouseDownPending: false,
+                waitingForLongPress: false,
+                pointerId: null
             };
+            this._currentDragState = dragState;
         };
 
-        // Touch events - require long press
+        // Pointer events - unified handling for mouse, touch, and pen
         buttons.forEach(button => {
-            let touchIdentifier = null;
-
-            button.addEventListener('touchstart', (e) => {
+            button.addEventListener('pointerdown', (e) => {
                 // Don't start drag if already dragging
                 if (dragState.active) return;
 
-                const touch = e.touches[0];
-                touchIdentifier = touch.identifier;
+                // Only handle primary pointer (left mouse button, primary touch)
+                if (!e.isPrimary) return;
 
-                dragState.longPressTimer = setTimeout(() => {
-                    startDrag(button, touch.clientY);
-                }, CONFIG.LONG_PRESS_DURATION);
-
-                // Track initial position for canceling if moved too much during long press
-                dragState.startY = touch.clientY;
-            });
-
-            button.addEventListener('touchmove', (e) => {
-                const touch = Array.from(e.touches).find(t => t.identifier === touchIdentifier);
-                if (!touch) return;
-
-                if (!dragState.active) {
-                    // Check if moved too much before long press completed
-                    if (Math.abs(touch.clientY - dragState.startY) > CONFIG.SWIPE_CANCEL_THRESHOLD) {
-                        cancelDrag();
-                    }
-                } else {
-                    e.preventDefault(); // Prevent scrolling while dragging
-                    updateDrag(touch.clientY);
-                }
-            });
-
-            button.addEventListener('touchend', (e) => {
-                if (dragState.longPressTimer) {
-                    clearTimeout(dragState.longPressTimer);
-                    dragState.longPressTimer = null;
-                }
-
-                if (dragState.active) {
-                    e.preventDefault(); // Prevent click event
-                    endDrag();
-                }
-            });
-
-            button.addEventListener('touchcancel', () => {
-                cancelDrag();
-            });
-
-            // Mouse events - start drag only on movement
-            button.addEventListener('mousedown', (e) => {
-                if (dragState.active) return;
-
-                // Track mouse down position but don't start drag yet
+                // Store pointer info
                 dragState.button = button;
                 dragState.startY = e.clientY;
-                dragState.mouseDownPending = true;
+                dragState.pointerId = e.pointerId;
+
+                // For touch/pen, require long press
+                // For mouse, start on first movement
+                if (e.pointerType === 'mouse') {
+                    dragState.mouseDownPending = true;
+                } else {
+                    // Touch or pen - wait for Lit component's long-press event
+                    dragState.waitingForLongPress = true;
+                }
             });
         });
 
-        // Global mouse events for desktop dragging
-        this._dragMouseMoveHandler = (e) => {
-            // Check if we should start dragging
-            if (dragState.mouseDownPending && !dragState.active) {
-                const deltaY = Math.abs(e.clientY - dragState.startY);
-                if (deltaY > CONFIG.DRAG_START_THRESHOLD) {
-                    dragState.mouseDownPending = false;
-                    startDrag(dragState.button, dragState.startY);
-                    updateDrag(e.clientY);
+        // Global pointer event handlers for smooth dragging
+        this._dragPointerMoveHandler = (e) => {
+            // Only handle the pointer we're tracking
+            if (e.pointerId !== dragState.pointerId) return;
+
+            if (!dragState.active) {
+                // If long press pending (touch/pen), check if moved too much
+                if (dragState.waitingForLongPress && Math.abs(e.clientY - dragState.startY) > CONFIG.SWIPE_CANCEL_THRESHOLD) {
+                    cancelDrag();
                 }
-            } else if (dragState.active) {
+                // For mouse, check if should start drag on movement
+                else if (dragState.mouseDownPending) {
+                    const deltaY = Math.abs(e.clientY - dragState.startY);
+                    if (deltaY > CONFIG.DRAG_START_THRESHOLD) {
+                        dragState.mouseDownPending = false;
+                        startDrag(dragState.button, dragState.startY);
+                        updateDrag(e.clientY);
+                    }
+                }
+            } else {
+                e.preventDefault(); // Prevent scrolling while dragging
                 updateDrag(e.clientY);
             }
         };
 
-        this._dragMouseUpHandler = () => {
+        this._dragPointerUpHandler = (e) => {
+            // Only handle the pointer we're tracking
+            if (e.pointerId !== dragState.pointerId) return;
+
             if (dragState.active) {
+                e.preventDefault(); // Prevent click event
                 endDrag();
             } else if (dragState.mouseDownPending) {
-                // Mouse up without drag - this is a click, let it through
+                // Pointer up without drag - this is a click, let it through
                 dragState.mouseDownPending = false;
                 dragState.button = null;
+            } else if (dragState.waitingForLongPress) {
+                // Pointer up while waiting for long press - treat as click
+                dragState.waitingForLongPress = false;
+                dragState.button = null;
             }
+
+            dragState.pointerId = null;
         };
 
-        document.addEventListener('mousemove', this._dragMouseMoveHandler);
-        document.addEventListener('mouseup', this._dragMouseUpHandler);
+        this._dragPointerCancelHandler = (e) => {
+            // Only handle the pointer we're tracking
+            if (e.pointerId !== dragState.pointerId) return;
+            cancelDrag();
+        };
+
+        document.addEventListener('pointermove', this._dragPointerMoveHandler);
+        document.addEventListener('pointerup', this._dragPointerUpHandler);
+        document.addEventListener('pointercancel', this._dragPointerCancelHandler);
     }
 
     /**
@@ -3509,20 +3475,28 @@ class PageApp {
     setupTouchSupport(route) {
         if (route.type === 'home') return;
 
-        let touchStartX = 0;
-        let touchStartY = 0;
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        let pointerId = null;
 
-        document.addEventListener('touchstart', (e) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
+        document.addEventListener('pointerdown', (e) => {
+            // Only handle primary pointer (touch or pen, not mouse)
+            if (!e.isPrimary || e.pointerType === 'mouse') return;
+
+            pointerStartX = e.clientX;
+            pointerStartY = e.clientY;
+            pointerId = e.pointerId;
         });
 
-        document.addEventListener('touchend', (e) => {
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
+        document.addEventListener('pointerup', (e) => {
+            // Only handle the pointer we're tracking
+            if (e.pointerId !== pointerId) return;
 
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
+            const pointerEndX = e.clientX;
+            const pointerEndY = e.clientY;
+
+            const deltaX = pointerEndX - pointerStartX;
+            const deltaY = pointerEndY - pointerStartY;
 
             // Horizontal swipe (song navigation)
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > CONFIG.SWIPE_THRESHOLD) {
@@ -3541,6 +3515,15 @@ class PageApp {
                         this.navigateToHash(`song-${this.currentSongIndex + 1}`);
                     }
                 }
+            }
+
+            // Reset pointer tracking
+            pointerId = null;
+        });
+
+        document.addEventListener('pointercancel', (e) => {
+            if (e.pointerId === pointerId) {
+                pointerId = null;
             }
         });
     }
@@ -3702,8 +3685,6 @@ class PageApp {
 
     renderAddSongResults(songs, resultsContainer) {
         console.log('[Add Song Modal] renderAddSongResults called with', songs.length, 'songs');
-        const template = document.getElementById('song-card-template');
-        console.log('[Add Song Modal] Template:', template);
 
         resultsContainer.textContent = '';
 
@@ -3717,52 +3698,18 @@ class PageApp {
             return;
         }
 
-        if (!template) {
-            console.error('[Add Song Modal] song-card-template not found!');
-            resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error: Template not found. Please refresh the page.</p>';
-            return;
-        }
-
         for (const song of songs) {
-            const clone = template.content.cloneNode(true);
-            const card = clone.querySelector('.song-card');
-            const title = clone.querySelector('.song-card-title');
-            const lastPlayed = clone.querySelector('.song-card-last-played');
-            const meta = clone.querySelector('.song-card-meta');
+            // Create the Lit song-card component
+            const card = document.createElement('song-card');
+            card.song = song;
+            card.variant = 'library';
 
-            title.textContent = song.title || 'Untitled';
-
-            // Build metadata string
-            const metadata = [];
-            if (song.artist) {
-                metadata.push(song.artist);
-            }
-            if (song.metadata?.key) {
-                metadata.push(song.metadata.key);
-            }
-            if (song.metadata?.tempo) {
-                metadata.push(`${song.metadata.tempo} BPM`);
-            }
-
-            meta.textContent = metadata.join(' • ');
-
-            // Add last played information (same as song library)
-            if (lastPlayed && song.appearances && song.appearances.length > 0) {
-                // Find most recent appearance
-                const sortedAppearances = [...song.appearances].sort((a, b) =>
-                    b.date.localeCompare(a.date)
-                );
-                const lastPlayedDate = sortedAppearances[0].date;
-                const weeksAgo = this.getWeeksAgo(lastPlayedDate);
-                lastPlayed.textContent = `Last played ${weeksAgo}`;
-            }
-
-            // Make card clickable
-            card.addEventListener('click', () => {
+            // Make card clickable to add to setlist
+            card.addEventListener('song-click', () => {
                 this.addSongToSetlist(song);
             });
 
-            resultsContainer.appendChild(clone);
+            resultsContainer.appendChild(card);
         }
         console.log('[Add Song Modal] Finished rendering', songs.length, 'songs');
     }
@@ -3808,48 +3755,6 @@ class PageApp {
             console.error('Error adding song to setlist:', error);
             alert('Failed to add song to setlist. Please try again.');
         }
-    }
-
-    setupLongPressDelete(card, index, song) {
-        let longPressTimer;
-        let touchStarted = false;
-
-        const startLongPress = (e) => {
-            touchStarted = true;
-            longPressTimer = setTimeout(() => {
-                if (touchStarted) {
-                    // Trigger long press - show delete confirmation
-                    this.showDeleteSongConfirmation(index, song);
-                    // Add visual feedback
-                    card.style.backgroundColor = '#ffebee';
-                }
-            }, 600); // 600ms long press
-        };
-
-        const cancelLongPress = (e) => {
-            touchStarted = false;
-            clearTimeout(longPressTimer);
-            card.style.backgroundColor = '';
-        };
-
-        // Prevent default context menu on long press
-        const preventContext = (e) => {
-            e.preventDefault();
-        };
-
-        // Touch events for mobile
-        card.addEventListener('touchstart', startLongPress, { passive: false });
-        card.addEventListener('touchend', cancelLongPress);
-        card.addEventListener('touchcancel', cancelLongPress);
-        card.addEventListener('touchmove', cancelLongPress);
-
-        // Mouse events for desktop
-        card.addEventListener('mousedown', startLongPress);
-        card.addEventListener('mouseup', cancelLongPress);
-        card.addEventListener('mouseleave', cancelLongPress);
-
-        // Prevent context menu
-        card.addEventListener('contextmenu', preventContext);
     }
 
     showDeleteSongConfirmation(index, song) {

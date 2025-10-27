@@ -1105,7 +1105,7 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     position: absolute;
     left: 0;
     right: 0;
-    height: calc(70px + 0.5rem); /* Match card min-height + gap */
+    height: calc(var(--drag-card-height, 70px) + 0.5rem); /* Match dragged card height + gap */
     background-color: #d5dbdb;
     border: 2px dashed #95a5a6;
     border-radius: 12px;
@@ -1114,11 +1114,11 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
 }
 
 .overview-song-card.drag-over-above::before {
-    top: calc(-70px - 1rem); /* Position above with gap */
+    top: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position above with gap */
 }
 
 .overview-song-card.drag-over-below::after {
-    bottom: calc(-70px - 1rem); /* Position below with gap */
+    bottom: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position below with gap */
 }
 
 .overview-songs.reordering .overview-song-card {
@@ -1240,11 +1240,6 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
-}
-
-.add-song-modal-content #add-song-results .song-card {
-    padding: 1.2rem 2rem;
-    min-height: 70px;
 }
 
 .add-song-modal-content .modal-close {

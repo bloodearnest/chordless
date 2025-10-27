@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v36';
+const CACHE_NAME = 'setalight-v37';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -19,11 +19,50 @@ const ASSETS = [
     '/js/transpose.js'
 ];
 
+// External CDN resources to cache for offline support
+const CDN_ASSETS = [
+    'https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js',
+    'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/class-map.js',
+    'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/style-map.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/custom-element.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/property.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/state.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/event-options.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-all.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-async.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-elements.js',
+    'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-nodes.js',
+    'https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js',
+    'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js',
+    'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/is-server.js',
+    'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive.js',
+    'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive-helpers.js',
+    'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/async-directive.js'
+];
+
 // Install service worker and cache assets
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => {
-            return cache.addAll(ASSETS);
+            // Cache local assets
+            const localCache = cache.addAll(ASSETS);
+
+            // Cache CDN assets (non-blocking, fail silently)
+            const cdnCache = Promise.allSettled(
+                CDN_ASSETS.map(url =>
+                    fetch(url, { mode: 'cors' })
+                        .then(response => {
+                            if (response.ok) {
+                                return cache.put(url, response);
+                            }
+                        })
+                        .catch(err => console.log('[SW] Failed to cache CDN asset:', url, err))
+                )
+            );
+
+            return Promise.all([localCache, cdnCache]);
         })
     );
     self.skipWaiting();
@@ -59,7 +98,33 @@ self.addEventListener('fetch', (event) => {
 
     console.log('[SW] Fetch:', event.request.method, url.pathname);
 
-    // Only handle same-origin requests
+    // Handle CDN requests (Lit.js from jsdelivr)
+    if (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.includes('/npm/lit')) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                // Return cached version if available, otherwise fetch and cache
+                if (cached) {
+                    return cached;
+                }
+                return fetch(event.request, { mode: 'cors' }).then((response) => {
+                    if (response.ok) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    }
+                    return response;
+                }).catch(() => {
+                    console.log('[SW] Failed to fetch CDN asset:', url.href);
+                    // Return a fallback or throw to let the browser handle it
+                    return new Response('CDN asset not available', { status: 503 });
+                });
+            })
+        );
+        return;
+    }
+
+    // Only handle same-origin requests after CDN check
     if (url.origin !== location.origin) {
         return;
     }
@@ -227,6 +292,25 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/import-song.html');
+        }
+    }
+
+    // Components test page: /components-test
+    if (path === '/components-test' || path === '/components-test/' || path === '/components-test.html') {
+        console.log('[SW] Serving components-test.html');
+        if (DEV_MODE) {
+            // Dev mode: Always fetch fresh, fallback to cache on failure
+            return fetch('/components-test.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/components-test.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/components-test.html');
+            });
+        } else {
+            return fetch('/components-test.html');
         }
     }
 

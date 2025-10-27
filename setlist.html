@@ -168,10 +168,27 @@
         </div>
     </template>
 
+    <!-- Import map for Lit -->
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+        }
+    }
+    </script>
+
     <script>
         // Set window name so bookmarklet can find and reuse this tab
         window.name = 'setalight';
     </script>
+    <!-- Import the SongCard component -->
+    <script type="module" src="/components/song-card.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
 </body>
 </html>

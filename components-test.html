@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Components Test - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
+
+    <!-- Import map for Lit -->
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+        }
+    }
+    </script>
+
+    <style>
+        /* Test page specific styles only */
+        body {
+            overflow: auto;
+            padding: 2rem;
+            background: #f5f7fa;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 2rem;
+            color: #3498db;
+        }
+
+        h2 {
+            font-size: 1.8rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+            color: #2c3e50;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 0.5rem;
+        }
+
+        h3 {
+            font-size: 1.5rem;
+            margin-top: 2rem;
+            margin-bottom: 1rem;
+        }
+
+        .test-section {
+            background: white;
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .test-description {
+            color: #7f8c8d;
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            font-style: italic;
+        }
+
+        .test-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            max-width: 800px;
+        }
+
+        .test-label {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #7f8c8d;
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .mode-toggle {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            align-items: center;
+        }
+
+        .mode-toggle button {
+            padding: 0.8rem 1.5rem;
+            font-size: 1.2rem;
+            border: 2px solid #3498db;
+            background: white;
+            color: #3498db;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mode-toggle button.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .mode-toggle button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+        }
+
+        /* Modal styles */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 12px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .modal-content h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 1.8rem;
+            color: #e74c3c;
+        }
+
+        .modal-content p {
+            margin-bottom: 2rem;
+            font-size: 1.2rem;
+            color: #2c3e50;
+            line-height: 1.5;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+        }
+
+        .modal-btn {
+            padding: 0.8rem 1.5rem;
+            font-size: 1.2rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .modal-btn-cancel {
+            background: #95a5a6;
+            color: white;
+        }
+
+        .modal-btn-cancel:hover {
+            background: #7f8c8d;
+        }
+
+        .modal-btn-confirm {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .modal-btn-confirm:hover {
+            background: #c0392b;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Component Test Page</h1>
+
+    <div class="test-section">
+        <h2>SongCard Component - List View</h2>
+        <p class="test-description">
+            Testing the SongCard component as it appears in a list. Toggle between setlist and library modes.
+        </p>
+
+        <div class="mode-toggle">
+            <span style="font-weight: 600;">Mode:</span>
+            <button id="mode-library" class="active">Library</button>
+            <button id="mode-setlist">Setlist</button>
+        </div>
+
+        <div class="test-list" id="card-list">
+            <!-- Cards will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <!-- Delete confirmation modal -->
+    <div class="modal-overlay" id="delete-modal">
+        <div class="modal-content">
+            <h2 id="modal-title">Delete Song?</h2>
+            <p id="modal-message"></p>
+            <div class="modal-actions">
+                <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
+                <button class="modal-btn modal-btn-confirm" id="modal-confirm">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Sample song data for testing
+        const sampleSongs = [
+            {
+                id: 'song-1',
+                title: 'How Great Thou Art',
+                artist: 'Words by Stuart Wesley Keene Hine | Music: Swedish Folk Melody',
+                ccliNumber: '14181',
+                metadata: {
+                    key: 'A',
+                    tempo: 110,
+                    timeSignature: '4/4'
+                },
+                lastUsedAt: '2025-10-20T10:30:00Z'
+            },
+            {
+                id: 'song-2',
+                title: 'Amazing Grace',
+                artist: 'John Newton',
+                ccliNumber: '22025',
+                metadata: {
+                    key: 'G',
+                    tempo: 90,
+                    timeSignature: '3/4'
+                },
+                lastUsedAt: '2025-10-13T14:00:00Z'
+            },
+            {
+                id: 'song-3',
+                title: 'Cornerstone',
+                artist: 'Hillsong Worship',
+                ccliNumber: '6158927',
+                metadata: {
+                    key: 'C',
+                    tempo: 73,
+                    timeSignature: '4/4'
+                },
+                lastUsedAt: '2025-10-06T11:00:00Z'
+            },
+            {
+                id: 'song-4',
+                title: 'Ancient Hymn',
+                artist: null,
+                ccliNumber: '123456',
+                metadata: {
+                    key: 'D',
+                    tempo: 120,
+                    timeSignature: '4/4'
+                },
+                lastUsedAt: '2025-09-28T10:00:00Z'
+            },
+            {
+                id: 'song-5',
+                title: 'Blessed Be Your Name',
+                artist: 'Matt Redman, Beth Redman',
+                ccliNumber: '3798438',
+                metadata: {
+                    key: 'B',
+                    tempo: 130,
+                    timeSignature: '4/4'
+                },
+                lastUsedAt: '2025-09-15T09:30:00Z'
+            },
+            {
+                id: 'song-6',
+                title: 'How Deep The Father\'s Love',
+                artist: 'Stuart Townend, Keith Getty, Kristyn Getty, John Smith, Another Person',
+                ccliNumber: '1558110',
+                metadata: {
+                    key: 'D',
+                    tempo: 68,
+                    timeSignature: '3/4'
+                },
+                lastUsedAt: '2024-12-20T10:00:00Z'
+            },
+            {
+                id: 'song-7',
+                title: 'Simple Song',
+                artist: 'Unknown',
+                ccliNumber: null,
+                metadata: {
+                    key: null,
+                    tempo: null,
+                    timeSignature: null
+                },
+                lastUsedAt: null
+            }
+        ];
+
+        // Import the SongCard component
+        import './components/song-card.js';
+
+        let currentMode = 'library';
+        let songToDelete = null;
+
+        // Modal elements
+        const modal = document.getElementById('delete-modal');
+        const modalTitle = document.getElementById('modal-title');
+        const modalMessage = document.getElementById('modal-message');
+        const modalCancel = document.getElementById('modal-cancel');
+        const modalConfirm = document.getElementById('modal-confirm');
+
+        function showDeleteModal(song, mode) {
+            songToDelete = song;
+
+            if (mode === 'setlist') {
+                modalTitle.textContent = 'Remove from Setlist?';
+                modalMessage.textContent = `Remove "${song.title}" from this setlist? The song will remain in your library.`;
+            } else {
+                modalTitle.textContent = 'Delete Song?';
+                modalMessage.textContent = `Permanently delete "${song.title}" from your library? This will also remove it from all setlists. This cannot be undone.`;
+            }
+
+            modal.classList.add('active');
+        }
+
+        function hideDeleteModal() {
+            modal.classList.remove('active');
+            songToDelete = null;
+        }
+
+        function deleteSong() {
+            if (songToDelete) {
+                console.log(`Deleting song from ${currentMode}:`, songToDelete.title);
+                // In the real app, this would call the appropriate delete function
+                // For now, just remove from the test list
+                const index = sampleSongs.findIndex(s => s.id === songToDelete.id);
+                if (index !== -1) {
+                    sampleSongs.splice(index, 1);
+                    renderCards();
+                }
+            }
+            hideDeleteModal();
+        }
+
+        function renderCards() {
+            const container = document.getElementById('card-list');
+            container.textContent = '';
+
+            for (const song of sampleSongs) {
+                const card = document.createElement('song-card');
+                card.song = song;
+                card.variant = currentMode;
+
+                // Add event listeners
+                card.addEventListener('song-click', (e) => {
+                    console.log('Song clicked:', e.detail.song.title);
+                });
+
+                card.addEventListener('song-long-press', (e) => {
+                    console.log('Song long-pressed:', e.detail.song.title);
+                    showDeleteModal(e.detail.song, currentMode);
+                });
+
+                container.appendChild(card);
+            }
+        }
+
+        // Wait for components to be defined, then render
+        customElements.whenDefined('song-card').then(() => {
+            renderCards();
+
+            // Set up mode toggle buttons
+            document.getElementById('mode-library').addEventListener('click', () => {
+                currentMode = 'library';
+                document.getElementById('mode-library').classList.add('active');
+                document.getElementById('mode-setlist').classList.remove('active');
+                renderCards();
+            });
+
+            document.getElementById('mode-setlist').addEventListener('click', () => {
+                currentMode = 'setlist';
+                document.getElementById('mode-setlist').classList.add('active');
+                document.getElementById('mode-library').classList.remove('active');
+                renderCards();
+            });
+
+            // Set up modal buttons
+            modalCancel.addEventListener('click', hideDeleteModal);
+            modalConfirm.addEventListener('click', deleteSong);
+
+            // Close modal on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    hideDeleteModal();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
