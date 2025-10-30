@@ -14,13 +14,11 @@ const CONFIG = {
     FONT_SIZE_STEP: 0.1,         // rem
 
     // Drag and drop
-    LONG_PRESS_DURATION: 500,    // ms
     POSITION_THRESHOLD: 20,      // px - minimum movement to change target position
     DRAG_START_THRESHOLD: 5,     // px - movement before starting drag
 
     // Touch gestures
     SWIPE_THRESHOLD: 50,         // px - minimum swipe distance
-    SWIPE_CANCEL_THRESHOLD: 10,  // px - movement before canceling long press
 
     // Scrolling
     KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
@@ -42,6 +40,7 @@ class PageApp {
         // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
         this.sectionState = {};
         this.sectionObserver = null;
+        this.overviewEditMode = false; // Track whether overview is in edit mode
         this.init();
     }
 
@@ -1541,18 +1540,12 @@ class PageApp {
                     history.replaceState({ view: 'overview' }, '', overviewUrl);
                 }
 
-                // Set up click handlers for overview song buttons
-                document.querySelectorAll('.overview-song-card').forEach(button => {
-                    button.addEventListener('click', () => {
-                        const songIndex = parseInt(button.dataset.songIndex);
-                        this.navigateToHash(`song-${songIndex}`);
-                    });
-                });
+                // Set up drag-and-drop (only enabled in edit mode)
+                if (this.overviewEditMode) {
+                    this.setupOverviewDragDrop();
+                }
 
-                // Set up drag-and-drop reordering for overview
-                this.setupOverviewDragDrop();
-
-                // Set up edit mode toggle
+                // Set up edit mode toggle (handles both overview and song edit modes)
                 this.setupEditMode();
 
                 // Set up section control buttons
@@ -1623,26 +1616,18 @@ class PageApp {
             const card = document.createElement('song-card');
             card.song = song;
             card.variant = 'setlist';
+            card.editMode = this.overviewEditMode; // Pass edit mode state
             card.classList.add('overview-song-card');
             card.dataset.songIndex = index;
 
             // Add click handler to navigate to song
-            card.addEventListener('song-click', () => {
-                this.goToSong(index);
+            card.addEventListener('song-click', (e) => {
+                this.navigateToHash(`song-${index}`);
             });
 
-            // Add long press handler - show delete modal OR start drag
-            card.addEventListener('song-long-press', (e) => {
-                // If we have a drag pending (touch/pen), start the drag instead of showing delete
-                // Check if this matches the current drag state
-                const dragState = this._currentDragState;
-                if (dragState && dragState.waitingForLongPress && dragState.button === card) {
-                    dragState.waitingForLongPress = false;
-                    this._startDragFromLongPress(card, dragState.startY);
-                } else {
-                    // Otherwise, show delete confirmation
-                    this.showDeleteSongConfirmation(index, song);
-                }
+            // Add delete button handler (for edit mode)
+            card.addEventListener('song-delete', (e) => {
+                this.showDeleteSongConfirmation(index, song);
             });
 
             overviewSongs.appendChild(card);
@@ -1667,6 +1652,9 @@ class PageApp {
         addSongButton.addEventListener('click', () => {
             this.openAddSongModal();
         });
+
+        // Initially hidden - only show in edit mode
+        addSongButton.style.display = 'none';
 
         overviewSongs.appendChild(addSongButton);
 
@@ -1847,12 +1835,15 @@ class PageApp {
                 metaEl.appendChild(typeSpan);
             }
 
-            // Hide all song-specific controls on overview
+            // Hide song-specific controls on overview (but keep edit toggle and info button)
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
-            if (editToggle) editToggle.style.display = 'none';
+            // Keep edit toggle visible for overview edit mode
+            if (editToggle) editToggle.style.display = 'flex';
             if (resetButton) resetButton.style.display = 'none';
             if (fontSizeControls) fontSizeControls.style.display = 'none';
-            infoButton.style.display = 'none';
+            // Show info button for setlist info
+            infoButton.style.display = 'flex';
+            infoButton.onclick = () => this.showSetlistInfo();
 
             if (keyValueDisplay) {
                 keyValueDisplay.textContent = '-';
@@ -2093,6 +2084,99 @@ class PageApp {
             modalBody.appendChild(trailer);
         }
 
+        modal.classList.add('active');
+
+        // Close modal handlers
+        const closeBtn = document.getElementById('modal-close');
+        closeBtn.onclick = () => modal.classList.remove('active');
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+            }
+        };
+    }
+
+    showSetlistInfo() {
+        const modal = document.getElementById('song-info-modal');
+        const modalBody = document.getElementById('modal-body');
+
+        // Clear previous content
+        modalBody.textContent = '';
+
+        if (!this.currentSetlist) {
+            modalBody.textContent = 'No setlist information available.';
+            return;
+        }
+
+        // Create title
+        const title = document.createElement('h2');
+        const formattedDate = this.formatSetlistName(this.currentSetlist.date);
+        title.textContent = this.currentSetlist.name
+            ? `${formattedDate} - ${this.currentSetlist.name}`
+            : formattedDate;
+        modalBody.appendChild(title);
+
+        // Create info grid
+        const infoGrid = document.createElement('div');
+        infoGrid.className = 'modal-info-grid';
+
+        // Get template for info items
+        const itemTemplate = document.getElementById('song-info-item-template');
+
+        // Helper function to add info items
+        const addInfoItem = (label, value) => {
+            if (!value) return; // Skip empty values
+            const clone = itemTemplate.content.cloneNode(true);
+            const labelEl = clone.querySelector('.modal-info-label');
+            const valueEl = clone.querySelector('.modal-info-value');
+
+            labelEl.textContent = label;
+            valueEl.textContent = value;
+
+            infoGrid.appendChild(clone);
+        };
+
+        // Add setlist metadata
+        addInfoItem('Date', this.formatSetlistName(this.currentSetlist.date));
+
+        if (this.currentSetlist.time) {
+            addInfoItem('Time', this.currentSetlist.time);
+        }
+
+        if (this.currentSetlist.type) {
+            addInfoItem('Type', this.currentSetlist.type);
+        }
+
+        if (this.currentSetlist.name) {
+            addInfoItem('Name', this.currentSetlist.name);
+        }
+
+        if (this.currentSetlist.leader) {
+            addInfoItem('Leader', this.currentSetlist.leader);
+        }
+
+        if (this.currentSetlist.venue) {
+            addInfoItem('Venue', this.currentSetlist.venue);
+        }
+
+        // Add song count
+        const songCount = this.currentSetlist.songs ? this.currentSetlist.songs.length : 0;
+        addInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`);
+
+        // Add timestamps
+        if (this.currentSetlist.createdAt) {
+            const created = new Date(this.currentSetlist.createdAt);
+            addInfoItem('Created', created.toLocaleString());
+        }
+
+        if (this.currentSetlist.updatedAt) {
+            const updated = new Date(this.currentSetlist.updatedAt);
+            addInfoItem('Last Modified', updated.toLocaleString());
+        }
+
+        modalBody.appendChild(infoGrid);
+
+        // Show modal
         modal.classList.add('active');
 
         // Close modal handlers
@@ -2449,6 +2533,14 @@ class PageApp {
         if (!editToggle) return;
 
         editToggle.addEventListener('click', async () => {
+            // Check if we're on overview or song view
+            if (this.currentSongIndex < 0) {
+                // We're on overview - toggle overview edit mode
+                this.toggleOverviewEditMode();
+                return;
+            }
+
+            // We're on song view - handle song edit mode
             const isEnteringEditMode = !document.body.classList.contains('edit-mode');
 
             if (isEnteringEditMode) {
@@ -2836,17 +2928,12 @@ class PageApp {
             buttonInitialTop: 0,
             buttonHeight: 0,
             rafId: null,
-            mouseDownPending: false,
-            waitingForLongPress: false,
-            pointerId: null
+            pointerId: null,
+            pointerType: null
         };
-
-        // Store reference on instance so song-long-press handler can access it
-        this._currentDragState = dragState;
 
         const startDrag = (button, clientY) => {
             dragState.active = true;
-            dragState.waitingForLongPress = false;
             dragState.button = button;
             dragState.startIndex = parseInt(button.dataset.songIndex);
             dragState.currentIndex = dragState.startIndex;
@@ -2868,11 +2955,6 @@ class PageApp {
 
             // Show initial drop indicator at original position
             performDragUpdate();
-        };
-
-        // Helper to start drag from long-press event
-        this._startDragFromLongPress = (button, clientY) => {
-            startDrag(button, clientY);
         };
 
         const updateDrag = (clientY) => {
@@ -3054,6 +3136,7 @@ class PageApp {
             const startIndex = dragState.startIndex;
             const targetIndex = dragState.currentIndex;
 
+            // Tell component that drag happened, suppress its click
             // Clean up visual state
             button.classList.remove('dragging');
             button.style.transform = ''; // Reset transform
@@ -3098,16 +3181,17 @@ class PageApp {
                         const card = document.createElement('song-card');
                         card.song = song;
                         card.variant = 'setlist';
+                        card.editMode = this.overviewEditMode; // Preserve edit mode state
                         card.classList.add('overview-song-card');
                         card.dataset.songIndex = index;
 
                         // Add click handler to navigate to song
                         card.addEventListener('song-click', () => {
-                            this.goToSong(index);
+                            this.navigateToHash(`song-${index}`);
                         });
 
-                        // Add long press handler for deletion
-                        card.addEventListener('song-long-press', () => {
+                        // Add delete button handler (for edit mode)
+                        card.addEventListener('song-delete', () => {
                             this.showDeleteSongConfirmation(index, song);
                         });
 
@@ -3131,25 +3215,28 @@ class PageApp {
                     // Remove the section from its current position
                     sectionToMove.remove();
 
+                    // Get a fresh list of sections after removal
+                    const remainingSections = Array.from(document.querySelectorAll('.section[id^="song-"]'));
+
                     // Insert at the new position
                     if (newIndex === 0) {
                         // Insert at the beginning (after overview)
                         const overview = document.getElementById('overview');
-                        if (overview.nextSibling) {
+                        if (overview && overview.nextSibling) {
                             container.insertBefore(sectionToMove, overview.nextSibling);
                         } else {
-                            container.appendChild(sectionToMove);
+                            container.insertBefore(sectionToMove, container.firstChild);
                         }
-                    } else if (newIndex >= songSections.length - 1) {
+                    } else if (newIndex >= remainingSections.length) {
                         // Insert at the end
                         container.appendChild(sectionToMove);
                     } else {
-                        // Insert before the section that's currently at newIndex
-                        // Account for the removal when finding the target
-                        const targetIndex = newIndex > startIndex ? newIndex : newIndex + 1;
-                        const targetSection = songSections[targetIndex];
-                        if (targetSection) {
+                        // Insert before the section that's currently at the target position
+                        const targetSection = remainingSections[newIndex];
+                        if (targetSection && targetSection.parentNode === container) {
                             container.insertBefore(sectionToMove, targetSection);
+                        } else {
+                            container.appendChild(sectionToMove);
                         }
                     }
 
@@ -3180,22 +3267,13 @@ class PageApp {
             }
 
             // Reset drag state
-            dragState = {
-                active: false,
-                button: null,
-                startIndex: null,
-                currentIndex: null,
-                lastAcceptedIndex: null,
-                startY: 0,
-                currentY: 0,
-                buttonInitialTop: 0,
-                buttonHeight: 0,
-                rafId: null,
-                mouseDownPending: false,
-                waitingForLongPress: false,
-                pointerId: null
-            };
-            this._currentDragState = dragState;
+            dragState.active = false;
+            dragState.button = null;
+            dragState.startIndex = null;
+            dragState.currentIndex = null;
+            dragState.lastAcceptedIndex = null;
+            dragState.pointerId = null;
+            dragState.pointerType = null;
         };
 
         const cancelDrag = () => {
@@ -3218,46 +3296,45 @@ class PageApp {
                 });
             }
 
-            dragState = {
-                active: false,
-                button: null,
-                startIndex: null,
-                currentIndex: null,
-                lastAcceptedIndex: null,
-                startY: 0,
-                currentY: 0,
-                buttonInitialTop: 0,
-                buttonHeight: 0,
-                rafId: null,
-                mouseDownPending: false,
-                waitingForLongPress: false,
-                pointerId: null
-            };
-            this._currentDragState = dragState;
+            dragState.active = false;
+            dragState.button = null;
+            dragState.startIndex = null;
+            dragState.currentIndex = null;
+            dragState.lastAcceptedIndex = null;
+            dragState.pointerId = null;
+            dragState.pointerType = null;
         };
 
-        // Pointer events - unified handling for mouse, touch, and pen
+        // Attach drag handlers to cards (we'll check if the handle was clicked)
         buttons.forEach(button => {
             button.addEventListener('pointerdown', (e) => {
+                // Don't start drag if not in edit mode
+                if (!this.overviewEditMode) return;
+
                 // Don't start drag if already dragging
                 if (dragState.active) return;
 
                 // Only handle primary pointer (left mouse button, primary touch)
                 if (!e.isPrimary) return;
 
+                // Check if the event originated from the drag handle
+                // We need to check the composed path since the handle is in shadow DOM
+                const path = e.composedPath();
+                const dragHandle = path.find(el => el.classList?.contains('drag-handle'));
+
+                if (!dragHandle) return; // Only drag when handle is grabbed
+
+                // Prevent the click from bubbling
+                e.stopPropagation();
+
                 // Store pointer info
                 dragState.button = button;
                 dragState.startY = e.clientY;
                 dragState.pointerId = e.pointerId;
+                dragState.pointerType = e.pointerType;
 
-                // For touch/pen, require long press
-                // For mouse, start on first movement
-                if (e.pointerType === 'mouse') {
-                    dragState.mouseDownPending = true;
-                } else {
-                    // Touch or pen - wait for Lit component's long-press event
-                    dragState.waitingForLongPress = true;
-                }
+                // Start drag immediately when handle is grabbed
+                startDrag(button, e.clientY);
             });
         });
 
@@ -3266,21 +3343,7 @@ class PageApp {
             // Only handle the pointer we're tracking
             if (e.pointerId !== dragState.pointerId) return;
 
-            if (!dragState.active) {
-                // If long press pending (touch/pen), check if moved too much
-                if (dragState.waitingForLongPress && Math.abs(e.clientY - dragState.startY) > CONFIG.SWIPE_CANCEL_THRESHOLD) {
-                    cancelDrag();
-                }
-                // For mouse, check if should start drag on movement
-                else if (dragState.mouseDownPending) {
-                    const deltaY = Math.abs(e.clientY - dragState.startY);
-                    if (deltaY > CONFIG.DRAG_START_THRESHOLD) {
-                        dragState.mouseDownPending = false;
-                        startDrag(dragState.button, dragState.startY);
-                        updateDrag(e.clientY);
-                    }
-                }
-            } else {
+            if (dragState.active) {
                 e.preventDefault(); // Prevent scrolling while dragging
                 updateDrag(e.clientY);
             }
@@ -3293,28 +3356,68 @@ class PageApp {
             if (dragState.active) {
                 e.preventDefault(); // Prevent click event
                 endDrag();
-            } else if (dragState.mouseDownPending) {
-                // Pointer up without drag - this is a click, let it through
-                dragState.mouseDownPending = false;
-                dragState.button = null;
-            } else if (dragState.waitingForLongPress) {
-                // Pointer up while waiting for long press - treat as click
-                dragState.waitingForLongPress = false;
-                dragState.button = null;
             }
 
             dragState.pointerId = null;
+            dragState.button = null;
         };
 
         this._dragPointerCancelHandler = (e) => {
             // Only handle the pointer we're tracking
             if (e.pointerId !== dragState.pointerId) return;
-            cancelDrag();
+
+            // For touch/pen, pointercancel fires when global handlers take over - ignore it
+            // For mouse, cancel the drag
+            if (e.pointerType === 'mouse') {
+                cancelDrag();
+            }
         };
 
         document.addEventListener('pointermove', this._dragPointerMoveHandler);
         document.addEventListener('pointerup', this._dragPointerUpHandler);
         document.addEventListener('pointercancel', this._dragPointerCancelHandler);
+    }
+
+    toggleOverviewEditMode() {
+        this.overviewEditMode = !this.overviewEditMode;
+
+        // Update button state (use the header edit toggle button)
+        const editToggle = document.getElementById('edit-mode-toggle');
+        if (editToggle) {
+            if (this.overviewEditMode) {
+                editToggle.classList.add('active');
+            } else {
+                editToggle.classList.remove('active');
+            }
+        }
+
+        // Update all song cards with new edit mode
+        const cards = document.querySelectorAll('.overview-song-card');
+        cards.forEach(card => {
+            card.editMode = this.overviewEditMode;
+        });
+
+        // Toggle drag-drop: only enable in edit mode
+        if (this.overviewEditMode) {
+            this.setupOverviewDragDrop();
+        } else {
+            // Clean up drag-drop listeners
+            if (this._dragPointerMoveHandler) {
+                document.removeEventListener('pointermove', this._dragPointerMoveHandler);
+            }
+            if (this._dragPointerUpHandler) {
+                document.removeEventListener('pointerup', this._dragPointerUpHandler);
+            }
+            if (this._dragPointerCancelHandler) {
+                document.removeEventListener('pointercancel', this._dragPointerCancelHandler);
+            }
+        }
+
+        // Show/hide add song button based on edit mode (only show in edit mode)
+        const addButton = document.querySelector('.add-song-button');
+        if (addButton) {
+            addButton.style.display = this.overviewEditMode ? 'block' : 'none';
+        }
     }
 
     /**

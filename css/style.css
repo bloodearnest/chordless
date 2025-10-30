@@ -1065,14 +1065,6 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
     padding: 1.5rem 0;
 }
 
-.overview-title {
-    font-size: 2.5rem;
-    font-weight: 600;
-    color: var(--header-bg);
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-
 .overview-songs {
     display: flex;
     flex-direction: column;
@@ -1084,6 +1076,7 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
 /* Override song card styles for setlist overview context */
 .overview-song-card {
     position: relative; /* Needed for drag and drop pseudo-elements */
+    touch-action: none; /* Prevent browser from handling touch (scrolling, zooming) during drag */
 }
 
 /* Drag and drop states */

@@ -189,18 +189,33 @@
     <h1>🧪 Component Test Page</h1>
 
     <div class="test-section">
-        <h2>SongCard Component - List View</h2>
+        <h2>SongCard Component - Library View</h2>
         <p class="test-description">
-            Testing the SongCard component as it appears in a list. Toggle between setlist and library modes.
+            Library variant with full information (artist, last played).
         </p>
 
         <div class="mode-toggle">
-            <span style="font-weight: 600;">Mode:</span>
-            <button id="mode-library" class="active">Library</button>
-            <button id="mode-setlist">Setlist</button>
+            <span style="font-weight: 600;">Edit Mode:</span>
+            <button id="library-edit-toggle">Toggle Edit Mode</button>
         </div>
 
-        <div class="test-list" id="card-list">
+        <div class="test-list" id="library-list">
+            <!-- Cards will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>SongCard Component - Setlist View</h2>
+        <p class="test-description">
+            Setlist variant with compact view (no artist, no last played).
+        </p>
+
+        <div class="mode-toggle">
+            <span style="font-weight: 600;">Edit Mode:</span>
+            <button id="setlist-edit-toggle">Toggle Edit Mode</button>
+        </div>
+
+        <div class="test-list" id="setlist-list">
             <!-- Cards will be populated by JavaScript -->
         </div>
     </div>
@@ -309,8 +324,10 @@
         // Import the SongCard component
         import './components/song-card.js';
 
-        let currentMode = 'library';
+        let libraryEditMode = false;
+        let setlistEditMode = false;
         let songToDelete = null;
+        let deleteContext = null;
 
         // Modal elements
         const modal = document.getElementById('delete-modal');
@@ -319,10 +336,11 @@
         const modalCancel = document.getElementById('modal-cancel');
         const modalConfirm = document.getElementById('modal-confirm');
 
-        function showDeleteModal(song, mode) {
+        function showDeleteModal(song, context) {
             songToDelete = song;
+            deleteContext = context;
 
-            if (mode === 'setlist') {
+            if (context === 'setlist') {
                 modalTitle.textContent = 'Remove from Setlist?';
                 modalMessage.textContent = `Remove "${song.title}" from this setlist? The song will remain in your library.`;
             } else {
@@ -336,39 +354,66 @@
         function hideDeleteModal() {
             modal.classList.remove('active');
             songToDelete = null;
+            deleteContext = null;
         }
 
         function deleteSong() {
             if (songToDelete) {
-                console.log(`Deleting song from ${currentMode}:`, songToDelete.title);
+                console.log(`Deleting song from ${deleteContext}:`, songToDelete.title);
                 // In the real app, this would call the appropriate delete function
                 // For now, just remove from the test list
                 const index = sampleSongs.findIndex(s => s.id === songToDelete.id);
                 if (index !== -1) {
                     sampleSongs.splice(index, 1);
-                    renderCards();
+                    renderLibraryCards();
+                    renderSetlistCards();
                 }
             }
             hideDeleteModal();
         }
 
-        function renderCards() {
-            const container = document.getElementById('card-list');
+        function renderLibraryCards() {
+            const container = document.getElementById('library-list');
             container.textContent = '';
 
             for (const song of sampleSongs) {
                 const card = document.createElement('song-card');
                 card.song = song;
-                card.variant = currentMode;
+                card.variant = 'library';
+                card.editMode = libraryEditMode;
 
                 // Add event listeners
                 card.addEventListener('song-click', (e) => {
-                    console.log('Song clicked:', e.detail.song.title);
+                    console.log('Library - Song clicked:', e.detail.song.title);
                 });
 
-                card.addEventListener('song-long-press', (e) => {
-                    console.log('Song long-pressed:', e.detail.song.title);
-                    showDeleteModal(e.detail.song, currentMode);
+                card.addEventListener('song-delete', (e) => {
+                    console.log('Library - Song delete clicked:', e.detail.song.title);
+                    showDeleteModal(e.detail.song, 'library');
+                });
+
+                container.appendChild(card);
+            }
+        }
+
+        function renderSetlistCards() {
+            const container = document.getElementById('setlist-list');
+            container.textContent = '';
+
+            for (const song of sampleSongs) {
+                const card = document.createElement('song-card');
+                card.song = song;
+                card.variant = 'setlist';
+                card.editMode = setlistEditMode;
+
+                // Add event listeners
+                card.addEventListener('song-click', (e) => {
+                    console.log('Setlist - Song clicked:', e.detail.song.title);
+                });
+
+                card.addEventListener('song-delete', (e) => {
+                    console.log('Setlist - Song delete clicked:', e.detail.song.title);
+                    showDeleteModal(e.detail.song, 'setlist');
                 });
 
                 container.appendChild(card);
@@ -377,21 +422,19 @@
 
         // Wait for components to be defined, then render
         customElements.whenDefined('song-card').then(() => {
-            renderCards();
+            renderLibraryCards();
+            renderSetlistCards();
 
-            // Set up mode toggle buttons
-            document.getElementById('mode-library').addEventListener('click', () => {
-                currentMode = 'library';
-                document.getElementById('mode-library').classList.add('active');
-                document.getElementById('mode-setlist').classList.remove('active');
-                renderCards();
+            // Set up library edit mode toggle
+            document.getElementById('library-edit-toggle').addEventListener('click', () => {
+                libraryEditMode = !libraryEditMode;
+                renderLibraryCards();
             });
 
-            document.getElementById('mode-setlist').addEventListener('click', () => {
-                currentMode = 'setlist';
-                document.getElementById('mode-setlist').classList.add('active');
-                document.getElementById('mode-library').classList.remove('active');
-                renderCards();
+            // Set up setlist edit mode toggle
+            document.getElementById('setlist-edit-toggle').addEventListener('click', () => {
+                setlistEditMode = !setlistEditMode;
+                renderSetlistCards();
             });
 
             // Set up modal buttons
