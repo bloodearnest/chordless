@@ -485,6 +485,12 @@ body.library-edit-mode .edit-mode-control.fade-in {
     display: flex;
     align-items: center;
     gap: 0.3rem;
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Header controls slot - add transition for animations */
+.header-controls-slot {
+    transition: opacity 0.3s ease-in-out;
 }
 
 /* Key selector - appears as plain text in normal mode, interactive button in edit mode */

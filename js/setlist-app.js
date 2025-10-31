@@ -1685,14 +1685,22 @@ class PageApp {
     }
 
     showOverview(instant = false) {
+        // Update the last visible section to prevent observer from triggering
+        this._lastVisibleSection = 'overview';
+
         this.scrollToSection('overview', -1, instant);
-        this.updateHeader(null, instant);
+        // Update header with animation for programmatic navigation
+        this.updateHeader(null, false);
         this.exitEditMode();
     }
 
     showSong(index, instant = false) {
+        // Update the last visible section to prevent observer from triggering
+        this._lastVisibleSection = `song-${index}`;
+
         this.scrollToSection(`song-${index}`, index, instant);
-        this.updateHeader(this.songs[index], instant);
+        // Update header with animation for programmatic navigation
+        this.updateHeader(this.songs[index], false);
         this.applyFontSize(index);
         this.exitEditMode();
     }
@@ -1739,26 +1747,59 @@ class PageApp {
         }
     }
 
-    updateHeader(song, instant = false) {
+    async updateHeader(song, instant = false) {
         const appHeader = document.getElementById('app-header');
         const metaEl = document.getElementById('song-meta-header');
         const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
         const resetButton = document.getElementById('reset-button');
         const fontSizeControls = document.querySelector('.font-size-controls');
+        const keySelectorValue = document.getElementById('key-selector-value');
 
+        // Determine new title
+        let newTitle;
         if (song) {
-            // Update title - app-header handles its own rendering
-            const newTitle = song.title;
-            if (appHeader.title !== newTitle) {
-                appHeader.title = newTitle;
+            newTitle = song.title;
+        } else {
+            if (this.currentSetlist) {
+                const formattedDate = this.formatSetlistName(this.currentSetlist.date);
+                newTitle = this.currentSetlist.name
+                    ? `${formattedDate} - ${this.currentSetlist.name}`
+                    : formattedDate;
+            } else {
+                newTitle = 'Setlist';
             }
+        }
 
-            // Update key selector value (used in both modes) - use current key
+        // Check if content is actually changing
+        const titleChanged = appHeader.title !== newTitle;
+        if (!titleChanged && !instant) {
+            return; // No change needed
+        }
+
+        if (instant) {
+            // Instant update - no animation
+            appHeader.setTitleInstant(newTitle);
+            this._updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue);
+        } else {
+            // Animated update - fade out old, swap content, fade in new
+            appHeader.title = newTitle;
+
+            await this._animateSlottedContent(async () => {
+                this._updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue);
+            });
+        }
+    }
+
+    _updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue) {
+        if (song) {
+            // Update key selector value
             if (song.currentKey) {
                 this.populateKeySelector(song.currentKey);
+            } else {
+                if (keySelectorValue) keySelectorValue.textContent = '-';
             }
 
-            // Update metadata - only show BPM (key is in separate wrapper now) - use current BPM
+            // Update BPM
             metaEl.textContent = '';
             if (song.currentBPM) {
                 const metaItem = document.createElement('span');
@@ -1781,20 +1822,9 @@ class PageApp {
             // Store current song for info button handler
             this._currentSongForInfo = song;
         } else {
-            // Overview - show setlist metadata
-            let newTitle;
-            if (this.currentSetlist) {
-                const formattedDate = this.formatSetlistName(this.currentSetlist.date);
-                newTitle = this.currentSetlist.name
-                    ? `${formattedDate} - ${this.currentSetlist.name}`
-                    : formattedDate;
-            } else {
-                newTitle = 'Setlist';
-            }
-
-            // Update title
-            if (appHeader.title !== newTitle) {
-                appHeader.title = newTitle;
+            // Overview - clear key
+            if (keySelectorValue) {
+                keySelectorValue.textContent = '-';
             }
 
             // Show setlist type in metadata
@@ -1806,16 +1836,10 @@ class PageApp {
                 metaEl.appendChild(typeSpan);
             }
 
-            // Hide song-specific controls on overview (but keep edit toggle and info button)
+            // Hide song-specific controls on overview
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
             if (resetButton) resetButton.style.display = 'none';
             if (fontSizeControls) fontSizeControls.style.display = 'none';
-
-            // Clear key selector value when on overview
-            const keySelectorValue = document.getElementById('key-selector-value');
-            if (keySelectorValue) {
-                keySelectorValue.textContent = '-';
-            }
 
             // Store that we're on overview for info button handler
             this._currentSongForInfo = null;
@@ -2163,18 +2187,29 @@ class PageApp {
 
         if (!section || !container) return;
 
+        // Disable observer during programmatic scroll
+        this._isProgrammaticScroll = true;
+
         // Scroll the container to bring the section into view
         const scrollLeft = section.offsetLeft;
 
         if (instant) {
             // Jump immediately without animation
             container.scrollLeft = scrollLeft;
+            // Re-enable observer immediately for instant scrolls
+            this._isProgrammaticScroll = false;
         } else {
             // Smooth scroll animation
             container.scrollTo({
                 left: scrollLeft,
                 behavior: 'smooth'
             });
+
+            // Re-enable observer after scroll animation completes
+            // Smooth scrolling typically takes 300-500ms
+            setTimeout(() => {
+                this._isProgrammaticScroll = false;
+            }, 600);
         }
 
         // Note: currentSongIndex is now automatically tracked by Intersection Observer
@@ -2191,26 +2226,46 @@ class PageApp {
         const container = document.querySelector('.song-container');
         if (!container) return;
 
+        // Track the most recently visible section to avoid duplicate updates
+        this._lastVisibleSection = null;
+
         // Observer watches which section is currently in view
         this.sectionObserver = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                // Only act on the section that's becoming visible (>50% visible)
-                if (entry.isIntersecting && entry.intersectionRatio > CONFIG.VISIBILITY_THRESHOLD) {
-                    const sectionId = entry.target.id;
+            // Skip if this is a programmatic scroll
+            if (this._isProgrammaticScroll) return;
 
-                    if (sectionId === 'overview') {
-                        this.currentSongIndex = -1;
-                        this.updateHeader(null);
-                    } else if (sectionId.startsWith('song-')) {
-                        const index = parseInt(sectionId.split('-')[1]);
-                        if (index >= 0 && index < this.songs.length) {
-                            this.currentSongIndex = index;
-                            this.updateHeader(this.songs[index]);
-                            this.applyFontSize(index);
-                        }
-                    }
+            // Find the most visible entry
+            let mostVisible = null;
+            let maxRatio = 0;
+
+            entries.forEach(entry => {
+                if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+                    maxRatio = entry.intersectionRatio;
+                    mostVisible = entry;
                 }
             });
+
+            // Only update if we found a visible section and it's different from last time
+            if (mostVisible && mostVisible.intersectionRatio > CONFIG.VISIBILITY_THRESHOLD) {
+                const sectionId = mostVisible.target.id;
+
+                // Skip if this is the same section we just updated
+                if (sectionId === this._lastVisibleSection) return;
+
+                this._lastVisibleSection = sectionId;
+
+                if (sectionId === 'overview') {
+                    this.currentSongIndex = -1;
+                    this.updateHeader(null, false); // animate=true for smooth transition
+                } else if (sectionId.startsWith('song-')) {
+                    const index = parseInt(sectionId.split('-')[1]);
+                    if (index >= 0 && index < this.songs.length) {
+                        this.currentSongIndex = index;
+                        this.updateHeader(this.songs[index], false); // animate=true for smooth transition
+                        this.applyFontSize(index);
+                    }
+                }
+            }
         }, {
             root: container,
             threshold: [0, 0.5, 1], // Trigger at 0%, 50%, and 100% visibility
@@ -2806,6 +2861,31 @@ class PageApp {
                 this.applyFontSize(this.currentSongIndex);
             }
         });
+    }
+
+    async _animateSlottedContent(updateCallback) {
+        const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
+        const metaEl = document.getElementById('song-meta-header');
+        const controlsSlot = document.querySelector('.header-controls-slot');
+
+        // Fade out (use the controls slot to fade everything together)
+        if (controlsSlot) {
+            controlsSlot.style.opacity = '0';
+        }
+
+        // Wait for fade-out (300ms to match app-header)
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Update content (this happens while opacity is 0, so changes are invisible)
+        await updateCallback();
+
+        // Small delay to ensure DOM has updated
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        // Fade in
+        if (controlsSlot) {
+            controlsSlot.style.opacity = '1';
+        }
     }
 
     applyFontSize(songIndex) {
@@ -3603,19 +3683,55 @@ class PageApp {
 
         console.log('[SetlistApp] Setting up touch support for route:', route.type);
 
-        // Find the song container element
-        const mainContent = document.getElementById('main-content');
+        // Find the container element (different for setlist vs library)
+        let mainContent;
+        if (route.type === 'songs' || route.type === 'librarySong') {
+            // Library page - use the library song view container
+            mainContent = document.getElementById('library-song-view');
+        } else {
+            // Setlist page
+            mainContent = document.getElementById('main-content');
+        }
+
         if (!mainContent) {
-            console.warn('[SetlistApp] main-content element not found, skipping touch setup');
+            console.warn('[SetlistApp] Container element not found, skipping touch setup');
             return;
         }
 
         // Prevent browser from handling touch gestures (like swipe-to-go-back) on the song content
-        // Only when viewing a song, not in overview mode
         mainContent.addEventListener('touchstart', (e) => {
-            // Only prevent if we're viewing a song (not in overview)
-            if (this.currentSongIndex >= 0 && e.touches.length === 1) {
+            // Check if we're in a state where we want to handle swipes
+            const container = document.querySelector('.songs-content-container');
+            const isViewingLibrarySong = container && container.classList.contains('viewing-song');
+            const isViewingSetlistSong = this.currentSongIndex >= 0;
+
+            if ((isViewingLibrarySong || isViewingSetlistSong) && e.touches.length === 1) {
                 e.preventDefault();
+            }
+        }, { passive: false });
+
+        // Also prevent touchmove to stop browser scroll-to-refresh and other gestures
+        mainContent.addEventListener('touchmove', (e) => {
+            const container = document.querySelector('.songs-content-container');
+            const isViewingLibrarySong = container && container.classList.contains('viewing-song');
+            const isViewingSetlistSong = this.currentSongIndex >= 0;
+
+            if (isViewingLibrarySong || isViewingSetlistSong) {
+                // Allow vertical scrolling within the song content
+                // but prevent horizontal gestures from triggering browser actions
+                const touch = e.touches[0];
+                if (!touch) return;
+
+                // Calculate if this is a horizontal swipe attempt
+                if (this._touchStartX !== undefined) {
+                    const deltaX = Math.abs(touch.clientX - this._touchStartX);
+                    const deltaY = Math.abs(touch.clientY - this._touchStartY);
+
+                    // If more horizontal than vertical, prevent it
+                    if (deltaX > deltaY) {
+                        e.preventDefault();
+                    }
+                }
             }
         }, { passive: false });
 
@@ -3631,6 +3747,13 @@ class PageApp {
             pointerStartX = e.clientX;
             pointerStartY = e.clientY;
             pointerId = e.pointerId;
+
+            // Store for touchmove check
+            this._touchStartX = e.clientX;
+            this._touchStartY = e.clientY;
+
+            // Capture the pointer to prevent browser default gestures
+            e.target.setPointerCapture(e.pointerId);
         });
 
         // Shared handler for both pointerup and pointercancel
@@ -3651,28 +3774,45 @@ class PageApp {
 
             console.log('[Touch] Swipe deltas - X:', deltaX, 'Y:', deltaY, 'threshold:', CONFIG.SWIPE_THRESHOLD);
 
-            // Horizontal swipe (song navigation)
+            // Horizontal swipe (song navigation or library back gesture)
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > CONFIG.SWIPE_THRESHOLD) {
                 console.log('[Touch] Horizontal swipe detected, deltaX:', deltaX);
-                if (deltaX > 0) {
-                    // Swipe right - go to previous
-                    if (this.currentSongIndex > 0) {
-                        this.navigateToHash(`song-${this.currentSongIndex - 1}`);
-                    } else if (this.currentSongIndex === 0) {
-                        this.navigateToHash('overview');
+
+                // Check if we're in library view
+                const container = document.querySelector('.songs-content-container');
+                const isViewingLibrarySong = container && container.classList.contains('viewing-song');
+
+                if (isViewingLibrarySong) {
+                    // Library view - only handle swipe right to go back
+                    if (deltaX > 0) {
+                        console.log('[Touch] Library: Swipe right to go back');
+                        this.closeLibrarySongView();
                     }
-                } else if (deltaX < 0) {
-                    // Swipe left - go to next
-                    if (this.currentSongIndex < 0 && this.songs.length > 0) {
-                        this.navigateToHash('song-0');
-                    } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
-                        this.navigateToHash(`song-${this.currentSongIndex + 1}`);
+                    // Ignore left swipe in library
+                } else if (this.currentSongIndex !== undefined) {
+                    // Setlist view - normal song navigation
+                    if (deltaX > 0) {
+                        // Swipe right - go to previous
+                        if (this.currentSongIndex > 0) {
+                            this.navigateToHash(`song-${this.currentSongIndex - 1}`);
+                        } else if (this.currentSongIndex === 0) {
+                            this.navigateToHash('overview');
+                        }
+                    } else if (deltaX < 0) {
+                        // Swipe left - go to next
+                        if (this.currentSongIndex < 0 && this.songs.length > 0) {
+                            this.navigateToHash('song-0');
+                        } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
+                            this.navigateToHash(`song-${this.currentSongIndex + 1}`);
+                        }
                     }
                 }
             }
 
             // Reset pointer tracking
             pointerId = null;
+            this._touchStartX = undefined;
+            this._touchStartY = undefined;
         };
 
         mainContent.addEventListener('pointerup', handlePointerEnd);

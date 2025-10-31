@@ -31,7 +31,8 @@ export class AppHeader extends LitElement {
         title: { type: String },
         showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
         showInfoButton: { type: Boolean, attribute: 'show-info-button' },
-        editMode: { type: Boolean, reflect: true }
+        editMode: { type: Boolean, reflect: true },
+        disableAnimation: { type: Boolean, attribute: 'disable-animation' }
     };
 
     static styles = css`
@@ -89,7 +90,11 @@ export class AppHeader extends LitElement {
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            transition: opacity 0.2s ease-in-out;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .title.fade-out {
+            opacity: 0;
         }
 
         .header-center {
@@ -98,12 +103,18 @@ export class AppHeader extends LitElement {
             gap: 0.5rem;
             flex: 0 0 auto;
             justify-content: flex-end;
+            transition: opacity 0.3s ease-in-out;
+        }
+
+        .header-center.fade-out {
+            opacity: 0;
         }
 
         ::slotted(.header-controls-slot) {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            transition: opacity 0.3s ease-in-out;
         }
 
         .header-right {
@@ -153,15 +164,97 @@ export class AppHeader extends LitElement {
         this.showEditToggle = false;
         this.showInfoButton = false;
         this.editMode = false;
+        this.disableAnimation = false;
+        this._previousTitle = '';
+        this._animating = false;
+        this._displayTitle = ''; // The title actually shown in the UI
+        this._pendingTitle = null; // Title waiting to be shown after fade-out
     }
 
     connectedCallback() {
         super.connectedCallback();
+        // Initialize display title
+        this._displayTitle = this.title;
+        this._previousTitle = this.title;
         console.log('[AppHeader] Connected with props:', {
             showEditToggle: this.showEditToggle,
             showInfoButton: this.showInfoButton,
             editMode: this.editMode
         });
+    }
+
+    updated(changedProperties) {
+        super.updated(changedProperties);
+
+        // Handle title changes
+        if (changedProperties.has('title') && this.title !== this._previousTitle) {
+            if (this.disableAnimation) {
+                // No animation - update immediately
+                this._displayTitle = this.title;
+                this._previousTitle = this.title;
+                this.requestUpdate();
+            } else if (!this._animating) {
+                // Animate the transition
+                this._animateTransition();
+            } else {
+                // Animation in progress - queue this update
+                this._pendingTitle = this.title;
+            }
+        }
+    }
+
+    async _animateTransition() {
+        if (this._animating) return;
+        this._animating = true;
+
+        const titleEl = this.shadowRoot?.querySelector('.title');
+        const centerEl = this.shadowRoot?.querySelector('.header-center');
+
+        // Fade out old content
+        titleEl?.classList.add('fade-out');
+        centerEl?.classList.add('fade-out');
+
+        // Wait for fade-out to complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        // Update the displayed title
+        this._displayTitle = this.title;
+        this._previousTitle = this.title;
+        this.requestUpdate();
+
+        // Wait for re-render
+        await this.updateComplete;
+
+        // Get fresh references after re-render
+        const newTitleEl = this.shadowRoot?.querySelector('.title');
+        const newCenterEl = this.shadowRoot?.querySelector('.header-center');
+
+        // Fade in new content
+        requestAnimationFrame(() => {
+            newTitleEl?.classList.remove('fade-out');
+            newCenterEl?.classList.remove('fade-out');
+        });
+
+        // Wait for fade-in to complete
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        this._animating = false;
+
+        // Handle any pending updates
+        if (this._pendingTitle && this._pendingTitle !== this.title) {
+            this._pendingTitle = null;
+            this._animateTransition();
+        }
+    }
+
+    // Public method to update without animation
+    setTitleInstant(newTitle) {
+        this.disableAnimation = true;
+        this.title = newTitle;
+        // Re-enable after a tick
+        setTimeout(() => {
+            this.disableAnimation = false;
+        }, 0);
     }
 
     render() {
@@ -180,7 +273,7 @@ export class AppHeader extends LitElement {
                             <line x1="3" y1="18" x2="21" y2="18"></line>
                         </svg>
                     </button>
-                    <div class="title" part="title">${this.title}</div>
+                    <div class="title" part="title">${this._displayTitle}</div>
                 </div>
 
                 <div class="header-center">
