@@ -109,7 +109,26 @@ export async function initCreateSetlistModal() {
     });
 }
 
+// Initialize nav menu button
+async function initNavMenuButton() {
+    // Wait for custom element to be defined
+    await customElements.whenDefined('nav-menu');
+
+    const navMenuButton = document.getElementById('nav-menu-button');
+    const navMenu = document.getElementById('nav-menu');
+
+    if (navMenuButton && navMenu) {
+        // Set the trigger button for positioning
+        navMenu.setTriggerButton(navMenuButton);
+
+        navMenuButton.addEventListener('click', () => {
+            navMenu.togglePopover();
+        });
+    }
+}
+
 // Auto-initialize if we're on the home page
 if (document.getElementById('create-setlist-modal')) {
     initCreateSetlistModal();
+    initNavMenuButton();
 }

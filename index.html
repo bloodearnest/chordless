@@ -28,42 +28,8 @@
                 </button>
             </header>
 
-            <!-- Navigation menu popover -->
-            <div id="nav-menu-popover" class="nav-menu-popover" popover>
-                <nav class="nav-menu">
-                    <a href="/" class="nav-menu-item">
-                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                            <line x1="16" y1="2" x2="16" y2="6"></line>
-                            <line x1="8" y1="2" x2="8" y2="6"></line>
-                            <line x1="3" y1="10" x2="21" y2="10"></line>
-                        </svg>
-                        <span>Setlists</span>
-                    </a>
-                    <a href="/songs" class="nav-menu-item">
-                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M9 18V5l12-2v13"></path>
-                            <circle cx="6" cy="18" r="3"></circle>
-                            <circle cx="18" cy="16" r="3"></circle>
-                        </svg>
-                        <span>Song Library</span>
-                    </a>
-                    <a href="/settings" class="nav-menu-item">
-                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M12 1v6m0 6v6"></path>
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"></path>
-                        </svg>
-                        <span>Settings</span>
-                    </a>
-                    <a href="/bookmarklet" class="nav-menu-item">
-                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-                        </svg>
-                        <span>Bookmarklet</span>
-                    </a>
-                </nav>
-            </div>
+            <!-- Navigation menu component -->
+            <nav-menu id="nav-menu"></nav-menu>
 
             <main class="home-content">
                 <div id="setlist-list" class="setlist-list">
@@ -129,6 +95,21 @@
         </div>
     </template>
 
+    <!-- Import map for Lit -->
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+        }
+    }
+    </script>
+
     <script>
         // Set window name so bookmarklet can find and reuse this tab
         window.name = 'setalight';
@@ -158,6 +139,8 @@
                 });
         }
     </script>
+    <!-- Import the nav-menu component -->
+    <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="js/create-setlist.js"></script>
     <script type="module" src="js/setlist-app.js"></script>
 </body>

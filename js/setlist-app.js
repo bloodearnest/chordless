@@ -2613,10 +2613,15 @@ class PageApp {
         });
 
         // Listen to nav menu clicks - open the popover
-        appHeader.addEventListener('nav-menu-click', () => {
-            const popover = document.getElementById('nav-menu-popover');
-            if (popover) {
-                popover.showPopover();
+        appHeader.addEventListener('nav-menu-click', (e) => {
+            const navMenu = document.getElementById('nav-menu');
+            if (navMenu) {
+                // Get the nav button from the app-header component
+                const navButton = appHeader.shadowRoot?.querySelector('.nav-menu-button');
+                if (navButton) {
+                    navMenu.setTriggerButton(navButton);
+                }
+                navMenu.togglePopover();
             }
         });
     }
@@ -3675,37 +3680,23 @@ class PageApp {
     }
 
     setupNavigationMenu(route) {
-        const navButton = document.getElementById('nav-menu-button');
-        const navPopover = document.getElementById('nav-menu-popover');
-        const navBackButton = document.getElementById('nav-back-button');
+        const navMenu = document.getElementById('nav-menu');
 
-        if (!navButton || !navPopover) return;
+        if (!navMenu) return;
 
-        // Position popover when it opens
-        navPopover.addEventListener('toggle', (e) => {
-            if (e.newState === 'open') {
-                const buttonRect = navButton.getBoundingClientRect();
-                navPopover.style.top = `${buttonRect.bottom + 4}px`;
-                navPopover.style.left = `${buttonRect.left}px`;
+        // Setup back button click handler
+        navMenu.addEventListener('back-click', () => {
+            if (this.navBackAction) {
+                this.navBackAction();
             }
         });
-
-        // Setup back button with single click handler
-        if (navBackButton) {
-            navBackButton.addEventListener('click', () => {
-                navPopover.hidePopover();
-                if (this.navBackAction) {
-                    this.navBackAction();
-                }
-            });
-        }
 
         // Set initial back button state
         this.updateNavigationMenu(route);
     }
 
     updateNavigationMenu(route) {
-        const navBackLabel = document.getElementById('nav-back-label');
+        const navMenu = document.getElementById('nav-menu');
 
         // Determine back button label and action based on route
         let backLabel = 'Back';
@@ -3725,8 +3716,8 @@ class PageApp {
             backAction = () => window.location.href = '/';
         }
 
-        if (navBackLabel) {
-            navBackLabel.textContent = backLabel;
+        if (navMenu) {
+            navMenu.setAttribute('back-label', backLabel);
         }
 
         // Store action for the click handler
