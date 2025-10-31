@@ -15,6 +15,7 @@ storage
  - syncing
 
 UI
+- device type fonts (mobile, tablet, desktop)
 - autoscaling font
 - logo
 

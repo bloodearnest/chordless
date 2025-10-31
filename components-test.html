@@ -189,6 +189,51 @@
     <h1>🧪 Component Test Page</h1>
 
     <div class="test-section">
+        <h2>AppHeader Component</h2>
+        <p class="test-description">
+            Testing the flexible header component in different configurations.
+        </p>
+
+        <h3>Settings Header (No edit, no info)</h3>
+        <app-header title="Settings"></app-header>
+
+        <h3 style="margin-top: 2rem;">Overview Header (With edit and info)</h3>
+        <div class="mode-toggle" style="margin-bottom: 1rem;">
+            <span style="font-weight: 600;">Edit Mode:</span>
+            <button id="header-overview-edit-toggle">Toggle Edit Mode</button>
+        </div>
+        <app-header
+            id="overview-header"
+            title="Sunday Service - 2025-10-30"
+            show-edit-toggle
+            show-info-button>
+        </app-header>
+
+        <h3 style="margin-top: 2rem;">Song Header (With controls slot)</h3>
+        <div class="mode-toggle" style="margin-bottom: 1rem;">
+            <span style="font-weight: 600;">Edit Mode:</span>
+            <button id="header-song-edit-toggle">Toggle Edit Mode</button>
+        </div>
+        <app-header
+            id="song-header"
+            title="Amazing Grace"
+            show-edit-toggle
+            show-info-button>
+            <div slot="controls" style="display: flex; gap: 1rem; align-items: center;">
+                <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">↺</button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">A−</button>
+                    <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">A+</button>
+                </div>
+                <div style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px;">
+                    Key: <strong>G</strong>
+                </div>
+                <div style="color: #7f8c8d;">BPM: 90 | Time: 3/4</div>
+            </div>
+        </app-header>
+    </div>
+
+    <div class="test-section">
         <h2>SongCard Component - Library View</h2>
         <p class="test-description">
             Library variant with full information (artist, last played).
@@ -321,8 +366,9 @@
             }
         ];
 
-        // Import the SongCard component
+        // Import the components
         import './components/song-card.js';
+        import './components/app-header.js';
 
         let libraryEditMode = false;
         let setlistEditMode = false;
@@ -435,6 +481,31 @@
             document.getElementById('setlist-edit-toggle').addEventListener('click', () => {
                 setlistEditMode = !setlistEditMode;
                 renderSetlistCards();
+            });
+
+            // Set up app-header test interactions
+            const overviewHeader = document.getElementById('overview-header');
+            const songHeader = document.getElementById('song-header');
+
+            document.getElementById('header-overview-edit-toggle').addEventListener('click', () => {
+                overviewHeader.editMode = !overviewHeader.editMode;
+            });
+
+            document.getElementById('header-song-edit-toggle').addEventListener('click', () => {
+                songHeader.editMode = !songHeader.editMode;
+            });
+
+            // Listen to header events
+            document.addEventListener('nav-menu-click', () => {
+                console.log('Nav menu clicked');
+            });
+
+            document.addEventListener('edit-mode-toggle', (e) => {
+                console.log('Edit mode toggled on:', e.target.title);
+            });
+
+            document.addEventListener('info-click', (e) => {
+                console.log('Info clicked on:', e.target.title);
             });
 
             // Set up modal buttons

@@ -11,18 +11,12 @@
 <body>
     <div class="app-container">
         <div id="song-view" class="view">
-            <header>
-                <div class="header-left">
-                    <button class="nav-menu-button" id="nav-menu-button" popovertarget="nav-menu-popover" aria-label="Navigation menu">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="3" y1="12" x2="21" y2="12"></line>
-                            <line x1="3" y1="6" x2="21" y2="6"></line>
-                            <line x1="3" y1="18" x2="21" y2="18"></line>
-                        </svg>
-                    </button>
-                    <div class="song-title-compact" id="song-title-header">Loading...</div>
-                </div>
-                <div class="header-center">
+            <app-header
+                id="app-header"
+                title="Loading..."
+                show-edit-toggle
+                show-info-button>
+                <div slot="controls" class="header-controls-slot">
                     <button class="reset-button edit-mode-control" id="reset-button" aria-label="Reset song">↺</button>
                     <div class="font-size-controls edit-mode-control">
                         <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
@@ -42,11 +36,7 @@
                     </div>
                     <div class="song-meta-compact" id="song-meta-header"></div>
                 </div>
-                <div class="header-right">
-                    <button class="edit-mode-toggle" id="edit-mode-toggle" aria-label="Toggle edit mode">✎</button>
-                    <button class="info-button" id="info-button" aria-label="Song info">i</button>
-                </div>
-            </header>
+            </app-header>
 
             <!-- Navigation menu popover -->
             <div id="nav-menu-popover" class="nav-menu-popover" popover>
@@ -187,8 +177,9 @@
         // Set window name so bookmarklet can find and reuse this tab
         window.name = 'setalight';
     </script>
-    <!-- Import the SongCard component -->
+    <!-- Import the SongCard and AppHeader components -->
     <script type="module" src="/components/song-card.js"></script>
+    <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
 </body>
 </html>

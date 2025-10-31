@@ -1548,6 +1548,9 @@ class PageApp {
                 // Set up edit mode toggle (handles both overview and song edit modes)
                 this.setupEditMode();
 
+                // Set up app-header event listeners (info button and nav menu)
+                this.setupAppHeaderEvents();
+
                 // Set up section control buttons
                 this.setupSectionControls();
 
@@ -1697,10 +1700,10 @@ class PageApp {
     async exitEditMode() {
         const isEditMode = document.body.classList.contains('edit-mode');
         if (isEditMode) {
-            const editToggle = document.getElementById('edit-mode-toggle');
+            const appHeader = document.getElementById('app-header');
             document.body.classList.remove('edit-mode');
-            if (editToggle) {
-                editToggle.classList.remove('active');
+            if (appHeader) {
+                appHeader.editMode = false;
             }
 
             // Update all sections to reflect non-edit mode
@@ -1737,34 +1740,17 @@ class PageApp {
     }
 
     updateHeader(song, instant = false) {
-        const titleEl = document.getElementById('song-title-header');
+        const appHeader = document.getElementById('app-header');
         const metaEl = document.getElementById('song-meta-header');
-        const infoButton = document.getElementById('info-button');
-        const keySelector = document.getElementById('key-selector');
-        const keyValueDisplay = document.getElementById('key-value-display');
         const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
-        const editToggle = document.getElementById('edit-mode-toggle');
         const resetButton = document.getElementById('reset-button');
         const fontSizeControls = document.querySelector('.font-size-controls');
 
         if (song) {
-            // Update title with crossfade animation (or instant if specified)
+            // Update title - app-header handles its own rendering
             const newTitle = song.title;
-            if (titleEl.textContent !== newTitle) {
-                if (instant) {
-                    // Instant update without animation
-                    titleEl.textContent = newTitle;
-                    titleEl.style.opacity = '1';
-                } else {
-                    // Fade out
-                    titleEl.style.opacity = '0';
-
-                    // Wait for fade out, then update and fade in
-                    setTimeout(() => {
-                        titleEl.textContent = newTitle;
-                        titleEl.style.opacity = '1';
-                    }, 200);
-                }
+            if (appHeader.title !== newTitle) {
+                appHeader.title = newTitle;
             }
 
             // Update key selector value (used in both modes) - use current key
@@ -1789,13 +1775,11 @@ class PageApp {
 
             // Show song-specific controls
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'flex';
-            if (editToggle) editToggle.style.display = 'flex';
             if (resetButton) resetButton.style.display = 'block';
             if (fontSizeControls) fontSizeControls.style.display = 'flex';
 
-            // Enable info button
-            infoButton.style.display = 'flex';
-            infoButton.onclick = () => this.showSongInfo(song);
+            // Store current song for info button handler
+            this._currentSongForInfo = song;
         } else {
             // Overview - show setlist metadata
             let newTitle;
@@ -1808,22 +1792,9 @@ class PageApp {
                 newTitle = 'Setlist';
             }
 
-            // Update title with crossfade animation (or instant if specified)
-            if (titleEl.textContent !== newTitle) {
-                if (instant) {
-                    // Instant update without animation
-                    titleEl.textContent = newTitle;
-                    titleEl.style.opacity = '1';
-                } else {
-                    // Fade out
-                    titleEl.style.opacity = '0';
-
-                    // Wait for fade out, then update and fade in
-                    setTimeout(() => {
-                        titleEl.textContent = newTitle;
-                        titleEl.style.opacity = '1';
-                    }, 200);
-                }
+            // Update title
+            if (appHeader.title !== newTitle) {
+                appHeader.title = newTitle;
             }
 
             // Show setlist type in metadata
@@ -1837,22 +1808,17 @@ class PageApp {
 
             // Hide song-specific controls on overview (but keep edit toggle and info button)
             if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
-            // Keep edit toggle visible for overview edit mode
-            if (editToggle) editToggle.style.display = 'flex';
             if (resetButton) resetButton.style.display = 'none';
             if (fontSizeControls) fontSizeControls.style.display = 'none';
-            // Show info button for setlist info
-            infoButton.style.display = 'flex';
-            infoButton.onclick = () => this.showSetlistInfo();
 
-            if (keyValueDisplay) {
-                keyValueDisplay.textContent = '-';
-            }
             // Clear key selector value when on overview
             const keySelectorValue = document.getElementById('key-selector-value');
             if (keySelectorValue) {
                 keySelectorValue.textContent = '-';
             }
+
+            // Store that we're on overview for info button handler
+            this._currentSongForInfo = null;
         }
     }
 
@@ -2529,10 +2495,11 @@ class PageApp {
     }
 
     setupEditMode() {
-        const editToggle = document.getElementById('edit-mode-toggle');
-        if (!editToggle) return;
+        const appHeader = document.getElementById('app-header');
+        if (!appHeader) return;
 
-        editToggle.addEventListener('click', async () => {
+        // Listen to the edit-mode-toggle event from app-header
+        appHeader.addEventListener('edit-mode-toggle', async () => {
             // Check if we're on overview or song view
             if (this.currentSongIndex < 0) {
                 // We're on overview - toggle overview edit mode
@@ -2546,7 +2513,7 @@ class PageApp {
             if (isEnteringEditMode) {
                 // Entering edit mode - fade out normal controls, fade in edit controls
                 document.body.classList.add('edit-mode');
-                editToggle.classList.add('active');
+                appHeader.editMode = true;
 
                 // Clear inline display:none if it was set during previous exit
                 document.querySelectorAll('.edit-mode-control').forEach(el => {
@@ -2577,7 +2544,7 @@ class PageApp {
                 // Exiting edit mode - fade everything simultaneously
                 // Remove edit mode class immediately to trigger all fades
                 document.body.classList.remove('edit-mode');
-                editToggle.classList.remove('active');
+                appHeader.editMode = false;
 
                 // Remove fade-in classes from edit controls (triggers fade out)
                 document.querySelectorAll('.edit-mode-control').forEach(el => {
@@ -2628,6 +2595,28 @@ class PageApp {
                         console.log('[ExitEditMode] Saved setlist to IndexedDB');
                     }
                 }, 250);
+            }
+        });
+    }
+
+    setupAppHeaderEvents() {
+        const appHeader = document.getElementById('app-header');
+        if (!appHeader) return;
+
+        // Listen to info button clicks
+        appHeader.addEventListener('info-click', () => {
+            if (this._currentSongForInfo) {
+                this.showSongInfo(this._currentSongForInfo);
+            } else {
+                this.showSetlistInfo();
+            }
+        });
+
+        // Listen to nav menu clicks - open the popover
+        appHeader.addEventListener('nav-menu-click', () => {
+            const popover = document.getElementById('nav-menu-popover');
+            if (popover) {
+                popover.showPopover();
             }
         });
     }
@@ -2915,6 +2904,14 @@ class PageApp {
         }
         if (this._dragPointerCancelHandler) {
             document.removeEventListener('pointercancel', this._dragPointerCancelHandler);
+        }
+
+        // Clean up any existing card-level listeners
+        if (this._cardPointerDownHandlers) {
+            this._cardPointerDownHandlers.forEach((handler, button) => {
+                button.removeEventListener('pointerdown', handler);
+            });
+            this._cardPointerDownHandlers.clear();
         }
 
         let dragState = {
@@ -3305,9 +3302,12 @@ class PageApp {
             dragState.pointerType = null;
         };
 
+        // Store card handlers so we can clean them up later
+        this._cardPointerDownHandlers = this._cardPointerDownHandlers || new Map();
+
         // Attach drag handlers to cards (we'll check if the handle was clicked)
         buttons.forEach(button => {
-            button.addEventListener('pointerdown', (e) => {
+            const handler = (e) => {
                 // Don't start drag if not in edit mode
                 if (!this.overviewEditMode) return;
 
@@ -3335,7 +3335,10 @@ class PageApp {
 
                 // Start drag immediately when handle is grabbed
                 startDrag(button, e.clientY);
-            });
+            };
+
+            button.addEventListener('pointerdown', handler);
+            this._cardPointerDownHandlers.set(button, handler);
         });
 
         // Global pointer event handlers for smooth dragging
@@ -3382,13 +3385,9 @@ class PageApp {
         this.overviewEditMode = !this.overviewEditMode;
 
         // Update button state (use the header edit toggle button)
-        const editToggle = document.getElementById('edit-mode-toggle');
-        if (editToggle) {
-            if (this.overviewEditMode) {
-                editToggle.classList.add('active');
-            } else {
-                editToggle.classList.remove('active');
-            }
+        const appHeader = document.getElementById('app-header');
+        if (appHeader) {
+            appHeader.editMode = this.overviewEditMode;
         }
 
         // Update all song cards with new edit mode
@@ -3410,6 +3409,14 @@ class PageApp {
             }
             if (this._dragPointerCancelHandler) {
                 document.removeEventListener('pointercancel', this._dragPointerCancelHandler);
+            }
+
+            // Clean up card-level pointerdown listeners
+            if (this._cardPointerDownHandlers) {
+                this._cardPointerDownHandlers.forEach((handler, button) => {
+                    button.removeEventListener('pointerdown', handler);
+                });
+                this._cardPointerDownHandlers.clear();
             }
         }
 
@@ -3523,9 +3530,13 @@ class PageApp {
                 const isEditMode = document.body.classList.contains('edit-mode');
                 if (isEditMode) {
                     e.preventDefault();
-                    const editToggle = document.getElementById('edit-mode-toggle');
-                    if (editToggle) {
-                        editToggle.click();
+                    const appHeader = document.getElementById('app-header');
+                    if (appHeader) {
+                        // Trigger the edit-mode-toggle event
+                        appHeader.dispatchEvent(new CustomEvent('edit-mode-toggle', {
+                            bubbles: true,
+                            composed: true
+                        }));
                     }
                 }
                 return;
@@ -3578,11 +3589,37 @@ class PageApp {
     setupTouchSupport(route) {
         if (route.type === 'home') return;
 
+        // Prevent duplicate setup
+        if (this._touchSupportSetup) {
+            console.log('[SetlistApp] Touch support already set up, skipping');
+            return;
+        }
+        this._touchSupportSetup = true;
+
+        console.log('[SetlistApp] Setting up touch support for route:', route.type);
+
+        // Find the song container element
+        const mainContent = document.getElementById('main-content');
+        if (!mainContent) {
+            console.warn('[SetlistApp] main-content element not found, skipping touch setup');
+            return;
+        }
+
+        // Prevent browser from handling touch gestures (like swipe-to-go-back) on the song content
+        // Only when viewing a song, not in overview mode
+        mainContent.addEventListener('touchstart', (e) => {
+            // Only prevent if we're viewing a song (not in overview)
+            if (this.currentSongIndex >= 0 && e.touches.length === 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+
         let pointerStartX = 0;
         let pointerStartY = 0;
         let pointerId = null;
 
-        document.addEventListener('pointerdown', (e) => {
+        mainContent.addEventListener('pointerdown', (e) => {
+            console.log('[Touch] pointerdown:', e.pointerType, e.isPrimary);
             // Only handle primary pointer (touch or pen, not mouse)
             if (!e.isPrimary || e.pointerType === 'mouse') return;
 
@@ -3591,9 +3628,15 @@ class PageApp {
             pointerId = e.pointerId;
         });
 
-        document.addEventListener('pointerup', (e) => {
+        // Shared handler for both pointerup and pointercancel
+        // (pointercancel fires when browser takes over for scrolling)
+        const handlePointerEnd = (e) => {
+            console.log('[Touch] pointer end:', e.type, 'pointerId:', e.pointerId, 'tracking:', pointerId);
+
             // Only handle the pointer we're tracking
-            if (e.pointerId !== pointerId) return;
+            if (e.pointerId !== pointerId) {
+                return;
+            }
 
             const pointerEndX = e.clientX;
             const pointerEndY = e.clientY;
@@ -3601,8 +3644,11 @@ class PageApp {
             const deltaX = pointerEndX - pointerStartX;
             const deltaY = pointerEndY - pointerStartY;
 
+            console.log('[Touch] Swipe deltas - X:', deltaX, 'Y:', deltaY, 'threshold:', CONFIG.SWIPE_THRESHOLD);
+
             // Horizontal swipe (song navigation)
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > CONFIG.SWIPE_THRESHOLD) {
+                console.log('[Touch] Horizontal swipe detected, deltaX:', deltaX);
                 if (deltaX > 0) {
                     // Swipe right - go to previous
                     if (this.currentSongIndex > 0) {
@@ -3622,13 +3668,10 @@ class PageApp {
 
             // Reset pointer tracking
             pointerId = null;
-        });
+        };
 
-        document.addEventListener('pointercancel', (e) => {
-            if (e.pointerId === pointerId) {
-                pointerId = null;
-            }
-        });
+        mainContent.addEventListener('pointerup', handlePointerEnd);
+        mainContent.addEventListener('pointercancel', handlePointerEnd);
     }
 
     setupNavigationMenu(route) {
