@@ -17,9 +17,6 @@ const CONFIG = {
     POSITION_THRESHOLD: 20,      // px - minimum movement to change target position
     DRAG_START_THRESHOLD: 5,     // px - movement before starting drag
 
-    // Touch gestures
-    SWIPE_THRESHOLD: 50,         // px - minimum swipe distance
-
     // Scrolling
     KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
 
@@ -98,9 +95,6 @@ class PageApp {
         // Set up keyboard navigation
         this.setupKeyboardNavigation(route);
 
-        // Set up touch/swipe support
-        this.setupTouchSupport(route);
-
         // Set up navigation menu
         this.setupNavigationMenu(route);
     }
@@ -164,10 +158,11 @@ class PageApp {
                 console.error('Song not found:', hash);
                 // Clear the hash if song not found
                 window.history.replaceState({}, '', '/songs');
-                // Remove the viewing-song class since we're not showing a song
+                // Scroll back to library list
                 const container = document.querySelector('.home-content-container, .songs-content-container');
-                if (container) {
-                    container.classList.remove('viewing-song');
+                const libraryList = container?.querySelector('.library-view');
+                if (libraryList) {
+                    libraryList.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'start' });
                 }
             }
         }
@@ -511,17 +506,20 @@ class PageApp {
         }
         this.applyLibraryFontSize();
 
-        // Slide to song view
+        // Scroll to song view using native scroll-snap
         const container = document.querySelector('.home-content-container, .songs-content-container');
-        if (container) {
-            container.classList.add('viewing-song');
+        const libraryView = container?.querySelector('.library-song-view');
+        if (libraryView) {
+            libraryView.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
         }
     }
 
     closeLibrarySongView(updateUrl = true) {
+        // Scroll back to library list using native scroll-snap
         const container = document.querySelector('.home-content-container, .songs-content-container');
-        if (container) {
-            container.classList.remove('viewing-song');
+        const libraryList = container?.querySelector('.library-view');
+        if (libraryList) {
+            libraryList.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
         }
 
         // Hide all header controls
@@ -772,6 +770,8 @@ class PageApp {
         const modalBody = document.getElementById('library-modal-body');
 
         if (!modal || !modalBody) return;
+
+        modal.show();
 
         // Clear previous content
         modalBody.textContent = '';
@@ -1041,8 +1041,6 @@ class PageApp {
     setupLibraryResetButton() {
         const resetButton = document.getElementById('library-reset-button');
         const resetModal = document.getElementById('library-reset-confirm-modal');
-        const cancelButton = document.getElementById('library-reset-cancel');
-        const confirmButton = document.getElementById('library-reset-confirm');
 
         if (!resetButton || !resetModal) return;
 
@@ -1052,30 +1050,13 @@ class PageApp {
 
         // Show confirmation modal when reset button is clicked
         newResetButton.addEventListener('click', () => {
-            resetModal.classList.add('active');
+            resetModal.show();
         });
 
-        // Cancel - close modal
-        if (cancelButton) {
-            cancelButton.onclick = () => {
-                resetModal.classList.remove('active');
-            };
-        }
-
-        // Close modal when clicking outside
-        resetModal.onclick = (e) => {
-            if (e.target === resetModal) {
-                resetModal.classList.remove('active');
-            }
-        };
-
-        // Confirm - reset everything
-        if (confirmButton) {
-            confirmButton.onclick = () => {
-                this.resetLibrarySong();
-                resetModal.classList.remove('active');
-            };
-        }
+        // Listen for confirm event
+        resetModal.addEventListener('confirm', () => {
+            this.resetLibrarySong();
+        });
     }
 
     async resetLibrarySong() {
@@ -1853,6 +1834,8 @@ class PageApp {
         // Clear previous content
         modalBody.textContent = '';
 
+        modal.show();
+
         // Load full song data from database to get appearances
         const fullSong = await this.db.getSong(song.songId);
         if (!fullSong) {
@@ -2073,17 +2056,6 @@ class PageApp {
             trailer.textContent = songData.metadata.ccliTrailer;
             modalBody.appendChild(trailer);
         }
-
-        modal.classList.add('active');
-
-        // Close modal handlers
-        const closeBtn = document.getElementById('modal-close');
-        closeBtn.onclick = () => modal.classList.remove('active');
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        };
     }
 
     showSetlistInfo() {
@@ -2095,8 +2067,11 @@ class PageApp {
 
         if (!this.currentSetlist) {
             modalBody.textContent = 'No setlist information available.';
+            modal.show();
             return;
         }
+
+        modal.show();
 
         // Create title
         const title = document.createElement('h2');
@@ -2905,37 +2880,18 @@ class PageApp {
     setupResetButton() {
         const resetButton = document.getElementById('reset-button');
         const resetModal = document.getElementById('reset-confirm-modal');
-        const cancelButton = document.getElementById('reset-cancel');
-        const confirmButton = document.getElementById('reset-confirm');
 
         if (!resetButton || !resetModal) return;
 
         // Show confirmation modal when reset button is clicked
         resetButton.addEventListener('click', () => {
-            resetModal.classList.add('active');
+            resetModal.show();
         });
 
-        // Cancel - close modal
-        if (cancelButton) {
-            cancelButton.addEventListener('click', () => {
-                resetModal.classList.remove('active');
-            });
-        }
-
-        // Close modal when clicking outside
-        resetModal.addEventListener('click', (e) => {
-            if (e.target === resetModal) {
-                resetModal.classList.remove('active');
-            }
+        // Listen for confirm event
+        resetModal.addEventListener('confirm', () => {
+            this.resetCurrentSong();
         });
-
-        // Confirm - reset everything
-        if (confirmButton) {
-            confirmButton.addEventListener('click', () => {
-                this.resetCurrentSong();
-                resetModal.classList.remove('active');
-            });
-        }
     }
 
     resetCurrentSong() {
@@ -3671,153 +3627,6 @@ class PageApp {
         });
     }
 
-    setupTouchSupport(route) {
-        if (route.type === 'home') return;
-
-        // Prevent duplicate setup
-        if (this._touchSupportSetup) {
-            console.log('[SetlistApp] Touch support already set up, skipping');
-            return;
-        }
-        this._touchSupportSetup = true;
-
-        console.log('[SetlistApp] Setting up touch support for route:', route.type);
-
-        // Find the container element (different for setlist vs library)
-        let mainContent;
-        if (route.type === 'songs' || route.type === 'librarySong') {
-            // Library page - use the library song view container
-            mainContent = document.getElementById('library-song-view');
-        } else {
-            // Setlist page
-            mainContent = document.getElementById('main-content');
-        }
-
-        if (!mainContent) {
-            console.warn('[SetlistApp] Container element not found, skipping touch setup');
-            return;
-        }
-
-        // Prevent browser from handling touch gestures (like swipe-to-go-back) on the song content
-        mainContent.addEventListener('touchstart', (e) => {
-            // Check if we're in a state where we want to handle swipes
-            const container = document.querySelector('.songs-content-container');
-            const isViewingLibrarySong = container && container.classList.contains('viewing-song');
-            const isViewingSetlistSong = this.currentSongIndex >= 0;
-
-            if ((isViewingLibrarySong || isViewingSetlistSong) && e.touches.length === 1) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-
-        // Also prevent touchmove to stop browser scroll-to-refresh and other gestures
-        mainContent.addEventListener('touchmove', (e) => {
-            const container = document.querySelector('.songs-content-container');
-            const isViewingLibrarySong = container && container.classList.contains('viewing-song');
-            const isViewingSetlistSong = this.currentSongIndex >= 0;
-
-            if (isViewingLibrarySong || isViewingSetlistSong) {
-                // Allow vertical scrolling within the song content
-                // but prevent horizontal gestures from triggering browser actions
-                const touch = e.touches[0];
-                if (!touch) return;
-
-                // Calculate if this is a horizontal swipe attempt
-                if (this._touchStartX !== undefined) {
-                    const deltaX = Math.abs(touch.clientX - this._touchStartX);
-                    const deltaY = Math.abs(touch.clientY - this._touchStartY);
-
-                    // If more horizontal than vertical, prevent it
-                    if (deltaX > deltaY) {
-                        e.preventDefault();
-                    }
-                }
-            }
-        }, { passive: false });
-
-        let pointerStartX = 0;
-        let pointerStartY = 0;
-        let pointerId = null;
-
-        mainContent.addEventListener('pointerdown', (e) => {
-            console.log('[Touch] pointerdown:', e.pointerType, e.isPrimary);
-            // Only handle primary pointer (touch or pen, not mouse)
-            if (!e.isPrimary || e.pointerType === 'mouse') return;
-
-            pointerStartX = e.clientX;
-            pointerStartY = e.clientY;
-            pointerId = e.pointerId;
-
-            // Store for touchmove check
-            this._touchStartX = e.clientX;
-            this._touchStartY = e.clientY;
-
-            // Capture the pointer to prevent browser default gestures
-            e.target.setPointerCapture(e.pointerId);
-        });
-
-        // Shared handler for both pointerup and pointercancel
-        // (pointercancel fires when browser takes over for scrolling)
-        const handlePointerEnd = (e) => {
-            console.log('[Touch] pointer end:', e.type, 'pointerId:', e.pointerId, 'tracking:', pointerId);
-
-            // Only handle the pointer we're tracking
-            if (e.pointerId !== pointerId) {
-                return;
-            }
-
-            const pointerEndX = e.clientX;
-            const pointerEndY = e.clientY;
-
-            const deltaX = pointerEndX - pointerStartX;
-            const deltaY = pointerEndY - pointerStartY;
-
-            console.log('[Touch] Swipe deltas - X:', deltaX, 'Y:', deltaY, 'threshold:', CONFIG.SWIPE_THRESHOLD);
-
-            // Horizontal swipe (song navigation or library back gesture)
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > CONFIG.SWIPE_THRESHOLD) {
-                console.log('[Touch] Horizontal swipe detected, deltaX:', deltaX);
-
-                // Check if we're in library view
-                const container = document.querySelector('.songs-content-container');
-                const isViewingLibrarySong = container && container.classList.contains('viewing-song');
-
-                if (isViewingLibrarySong) {
-                    // Library view - only handle swipe right to go back
-                    if (deltaX > 0) {
-                        console.log('[Touch] Library: Swipe right to go back');
-                        this.closeLibrarySongView();
-                    }
-                    // Ignore left swipe in library
-                } else if (this.currentSongIndex !== undefined) {
-                    // Setlist view - normal song navigation
-                    if (deltaX > 0) {
-                        // Swipe right - go to previous
-                        if (this.currentSongIndex > 0) {
-                            this.navigateToHash(`song-${this.currentSongIndex - 1}`);
-                        } else if (this.currentSongIndex === 0) {
-                            this.navigateToHash('overview');
-                        }
-                    } else if (deltaX < 0) {
-                        // Swipe left - go to next
-                        if (this.currentSongIndex < 0 && this.songs.length > 0) {
-                            this.navigateToHash('song-0');
-                        } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
-                            this.navigateToHash(`song-${this.currentSongIndex + 1}`);
-                        }
-                    }
-                }
-            }
-
-            // Reset pointer tracking
-            pointerId = null;
-            this._touchStartX = undefined;
-            this._touchStartY = undefined;
-        };
-
-        mainContent.addEventListener('pointerup', handlePointerEnd);
-        mainContent.addEventListener('pointercancel', handlePointerEnd);
-    }
 
     setupNavigationMenu(route) {
         const navMenu = document.getElementById('nav-menu');
@@ -3869,9 +3678,8 @@ class PageApp {
         const modal = document.getElementById('add-song-modal');
         const searchInput = document.getElementById('add-song-search-input');
         const resultsContainer = document.getElementById('add-song-results');
-        const closeBtn = document.getElementById('add-song-modal-close');
 
-        console.log('[Add Song Modal] Elements:', { modal, searchInput, resultsContainer, closeBtn });
+        console.log('[Add Song Modal] Elements:', { modal, searchInput, resultsContainer });
 
         // Load all songs for searching
         try {
@@ -3904,13 +3712,13 @@ class PageApp {
             searchInput.value = '';
             this.renderAddSongResults(songs, resultsContainer);
 
+            modal.show();
+
         } catch (error) {
             console.error('[Add Song Modal] Error loading songs:', error);
             resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error loading songs. Please try again.</p>';
+            modal.show();
         }
-
-        // Show modal
-        modal.classList.add('active');
 
         // Focus search input
         setTimeout(() => searchInput.focus(), 100);
@@ -3922,17 +3730,13 @@ class PageApp {
 
         searchInput.addEventListener('input', handleSearch);
 
-        // Setup close handlers
-        const closeModal = () => {
-            modal.classList.remove('active');
+        // Setup close handler to clean up
+        const handleClose = () => {
             searchInput.removeEventListener('input', handleSearch);
             this.addSongModalSongs = null;
         };
 
-        closeBtn.onclick = closeModal;
-        modal.onclick = (e) => {
-            if (e.target === modal) closeModal();
-        };
+        modal.addEventListener('close', handleClose, { once: true });
     }
 
     filterAddSongResults(searchTerm, resultsContainer) {
@@ -4024,7 +3828,7 @@ class PageApp {
 
             // Close modal
             const modal = document.getElementById('add-song-modal');
-            modal.classList.remove('active');
+            modal.close();
 
             // Reload the setlist to show the new song
             await this.renderSetlist(setlist.id);
@@ -4037,31 +3841,21 @@ class PageApp {
     showDeleteSongConfirmation(index, song) {
         const modal = document.getElementById('delete-song-modal');
         const songTitleEl = document.getElementById('delete-song-title');
-        const confirmBtn = document.getElementById('delete-song-confirm');
-        const cancelBtn = document.getElementById('delete-song-cancel');
 
         songTitleEl.textContent = song.title;
 
-        modal.classList.add('active');
+        modal.show();
 
         const handleConfirm = async () => {
-            modal.classList.remove('active');
             await this.deleteSongFromSetlist(index);
             cleanup();
         };
 
-        const handleCancel = () => {
-            modal.classList.remove('active');
-            cleanup();
-        };
-
         const cleanup = () => {
-            confirmBtn.removeEventListener('click', handleConfirm);
-            cancelBtn.removeEventListener('click', handleCancel);
+            modal.removeEventListener('confirm', handleConfirm);
         };
 
-        confirmBtn.addEventListener('click', handleConfirm);
-        cancelBtn.addEventListener('click', handleCancel);
+        modal.addEventListener('confirm', handleConfirm, { once: true });
     }
 
     async deleteSongFromSetlist(index) {

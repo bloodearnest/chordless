@@ -18,7 +18,6 @@ export async function initCreateSetlistModal() {
 
     const modal = document.getElementById('create-setlist-modal');
     const createButton = document.getElementById('create-setlist-button');
-    const closeButton = document.getElementById('create-modal-close');
     const cancelButton = document.getElementById('create-cancel');
     const form = document.getElementById('create-setlist-form');
     const dateInput = document.getElementById('setlist-date');
@@ -44,22 +43,12 @@ export async function initCreateSetlistModal() {
         nameInput.value = '';
         document.getElementById('setlist-leader').value = '';
 
-        modal.classList.add('active');
+        modal.show();
     });
 
-    // Close modal handlers
-    const closeModal = () => {
-        modal.classList.remove('active');
-    };
-
-    closeButton.addEventListener('click', closeModal);
-    cancelButton.addEventListener('click', closeModal);
-
-    // Close on overlay click
-    modal.addEventListener('click', (e) => {
-        if (e.target === modal) {
-            closeModal();
-        }
+    // Close modal handler
+    cancelButton.addEventListener('click', () => {
+        modal.close();
     });
 
     // Auto-detect type when date or name changes
@@ -98,7 +87,7 @@ export async function initCreateSetlistModal() {
             console.log('Setlist created:', newSetlist);
 
             // Close modal
-            closeModal();
+            modal.close();
 
             // Redirect to the new setlist
             window.location.href = `/setlist/${newSetlist.id}`;

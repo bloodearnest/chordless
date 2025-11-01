@@ -71,20 +71,14 @@
                     </div>
                 </div>
                 <script>
-                    // Immediate hash check to prevent scroll on load
+                    // Immediate scroll to song view if hash is present
                     (function() {
                         if (window.location.hash) {
                             const container = document.getElementById('songs-content-container');
-                            if (container) {
-                                // Disable transitions, apply transform, then re-enable
-                                container.style.transition = 'none';
-                                container.classList.add('viewing-song');
-                                // Force reflow
-                                container.offsetHeight;
-                                // Re-enable transitions after a tiny delay
-                                setTimeout(() => {
-                                    container.style.transition = '';
-                                }, 50);
+                            const libraryView = container?.querySelector('.library-song-view');
+                            if (libraryView) {
+                                // Scroll immediately without animation on initial load
+                                libraryView.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'start' });
                             }
                         }
                     })();
@@ -93,24 +87,19 @@
         </div>
 
         <!-- Song info modal -->
-        <div class="modal-overlay" id="library-song-info-modal">
-            <div class="modal-content">
-                <button class="modal-close" id="library-modal-close">&times;</button>
-                <div id="library-modal-body"></div>
-            </div>
-        </div>
+        <app-modal id="library-song-info-modal" size="fullscreen">
+            <div id="library-modal-body"></div>
+        </app-modal>
 
         <!-- Reset confirmation modal -->
-        <div class="modal-overlay" id="library-reset-confirm-modal">
-            <div class="modal-content">
-                <h2>Reset Song?</h2>
-                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
-                <div class="modal-actions">
-                    <button class="modal-btn modal-btn-cancel" id="library-reset-cancel">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" id="library-reset-confirm">Reset</button>
-                </div>
-            </div>
-        </div>
+        <app-modal
+            id="library-reset-confirm-modal"
+            type="confirm"
+            title="Reset Song?"
+            message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+            confirm-label="Reset"
+            cancel-label="Cancel">
+        </app-modal>
     </div>
 
 
@@ -161,6 +150,7 @@
     <!-- Import the components -->
     <script type="module" src="/components/song-card.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
+    <script type="module" src="/components/app-modal.js"></script>
     <script type="module">
         // Initialize nav menu button - wait for custom element to be defined
         customElements.whenDefined('nav-menu').then(() => {

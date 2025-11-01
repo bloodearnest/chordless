@@ -49,56 +49,45 @@
         </div>
 
         <!-- Song info modal -->
-        <div class="modal-overlay" id="song-info-modal">
-            <div class="modal-content">
-                <button class="modal-close" id="modal-close">&times;</button>
-                <div id="modal-body"></div>
-            </div>
-        </div>
+        <app-modal id="song-info-modal" size="fullscreen">
+            <div id="modal-body"></div>
+        </app-modal>
 
         <!-- Reset confirmation modal -->
-        <div class="modal-overlay" id="reset-confirm-modal">
-            <div class="modal-content">
-                <h2>Reset Song?</h2>
-                <p>This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone.</p>
-                <div class="modal-actions">
-                    <button class="modal-btn modal-btn-cancel" id="reset-cancel">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" id="reset-confirm">Reset</button>
-                </div>
-            </div>
-        </div>
+        <app-modal
+            id="reset-confirm-modal"
+            type="confirm"
+            title="Reset Song?"
+            message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+            confirm-label="Reset"
+            cancel-label="Cancel">
+        </app-modal>
 
         <!-- Add Song modal -->
-        <div class="modal-overlay add-song-modal-overlay" id="add-song-modal">
-            <div class="modal-content add-song-modal-content">
-                <button class="modal-close" id="add-song-modal-close">&times;</button>
-                <h2>Add Song to Setlist</h2>
-                <div class="song-library-header">
-                    <input
-                        type="text"
-                        id="add-song-search-input"
-                        class="song-search-input"
-                        placeholder="Search songs by title, artist, or lyrics..."
-                        autocomplete="off"
-                    >
-                </div>
-                <div id="add-song-results" class="song-library-list">
-                    <p style="text-align: center; color: #95a5a6;">Start typing to search songs...</p>
-                </div>
+        <app-modal id="add-song-modal" size="fullscreen">
+            <div slot="header" class="song-library-header">
+                <input
+                    type="text"
+                    id="add-song-search-input"
+                    class="song-search-input"
+                    placeholder="Search songs by title, artist, or lyrics..."
+                    autocomplete="off"
+                >
             </div>
-        </div>
+            <div id="add-song-results" class="song-library-list">
+                <p style="text-align: center; color: #95a5a6;">Start typing to search songs...</p>
+            </div>
+        </app-modal>
 
         <!-- Delete Song confirmation modal -->
-        <div class="modal-overlay" id="delete-song-modal">
-            <div class="modal-content">
-                <h2>Remove Song from Setlist?</h2>
-                <p>Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this setlist?</p>
-                <div class="modal-actions">
-                    <button class="modal-btn modal-btn-cancel" id="delete-song-cancel">Cancel</button>
-                    <button class="modal-btn modal-btn-confirm" id="delete-song-confirm">Remove</button>
-                </div>
-            </div>
-        </div>
+        <app-modal
+            id="delete-song-modal"
+            type="confirm"
+            title="Remove Song from Setlist?"
+            confirm-label="Remove"
+            cancel-label="Cancel">
+            <p>Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this setlist?</p>
+        </app-modal>
     </div>
 
     <!-- Template for key option item -->
@@ -140,6 +129,7 @@
     <script type="module" src="/components/song-card.js"></script>
     <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
+    <script type="module" src="/components/app-modal.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
 </body>
 </html>
