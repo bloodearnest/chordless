@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v56';
+const CACHE_NAME = 'setalight-v64';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -17,7 +17,8 @@ const ASSETS = [
     '/js/db.js',
     '/js/import.js',
     '/js/transpose.js',
-    '/components/media-player.js'
+    '/components/media-player.js',
+    '/components/media-player-settings.js'
 ];
 
 // External CDN resources to cache for offline support
