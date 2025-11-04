@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v37';
+const CACHE_NAME = 'setalight-v43';
 const ASSETS = [
     '/',
     '/css/style.css',

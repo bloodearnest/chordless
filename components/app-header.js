@@ -32,7 +32,8 @@ export class AppHeader extends LitElement {
         showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
         showInfoButton: { type: Boolean, attribute: 'show-info-button' },
         editMode: { type: Boolean, reflect: true },
-        disableAnimation: { type: Boolean, attribute: 'disable-animation' }
+        disableAnimation: { type: Boolean, attribute: 'disable-animation' },
+        expanded: { type: Boolean, reflect: true }
     };
 
     static styles = css`
@@ -43,20 +44,42 @@ export class AppHeader extends LitElement {
         header {
             background-color: var(--header-bg, #3498db);
             color: var(--header-text, white);
-            padding: 0.5rem 1.5rem;
+            padding: 0.5rem 0.5rem;
             display: flex;
+            flex-wrap: wrap;
             justify-content: space-between;
             align-items: center;
             flex-shrink: 0;
-            gap: 1.5rem;
+            gap: 0.5rem;
+            width: 100%;
+            max-width: 100%;
+            box-sizing: border-box;
+            min-width: 0;
+            overflow: hidden;
+            transition: height 0.3s ease-in-out;
         }
 
-        .header-left {
+        /* Larger padding and gap on tablet/desktop */
+        @media (min-width: 48rem) {
+            header {
+                padding: 0.5rem 1.5rem;
+                gap: 1.5rem;
+                flex-wrap: nowrap;
+            }
+        }
+
+        .header-row-1 {
             display: flex;
             align-items: center;
             gap: 0.75rem;
             flex: 1;
             min-width: 0;
+        }
+
+        .header-row-2 {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
         }
 
         .nav-menu-button {
@@ -85,7 +108,7 @@ export class AppHeader extends LitElement {
         }
 
         .title {
-            font-size: 1.4rem;
+            font-size: calc(1.4rem * var(--font-scale, 1));
             font-weight: 600;
             white-space: nowrap;
             overflow: hidden;
@@ -115,6 +138,23 @@ export class AppHeader extends LitElement {
             align-items: center;
             gap: 0.5rem;
             transition: opacity 0.3s ease-in-out;
+            flex-wrap: wrap;
+        }
+
+        /* Force visibility of slotted controls when expanded on mobile */
+        @media (max-width: 47.99rem) {
+            :host([expanded]) ::slotted(.header-controls-slot) {
+                display: flex !important;
+                visibility: visible !important;
+                gap: 0.2rem !important;
+                flex-wrap: nowrap !important;
+            }
+
+            :host([expanded]) ::slotted(.header-controls-slot > *) {
+                display: flex !important;
+                visibility: visible !important;
+                flex-shrink: 0 !important;
+            }
         }
 
         .header-right {
@@ -123,18 +163,77 @@ export class AppHeader extends LitElement {
             gap: 0.75rem;
         }
 
+        /* Mobile: two-row layout when expanded */
+        @media (max-width: 47.99rem) {
+            /* Row 1: always visible */
+            .header-row-1 {
+                width: 100%;
+            }
+
+            .header-row-1 .title {
+                flex: 1;
+            }
+
+            /* Row 2: hidden by default */
+            .header-row-2 {
+                display: none;
+            }
+
+            /* Always show expand toggle on mobile */
+            .expand-toggle {
+                display: flex;
+            }
+
+            /* When expanded: show row 2 */
+            :host([expanded]) .header-row-2 {
+                display: flex;
+                width: 100%;
+                justify-content: flex-end;
+                gap: 0.2rem;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            /* Make buttons smaller on mobile */
+            :host([expanded]) .icon-button {
+                width: 1.8rem;
+                height: 1.8rem;
+                font-size: 0.9rem;
+                flex-shrink: 0;
+                border-width: 1px;
+            }
+        }
+
+        /* Tablet/desktop: single row, hide expand button */
+        @media (min-width: 48rem) {
+            .header-row-1 {
+                flex: 0 0 auto;
+            }
+
+            .header-row-1 .expand-toggle {
+                display: none !important;
+            }
+
+            .header-row-2 {
+                display: flex;
+                justify-content: flex-end;
+                flex: 1;
+            }
+        }
+
         .icon-button {
             background: none;
             border: 2px solid var(--header-text, white);
             color: var(--header-text, white);
-            width: 2.5rem;
-            height: 2.5rem;
+            width: calc(2.5rem * var(--font-scale, 1));
+            height: calc(2.5rem * var(--font-scale, 1));
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            font-size: 1.3rem;
+            font-size: calc(1.3rem * var(--font-scale, 1));
             font-weight: bold;
             transition: all 0.2s;
         }
@@ -165,6 +264,7 @@ export class AppHeader extends LitElement {
         this.showInfoButton = false;
         this.editMode = false;
         this.disableAnimation = false;
+        this.expanded = false;
         this._previousTitle = '';
         this._animating = false;
         this._displayTitle = ''; // The title actually shown in the UI
@@ -260,7 +360,8 @@ export class AppHeader extends LitElement {
     render() {
         return html`
             <header part="header">
-                <div class="header-left">
+                <!-- Row 1: Always visible on mobile -->
+                <div class="header-row-1">
                     <button
                         class="nav-menu-button"
                         part="nav-button"
@@ -274,13 +375,19 @@ export class AppHeader extends LitElement {
                         </svg>
                     </button>
                     <div class="title" part="title">${this._displayTitle}</div>
+                    <button
+                        class="icon-button expand-toggle ${this.expanded ? 'active' : ''}"
+                        @click=${this._handleExpandToggle}
+                        aria-label="Toggle header controls"
+                    >
+                        ${this.expanded ? '▲' : '▼'}
+                    </button>
                 </div>
 
-                <div class="header-center">
+                <!-- Row 2: Controls (hidden on mobile unless expanded) -->
+                <div class="header-row-2">
                     <slot name="controls"></slot>
-                </div>
 
-                <div class="header-right">
                     ${this.showEditToggle ? html`
                         <button
                             class="icon-button edit-toggle ${this.editMode ? 'active' : ''}"
@@ -326,6 +433,22 @@ export class AppHeader extends LitElement {
             bubbles: true,
             composed: true
         }));
+    }
+
+    _handleExpandToggle(e) {
+        this.expanded = !this.expanded;
+        console.log('[AppHeader] Expanded state:', this.expanded);
+        // Toggle a class on body so main CSS can respond
+        if (this.expanded) {
+            document.body.classList.add('header-expanded');
+            document.documentElement.style.setProperty('--header-expanded', '1');
+            console.log('[AppHeader] Added header-expanded class to body');
+        } else {
+            document.body.classList.remove('header-expanded');
+            document.documentElement.style.setProperty('--header-expanded', '0');
+            console.log('[AppHeader] Removed header-expanded class from body');
+        }
+        console.log('[AppHeader] Body classes:', document.body.className);
     }
 }
 

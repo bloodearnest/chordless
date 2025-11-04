@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="description" content="Song library for worship songs">
     <meta name="view-transition" content="same-origin">
     <title>Song Library - Setalight</title>
@@ -43,6 +43,7 @@
                     <div class="song-meta-compact" id="library-song-meta-header" style="display: none;"></div>
                 </div>
                 <div class="header-right">
+                    <button class="expand-toggle" id="header-expand-toggle" aria-label="Toggle header controls">▼</button>
                     <button class="edit-mode-toggle" id="library-edit-toggle" aria-label="Toggle edit mode" style="display: none;">✎</button>
                     <button class="info-button" id="library-info-button" aria-label="Song info" style="display: none;">i</button>
                 </div>
@@ -166,6 +167,16 @@
                 });
             }
         });
+
+        // Initialize header expand toggle
+        const expandToggle = document.getElementById('header-expand-toggle');
+        if (expandToggle) {
+            expandToggle.addEventListener('click', () => {
+                const isExpanded = document.body.classList.toggle('header-expanded');
+                expandToggle.textContent = isExpanded ? '▲' : '▼';
+                console.log('[Header] Expanded:', isExpanded);
+            });
+        }
     </script>
     <script type="module" src="/js/setlist-app.js"></script>
 </body>

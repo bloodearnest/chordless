@@ -1368,7 +1368,6 @@ class PageApp {
         try {
             // Load setlist from IndexedDB
             const setlist = await this.db.getSetlist(setlistId);
-            console.log('[DEBUG] Loaded setlist from DB:', setlist);
 
             if (!setlist) {
                 console.error('[ERROR] Setlist not found in IndexedDB:', setlistId);
@@ -1410,17 +1409,12 @@ class PageApp {
             // Parse each song on-demand
             const songs = [];
             for (const songEntry of setlist.songs) {
-                console.log('[DEBUG] Processing song entry:', songEntry);
-
                 // Get source text (local edits or from Songs collection)
                 let sourceText;
                 if (songEntry.chordproEdits) {
-                    console.log('[DEBUG] Using local edits for song');
                     sourceText = songEntry.chordproEdits;
                 } else {
-                    console.log('[DEBUG] Loading canonical song:', songEntry.songId);
                     const canonicalSong = await this.db.getSong(songEntry.songId);
-                    console.log('[DEBUG] Canonical song loaded:', canonicalSong);
 
                     if (!canonicalSong) {
                         console.error('[ERROR] Song not found in DB:', songEntry.songId);

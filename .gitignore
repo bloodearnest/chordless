@@ -1,5 +1,7 @@
 ./sets/*
 .claude
+.opencode
+.playwright-mcp
 
 # Node modules (dev dependencies only)
 node_modules/
