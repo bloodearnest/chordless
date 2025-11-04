@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v43';
+const CACHE_NAME = 'setalight-v52';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -16,7 +16,8 @@ const ASSETS = [
     '/js/setlist-app.js',
     '/js/db.js',
     '/js/import.js',
-    '/js/transpose.js'
+    '/js/transpose.js',
+    '/components/media-player.js'
 ];
 
 // External CDN resources to cache for offline support
@@ -129,8 +130,15 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // API requests - pass through to Python backend (for now)
+    // API requests - pass through to network
     if (url.pathname.startsWith('/api/')) {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+
+    // Directory listings in /sets/ - pass through to get real directory listing
+    if (url.pathname.startsWith('/sets/') && url.pathname.endsWith('/')) {
+        console.log('[SW] Passing through directory listing request:', url.pathname);
         event.respondWith(fetch(event.request));
         return;
     }
@@ -182,6 +190,35 @@ self.addEventListener('fetch', (event) => {
     if (event.request.mode === 'navigate' || acceptHeader.includes('text/html')) {
         console.log('[SW] Handling navigation to:', url.pathname);
         event.respondWith(handleRoute(url));
+        return;
+    }
+
+    // Pad audio files - cache on demand for offline use
+    if (url.pathname.startsWith('/pads/') && url.pathname.endsWith('.mp3')) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => {
+                if (cached) {
+                    console.log('[SW] Serving cached pad:', url.pathname);
+                    return cached;
+                }
+
+                // Not cached, fetch and cache it
+                console.log('[SW] Fetching and caching pad:', url.pathname);
+                return fetch(event.request).then((response) => {
+                    if (response.ok) {
+                        const responseToCache = response.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                            console.log('[SW] Cached pad for offline use:', url.pathname);
+                        });
+                    }
+                    return response;
+                }).catch((error) => {
+                    console.error('[SW] Failed to fetch pad:', url.pathname, error);
+                    throw error;
+                });
+            })
+        );
         return;
     }
 

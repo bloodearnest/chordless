@@ -1282,7 +1282,7 @@ class PageApp {
         // progressBar and message are already defined above, no need to query DOM
 
         try {
-            const result = await importer.importFromServer(CONFIG.DEFAULT_IMPORT_CUTOFF, (progress) => {
+            const result = await importer.importFromServer((progress) => {
                 message.textContent = progress.message;
 
                 if (progress.current && progress.total) {

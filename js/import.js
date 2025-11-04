@@ -15,12 +15,48 @@ export class SetlistImporter {
     }
 
     /**
+     * Parse directory listing HTML from http.server
+     * @param {string} html - HTML directory listing
+     * @returns {Array<string>} - Array of file/directory names
+     */
+    _parseDirectoryListing(html) {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const links = doc.querySelectorAll('a');
+        const items = [];
+
+        for (const link of links) {
+            const href = link.getAttribute('href');
+            // Skip parent directory link and absolute URLs
+            if (href && href !== '../' && !href.startsWith('http') && !href.startsWith('/')) {
+                items.push(href.replace(/\/$/, '')); // Remove trailing slash
+            }
+        }
+
+        return items;
+    }
+
+    /**
+     * Fetch directory listing from server
+     * @param {string} path - Path relative to server root (e.g., "sets/")
+     * @returns {Array<string>} - Array of directory/file names
+     */
+    async _fetchDirectoryListing(path) {
+        // Use reload cache mode to bypass service worker and get real directory listing
+        const response = await fetch(`/${path}`, { cache: 'reload' });
+        if (!response.ok) {
+            throw new Error(`Failed to fetch directory listing: ${response.status}`);
+        }
+        const html = await response.text();
+        return this._parseDirectoryListing(html);
+    }
+
+    /**
      * Import all setlists from server into IndexedDB
-     * @param {string} cutoffDate - ISO date string (e.g. "2025-01-01")
      * @param {Function} progressCallback - Optional callback for progress updates
      */
-    async importFromServer(cutoffDate = '2025-01-01', progressCallback = null) {
-        console.log('[Import] Starting import from server with cutoff date:', cutoffDate);
+    async importFromServer(progressCallback = null) {
+        console.log('[Import] Starting import from server');
 
         // Clear existing data
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
@@ -31,19 +67,54 @@ export class SetlistImporter {
         if (progressCallback) progressCallback({ stage: 'fetching', message: 'Fetching setlists from server...' });
 
         try {
-            // Fetch all setlists from the API
-            const response = await fetch(`/api/import?cutoff=${encodeURIComponent(cutoffDate)}`);
-            if (!response.ok) {
-                throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+            // Fetch directory listing from /sets/
+            const setlistDirs = await this._fetchDirectoryListing('sets');
+            console.log(`[Import] Found ${setlistDirs.length} setlist directories:`, setlistDirs);
+
+            const setlists = [];
+
+            for (const dirName of setlistDirs) {
+                console.log(`[Import] Checking directory: ${dirName}`);
+
+                // Directory names should be in YYYY-MM-DD format
+                const dateMatch = dirName.match(/^\d{4}-\d{2}-\d{2}$/);
+                if (!dateMatch) {
+                    console.log(`[Import] Skipping ${dirName} - doesn't match date format`);
+                    continue;
+                }
+
+                // Fetch files in this setlist directory
+                const files = await this._fetchDirectoryListing(`sets/${dirName}`);
+                console.log(`[Import] Files in ${dirName}:`, files);
+
+                const chordproFiles = files.filter(f =>
+                    f.endsWith('.cho') ||
+                    f.endsWith('.chordpro') ||
+                    f.endsWith('.txt') ||
+                    f.includes('chordpro')
+                );
+                console.log(`[Import] ChordPro files in ${dirName}:`, chordproFiles);
+
+                setlists.push({
+                    id: dirName,
+                    date: dirName,
+                    path: `sets/${dirName}/`,
+                    songs: chordproFiles.map(f => ({
+                        filename: f,
+                        path: `sets/${dirName}/${f}`
+                    }))
+                });
             }
 
-            const setlists = await response.json();
-            console.log(`[Import] Received ${setlists.length} setlists from server`);
+            // Sort by date, most recent first
+            setlists.sort((a, b) => b.date.localeCompare(a.date));
+            console.log(`[Import] Processing ${setlists.length} setlists (after cutoff filter):`, setlists.map(s => ({ id: s.id, songCount: s.songs.length })));
 
             // Import each setlist
             const importedSetlists = [];
             for (let i = 0; i < setlists.length; i++) {
                 const setlistData = setlists[i];
+                console.log(`[Import] ========== Importing setlist ${i + 1}/${setlists.length}: ${setlistData.id} with ${setlistData.songs.length} songs ==========`);
                 if (progressCallback) {
                     progressCallback({
                         stage: 'importing',
@@ -56,9 +127,9 @@ export class SetlistImporter {
                 try {
                     const setlist = await this.importSetlistFromServer(setlistData);
                     importedSetlists.push(setlist);
-                    console.log(`[Import] Imported setlist: ${setlistData.id}`);
+                    console.log(`[Import] ✅ Successfully imported setlist: ${setlistData.id} with ${setlist.songs.length} songs`);
                 } catch (err) {
-                    console.error(`[Import] Failed to import ${setlistData.id}:`, err);
+                    console.error(`[Import] ❌ Failed to import ${setlistData.id}:`, err);
                 }
             }
 
@@ -110,7 +181,12 @@ export class SetlistImporter {
             console.log(`[Import] Processing song: ${songData.filename}`);
 
             try {
-                const chordproText = songData.content;
+                // Fetch the ChordPro file content
+                const response = await fetch(`/${songData.path}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch ${songData.path}: ${response.status}`);
+                }
+                const chordproText = await response.text();
                 console.log(`[Import] Read ${chordproText.length} chars from ${songData.filename}`);
 
                 // Parse the chordpro
