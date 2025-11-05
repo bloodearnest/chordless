@@ -73,6 +73,14 @@
                     </div>
 
                     <div class="settings-section">
+                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">Media Player</h3>
+                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
+                            Configure global media player settings. These settings apply to all setlists.
+                        </p>
+                        <media-player-settings id="media-player-settings"></media-player-settings>
+                    </div>
+
+                    <div class="settings-section">
                         <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">App Settings</h3>
                         <p style="color: #7f8c8d; font-size: 1.1rem;">
                             Additional settings coming soon...
@@ -115,6 +123,34 @@
 
                 navMenuButton.addEventListener('click', () => {
                     navMenu.togglePopover();
+                });
+            }
+        });
+
+        // Initialize media player settings - wait for custom element to be defined
+        customElements.whenDefined('media-player-settings').then(() => {
+            const settingsComponent = document.getElementById('media-player-settings');
+
+            if (settingsComponent) {
+                // Load saved settings from localStorage
+                const savedSettings = localStorage.getItem('mediaPlayerSettings');
+                if (savedSettings) {
+                    const settings = JSON.parse(savedSettings);
+                    settingsComponent.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false;
+                    settingsComponent.padsEnabled = settings.padsEnabled !== false;
+                    settingsComponent.metronomeEnabled = settings.metronomeEnabled !== false;
+                    settingsComponent.stereoSplitEnabled = settings.stereoSplitEnabled === true;
+                }
+
+                // Listen for settings changes and save to localStorage
+                settingsComponent.addEventListener('settings-change', (event) => {
+                    console.log('[Settings] Media player settings changed:', event.detail);
+                    localStorage.setItem('mediaPlayerSettings', JSON.stringify(event.detail));
+
+                    // Dispatch custom event that media player can listen to
+                    window.dispatchEvent(new CustomEvent('media-player-settings-changed', {
+                        detail: event.detail
+                    }));
                 });
             }
         });
@@ -172,8 +208,9 @@
             }
         });
     </script>
-    <!-- Import the nav-menu component -->
+    <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
+    <script type="module" src="/components/media-player-settings.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
     <script type="module" src="/js/ccli-imports.js"></script>
 </body>

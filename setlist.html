@@ -127,6 +127,32 @@
     <script>
         // Set window name so bookmarklet can find and reuse this tab
         window.name = 'setalight';
+
+        // Check media player settings and conditionally render
+        function updateMediaPlayerVisibility() {
+            const mediaPlayer = document.getElementById('media-player');
+            if (!mediaPlayer) return;
+
+            const savedSettings = localStorage.getItem('mediaPlayerSettings');
+            const settings = savedSettings ? JSON.parse(savedSettings) : { mediaPlayerEnabled: true };
+
+            // Hide/show media player based on global setting
+            if (settings.mediaPlayerEnabled === false) {
+                mediaPlayer.style.display = 'none';
+            } else {
+                mediaPlayer.style.display = '';
+            }
+        }
+
+        // Update on page load
+        customElements.whenDefined('media-player').then(() => {
+            updateMediaPlayerVisibility();
+        });
+
+        // Update when settings change (from settings page)
+        window.addEventListener('media-player-settings-changed', () => {
+            updateMediaPlayerVisibility();
+        });
     </script>
     <!-- Import the components -->
     <script type="module" src="/components/song-card.js"></script>

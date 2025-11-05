@@ -48,17 +48,17 @@ export class MediaPlayer extends LitElement {
         .container {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            padding: 1rem;
+            gap: 0.9rem;
+            padding: 1.2rem;
             background: var(--player-bg, #34495e);
-            border-radius: 8px;
+            border-radius: 10px;
             color: var(--player-text, white);
             width: fit-content;
         }
 
         .play-button {
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -67,7 +67,7 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.44rem;
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
@@ -103,8 +103,8 @@ export class MediaPlayer extends LitElement {
         }
 
         .stop-button {
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -113,7 +113,7 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.44rem;
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
@@ -139,8 +139,8 @@ export class MediaPlayer extends LitElement {
         }
 
         .toggle-button {
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -149,7 +149,7 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.7rem;
+            font-size: 0.84rem;
             font-weight: 600;
             line-height: 1;
             box-sizing: border-box;
@@ -172,8 +172,8 @@ export class MediaPlayer extends LitElement {
         }
 
         .metronome-button {
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -182,10 +182,10 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 2rem;
+            font-size: 2.4rem;
             line-height: 1;
-            padding-left: 1.5rem;
-            padding-bottom: 0.1rem;
+            padding-left: 1.8rem;
+            padding-bottom: 0.12rem;
             box-sizing: border-box;
             transition: all 0.2s;
         }
@@ -206,8 +206,8 @@ export class MediaPlayer extends LitElement {
         }
 
         .split-button {
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -216,7 +216,7 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 1.2rem;
+            font-size: 1.44rem;
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
@@ -239,8 +239,8 @@ export class MediaPlayer extends LitElement {
 
         .volume-control-item {
             position: relative;
-            width: 3rem;
-            height: 3rem;
+            width: 3.6rem;
+            height: 3.6rem;
             border-radius: 50%;
             border: 2px solid var(--player-text, white);
             background: transparent;
@@ -249,7 +249,7 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.75rem;
+            font-size: 0.9rem;
             font-weight: 600;
             user-select: none;
             touch-action: none;
@@ -274,21 +274,29 @@ export class MediaPlayer extends LitElement {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
 
         .control-group-buttons {
             display: flex;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
 
         .control-group-label {
-            font-size: 0.7rem;
+            font-size: 0.84rem;
             font-weight: 600;
             color: var(--player-text, white);
             opacity: 0.7;
             text-transform: uppercase;
             letter-spacing: 0.05em;
+        }
+
+        .control-group-info {
+            font-size: 0.96rem;
+            color: var(--player-text, white);
+            opacity: 0.7;
+            text-align: center;
+            margin-top: 0.12rem;
         }
 
         .vertical-slider {
@@ -368,8 +376,10 @@ export class MediaPlayer extends LitElement {
         this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true; // Default false
 
         // User toggle states (independent of which song is active)
-        this._padsOn = false; // Pads off by default
-        this._clickOn = false; // Click off by default
+        // If only one feature is enabled, it should always be "on" (no toggle needed)
+        const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled;
+        this._padsOn = bothEnabled ? false : this._padsEnabled; // Always on if pads are the only feature
+        this._clickOn = bothEnabled ? false : this._metronomeGlobalEnabled; // Always on if click is the only feature
 
         // Active song state (what's currently loaded in the player)
         this._activeSongKey = null;
@@ -391,6 +401,7 @@ export class MediaPlayer extends LitElement {
 
         // Metronome properties
         this._metronomeInterval = null;
+        this._beatInterval = null; // Stores the calculated beat interval in ms
         this._metronomeBeat = 0;
         this._audioContext = null;
         this._clickGain = null;
@@ -423,6 +434,17 @@ export class MediaPlayer extends LitElement {
         this._padsEnabled = settings.padsEnabled !== false;
         this._metronomeGlobalEnabled = settings.metronomeEnabled !== false;
         this.stereoSplitEnabled = settings.stereoSplitEnabled === true;
+
+        // If only one feature is enabled, ensure it's always "on"
+        const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled;
+        if (!bothEnabled) {
+            if (this._padsEnabled) {
+                this._padsOn = true;
+            }
+            if (this._metronomeGlobalEnabled) {
+                this._clickOn = true;
+            }
+        }
 
         // Stop metronome if it was disabled globally
         if (!this._metronomeGlobalEnabled && this.metronomeEnabled) {
@@ -714,22 +736,35 @@ export class MediaPlayer extends LitElement {
         const beatInterval = quarterNoteInterval * multiplier;
         console.log(`[MediaPlayer] BPM: ${bpm} (${tempoNote}) -> Quarter note BPM: ${quarterNoteBpm.toFixed(1)} -> Clicking on 1/${clickNoteValue} notes -> Click interval: ${beatInterval.toFixed(1)}ms (multiplier: ${multiplier})`);
 
-        this._metronomeInterval = setInterval(() => {
-            this._playClick();
-        }, beatInterval);
+        // Store the beat interval for the scheduling loop
+        this._beatInterval = beatInterval;
 
-        // Play first click immediately
+        // Start the metronome scheduling loop
+        // Play first click immediately, then schedule subsequent clicks
         this._playClick();
+        this._scheduleNextClick();
+    }
+
+    _scheduleNextClick() {
+        if (!this._beatInterval) return;
+
+        // Use setTimeout for the next click
+        // This ensures consistent timing even if _playClick() takes some time to execute
+        this._metronomeInterval = setTimeout(() => {
+            this._playClick();
+            this._scheduleNextClick(); // Schedule the next one
+        }, this._beatInterval);
     }
 
     _stopMetronome() {
         console.log('[MediaPlayer] Stopping metronome, active oscillators:', this._activeOscillators?.length || 0);
 
-        // Clear interval
+        // Clear timeout and beat interval
         if (this._metronomeInterval) {
-            clearInterval(this._metronomeInterval);
+            clearTimeout(this._metronomeInterval);
             this._metronomeInterval = null;
         }
+        this._beatInterval = null;
 
         // Reset beat counter
         this._metronomeBeat = 0;
@@ -852,6 +887,17 @@ export class MediaPlayer extends LitElement {
         const wasPlayingPads = this._padsOn && oldActiveKey && !this._audio?.paused;
         const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeInterval;
 
+        console.log('[MediaPlayer] _startSong state check:', {
+            _padsOn: this._padsOn,
+            _padsEnabled: this._padsEnabled,
+            _clickOn: this._clickOn,
+            _metronomeGlobalEnabled: this._metronomeGlobalEnabled,
+            wasPlayingPads,
+            wasPlayingClick,
+            oldActiveKey,
+            needsKeyChange
+        });
+
         // Set this as the active song BEFORE starting pads/click
         // This ensures the metronome has access to the tempo/time signature
         this._activeSongKey = this.currentKey;
@@ -865,14 +911,19 @@ export class MediaPlayer extends LitElement {
             await this._crossfadeToNewSong();
         } else if (this._padsOn && !wasPlayingPads) {
             // Pads toggle is on but not playing yet, start them
-            console.log('[MediaPlayer] Starting pads for first time');
+            console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn);
+            this._updateAudioSource(); // Set the audio source before playing
             await this._fadeIn();
         } else if (!this._padsOn && wasPlayingPads) {
             // Pads toggle was turned off while playing, fade out
             console.log('[MediaPlayer] Pads toggle off, fading out');
             await this._fadeOut();
-        } else {
-            // Just update the audio source (preload)
+        } else if (this._padsOn && wasPlayingPads && !needsKeyChange) {
+            // Pads already playing in the same key - do nothing
+            console.log('[MediaPlayer] Pads already playing in same key, no action needed');
+        } else if (!this._padsOn) {
+            // Pads toggle is off, just update the audio source (preload for later)
+            console.log('[MediaPlayer] Pads off, preloading audio source');
             this._updateAudioSource();
         }
 
@@ -1041,9 +1092,12 @@ export class MediaPlayer extends LitElement {
     }
 
     async _fadeIn() {
-        if (!this._audio) return;
+        if (!this._audio) {
+            console.error('[MediaPlayer] _fadeIn called but _audio is null!');
+            return;
+        }
 
-        console.log('[MediaPlayer] Fading in');
+        console.log('[MediaPlayer] Fading in, audio src:', this._audio.src);
 
         // Resume AudioContext if suspended (required for autoplay policies)
         if (this._audioContext && this._audioContext.state === 'suspended') {
@@ -1398,10 +1452,14 @@ export class MediaPlayer extends LitElement {
         const clickPlaying = this._metronomeInterval !== null;
         const isPlaying = padsPlaying || clickPlaying;
 
+        // Show toggle buttons only if BOTH features are enabled
+        const showToggles = this._padsEnabled && this._metronomeGlobalEnabled;
+
         return html`
             <div class="container" part="container">
                 <div class="control-group">
                     <div class="control-group-label">Song</div>
+                    <div class="control-group-info">${isPlaying ? 'Playing' : 'Stopped'}</div>
                     <div class="control-group-buttons">
                         <button
                             class="play-button"
@@ -1429,15 +1487,18 @@ export class MediaPlayer extends LitElement {
                 ${this._padsEnabled ? html`
                     <div class="control-group">
                         <div class="control-group-label">Pads</div>
+                        <div class="control-group-info">${this._activeSongKey || this.currentKey || '-'}</div>
                         <div class="control-group-buttons">
-                            <button
-                                class="toggle-button ${this._padsOn ? 'active' : ''}"
-                                @click=${this._togglePads}
-                                aria-label="Toggle pads"
-                                title="Toggle pads on/off"
-                            >
-                                ${this._padsOn ? 'ON' : 'OFF'}
-                            </button>
+                            ${showToggles ? html`
+                                <button
+                                    class="toggle-button ${this._padsOn ? 'active' : ''}"
+                                    @click=${this._togglePads}
+                                    aria-label="Toggle pads"
+                                    title="Toggle pads on/off"
+                                >
+                                    ${this._padsOn ? 'ON' : 'OFF'}
+                                </button>
+                            ` : ''}
                             <div
                                 class="volume-control-item ${this._activeVolumeControl === 'pad' ? 'dragging' : ''}"
                                 @mousedown=${(e) => this._startVolumeControl(e, 'pad')}
@@ -1453,16 +1514,19 @@ export class MediaPlayer extends LitElement {
                 ${this._metronomeGlobalEnabled ? html`
                     <div class="control-group">
                         <div class="control-group-label">Click</div>
+                        <div class="control-group-info">${this._activeSongBpm || '-'} BPM · ${this._activeSongTimeSignature || '-'}</div>
                         <div class="control-group-buttons">
-                            <button
-                                class="toggle-button ${this._clickOn ? 'active' : ''}"
-                                part="click-toggle-button"
-                                @click=${this._toggleClick}
-                                aria-label="Toggle click"
-                                title="Toggle click on/off"
-                            >
-                                ${this._clickOn ? 'ON' : 'OFF'}
-                            </button>
+                            ${showToggles ? html`
+                                <button
+                                    class="toggle-button ${this._clickOn ? 'active' : ''}"
+                                    part="click-toggle-button"
+                                    @click=${this._toggleClick}
+                                    aria-label="Toggle click"
+                                    title="Toggle click on/off"
+                                >
+                                    ${this._clickOn ? 'ON' : 'OFF'}
+                                </button>
+                            ` : ''}
                             <div
                                 class="volume-control-item ${this._activeVolumeControl === 'click' ? 'dragging' : ''}"
                                 @mousedown=${(e) => this._startVolumeControl(e, 'click')}
