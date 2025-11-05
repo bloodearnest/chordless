@@ -1,7 +1,7 @@
 // Import tool for migrating filesystem data to IndexedDB
 
 import { ChordProParser } from './parser.js';
-import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText, determineSetlistType } from './db.js';
+import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText, determineSetlistType, parseTempo } from './db.js';
 
 export class SetlistImporter {
     constructor() {
@@ -282,6 +282,9 @@ export class SetlistImporter {
             return songId;
         }
 
+        // Parse tempo to extract BPM and note subdivision
+        const tempoParsed = parseTempo(parsed.metadata.tempo);
+
         // Create new song entry
         const song = {
             id: songId,
@@ -292,7 +295,8 @@ export class SetlistImporter {
             chordproText: chordproText,
             metadata: {
                 key: parsed.metadata.key || null,
-                tempo: parsed.metadata.tempo || null,
+                tempo: tempoParsed.bpm,
+                tempoNote: tempoParsed.note,
                 timeSignature: parsed.metadata.time || null
             },
             lyricsText: extractLyricsText(parsed),

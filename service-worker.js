@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v64';
+const CACHE_NAME = 'setalight-v98';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -206,7 +206,8 @@ self.addEventListener('fetch', (event) => {
                 // Not cached, fetch and cache it
                 console.log('[SW] Fetching and caching pad:', url.pathname);
                 return fetch(event.request).then((response) => {
-                    if (response.ok) {
+                    // Only cache full responses (200), not partial responses (206)
+                    if (response.ok && response.status === 200) {
                         const responseToCache = response.clone();
                         caches.open(CACHE_NAME).then((cache) => {
                             cache.put(event.request, responseToCache);

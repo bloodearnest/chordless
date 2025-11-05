@@ -19,18 +19,25 @@ import { LitElement, html, css } from 'lit';
 export class MediaPlayer extends LitElement {
     static properties = {
         currentKey: { type: String, attribute: 'current-key' },
-        bpm: { type: Number },
-        timeSignature: { type: String, attribute: 'time-signature' },
-        playing: { type: Boolean, reflect: true },
-        metronomeEnabled: { type: Boolean, state: true },
         stereoSplitEnabled: { type: Boolean, state: true },
         _fadingOut: { type: Boolean, state: true },
         _fadingIn: { type: Boolean, state: true },
         _showingVolumeSlider: { type: Boolean, state: true },
         _padVolume: { type: Number, state: true },
         _clickVolume: { type: Number, state: true },
-        _padsEnabled: { type: Boolean, state: true },
-        _metronomeGlobalEnabled: { type: Boolean, state: true }
+        _padsEnabled: { type: Boolean, state: true }, // Global setting (from settings page)
+        _metronomeGlobalEnabled: { type: Boolean, state: true }, // Global setting (from settings page)
+        _padsOn: { type: Boolean, state: true }, // User toggled pads on/off
+        _clickOn: { type: Boolean, state: true }, // User toggled click on/off
+        // Current song metadata (from song-change event, updated on swipe)
+        _currentBpm: { type: Number, state: true },
+        _currentTempoNote: { type: String, state: true },
+        _currentTimeSignature: { type: String, state: true },
+        // Active song metadata (loaded in player, only updated when play is pressed)
+        _activeSongKey: { type: String, state: true }, // The song key currently loaded in media player
+        _activeSongBpm: { type: Number, state: true },
+        _activeSongTempoNote: { type: String, state: true },
+        _activeSongTimeSignature: { type: String, state: true }
     };
 
     static styles = css`
@@ -80,13 +87,28 @@ export class MediaPlayer extends LitElement {
             color: var(--player-bg, #34495e);
         }
 
-        .panic-button {
+        .play-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .play-button:disabled:hover {
+            background: transparent;
+            transform: none;
+        }
+
+        .play-button.playing:disabled:hover {
+            background: var(--player-text, white);
+            transform: none;
+        }
+
+        .stop-button {
             width: 3rem;
             height: 3rem;
             border-radius: 50%;
-            border: 2px solid #e74c3c;
+            border: 2px solid var(--player-text, white);
             background: transparent;
-            color: #e74c3c;
+            color: var(--player-text, white);
             cursor: pointer;
             display: flex;
             align-items: center;
@@ -95,17 +117,58 @@ export class MediaPlayer extends LitElement {
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
-            font-weight: bold;
         }
 
-        .panic-button:hover {
-            background: #e74c3c;
-            color: white;
+        .stop-button:hover {
+            background: rgba(255, 255, 255, 0.1);
             transform: scale(1.05);
         }
 
-        .panic-button:active {
+        .stop-button:active {
             transform: scale(0.95);
+        }
+
+        .stop-button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+
+        .stop-button:disabled:hover {
+            background: transparent;
+            transform: none;
+        }
+
+        .toggle-button {
+            width: 3rem;
+            height: 3rem;
+            border-radius: 50%;
+            border: 2px solid var(--player-text, white);
+            background: transparent;
+            color: var(--player-text, white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            font-weight: 600;
+            line-height: 1;
+            box-sizing: border-box;
+            transition: all 0.2s;
+        }
+
+        .toggle-button:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
+        .toggle-button:active {
+            transform: scale(0.95);
+        }
+
+        .toggle-button.active {
+            background: #27ae60;
+            border-color: #27ae60;
+            color: white;
         }
 
         .metronome-button {
@@ -284,9 +347,8 @@ export class MediaPlayer extends LitElement {
         super();
         this.currentKey = '';
         this.bpm = 120;
+        this.tempoNote = '1/4'; // Default to quarter notes
         this.timeSignature = '4/4';
-        this.playing = false;
-        this.metronomeEnabled = false;
         this._fadingOut = false;
         this._fadingIn = false;
         this._audio = null;
@@ -305,6 +367,16 @@ export class MediaPlayer extends LitElement {
         this._metronomeGlobalEnabled = globalSettings.metronomeEnabled !== false; // Default true
         this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true; // Default false
 
+        // User toggle states (independent of which song is active)
+        this._padsOn = false; // Pads off by default
+        this._clickOn = false; // Click off by default
+
+        // Active song state (what's currently loaded in the player)
+        this._activeSongKey = null;
+        this._activeSongBpm = null;
+        this._activeSongTempoNote = null;
+        this._activeSongTimeSignature = null;
+
         // Load persistent volume settings from localStorage
         const savedPadVolume = localStorage.getItem('setalight-pad-volume');
         const savedClickVolume = localStorage.getItem('setalight-click-volume');
@@ -322,6 +394,7 @@ export class MediaPlayer extends LitElement {
         this._metronomeBeat = 0;
         this._audioContext = null;
         this._clickGain = null;
+        this._activeOscillators = []; // Track active oscillators for cleanup
     }
 
     connectedCallback() {
@@ -329,8 +402,10 @@ export class MediaPlayer extends LitElement {
         this._initAudio();
         this._boundHandleKeydown = this._handleKeydown.bind(this);
         this._boundHandleSettingsChange = this._handleSettingsChange.bind(this);
+        this._boundHandleSongChange = this._handleSongChange.bind(this);
         document.addEventListener('keydown', this._boundHandleKeydown);
         document.addEventListener('settings-change', this._boundHandleSettingsChange);
+        document.addEventListener('song-change', this._boundHandleSongChange);
     }
 
     disconnectedCallback() {
@@ -338,6 +413,7 @@ export class MediaPlayer extends LitElement {
         this._cleanup();
         document.removeEventListener('keydown', this._boundHandleKeydown);
         document.removeEventListener('settings-change', this._boundHandleSettingsChange);
+        document.removeEventListener('song-change', this._boundHandleSongChange);
     }
 
     _handleSettingsChange(event) {
@@ -360,26 +436,27 @@ export class MediaPlayer extends LitElement {
         this.requestUpdate();
     }
 
+    _handleSongChange(event) {
+        const { key, bpm, tempoNote, timeSignature, title } = event.detail;
+        console.log('[MediaPlayer] Song changed:', { key, bpm, tempoNote, timeSignature, title });
+
+        // Update current song metadata (stored but not activated until play is pressed)
+        if (key) {
+            this.currentKey = key;
+        }
+        // Store current song's tempo/time signature metadata
+        this._currentBpm = bpm || null;
+        this._currentTempoNote = tempoNote || '1/4';
+        this._currentTimeSignature = timeSignature || null;
+    }
+
     updated(changedProperties) {
         super.updated(changedProperties);
 
-        // Handle key changes
-        if (changedProperties.has('currentKey') && this.currentKey) {
-            const oldKey = changedProperties.get('currentKey');
-            if (oldKey && oldKey !== this.currentKey && this.playing) {
-                // Key changed while playing - crossfade
-                this._crossfadeToNewKey();
-            } else if (!this.playing) {
-                // Just update the source without playing
-                this._updateAudioSource();
-            }
-        }
-
-        // Handle BPM or time signature changes while metronome is running
-        if ((changedProperties.has('bpm') || changedProperties.has('timeSignature')) && this.metronomeEnabled) {
-            console.log('[MediaPlayer] Tempo/time changed, restarting metronome');
-            this._stopMetronome();
-            this._startMetronome();
+        // Handle key changes - just update the source, don't auto-switch
+        if (changedProperties.has('currentKey') && this.currentKey && !this._padsOn) {
+            // Update the source without playing (pre-load for quick start)
+            this._updateAudioSource();
         }
 
         // Handle stereo split changes
@@ -416,7 +493,7 @@ export class MediaPlayer extends LitElement {
             // Handle audio errors
             this._audio.addEventListener('error', (e) => {
                 console.error('[MediaPlayer] Audio error:', e);
-                this.playing = false;
+                this._padsOn = false;
                 this._fadingIn = false;
                 this._fadingOut = false;
             });
@@ -449,44 +526,37 @@ export class MediaPlayer extends LitElement {
     }
 
     _handleKeydown(event) {
-        // Toggle play/pause on spacebar
+        // Start song on spacebar
         if (event.code === 'Space' && !event.target.matches('input, textarea')) {
             event.preventDefault();
-            this._togglePlay();
+            this._startSong();
         }
-        // Panic button on Escape - immediately stop all audio
+        // Stop button on Escape - fade out and stop
         if (event.code === 'Escape') {
             event.preventDefault();
-            this._panic();
+            this._stop();
         }
     }
 
-    _panic() {
-        console.log('[MediaPlayer] PANIC - stopping all audio immediately');
+    async _stop() {
+        console.log('[MediaPlayer] Stop - stopping click and fading out pads');
 
-        // Clear any fade intervals
-        if (this._fadeInterval) {
-            clearInterval(this._fadeInterval);
-            this._fadeInterval = null;
+        // Check what's actually playing
+        const padsPlaying = this._audio && !this._audio.paused;
+        const clickPlaying = this._metronomeInterval !== null;
+
+        // Stop click immediately if playing (but don't change toggle state)
+        if (clickPlaying) {
+            this._stopMetronome();
         }
 
-        // Immediately stop and mute current audio
-        if (this._audio) {
-            this._audio.pause();
-            this._audio.currentTime = 0;
-        }
-        if (this._padGain) {
-            this._padGain.gain.value = 0;
+        // Fade out pads if playing (but don't change toggle state)
+        if (padsPlaying) {
+            await this._fadeOut();
         }
 
-        // Stop metronome
-        this._stopMetronome();
-
-        // Reset all state
-        this.playing = false;
-        this.metronomeEnabled = false;
-        this._fadingIn = false;
-        this._fadingOut = false;
+        // Force UI update
+        this.requestUpdate();
     }
 
     _toggleMetronome() {
@@ -569,13 +639,80 @@ export class MediaPlayer extends LitElement {
         // Update gain to current volume setting
         this._clickGain.gain.value = this._clickVolume;
 
-        console.log(`[MediaPlayer] Starting metronome at ${this.bpm} BPM, ${this.timeSignature}`);
+        // Cannot start metronome without active song metadata
+        if (!this._activeSongBpm || !this._activeSongTimeSignature) {
+            console.warn('[MediaPlayer] Cannot start metronome: no active song with tempo/time signature');
+            return;
+        }
+
+        const timeSignature = this._activeSongTimeSignature;
+        const tempoNote = this._activeSongTempoNote || '1/4';
+        const bpm = this._activeSongBpm;
+
+        console.log(`[MediaPlayer] Starting metronome at ${bpm} BPM, ${tempoNote} notes, ${timeSignature}`);
+
+        // Parse and log time signature
+        const [beatsPerBar] = timeSignature.split('/').map(Number);
+        console.log(`[MediaPlayer] Time signature parsed: ${timeSignature} -> beatsPerBar: ${beatsPerBar}`);
 
         // Reset beat counter
         this._metronomeBeat = 0;
 
-        // Calculate interval based on BPM
-        const beatInterval = 60000 / this.bpm; // milliseconds per beat
+        // Calculate interval based on BPM and note subdivision
+        // First, convert BPM to quarter note tempo based on tempoNote and time signature
+        // The stored BPM represents beats per minute for whatever note value is in tempoNote
+        let quarterNoteBpm = bpm; // Default assumes quarter notes
+
+        // Special case: compound time signatures (6/8, 9/8, 12/8) with default tempo note
+        // In compound time, "plain BPM" (quarter note default) means the dotted quarter note (compound beat)
+        const [beatsPerMeasure, noteValue] = timeSignature.split('/').map(Number);
+        const isCompoundTime = noteValue === 8 && beatsPerMeasure % 3 === 0;
+        console.log(`[MediaPlayer] Compound time check: beatsPerMeasure=${beatsPerMeasure}, noteValue=${noteValue}, isCompoundTime=${isCompoundTime}, tempoNote=${tempoNote}`);
+
+        if (tempoNote === '1/4' && isCompoundTime) {
+            // BPM refers to dotted quarter notes (3 eighths)
+            // Convert to eighth note tempo: bpm × 3
+            // Then convert to quarter note tempo: (bpm × 3) / 2 = bpm × 1.5
+            quarterNoteBpm = bpm * 1.5;
+            console.log(`[MediaPlayer] Applied compound time conversion: ${bpm} -> ${quarterNoteBpm}`);
+        } else if (tempoNote && tempoNote !== '1/4') {
+            const [numerator, denominator] = tempoNote.split('/').map(Number);
+            if (numerator && denominator) {
+                // Convert to quarter note tempo
+                // 1/8 note tempo: multiply by 0.5 (eighth notes are twice as fast as quarters)
+                // 1/16 note tempo: multiply by 0.25
+                // 1/2 note tempo: multiply by 2
+                // Formula: quarterNoteBpm = bpm * (tempoNote / quarterNote)
+                //        = bpm * (numerator/denominator) / (1/4)
+                //        = bpm * (numerator * 4 / denominator)
+                quarterNoteBpm = bpm * (numerator * 4 / denominator);
+            }
+        }
+
+        // Now calculate quarter note interval using the converted BPM
+        const quarterNoteInterval = 60000 / quarterNoteBpm; // milliseconds per quarter note
+
+        // Calculate multiplier based on note subdivision for the actual clicks
+        // We click on the note value from the time signature (e.g., 8th notes in 6/8)
+        // 1/4 = 1.0 (quarter notes)
+        // 1/8 = 0.5 (eighth notes, twice as fast)
+        // 1/16 = 0.25 (sixteenth notes, four times as fast)
+        // 1/2 = 2.0 (half notes, half as fast)
+
+        // For compound time, we click on eighth notes regardless of tempo note
+        let clickNoteValue;
+        if (isCompoundTime) {
+            clickNoteValue = 8; // Always click on eighth notes in compound time
+        } else {
+            // Use the note value from time signature, or tempo note if specified differently
+            clickNoteValue = noteValue;
+        }
+
+        // Convert click note value to multiplier relative to quarter notes
+        const multiplier = (1 / clickNoteValue) * 4; // e.g., 1/8 * 4 = 0.5
+
+        const beatInterval = quarterNoteInterval * multiplier;
+        console.log(`[MediaPlayer] BPM: ${bpm} (${tempoNote}) -> Quarter note BPM: ${quarterNoteBpm.toFixed(1)} -> Clicking on 1/${clickNoteValue} notes -> Click interval: ${beatInterval.toFixed(1)}ms (multiplier: ${multiplier})`);
 
         this._metronomeInterval = setInterval(() => {
             this._playClick();
@@ -586,21 +723,63 @@ export class MediaPlayer extends LitElement {
     }
 
     _stopMetronome() {
+        console.log('[MediaPlayer] Stopping metronome, active oscillators:', this._activeOscillators?.length || 0);
+
+        // Clear interval
         if (this._metronomeInterval) {
             clearInterval(this._metronomeInterval);
             this._metronomeInterval = null;
         }
+
+        // Reset beat counter
         this._metronomeBeat = 0;
+
+        // Stop all active oscillators immediately
+        if (this._activeOscillators && this._activeOscillators.length > 0) {
+            this._activeOscillators.forEach(oscillator => {
+                try {
+                    oscillator.stop();
+                    oscillator.disconnect();
+                } catch (e) {
+                    // Oscillator may have already stopped
+                    console.log('[MediaPlayer] Error stopping oscillator (may be already stopped):', e.message);
+                }
+            });
+            this._activeOscillators = [];
+        }
+
+        console.log('[MediaPlayer] Metronome stopped');
     }
 
     _playClick() {
         if (!this._audioContext) return;
+        if (!this._activeSongTimeSignature) return; // No active song
 
-        // Parse time signature
-        const [beatsPerBar] = this.timeSignature.split('/').map(Number);
+        // Parse time signature to get beats per bar and note value
+        const timeSignature = this._activeSongTimeSignature;
+        const [beatsPerBar, noteValue] = timeSignature.split('/').map(Number);
 
-        // Determine if this is the first beat of the bar (accented)
-        const isAccent = this._metronomeBeat === 0;
+        // Determine accent level based on beat position and time signature
+        let clickType = 'light'; // Default: light
+
+        if (this._metronomeBeat === 0) {
+            // First beat is always heavy (downbeat)
+            clickType = 'heavy';
+        } else if (beatsPerBar === 6 && noteValue === 8 && this._metronomeBeat === 3) {
+            // Special case: 6/8 gets medium accent on beat 4 (index 3)
+            // This represents two groups of three eighth notes
+            clickType = 'medium';
+        } else if (beatsPerBar === 12 && noteValue === 8) {
+            // Special case: 12/8 - treat like 4/4 with medium accents every 3 beats
+            // Pattern: Heavy - light - light - Medium - light - light - Medium - light - light - Medium - light - light
+            if (this._metronomeBeat === 3 || this._metronomeBeat === 6 || this._metronomeBeat === 9) {
+                clickType = 'medium';
+            }
+        }
+        // General pattern for everything else:
+        // First beat: heavy
+        // All other beats: light
+        // Works for: 4/4, 3/4, 5/8, 7/8, etc.
 
         // Create oscillator for click sound
         const oscillator = this._audioContext.createOscillator();
@@ -609,9 +788,17 @@ export class MediaPlayer extends LitElement {
         oscillator.connect(envelope);
         envelope.connect(this._clickGain);
 
-        // Accented beat is higher pitch and louder
-        oscillator.frequency.value = isAccent ? 1000 : 800;
-        envelope.gain.value = isAccent ? 2.0 : 1.0;
+        // Set frequency and gain based on accent type
+        if (clickType === 'heavy') {
+            oscillator.frequency.value = 1000;
+            envelope.gain.value = 2.0;
+        } else if (clickType === 'medium') {
+            oscillator.frequency.value = 900;
+            envelope.gain.value = 1.5;
+        } else { // light
+            oscillator.frequency.value = 800;
+            envelope.gain.value = 1.0;
+        }
 
         const now = this._audioContext.currentTime;
         oscillator.start(now);
@@ -622,8 +809,198 @@ export class MediaPlayer extends LitElement {
 
         oscillator.stop(now + 0.03);
 
+        // Track this oscillator for cleanup
+        this._activeOscillators.push(oscillator);
+
+        // Remove from tracking after it stops
+        setTimeout(() => {
+            const index = this._activeOscillators.indexOf(oscillator);
+            if (index > -1) {
+                this._activeOscillators.splice(index, 1);
+            }
+        }, 50);
+
         // Increment beat counter
         this._metronomeBeat = (this._metronomeBeat + 1) % beatsPerBar;
+    }
+
+    async _startSong() {
+        if (!this.currentKey) {
+            console.warn('[MediaPlayer] No key set, cannot start song');
+            return;
+        }
+
+        // Check if this song is already the active one
+        if (this._isCurrentSongActive()) {
+            console.log('[MediaPlayer] Current song is already active, ignoring');
+            return;
+        }
+
+        console.log('[MediaPlayer] Starting song:', this.currentKey, this._currentBpm, this._currentTimeSignature);
+
+        // Store old active song values to check if we need to change
+        const oldActiveKey = this._activeSongKey;
+        const oldActiveBpm = this._activeSongBpm;
+
+        const needsKeyChange = oldActiveKey && oldActiveKey !== this.currentKey;
+        const needsTempoChange = oldActiveBpm && (
+            this._activeSongBpm !== this._currentBpm ||
+            this._activeSongTempoNote !== this._currentTempoNote ||
+            this._activeSongTimeSignature !== this._currentTimeSignature
+        );
+
+        const wasPlayingPads = this._padsOn && oldActiveKey && !this._audio?.paused;
+        const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeInterval;
+
+        // Set this as the active song BEFORE starting pads/click
+        // This ensures the metronome has access to the tempo/time signature
+        this._activeSongKey = this.currentKey;
+        this._activeSongBpm = this._currentBpm;
+        this._activeSongTempoNote = this._currentTempoNote;
+        this._activeSongTimeSignature = this._currentTimeSignature;
+
+        // Handle pads: crossfade if key changed and pads toggle is on
+        if (needsKeyChange && this._padsOn && wasPlayingPads) {
+            console.log('[MediaPlayer] Crossfading pads from', this._activeSongKey, 'to', this.currentKey);
+            await this._crossfadeToNewSong();
+        } else if (this._padsOn && !wasPlayingPads) {
+            // Pads toggle is on but not playing yet, start them
+            console.log('[MediaPlayer] Starting pads for first time');
+            await this._fadeIn();
+        } else if (!this._padsOn && wasPlayingPads) {
+            // Pads toggle was turned off while playing, fade out
+            console.log('[MediaPlayer] Pads toggle off, fading out');
+            await this._fadeOut();
+        } else {
+            // Just update the audio source (preload)
+            this._updateAudioSource();
+        }
+
+        // Handle click: stop, wait 1s, restart with new tempo if needed
+        if (needsTempoChange && this._clickOn && wasPlayingClick) {
+            console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm);
+            this._stopMetronome();
+            // Wait 1 second before restarting
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            if (this._clickOn) {  // Check again in case user toggled off during wait
+                this._startMetronome();
+            }
+        } else if (this._clickOn && !wasPlayingClick) {
+            // Click toggle is on but not playing yet, start it
+            console.log('[MediaPlayer] Starting click for first time');
+            this._startMetronome();
+        } else if (!this._clickOn && wasPlayingClick) {
+            // Click toggle was turned off while playing, stop it
+            console.log('[MediaPlayer] Click toggle off, stopping');
+            this._stopMetronome();
+        }
+
+        // Active song properties already set at the beginning of this method
+    }
+
+    _togglePads() {
+        this._padsOn = !this._padsOn;
+        console.log('[MediaPlayer] Pads toggle:', this._padsOn);
+
+        // If a song is active, immediately start/stop pads
+        if (this._activeSongKey) {
+            if (this._padsOn) {
+                // Turn pads on - fade in
+                this._fadeIn();
+            } else {
+                // Turn pads off - fade out
+                this._fadeOut();
+            }
+        }
+        // Song is still "playing" - toggles just control outputs
+    }
+
+    _toggleClick() {
+        this._clickOn = !this._clickOn;
+        console.log('[MediaPlayer] Click toggle:', this._clickOn);
+
+        // If a song is active, immediately start/stop click
+        if (this._activeSongBpm) {
+            if (this._clickOn) {
+                // Turn click on - start metronome
+                this._startMetronome();
+            } else {
+                // Turn click off - stop metronome
+                this._stopMetronome();
+            }
+        }
+    }
+
+    _isCurrentSongActive() {
+        return this._activeSongKey === this.currentKey &&
+               this._activeSongBpm === this.bpm &&
+               this._activeSongTempoNote === this.tempoNote &&
+               this._activeSongTimeSignature === this.timeSignature;
+    }
+
+    async _crossfadeToNewSong() {
+        console.log('[MediaPlayer] Crossfading to new song');
+
+        // Store the old audio element
+        const oldAudio = this._audio;
+        const oldPadGain = this._padGain;
+
+        // Create new audio element for the new key
+        this._audio = new Audio();
+        this._audio.loop = true;
+        this._audio.crossOrigin = 'anonymous';
+
+        // Create new Web Audio nodes
+        const newPadSource = this._audioContext.createMediaElementSource(this._audio);
+        this._padGain = this._audioContext.createGain();
+        this._padGain.gain.value = 0; // Start silent
+
+        // Connect new audio
+        newPadSource.connect(this._padGain);
+        this._updateAudioRouting();
+
+        // Update source to new key
+        this._updateAudioSource();
+
+        // Start playing the new audio
+        try {
+            await this._audio.play();
+            this._padsOn = true;
+        } catch (e) {
+            console.error('[MediaPlayer] Failed to start new audio:', e);
+            return;
+        }
+
+        // Crossfade: fade out old, fade in new
+        const fadeDuration = 2000; // 2 seconds
+        const fadeSteps = 50;
+        const fadeInterval = fadeDuration / fadeSteps;
+
+        let step = 0;
+        const crossfadeInterval = setInterval(() => {
+            step++;
+            const progress = step / fadeSteps;
+
+            // Fade out old
+            if (oldPadGain) {
+                oldPadGain.gain.value = this._padVolume * (1 - progress);
+            }
+
+            // Fade in new
+            this._padGain.gain.value = this._padVolume * progress;
+
+            if (step >= fadeSteps) {
+                clearInterval(crossfadeInterval);
+
+                // Clean up old audio
+                if (oldAudio) {
+                    oldAudio.pause();
+                    oldAudio.currentTime = 0;
+                }
+
+                console.log('[MediaPlayer] Crossfade complete');
+            }
+        }, fadeInterval);
     }
 
     async _togglePlay() {
@@ -656,7 +1033,7 @@ export class MediaPlayer extends LitElement {
             return;
         }
 
-        if (this.playing) {
+        if (this._padsOn) {
             await this._fadeOut();
         } else {
             await this._fadeIn();
@@ -681,7 +1058,7 @@ export class MediaPlayer extends LitElement {
         }
 
         this._fadingIn = true;
-        this.playing = true;
+        this._padsOn = true;
 
         // Check if audio is already playing (e.g., interrupted from fade-out)
         const alreadyPlaying = !this._audio.paused;
@@ -694,7 +1071,7 @@ export class MediaPlayer extends LitElement {
                 await this._audio.play();
             } catch (error) {
                 console.error('[MediaPlayer] Play failed:', error);
-                this.playing = false;
+                this._padsOn = false;
                 this._fadingIn = false;
                 return;
             }
@@ -778,7 +1155,7 @@ export class MediaPlayer extends LitElement {
                     this._fadeInterval = null;
                     this._padGain.gain.value = 0; // Ensure it's actually zero
                     this._audio.pause();
-                    this.playing = false;
+                    this._padsOn = false;
                     this._fadingOut = false;
                     console.log('[MediaPlayer] Fade out complete');
                     resolve();
@@ -931,7 +1308,7 @@ export class MediaPlayer extends LitElement {
     _getStatusText() {
         if (this._fadingIn) return 'Fading in...';
         if (this._fadingOut) return 'Fading out...';
-        if (this.playing) return 'Playing';
+        if (this._padsOn) return 'Playing';
         return 'Stopped';
     }
 
@@ -995,7 +1372,7 @@ export class MediaPlayer extends LitElement {
             this._padVolume = newVolume;
             // Update current audio gain if playing AND not currently fading
             // If fading, just update the target - the fade will reach the new target
-            if (this._padGain && this.playing && !this._fadingIn && !this._fadingOut) {
+            if (this._padGain && this._padsOn && !this._fadingIn && !this._fadingOut) {
                 this._padGain.gain.value = this._padVolume;
             }
             // Save to localStorage
@@ -1017,20 +1394,49 @@ export class MediaPlayer extends LitElement {
     }
 
     render() {
+        const padsPlaying = this._audio && !this._audio.paused;
+        const clickPlaying = this._metronomeInterval !== null;
+        const isPlaying = padsPlaying || clickPlaying;
+
         return html`
             <div class="container" part="container">
+                <div class="control-group">
+                    <div class="control-group-label">Song</div>
+                    <div class="control-group-buttons">
+                        <button
+                            class="play-button"
+                            part="start-song-button"
+                            @click=${this._startSong}
+                            aria-label="Start song"
+                            title="Start song (Space)"
+                            ?disabled=${!this.currentKey || this._isCurrentSongActive()}
+                        >
+                            ▶
+                        </button>
+                        <button
+                            class="stop-button"
+                            part="stop-button"
+                            @click=${this._stop}
+                            aria-label="Stop (Escape)"
+                            title="Stop - Press Escape"
+                            ?disabled=${!isPlaying}
+                        >
+                            ⏹
+                        </button>
+                    </div>
+                </div>
+
                 ${this._padsEnabled ? html`
                     <div class="control-group">
                         <div class="control-group-label">Pads</div>
                         <div class="control-group-buttons">
                             <button
-                                class="play-button ${this.playing ? 'playing' : ''}"
-                                part="play-button"
-                                @click=${this._togglePlay}
-                                aria-label="${this.playing ? 'Pause' : 'Play'}"
-                                ?disabled=${!this.currentKey}
+                                class="toggle-button ${this._padsOn ? 'active' : ''}"
+                                @click=${this._togglePads}
+                                aria-label="Toggle pads"
+                                title="Toggle pads on/off"
                             >
-                                ${this.playing ? '⏸' : '▶'}
+                                ${this._padsOn ? 'ON' : 'OFF'}
                             </button>
                             <div
                                 class="volume-control-item ${this._activeVolumeControl === 'pad' ? 'dragging' : ''}"
@@ -1049,14 +1455,13 @@ export class MediaPlayer extends LitElement {
                         <div class="control-group-label">Click</div>
                         <div class="control-group-buttons">
                             <button
-                                class="metronome-button ${this.metronomeEnabled ? 'active' : ''}"
-                                part="metronome-button"
-                                @click=${this._toggleMetronome}
-                                aria-label="Toggle metronome"
-                                title="Metronome"
-                                ?disabled=${!this.bpm || !this.timeSignature}
+                                class="toggle-button ${this._clickOn ? 'active' : ''}"
+                                part="click-toggle-button"
+                                @click=${this._toggleClick}
+                                aria-label="Toggle click"
+                                title="Toggle click on/off"
                             >
-                                ♩
+                                ${this._clickOn ? 'ON' : 'OFF'}
                             </button>
                             <div
                                 class="volume-control-item ${this._activeVolumeControl === 'click' ? 'dragging' : ''}"
@@ -1069,21 +1474,6 @@ export class MediaPlayer extends LitElement {
                         </div>
                     </div>
                 ` : ''}
-
-                <div class="control-group">
-                    <div class="control-group-label">Panic</div>
-                    <div class="control-group-buttons">
-                        <button
-                            class="panic-button"
-                            part="panic-button"
-                            @click=${this._panic}
-                            aria-label="Emergency stop (Escape)"
-                            title="Emergency stop - Press Escape"
-                        >
-                            ⏹
-                        </button>
-                    </div>
-                </div>
             </div>
 
             ${this._showingVolumeSlider ? html`

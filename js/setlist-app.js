@@ -2,7 +2,7 @@
 // Works with service worker routing and Navigation API
 
 import { ChordProParser } from './parser.js';
-import { SetalightDB } from './db.js';
+import { SetalightDB, formatTempo } from './db.js';
 import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
 
 // Configuration constants
@@ -1411,10 +1411,11 @@ class PageApp {
             for (const songEntry of setlist.songs) {
                 // Get source text (local edits or from Songs collection)
                 let sourceText;
+                let canonicalSong = null;
                 if (songEntry.chordproEdits) {
                     sourceText = songEntry.chordproEdits;
                 } else {
-                    const canonicalSong = await this.db.getSong(songEntry.songId);
+                    canonicalSong = await this.db.getSong(songEntry.songId);
 
                     if (!canonicalSong) {
                         console.error('[ERROR] Song not found in DB:', songEntry.songId);
@@ -1444,14 +1445,40 @@ class PageApp {
                 // Store original key for transposition reference
                 const originalKey = parsed.metadata.key;
 
+                // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
+                let currentBPM = parsed.metadata.tempo;
+                let timeSignature = parsed.metadata.time; // ChordPro uses 'time'
+                if (canonicalSong && canonicalSong.metadata) {
+                    currentBPM = canonicalSong.metadata.tempo || parsed.metadata.tempo;
+                    timeSignature = canonicalSong.metadata.timeSignature || parsed.metadata.time;
+                }
+
+                // Derive default tempoNote from time signature denominator if not explicitly set
+                let tempoNote = '1/4'; // Default to quarter notes
+                if (timeSignature) {
+                    const [, denominator] = timeSignature.split('/').map(s => s.trim());
+                    if (denominator) {
+                        tempoNote = `1/${denominator}`;
+                    }
+                }
+                // Override with explicit tempoNote if available from database
+                if (canonicalSong && canonicalSong.metadata && canonicalSong.metadata.tempoNote) {
+                    tempoNote = canonicalSong.metadata.tempoNote;
+                }
+
                 // Create song object for runtime
                 songs.push({
                     title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
                     htmlContent: htmlContent,
-                    metadata: parsed.metadata,
+                    metadata: {
+                        ...parsed.metadata,
+                        tempo: currentBPM,
+                        tempoNote: tempoNote,
+                        timeSignature: timeSignature
+                    },
                     originalKey: originalKey, // Immutable original
                     currentKey: parsed.metadata.key,
-                    currentBPM: parsed.metadata.tempo,
+                    currentBPM: currentBPM,
                     currentFontSize: songEntry.modifications.fontSize || CONFIG.DEFAULT_FONT_SIZE,
                     songId: songEntry.songId,
                     sourceText: sourceText,
@@ -1667,6 +1694,9 @@ class PageApp {
         // Update header with animation for programmatic navigation
         this.updateHeader(null, false);
         this.exitEditMode();
+
+        // Dispatch song-change event with null to clear media player
+        this.dispatchSongChange(null);
     }
 
     showSong(index, instant = false) {
@@ -1678,6 +1708,11 @@ class PageApp {
         this.updateHeader(this.songs[index], false);
         this.applyFontSize(index);
         this.exitEditMode();
+
+        // Dispatch song-change event for media player
+        if (this.songs[index]) {
+            this.dispatchSongChange(this.songs[index]);
+        }
     }
 
     async exitEditMode() {
@@ -1785,7 +1820,8 @@ class PageApp {
                 label.textContent = 'BPM:';
                 metaItem.appendChild(label);
 
-                metaItem.appendChild(document.createTextNode(' ' + song.currentBPM));
+                const formattedTempo = formatTempo(song.currentBPM, song.metadata?.tempoNote);
+                metaItem.appendChild(document.createTextNode(' ' + formattedTempo));
                 metaEl.appendChild(metaItem);
             }
 
@@ -1819,6 +1855,24 @@ class PageApp {
             // Store that we're on overview for info button handler
             this._currentSongForInfo = null;
         }
+    }
+
+    dispatchSongChange(song) {
+        // Dispatch custom event for media player to listen to
+        const event = new CustomEvent('song-change', {
+            detail: {
+                key: song?.metadata?.key || null,
+                bpm: song?.metadata?.tempo || null,
+                tempoNote: song?.metadata?.tempoNote || '1/4',
+                timeSignature: song?.metadata?.timeSignature || null,
+                title: song?.title || null
+            },
+            bubbles: true,
+            composed: true
+        });
+
+        document.dispatchEvent(event);
+        console.log('[SongChange] Dispatched:', event.detail);
     }
 
     async showSongInfo(song) {
@@ -2226,12 +2280,14 @@ class PageApp {
                 if (sectionId === 'overview') {
                     this.currentSongIndex = -1;
                     this.updateHeader(null, false); // animate=true for smooth transition
+                    this.dispatchSongChange(null);
                 } else if (sectionId.startsWith('song-')) {
                     const index = parseInt(sectionId.split('-')[1]);
                     if (index >= 0 && index < this.songs.length) {
                         this.currentSongIndex = index;
                         this.updateHeader(this.songs[index], false); // animate=true for smooth transition
                         this.applyFontSize(index);
+                        this.dispatchSongChange(this.songs[index]);
                     }
                 }
             }

@@ -190,6 +190,86 @@ export function hashText(text) {
     return hash.toString(36);
 }
 
+/**
+ * Parse tempo string into BPM number and note subdivision
+ * Examples:
+ *   "150" -> { bpm: 150, note: "1/4" }
+ *   "61 bpm" -> { bpm: 61, note: "1/4" }
+ *   "150 (1/8)" -> { bpm: 150, note: "1/8" }
+ *   "150 (8th note)" -> { bpm: 150, note: "1/8" }
+ *
+ * @param {string} tempoStr - Tempo string from ChordPro metadata
+ * @returns {{bpm: number|null, note: string}} - Parsed tempo and note subdivision
+ */
+export function parseTempo(tempoStr) {
+    if (!tempoStr) {
+        return { bpm: null, note: '1/4' };
+    }
+
+    const str = String(tempoStr).trim();
+
+    // Extract base BPM number (first number in the string)
+    const bpmMatch = str.match(/(\d+)/);
+    const bpm = bpmMatch ? parseInt(bpmMatch[1]) : null;
+
+    // Extract note subdivision from brackets or text
+    let note = '1/4'; // Default to quarter note
+
+    // Check for bracketed subdivision like (1/8) or (8th note)
+    const bracketMatch = str.match(/\(([^)]+)\)/);
+    if (bracketMatch) {
+        const bracketContent = bracketMatch[1].trim().toLowerCase();
+
+        // Check for fraction format like "1/8"
+        if (bracketContent.match(/1\/\d+/)) {
+            note = bracketContent;
+        }
+        // Check for written format like "8th note" or "16th"
+        else if (bracketContent.includes('8th') || bracketContent.includes('eighth')) {
+            note = '1/8';
+        }
+        else if (bracketContent.includes('16th') || bracketContent.includes('sixteenth')) {
+            note = '1/16';
+        }
+        else if (bracketContent.includes('half')) {
+            note = '1/2';
+        }
+        else if (bracketContent.includes('whole')) {
+            note = '1/1';
+        }
+    }
+
+    return { bpm, note };
+}
+
+/**
+ * Format tempo for display as "BPM/note"
+ * Examples:
+ *   150, "1/4" -> "150"
+ *   150, "1/8" -> "150/8"
+ *   150, "1/16" -> "150/16"
+ *
+ * @param {number|null} bpm - The BPM number
+ * @param {string} tempoNote - The note subdivision (e.g., "1/4", "1/8")
+ * @returns {string} - Formatted tempo string
+ */
+export function formatTempo(bpm, tempoNote = '1/4') {
+    if (!bpm) return '';
+
+    // If quarter note (default), just show BPM
+    if (!tempoNote || tempoNote === '1/4') {
+        return `${bpm}`;
+    }
+
+    // Otherwise show BPM/denominator (e.g., "150/8" for 1/8 notes)
+    const [, denominator] = tempoNote.split('/').map(Number);
+    if (denominator) {
+        return `${bpm}/${denominator}`;
+    }
+
+    return `${bpm}`;
+}
+
 export function generateSongId(parsed) {
     // Prefer CCLI number as deterministic ID
     if (parsed.metadata.ccliSongNumber || parsed.metadata.ccli) {
