@@ -1504,43 +1504,80 @@ class PageApp {
                 }
             });
 
+            // Check hash BEFORE rendering to determine initial view state
+            const hash = window.location.hash;
+            const hashValue = hash.substring(1);
+            const shouldShowSongDirectly = hashValue && hashValue.startsWith('song-');
+            console.log('[Initial Load] hash:', hash, 'hashValue:', hashValue, 'shouldShowSongDirectly:', shouldShowSongDirectly);
+
             // Render all songs on one page
             const container = document.querySelector('.song-container');
             console.log('Rendering full setlist into container:', container);
             // Clear container and append fragment
             container.textContent = '';
-            container.appendChild(this.renderFullSetlist(setlist, songs));
+            const fragment = this.renderFullSetlist(setlist, songs);
+            container.appendChild(fragment);
+
+            // If going directly to a song, scroll to it immediately (before layout/paint)
+            if (shouldShowSongDirectly) {
+                const songIndex = parseInt(hashValue.split('-')[1]);
+                console.log('[Initial Load] Going directly to song index:', songIndex);
+
+                const targetSection = container.querySelector(`#song-${songIndex}`);
+                if (targetSection) {
+                    // Set scroll position immediately, before browser paints
+                    container.scrollLeft = targetSection.offsetLeft;
+                    console.log('[Initial Load] Set scroll position to:', targetSection.offsetLeft);
+                } else {
+                    console.warn('[Initial Load] Could not find target section song-' + songIndex);
+                }
+            }
 
             // Set up navigation based on hash
             console.log('About to setup hash navigation');
             this.setupHashNavigation(setlistId, songs.length);
 
             // Navigate to the correct section based on hash
-            const hash = window.location.hash;
             console.log('Current hash:', hash);
 
-            // Wait for layout to complete before scrolling
-            requestAnimationFrame(() => {
-                if (hash) {
-                    const hashValue = hash.substring(1);
-                    if (hashValue === 'overview') {
-                        this.showOverview(true); // true = instant, no animation
-                        // Set initial history state
-                        history.replaceState({ view: 'overview' }, '', window.location.href);
-                    } else if (hashValue.startsWith('song-')) {
-                        const index = parseInt(hashValue.split('-')[1]);
-                        this.showSong(index, true); // true = instant, no animation
-                        // Set initial history state (without fromOverview since we loaded directly)
-                        history.replaceState({ view: 'song', index: index }, '', window.location.href);
+            // Set up initial view state (no scrolling on page load)
+            if (hash) {
+                if (hashValue === 'overview') {
+                    // Overview is already visible by default
+                    this._lastVisibleSection = 'overview';
+                    this.updateHeader(null, true); // true = instant, no animation
+                    this.exitEditMode();
+                    this.dispatchSongChange(null);
+                    // Set initial history state
+                    history.replaceState({ view: 'overview' }, '', window.location.href);
+                } else if (hashValue.startsWith('song-')) {
+                    const index = parseInt(hashValue.split('-')[1]);
+                    // Song is already visible from pre-render setup above
+                    this._lastVisibleSection = `song-${index}`;
+                    this.updateHeader(this.songs[index], true); // true = instant, no animation
+                    this.applyFontSize(index);
+                    this.exitEditMode();
+                    // Dispatch song-change event for media player
+                    if (this.songs[index]) {
+                        this.dispatchSongChange(this.songs[index]);
                     }
-                } else {
-                    // Default to overview
-                    console.log('No hash, showing overview');
-                    this.showOverview(true); // true = instant, no animation
-                    // Set initial history state and add hash
-                    const overviewUrl = `${window.location.pathname}#overview`;
-                    history.replaceState({ view: 'overview' }, '', overviewUrl);
+                    // Set initial history state (without fromOverview since we loaded directly)
+                    history.replaceState({ view: 'song', index: index }, '', window.location.href);
                 }
+            } else {
+                // Default to overview (already visible)
+                console.log('No hash, showing overview');
+                this._lastVisibleSection = 'overview';
+                this.updateHeader(null, true); // true = instant, no animation
+                this.exitEditMode();
+                this.dispatchSongChange(null);
+                // Set initial history state and add hash
+                const overviewUrl = `${window.location.pathname}#overview`;
+                history.replaceState({ view: 'overview' }, '', overviewUrl);
+            }
+
+            // Wait for layout to complete before other setup
+            requestAnimationFrame(() => {
 
                 // Set up drag-and-drop (only enabled in edit mode)
                 if (this.overviewEditMode) {
