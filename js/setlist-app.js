@@ -1897,19 +1897,13 @@ class PageApp {
     dispatchSongChange(song) {
         // Dispatch custom event for media player to listen to
         const event = new CustomEvent('song-change', {
-            detail: {
-                key: song?.metadata?.key || null,
-                bpm: song?.metadata?.tempo || null,
-                tempoNote: song?.metadata?.tempoNote || '1/4',
-                timeSignature: song?.metadata?.timeSignature || null,
-                title: song?.title || null
-            },
+            detail: { song },
             bubbles: true,
             composed: true
         });
 
         document.dispatchEvent(event);
-        console.log('[SongChange] Dispatched:', event.detail);
+        console.log('[SongChange] Dispatched song:', song?.songId, song?.title);
     }
 
     async showSongInfo(song) {

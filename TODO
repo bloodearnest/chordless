@@ -1,5 +1,6 @@
-
-
+current
+ - player: click stuttering start
+ - nav-menu: fix back to setlist
 
 import
  - don't go back to import page (history)
@@ -15,11 +16,13 @@ storage
  - syncing
 
 UI
-- device type fonts (mobile, tablet, desktop)
+- device type fonts (mobile, tablet, desktop) - partially done.
 - autoscaling font
 - logo
 
 editing
+- change bpm
+- change click pattern
 - edit chordpro
 - song notes/stickies
 - nashville numbers
@@ -30,7 +33,9 @@ live
 
 settings
  - preferences
-   - vocalist?
+   - vocalist/drummer?
+   - guitarist
+   - hide chorus?
    - darkmode
 
 library

@@ -30,10 +30,12 @@ export class MediaPlayer extends LitElement {
         _padsOn: { type: Boolean, state: true }, // User toggled pads on/off
         _clickOn: { type: Boolean, state: true }, // User toggled click on/off
         // Current song metadata (from song-change event, updated on swipe)
+        _currentSongId: { type: String, state: true },
         _currentBpm: { type: Number, state: true },
         _currentTempoNote: { type: String, state: true },
         _currentTimeSignature: { type: String, state: true },
         // Active song metadata (loaded in player, only updated when play is pressed)
+        _activeSongId: { type: String, state: true }, // The song ID currently loaded in media player
         _activeSongKey: { type: String, state: true }, // The song key currently loaded in media player
         _activeSongBpm: { type: Number, state: true },
         _activeSongTempoNote: { type: String, state: true },
@@ -46,20 +48,136 @@ export class MediaPlayer extends LitElement {
         }
 
         .container {
-            display: flex;
-            align-items: center;
-            gap: 0.9rem;
-            padding: 1.2rem;
+            display: grid;
+            grid-template-columns: auto 1px auto;
+            grid-template-rows: auto auto;
+            column-gap: 0.5rem;
+            row-gap: 0.8rem;
+            padding: 1.2rem 1.5rem;
             background: var(--player-bg, #34495e);
             border-radius: 10px;
             color: var(--player-text, white);
             width: fit-content;
         }
 
+        .divider {
+            grid-column: 2;
+            grid-row: 1 / -1;
+            width: 1px;
+        }
+
+        .led-display-section {
+            grid-column: 1;
+            grid-row: 1;
+        }
+
+        .play-stop-section {
+            grid-column: 1;
+            grid-row: 2;
+        }
+
+        .knobs-section {
+            grid-column: 3;
+            grid-row: 1;
+            display: flex;
+            height: 100%;
+        }
+
+        .toggles-section {
+            grid-column: 3;
+            grid-row: 2;
+        }
+
+        .transport-row {
+            display: flex;
+            align-items: center;
+            gap: 0;
+        }
+
+        .cassette-buttons {
+            display: flex;
+            gap: 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .cassette-buttons .play-button {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .cassette-buttons .stop-button {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            margin-left: -2px;
+        }
+
+        .cassette-buttons .led-button {
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+            margin-left: -2px;
+        }
+
+        .cassette-buttons .led-button.middle {
+            border-top-right-radius: 0;
+            border-bottom-right-radius: 0;
+        }
+
+        .toggles-section .cassette-buttons {
+            gap: 1rem;
+        }
+
+        .toggles-section .cassette-buttons .led-button {
+            border-radius: 4px;
+            margin-left: 0;
+        }
+
+        .toggles-section .cassette-buttons .led-button.middle {
+            border-radius: 4px;
+        }
+
+        .knobs-row {
+            display: flex;
+            align-items: stretch;
+            gap: 1rem;
+            height: 100%;
+        }
+
+        .led-display {
+            display: grid;
+            grid-template-columns: auto auto auto;
+            gap: 0.5rem 1rem;
+            background: #1a1a1a;
+            border: 2px solid var(--player-text, white);
+            border-radius: 4px;
+            padding: 0.25rem 0.5rem;
+            font-family: 'Courier New', monospace;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            box-sizing: border-box;
+            font-size: 0.75rem;
+            color: #00ff00;
+            text-shadow: 0 0 3px #00ff00, 0 0 6px #00ff00;
+        }
+
+        .led-label {
+            opacity: 0.5;
+            text-align: right;
+        }
+
+        .led-value {
+            text-align: center;
+        }
+
+        .led-header {
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
         .play-button {
-            width: 3.6rem;
+            width: 5.4rem;
             height: 3.6rem;
-            border-radius: 50%;
+            border-radius: 4px;
             border: 2px solid var(--player-text, white);
             background: transparent;
             color: var(--player-text, white);
@@ -71,41 +189,41 @@ export class MediaPlayer extends LitElement {
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
-        }
-
-        .play-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
+            outline: none;
         }
 
         .play-button:active {
-            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .play-button.playing {
-            background: var(--player-text, white);
-            color: var(--player-bg, #34495e);
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .play-button:disabled {
-            opacity: 0.3;
             cursor: not-allowed;
-        }
-
-        .play-button:disabled:hover {
             background: transparent;
-            transform: none;
         }
 
-        .play-button.playing:disabled:hover {
-            background: var(--player-text, white);
-            transform: none;
+        .play-button:disabled:active {
+            background: transparent;
+        }
+
+        .play-button.playing:disabled {
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .play-button.playing:disabled:active {
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .stop-button {
-            width: 3.6rem;
+            width: 5.4rem;
             height: 3.6rem;
-            border-radius: 50%;
+            border-radius: 4px;
             border: 2px solid var(--player-text, white);
             background: transparent;
             color: var(--player-text, white);
@@ -117,25 +235,20 @@ export class MediaPlayer extends LitElement {
             line-height: 1;
             box-sizing: border-box;
             transition: all 0.2s;
-        }
-
-        .stop-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
+            outline: none;
         }
 
         .stop-button:active {
-            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .stop-button:disabled {
-            opacity: 0.3;
             cursor: not-allowed;
+            background: transparent;
         }
 
-        .stop-button:disabled:hover {
+        .stop-button:disabled:active {
             background: transparent;
-            transform: none;
         }
 
         .toggle-button {
@@ -156,19 +269,13 @@ export class MediaPlayer extends LitElement {
             transition: all 0.2s;
         }
 
-        .toggle-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
-        }
-
         .toggle-button:active {
-            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .toggle-button.active {
-            background: #27ae60;
-            border-color: #27ae60;
-            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .metronome-button {
@@ -190,19 +297,13 @@ export class MediaPlayer extends LitElement {
             transition: all 0.2s;
         }
 
-        .metronome-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
-        }
-
         .metronome-button:active {
-            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .metronome-button.active {
-            background: #3498db;
-            border-color: #3498db;
-            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
         .split-button {
@@ -222,26 +323,59 @@ export class MediaPlayer extends LitElement {
             transition: all 0.2s;
         }
 
-        .split-button:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
-        }
-
         .split-button:active {
-            transform: scale(0.95);
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .split-button.active {
-            background: #9b59b6;
-            border-color: #9b59b6;
-            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
         }
 
-        .volume-control-item {
+        .volume-knob {
             position: relative;
+            width: 3.4rem;
+            height: 3.4rem;
+            border-radius: 50%;
+            border: 2px solid var(--player-text, white);
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(0, 0, 0, 0.2) 100%);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: none;
+            box-sizing: border-box;
+            transition: all 0.2s;
+            box-shadow: inset 0 1px 2px rgba(255, 255, 255, 0.2), inset 0 -1px 2px rgba(0, 0, 0, 0.3);
+        }
+
+        .volume-knob.dragging {
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(0, 0, 0, 0.1) 100%);
+        }
+
+        .volume-indicator {
+            position: absolute;
+            top: 0.25rem;
+            width: 2px;
+            height: 0.5rem;
+            background: var(--player-text, white);
+            border-radius: 1px;
+            transform-origin: center 1.45rem;
+            transition: transform 0.1s;
+        }
+
+        .volume-value {
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--player-text, white);
+            z-index: 1;
+        }
+
+        .led-button {
             width: 3.6rem;
             height: 3.6rem;
-            border-radius: 50%;
+            border-radius: 4px;
             border: 2px solid var(--player-text, white);
             background: transparent;
             color: var(--player-text, white);
@@ -249,41 +383,68 @@ export class MediaPlayer extends LitElement {
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 0.9rem;
-            font-weight: 600;
-            user-select: none;
-            touch-action: none;
             box-sizing: border-box;
             transition: all 0.2s;
+            position: relative;
+            outline: none;
         }
 
-        .volume-control-item:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.05);
-        }
-
-        .volume-control-item:active {
-            transform: scale(0.95);
-        }
-
-        .volume-control-item.dragging {
+        .led-button:active {
             background: rgba(255, 255, 255, 0.2);
         }
 
-        .control-group {
+        .led-button.active {
+            background: rgba(0, 0, 0, 0.3);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .led-light {
+            width: 1.2rem;
+            height: 1.2rem;
+            border-radius: 50%;
+            border: 1px solid var(--player-text, white);
+            background: rgba(255, 255, 255, 0.1);
+            transition: all 0.2s;
+            box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .led-light.pads-on {
+            background: #27ae60;
+            border-color: #27ae60;
+            box-shadow: 0 0 6px rgba(39, 174, 96, 0.8), inset 0 0 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .led-light.click-on {
+            background: #3498db;
+            border-color: #3498db;
+            box-shadow: 0 0 6px rgba(52, 152, 219, 0.8), inset 0 0 3px rgba(0, 0, 0, 0.3);
+        }
+
+        .button-group {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.6rem;
+            gap: 0.3rem;
         }
 
-        .control-group-buttons {
+        .button-info {
+            font-size: 0.7rem;
+            color: var(--player-text, white);
+            opacity: 0.6;
+            text-align: center;
+        }
+
+        .knob-column {
             display: flex;
-            gap: 0.6rem;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            width: 3.6rem;
+            height: 100%;
         }
 
-        .control-group-label {
-            font-size: 0.84rem;
+        .knob-label {
+            font-size: 0.95rem;
             font-weight: 600;
             color: var(--player-text, white);
             opacity: 0.7;
@@ -291,63 +452,15 @@ export class MediaPlayer extends LitElement {
             letter-spacing: 0.05em;
         }
 
-        .control-group-info {
-            font-size: 0.96rem;
+        .toggle-label {
+            font-size: 0.95rem;
+            font-weight: 600;
             color: var(--player-text, white);
             opacity: 0.7;
-            text-align: center;
-            margin-top: 0.12rem;
-        }
-
-        .vertical-slider {
-            position: fixed;
-            width: 60px;
-            height: 200px;
-            background: var(--player-bg, #34495e);
-            border: 2px solid var(--player-text, white);
-            border-radius: 30px;
-            padding: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-            z-index: 10000;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.15s;
-        }
-
-        .vertical-slider.visible {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .vertical-slider-track {
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 20px;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .vertical-slider-fill {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            background: var(--player-text, white);
-            border-radius: 20px;
-            transition: height 0.05s;
-        }
-
-        .vertical-slider-value {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.2rem;
-            font-weight: bold;
-            color: var(--player-bg, #34495e);
-            text-shadow: 0 0 3px rgba(255, 255, 255, 0.8);
-            z-index: 1;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.3rem;
+            line-height: 1;
         }
     `;
 
@@ -459,17 +572,20 @@ export class MediaPlayer extends LitElement {
     }
 
     _handleSongChange(event) {
-        const { key, bpm, tempoNote, timeSignature, title } = event.detail;
-        console.log('[MediaPlayer] Song changed:', { key, bpm, tempoNote, timeSignature, title });
+        const song = event.detail.song;
+        console.log('[MediaPlayer] Song changed:', song?.songId, song?.title);
 
         // Update current song metadata (stored but not activated until play is pressed)
-        if (key) {
-            this.currentKey = key;
+        this._currentSongId = song?.songId || null;
+        if (song?.metadata?.key) {
+            this.currentKey = song.metadata.key;
+        } else {
+            this.currentKey = null;
         }
         // Store current song's tempo/time signature metadata
-        this._currentBpm = bpm || null;
-        this._currentTempoNote = tempoNote || '1/4';
-        this._currentTimeSignature = timeSignature || null;
+        this._currentBpm = song?.metadata?.tempo || null;
+        this._currentTempoNote = song?.metadata?.tempoNote || '1/4';
+        this._currentTimeSignature = song?.metadata?.timeSignature || null;
     }
 
     updated(changedProperties) {
@@ -568,6 +684,7 @@ export class MediaPlayer extends LitElement {
         const clickPlaying = this._metronomeInterval !== null;
 
         // Stop click immediately if playing (but don't change toggle state)
+        // This also resets the beat counter so it starts fresh next time
         if (clickPlaying) {
             this._stopMetronome();
         }
@@ -576,6 +693,13 @@ export class MediaPlayer extends LitElement {
         if (padsPlaying) {
             await this._fadeOut();
         }
+
+        // Clear active song properties so play button is no longer disabled
+        this._activeSongId = null;
+        this._activeSongKey = null;
+        this._activeSongBpm = null;
+        this._activeSongTempoNote = null;
+        this._activeSongTimeSignature = null;
 
         // Force UI update
         this.requestUpdate();
@@ -900,13 +1024,34 @@ export class MediaPlayer extends LitElement {
 
         // Set this as the active song BEFORE starting pads/click
         // This ensures the metronome has access to the tempo/time signature
+        this._activeSongId = this._currentSongId;
         this._activeSongKey = this.currentKey;
         this._activeSongBpm = this._currentBpm;
         this._activeSongTempoNote = this._currentTempoNote;
         this._activeSongTimeSignature = this._currentTimeSignature;
 
-        // Handle pads: crossfade if key changed and pads toggle is on
-        if (needsKeyChange && this._padsOn && wasPlayingPads) {
+        // If we're currently fading out, cancel it and fade back in
+        if (this._fadingOut) {
+            console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in');
+            if (this._fadeInterval) {
+                clearInterval(this._fadeInterval);
+                this._fadeInterval = null;
+            }
+            this._fadingOut = false;
+
+            // Restart pads if they're toggled on
+            if (this._padsOn) {
+                // Resume playback if paused
+                if (this._audio?.paused) {
+                    await this._audio.play();
+                }
+                // Fade in from current volume
+                await this._fadeIn();
+            }
+
+            // Click will be started below in the normal flow if needed
+        } else if (needsKeyChange && this._padsOn && wasPlayingPads) {
+            // Handle pads: crossfade if key changed and pads toggle is on
             console.log('[MediaPlayer] Crossfading pads from', this._activeSongKey, 'to', this.currentKey);
             await this._crossfadeToNewSong();
         } else if (this._padsOn && !wasPlayingPads) {
@@ -927,15 +1072,11 @@ export class MediaPlayer extends LitElement {
             this._updateAudioSource();
         }
 
-        // Handle click: stop, wait 1s, restart with new tempo if needed
+        // Handle click: restart with new tempo if needed
         if (needsTempoChange && this._clickOn && wasPlayingClick) {
             console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm);
             this._stopMetronome();
-            // Wait 1 second before restarting
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            if (this._clickOn) {  // Check again in case user toggled off during wait
-                this._startMetronome();
-            }
+            this._startMetronome();
         } else if (this._clickOn && !wasPlayingClick) {
             // Click toggle is on but not playing yet, start it
             console.log('[MediaPlayer] Starting click for first time');
@@ -1209,7 +1350,6 @@ export class MediaPlayer extends LitElement {
                     this._fadeInterval = null;
                     this._padGain.gain.value = 0; // Ensure it's actually zero
                     this._audio.pause();
-                    this._padsOn = false;
                     this._fadingOut = false;
                     console.log('[MediaPlayer] Fade out complete');
                     resolve();
@@ -1452,17 +1592,48 @@ export class MediaPlayer extends LitElement {
         const clickPlaying = this._metronomeInterval !== null;
         const isPlaying = padsPlaying || clickPlaying;
 
-        // Show toggle buttons only if BOTH features are enabled
-        const showToggles = this._padsEnabled && this._metronomeGlobalEnabled;
+        // Check if we're viewing a different song than what's playing
+        // Compare song IDs instead of individual properties
+        const viewingDifferentSong = this._currentSongId && this._activeSongId &&
+            this._currentSongId !== this._activeSongId;
+
+        // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
+        const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong);
 
         return html`
             <div class="container" part="container">
-                <div class="control-group">
-                    <div class="control-group-label">Song</div>
-                    <div class="control-group-info">${isPlaying ? 'Playing' : 'Stopped'}</div>
-                    <div class="control-group-buttons">
+                <!-- Row 1, Column 1: LED display -->
+                ${(this._padsEnabled || this._metronomeGlobalEnabled) ? html`
+                    <div class="led-display-section">
+                        <div class="led-display">
+                            <!-- Row 1: Headers -->
+                            <div class="led-label"></div>
+                            <div class="led-value led-header">${isPlaying ? 'Playing' : 'Stopped'}</div>
+                            <div class="led-value led-header">Next</div>
+
+                            <!-- Row 2: Key -->
+                            <div class="led-label">Key</div>
+                            <div class="led-value">${this._activeSongKey || '-'}</div>
+                            <div class="led-value">${showNextData ? (this.currentKey || '-') : '-'}</div>
+
+                            <!-- Row 3: BPM -->
+                            <div class="led-label">BPM</div>
+                            <div class="led-value">${this._activeSongBpm || '-'}</div>
+                            <div class="led-value">${showNextData ? (this._currentBpm || '-') : '-'}</div>
+
+                            <!-- Row 4: Time -->
+                            <div class="led-label">Time</div>
+                            <div class="led-value">${this._activeSongTimeSignature || '-'}</div>
+                            <div class="led-value">${showNextData ? (this._currentTimeSignature || '-') : '-'}</div>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <!-- Row 2, Column 1: Play/Stop buttons -->
+                <div class="play-stop-section">
+                    <div class="cassette-buttons">
                         <button
-                            class="play-button"
+                            class="play-button ${isPlaying ? 'playing' : ''}"
                             part="start-song-button"
                             @click=${this._startSong}
                             aria-label="Start song"
@@ -1484,72 +1655,74 @@ export class MediaPlayer extends LitElement {
                     </div>
                 </div>
 
-                ${this._padsEnabled ? html`
-                    <div class="control-group">
-                        <div class="control-group-label">Pads</div>
-                        <div class="control-group-info">${this._activeSongKey || this.currentKey || '-'}</div>
-                        <div class="control-group-buttons">
-                            ${showToggles ? html`
-                                <button
-                                    class="toggle-button ${this._padsOn ? 'active' : ''}"
-                                    @click=${this._togglePads}
-                                    aria-label="Toggle pads"
-                                    title="Toggle pads on/off"
-                                >
-                                    ${this._padsOn ? 'ON' : 'OFF'}
-                                </button>
+                <!-- Divider spanning both rows -->
+                ${(this._padsEnabled || this._metronomeGlobalEnabled) ? html`
+                    <div class="divider"></div>
+                ` : ''}
+
+                <!-- Row 1, Column 3: Volume knobs -->
+                ${(this._padsEnabled || this._metronomeGlobalEnabled) ? html`
+                    <div class="knobs-section">
+                        <div class="knobs-row">
+                            ${this._padsEnabled ? html`
+                                <div class="knob-column">
+                                    <div class="knob-label">Pads</div>
+                                    <div
+                                        class="volume-knob ${this._activeVolumeControl === 'pad' ? 'dragging' : ''}"
+                                        @mousedown=${(e) => this._startVolumeControl(e, 'pad')}
+                                        @touchstart=${(e) => this._startVolumeControl(e, 'pad')}
+                                        title="Pad Volume"
+                                    >
+                                        <div class="volume-indicator" style="transform: rotate(${(this._padVolume - 0.5) * 270}deg)"></div>
+                                        <div class="volume-value">${Math.round(this._padVolume * 11)}</div>
+                                    </div>
+                                    <div class="toggle-label">${this._padsOn ? 'On' : 'Off'}</div>
+                                </div>
                             ` : ''}
-                            <div
-                                class="volume-control-item ${this._activeVolumeControl === 'pad' ? 'dragging' : ''}"
-                                @mousedown=${(e) => this._startVolumeControl(e, 'pad')}
-                                @touchstart=${(e) => this._startVolumeControl(e, 'pad')}
-                                title="Pad Volume"
-                            >
-                                ${Math.round(this._padVolume * 100)}%
-                            </div>
+                            ${this._metronomeGlobalEnabled ? html`
+                                <div class="knob-column">
+                                    <div class="knob-label">Click</div>
+                                    <div
+                                        class="volume-knob ${this._activeVolumeControl === 'click' ? 'dragging' : ''}"
+                                        @mousedown=${(e) => this._startVolumeControl(e, 'click')}
+                                        @touchstart=${(e) => this._startVolumeControl(e, 'click')}
+                                        title="Click Volume"
+                                    >
+                                        <div class="volume-indicator" style="transform: rotate(${(this._clickVolume - 0.5) * 270}deg)"></div>
+                                        <div class="volume-value">${Math.round(this._clickVolume * 11)}</div>
+                                    </div>
+                                    <div class="toggle-label">${this._clickOn ? 'On' : 'Off'}</div>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                 ` : ''}
 
-                ${this._metronomeGlobalEnabled ? html`
-                    <div class="control-group">
-                        <div class="control-group-label">Click</div>
-                        <div class="control-group-info">${this._activeSongBpm || '-'} BPM · ${this._activeSongTimeSignature || '-'}</div>
-                        <div class="control-group-buttons">
-                            ${showToggles ? html`
-                                <button
-                                    class="toggle-button ${this._clickOn ? 'active' : ''}"
-                                    part="click-toggle-button"
-                                    @click=${this._toggleClick}
-                                    aria-label="Toggle click"
-                                    title="Toggle click on/off"
-                                >
-                                    ${this._clickOn ? 'ON' : 'OFF'}
+                <!-- Row 2, Column 3: LED toggle buttons -->
+                ${(this._padsEnabled || this._metronomeGlobalEnabled) ? html`
+                    <div class="toggles-section">
+                        <div class="cassette-buttons">
+                            ${this._padsEnabled && this._metronomeGlobalEnabled ? html`
+                                <button class="led-button middle ${this._padsOn ? 'active' : ''}" @click=${this._togglePads} title="Toggle pads on/off">
+                                    <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
+                                </button>
+                                <button class="led-button ${this._clickOn ? 'active' : ''}" @click=${this._toggleClick} title="Toggle click on/off">
+                                    <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
+                                </button>
+                            ` : this._padsEnabled ? html`
+                                <button class="led-button ${this._padsOn ? 'active' : ''}" @click=${this._togglePads} title="Toggle pads on/off">
+                                    <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
+                                </button>
+                            ` : this._metronomeGlobalEnabled ? html`
+                                <button class="led-button ${this._clickOn ? 'active' : ''}" @click=${this._toggleClick} title="Toggle click on/off">
+                                    <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
                                 </button>
                             ` : ''}
-                            <div
-                                class="volume-control-item ${this._activeVolumeControl === 'click' ? 'dragging' : ''}"
-                                @mousedown=${(e) => this._startVolumeControl(e, 'click')}
-                                @touchstart=${(e) => this._startVolumeControl(e, 'click')}
-                                title="Click Volume"
-                            >
-                                ${Math.round(this._clickVolume * 100)}%
-                            </div>
                         </div>
                     </div>
                 ` : ''}
             </div>
 
-            ${this._showingVolumeSlider ? html`
-                <div class="vertical-slider visible" style="left: ${this._sliderX}px; top: ${this._sliderY - 100}px;">
-                    <div class="vertical-slider-value">
-                        ${Math.round((this._activeVolumeControl === 'pad' ? this._padVolume : this._clickVolume) * 100)}%
-                    </div>
-                    <div class="vertical-slider-track">
-                        <div class="vertical-slider-fill" style="height: ${(this._activeVolumeControl === 'pad' ? this._padVolume : this._clickVolume) * 100}%"></div>
-                    </div>
-                </div>
-            ` : ''}
         `;
     }
 }
