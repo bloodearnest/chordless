@@ -29,8 +29,13 @@ export class MediaPlayer extends LitElement {
         _metronomeGlobalEnabled: { type: Boolean, state: true }, // Global setting (from settings page)
         _padsOn: { type: Boolean, state: true }, // User toggled pads on/off
         _clickOn: { type: Boolean, state: true }, // User toggled click on/off
+        _collapsed: { type: Boolean, state: true }, // Whether the player is collapsed
+        _showingSettings: { type: Boolean, state: true }, // Whether settings modal is open
+        _dragOffsetX: { type: Number, state: true }, // Drag position X offset
+        _dragOffsetY: { type: Number, state: true }, // Drag position Y offset
         // Current song metadata (from song-change event, updated on swipe)
         _currentSongId: { type: String, state: true },
+        _currentSongTitle: { type: String, state: true },
         _currentBpm: { type: Number, state: true },
         _currentTempoNote: { type: String, state: true },
         _currentTimeSignature: { type: String, state: true },
@@ -39,12 +44,92 @@ export class MediaPlayer extends LitElement {
         _activeSongKey: { type: String, state: true }, // The song key currently loaded in media player
         _activeSongBpm: { type: Number, state: true },
         _activeSongTempoNote: { type: String, state: true },
-        _activeSongTimeSignature: { type: String, state: true }
+        _activeSongTimeSignature: { type: String, state: true },
+        _activeSongTitle: { type: String, state: true }
     };
 
     static styles = css`
         :host {
             display: inline-block;
+        }
+
+        .player {
+            background: var(--player-bg, #34495e);
+            border-radius: 10px;
+            color: var(--player-text, white);
+            width: fit-content;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+
+        .title-bar {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px 10px 0 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            cursor: move;
+            user-select: none;
+        }
+
+        .title-bar-content {
+            flex: 1;
+            font-size: 0.9rem;
+            font-weight: 500;
+            opacity: 0.8;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 0.25rem 0.5rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .title-bar-buttons {
+            display: flex;
+            gap: 0;
+            flex-shrink: 0;
+        }
+
+        .title-bar-button {
+            width: 3rem;
+            height: auto;
+            border-radius: 0;
+            border: none;
+            border-left: 3px solid rgba(255, 255, 255, 0.1);
+            background: transparent;
+            color: var(--player-text, white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            opacity: 0.7;
+            transition: opacity 0.2s, background 0.2s;
+            padding: 0;
+            line-height: 1;
+        }
+
+        .title-bar-button:last-child {
+            border-radius: 0 10px 0 0;
+        }
+
+        .title-bar-button:hover {
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .title-bar-button:active {
+            background: rgba(255, 255, 255, 0.2);
         }
 
         .container {
@@ -53,11 +138,7 @@ export class MediaPlayer extends LitElement {
             grid-template-rows: auto auto;
             column-gap: 0.5rem;
             row-gap: 0.8rem;
-            padding: 1.2rem 1.5rem;
-            background: var(--player-bg, #34495e);
-            border-radius: 10px;
-            color: var(--player-text, white);
-            width: fit-content;
+            padding: 1rem;
         }
 
         .divider {
@@ -462,6 +543,85 @@ export class MediaPlayer extends LitElement {
             margin-top: 0.3rem;
             line-height: 1;
         }
+
+        .collapsed-button {
+            width: 4rem;
+            height: 4rem;
+            border-radius: 50%;
+            border: 2px solid var(--player-text, white);
+            background: rgba(52, 73, 94, 0.6);
+            color: var(--player-text, white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            backdrop-filter: blur(4px);
+            transition: background 0.2s;
+            padding: 0;
+            padding-left: 0.2rem;
+            line-height: 1;
+            animation: fadeIn 0.2s ease-in-out;
+        }
+
+        .collapsed-button:active {
+            background: rgba(52, 73, 94, 0.8);
+        }
+
+
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+
+        .settings-content {
+            background: var(--player-bg, #34495e);
+            border-radius: 10px;
+            padding: 2rem;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .settings-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--player-text, white);
+        }
+
+        .close-button {
+            width: 2rem;
+            height: 2rem;
+            border-radius: 50%;
+            border: 1px solid var(--player-text, white);
+            background: transparent;
+            color: var(--player-text, white);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        .close-button:active {
+            background: rgba(255, 255, 255, 0.2);
+        }
     `;
 
     constructor() {
@@ -489,16 +649,41 @@ export class MediaPlayer extends LitElement {
         this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true; // Default false
 
         // User toggle states (independent of which song is active)
-        // If only one feature is enabled, it should always be "on" (no toggle needed)
-        const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled;
-        this._padsOn = bothEnabled ? false : this._padsEnabled; // Always on if pads are the only feature
-        this._clickOn = bothEnabled ? false : this._metronomeGlobalEnabled; // Always on if click is the only feature
+        // Load saved toggle states from localStorage, default to true (on)
+        const savedPadsOn = localStorage.getItem('media-player-pads-on');
+        const savedClickOn = localStorage.getItem('media-player-click-on');
+
+        this._padsOn = savedPadsOn !== null ? JSON.parse(savedPadsOn) : true;
+        this._clickOn = savedClickOn !== null ? JSON.parse(savedClickOn) : true;
 
         // Active song state (what's currently loaded in the player)
+        this._activeSongId = null;
         this._activeSongKey = null;
         this._activeSongBpm = null;
         this._activeSongTempoNote = null;
         this._activeSongTimeSignature = null;
+        this._activeSongTitle = null;
+
+        // UI state - load from localStorage, default to collapsed
+        const savedCollapsed = localStorage.getItem('media-player-collapsed');
+        this._collapsed = savedCollapsed !== null ? JSON.parse(savedCollapsed) : true;
+        this._showingSettings = false;
+
+        // Drag state
+        this._isDragging = false;
+        this._dragStartX = 0;
+        this._dragStartY = 0;
+
+        // Load saved position from localStorage immediately
+        const savedPosition = localStorage.getItem('media-player-position');
+        if (savedPosition) {
+            const { x, y } = JSON.parse(savedPosition);
+            this._dragOffsetX = x;
+            this._dragOffsetY = y;
+        } else {
+            this._dragOffsetX = 0;
+            this._dragOffsetY = 0;
+        }
 
         // Load persistent volume settings from localStorage
         const savedPadVolume = localStorage.getItem('setalight-pad-volume');
@@ -577,6 +762,7 @@ export class MediaPlayer extends LitElement {
 
         // Update current song metadata (stored but not activated until play is pressed)
         this._currentSongId = song?.songId || null;
+        this._currentSongTitle = song?.title || null;
         if (song?.metadata?.key) {
             this.currentKey = song.metadata.key;
         } else {
@@ -700,6 +886,7 @@ export class MediaPlayer extends LitElement {
         this._activeSongBpm = null;
         this._activeSongTempoNote = null;
         this._activeSongTimeSignature = null;
+        this._activeSongTitle = null;
 
         // Force UI update
         this.requestUpdate();
@@ -1029,6 +1216,7 @@ export class MediaPlayer extends LitElement {
         this._activeSongBpm = this._currentBpm;
         this._activeSongTempoNote = this._currentTempoNote;
         this._activeSongTimeSignature = this._currentTimeSignature;
+        this._activeSongTitle = this._currentSongTitle;
 
         // If we're currently fading out, cancel it and fade back in
         if (this._fadingOut) {
@@ -1094,6 +1282,9 @@ export class MediaPlayer extends LitElement {
         this._padsOn = !this._padsOn;
         console.log('[MediaPlayer] Pads toggle:', this._padsOn);
 
+        // Save to localStorage
+        localStorage.setItem('media-player-pads-on', JSON.stringify(this._padsOn));
+
         // If a song is active, immediately start/stop pads
         if (this._activeSongKey) {
             if (this._padsOn) {
@@ -1111,6 +1302,9 @@ export class MediaPlayer extends LitElement {
         this._clickOn = !this._clickOn;
         console.log('[MediaPlayer] Click toggle:', this._clickOn);
 
+        // Save to localStorage
+        localStorage.setItem('media-player-click-on', JSON.stringify(this._clickOn));
+
         // If a song is active, immediately start/stop click
         if (this._activeSongBpm) {
             if (this._clickOn) {
@@ -1121,6 +1315,79 @@ export class MediaPlayer extends LitElement {
                 this._stopMetronome();
             }
         }
+    }
+
+    _toggleCollapse() {
+        this._collapsed = !this._collapsed;
+        console.log('[MediaPlayer] Collapsed:', this._collapsed);
+
+        // Save to localStorage
+        localStorage.setItem('media-player-collapsed', JSON.stringify(this._collapsed));
+    }
+
+    _toggleSettings() {
+        this._showingSettings = !this._showingSettings;
+        console.log('[MediaPlayer] Settings:', this._showingSettings);
+    }
+
+    _startDrag(e) {
+        // Don't start drag if clicking on a button
+        if (e.target.closest('.title-bar-button')) {
+            return;
+        }
+
+        this._isDragging = true;
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        this._dragStartX = clientX - this._dragOffsetX;
+        this._dragStartY = clientY - this._dragOffsetY;
+
+        // Prevent text selection during drag
+        e.preventDefault();
+
+        // Add global event listeners
+        const handleMove = (moveEvent) => this._handleDrag(moveEvent);
+        const handleEnd = () => this._endDrag(handleMove, handleEnd);
+
+        document.addEventListener('mousemove', handleMove);
+        document.addEventListener('mouseup', handleEnd);
+        document.addEventListener('touchmove', handleMove);
+        document.addEventListener('touchend', handleEnd);
+    }
+
+    _handleDrag(e) {
+        if (!this._isDragging) return;
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        this._dragOffsetX = clientX - this._dragStartX;
+        this._dragOffsetY = clientY - this._dragStartY;
+
+        this._applyPosition();
+    }
+
+    _endDrag(handleMove, handleEnd) {
+        this._isDragging = false;
+
+        // Remove global event listeners
+        document.removeEventListener('mousemove', handleMove);
+        document.removeEventListener('mouseup', handleEnd);
+        document.removeEventListener('touchmove', handleMove);
+        document.removeEventListener('touchend', handleEnd);
+
+        // Save position to localStorage
+        localStorage.setItem('media-player-position', JSON.stringify({
+            x: this._dragOffsetX,
+            y: this._dragOffsetY
+        }));
+    }
+
+    _applyPosition() {
+        // Position is now applied directly in the template via style binding
+        // Just trigger a re-render
+        this.requestUpdate();
     }
 
     _isCurrentSongActive() {
@@ -1600,9 +1867,68 @@ export class MediaPlayer extends LitElement {
         // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
         const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong);
 
+        // If collapsed, show just the expand button (always bottom-left)
+        if (this._collapsed) {
+            return html`
+                <button
+                    class="collapsed-button"
+                    @click=${this._toggleCollapse}
+                    title="Expand player"
+                >
+                    ▶
+                </button>
+            `;
+        }
+
         return html`
-            <div class="container" part="container">
-                <!-- Row 1, Column 1: LED display -->
+            <!-- Settings modal (outside container so it's not constrained) -->
+            ${this._showingSettings ? html`
+                <div class="settings-modal" @click=${this._toggleSettings}>
+                    <div class="settings-content" @click=${(e) => e.stopPropagation()}>
+                        <div class="settings-header">
+                            <div class="settings-title">Media Player Settings</div>
+                            <button class="close-button" @click=${this._toggleSettings} aria-label="Close">×</button>
+                        </div>
+                        <media-player-settings
+                            .mediaPlayerEnabled=${true}
+                            .padsEnabled=${this._padsEnabled}
+                            .metronomeEnabled=${this._metronomeGlobalEnabled}
+                            .stereoSplitEnabled=${this.stereoSplitEnabled}
+                            @settings-change=${(e) => {
+                                console.log('[MediaPlayer] Settings changed from modal:', e.detail);
+                                // Save to localStorage
+                                localStorage.setItem('mediaPlayerSettings', JSON.stringify(e.detail));
+                                // Update our local state
+                                this._padsEnabled = e.detail.padsEnabled !== false;
+                                this._metronomeGlobalEnabled = e.detail.metronomeEnabled !== false;
+                                this.stereoSplitEnabled = e.detail.stereoSplitEnabled === true;
+                                // Dispatch to sync with global settings
+                                window.dispatchEvent(new CustomEvent('media-player-settings-changed', {
+                                    detail: e.detail
+                                }));
+                                this._updateAudioRouting();
+                                this.requestUpdate();
+                            }}
+                        ></media-player-settings>
+                    </div>
+                </div>
+            ` : ''}
+
+            <div class="player" part="player" style="transform: translate(${this._dragOffsetX}px, ${this._dragOffsetY}px);">
+                <!-- Title bar -->
+                <div class="title-bar" @mousedown=${this._startDrag} @touchstart=${this._startDrag}>
+                    <div class="title-bar-content">
+                        ${this._activeSongTitle || 'Media Player'}
+                    </div>
+                    <div class="title-bar-buttons">
+                        <button class="title-bar-button" @click=${this._toggleSettings} title="Settings">⚙</button>
+                        <button class="title-bar-button" @click=${this._toggleCollapse} title="Minimize">▼</button>
+                    </div>
+                </div>
+
+                <!-- Container with grid layout -->
+                <div class="container" part="container">
+                    <!-- Row 1, Column 1: LED display -->
                 ${(this._padsEnabled || this._metronomeGlobalEnabled) ? html`
                     <div class="led-display-section">
                         <div class="led-display">
@@ -1721,8 +2047,8 @@ export class MediaPlayer extends LitElement {
                         </div>
                     </div>
                 ` : ''}
-            </div>
-
+                </div><!-- End container -->
+            </div><!-- End player -->
         `;
     }
 }
