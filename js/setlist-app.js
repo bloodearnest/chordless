@@ -2348,6 +2348,10 @@ class PageApp {
                     this.showSong(index, false);
                 }
             }
+
+            // Update navigation menu after popstate
+            const route = window.__ROUTE__ || this.parseRoute(window.location.pathname);
+            this.updateNavigationMenu(route);
         });
 
         console.log('History navigation setup complete for', totalSongs, 'songs');
@@ -2392,6 +2396,10 @@ class PageApp {
                 this.showOverview(false);
             }
         }
+
+        // Update navigation menu after changing hash
+        const route = window.__ROUTE__ || this.parseRoute(window.location.pathname);
+        this.updateNavigationMenu(route);
     }
 
     loadState() {
@@ -3721,6 +3729,11 @@ class PageApp {
             }
         });
 
+        // Listen for hash changes to update the nav-menu
+        window.addEventListener('hashchange', () => {
+            this.updateNavigationMenu(route);
+        });
+
         // Set initial back button state
         this.updateNavigationMenu(route);
     }
@@ -3733,8 +3746,22 @@ class PageApp {
         let backAction = () => window.history.back();
 
         if (route.type === 'setlist') {
-            backLabel = 'Back to Setlists';
-            backAction = () => window.location.href = '/';
+            // Check if we're viewing a specific song (via hash) or the overview
+            const hash = window.location.hash;
+            const isViewingSong = hash && hash.startsWith('#song-');
+
+            if (isViewingSong) {
+                backLabel = 'Back to Setlist';
+                backAction = () => {
+                    window.location.hash = '';
+                };
+            } else {
+                backLabel = 'Back to Setlists';
+                backAction = () => window.location.href = '/';
+            }
+        } else if (route.type === 'song') {
+            backLabel = 'Back to Setlist';
+            backAction = () => window.location.href = `/setlist/${route.setlistId}`;
         } else if (route.type === 'librarySong') {
             backLabel = 'Back to Song Library';
             backAction = () => this.closeLibrarySongView();

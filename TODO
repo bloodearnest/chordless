@@ -1,6 +1,9 @@
 current
- - player: click stuttering start
  - nav-menu: fix back to setlist
+
+lit migration
+ - finish it
+
 
 import
  - don't go back to import page (history)
@@ -10,7 +13,10 @@ sharing
 - temporary sharing
 - email media team
 
-storage
+player
+ - click stuttering start
+
+storage/sync
 - oauth
 - gdrive as source of truth
  - syncing
