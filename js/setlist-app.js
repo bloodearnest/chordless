@@ -2731,7 +2731,7 @@ class PageApp {
             }
         });
 
-        // Listen to nav menu clicks - open the popover
+        // Listen to nav menu clicks - toggle the popover
         appHeader.addEventListener('nav-menu-click', (e) => {
             const navMenu = document.getElementById('nav-menu');
             if (navMenu) {
@@ -3729,9 +3729,25 @@ class PageApp {
             }
         });
 
-        // Listen for hash changes to update the nav-menu
-        window.addEventListener('hashchange', () => {
-            this.updateNavigationMenu(route);
+        // Setup song click handler for setlist song navigation
+        navMenu.addEventListener('song-click', (e) => {
+            const songIndex = e.detail.index;
+            if (songIndex !== undefined && songIndex >= 0) {
+                this.navigateToHash(`song-${songIndex}`);
+            }
+        });
+
+        // Setup overview click handler for setlist navigation
+        navMenu.addEventListener('overview-click', () => {
+            this.navigateToHash('overview');
+        });
+
+        // Setup settings click handler to open settings modal
+        navMenu.addEventListener('settings-click', () => {
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal) {
+                settingsModal.show();
+            }
         });
 
         // Set initial back button state
@@ -3744,6 +3760,7 @@ class PageApp {
         // Determine back button label and action based on route
         let backLabel = 'Back';
         let backAction = () => window.history.back();
+        let showOverviewLink = false;
 
         if (route.type === 'setlist') {
             // Check if we're viewing a specific song (via hash) or the overview
@@ -3751,13 +3768,12 @@ class PageApp {
             const isViewingSong = hash && hash.startsWith('#song-');
 
             if (isViewingSong) {
-                backLabel = 'Back to Setlist';
-                backAction = () => {
-                    window.location.hash = '';
-                };
+                // When viewing a song, show Overview in the setlist section
+                showOverviewLink = true;
             } else {
+                // When viewing overview, show back to setlists
                 backLabel = 'Back to Setlists';
-                backAction = () => window.location.href = '/';
+                backAction = () => window.history.back();
             }
         } else if (route.type === 'song') {
             backLabel = 'Back to Setlist';
@@ -3765,15 +3781,46 @@ class PageApp {
         } else if (route.type === 'librarySong') {
             backLabel = 'Back to Song Library';
             backAction = () => this.closeLibrarySongView();
-        } else if (route.type === 'songs') {
-            backLabel = 'Back to Home';
-            backAction = () => window.location.href = '/';
         } else if (route.type === 'settings') {
             backLabel = 'Back to Home';
             backAction = () => window.location.href = '/';
         }
 
         if (navMenu) {
+            // Set songs list for setlist routes
+            if (route.type === 'setlist' && this.songs && this.songs.length > 0) {
+                navMenu.songs = this.songs;
+
+                // Set setlist title (name if available, otherwise date and type)
+                if (this.currentSetlist) {
+                    if (this.currentSetlist.name) {
+                        navMenu.setlistTitle = this.currentSetlist.name;
+                    } else {
+                        let datePart = this.formatSetlistName(this.currentSetlist.date);
+                        // Remove the day name in parentheses (e.g., "(Sunday)")
+                        datePart = datePart.replace(/\s*\([^)]+\)/, '');
+                        const typePart = this.currentSetlist.type ? ` - ${this.currentSetlist.type}` : '';
+                        navMenu.setlistTitle = datePart + typePart;
+                    }
+                }
+            } else {
+                navMenu.songs = [];
+                navMenu.setlistTitle = 'Setlist';
+            }
+
+            // Set overview link visibility
+            navMenu.showOverviewLink = showOverviewLink;
+
+            // Set back button visibility
+            if (route.type === 'setlist') {
+                const hash = window.location.hash;
+                const isViewingSong = hash && hash.startsWith('#song-');
+                navMenu.showBackButton = !isViewingSong; // Only show when viewing overview
+            } else if (route.type === 'songs') {
+                navMenu.showBackButton = false; // No back button for song library
+            } else {
+                navMenu.showBackButton = true;
+            }
             navMenu.setAttribute('back-label', backLabel);
         }
 

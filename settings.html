@@ -27,66 +27,8 @@
             <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
 
             <main class="home-content">
-                <div class="settings-content">
-                    <h2>Settings</h2>
-
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 2rem; margin-bottom: 1rem; color: var(--header-bg);">Data Management</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            Import setlists and songs from the filesystem. This will scan the sets/ directory and add all found setlists to the database.
-                        </p>
-                        <button id="import-button" class="setlist-button" style="display: inline-block; width: auto;">
-                            Import Setlists from Filesystem
-                        </button>
-
-                        <h4 style="font-size: 1.4rem; margin-top: 2rem; margin-bottom: 1rem; color: #e74c3c;">Danger Zone</h4>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            Clear all data from IndexedDB and localStorage. This action cannot be undone!
-                        </p>
-                        <button id="clear-db-button" class="setlist-button" style="display: inline-block; width: auto; background-color: #e74c3c; border-color: #c0392b;">
-                            Clear Database
-                        </button>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">CCLI Bookmarklet</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            Import songs directly from SongSelect with a single click using the bookmarklet.
-                        </p>
-                        <a href="/bookmarklet" class="setlist-button" style="display: inline-block; width: auto; text-decoration: none;">
-                            Install Bookmarklet
-                        </a>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">CCLI Extension Imports</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            Songs imported from SongSelect using the Chrome extension will appear here. Process them to add to your library.
-                        </p>
-                        <button id="check-imports-button" class="setlist-button" style="display: inline-block; width: auto; margin-right: 1rem;">
-                            Check for Pending Imports
-                        </button>
-                        <div id="pending-imports-list" style="margin-top: 2rem; display: none;">
-                            <h4 style="font-size: 1.4rem; margin-bottom: 1rem; color: var(--header-bg);">Pending Imports</h4>
-                            <div id="imports-container"></div>
-                        </div>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">Media Player</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            Configure global media player settings. These settings apply to all setlists.
-                        </p>
-                        <media-player-settings id="media-player-settings"></media-player-settings>
-                    </div>
-
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">App Settings</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem;">
-                            Additional settings coming soon...
-                        </p>
-                    </div>
-                </div>
+                <h2 style="margin: 2rem 1rem 1rem 1rem;">Settings</h2>
+                <app-settings id="app-settings"></app-settings>
             </main>
         </div>
     </div>
@@ -180,37 +122,48 @@
                 });
         }
 
-        // Handle clear database button
-        document.getElementById('clear-db-button').addEventListener('click', async () => {
-            const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
+        // Handle app-settings component events
+        customElements.whenDefined('app-settings').then(() => {
+            const appSettings = document.getElementById('app-settings');
 
-            if (!confirmed) return;
+            if (appSettings) {
+                // Handle clear database request
+                appSettings.addEventListener('clear-database-requested', async () => {
+                    const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
 
-            try {
-                // Clear IndexedDB
-                const db = new SetalightDB();
-                await db.init();
-                await db.clearAll();
+                    if (!confirmed) return;
 
-                // Clear localStorage
-                localStorage.clear();
+                    try {
+                        // Clear IndexedDB
+                        const db = new SetalightDB();
+                        await db.init();
+                        await db.clearAll();
 
-                // Clear sessionStorage
-                sessionStorage.clear();
+                        // Clear localStorage
+                        localStorage.clear();
 
-                alert('✅ Database cleared successfully!\n\nThe page will now reload.');
+                        // Clear sessionStorage
+                        sessionStorage.clear();
 
-                // Reload the page
-                window.location.reload();
-            } catch (error) {
-                console.error('Failed to clear database:', error);
-                alert('❌ Failed to clear database: ' + error.message);
+                        alert('✅ Database cleared successfully!\n\nThe page will now reload.');
+
+                        // Reload the page
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Failed to clear database:', error);
+                        alert('❌ Failed to clear database: ' + error.message);
+                    }
+                });
+
+                // Handle import request - handled by setlist-app.js
+                // Handle check imports request - handled by ccli-imports.js
             }
         });
     </script>
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/media-player-settings.js"></script>
+    <script type="module" src="/components/app-settings.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
     <script type="module" src="/js/ccli-imports.js"></script>
 </body>

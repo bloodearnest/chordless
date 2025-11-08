@@ -25,7 +25,10 @@ export class NavMenu extends LitElement {
     static properties = {
         showBackButton: { type: Boolean, attribute: 'show-back-button' },
         backLabel: { type: String, attribute: 'back-label' },
-        popoverId: { type: String, attribute: 'popover-id' }
+        popoverId: { type: String, attribute: 'popover-id' },
+        songs: { type: Array },
+        showOverviewLink: { type: Boolean },
+        setlistTitle: { type: String }
     };
 
     static styles = css`
@@ -44,11 +47,15 @@ export class NavMenu extends LitElement {
             padding: 0;
             background: white;
             min-width: 250px;
-            max-width: 250px;
+            max-width: 90vw;
+            max-height: 80vh;
             margin: 0;
             position: fixed;
             inset: unset;
-            overflow: hidden;
+            overflow-y: auto;
+            /* Start positioned off-screen to prevent flash */
+            top: -9999px;
+            left: -9999px;
         }
 
         .nav-menu-popover::backdrop {
@@ -93,20 +100,33 @@ export class NavMenu extends LitElement {
             color: var(--color-primary, #3498db);
         }
 
-        .back-button {
+        .setlist-section {
             margin-bottom: 0.5rem;
-            padding-bottom: 1rem;
+            padding-bottom: 0.5rem;
             position: relative;
         }
 
-        .back-button::after {
+        .setlist-section::after {
             content: '';
             position: absolute;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 1px;
+            height: 3px;
             background: #ecf0f1;
+        }
+
+        .section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: #7f8c8d;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .song-item {
+            font-size: 1.3rem;
         }
     `;
 
@@ -116,6 +136,9 @@ export class NavMenu extends LitElement {
         this.backLabel = 'Back';
         this.popoverId = 'nav-menu-popover';
         this.triggerButton = null;
+        this.songs = [];
+        this.showOverviewLink = false;
+        this.setlistTitle = 'Setlist';
     }
 
     connectedCallback() {
@@ -126,11 +149,40 @@ export class NavMenu extends LitElement {
             if (popover) {
                 popover.addEventListener('toggle', (e) => {
                     if (e.newState === 'open') {
+                        // Position the popover before it becomes visible
                         this._positionPopover();
+                        // Add click-outside listener when open
+                        setTimeout(() => {
+                            document.addEventListener('click', this._handleClickOutside);
+                        }, 0);
+                    } else {
+                        // Remove listener when closed
+                        document.removeEventListener('click', this._handleClickOutside);
                     }
                 });
             }
         });
+
+        // Bind the click outside handler
+        this._handleClickOutside = this._handleClickOutside.bind(this);
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        document.removeEventListener('click', this._handleClickOutside);
+    }
+
+    _handleClickOutside(e) {
+        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        if (!popover) return;
+
+        // Close if clicked outside (browser handles auto-close)
+        const clickedInside = e.composedPath().includes(popover);
+        const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton);
+
+        if (!clickedInside && !clickedTrigger) {
+            this.closePopover();
+        }
     }
 
     // Set the trigger button element for positioning
@@ -150,13 +202,49 @@ export class NavMenu extends LitElement {
 
     render() {
         return html`
-            <div id="${this.popoverId}" class="nav-menu-popover" part="popover" popover>
+            <div id="${this.popoverId}" class="nav-menu-popover" part="popover" popover="manual">
                 <nav class="nav-menu" part="nav">
+                    ${(this.showOverviewLink || this.songs?.length > 0) ? html`
+                        <div class="setlist-section">
+                            <div class="section-title">${this.setlistTitle}</div>
+                            ${this.showOverviewLink ? html`
+                                <button
+                                    class="nav-menu-item"
+                                    part="nav-item overview-item"
+                                    @click=${this._handleOverviewClick}
+                                >
+                                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <rect x="3" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="3" width="7" height="7"></rect>
+                                        <rect x="14" y="14" width="7" height="7"></rect>
+                                        <rect x="3" y="14" width="7" height="7"></rect>
+                                    </svg>
+                                    <span>Overview</span>
+                                </button>
+                            ` : ''}
+                            ${this.songs?.map((song, index) => html`
+                                <button
+                                    class="nav-menu-item song-item"
+                                    part="nav-item song-item"
+                                    @click=${() => this._handleSongClick(index)}
+                                >
+                                    <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M9 18V5l12-2v13"></path>
+                                        <circle cx="6" cy="18" r="3"></circle>
+                                        <circle cx="18" cy="16" r="3"></circle>
+                                    </svg>
+                                    <span>${song.title}</span>
+                                </button>
+                            `)}
+                        </div>
+                    ` : ''}
+
                     ${this.showBackButton ? html`
                         <button
-                            class="nav-menu-item back-button"
+                            class="nav-menu-item"
                             part="nav-item back-button"
                             @click=${this._handleBackClick}
+                            style="margin-bottom: 0.5rem; padding-bottom: 1rem; border-bottom: 1px solid #ecf0f1;"
                         >
                             <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="19" y1="12" x2="5" y2="12"></line>
@@ -185,20 +273,19 @@ export class NavMenu extends LitElement {
                         <span>Song Library</span>
                     </a>
 
-                    <a href="/settings" class="nav-menu-item" part="nav-item">
-                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <button class="nav-menu-item" part="nav-item" @click=${this._handleSettingsClick}>
+                        <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"></path>
                             <circle cx="12" cy="12" r="3"></circle>
-                            <path d="M12 1v6m0 6v6"></path>
-                            <path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 19.07a10 10 0 0 1 0-14.14"></path>
                         </svg>
                         <span>Settings</span>
-                    </a>
+                    </button>
 
                     <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
                         <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
                         </svg>
-                        <span>Bookmarklet</span>
+                        <span>SongSelect Import</span>
                     </a>
                 </nav>
             </div>
@@ -215,9 +302,42 @@ export class NavMenu extends LitElement {
         this.closePopover();
     }
 
+    _handleOverviewClick() {
+        this.dispatchEvent(new CustomEvent('overview-click', {
+            bubbles: true,
+            composed: true
+        }));
+
+        // Close the popover after overview is clicked
+        this.closePopover();
+    }
+
+    _handleSongClick(index) {
+        this.dispatchEvent(new CustomEvent('song-click', {
+            bubbles: true,
+            composed: true,
+            detail: { index }
+        }));
+
+        // Close the popover after song is clicked
+        this.closePopover();
+    }
+
+    _handleSettingsClick() {
+        this.dispatchEvent(new CustomEvent('settings-click', {
+            bubbles: true,
+            composed: true
+        }));
+
+        // Close the popover after settings is clicked
+        this.closePopover();
+    }
+
     // Public API for controlling the popover
     showPopover() {
         const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        // Position before showing to avoid visual jump
+        this._positionPopover();
         popover?.showPopover();
     }
 
@@ -229,6 +349,11 @@ export class NavMenu extends LitElement {
     togglePopover() {
         const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
         popover?.togglePopover();
+    }
+
+    isOpen() {
+        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        return popover?.matches(':popover-open') || false;
     }
 }
 
