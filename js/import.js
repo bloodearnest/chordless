@@ -2,16 +2,19 @@
 
 import { ChordProParser } from './parser.js';
 import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText, determineSetlistType, parseTempo } from './db.js';
+import { getGlobalSongsDB } from './songs-db.js';
 
 export class SetlistImporter {
-    constructor() {
-        this.db = new SetalightDB();
+    constructor(workspaceId = null) {
+        this.workspaceDb = new SetalightDB(workspaceId);
+        this.songsDb = null; // Will be initialized in init()
         this.parser = new ChordProParser();
         this.songsCache = new Map(); // In-memory cache during import
     }
 
     async init() {
-        await this.db.init();
+        await this.workspaceDb.init();
+        this.songsDb = await getGlobalSongsDB();
     }
 
     /**
@@ -60,7 +63,8 @@ export class SetlistImporter {
 
         // Clear existing data
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
-        await this.db.clearAll();
+        await this.workspaceDb.clearAll();
+        await this.songsDb.clearAll();
         this.songsCache.clear();
         console.log('[Import] Cleared existing data');
 
@@ -133,10 +137,24 @@ export class SetlistImporter {
                 }
             }
 
-            // Save all songs to database
+            // Save all songs to both global and workspace databases
+            // Global DB: For future workspace switching
+            // Workspace DB: For backward compatibility with existing app
             if (progressCallback) progressCallback({ stage: 'saving', message: 'Saving songs to database...' });
             for (const song of this.songsCache.values()) {
-                await this.db.saveSong(song);
+                // Save to global songs database
+                await this.songsDb.saveSong(song);
+
+                // LEGACY: Also save to workspace DB for backward compatibility
+                // Convert to legacy format with appearances for old app code
+                const legacySong = {
+                    ...song,
+                    chordproText: song.rawChordPro, // Old field name
+                    appearances: [], // Will be populated by song_usage later
+                    createdAt: song.importedAt,
+                    lastUsedAt: song.importedAt
+                };
+                await this.workspaceDb.saveSong(legacySong);
             }
 
             console.log(`[Import] Complete! Imported ${importedSetlists.length} setlists, ${this.songsCache.size} unique songs`);
@@ -255,14 +273,18 @@ export class SetlistImporter {
             updatedAt: new Date().toISOString()
         };
 
-        // Save setlist to database
-        await this.db.saveSetlist(setlist);
+        // Save setlist to workspace database
+        await this.workspaceDb.saveSetlist(setlist);
+
+        // Update song usage tracking
+        await this.workspaceDb.updateSongUsageOnSetlistSave(setlist);
 
         return setlist;
     }
 
     /**
-     * Find existing song or create new one
+     * Find existing song or create new one in global database
+     * Returns songId
      */
     async findOrCreateSong(parsed, chordproText, setlistId, setlistDate) {
         const songId = generateSongId(parsed);
@@ -270,29 +292,21 @@ export class SetlistImporter {
 
         // Check if we've already seen this song during this import
         if (this.songsCache.has(songId)) {
-            const song = this.songsCache.get(songId);
-
-            // Add to appearances
-            song.appearances.push({
-                setlistId: setlistId,
-                date: setlistDate,
-                playedInKey: parsed.metadata.key || null
-            });
-
+            // Song already in cache, just return its ID
             return songId;
         }
 
         // Parse tempo to extract BPM and note subdivision
         const tempoParsed = parseTempo(parsed.metadata.tempo);
 
-        // Create new song entry
+        // Create new song entry (only static content, no usage data)
         const song = {
             id: songId,
             ccliNumber: parsed.metadata.ccliSongNumber || parsed.metadata.ccli || null,
             title: parsed.metadata.title || 'Untitled',
             titleNormalized: normalizeTitle(parsed.metadata.title || 'untitled'),
             artist: parsed.metadata.artist || null,
-            chordproText: chordproText,
+            rawChordPro: chordproText,
             metadata: {
                 key: parsed.metadata.key || null,
                 tempo: tempoParsed.bpm,
@@ -301,13 +315,8 @@ export class SetlistImporter {
             },
             lyricsText: extractLyricsText(parsed),
             textHash: textHash,
-            appearances: [{
-                setlistId: setlistId,
-                date: setlistDate,
-                playedInKey: parsed.metadata.key || null
-            }],
-            createdAt: new Date().toISOString(),
-            lastUsedAt: setlistDate
+            sourceWorkspace: this.workspaceDb.workspaceId || 'default',
+            importedAt: new Date().toISOString()
         };
 
         // Add to cache

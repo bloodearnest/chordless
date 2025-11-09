@@ -31,6 +31,7 @@ export class AppHeader extends LitElement {
         title: { type: String },
         showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
         showInfoButton: { type: Boolean, attribute: 'show-info-button' },
+        showShareButton: { type: Boolean, attribute: 'show-share-button' },
         editMode: { type: Boolean, reflect: true },
         disableAnimation: { type: Boolean, attribute: 'disable-animation' },
         expanded: { type: Boolean, reflect: true }
@@ -262,6 +263,7 @@ export class AppHeader extends LitElement {
         this.title = '';
         this.showEditToggle = false;
         this.showInfoButton = false;
+        this.showShareButton = false;
         this.editMode = false;
         this.disableAnimation = false;
         this.expanded = false;
@@ -409,6 +411,17 @@ export class AppHeader extends LitElement {
                             i
                         </button>
                     ` : ''}
+
+                    ${this.showShareButton ? html`
+                        <button
+                            class="icon-button share-button"
+                            part="share-button"
+                            @click=${this._handleShareClick}
+                            aria-label="Share setlist"
+                        >
+                            ↗
+                        </button>
+                    ` : ''}
                 </div>
             </header>
         `;
@@ -430,6 +443,13 @@ export class AppHeader extends LitElement {
 
     _handleInfoClick(e) {
         this.dispatchEvent(new CustomEvent('info-click', {
+            bubbles: true,
+            composed: true
+        }));
+    }
+
+    _handleShareClick(e) {
+        this.dispatchEvent(new CustomEvent('share-click', {
             bubbles: true,
             composed: true
         }));

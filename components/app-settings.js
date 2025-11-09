@@ -113,6 +113,16 @@ export class AppSettings extends LitElement {
                 </div>
 
                 <div class="settings-section">
+                    <h3>Cloud Features</h3>
+                    <p>
+                        Connect with Google Drive to enable cloud storage, sync, and collaboration features.
+                    </p>
+                    <a href="/authorize" class="setlist-button" style="display: inline-block; width: auto; text-decoration: none;">
+                        Manage Google Authorization
+                    </a>
+                </div>
+
+                <div class="settings-section">
                     <h3>Media Player</h3>
                     <p>
                         Configure global media player settings. These settings apply to all setlists.

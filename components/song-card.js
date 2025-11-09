@@ -334,14 +334,36 @@ export class SongCard extends LitElement {
     }
 
     renderLastPlayed() {
-        const { lastUsedAt } = this.song;
+        const { lastUsageInfo, lastUsedAt } = this.song;
 
-        if (!lastUsedAt) {
-            return '';
+        // Use new lastUsageInfo if available
+        if (lastUsageInfo && lastUsageInfo.date) {
+            const weeksAgo = this.getWeeksAgo(lastUsageInfo.date);
+            const parts = [];
+
+            // Add leader if available
+            if (lastUsageInfo.leader) {
+                parts.push(lastUsageInfo.leader);
+            }
+
+            // Add key if available
+            if (lastUsageInfo.key) {
+                parts.push(`in ${lastUsageInfo.key}`);
+            }
+
+            // Add time ago
+            parts.push(weeksAgo);
+
+            return html`<div class="last-played" part="last-played">${parts.join(' • ')}</div>`;
         }
 
-        const weeksAgo = this.getWeeksAgo(lastUsedAt);
-        return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`;
+        // Fallback to old lastUsedAt field
+        if (lastUsedAt) {
+            const weeksAgo = this.getWeeksAgo(lastUsedAt);
+            return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`;
+        }
+
+        return '';
     }
 
     getWeeksAgo(dateString) {

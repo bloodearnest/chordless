@@ -38,6 +38,7 @@ class PageApp {
         this.sectionState = {};
         this.sectionObserver = null;
         this.overviewEditMode = false; // Track whether overview is in edit mode
+        this.settingsImportHandler = null;
         this.init();
     }
 
@@ -312,6 +313,20 @@ class PageApp {
                 message.textContent = 'No songs in library. Import setlists to populate the song library.';
                 libraryContainer.appendChild(message);
                 return;
+            }
+
+            // Enrich songs with latest usage data
+            for (const song of songs) {
+                const usage = await this.db.getSongUsage(song.id);
+                if (usage && usage.usageHistory && usage.usageHistory.length > 0) {
+                    // Most recent is first (already sorted by date descending)
+                    const lastUsage = usage.usageHistory[0];
+                    song.lastUsageInfo = {
+                        date: lastUsage.setlistDate,
+                        leader: lastUsage.leader,
+                        key: lastUsage.playedInKey
+                    };
+                }
             }
 
             // Sort songs alphabetically by title
@@ -885,6 +900,26 @@ class PageApp {
 
                 item.appendChild(dateSpan);
                 item.appendChild(relativeSpan);
+
+                // Add leader and key info if available
+                const metaParts = [];
+                if (appearance.leader) {
+                    metaParts.push(appearance.leader);
+                }
+                if (appearance.playedInKey) {
+                    metaParts.push(`Key: ${appearance.playedInKey}`);
+                }
+
+                if (metaParts.length > 0) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'appearance-meta';
+                    metaSpan.textContent = metaParts.join(' • ');
+                    metaSpan.style.fontSize = '1.2rem';
+                    metaSpan.style.color = '#95a5a6';
+                    metaSpan.style.marginTop = '0.3rem';
+                    item.appendChild(metaSpan);
+                }
+
                 appearancesList.appendChild(item);
             });
 
@@ -1171,7 +1206,9 @@ class PageApp {
             .map(appearance => ({
                 date: appearance.date,
                 formattedDate: this.formatDate(appearance.date),
-                weeksAgo: this.getWeeksAgo(appearance.date)
+                weeksAgo: this.getWeeksAgo(appearance.date),
+                playedInKey: appearance.playedInKey,
+                leader: appearance.leader
             }));
     }
 
@@ -1225,12 +1262,15 @@ class PageApp {
     }
 
     setupImportButton() {
-        const importButton = document.getElementById('import-button');
-        if (!importButton) return;
+        const appSettings = document.getElementById('app-settings');
+        if (!appSettings) return;
 
-        importButton.addEventListener('click', async () => {
-            await this.runImport();
-        });
+        if (this.settingsImportHandler) {
+            appSettings.removeEventListener('import-requested', this.settingsImportHandler);
+        }
+
+        this.settingsImportHandler = () => this.runImport();
+        appSettings.addEventListener('import-requested', this.settingsImportHandler);
     }
 
     async runImport() {
@@ -1923,11 +1963,24 @@ class PageApp {
             return;
         }
 
+        // Load song usage data to get appearances
+        const songUsage = await this.db.getSongUsage(song.songId);
+
+        // Convert usage history to appearances format
+        const appearances = songUsage?.usageHistory?.map(entry => ({
+            setlistId: entry.setlistId,
+            date: entry.setlistDate,
+            playedInKey: entry.playedInKey,
+            leader: entry.leader,
+            setlistName: entry.setlistName
+        })) || [];
+
         // Merge the display song data with the full database song data
         const songData = {
             ...fullSong,
             title: song.title,
-            metadata: song.metadata
+            metadata: song.metadata,
+            appearances: appearances
         };
 
         // Create title
@@ -2039,6 +2092,26 @@ class PageApp {
 
                 item.appendChild(dateSpan);
                 item.appendChild(relativeSpan);
+
+                // Add leader and key info if available
+                const metaParts = [];
+                if (appearance.leader) {
+                    metaParts.push(appearance.leader);
+                }
+                if (appearance.playedInKey) {
+                    metaParts.push(`Key: ${appearance.playedInKey}`);
+                }
+
+                if (metaParts.length > 0) {
+                    const metaSpan = document.createElement('span');
+                    metaSpan.className = 'appearance-meta';
+                    metaSpan.textContent = metaParts.join(' • ');
+                    metaSpan.style.fontSize = '1.2rem';
+                    metaSpan.style.color = '#95a5a6';
+                    metaSpan.style.marginTop = '0.3rem';
+                    item.appendChild(metaSpan);
+                }
+
                 appearancesList.appendChild(item);
             });
 
@@ -2728,6 +2801,17 @@ class PageApp {
                 this.showSongInfo(this._currentSongForInfo);
             } else {
                 this.showSetlistInfo();
+            }
+        });
+
+        // Listen to share button clicks
+        appHeader.addEventListener('share-click', () => {
+            const shareModal = document.getElementById('share-modal');
+            const shareSetlist = document.getElementById('share-setlist');
+            if (shareModal && shareSetlist) {
+                // Pass current setlist to share component
+                shareSetlist.setlist = this.currentSetlist;
+                shareModal.show();
             }
         });
 

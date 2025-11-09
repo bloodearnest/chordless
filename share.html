@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Import shared setlist">
+    <meta name="view-transition" content="same-origin">
+    <title>Import Shared Setlist - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .share-container {
+            max-width: 600px;
+            margin: 4rem auto;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .share-status {
+            padding: 2rem;
+            border-radius: 8px;
+            margin-bottom: 2rem;
+        }
+
+        .share-status.loading {
+            background: #ecf0f1;
+        }
+
+        .share-status.success {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .share-status.error {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+
+        .spinner {
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .share-details {
+            margin-top: 2rem;
+            padding: 1.5rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+            text-align: left;
+        }
+
+        .share-details h3 {
+            margin-top: 0;
+        }
+
+        .song-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .song-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .song-list li:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="share-container">
+            <h1>Import Shared Setlist</h1>
+
+            <div id="status-container"></div>
+            <div id="details-container"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { SetalightDB } from '/js/db.js';
+
+        // Auto-detect auth proxy URL
+        const AUTH_PROXY_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:8787'
+            : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+
+        // Extract share ID from URL
+        const pathParts = window.location.pathname.split('/');
+        const shareId = pathParts[pathParts.length - 1];
+
+        if (!shareId || shareId.length !== 8) {
+            showError('Invalid share link');
+        } else {
+            importSharedSetlist(shareId);
+        }
+
+        async function importSharedSetlist(shareId) {
+            showLoading('Fetching shared setlist...');
+
+            try {
+                // Fetch setlist from auth proxy
+                const response = await fetch(`${AUTH_PROXY_URL}/api/share/${shareId}`);
+
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('Setlist not found or expired');
+                    }
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to fetch setlist');
+                }
+
+                const { setlist, created_at } = await response.json();
+
+                // Show details
+                showDetails(setlist, created_at);
+
+                // Import into database
+                showLoading('Importing into your library...');
+
+                const db = new SetalightDB();
+                await db.init();
+
+                // Check if setlist already exists
+                const existingSetlists = await db.getAllSetlists();
+                const duplicate = existingSetlists.find(s => s.date === setlist.date);
+
+                let importedSetlist;
+
+                if (duplicate) {
+                    // Ask user if they want to replace or import as new
+                    const replace = confirm(
+                        `You already have a setlist for ${formatDate(setlist.date)}.\n\n` +
+                        `Do you want to replace it?\n\n` +
+                        `Click OK to replace, Cancel to import as a new setlist.`
+                    );
+
+                    if (replace) {
+                        // Replace existing
+                        setlist.id = duplicate.id;
+                        await db.updateSetlist(setlist);
+                        importedSetlist = setlist;
+                    } else {
+                        // Import as new with modified date
+                        const newDate = new Date(setlist.date);
+                        newDate.setMinutes(newDate.getMinutes() + 1);
+                        setlist.date = newDate.toISOString();
+                        delete setlist.id;
+                        importedSetlist = await db.createSetlist(setlist);
+                    }
+                } else {
+                    // New setlist - import directly
+                    delete setlist.id; // Remove old ID
+                    importedSetlist = await db.createSetlist(setlist);
+                }
+
+                // Show success
+                showSuccess('Setlist imported successfully!', importedSetlist);
+
+                // Redirect after 2 seconds
+                setTimeout(() => {
+                    window.location.href = `/setlist/${importedSetlist.id}`;
+                }, 2000);
+
+            } catch (error) {
+                console.error('[Share] Error importing setlist:', error);
+                showError(error.message);
+            }
+        }
+
+        function showLoading(message) {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="share-status loading">
+                    <div class="spinner"></div>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+
+        function showSuccess(message, setlist) {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="share-status success">
+                    <h2>✓ ${message}</h2>
+                    <p>Redirecting to setlist...</p>
+                </div>
+            `;
+        }
+
+        function showError(message) {
+            const container = document.getElementById('status-container');
+            container.innerHTML = `
+                <div class="share-status error">
+                    <h2>✗ Error</h2>
+                    <p>${message}</p>
+                    <br>
+                    <a href="/" class="setlist-button">Go to Home</a>
+                </div>
+            `;
+        }
+
+        function showDetails(setlist, createdAt) {
+            const container = document.getElementById('details-container');
+
+            const songCount = setlist.songs?.length || 0;
+            const date = formatDate(setlist.date);
+
+            container.innerHTML = `
+                <div class="share-details">
+                    <h3>${setlist.name || date}</h3>
+                    <p><strong>Date:</strong> ${date}</p>
+                    <p><strong>Songs:</strong> ${songCount}</p>
+                    ${setlist.songs?.length > 0 ? `
+                        <ul class="song-list">
+                            ${setlist.songs.map(song => `
+                                <li>${song.title}${song.artist ? ` - ${song.artist}` : ''}</li>
+                            `).join('')}
+                        </ul>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function formatDate(isoString) {
+            const date = new Date(isoString);
+            return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+    </script>
+</body>
+</html>

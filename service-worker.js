@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v203';
+const CACHE_NAME = 'setalight-v205';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -86,12 +86,235 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// Import auth-db module
+import * as AuthDB from '/js/auth-db.js';
+
 // Handle messages from clients
-self.addEventListener('message', (event) => {
-    if (event.data && event.data.type === 'SKIP_WAITING') {
-        console.log('[SW] Received SKIP_WAITING message');
-        self.skipWaiting();
+self.addEventListener('message', async (event) => {
+    const { type, data, messageId } = event.data || {};
+
+    console.log('[SW] Received message:', type);
+
+    try {
+        switch (type) {
+            case 'SKIP_WAITING':
+                console.log('[SW] Received SKIP_WAITING message');
+                self.skipWaiting();
+                break;
+
+            case 'STORE_BLOB':
+                // Store encrypted token blob
+                await AuthDB.storeBlob(data.blob, data.metadata);
+                respondToClient(event, messageId, { success: true });
+                break;
+
+            case 'GET_BLOB':
+                // Retrieve blob
+                const blobData = await AuthDB.getBlob();
+                respondToClient(event, messageId, { success: true, data: blobData });
+                break;
+
+            case 'DELETE_BLOB':
+                // Delete blob (logout)
+                await AuthDB.deleteBlob();
+                respondToClient(event, messageId, { success: true });
+                break;
+
+            case 'QUEUE_INVITE':
+                // Queue an invite operation
+                const inviteId = await AuthDB.queueOperation({
+                    type: 'invite',
+                    file_id: data.file_id,
+                    email: data.email
+                });
+                respondToClient(event, messageId, { success: true, operationId: inviteId });
+                // Trigger processing
+                processOperationQueue();
+                break;
+
+            case 'QUEUE_REVOKE':
+                // Queue a revoke operation
+                const revokeId = await AuthDB.queueOperation({
+                    type: 'revoke',
+                    file_id: data.file_id,
+                    permission_id: data.permission_id
+                });
+                respondToClient(event, messageId, { success: true, operationId: revokeId });
+                // Trigger processing
+                processOperationQueue();
+                break;
+
+            case 'GET_PENDING_OPERATIONS':
+                // Get all pending operations
+                const pending = await AuthDB.getPendingOperations();
+                respondToClient(event, messageId, { success: true, operations: pending });
+                break;
+
+            case 'EXPORT_BLOB':
+                // Export blob as backup
+                const backup = await AuthDB.exportBlobBackup();
+                respondToClient(event, messageId, { success: true, backup });
+                break;
+
+            case 'IMPORT_BLOB':
+                // Import blob from backup
+                await AuthDB.importBlobBackup(data.backup);
+                respondToClient(event, messageId, { success: true });
+                break;
+
+            case 'PROCESS_QUEUE':
+                // Manually trigger queue processing
+                processOperationQueue();
+                respondToClient(event, messageId, { success: true });
+                break;
+
+            default:
+                console.warn('[SW] Unknown message type:', type);
+        }
+    } catch (error) {
+        console.error('[SW] Error handling message:', error);
+        respondToClient(event, messageId, { success: false, error: error.message });
     }
+});
+
+// Helper to respond to client messages
+function respondToClient(event, messageId, response) {
+    if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage({ messageId, ...response });
+    }
+}
+
+// ==============================================================================
+// FUTURE FEATURE: Drive API Operation Queue
+// ==============================================================================
+// The functions below handle queued Drive API operations (invite/revoke permissions).
+// Operations are queued when offline and processed when the user is online and authenticated.
+// Currently not used - infrastructure for future collaboration features.
+// ==============================================================================
+
+// Process operation queue
+async function processOperationQueue() {
+    console.log('[SW] Processing operation queue');
+
+    try {
+        const pending = await AuthDB.getPendingOperations();
+        console.log('[SW] Found', pending.length, 'pending operations');
+
+        for (const operation of pending) {
+            // Skip if retried too many times
+            if (operation.retry_count >= 3) {
+                console.warn('[SW] Operation', operation.id, 'exceeded retry limit');
+                await AuthDB.updateOperationStatus(operation.id, 'failed', 'Exceeded retry limit');
+                continue;
+            }
+
+            try {
+                await processOperation(operation);
+                await AuthDB.updateOperationStatus(operation.id, 'completed');
+                console.log('[SW] Operation', operation.id, 'completed');
+            } catch (error) {
+                console.error('[SW] Operation', operation.id, 'failed:', error);
+                await AuthDB.updateOperationStatus(operation.id, 'failed', error.message);
+            }
+        }
+
+        // Clean up old completed operations
+        await AuthDB.clearCompletedOperations();
+    } catch (error) {
+        console.error('[SW] Error processing queue:', error);
+    }
+}
+
+// Process a single operation
+async function processOperation(operation) {
+    // Get blob
+    const blobData = await AuthDB.getBlob();
+    if (!blobData) {
+        throw new Error('No auth blob found - user needs to re-authenticate');
+    }
+
+    // Get current ID token from a client
+    const idToken = await requestIdTokenFromClient();
+    if (!idToken) {
+        throw new Error('No ID token available - user needs to refresh session');
+    }
+
+    const AUTH_PROXY_URL = self.location.hostname === 'localhost'
+        ? 'http://localhost:8787'
+        : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+
+    if (operation.type === 'invite') {
+        // Call /session/invite
+        const response = await fetch(`${AUTH_PROXY_URL}/session/invite`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blob: blobData.blob,
+                id_token: idToken,
+                file_id: operation.file_id,
+                email: operation.email
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Invite failed');
+        }
+
+        return await response.json();
+    } else if (operation.type === 'revoke') {
+        // Call /session/revoke
+        const response = await fetch(`${AUTH_PROXY_URL}/session/revoke`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                blob: blobData.blob,
+                id_token: idToken,
+                file_id: operation.file_id,
+                permission_id: operation.permission_id
+            })
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Revoke failed');
+        }
+
+        return await response.json();
+    }
+
+    throw new Error('Unknown operation type: ' + operation.type);
+}
+
+// Request ID token from an active client
+async function requestIdTokenFromClient() {
+    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+
+    if (clients.length === 0) {
+        return null;
+    }
+
+    // Ask the first client for an ID token
+    return new Promise((resolve) => {
+        const messageChannel = new MessageChannel();
+        const timeout = setTimeout(() => resolve(null), 5000);
+
+        messageChannel.port1.onmessage = (event) => {
+            clearTimeout(timeout);
+            resolve(event.data.idToken || null);
+        };
+
+        clients[0].postMessage(
+            { type: 'REQUEST_ID_TOKEN' },
+            [messageChannel.port2]
+        );
+    });
+}
+
+// Process queue periodically when online
+self.addEventListener('online', () => {
+    console.log('[SW] Back online, processing queue');
+    processOperationQueue();
 });
 
 // Fetch event handler - routes requests
@@ -99,6 +322,16 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
     console.log('[SW] Fetch:', event.request.method, url.pathname);
+
+    // Always pass through Google OAuth/GSI requests
+    if (url.origin === 'https://accounts.google.com') {
+        return;
+    }
+
+    // Always pass through auth-proxy requests (different port)
+    if (url.port === '8787' || url.hostname.includes('workers.dev')) {
+        return;
+    }
 
     // Handle CDN requests (Lit.js from jsdelivr)
     if (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.includes('/npm/lit')) {
@@ -370,6 +603,43 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/setlist.html');
+        }
+    }
+
+    // Share page: /share/{id}
+    const shareMatch = path.match(/^\/share\/([a-zA-Z0-9]+)$/);
+    if (shareMatch) {
+        console.log('[SW] Serving share.html');
+        if (DEV_MODE) {
+            return fetch('/share.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/share.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/share.html');
+            });
+        } else {
+            return fetch('/share.html');
+        }
+    }
+
+    // Authorize page: /authorize
+    if (path === '/authorize' || path === '/authorize/' || path === '/authorize.html') {
+        console.log('[SW] Serving authorize.html');
+        if (DEV_MODE) {
+            return fetch('/authorize.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/authorize.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/authorize.html');
+            });
+        } else {
+            return fetch('/authorize.html');
         }
     }
 
