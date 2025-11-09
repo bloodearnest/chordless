@@ -780,7 +780,7 @@ class PageApp {
         newInfoButton.onclick = () => this.showLibrarySongInfo(parsed, song);
     }
 
-    showLibrarySongInfo(parsed, song) {
+    async showLibrarySongInfo(parsed, song) {
         const modal = document.getElementById('library-song-info-modal');
         const modalBody = document.getElementById('library-modal-body');
 
@@ -791,249 +791,39 @@ class PageApp {
         // Clear previous content
         modalBody.textContent = '';
 
-        // Create title
-        const title = document.createElement('h2');
-        title.textContent = parsed.metadata.title || 'Untitled';
-        modalBody.appendChild(title);
+        // Create or get song-info component
+        let songInfoEl = modalBody.querySelector('song-info');
+        if (!songInfoEl) {
+            songInfoEl = document.createElement('song-info');
+            modalBody.appendChild(songInfoEl);
+        }
 
-        // Create two-column container
-        const columnsContainer = document.createElement('div');
-        columnsContainer.className = 'modal-columns-container';
+        // Show loading state
+        songInfoEl.loading = true;
 
-        // Left column with metadata
-        const leftColumn = document.createElement('div');
-        leftColumn.className = 'modal-info-grid modal-left-column';
+        // Load song usage data to get appearances
+        const songUsage = await this.db.getSongUsage(song.id);
 
-        // Get template for info items
-        const itemTemplate = document.getElementById('song-info-item-template');
+        // Convert usage history to appearances format
+        const appearances = songUsage?.usageHistory?.map(entry => ({
+            setlistId: entry.setlistId,
+            date: entry.setlistDate,
+            playedInKey: entry.playedInKey,
+            leader: entry.leader,
+            setlistName: entry.setlistName
+        })) || [];
 
-        // Helper function to add info items
-        const addInfoItem = (label, value, tooltip = null) => {
-            const clone = itemTemplate.content.cloneNode(true);
-            const labelEl = clone.querySelector('.modal-info-label');
-            const valueEl = clone.querySelector('.modal-info-value');
-
-            labelEl.textContent = label;
-            valueEl.textContent = value;
-
-            // Add tooltip if provided
-            if (tooltip) {
-                const tooltipWrapper = document.createElement('span');
-                tooltipWrapper.className = 'info-tooltip-wrapper';
-
-                const tooltipIcon = document.createElement('span');
-                tooltipIcon.className = 'info-tooltip-icon';
-                tooltipIcon.textContent = 'ⓘ';
-
-                const tooltipText = document.createElement('span');
-                tooltipText.className = 'info-tooltip-text';
-                tooltipText.textContent = tooltip;
-
-                tooltipWrapper.appendChild(tooltipIcon);
-                tooltipWrapper.appendChild(tooltipText);
-
-                // Toggle tooltip on click
-                tooltipIcon.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    tooltipWrapper.classList.toggle('active');
-                });
-
-                labelEl.appendChild(tooltipWrapper);
-            }
-
-            leftColumn.appendChild(clone);
+        // Create song data object
+        const songData = {
+            ...song,
+            title: parsed.metadata.title || song.title,
+            metadata: parsed.metadata
         };
 
-        // Add metadata items
-        if (parsed.metadata.artist) {
-            addInfoItem('Artist', parsed.metadata.artist);
-        }
-
-        // Merge key and tempo on one line
-        if (parsed.metadata.key || parsed.metadata.tempo) {
-            const keyTempo = [];
-            if (parsed.metadata.key) keyTempo.push(`Key: ${parsed.metadata.key}`);
-            if (parsed.metadata.tempo) keyTempo.push(`${parsed.metadata.tempo} BPM`);
-
-            addInfoItem(
-                'Original Key / Tempo',
-                keyTempo.join(' • '),
-                'This is the key/tempo from when the song was first imported, and may not reflect the original CCLI key.'
-            );
-        }
-
-        if (parsed.metadata.time) {
-            addInfoItem('Time Signature', parsed.metadata.time);
-        }
-
-        // Add appearance statistics
-        const stats = this.calculateAppearanceStats(song);
-        if (stats.totalAppearances > 0) {
-            addInfoItem('Times Played (Total)', stats.totalAppearances.toString());
-        }
-
-        // Right column with recent appearances
-        const rightColumn = document.createElement('div');
-        rightColumn.className = 'modal-right-column';
-
-        const recentAppearances = this.getRecentAppearances(song);
-        if (recentAppearances.length > 0) {
-            const appearancesTitle = document.createElement('div');
-            appearancesTitle.className = 'modal-appearances-title';
-            appearancesTitle.textContent = 'Played in Last Year';
-            rightColumn.appendChild(appearancesTitle);
-
-            const appearancesList = document.createElement('div');
-            appearancesList.className = 'modal-appearances-list';
-
-            recentAppearances.forEach(appearance => {
-                const item = document.createElement('div');
-                item.className = 'modal-appearance-item';
-
-                const dateSpan = document.createElement('span');
-                dateSpan.className = 'appearance-date';
-                dateSpan.textContent = appearance.formattedDate;
-
-                const relativeSpan = document.createElement('span');
-                relativeSpan.className = 'appearance-relative';
-                relativeSpan.textContent = appearance.weeksAgo;
-
-                item.appendChild(dateSpan);
-                item.appendChild(relativeSpan);
-
-                // Add leader and key info if available
-                const metaParts = [];
-                if (appearance.leader) {
-                    metaParts.push(appearance.leader);
-                }
-                if (appearance.playedInKey) {
-                    metaParts.push(`Key: ${appearance.playedInKey}`);
-                }
-
-                if (metaParts.length > 0) {
-                    const metaSpan = document.createElement('span');
-                    metaSpan.className = 'appearance-meta';
-                    metaSpan.textContent = metaParts.join(' • ');
-                    metaSpan.style.fontSize = '1.2rem';
-                    metaSpan.style.color = '#95a5a6';
-                    metaSpan.style.marginTop = '0.3rem';
-                    item.appendChild(metaSpan);
-                }
-
-                appearancesList.appendChild(item);
-            });
-
-            rightColumn.appendChild(appearancesList);
-        }
-
-        // Add CCLI to left column
-        if (parsed.metadata.ccli || parsed.metadata.ccliSongNumber) {
-            const clone = itemTemplate.content.cloneNode(true);
-            const labelEl = clone.querySelector('.modal-info-label');
-            const valueEl = clone.querySelector('.modal-info-value');
-
-            labelEl.textContent = 'CCLI Number';
-            valueEl.style.display = 'flex';
-            valueEl.style.alignItems = 'center';
-            valueEl.style.gap = '1rem';
-
-            const ccliSpan = document.createElement('span');
-            ccliSpan.textContent = parsed.metadata.ccli || parsed.metadata.ccliSongNumber;
-            valueEl.appendChild(ccliSpan);
-
-            if (parsed.metadata.ccliSongNumber) {
-                const songSelectUrl = `https://songselect.ccli.com/songs/${parsed.metadata.ccliSongNumber}/`;
-                const link = document.createElement('a');
-                link.href = songSelectUrl;
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.style.display = 'inline-flex';
-                link.style.alignItems = 'center';
-                link.style.gap = '0.5rem';
-                link.style.textDecoration = 'none';
-                link.style.color = '#00a3e0';
-                link.style.fontSize = '1.1rem';
-                link.style.fontWeight = '600';
-                link.style.padding = '0.25rem 0.5rem';
-                link.style.borderRadius = '4px';
-                link.style.transition = 'background-color 0.2s';
-                link.addEventListener('mouseover', () => link.style.backgroundColor = 'rgba(0,163,224,0.1)');
-                link.addEventListener('mouseout', () => link.style.backgroundColor = 'transparent');
-
-                // Create SVG icon
-                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg.setAttribute('width', '20');
-                svg.setAttribute('height', '20');
-                svg.setAttribute('viewBox', '0 0 1000 1000');
-
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('fill', '#00a3e0');
-                rect.setAttribute('y', '0');
-                rect.setAttribute('width', '1000');
-                rect.setAttribute('height', '1000');
-                rect.setAttribute('rx', '190.32');
-                rect.setAttribute('ry', '190.32');
-                svg.appendChild(rect);
-
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('fill', '#fff');
-                path.setAttribute('d', 'M758.53,231.15c1.6,1.57,1.61,4.18.02,5.76l-34.9,34.9c-1.54,1.54-4.02,1.53-5.59,0-122.98-119.9-319.88-118.95-441.69,2.86,0,0-97.82,97.82-129.96,129.96-2.86,2.86-7.71.08-6.67-3.83,16.27-61.04,48.19-118.82,96.06-166.7,144.17-144.17,377.31-145.16,522.7-2.96ZM558.62,556.91c-35.53,35.53-94,33.13-126.31-6.85-24.57-30.4-24.76-75.05-.46-105.67,31.36-39.52,88.32-42.93,124.1-10.23,1.59,1.46,4.02,1.47,5.54-.05l34.87-34.88c1.6-1.6,1.59-4.26-.05-5.81-55.76-52.66-143.67-51.7-198.26,2.89,0,0-.01.01-.02.02h0s-241.09,241.09-241.09,241.09c-1.17,1.17-1.52,2.93-.88,4.45,6.75,15.88,14.76,31.45,23.83,46.47,1.35,2.23,4.47,2.6,6.32.75l174.57-174.57c-1.36,30.21,14.69,60.44,37.27,83.03,55.57,55.57,144.88,56.09,201.19-.05.47-.47,218.59-218.58,241.07-241.06,1.15-1.15,1.46-2.85.83-4.34-6.78-15.98-14.86-31.58-23.97-46.66-1.35-2.23-4.47-2.6-6.32-.75l-252.21,252.22ZM357.4,355.89s.07-.07.1-.1c77.04-77.04,201.38-77.96,279.55-2.75,1.57,1.51,4.03,1.52,5.57-.02l34.89-34.89c1.59-1.59,1.58-4.22-.03-5.79-100.58-97.48-260.91-96.82-360.67,2.94l-188.7,188.7c-.79.79-1.23,1.87-1.2,2.99.56,21.22,2.94,42.57,7.13,63.46.63,3.13,4.56,4.28,6.82,2.02l216.54-216.54h0ZM357.5,638.14c-5.57-5.57-10.72-11.41-15.49-17.45-1.49-1.88-4.24-2.07-5.94-.37l-35.08,35.08c-1.47,1.47-1.6,3.83-.28,5.42,5.08,6.15,10.47,12.12,16.23,17.88,100.37,100.37,262.97,100.23,363.34-.14l188.96-188.96c.79-.79,1.23-1.89,1.2-3.01-.64-22.11-3.15-43.27-7.2-63.26-.63-3.13-4.55-4.25-6.81-1.99l-216.73,216.73c-77.97,77.93-204.24,78.03-282.19.07ZM276.38,719.26c-5.59-5.59-10.82-11.38-15.86-17.28-1.52-1.78-4.21-1.89-5.86-.24l-34.98,34.98c-1.5,1.5-1.59,3.9-.2,5.49,5.24,5.99,10.64,11.89,16.35,17.6,145.17,145.17,380.95,145.58,525.7,0,47.87-48.14,80.27-105.98,96.53-167.28,1.06-3.99-3.81-6.84-6.73-3.92l-130.5,130.5c-123.43,123.43-321.68,122.91-444.44.14ZM862.6,887.88c-6.72,0-13.01-1.28-18.93-3.82-5.9-2.54-11.08-6.07-15.57-10.54-4.47-4.47-7.98-9.68-10.54-15.57-2.54-5.9-3.82-12.22-3.82-18.93s1.28-13.03,3.82-18.93c2.56-5.9,6.07-11.1,10.54-15.57,4.49-4.47,9.68-8,15.57-10.54,5.92-2.54,12.22-3.82,18.93-3.82s13.12,1.28,19.02,3.82c5.92,2.54,11.1,6.07,15.57,10.54,4.49,4.47,7.98,9.68,10.49,15.57s3.78,12.22,3.78,18.93-1.26,13.03-3.78,18.93-6,11.1-10.49,15.57c-4.47,4.47-9.66,8-15.57,10.54-5.9,2.54-12.24,3.82-19.02,3.82ZM862.6,878.73c7.35,0,14-1.78,19.98-5.37,6-3.59,10.79-8.37,14.36-14.36,3.59-5.98,5.37-12.66,5.37-19.98s-1.78-14-5.37-19.98c-3.57-5.98-8.35-10.77-14.36-14.36-5.98-3.59-12.64-5.37-19.98-5.37s-13.92,1.78-19.94,5.37c-6,3.59-10.79,8.37-14.36,14.36-3.55,5.98-5.33,12.66-5.33,19.98s1.78,14,5.33,19.98c3.57,5.98,8.35,10.77,14.36,14.36,6.02,3.59,12.68,5.37,19.94,5.37ZM845.81,861.27v-45h21.66c2.31,0,4.53.55,6.72,1.64s3.99,2.67,5.37,4.74c1.41,2.08,2.1,4.62,2.1,7.64s-.71,5.73-2.14,7.93-3.25,3.92-5.5,5.12c-2.22,1.2-4.55,1.81-6.97,1.81h-16.71v-6.3h14.61c2.14,0,4.01-.73,5.63-2.22,1.64-1.49,2.43-3.59,2.43-6.34s-.8-4.81-2.43-6c-1.62-1.2-3.44-1.81-5.46-1.81h-11.25v38.79h-8.06ZM874.6,861.27l-11-20.99h8.73l11.17,20.99h-8.9Z');
-                svg.appendChild(path);
-
-                link.appendChild(svg);
-
-                const linkText = document.createElement('span');
-                linkText.textContent = 'View on SongSelect';
-                link.appendChild(linkText);
-
-                valueEl.appendChild(link);
-            }
-
-            leftColumn.appendChild(clone);
-        }
-
-        columnsContainer.appendChild(leftColumn);
-        columnsContainer.appendChild(rightColumn);
-        modalBody.appendChild(columnsContainer);
-
-        // Close tooltips when clicking elsewhere in modal
-        modalBody.addEventListener('click', () => {
-            const activeTooltips = modalBody.querySelectorAll('.info-tooltip-wrapper.active');
-            activeTooltips.forEach(tooltip => tooltip.classList.remove('active'));
-        });
-
-        // Add copyright info
-        if (parsed.metadata.copyright) {
-            const copyright = document.createElement('div');
-            copyright.className = 'modal-ccli';
-            copyright.textContent = parsed.metadata.copyright;
-            modalBody.appendChild(copyright);
-        }
-
-        if (parsed.metadata.ccliTrailer) {
-            const trailer = document.createElement('div');
-            trailer.className = 'modal-ccli';
-            trailer.textContent = parsed.metadata.ccliTrailer;
-            modalBody.appendChild(trailer);
-        }
-
-        // Show modal
-        modal.classList.add('active');
-
-        // Setup close button
-        const closeButton = document.getElementById('library-modal-close');
-        if (closeButton) {
-            closeButton.onclick = () => {
-                modal.classList.remove('active');
-            };
-        }
-
-        // Close on overlay click
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        };
+        // Update component
+        songInfoEl.loading = false;
+        songInfoEl.song = songData;
+        songInfoEl.appearances = appearances;
     }
 
     setupLibraryFontSizeControls() {
@@ -1955,11 +1745,22 @@ class PageApp {
 
         modal.show();
 
+        // Create or get song-info component
+        let songInfoEl = modalBody.querySelector('song-info');
+        if (!songInfoEl) {
+            songInfoEl = document.createElement('song-info');
+            modalBody.appendChild(songInfoEl);
+        }
+
+        // Show loading state
+        songInfoEl.loading = true;
+
         // Load full song data from database to get appearances
         const fullSong = await this.db.getSong(song.songId);
         if (!fullSong) {
             console.error('Could not load full song data for:', song.songId);
-            modalBody.textContent = 'Error loading song information.';
+            songInfoEl.loading = false;
+            songInfoEl.song = null;
             return;
         }
 
@@ -1979,235 +1780,13 @@ class PageApp {
         const songData = {
             ...fullSong,
             title: song.title,
-            metadata: song.metadata,
-            appearances: appearances
+            metadata: song.metadata
         };
 
-        // Create title
-        const title = document.createElement('h2');
-        title.textContent = songData.title;
-        modalBody.appendChild(title);
-
-        // Create two-column container
-        const columnsContainer = document.createElement('div');
-        columnsContainer.className = 'modal-columns-container';
-
-        // Left column with metadata
-        const leftColumn = document.createElement('div');
-        leftColumn.className = 'modal-info-grid modal-left-column';
-
-        // Get template for info items
-        const itemTemplate = document.getElementById('song-info-item-template');
-
-        // Helper function to add info items
-        const addInfoItem = (label, value, tooltip = null) => {
-            const clone = itemTemplate.content.cloneNode(true);
-            const labelEl = clone.querySelector('.modal-info-label');
-            const valueEl = clone.querySelector('.modal-info-value');
-
-            labelEl.textContent = label;
-            valueEl.textContent = value;
-
-            // Add tooltip if provided
-            if (tooltip) {
-                const tooltipWrapper = document.createElement('span');
-                tooltipWrapper.className = 'info-tooltip-wrapper';
-
-                const tooltipIcon = document.createElement('span');
-                tooltipIcon.className = 'info-tooltip-icon';
-                tooltipIcon.textContent = 'ⓘ';
-
-                const tooltipText = document.createElement('span');
-                tooltipText.className = 'info-tooltip-text';
-                tooltipText.textContent = tooltip;
-
-                tooltipWrapper.appendChild(tooltipIcon);
-                tooltipWrapper.appendChild(tooltipText);
-
-                // Toggle tooltip on click
-                tooltipIcon.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    tooltipWrapper.classList.toggle('active');
-                });
-
-                labelEl.appendChild(tooltipWrapper);
-            }
-
-            leftColumn.appendChild(clone);
-        };
-
-        // Add metadata items
-        if (songData.metadata.artist) {
-            addInfoItem('Artist', songData.metadata.artist);
-        }
-
-        // Merge key and tempo on one line
-        if (songData.metadata.key || songData.metadata.tempo) {
-            const keyTempo = [];
-            if (songData.metadata.key) keyTempo.push(`Key: ${songData.metadata.key}`);
-            if (songData.metadata.tempo) keyTempo.push(`${songData.metadata.tempo} BPM`);
-
-            addInfoItem(
-                'Original Key / Tempo',
-                keyTempo.join(' • '),
-                'This is the key/tempo from when the song was first imported, and may not reflect the original CCLI key.'
-            );
-        }
-
-        if (songData.metadata.time) {
-            addInfoItem('Time Signature', songData.metadata.time);
-        }
-
-        // Add appearance statistics
-        const stats = this.calculateAppearanceStats(songData);
-        if (stats.totalAppearances > 0) {
-            addInfoItem('Times Played (Total)', stats.totalAppearances.toString());
-        }
-
-        // Right column with recent appearances
-        const rightColumn = document.createElement('div');
-        rightColumn.className = 'modal-right-column';
-
-        const recentAppearances = this.getRecentAppearances(songData);
-        if (recentAppearances.length > 0) {
-            const appearancesTitle = document.createElement('div');
-            appearancesTitle.className = 'modal-appearances-title';
-            appearancesTitle.textContent = 'Played in Last Year';
-            rightColumn.appendChild(appearancesTitle);
-
-            const appearancesList = document.createElement('div');
-            appearancesList.className = 'modal-appearances-list';
-
-            recentAppearances.forEach(appearance => {
-                const item = document.createElement('div');
-                item.className = 'modal-appearance-item';
-
-                const dateSpan = document.createElement('span');
-                dateSpan.className = 'appearance-date';
-                dateSpan.textContent = appearance.formattedDate;
-
-                const relativeSpan = document.createElement('span');
-                relativeSpan.className = 'appearance-relative';
-                relativeSpan.textContent = appearance.weeksAgo;
-
-                item.appendChild(dateSpan);
-                item.appendChild(relativeSpan);
-
-                // Add leader and key info if available
-                const metaParts = [];
-                if (appearance.leader) {
-                    metaParts.push(appearance.leader);
-                }
-                if (appearance.playedInKey) {
-                    metaParts.push(`Key: ${appearance.playedInKey}`);
-                }
-
-                if (metaParts.length > 0) {
-                    const metaSpan = document.createElement('span');
-                    metaSpan.className = 'appearance-meta';
-                    metaSpan.textContent = metaParts.join(' • ');
-                    metaSpan.style.fontSize = '1.2rem';
-                    metaSpan.style.color = '#95a5a6';
-                    metaSpan.style.marginTop = '0.3rem';
-                    item.appendChild(metaSpan);
-                }
-
-                appearancesList.appendChild(item);
-            });
-
-            rightColumn.appendChild(appearancesList);
-        }
-
-        // Add CCLI to left column
-        if (songData.metadata.ccli || songData.metadata.ccliSongNumber) {
-            const clone = itemTemplate.content.cloneNode(true);
-            const labelEl = clone.querySelector('.modal-info-label');
-            const valueEl = clone.querySelector('.modal-info-value');
-
-            labelEl.textContent = 'CCLI Number';
-            valueEl.style.display = 'flex';
-            valueEl.style.alignItems = 'center';
-            valueEl.style.gap = '1rem';
-
-            const ccliSpan = document.createElement('span');
-            ccliSpan.textContent = songData.metadata.ccli || songData.metadata.ccliSongNumber;
-            valueEl.appendChild(ccliSpan);
-
-            if (songData.metadata.ccliSongNumber) {
-                const songSelectUrl = `https://songselect.ccli.com/songs/${songData.metadata.ccliSongNumber}/`;
-                const link = document.createElement('a');
-                link.href = songSelectUrl;
-                link.target = '_blank';
-                link.rel = 'noopener noreferrer';
-                link.style.display = 'inline-flex';
-                link.style.alignItems = 'center';
-                link.style.gap = '0.5rem';
-                link.style.textDecoration = 'none';
-                link.style.color = '#00a3e0';
-                link.style.fontSize = '1.1rem';
-                link.style.fontWeight = '600';
-                link.style.padding = '0.25rem 0.5rem';
-                link.style.borderRadius = '4px';
-                link.style.transition = 'background-color 0.2s';
-                link.addEventListener('mouseover', () => link.style.backgroundColor = 'rgba(0,163,224,0.1)');
-                link.addEventListener('mouseout', () => link.style.backgroundColor = 'transparent');
-
-                // Create SVG icon
-                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-                svg.setAttribute('width', '20');
-                svg.setAttribute('height', '20');
-                svg.setAttribute('viewBox', '0 0 1000 1000');
-
-                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-                rect.setAttribute('fill', '#00a3e0');
-                rect.setAttribute('y', '0');
-                rect.setAttribute('width', '1000');
-                rect.setAttribute('height', '1000');
-                rect.setAttribute('rx', '190.32');
-                rect.setAttribute('ry', '190.32');
-                svg.appendChild(rect);
-
-                const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                path.setAttribute('fill', '#fff');
-                path.setAttribute('d', 'M758.53,231.15c1.6,1.57,1.61,4.18.02,5.76l-34.9,34.9c-1.54,1.54-4.02,1.53-5.59,0-122.98-119.9-319.88-118.95-441.69,2.86,0,0-97.82,97.82-129.96,129.96-2.86,2.86-7.71.08-6.67-3.83,16.27-61.04,48.19-118.82,96.06-166.7,144.17-144.17,377.31-145.16,522.7-2.96ZM558.62,556.91c-35.53,35.53-94,33.13-126.31-6.85-24.57-30.4-24.76-75.05-.46-105.67,31.36-39.52,88.32-42.93,124.1-10.23,1.59,1.46,4.02,1.47,5.54-.05l34.87-34.88c1.6-1.6,1.59-4.26-.05-5.81-55.76-52.66-143.67-51.7-198.26,2.89,0,0-.01.01-.02.02h0s-241.09,241.09-241.09,241.09c-1.17,1.17-1.52,2.93-.88,4.45,6.75,15.88,14.76,31.45,23.83,46.47,1.35,2.23,4.47,2.6,6.32.75l174.57-174.57c-1.36,30.21,14.69,60.44,37.27,83.03,55.57,55.57,144.88,56.09,201.19-.05.47-.47,218.59-218.58,241.07-241.06,1.15-1.15,1.46-2.85.83-4.34-6.78-15.98-14.86-31.58-23.97-46.66-1.35-2.23-4.47-2.6-6.32-.75l-252.21,252.22ZM357.4,355.89s.07-.07.1-.1c77.04-77.04,201.38-77.96,279.55-2.75,1.57,1.51,4.03,1.52,5.57-.02l34.89-34.89c1.59-1.59,1.58-4.22-.03-5.79-100.58-97.48-260.91-96.82-360.67,2.94l-188.7,188.7c-.79.79-1.23,1.87-1.2,2.99.56,21.22,2.94,42.57,7.13,63.46.63,3.13,4.56,4.28,6.82,2.02l216.54-216.54h0ZM357.5,638.14c-5.57-5.57-10.72-11.41-15.49-17.45-1.49-1.88-4.24-2.07-5.94-.37l-35.08,35.08c-1.47,1.47-1.6,3.83-.28,5.42,5.08,6.15,10.47,12.12,16.23,17.88,100.37,100.37,262.97,100.23,363.34-.14l188.96-188.96c.79-.79,1.23-1.89,1.2-3.01-.64-22.11-3.15-43.27-7.2-63.26-.63-3.13-4.55-4.25-6.81-1.99l-216.73,216.73c-77.97,77.93-204.24,78.03-282.19.07ZM276.38,719.26c-5.59-5.59-10.82-11.38-15.86-17.28-1.52-1.78-4.21-1.89-5.86-.24l-34.98,34.98c-1.5,1.5-1.59,3.9-.2,5.49,5.24,5.99,10.64,11.89,16.35,17.6,145.17,145.17,380.95,145.58,525.7,0,47.87-48.14,80.27-105.98,96.53-167.28,1.06-3.99-3.81-6.84-6.73-3.92l-130.5,130.5c-123.43,123.43-321.68,122.91-444.44.14ZM862.6,887.88c-6.72,0-13.01-1.28-18.93-3.82-5.9-2.54-11.08-6.07-15.57-10.54-4.47-4.47-7.98-9.68-10.54-15.57-2.54-5.9-3.82-12.22-3.82-18.93s1.28-13.03,3.82-18.93c2.56-5.9,6.07-11.1,10.54-15.57,4.49-4.47,9.68-8,15.57-10.54,5.92-2.54,12.22-3.82,18.93-3.82s13.12,1.28,19.02,3.82c5.92,2.54,11.1,6.07,15.57,10.54,4.49,4.47,7.98,9.68,10.49,15.57s3.78,12.22,3.78,18.93-1.26,13.03-3.78,18.93-6,11.1-10.49,15.57c-4.47,4.47-9.66,8-15.57,10.54-5.9,2.54-12.24,3.82-19.02,3.82ZM862.6,878.73c7.35,0,14-1.78,19.98-5.37,6-3.59,10.79-8.37,14.36-14.36,3.59-5.98,5.37-12.66,5.37-19.98s-1.78-14-5.37-19.98c-3.57-5.98-8.35-10.77-14.36-14.36-5.98-3.59-12.64-5.37-19.98-5.37s-13.92,1.78-19.94,5.37c-6,3.59-10.79,8.37-14.36,14.36-3.55,5.98-5.33,12.66-5.33,19.98s1.78,14,5.33,19.98c3.57,5.98,8.35,10.77,14.36,14.36,6.02,3.59,12.68,5.37,19.94,5.37ZM845.81,861.27v-45h21.66c2.31,0,4.53.55,6.72,1.64s3.99,2.67,5.37,4.74c1.41,2.08,2.1,4.62,2.1,7.64s-.71,5.73-2.14,7.93-3.25,3.92-5.5,5.12c-2.22,1.2-4.55,1.81-6.97,1.81h-16.71v-6.3h14.61c2.14,0,4.01-.73,5.63-2.22,1.64-1.49,2.43-3.59,2.43-6.34s-.8-4.81-2.43-6c-1.62-1.2-3.44-1.81-5.46-1.81h-11.25v38.79h-8.06ZM874.6,861.27l-11-20.99h8.73l11.17,20.99h-8.9Z');
-                svg.appendChild(path);
-
-                link.appendChild(svg);
-
-                const linkText = document.createElement('span');
-                linkText.textContent = 'View on SongSelect';
-                link.appendChild(linkText);
-
-                valueEl.appendChild(link);
-            }
-
-            leftColumn.appendChild(clone);
-        }
-
-        columnsContainer.appendChild(leftColumn);
-        columnsContainer.appendChild(rightColumn);
-        modalBody.appendChild(columnsContainer);
-
-        // Close tooltips when clicking elsewhere in modal
-        modalBody.addEventListener('click', () => {
-            const activeTooltips = modalBody.querySelectorAll('.info-tooltip-wrapper.active');
-            activeTooltips.forEach(tooltip => tooltip.classList.remove('active'));
-        });
-
-        // Add copyright info
-        if (songData.metadata.copyright) {
-            const copyright = document.createElement('div');
-            copyright.className = 'modal-ccli';
-            copyright.textContent = songData.metadata.copyright;
-            modalBody.appendChild(copyright);
-        }
-
-        if (songData.metadata.ccliTrailer) {
-            const trailer = document.createElement('div');
-            trailer.className = 'modal-ccli';
-            trailer.textContent = songData.metadata.ccliTrailer;
-            modalBody.appendChild(trailer);
-        }
+        // Update component
+        songInfoEl.loading = false;
+        songInfoEl.song = songData;
+        songInfoEl.appearances = appearances;
     }
 
     showSetlistInfo() {
