@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Authorize Setalight with Google Drive">
+    <title>Authorize - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <style>
+        .auth-container {
+            max-width: 600px;
+            margin: 4rem auto;
+            padding: 2rem;
+            text-align: center;
+        }
+
+        .auth-card {
+            background: white;
+            border-radius: 12px;
+            padding: 3rem 2rem;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-card h1 {
+            color: var(--header-bg, #3498db);
+            margin-top: 0;
+        }
+
+        .auth-status {
+            padding: 2rem;
+            border-radius: 8px;
+            margin: 2rem 0;
+        }
+
+        .auth-status.pending {
+            background: #f8f9fa;
+        }
+
+        .auth-status.success {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .auth-status.error {
+            background: #fadbd8;
+            color: #e74c3c;
+        }
+
+        .auth-status.authenticated {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+
+        .feature-list {
+            text-align: left;
+            margin: 2rem 0;
+            padding: 0 2rem;
+        }
+
+        .feature-list li {
+            padding: 0.5rem 0;
+            color: #555;
+        }
+
+        .auth-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .button-large {
+            padding: 1.2rem 2rem;
+            font-size: 1.2rem;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .button-primary {
+            background: var(--header-bg, #3498db);
+            color: white;
+        }
+
+        .button-primary:hover {
+            background: #2980b9;
+            transform: translateY(-1px);
+        }
+
+        .button-secondary {
+            background: white;
+            color: var(--header-bg, #3498db);
+            border: 2px solid var(--header-bg, #3498db);
+        }
+
+        .button-secondary:hover {
+            background: #ecf0f1;
+        }
+
+        .button-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .button-danger:hover {
+            background: #c0392b;
+        }
+
+        .spinner {
+            border: 4px solid #ecf0f1;
+            border-top: 4px solid var(--header-bg, #3498db);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 1rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-text {
+            color: #7f8c8d;
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="auth-container">
+            <div class="auth-card">
+                <h1>🔐 Google Drive Authorization</h1>
+
+                <div id="auth-status"></div>
+
+                <div id="auth-content">
+                    <!-- Content populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as GoogleAuth from '/js/google-auth.js';
+
+        let isAuthenticated = false;
+
+        async function checkAuthStatus() {
+            isAuthenticated = await GoogleAuth.isAuthenticated();
+            renderAuthUI();
+        }
+
+        function renderAuthUI() {
+            const statusEl = document.getElementById('auth-status');
+            const contentEl = document.getElementById('auth-content');
+
+            if (isAuthenticated) {
+                statusEl.innerHTML = `
+                    <div class="auth-status authenticated">
+                        <h2>✓ You're Authorized!</h2>
+                        <p>Your Google Drive connection is active.</p>
+                    </div>
+                `;
+
+                contentEl.innerHTML = `
+                    <p class="info-text">
+                        Cloud features are now enabled for this device. You can now use
+                        Google Drive storage and real-time sync features.
+                    </p>
+
+                    <div class="auth-actions">
+                        <button class="button-large button-secondary" onclick="window.location.href='/'">
+                            ← Back to Setlists
+                        </button>
+                        <button class="button-large button-secondary" onclick="testTokenRefresh()">
+                            🔄 Test Token Refresh
+                        </button>
+                        <button class="button-large button-secondary" onclick="downloadBackup()">
+                            📥 Download Auth Backup
+                        </button>
+                        <button class="button-large button-danger" onclick="logout()">
+                            🚪 Logout & Revoke Access
+                        </button>
+                    </div>
+                `;
+            } else {
+                statusEl.innerHTML = `
+                    <div class="auth-status pending">
+                        <h2>Not Authorized</h2>
+                        <p>Connect with Google to enable cloud features.</p>
+                    </div>
+                `;
+
+                contentEl.innerHTML = `
+                    <p class="info-text">
+                        Authorizing with Google enables:
+                    </p>
+
+                    <ul class="feature-list">
+                        <li>📁 Store setlists in Google Drive</li>
+                        <li>🔄 Sync across all your devices</li>
+                        <li>🤝 Real-time collaboration (coming soon)</li>
+                        <li>📱 Live performance sync (coming soon)</li>
+                    </ul>
+
+                    <p class="info-text">
+                        <strong>Note:</strong> This authorization happens locally on your device.
+                        Your credentials are encrypted and never stored on our servers.
+                    </p>
+
+                    <div class="auth-actions">
+                        <button class="button-large button-primary" onclick="authorize()">
+                            🔑 Authorize with Google
+                        </button>
+                        <button class="button-large button-secondary" onclick="window.location.href='/'">
+                            ← Back to Setlists
+                        </button>
+                        <button class="button-large button-secondary" onclick="showImportBackup()">
+                            📤 Import Auth Backup
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        async function authorize() {
+            const statusEl = document.getElementById('auth-status');
+
+            statusEl.innerHTML = `
+                <div class="auth-status pending">
+                    <div class="spinner"></div>
+                    <p>Opening Google authorization...</p>
+                </div>
+            `;
+
+            try {
+                await GoogleAuth.authorizeWithGoogle();
+
+                statusEl.innerHTML = `
+                    <div class="auth-status success">
+                        <h2>✓ Authorization Successful!</h2>
+                        <p>Your Google Drive connection is now active.</p>
+                    </div>
+                `;
+
+                // Refresh UI after a moment
+                setTimeout(() => {
+                    isAuthenticated = true;
+                    renderAuthUI();
+                }, 2000);
+
+            } catch (error) {
+                console.error('[Authorize] Error:', error);
+                statusEl.innerHTML = `
+                    <div class="auth-status error">
+                        <h2>✗ Authorization Failed</h2>
+                        <p>${error.message}</p>
+                        <button class="button-large button-primary" onclick="authorize()" style="margin-top: 1rem;">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        async function logout() {
+            if (!confirm('Are you sure you want to logout and revoke Google Drive access?\n\nYou will need to re-authorize to use cloud features.')) {
+                return;
+            }
+
+            try {
+                await GoogleAuth.logout();
+                isAuthenticated = false;
+                renderAuthUI();
+                alert('✓ Successfully logged out');
+            } catch (error) {
+                console.error('[Authorize] Logout error:', error);
+                alert('Error logging out: ' + error.message);
+            }
+        }
+
+        async function downloadBackup() {
+            try {
+                await GoogleAuth.downloadBlobBackup();
+            } catch (error) {
+                console.error('[Authorize] Backup error:', error);
+                alert('Error downloading backup: ' + error.message);
+            }
+        }
+
+        function showImportBackup() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json,.json';
+            input.onchange = async (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+
+                try {
+                    const text = await file.text();
+                    const backup = JSON.parse(text);
+                    await GoogleAuth.importBlobBackup(backup);
+                    alert('✓ Auth backup imported successfully!');
+                    isAuthenticated = true;
+                    renderAuthUI();
+                } catch (error) {
+                    console.error('[Authorize] Import error:', error);
+                    alert('Error importing backup: ' + error.message);
+                }
+            };
+            input.click();
+        }
+
+        // Test function to force token expiry and test refresh
+        async function testTokenRefresh() {
+            console.log('[Test] Starting token refresh test...');
+
+            try {
+                // Check if Service Worker is active
+                if (!navigator.serviceWorker.controller) {
+                    alert('⚠️ Service Worker not active. Please refresh the page and try again.');
+                    return;
+                }
+
+                // Get current blob using GoogleAuth helper
+                const blobData = await GoogleAuth.getStoredBlob();
+
+                if (!blobData) {
+                    console.error('[Test] Not authenticated');
+                    alert('Not authenticated - authorize first');
+                    return;
+                }
+
+                const { blob, metadata } = blobData;
+                console.log('[Test] Current token expires at:', metadata.expires_at);
+                console.log('[Test] Current token:', metadata.access_token.substring(0, 20) + '...');
+
+                // Force expiry by setting expires_at to the past
+                const expiredMetadata = {
+                    ...metadata,
+                    expires_at: new Date(Date.now() - 60000).toISOString() // 1 minute ago
+                };
+
+                // Store expired metadata using GoogleAuth message helper
+                await new Promise((resolve, reject) => {
+                    const messageChannel = new MessageChannel();
+                    const messageId = crypto.randomUUID();
+                    const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+
+                    messageChannel.port1.onmessage = (event) => {
+                        clearTimeout(timeout);
+                        if (event.data.messageId === messageId) {
+                            resolve(event.data);
+                        }
+                    };
+
+                    navigator.serviceWorker.controller.postMessage(
+                        { type: 'STORE_BLOB', data: { blob, metadata: expiredMetadata }, messageId },
+                        [messageChannel.port2]
+                    );
+                });
+
+                console.log('[Test] Token expiry set to past, now calling getAccessToken()...');
+
+                // This should trigger a refresh
+                const newToken = await GoogleAuth.getAccessToken();
+
+                console.log('[Test] ✅ Token refresh successful!');
+                console.log('[Test] New token:', newToken.substring(0, 20) + '...');
+
+                // Verify new expiry is in the future
+                const updatedBlob = await GoogleAuth.getStoredBlob();
+                console.log('[Test] New token expires at:', updatedBlob.metadata.expires_at);
+
+                const oldExpiry = new Date(metadata.expires_at);
+                const newExpiry = new Date(updatedBlob.metadata.expires_at);
+
+                if (newExpiry > new Date()) {
+                    alert('✅ Token refresh test passed!\n\n' +
+                          `Old expiry: ${oldExpiry.toLocaleTimeString()}\n` +
+                          `New expiry: ${newExpiry.toLocaleTimeString()}\n\n` +
+                          'Check console for details.');
+                } else {
+                    throw new Error('New token still expired!');
+                }
+
+            } catch (error) {
+                console.error('[Test] ❌ Token refresh failed:', error);
+                alert('❌ Token refresh test failed:\n\n' + error.message);
+            }
+        }
+
+        // Make functions global
+        window.authorize = authorize;
+        window.logout = logout;
+        window.downloadBackup = downloadBackup;
+        window.showImportBackup = showImportBackup;
+        window.testTokenRefresh = testTokenRefresh;
+
+        // Initialize
+        checkAuthStatus();
+
+        // Listen for ID token requests from Service Worker
+        GoogleAuth.listenForIdTokenRequests();
+    </script>
+</body>
+</html>

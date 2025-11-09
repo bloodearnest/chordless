@@ -1,0 +1,25 @@
+{
+  "name": "setalight-auth-proxy",
+  "version": "1.0.0",
+  "description": "Stateless OAuth proxy for Setalight Google Drive integration",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "jose": "^5.9.6",
+    "google-auth-library": "^9.15.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.46.0"
+  },
+  "overrides": {
+    "rollup-plugin-inject": "npm:@rollup/plugin-inject@^5.0.5",
+    "sourcemap-codec": "npm:@jridgewell/sourcemap-codec@^1.5.0"
+  },
+  "keywords": ["oauth", "google-drive", "cloudflare-worker"],
+  "author": "",
+  "license": "ISC"
+}
