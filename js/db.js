@@ -18,14 +18,14 @@ export const SETLIST_TYPES = {
 };
 
 export class SetalightDB {
-    constructor(workspaceId = null) {
+    constructor(workspaceName = null) {
         // Use workspace-specific database name
-        const dbName = workspaceId
-            ? `SetalightDB-workspace-${workspaceId}`
+        const dbName = workspaceName
+            ? `SetalightDB-${workspaceName}`
             : DB_NAME; // Fallback for backward compatibility
 
         this.dbName = dbName;
-        this.workspaceId = workspaceId;
+        this.workspaceName = workspaceName;
         this.db = null;
     }
 
@@ -216,7 +216,7 @@ export class SetalightDB {
         for (const song of setlist.songs) {
             let usage = await this.getSongUsage(song.songId) || {
                 songId: song.songId,
-                workspaceId: this.workspaceId,
+                workspaceName: this.workspaceName,
                 usageHistory: []
             };
 

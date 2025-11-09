@@ -29,7 +29,7 @@ const CONFIG = {
 
 class PageApp {
     constructor() {
-        this.db = new SetalightDB();
+        this.db = new SetalightDB('TEST');
         this.parser = new ChordProParser();
         this.currentSongIndex = undefined;
         this.songs = [];
@@ -1066,7 +1066,7 @@ class PageApp {
     async runImport() {
         // Dynamically import the importer
         const { SetlistImporter } = await import('./import.js');
-        const importer = new SetlistImporter();
+        const importer = new SetlistImporter('TEST');
         await importer.init();
 
         // Show progress modal
@@ -3403,14 +3403,6 @@ class PageApp {
         // Setup overview click handler for setlist navigation
         navMenu.addEventListener('overview-click', () => {
             this.navigateToHash('overview');
-        });
-
-        // Setup settings click handler to open settings modal
-        navMenu.addEventListener('settings-click', () => {
-            const settingsModal = document.getElementById('settings-modal');
-            if (settingsModal) {
-                settingsModal.show();
-            }
         });
 
         // Set initial back button state

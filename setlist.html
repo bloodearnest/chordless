@@ -89,14 +89,6 @@
             <p>Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this setlist?</p>
         </app-modal>
 
-        <!-- Settings modal -->
-        <app-modal id="settings-modal" size="fullscreen">
-            <div slot="header">
-                <h2 style="margin: 0; font-size: 1.8rem;">Settings</h2>
-            </div>
-            <app-settings id="modal-app-settings"></app-settings>
-        </app-modal>
-
         <!-- Share modal -->
         <app-modal id="share-modal" size="fullscreen">
             <div slot="header">
@@ -170,55 +162,16 @@
             updateMediaPlayerVisibility();
         });
     </script>
-    <script type="module">
-        import { SetalightDB } from '/js/db.js';
-
-        // Wait for app-settings component to be defined
-        customElements.whenDefined('app-settings').then(() => {
-            const appSettings = document.getElementById('modal-app-settings');
-
-            if (appSettings) {
-                // Handle clear database request
-                appSettings.addEventListener('clear-database-requested', async () => {
-                    const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
-
-                    if (!confirmed) return;
-
-                    try {
-                        const db = new SetalightDB();
-                        await db.init();
-                        await db.clearAll();
-                        localStorage.clear();
-                        sessionStorage.clear();
-
-                        alert('✅ Database cleared successfully!\n\nThe page will now reload.');
-                        window.location.reload();
-                    } catch (error) {
-                        console.error('Failed to clear database:', error);
-                        alert('❌ Failed to clear database: ' + error.message);
-                    }
-                });
-
-                // Handle import request
-                appSettings.addEventListener('import-requested', () => {
-                    // Navigate to settings page which handles imports
-                    window.location.href = '/settings';
-                });
-            }
-        });
-    </script>
     <!-- Import the components -->
     <script type="module" src="/components/song-card.js"></script>
     <script type="module" src="/components/song-info.js"></script>
     <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-modal.js"></script>
-    <script type="module" src="/components/app-settings.js"></script>
     <script type="module" src="/components/share-setlist.js"></script>
     <script type="module" src="/components/media-player-settings.js"></script>
     <script type="module" src="/components/media-player.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
-    <script type="module" src="/js/ccli-imports.js"></script>
 
     <!-- Initialize Google Auth for ID token requests from Service Worker -->
     <script type="module">

@@ -8,7 +8,7 @@ import { ChordProParser } from './parser.js';
     'use strict';
 
     // Initialize database
-    const db = new SetalightDB();
+    const db = new SetalightDB('TEST');
     await db.init();
 
     const parser = new ChordProParser();

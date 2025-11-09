@@ -5,8 +5,8 @@ import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsTex
 import { getGlobalSongsDB } from './songs-db.js';
 
 export class SetlistImporter {
-    constructor(workspaceId = null) {
-        this.workspaceDb = new SetalightDB(workspaceId);
+    constructor(workspaceName = null) {
+        this.workspaceDb = new SetalightDB(workspaceName);
         this.songsDb = null; // Will be initialized in init()
         this.parser = new ChordProParser();
         this.songsCache = new Map(); // In-memory cache during import
@@ -315,7 +315,7 @@ export class SetlistImporter {
             },
             lyricsText: extractLyricsText(parsed),
             textHash: textHash,
-            sourceWorkspace: this.workspaceDb.workspaceId || 'default',
+            sourceWorkspace: this.workspaceDb.workspaceName || 'default',
             importedAt: new Date().toISOString()
         };
 

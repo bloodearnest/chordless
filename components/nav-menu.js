@@ -1,4 +1,8 @@
 import { LitElement, html, css } from 'lit';
+import './app-modal.js';
+import './app-settings.js';
+import { SetalightDB } from '../js/db.js';
+import { getGlobalSongsDB } from '../js/songs-db.js';
 
 /**
  * NavMenu Component
@@ -165,6 +169,10 @@ export class NavMenu extends LitElement {
 
         // Bind the click outside handler
         this._handleClickOutside = this._handleClickOutside.bind(this);
+
+        // Listen for app-settings events
+        this.addEventListener('import-requested', this._handleImportRequested);
+        this.addEventListener('clear-database-requested', this._handleClearDatabaseRequested);
     }
 
     disconnectedCallback() {
@@ -296,6 +304,17 @@ export class NavMenu extends LitElement {
                     </a>
                 </nav>
             </div>
+
+            <app-modal
+                id="nav-settings-modal"
+                size="fullscreen"
+                @close=${this._closeSettingsModal}
+            >
+                <div slot="header">
+                    <h2 style="margin: 0; font-size: 1.8rem;">Settings</h2>
+                </div>
+                <app-settings></app-settings>
+            </app-modal>
         `;
     }
 
@@ -331,13 +350,50 @@ export class NavMenu extends LitElement {
     }
 
     _handleSettingsClick() {
-        this.dispatchEvent(new CustomEvent('settings-click', {
-            bubbles: true,
-            composed: true
-        }));
-
-        // Close the popover after settings is clicked
         this.closePopover();
+        // Wait for next frame to ensure popover is closed before showing modal
+        requestAnimationFrame(() => {
+            const modal = this.shadowRoot?.querySelector('#nav-settings-modal');
+            if (modal) {
+                modal.show();
+            }
+        });
+    }
+
+    _closeSettingsModal() {
+        const modal = this.shadowRoot?.querySelector('#nav-settings-modal');
+        if (modal) {
+            modal.close();
+        }
+    }
+
+    async _handleClearDatabaseRequested() {
+        const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
+
+        if (!confirmed) return;
+
+        try {
+            const db = new SetalightDB('TEST');
+            await db.init();
+            await db.clearAll();
+
+            const songsDb = await getGlobalSongsDB();
+            await songsDb.clearAll();
+
+            localStorage.clear();
+            sessionStorage.clear();
+
+            alert('✅ Database cleared successfully!\n\nThe page will now reload.');
+            window.location.reload();
+        } catch (error) {
+            console.error('Failed to clear database:', error);
+            alert('❌ Failed to clear database: ' + error.message);
+        }
+    }
+
+    async _handleImportRequested() {
+        // Navigate to settings page which handles the actual import
+        window.location.href = '/settings';
     }
 
     // Public API for controlling the popover

@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import './media-player-settings.js';
 
 /**
  * AppSettings Component
@@ -6,9 +7,7 @@ import { LitElement, html, css } from 'lit';
  * Settings interface for the application
  */
 export class AppSettings extends LitElement {
-    static properties = {
-        _pendingImportsVisible: { type: Boolean, state: true }
-    };
+    static properties = {};
 
     static styles = css`
         :host {
@@ -56,15 +55,10 @@ export class AppSettings extends LitElement {
         a {
             text-decoration: none;
         }
-
-        #pending-imports-list {
-            margin-top: 2rem;
-        }
     `;
 
     constructor() {
         super();
-        this._pendingImportsVisible = false;
     }
 
     render() {
@@ -96,20 +90,6 @@ export class AppSettings extends LitElement {
                     <a href="/bookmarklet" class="setlist-button">
                         Install Bookmarklet
                     </a>
-                </div>
-
-                <div class="settings-section">
-                    <h3>CCLI Extension Imports</h3>
-                    <p>
-                        Songs imported from SongSelect using the Chrome extension will appear here. Process them to add to your library.
-                    </p>
-                    <button class="setlist-button" @click=${this._handleCheckImports} style="margin-right: 1rem;">
-                        Check for Pending Imports
-                    </button>
-                    <div id="pending-imports-list" style="display: ${this._pendingImportsVisible ? 'block' : 'none'};">
-                        <h4 style="color: var(--header-bg, #3498db);">Pending Imports</h4>
-                        <div id="imports-container"></div>
-                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -145,21 +125,6 @@ export class AppSettings extends LitElement {
             bubbles: true,
             composed: true
         }));
-    }
-
-    _handleCheckImports() {
-        this.dispatchEvent(new CustomEvent('check-imports-requested', {
-            bubbles: true,
-            composed: true
-        }));
-    }
-
-    showPendingImports() {
-        this._pendingImportsVisible = true;
-    }
-
-    hidePendingImports() {
-        this._pendingImportsVisible = false;
     }
 }
 
