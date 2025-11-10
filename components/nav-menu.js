@@ -3,6 +3,7 @@ import './app-modal.js';
 import './app-settings.js';
 import { SetalightDB } from '../js/db.js';
 import { getGlobalSongsDB } from '../js/songs-db.js';
+import { getCurrentOrganisation } from '../js/workspace.js'; // Used in _handleClearDatabaseRequested
 
 /**
  * NavMenu Component
@@ -373,7 +374,7 @@ export class NavMenu extends LitElement {
         if (!confirmed) return;
 
         try {
-            const db = new SetalightDB('TEST');
+            const db = new SetalightDB(getCurrentOrganisation());
             await db.init();
             await db.clearAll();
 

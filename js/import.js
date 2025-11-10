@@ -5,15 +5,15 @@ import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsTex
 import { getGlobalSongsDB } from './songs-db.js';
 
 export class SetlistImporter {
-    constructor(workspaceName = null) {
-        this.workspaceDb = new SetalightDB(workspaceName);
+    constructor(organisationName = null) {
+        this.organisationDb = new SetalightDB(organisationName);
         this.songsDb = null; // Will be initialized in init()
         this.parser = new ChordProParser();
         this.songsCache = new Map(); // In-memory cache during import
     }
 
     async init() {
-        await this.workspaceDb.init();
+        await this.organisationDb.init();
         this.songsDb = await getGlobalSongsDB();
     }
 
@@ -63,7 +63,7 @@ export class SetlistImporter {
 
         // Clear existing data
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
-        await this.workspaceDb.clearAll();
+        await this.organisationDb.clearAll();
         await this.songsDb.clearAll();
         this.songsCache.clear();
         console.log('[Import] Cleared existing data');
@@ -154,7 +154,7 @@ export class SetlistImporter {
                     createdAt: song.importedAt,
                     lastUsedAt: song.importedAt
                 };
-                await this.workspaceDb.saveSong(legacySong);
+                await this.organisationDb.saveSong(legacySong);
             }
 
             console.log(`[Import] Complete! Imported ${importedSetlists.length} setlists, ${this.songsCache.size} unique songs`);
@@ -274,10 +274,10 @@ export class SetlistImporter {
         };
 
         // Save setlist to workspace database
-        await this.workspaceDb.saveSetlist(setlist);
+        await this.organisationDb.saveSetlist(setlist);
 
         // Update song usage tracking
-        await this.workspaceDb.updateSongUsageOnSetlistSave(setlist);
+        await this.organisationDb.updateSongUsageOnSetlistSave(setlist);
 
         return setlist;
     }
@@ -315,7 +315,7 @@ export class SetlistImporter {
             },
             lyricsText: extractLyricsText(parsed),
             textHash: textHash,
-            sourceWorkspace: this.workspaceDb.workspaceName || 'default',
+            sourceWorkspace: this.organisationDb.organisationName || 'default',
             importedAt: new Date().toISOString()
         };
 

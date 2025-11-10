@@ -4,6 +4,7 @@
 import { ChordProParser } from './parser.js';
 import { SetalightDB, formatTempo } from './db.js';
 import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
+import { getCurrentOrganisation } from './workspace.js';
 
 // Configuration constants
 const CONFIG = {
@@ -29,7 +30,7 @@ const CONFIG = {
 
 class PageApp {
     constructor() {
-        this.db = new SetalightDB('TEST');
+        this.db = new SetalightDB(getCurrentOrganisation());
         this.parser = new ChordProParser();
         this.currentSongIndex = undefined;
         this.songs = [];
@@ -1066,7 +1067,7 @@ class PageApp {
     async runImport() {
         // Dynamically import the importer
         const { SetlistImporter } = await import('./import.js');
-        const importer = new SetlistImporter('TEST');
+        const importer = new SetlistImporter(getCurrentOrganisation());
         await importer.init();
 
         // Show progress modal

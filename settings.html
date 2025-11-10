@@ -50,6 +50,7 @@
 
     <script type="module">
         import { SetalightDB } from '/js/db.js';
+        import { getCurrentOrganisation } from '/js/workspace.js';
 
         // Set window name for bookmarklet
         window.name = 'setalight';
@@ -135,7 +136,7 @@
 
                     try {
                         // Clear IndexedDB
-                        const db = new SetalightDB();
+                        const db = new SetalightDB(getCurrentOrganisation());
                         await db.init();
                         await db.clearAll();
 
@@ -162,6 +163,7 @@
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/media-player-settings.js"></script>
+    <script type="module" src="/components/select-organisation.js"></script>
     <script type="module" src="/components/app-settings.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
 </body>

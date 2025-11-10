@@ -1,8 +1,8 @@
 // IndexedDB wrapper for Setalight
-// Manages workspace-specific setlists and song usage tracking
+// Manages organisation-specific setlists and song usage tracking
 //
 // NOTE: Song content (ChordPro, metadata) is stored in the global SongsDB (songs-db.js)
-// This workspace DB only stores:
+// This organisation DB only stores:
 // - Setlists
 // - Song usage history (which setlists a song appears in)
 
@@ -18,14 +18,14 @@ export const SETLIST_TYPES = {
 };
 
 export class SetalightDB {
-    constructor(workspaceName = null) {
-        // Use workspace-specific database name
-        const dbName = workspaceName
-            ? `SetalightDB-${workspaceName}`
+    constructor(organisationName = null) {
+        // Use organisation-specific database name
+        const dbName = organisationName
+            ? `SetalightDB-${organisationName}`
             : DB_NAME; // Fallback for backward compatibility
 
         this.dbName = dbName;
-        this.workspaceName = workspaceName;
+        this.organisationName = organisationName;
         this.db = null;
     }
 
@@ -391,13 +391,12 @@ export function formatTempo(bpm, tempoNote = '1/4') {
 }
 
 /**
- * Helper to get current workspace database
- * Requires workspace-manager.js to be loaded
+ * Helper to get current organisation database
+ * Returns a database instance for the currently active organisation
  */
-export function getCurrentDB() {
-    // This will be implemented when workspace-manager.js is created
-    // For now, return default DB for backward compatibility
-    return new SetalightDB();
+export async function getCurrentDB() {
+    const { getCurrentOrganisation } = await import('./workspace.js');
+    return new SetalightDB(getCurrentOrganisation());
 }
 
 export function generateSongId(parsed) {

@@ -1,12 +1,13 @@
 // Create Setlist Modal Handler
 import { SetalightDB, getNextSunday, determineSetlistType, createSetlist } from './db.js';
+import { getCurrentOrganisation } from './workspace.js';
 
 let db = null;
 
 // Initialize the database
 async function initDB() {
     if (!db) {
-        db = new SetalightDB();
+        db = new SetalightDB(getCurrentOrganisation());
         await db.init();
     }
     return db;

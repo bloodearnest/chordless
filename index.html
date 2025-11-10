@@ -19,7 +19,7 @@
                         <line x1="3" y1="18" x2="21" y2="18"></line>
                     </svg>
                 </button>
-                <h1>Setalight</h1>
+                <h1 id="page-title">Setalight</h1>
                 <button class="create-setlist-button" id="create-setlist-button" aria-label="Create new setlist">
                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                         <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -135,6 +135,18 @@
                 });
         }
     </script>
+
+    <script type="module">
+        // Update page title with church name
+        import { getCurrentOrganisation } from '/js/workspace.js';
+
+        const churchName = getCurrentOrganisation();
+        const titleElement = document.getElementById('page-title');
+        if (titleElement) {
+            titleElement.textContent = `Setlists - ${churchName}`;
+        }
+    </script>
+
     <!-- Import the components -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-modal.js"></script>

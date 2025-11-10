@@ -3,12 +3,13 @@
 
 import { SetalightDB, generateSongId, normalizeTitle, hashText, extractLyricsText, createSetlist, getNextSunday, determineSetlistType } from './db.js';
 import { ChordProParser } from './parser.js';
+import { getCurrentOrganisation } from './workspace.js';
 
 (async function() {
     'use strict';
 
     // Initialize database
-    const db = new SetalightDB('TEST');
+    const db = new SetalightDB(getCurrentOrganisation());
     await db.init();
 
     const parser = new ChordProParser();

@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import './media-player-settings.js';
+import './select-organisation.js';
 
 /**
  * AppSettings Component
@@ -16,40 +17,62 @@ export class AppSettings extends LitElement {
 
         .settings-content {
             padding: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
         }
 
         .settings-section {
-            margin-bottom: 2rem;
+            background: var(--settings-bg, #34495e);
+            border-radius: 8px;
+            padding: 1.5rem;
+            color: var(--settings-text, white);
         }
 
         h3 {
-            font-size: 1.6rem;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            color: var(--header-bg, #3498db);
+            font-size: 1.2rem;
+            margin: 0 0 1rem 0;
+            font-weight: 600;
         }
 
         h4 {
-            font-size: 1.4rem;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
+            font-size: 1rem;
+            margin: 1.5rem 0 1rem 0;
+            font-weight: 600;
             color: #e74c3c;
         }
 
         p {
-            color: #7f8c8d;
-            font-size: 1.1rem;
-            margin-bottom: 1.5rem;
+            font-size: 0.85rem;
+            margin: 0 0 1rem 0;
+            opacity: 0.7;
+            line-height: 1.4;
         }
 
         .setlist-button {
             display: inline-block;
             width: auto;
+            padding: 0.75rem 1.5rem;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .setlist-button:hover {
+            background: rgba(255, 255, 255, 0.15);
         }
 
         .danger-button {
-            background-color: #e74c3c;
-            border-color: #c0392b;
+            background-color: rgba(231, 76, 60, 0.2);
+        }
+
+        .danger-button:hover {
+            background-color: rgba(231, 76, 60, 0.3);
         }
 
         a {
@@ -64,6 +87,32 @@ export class AppSettings extends LitElement {
     render() {
         return html`
             <div class="settings-content">
+                <div class="settings-section">
+                    <h3>Church</h3>
+                    <p>
+                        Select which church you're currently working with. Each church has its own setlists.
+                    </p>
+                    <select-organisation></select-organisation>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Media Player</h3>
+                    <p>
+                        Configure global media player settings. These settings apply to all setlists.
+                    </p>
+                    <media-player-settings></media-player-settings>
+                </div>
+
+                <div class="settings-section">
+                    <h3>Cloud Features</h3>
+                    <p>
+                        Connect with Google Drive to enable cloud storage, sync, and collaboration features.
+                    </p>
+                    <a href="/authorize" class="setlist-button">
+                        Manage Google Authorization
+                    </a>
+                </div>
+
                 <div class="settings-section">
                     <h3>Data Management</h3>
                     <p>
@@ -80,34 +129,6 @@ export class AppSettings extends LitElement {
                     <button class="setlist-button danger-button" @click=${this._handleClearDatabase}>
                         Clear Database
                     </button>
-                </div>
-
-                <div class="settings-section">
-                    <h3>CCLI Bookmarklet</h3>
-                    <p>
-                        Import songs directly from SongSelect with a single click using the bookmarklet.
-                    </p>
-                    <a href="/bookmarklet" class="setlist-button">
-                        Install Bookmarklet
-                    </a>
-                </div>
-
-                <div class="settings-section">
-                    <h3>Cloud Features</h3>
-                    <p>
-                        Connect with Google Drive to enable cloud storage, sync, and collaboration features.
-                    </p>
-                    <a href="/authorize" class="setlist-button" style="display: inline-block; width: auto; text-decoration: none;">
-                        Manage Google Authorization
-                    </a>
-                </div>
-
-                <div class="settings-section">
-                    <h3>Media Player</h3>
-                    <p>
-                        Configure global media player settings. These settings apply to all setlists.
-                    </p>
-                    <media-player-settings></media-player-settings>
                 </div>
             </div>
         `;
