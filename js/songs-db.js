@@ -1,20 +1,29 @@
 /**
  * Global Songs Database
  *
- * Stores song content (ChordPro, metadata) that is shared across all workspaces.
- * This is separate from workspace-specific song usage tracking.
+ * Stores song metadata (NOT chordpro content) that is shared across all organisations.
+ * ChordPro content is stored separately in ChordProDB.
  *
- * Database: SetalightDB-songs (global, not workspace-specific)
- * Object Store: songs
+ * Database: SetalightDB-songs (global, not organisation-specific)
+ * Object Stores:
+ * - songs: Song metadata with versions array
+ * - chordpro: Raw chordpro content (managed by ChordProDB)
  *
  * Song records contain:
- * - Static content: rawChordPro, parsed metadata, title, artist, etc.
- * - Import metadata: when/where imported
- * - NO usage data (that's in workspace DBs)
+ * - Identity: id, ccliNumber, titleNormalized
+ * - Versions: array of version references (each points to a chordpro file)
+ * - Usage tracking: appearances, lastUsedAt
+ * - Import metadata: source, sourceUrl, createdAt
+ * - Sync metadata: Drive file IDs, sync status (for future)
+ *
+ * ChordPro records contain:
+ * - content: Raw chordpro text
+ * - contentHash: For deduplication
+ * - Sync metadata: lastModified, Drive sync state (for future)
  */
 
 const DB_NAME = 'SetalightDB-songs';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 export class SongsDB {
     constructor() {
@@ -25,8 +34,9 @@ export class SongsDB {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-            request.onerror = () => {
-                reject(new Error('Failed to open Songs IndexedDB'));
+            request.onerror = (event) => {
+                console.error('[SongsDB] Error opening database:', event.target.error);
+                reject(new Error(`Failed to open Songs IndexedDB: ${event.target.error?.message || 'Unknown error'}`));
             };
 
             request.onsuccess = (event) => {
@@ -36,14 +46,34 @@ export class SongsDB {
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
+                const oldVersion = event.oldVersion;
 
-                // Create Songs store
+                console.log('[SongsDB] Upgrading from version', oldVersion, 'to', DB_VERSION);
+
+                // Migration from v1 to v2: Delete and recreate stores with new schema
+                if (oldVersion > 0 && oldVersion < 2) {
+                    console.log('[SongsDB] Migrating from v1 to v2');
+
+                    // Delete old songs store (has wrong indexes)
+                    if (db.objectStoreNames.contains('songs')) {
+                        console.log('[SongsDB] Deleting old songs store');
+                        db.deleteObjectStore('songs');
+                    }
+                }
+
+                // Create Songs store (metadata only)
                 if (!db.objectStoreNames.contains('songs')) {
+                    console.log('[SongsDB] Creating songs store');
                     const songStore = db.createObjectStore('songs', { keyPath: 'id' });
                     songStore.createIndex('ccliNumber', 'ccliNumber', { unique: false });
                     songStore.createIndex('titleNormalized', 'titleNormalized', { unique: false });
-                    songStore.createIndex('textHash', 'textHash', { unique: false });
-                    songStore.createIndex('sourceWorkspace', 'sourceWorkspace', { unique: false });
+                }
+
+                // Create ChordPro store (content only)
+                if (!db.objectStoreNames.contains('chordpro')) {
+                    console.log('[SongsDB] Creating chordpro store');
+                    const chordproStore = db.createObjectStore('chordpro', { keyPath: 'id' });
+                    chordproStore.createIndex('contentHash', 'contentHash', { unique: false });
                 }
             };
         });
@@ -113,16 +143,6 @@ export class SongsDB {
         });
     }
 
-    async getSongsByWorkspace(workspaceId) {
-        const tx = this.db.transaction(['songs'], 'readonly');
-        const store = tx.objectStore('songs');
-        const index = store.index('sourceWorkspace');
-        const request = index.getAll(workspaceId);
-        return new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
 
     async deleteSong(id) {
         const tx = this.db.transaction(['songs'], 'readwrite');
@@ -134,11 +154,13 @@ export class SongsDB {
         });
     }
 
-    // Clear all songs (for testing/migration)
+    // Clear all songs and chordpro files (for testing/migration)
     async clearAll() {
-        const tx = this.db.transaction(['songs'], 'readwrite');
+        const tx = this.db.transaction(['songs', 'chordpro'], 'readwrite');
         const songStore = tx.objectStore('songs');
+        const chordproStore = tx.objectStore('chordpro');
         await songStore.clear();
+        await chordproStore.clear();
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
@@ -149,8 +171,29 @@ export class SongsDB {
 /**
  * Helper to get the global songs database instance
  */
+let globalSongsDB = null;
+
 export async function getGlobalSongsDB() {
-    const db = new SongsDB();
-    await db.init();
-    return db;
+    if (!globalSongsDB) {
+        globalSongsDB = new SongsDB();
+        try {
+            await globalSongsDB.init();
+        } catch (error) {
+            console.error('[SongsDB] Failed to initialize, resetting global instance');
+            globalSongsDB = null;
+            throw error;
+        }
+    }
+    return globalSongsDB;
+}
+
+/**
+ * Reset the global songs database instance (for after database deletion)
+ */
+export function resetGlobalSongsDB() {
+    if (globalSongsDB && globalSongsDB.db) {
+        globalSongsDB.db.close();
+    }
+    globalSongsDB = null;
+    console.log('[SongsDB] Global instance reset');
 }

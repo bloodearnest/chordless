@@ -392,7 +392,13 @@ export class NavMenu extends LitElement {
         }
     }
 
-    async _handleImportRequested() {
+    async _handleImportRequested(event) {
+        // If we're already on the settings page, don't navigate
+        // Let the event bubble to setlist-app which will handle the import
+        if (window.location.pathname === '/settings') {
+            return;
+        }
+
         // Navigate to settings page which handles the actual import
         window.location.href = '/settings';
     }

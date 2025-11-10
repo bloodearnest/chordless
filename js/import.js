@@ -1,7 +1,8 @@
 // Import tool for migrating filesystem data to IndexedDB
 
 import { ChordProParser } from './parser.js';
-import { SetalightDB, normalizeTitle, hashText, generateSongId, extractLyricsText, determineSetlistType, parseTempo } from './db.js';
+import { SetalightDB, determineSetlistType } from './db.js';
+import { createSong, findExistingSong, hashText } from './song-utils.js';
 import { getGlobalSongsDB } from './songs-db.js';
 
 export class SetlistImporter {
@@ -61,10 +62,41 @@ export class SetlistImporter {
     async importFromServer(progressCallback = null) {
         console.log('[Import] Starting import from server');
 
-        // Clear existing data
+        // Clear existing data by deleting and recreating the database
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
+
+        // Close and reset the global songs database instance
+        const { resetGlobalSongsDB } = await import('./songs-db.js');
+        resetGlobalSongsDB();
+
+        // Delete the songs database completely
+        console.log('[Import] Deleting songs database...');
+        await new Promise((resolve, reject) => {
+            const deleteRequest = indexedDB.deleteDatabase('SetalightDB-songs');
+            deleteRequest.onsuccess = () => {
+                console.log('[Import] Songs database deleted successfully');
+                resolve();
+            };
+            deleteRequest.onerror = (event) => {
+                console.error('[Import] Failed to delete songs database:', event.target.error);
+                reject(new Error('Failed to delete songs database'));
+            };
+            deleteRequest.onblocked = () => {
+                console.warn('[Import] Delete blocked - close other tabs using this database');
+                // Resolve anyway after a short delay
+                setTimeout(resolve, 100);
+            };
+        });
+
+        // Wait a bit for the deletion to complete
+        await new Promise(resolve => setTimeout(resolve, 100));
+
+        // Reinitialize the songs database
+        console.log('[Import] Reinitializing songs database...');
+        this.songsDb = await getGlobalSongsDB();
+
+        // Clear organisation database
         await this.organisationDb.clearAll();
-        await this.songsDb.clearAll();
         this.songsCache.clear();
         console.log('[Import] Cleared existing data');
 
@@ -137,25 +169,9 @@ export class SetlistImporter {
                 }
             }
 
-            // Save all songs to both global and workspace databases
-            // Global DB: For future workspace switching
-            // Workspace DB: For backward compatibility with existing app
-            if (progressCallback) progressCallback({ stage: 'saving', message: 'Saving songs to database...' });
-            for (const song of this.songsCache.values()) {
-                // Save to global songs database
-                await this.songsDb.saveSong(song);
-
-                // LEGACY: Also save to workspace DB for backward compatibility
-                // Convert to legacy format with appearances for old app code
-                const legacySong = {
-                    ...song,
-                    chordproText: song.rawChordPro, // Old field name
-                    appearances: [], // Will be populated by song_usage later
-                    createdAt: song.importedAt,
-                    lastUsedAt: song.importedAt
-                };
-                await this.organisationDb.saveSong(legacySong);
-            }
+            // Songs are saved to global database as they're imported
+            // No need to save again here
+            if (progressCallback) progressCallback({ stage: 'complete', message: 'Finalizing import...' });
 
             console.log(`[Import] Complete! Imported ${importedSetlists.length} setlists, ${this.songsCache.size} unique songs`);
 
@@ -287,42 +303,40 @@ export class SetlistImporter {
      * Returns songId
      */
     async findOrCreateSong(parsed, chordproText, setlistId, setlistDate) {
-        const songId = generateSongId(parsed);
-        const textHash = hashText(chordproText);
+        const ccliNumber = parsed.metadata.ccliSongNumber || parsed.metadata.ccli || null;
+        const title = parsed.metadata.title || 'Untitled';
 
         // Check if we've already seen this song during this import
-        if (this.songsCache.has(songId)) {
-            // Song already in cache, just return its ID
-            return songId;
+        // Use content hash as cache key
+        const contentHash = hashText(chordproText);
+        if (this.songsCache.has(contentHash)) {
+            return this.songsCache.get(contentHash);
         }
 
-        // Parse tempo to extract BPM and note subdivision
-        const tempoParsed = parseTempo(parsed.metadata.tempo);
+        // Check if song already exists in database
+        const existing = await findExistingSong(ccliNumber, title, chordproText);
 
-        // Create new song entry (only static content, no usage data)
-        const song = {
-            id: songId,
-            ccliNumber: parsed.metadata.ccliSongNumber || parsed.metadata.ccli || null,
-            title: parsed.metadata.title || 'Untitled',
-            titleNormalized: normalizeTitle(parsed.metadata.title || 'untitled'),
-            artist: parsed.metadata.artist || null,
-            rawChordPro: chordproText,
-            metadata: {
-                key: parsed.metadata.key || null,
-                tempo: tempoParsed.bpm,
-                tempoNote: tempoParsed.note,
-                timeSignature: parsed.metadata.time || null
-            },
-            lyricsText: extractLyricsText(parsed),
-            textHash: textHash,
-            sourceWorkspace: this.organisationDb.organisationName || 'default',
-            importedAt: new Date().toISOString()
-        };
+        if (existing) {
+            console.log(`[Import] Found existing song: ${title} (${existing.matchType})`);
+            this.songsCache.set(contentHash, existing.song.id);
+            return existing.song.id;
+        }
+
+        // Create new song using new model
+        const song = await createSong(chordproText, {
+            ccliNumber: ccliNumber,
+            title: title,
+            source: 'filesystem',
+            sourceUrl: `sets/${setlistDate}`,
+            versionLabel: 'Original'
+        });
+
+        console.log(`[Import] Created new song: ${title} (${song.id})`);
 
         // Add to cache
-        this.songsCache.set(songId, song);
+        this.songsCache.set(contentHash, song.id);
 
-        return songId;
+        return song.id;
     }
 
     /**

@@ -153,11 +153,12 @@ class PageApp {
 
         // If hash is provided, load that song
         if (hash) {
-            const song = await this.db.getSong(hash);
-            if (song) {
+            const { getSongWithContent } = await import('./song-utils.js');
+            try {
+                const song = await getSongWithContent(hash);
                 await this.viewLibrarySong(song, false); // false = don't update URL (we're already there)
-            } else {
-                console.error('Song not found:', hash);
+            } catch (error) {
+                console.error('Song not found:', hash, error);
                 // Clear the hash if song not found
                 window.history.replaceState({}, '', '/songs');
                 // Scroll back to library list
@@ -190,11 +191,13 @@ class PageApp {
                 this.closeLibrarySongView(false); // false = don't update URL (already changed)
             } else {
                 // Hash present = show specific song
-                const song = await this.db.getSong(hash);
-                if (song) {
+                const { getSongWithContent } = await import('./song-utils.js');
+                try {
+                    const song = await getSongWithContent(hash);
                     await this.viewLibrarySong(song, false); // false = don't update URL
-                } else {
+                } catch (error) {
                     // Song not found, go back to library
+                    console.error('Song not found:', hash, error);
                     window.location.hash = '';
                 }
             }
@@ -303,10 +306,14 @@ class PageApp {
             loadingMsg.textContent = 'Loading songs...';
             libraryContainer.appendChild(loadingMsg);
 
-            const songs = await this.db.getAllSongs();
-            console.log('Loaded songs:', songs.length, songs);
+            // Load songs from global songs DB
+            const { getGlobalSongsDB } = await import('./songs-db.js');
+            const { getSongWithContent } = await import('./song-utils.js');
+            const songsDB = await getGlobalSongsDB();
+            const songRecords = await songsDB.getAllSongs();
+            console.log('Loaded song records:', songRecords.length);
 
-            if (songs.length === 0) {
+            if (songRecords.length === 0) {
                 libraryContainer.textContent = '';
                 const message = document.createElement('p');
                 message.style.textAlign = 'center';
@@ -316,17 +323,28 @@ class PageApp {
                 return;
             }
 
-            // Enrich songs with latest usage data
-            for (const song of songs) {
-                const usage = await this.db.getSongUsage(song.id);
-                if (usage && usage.usageHistory && usage.usageHistory.length > 0) {
-                    // Most recent is first (already sorted by date descending)
-                    const lastUsage = usage.usageHistory[0];
-                    song.lastUsageInfo = {
-                        date: lastUsage.setlistDate,
-                        leader: lastUsage.leader,
-                        key: lastUsage.playedInKey
-                    };
+            // Parse titles from chordpro and enrich with usage data
+            const songs = [];
+            for (const songRecord of songRecords) {
+                try {
+                    const fullSong = await getSongWithContent(songRecord.id);
+
+                    // Get usage data from organisation DB
+                    const usage = await this.db.getSongUsage(songRecord.id);
+                    if (usage && usage.usageHistory && usage.usageHistory.length > 0) {
+                        // Most recent is first (already sorted by date descending)
+                        const lastUsage = usage.usageHistory[0];
+                        fullSong.lastUsageInfo = {
+                            date: lastUsage.setlistDate,
+                            leader: lastUsage.leader,
+                            key: lastUsage.playedInKey
+                        };
+                    }
+
+                    songs.push(fullSong);
+                } catch (error) {
+                    console.error(`Error loading song ${songRecord.id}:`, error);
+                    // Continue with next song
                 }
             }
 
@@ -438,18 +456,16 @@ class PageApp {
         // Update navigation menu for library song context
         this.updateNavigationMenu({ type: 'librarySong', songId: song.id });
 
-        // Debug: log the song object to see what fields it has
-        console.log('Song object:', song);
-        console.log('Available fields:', Object.keys(song));
-
-        // Parse the song (note: field is chordproText with lowercase 'p')
-        const chordproContent = song.chordproText || song.rawChordPro;
+        // Get chordpro content from new model
+        const chordproContent = song.chordproContent || song.chordproText || song.rawChordPro;
         if (!chordproContent) {
             console.error('Song has no ChordPro content!', song);
+            console.error('Available fields:', Object.keys(song));
             throw new Error('Song has no ChordPro content');
         }
-        console.log('Parsing song:', chordproContent.substring(0, 100));
-        const parsed = this.parser.parse(chordproContent);
+
+        // Use already-parsed data if available, otherwise parse
+        const parsed = song.parsed || this.parser.parse(chordproContent);
 
         // Store parsed song for library context
         this.currentLibraryParsedSong = parsed;
@@ -1246,13 +1262,15 @@ class PageApp {
                 if (songEntry.chordproEdits) {
                     sourceText = songEntry.chordproEdits;
                 } else {
-                    canonicalSong = await this.db.getSong(songEntry.songId);
-
-                    if (!canonicalSong) {
-                        console.error('[ERROR] Song not found in DB:', songEntry.songId);
+                    // Use new model - get song with content
+                    const { getSongWithContent } = await import('./song-utils.js');
+                    try {
+                        canonicalSong = await getSongWithContent(songEntry.songId, songEntry.versionId || null);
+                        sourceText = canonicalSong.chordproContent;
+                    } catch (error) {
+                        console.error('[ERROR] Song not found in DB:', songEntry.songId, error);
                         continue;
                     }
-                    sourceText = canonicalSong.chordproText;
                 }
 
                 // Parse the chordpro
@@ -3496,10 +3514,14 @@ class PageApp {
         try {
             resultsContainer.innerHTML = '<p style="text-align: center; color: #95a5a6;">Loading songs...</p>';
 
-            const songs = await this.db.getAllSongs();
-            console.log('[Add Song Modal] Loaded songs:', songs.length);
+            // Load songs from global songs DB and parse titles
+            const { getGlobalSongsDB } = await import('./songs-db.js');
+            const { getSongWithContent } = await import('./song-utils.js');
+            const songsDB = await getGlobalSongsDB();
+            const songRecords = await songsDB.getAllSongs();
+            console.log('[Add Song Modal] Loaded song records:', songRecords.length);
 
-            if (songs.length === 0) {
+            if (songRecords.length === 0) {
                 resultsContainer.innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
                         <p style="font-size: 1.3rem; margin-bottom: 1rem;">No songs in library</p>
@@ -3507,6 +3529,17 @@ class PageApp {
                     </div>
                 `;
                 return;
+            }
+
+            // Parse titles from chordpro
+            const songs = [];
+            for (const songRecord of songRecords) {
+                try {
+                    const fullSong = await getSongWithContent(songRecord.id);
+                    songs.push(fullSong);
+                } catch (error) {
+                    console.error(`Error loading song ${songRecord.id}:`, error);
+                }
             }
 
             // Sort songs alphabetically by title

@@ -769,7 +769,7 @@ export class MediaPlayer extends LitElement {
             this.currentKey = null;
         }
         // Store current song's tempo/time signature metadata
-        this._currentBpm = song?.metadata?.tempo || null;
+        this._currentBpm = song?.metadata?.tempo ? Number(song.metadata.tempo) : null;
         this._currentTempoNote = song?.metadata?.tempoNote || '1/4';
         this._currentTimeSignature = song?.metadata?.timeSignature || null;
     }
@@ -980,7 +980,7 @@ export class MediaPlayer extends LitElement {
 
         const timeSignature = this._activeSongTimeSignature;
         const tempoNote = this._activeSongTempoNote || '1/4';
-        const bpm = this._activeSongBpm;
+        const bpm = Number(this._activeSongBpm);
 
         console.log(`[MediaPlayer] Starting metronome at ${bpm} BPM, ${tempoNote} notes, ${timeSignature}`);
 

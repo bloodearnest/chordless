@@ -1,7 +1,8 @@
 // Import Song Handler for Setalight
 // Handles bookmarklet imports with user choice UI
 
-import { SetalightDB, generateSongId, normalizeTitle, hashText, extractLyricsText, createSetlist, getNextSunday, determineSetlistType } from './db.js';
+import { SetalightDB, createSetlist, getNextSunday, determineSetlistType } from './db.js';
+import { createSong, findExistingSong } from './song-utils.js';
 import { ChordProParser } from './parser.js';
 import { getCurrentOrganisation } from './workspace.js';
 
@@ -56,53 +57,38 @@ import { getCurrentOrganisation } from './workspace.js';
         console.log('[Import] ChordPro length:', chordproText.length);
 
         try {
-            // Parse the ChordPro text
-            const parsed = parser.parse(chordproText);
+            const ccliNumber = metadata.ccliNumber || null;
+            const title = metadata.title || 'Untitled';
 
-            // Merge bookmarklet metadata with parsed metadata
-            parsed.metadata = {
-                ...parsed.metadata,
-                title: metadata.title || parsed.metadata.title,
-                ccliSongNumber: metadata.ccliNumber || parsed.metadata.ccliSongNumber,
-                key: metadata.key || parsed.metadata.key,
-                artist: metadata.artist || parsed.metadata.artist
-            };
+            // Check if song already exists
+            const existing = await findExistingSong(ccliNumber, title, chordproText);
 
-            // Generate song object for IndexedDB
-            const song = {
-                id: generateSongId(parsed),
-                ccliNumber: parsed.metadata.ccliSongNumber,
-                title: parsed.metadata.title,
-                artist: parsed.metadata.artist || null,
-                titleNormalized: normalizeTitle(parsed.metadata.title || ''),
-                textHash: hashText(chordproText),
-                metadata: {
-                    key: parsed.metadata.key || null,
-                    tempo: parsed.metadata.tempo || null,
-                    timeSignature: parsed.metadata.time || null
-                },
-                chordproText: chordproText,
-                lyricsText: extractLyricsText(parsed),
-                appearances: [],
-                createdAt: new Date().toISOString(),
-                lastUsedAt: null,
-                source: source
-            };
+            if (existing) {
+                console.log('[Import] Song already exists:', title, `(${existing.matchType})`);
+                isDuplicate = true;
+                pendingSong = existing.song;
+                pendingChordproText = chordproText;
+                await showChoices(existing.song, existing.song);
+                return;
+            }
+
+            // Create new song using new model
+            const song = await createSong(chordproText, {
+                ccliNumber: ccliNumber,
+                title: title,
+                source: source,
+                sourceUrl: null,
+                versionLabel: 'Original (SongSelect)'
+            });
+
+            console.log('[Import] Created new song:', title);
 
             // Store pending song
             pendingSong = song;
             pendingChordproText = chordproText;
 
-            // Check if song already exists
-            const existing = await db.getSong(song.id);
-
-            if (existing) {
-                console.log('[Import] Song already exists:', song.id);
-                isDuplicate = true;
-            }
-
             // Show choices UI
-            await showChoices(song, existing);
+            await showChoices(song, null);
 
         } catch (error) {
             console.error('[Import] Failed to process song:', error);
@@ -196,13 +182,8 @@ import { getCurrentOrganisation } from './workspace.js';
 
     async function saveSongAndAddToSetlist(setlistId) {
         try {
-            // Save song to database (unless user chose to use existing)
-            if (duplicateChoice !== 'use-existing') {
-                await db.saveSong(pendingSong);
-                console.log('[Import] Saved song to database:', pendingSong.id);
-            } else {
-                console.log('[Import] Using existing song:', pendingSong.id);
-            }
+            // Song is already saved to global DB when created/found
+            console.log('[Import] Using song:', pendingSong.id);
 
             // Load setlist
             const setlist = await db.getSetlist(setlistId);
@@ -241,14 +222,17 @@ import { getCurrentOrganisation } from './workspace.js';
 
     async function saveSongOnly() {
         try {
-            // Save song to database (unless user chose to use existing)
+            // Song is already saved to global DB when created/found
+            console.log('[Import] Song in library:', pendingSong.id);
+
+            // Get title from song (need to import song-utils to get full song)
+            const { getSongWithContent } = await import('./song-utils.js');
+            const fullSong = await getSongWithContent(pendingSong.id);
+
             if (duplicateChoice !== 'use-existing') {
-                await db.saveSong(pendingSong);
-                console.log('[Import] Saved song to database:', pendingSong.id);
-                alert(`✅ Saved "${pendingSong.title}" to song library!`);
+                alert(`✅ Saved "${fullSong.title}" to song library!`);
             } else {
-                console.log('[Import] Using existing song:', pendingSong.id);
-                alert(`✅ Song "${pendingSong.title}" is already in your library!`);
+                alert(`✅ Song "${fullSong.title}" is already in your library!`);
             }
 
             // Navigate to the specific song in the library
