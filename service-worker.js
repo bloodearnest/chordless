@@ -625,9 +625,9 @@ async function handleRoute(url) {
         }
     }
 
-    // Authorize page: /authorize
+    // Authorize page: /authorize (redirects to storage)
     if (path === '/authorize' || path === '/authorize/' || path === '/authorize.html') {
-        console.log('[SW] Serving authorize.html');
+        console.log('[SW] Serving authorize.html (redirect page)');
         if (DEV_MODE) {
             return fetch('/authorize.html', { cache: 'no-cache' }).then((response) => {
                 const responseToCache = response.clone();
@@ -640,6 +640,24 @@ async function handleRoute(url) {
             });
         } else {
             return fetch('/authorize.html');
+        }
+    }
+
+    // Storage page: /storage
+    if (path === '/storage' || path === '/storage/' || path === '/storage.html') {
+        console.log('[SW] Serving storage.html');
+        if (DEV_MODE) {
+            return fetch('/storage.html', { cache: 'no-cache' }).then((response) => {
+                const responseToCache = response.clone();
+                caches.open(CACHE_NAME).then((cache) => {
+                    cache.put('/storage.html', responseToCache);
+                });
+                return response;
+            }).catch(() => {
+                return caches.match('/storage.html');
+            });
+        } else {
+            return fetch('/storage.html');
         }
     }
 

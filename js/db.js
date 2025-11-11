@@ -88,6 +88,24 @@ export class SetalightDB {
         });
     }
 
+    /**
+     * Batch save multiple setlists in one transaction (faster)
+     */
+    async saveSetlistsBatch(setlists) {
+        if (setlists.length === 0) return;
+
+        const tx = this.db.transaction(['setlists'], 'readwrite');
+        const store = tx.objectStore('setlists');
+
+        // Queue all puts in one transaction
+        setlists.forEach(setlist => store.put(setlist));
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
     async getSetlist(id) {
         const tx = this.db.transaction(['setlists'], 'readonly');
         const store = tx.objectStore('setlists');

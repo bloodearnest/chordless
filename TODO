@@ -1,13 +1,24 @@
-current
- - nav-menu: fix back to setlist
-
 lit migration
  - finish it
+ - test page for each component
 
+live mode
+ - button on setlist
+ - fullscreen
+ - keep screen alive
+ - simple standalone sharing
+ - webrtc sync
+
+tests
+ - more unit tests
+ - component tests (using test page?)
 
 import
  - don't go back to import page (history)
  - adding the same song twice to set lists
+ - try importing in original key, but record the key that it was set to in the songselect page, and add to setlist in that key
+  - handle numbers on import (need to get an original key)
+ - make it reuse open windows for import (maybe need to get the default app, not opened via import, to have the tag tag?)
 
 sharing
 - temporary sharing
@@ -15,6 +26,7 @@ sharing
 
 player
  - click stuttering start
+ - survive pageloads
 
 storage/sync
 - oauth
@@ -31,11 +43,10 @@ editing
 - change click pattern
 - edit chordpro
 - song notes/stickies
-- nashville numbers
 
-live
- - simple sharing
- - websocket sync
+transpose
+- nashville numbers
+- capo
 
 settings
  - preferences

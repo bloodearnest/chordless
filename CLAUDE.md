@@ -4,6 +4,7 @@
 
 This is a webapp for arranging a setlist of worship songs for church, showing the lyrics and chords for them.
 
+The songs are input as chordpro files
 
 Its key features:
  - hide or show chords separately on each stanza
@@ -20,7 +21,6 @@ Extra features I would like to add
  - quick edit feature for quick song corrections
 
 
-The songs are input as chordpro files
 
 ## Core model: setlist
 
@@ -42,6 +42,8 @@ To do that, you have to enter edit mode explicitly. This has several goals
 - we are using an offline first approach, with proper url navigation and page reload, handled by a service worker
 - we are using newer css techniques to do the transition to avoid FOUS and other things.
 - we are using lit for components
+- we are using service worker 
+- we are using google auth and gdrive api for remote storage
 
 
 ## Development Standards

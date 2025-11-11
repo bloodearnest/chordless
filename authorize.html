@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Authorize Setalight with Google Drive">
-    <title>Authorize - Setalight</title>
+    <meta name="description" content="Redirecting to Storage">
+    <title>Redirecting... - Setalight</title>
+    <meta http-equiv="refresh" content="0; url=/storage">
     <link rel="stylesheet" href="/css/style.css">
     <style>
         .auth-container {
@@ -133,19 +134,21 @@
     <div class="app-container">
         <div class="auth-container">
             <div class="auth-card">
-                <h1>🔐 Google Drive Authorization</h1>
-
-                <div id="auth-status"></div>
-
-                <div id="auth-content">
-                    <!-- Content populated by JavaScript -->
+                <h1>Redirecting...</h1>
+                <div class="auth-status pending">
+                    <div class="spinner"></div>
+                    <p>Redirecting to Storage...</p>
+                    <p style="font-size: 0.9rem; margin-top: 1rem;">
+                        <a href="/storage" style="color: var(--header-bg, #3498db);">Click here if not redirected automatically</a>
+                    </p>
                 </div>
             </div>
         </div>
     </div>
 
     <script type="module">
-        import * as GoogleAuth from '/js/google-auth.js';
+        // Redirect to storage page
+        window.location.href = '/storage';
 
         let isAuthenticated = false;
 

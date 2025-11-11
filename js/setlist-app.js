@@ -40,6 +40,7 @@ class PageApp {
         this.sectionObserver = null;
         this.overviewEditMode = false; // Track whether overview is in edit mode
         this.settingsImportHandler = null;
+        this.storageImportHandler = null;
         this.init();
     }
 
@@ -92,6 +93,8 @@ class PageApp {
             await this.renderSetlist(route.setlistId);
         } else if (route.type === 'settings') {
             await this.renderSettings();
+        } else if (route.type === 'storage') {
+            await this.renderStorage();
         }
 
         // Set up keyboard navigation
@@ -112,6 +115,10 @@ class PageApp {
 
         if (pathname === '/settings' || pathname === '/settings/' || pathname === '/settings.html') {
             return { type: 'settings' };
+        }
+
+        if (pathname === '/storage' || pathname === '/storage/' || pathname === '/storage.html') {
+            return { type: 'storage' };
         }
 
         const setlistMatch = pathname.match(/^\/setlist\/([^\/]+)$/);
@@ -174,6 +181,11 @@ class PageApp {
     async renderSettings() {
         // Setup the import button on the settings page
         this.setupImportButton();
+    }
+
+    async renderStorage() {
+        // Setup the import button on the storage page
+        this.setupStorageImportButton();
     }
 
     setupLibraryHashNavigation() {
@@ -1078,6 +1090,18 @@ class PageApp {
 
         this.settingsImportHandler = () => this.runImport();
         appSettings.addEventListener('import-requested', this.settingsImportHandler);
+    }
+
+    setupStorageImportButton() {
+        const storagePage = document.getElementById('storage-page');
+        if (!storagePage) return;
+
+        if (this.storageImportHandler) {
+            storagePage.removeEventListener('import-requested', this.storageImportHandler);
+        }
+
+        this.storageImportHandler = () => this.runImport();
+        storagePage.addEventListener('import-requested', this.storageImportHandler);
     }
 
     async runImport() {

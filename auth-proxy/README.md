@@ -27,7 +27,16 @@ Exchange authorization code for encrypted token blob.
 {
   "blob": "eyJhbGc...",
   "access_token": "ya29...",
-  "expires_in": 3600
+  "expires_in": 3600,
+  "id_token": "id-token-from-google",
+  "user": {
+    "name": "Chris Worship",
+    "email": "chris@example.com",
+    "picture": "https://lh3.googleusercontent.com/...",
+    "given_name": "Chris",
+    "family_name": "Worship",
+    "sub": "google-user-id"
+  }
 }
 ```
 

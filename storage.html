@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Storage for Setalight">
+    <meta name="view-transition" content="same-origin">
+    <title>Storage - Setalight</title>
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <div id="storage-view" class="view">
+            <header>
+                <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <h1>Storage</h1>
+                <div></div>
+            </header>
+
+            <!-- Navigation menu component -->
+            <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
+
+            <main class="home-content">
+                <storage-page id="storage-page"></storage-page>
+            </main>
+        </div>
+    </div>
+
+    <!-- Import map for Lit -->
+    <script type="importmap">
+    {
+        "imports": {
+            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import { SetalightDB } from '/js/db.js';
+        import { getCurrentOrganisation } from '/js/workspace.js';
+        // Set window name for bookmarklet
+        window.name = 'setalight';
+
+        // Initialize nav menu button - wait for custom element to be defined
+        customElements.whenDefined('nav-menu').then(() => {
+            const navMenuButton = document.getElementById('nav-menu-button');
+            const navMenu = document.getElementById('nav-menu');
+
+            if (navMenuButton && navMenu) {
+                // Set the trigger button for positioning
+                navMenu.setTriggerButton(navMenuButton);
+
+                navMenuButton.addEventListener('click', () => {
+                    navMenu.togglePopover();
+                });
+            }
+        });
+
+        // Register service worker
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js', { type: 'module' })
+                .then(registration => {
+                    console.log('Service Worker registered:', registration);
+
+                    // If no controller, this is first install - reload once to activate
+                    if (!navigator.serviceWorker.controller) {
+                        console.log('First install - reloading page to activate Service Worker');
+                        // Set flag to avoid reload loop
+                        if (!sessionStorage.getItem('sw-first-load')) {
+                            sessionStorage.setItem('sw-first-load', '1');
+                            window.location.reload();
+                        }
+                    } else {
+                        console.log('Service Worker is active and controlling page');
+                        // Clear the first load flag since we have a controller now
+                        sessionStorage.removeItem('sw-first-load');
+                    }
+                })
+                .catch(error => {
+                    console.error('Service Worker registration failed:', error);
+                });
+        }
+
+        // Listen for ID token requests from Service Worker
+        import('/js/google-auth.js').then(({ listenForIdTokenRequests }) => {
+            listenForIdTokenRequests();
+        });
+
+        // Handle clear database requests from storage page
+        customElements.whenDefined('storage-page').then(() => {
+            const storagePage = document.getElementById('storage-page');
+            if (!storagePage) return;
+
+            storagePage.addEventListener('clear-database-requested', async () => {
+                const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
+                if (!confirmed) return;
+
+                try {
+                    const db = new SetalightDB(getCurrentOrganisation());
+                    await db.init();
+                    await db.clearAll();
+
+                    localStorage.clear();
+                    sessionStorage.clear();
+
+                    alert('✅ Local data cleared. The page will now reload.');
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Failed to clear database:', error);
+                    alert('❌ Failed to clear data: ' + error.message);
+                }
+            });
+        });
+    </script>
+    <!-- Import components -->
+    <script type="module" src="/components/nav-menu.js"></script>
+    <script type="module" src="/components/storage-page.js"></script>
+    <script type="module" src="/js/setlist-app.js"></script>
+</body>
+</html>

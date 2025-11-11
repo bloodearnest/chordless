@@ -137,10 +137,21 @@ async function handleOAuthCallback(request, env) {
 
 	const blob = await encryptBlob(blobData, env);
 
+	const user = {
+		name: payload.name || null,
+		email: payload.email || null,
+		picture: payload.picture || null,
+		given_name: payload.given_name || null,
+		family_name: payload.family_name || null,
+		sub: payload.sub || null,
+	};
+
 	return jsonResponse({
 		blob,
 		access_token,
 		expires_in: Math.floor((expiry_date - Date.now()) / 1000),
+		id_token,
+		user,
 	});
 }
 

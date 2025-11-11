@@ -31,11 +31,97 @@
 
 // Configuration
 const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com';
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file';
+const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile';
 
 const AUTH_PROXY_URL = window.location.hostname === 'localhost'
     ? 'http://localhost:8787'
     : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+
+/**
+ * Parse JWT and extract payload
+ */
+function parseJwt(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (error) {
+        console.error('[Auth] Failed to parse JWT:', error);
+        return null;
+    }
+}
+
+/**
+ * Get current user info from stored blob
+ * Returns { name, email, picture } or null
+ */
+export async function getCurrentUserInfo() {
+    try {
+        const blobData = await getStoredBlob();
+        const metadata = blobData?.metadata;
+
+        if (!metadata) {
+            return null;
+        }
+
+        let user = metadata.user || null;
+        let shouldPersist = false;
+
+        if (!user && metadata.id_token) {
+            const payload = parseJwt(metadata.id_token);
+            if (payload) {
+                user = {
+                    name: payload.name || null,
+                    email: payload.email || null,
+                    picture: payload.picture || null,
+                    given_name: payload.given_name || null,
+                    family_name: payload.family_name || null,
+                    sub: payload.sub || null
+                };
+                shouldPersist = true;
+            }
+        }
+
+        if (!user) {
+            return null;
+        }
+
+        if (!user.avatarDataUrl && user.picture) {
+            try {
+                const enriched = await buildStoredUserProfile(user);
+                if (enriched.avatarDataUrl) {
+                    user = enriched;
+                    shouldPersist = true;
+                }
+            } catch (error) {
+                console.warn('[Auth] Failed to cache avatar image:', error);
+            }
+        }
+
+        if (shouldPersist && blobData?.blob) {
+            const updatedMetadata = {
+                ...metadata,
+                user
+            };
+            try {
+                await sendToServiceWorker('STORE_BLOB', {
+                    blob: blobData.blob,
+                    metadata: updatedMetadata
+                });
+            } catch (error) {
+                console.warn('[Auth] Failed to persist user metadata:', error);
+            }
+        }
+
+        return formatUserInfoForUI(user);
+    } catch (error) {
+        console.error('[Auth] Failed to get user info:', error);
+        return null;
+    }
+}
 
 /**
  * Initialize Google Identity Services
@@ -88,18 +174,29 @@ export async function authorizeWithGoogle() {
                         throw new Error(error.error || 'Failed to exchange code for tokens');
                     }
 
-                    const { blob, access_token, expires_in } = await blobResponse.json();
+                    const { blob, access_token, expires_in, id_token, user } = await blobResponse.json();
+
+                    const normalizedUser = user
+                        ? await buildStoredUserProfile(user).catch(() => user)
+                        : null;
+
+                    const metadata = {
+                        access_token,
+                        expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
+                        user: normalizedUser
+                    };
+
+                    if (id_token) {
+                        metadata.id_token = id_token;
+                    }
 
                     // Store blob in Service Worker
                     await sendToServiceWorker('STORE_BLOB', {
                         blob,
-                        metadata: {
-                            access_token,
-                            expires_at: new Date(Date.now() + expires_in * 1000).toISOString()
-                        }
+                        metadata
                     });
 
-                    resolve({ blob, access_token, expires_in });
+                    resolve({ blob, access_token, expires_in, user: normalizedUser || user });
                 } catch (error) {
                     reject(error);
                 }
@@ -189,7 +286,7 @@ export async function getAccessToken() {
 
     // Token expired or about to expire, refresh it
     console.log('[Auth] Access token expired, refreshing...');
-    const newToken = await refreshAccessToken(blob);
+    const newToken = await refreshAccessToken(blob, metadata);
     return newToken;
 }
 
@@ -203,7 +300,7 @@ export async function getAccessToken() {
  * @param {string} blob - Encrypted JWE blob containing refresh token
  * @returns {Promise<string>} New access token
  */
-async function refreshAccessToken(blob) {
+async function refreshAccessToken(blob, existingMetadata = {}) {
     // Call auth proxy to refresh (no ID token needed - blob proves ownership)
     const response = await fetch(`${AUTH_PROXY_URL}/session/refresh`, {
         method: 'POST',
@@ -218,16 +315,73 @@ async function refreshAccessToken(blob) {
 
     const { access_token, expires_in } = await response.json();
 
+    const updatedMetadata = {
+        ...existingMetadata,
+        access_token,
+        expires_at: new Date(Date.now() + expires_in * 1000).toISOString()
+    };
+
     // Update stored metadata in Service Worker
     await sendToServiceWorker('STORE_BLOB', {
         blob,
-        metadata: {
-            access_token,
-            expires_at: new Date(Date.now() + expires_in * 1000).toISOString()
-        }
+        metadata: updatedMetadata
     });
 
     return access_token;
+}
+
+async function buildStoredUserProfile(user) {
+    if (!user || !user.picture) {
+        return user;
+    }
+
+    const picture = user.picture;
+
+    try {
+        const response = await fetch(picture, {
+            mode: 'cors',
+            credentials: 'omit',
+            cache: 'force-cache'
+        });
+
+        if (!response.ok) {
+            throw new Error(`Avatar request failed with status ${response.status}`);
+        }
+
+        const blob = await response.blob();
+        const avatarDataUrl = await blobToDataUrl(blob);
+
+        return {
+            ...user,
+            avatarDataUrl,
+            avatarUpdatedAt: new Date().toISOString()
+        };
+    } catch (error) {
+        console.warn('[Auth] Unable to cache avatar image:', error.message);
+        return user;
+    }
+}
+
+function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Failed to read avatar blob'));
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+    });
+}
+
+function formatUserInfoForUI(user) {
+    if (!user) return null;
+
+    return {
+        name: user.name || null,
+        email: user.email || null,
+        picture: user.picture || null,
+        avatarDataUrl: user.avatarDataUrl || null,
+        givenName: user.given_name || null,
+        familyName: user.family_name || null
+    };
 }
 
 /**

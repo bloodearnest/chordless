@@ -90,6 +90,24 @@ export class SongsDB {
         });
     }
 
+    /**
+     * Batch save multiple songs in one transaction (faster)
+     */
+    async saveSongsBatch(songs) {
+        if (songs.length === 0) return;
+
+        const tx = this.db.transaction(['songs'], 'readwrite');
+        const store = tx.objectStore('songs');
+
+        // Queue all puts in one transaction
+        songs.forEach(song => store.put(song));
+
+        return new Promise((resolve, reject) => {
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
     async getSong(id) {
         const tx = this.db.transaction(['songs'], 'readonly');
         const store = tx.objectStore('songs');

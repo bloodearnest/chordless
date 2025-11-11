@@ -4,11 +4,14 @@ import { ChordProParser } from './parser.js';
 import { SetalightDB, determineSetlistType } from './db.js';
 import { createSong, findExistingSong, hashText } from './song-utils.js';
 import { getGlobalSongsDB } from './songs-db.js';
+import { getGlobalChordProDB } from './chordpro-db.js';
+import { getCurrentUserInfo } from './google-auth.js';
 
 export class SetlistImporter {
     constructor(organisationName = null) {
         this.organisationDb = new SetalightDB(organisationName);
         this.songsDb = null; // Will be initialized in init()
+        this.chordproDb = null; // Will be initialized in init()
         this.parser = new ChordProParser();
         this.songsCache = new Map(); // In-memory cache during import
     }
@@ -16,6 +19,7 @@ export class SetlistImporter {
     async init() {
         await this.organisationDb.init();
         this.songsDb = await getGlobalSongsDB();
+        this.chordproDb = await getGlobalChordProDB();
     }
 
     /**
@@ -62,42 +66,30 @@ export class SetlistImporter {
     async importFromServer(progressCallback = null) {
         console.log('[Import] Starting import from server');
 
-        // Clear existing data by deleting and recreating the database
+        // Get current user info for leader field
+        const userInfo = await getCurrentUserInfo();
+        const defaultLeader = userInfo?.name || userInfo?.email || '';
+        console.log(`[Import] Using default leader: ${defaultLeader}`);
+        this.defaultLeader = defaultLeader;
+
+        // Clear existing data (without deleting the database)
+        // This works even when multiple tabs are open
         if (progressCallback) progressCallback({ stage: 'clearing', message: 'Clearing existing data...' });
 
-        // Close and reset the global songs database instance
-        const { resetGlobalSongsDB } = await import('./songs-db.js');
-        resetGlobalSongsDB();
+        console.log('[Import] Clearing all data from databases...');
 
-        // Delete the songs database completely
-        console.log('[Import] Deleting songs database...');
-        await new Promise((resolve, reject) => {
-            const deleteRequest = indexedDB.deleteDatabase('SetalightDB-songs');
-            deleteRequest.onsuccess = () => {
-                console.log('[Import] Songs database deleted successfully');
-                resolve();
-            };
-            deleteRequest.onerror = (event) => {
-                console.error('[Import] Failed to delete songs database:', event.target.error);
-                reject(new Error('Failed to delete songs database'));
-            };
-            deleteRequest.onblocked = () => {
-                console.warn('[Import] Delete blocked - close other tabs using this database');
-                // Resolve anyway after a short delay
-                setTimeout(resolve, 100);
-            };
-        });
-
-        // Wait a bit for the deletion to complete
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        // Reinitialize the songs database
-        console.log('[Import] Reinitializing songs database...');
-        this.songsDb = await getGlobalSongsDB();
+        // Clear songs database (without deleting - works with multiple tabs)
+        await this.songsDb.clearAll();
 
         // Clear organisation database
         await this.organisationDb.clearAll();
+
+        // Clear chordpro database
+        await this.chordproDb.clearAll();
+
+        // Clear caches
         this.songsCache.clear();
+
         console.log('[Import] Cleared existing data');
 
         if (progressCallback) progressCallback({ stage: 'fetching', message: 'Fetching setlists from server...' });
@@ -283,7 +275,7 @@ export class SetlistImporter {
             time: '10:30', // Default time
             type: determineSetlistType(setlistData.date, name),
             name: name || '',
-            leader: '', // Will be populated with user details later
+            leader: this.defaultLeader || '', // Populate with current user's name
             songs: songs,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()

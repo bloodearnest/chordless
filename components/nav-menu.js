@@ -297,11 +297,11 @@ export class NavMenu extends LitElement {
                         <span>SongSelect Import</span>
                     </a>
 
-                    <a href="/authorize" class="nav-menu-item" part="nav-item">
+                    <a href="/storage" class="nav-menu-item" part="nav-item">
                         <svg class="nav-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
                         </svg>
-                        <span>Cloud Authorization</span>
+                        <span>Storage</span>
                     </a>
                 </nav>
             </div>
@@ -309,7 +309,6 @@ export class NavMenu extends LitElement {
             <app-modal
                 id="nav-settings-modal"
                 size="fullscreen"
-                @close=${this._closeSettingsModal}
             >
                 <div slot="header">
                     <h2 style="margin: 0; font-size: 1.8rem;">Settings</h2>
@@ -359,13 +358,6 @@ export class NavMenu extends LitElement {
                 modal.show();
             }
         });
-    }
-
-    _closeSettingsModal() {
-        const modal = this.shadowRoot?.querySelector('#nav-settings-modal');
-        if (modal) {
-            modal.close();
-        }
     }
 
     async _handleClearDatabaseRequested() {
