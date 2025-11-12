@@ -19,6 +19,9 @@ const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3';
 
 const ROOT_FOLDER_NAME = 'Setalight';
+const PADS_FOLDER_NAME = 'pads';
+const PADSET_CATEGORY = 'padset';
+const PADSET_FILE_CATEGORY = 'padsetFile';
 const APP_VERSION = '1.0.0';
 
 /**
@@ -275,21 +278,30 @@ function parseBatchResponse(responseText) {
  */
 async function uploadFile(metadata, content, contentType = 'text/plain') {
     const token = await GoogleAuth.getAccessToken();
-
-    // Multipart upload
     const boundary = '-------314159265358979323846';
-    const delimiter = `\r\n--${boundary}\r\n`;
-    const closeDelimiter = `\r\n--${boundary}--`;
+    const encoder = new TextEncoder();
 
-    const metadataBody = JSON.stringify(metadata);
-    const body =
-        delimiter +
-        'Content-Type: application/json; charset=UTF-8\r\n\r\n' +
-        metadataBody +
-        delimiter +
-        `Content-Type: ${contentType}\r\n\r\n` +
-        content +
-        closeDelimiter;
+    const headerJson = encoder.encode(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n`);
+    const metadataBytes = encoder.encode(JSON.stringify(metadata));
+    const headerContent = encoder.encode(`\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`);
+    const closing = encoder.encode(`\r\n--${boundary}--`);
+
+    let contentBlob;
+    if (typeof content === 'string') {
+        contentBlob = new Blob([encoder.encode(content)]);
+    } else if (content instanceof Blob) {
+        contentBlob = content;
+    } else if (content instanceof ArrayBuffer) {
+        contentBlob = new Blob([content]);
+    } else if (content instanceof Uint8Array) {
+        contentBlob = new Blob([content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength)]);
+    } else {
+        throw new Error('Unsupported content type for Drive upload');
+    }
+
+    const body = new Blob([headerJson, metadataBytes, headerContent, contentBlob, closing], {
+        type: `multipart/related; boundary=${boundary}`
+    });
 
     const response = await fetch(`${UPLOAD_API_BASE}/files?uploadType=multipart`, {
         method: 'POST',
@@ -297,7 +309,7 @@ async function uploadFile(metadata, content, contentType = 'text/plain') {
             'Authorization': `Bearer ${token}`,
             'Content-Type': `multipart/related; boundary=${boundary}`
         },
-        body: body
+        body
     });
 
     if (!response.ok) {
@@ -348,6 +360,22 @@ async function downloadFile(fileId) {
     }
 
     return response.text();
+}
+
+export async function downloadFileBinary(fileId) {
+    const token = await GoogleAuth.getAccessToken();
+
+    const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    });
+
+    if (!response.ok) {
+        throw new Error(`Drive download error: ${response.statusText}`);
+    }
+
+    return response.arrayBuffer();
 }
 
 /**
@@ -431,6 +459,96 @@ export async function findOrCreateOrganisationFolder(organisationName, organisat
         folderId: folder.id,
         isNew: true
     };
+}
+
+export async function getPadsRootFolder() {
+    const rootFolderId = await findOrCreateRootFolder();
+    let padsFolderId = await findSubfolder(rootFolderId, PADS_FOLDER_NAME);
+    if (!padsFolderId) {
+        padsFolderId = await createSubfolder(rootFolderId, PADS_FOLDER_NAME);
+    }
+    return padsFolderId;
+}
+
+export async function listPadSetFolders() {
+    const padsRootId = await getPadsRootFolder();
+    const query = `'${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const result = await driveRequest(`/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`);
+    return result.files || [];
+}
+
+export async function ensurePadSetFolder(padSetName) {
+    const padsRootId = await getPadsRootFolder();
+    const query = `name='${padSetName}' and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const result = await driveRequest(`/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`);
+
+    if (result.files && result.files.length > 0) {
+        const folder = result.files[0];
+        await updatePadSetFolderMetadata(folder.id, padSetName);
+        return folder.id;
+    }
+
+    const folder = await driveRequest('/files', {
+        method: 'POST',
+        body: JSON.stringify({
+            name: padSetName,
+            mimeType: 'application/vnd.google-apps.folder',
+            parents: [padsRootId],
+            appProperties: {
+                category: PADSET_CATEGORY,
+                padSetName,
+                appVersion: APP_VERSION,
+                createdAt: new Date().toISOString()
+            }
+        })
+    });
+
+    return folder.id;
+}
+
+export async function updatePadSetFolderMetadata(folderId, padSetName) {
+    return driveRequest(`/files/${folderId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+            name: padSetName,
+            appProperties: {
+                category: PADSET_CATEGORY,
+                padSetName,
+                appVersion: APP_VERSION,
+                updatedAt: new Date().toISOString()
+            }
+        })
+    });
+}
+
+export async function listPadSetFiles(folderId) {
+    const query = `'${folderId}' in parents and trashed=false`;
+    const result = await driveRequest(`/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime,md5Checksum,mimeType)`);
+    return result.files || [];
+}
+
+export async function deleteFilesInFolder(folderId) {
+    const files = await listPadSetFiles(folderId);
+    const fileIds = files.map(file => file.id);
+    if (fileIds.length > 0) {
+        await batchDeleteFiles(fileIds);
+    }
+}
+
+export async function uploadPadFile(folderId, key, blob) {
+    const metadata = {
+        name: `${key}.mp3`,
+        parents: [folderId],
+        appProperties: {
+            category: PADSET_FILE_CATEGORY,
+            padKey: key,
+            padSetFolderId: folderId,
+            appVersion: APP_VERSION,
+            uploadedAt: new Date().toISOString()
+        }
+    };
+
+    return uploadFile(metadata, blob, 'audio/mpeg');
 }
 
 /**

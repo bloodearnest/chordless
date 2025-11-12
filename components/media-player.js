@@ -1,18 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import './help-tooltip.js';
-
-const PAD_FILE_KEYS = new Set(['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']);
-const ENHARMONIC_KEY_MAP = {
-    Bb: 'A#',
-    Db: 'C#',
-    Eb: 'D#',
-    Gb: 'F#',
-    Ab: 'G#',
-    Cb: 'B',
-    Fb: 'E',
-    'E#': 'F',
-    'B#': 'C'
-};
+import { normalizePadKey } from '../js/pad-keys.js';
+import { getActivePadSet, getPadCacheUrl, ensurePadKeyCached } from '../js/pad-set-service.js';
 
 /**
  * MediaPlayer Component
@@ -61,7 +50,8 @@ export class MediaPlayer extends LitElement {
         _activeSongTimeSignature: { type: String, state: true },
         _activeSongTitle: { type: String, state: true },
         _metronomeRunning: { type: Boolean, state: true },
-        _padLoadFailed: { type: Boolean, state: true }
+        _padLoadFailed: { type: Boolean, state: true },
+        _activePadSet: { type: Object, state: true }
     };
 
     static styles = css`
@@ -685,6 +675,7 @@ export class MediaPlayer extends LitElement {
         this._activeSongTempoNote = null;
         this._activeSongTimeSignature = null;
         this._activeSongTitle = null;
+        this._activePadSet = getActivePadSet();
 
         // UI state - load from localStorage, default to collapsed
         const savedCollapsed = localStorage.getItem('media-player-collapsed');
@@ -737,9 +728,11 @@ export class MediaPlayer extends LitElement {
         this._boundHandleKeydown = this._handleKeydown.bind(this);
         this._boundHandleSettingsChange = this._handleSettingsChange.bind(this);
         this._boundHandleSongChange = this._handleSongChange.bind(this);
+        this._boundHandlePadSetChange = this._handlePadSetChange.bind(this);
         document.addEventListener('keydown', this._boundHandleKeydown);
         document.addEventListener('settings-change', this._boundHandleSettingsChange);
         document.addEventListener('song-change', this._boundHandleSongChange);
+        window.addEventListener('pad-set-changed', this._boundHandlePadSetChange);
     }
 
     disconnectedCallback() {
@@ -748,6 +741,7 @@ export class MediaPlayer extends LitElement {
         document.removeEventListener('keydown', this._boundHandleKeydown);
         document.removeEventListener('settings-change', this._boundHandleSettingsChange);
         document.removeEventListener('song-change', this._boundHandleSongChange);
+        window.removeEventListener('pad-set-changed', this._boundHandlePadSetChange);
     }
 
     _handleSettingsChange(event) {
@@ -799,13 +793,27 @@ export class MediaPlayer extends LitElement {
         this._currentTimeSignature = song?.metadata?.timeSignature || null;
     }
 
+    _handlePadSetChange(event) {
+        const padSet = event?.detail?.padSet || getActivePadSet();
+        this._activePadSet = padSet;
+        this._padLoadFailed = false;
+
+        if (!this._padsOn) {
+            this._updateAudioSource().catch((error) => {
+                console.error('[MediaPlayer] Failed to update pad source after pad-set change:', error);
+            });
+        }
+    }
+
     updated(changedProperties) {
         super.updated(changedProperties);
 
         // Handle key changes - just update the source, don't auto-switch
         if (changedProperties.has('currentKey') && this.currentKey && !this._padsOn) {
             // Update the source without playing (pre-load for quick start)
-            this._updateAudioSource();
+            this._updateAudioSource().catch((error) => {
+                console.error('[MediaPlayer] Failed to preload pad source:', error);
+            });
         }
 
         // Handle stereo split changes
@@ -839,7 +847,9 @@ export class MediaPlayer extends LitElement {
 
             // Update source if we have a key
             if (this.currentKey) {
-                this._updateAudioSource();
+                this._updateAudioSource().catch((error) => {
+                    console.error('[MediaPlayer] Failed to prepare pad source during init:', error);
+                });
             }
         }
     }
@@ -874,50 +884,34 @@ export class MediaPlayer extends LitElement {
 
     _getPadFilenameKey(key) {
         if (!key) return null;
-
-        const normalized = `${key}`.trim()
-            .replace(/♭/g, 'b')
-            .replace(/♯/g, '#');
-        const match = normalized.match(/^([A-Ga-g])([#b]?)/);
-
-        if (!match) {
-            const upper = normalized.toUpperCase();
-            const fallback = ENHARMONIC_KEY_MAP[upper] || upper;
-            return PAD_FILE_KEYS.has(fallback) ? fallback : null;
-        }
-
-        const letter = match[1].toUpperCase();
-        const accidentalRaw = match[2] || '';
-        const accidental = accidentalRaw === '#'
-            ? '#'
-            : (accidentalRaw.toLowerCase() === 'b' ? 'b' : '');
-        const canonical = `${letter}${accidental}`;
-        const padKey = ENHARMONIC_KEY_MAP[canonical] || canonical;
-
-        if (!PAD_FILE_KEYS.has(padKey)) {
-            return null;
-        }
-
-        if (padKey !== canonical) {
-            console.debug(`[MediaPlayer] Using enharmonic pad key "${padKey}" for "${key}"`);
-        }
-
-        return padKey;
+        return normalizePadKey(key);
     }
 
-    _getPadUrl(key = this.currentKey) {
+    async _resolvePadUrlForKey(key) {
+        if (!key) return null;
         const padKey = this._getPadFilenameKey(key);
         if (!padKey) {
             return null;
         }
+
+        if (this._activePadSet && this._activePadSet.type === 'drive') {
+            try {
+                await ensurePadKeyCached(this._activePadSet, padKey);
+            } catch (error) {
+                console.error('[MediaPlayer] Failed to cache pad audio from Drive:', error);
+                return null;
+            }
+            return getPadCacheUrl(this._activePadSet.id, padKey);
+        }
+
         return `/pads/${encodeURIComponent(padKey)} - WARM - CHURCHFRONT PADS.mp3`;
     }
 
-    _updateAudioSource() {
+    async _updateAudioSource() {
         if (!this._audio || !this.currentKey) return false;
 
         const isActiveKey = this._activeSongKey && this.currentKey === this._activeSongKey;
-        const url = this._getPadUrl(this.currentKey);
+        const url = await this._resolvePadUrlForKey(this.currentKey);
         if (!url) {
             console.warn(`[MediaPlayer] No pad audio available for key "${this.currentKey}"`);
             this._audio.removeAttribute('src');
@@ -1370,7 +1364,7 @@ export class MediaPlayer extends LitElement {
         } else if (this._padsOn && !wasPlayingPads) {
             // Pads toggle is on but not playing yet, start them
             console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn);
-            const hasSource = this._updateAudioSource(); // Set the audio source before playing
+            const hasSource = await this._updateAudioSource(); // Set the audio source before playing
             if (hasSource) {
                 await this._fadeIn();
             }
@@ -1384,7 +1378,9 @@ export class MediaPlayer extends LitElement {
         } else if (!this._padsOn) {
             // Pads toggle is off, just update the audio source (preload for later)
             console.log('[MediaPlayer] Pads off, preloading audio source');
-            this._updateAudioSource();
+            this._updateAudioSource().catch((error) => {
+                console.error('[MediaPlayer] Failed to preload pad source while pads off:', error);
+            });
         }
 
         // Handle click: restart with new tempo if needed
@@ -1529,7 +1525,7 @@ export class MediaPlayer extends LitElement {
 
         const oldAudio = this._audio;
         const oldPadGain = this._padGain;
-        const padUrl = this._getPadUrl(this.currentKey);
+        const padUrl = await this._resolvePadUrlForKey(this.currentKey);
         if (!padUrl) {
             console.warn('[MediaPlayer] Unable to crossfade pads: no pad audio for current key');
             await this._fadeOut();
@@ -1805,11 +1801,12 @@ export class MediaPlayer extends LitElement {
         this._fadingOut = true;
         this._fadingIn = true;
 
-        const newUrl = this._getPadUrl(this.currentKey);
+        const newUrl = await this._resolvePadUrlForKey(this.currentKey);
         if (!newUrl) {
             console.warn('[MediaPlayer] Unable to crossfade to new key: no pad audio available');
             this._fadingOut = false;
             this._fadingIn = false;
+            this._padLoadFailed = true;
             return;
         }
 

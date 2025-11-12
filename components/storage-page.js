@@ -1,6 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import './drive-sync-panel.js';
 import './storage-summary.js';
+import './pad-set-manager.js';
 
 /**
  * StoragePage Component
@@ -236,6 +237,7 @@ export class StoragePage extends LitElement {
                 ${this._renderLocalSummarySection()}
                 ${this._renderAuthSection()}
                 ${this._renderSyncSection(!this.isAuthenticated)}
+                ${this._renderPadSetSection(!this.isAuthenticated)}
                 ${this._renderImportSection()}
                 ${this._renderDangerSection()}
             </div>
@@ -356,6 +358,18 @@ export class StoragePage extends LitElement {
         `;
     }
 
+    _renderPadSetSection(disabled = false) {
+        return html`
+            <div class="storage-section ${disabled ? 'is-disabled' : ''}">
+                <h3>🎚️ Pad Sets</h3>
+                <p>
+                    Upload zipped pad libraries (with all 12 keys) to Google Drive and switch between them in the media player.
+                </p>
+                <pad-set-manager></pad-set-manager>
+            </div>
+        `;
+    }
+
     _renderImportSection() {
         return html`
             <div class="storage-section">
@@ -383,6 +397,7 @@ export class StoragePage extends LitElement {
             </div>
         `;
     }
+
 
     async _authorize() {
         this.authStatus = 'authorizing';

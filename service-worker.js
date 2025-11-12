@@ -8,7 +8,8 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v212';
+const CACHE_NAME = 'setalight-v213';
+const PAD_CACHE_NAME = 'padsets-cache-v1';
 const ASSETS = [
     '/',
     '/css/style.css',
@@ -76,7 +77,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) => {
             return Promise.all(
                 cacheNames.map((cacheName) => {
-                    if (cacheName !== CACHE_NAME) {
+                    if (cacheName !== CACHE_NAME && cacheName !== PAD_CACHE_NAME) {
                         return caches.delete(cacheName);
                     }
                 })
@@ -452,6 +453,19 @@ self.addEventListener('fetch', (event) => {
                     console.error('[SW] Failed to fetch pad:', url.pathname, error);
                     throw error;
                 });
+            })
+        );
+        return;
+    }
+
+    if (url.pathname.startsWith('/pad-sets/')) {
+        event.respondWith(
+            caches.open(PAD_CACHE_NAME).then(async (cache) => {
+                const cached = await cache.match(event.request);
+                if (cached) {
+                    return cached;
+                }
+                return new Response('Pad set asset not available offline', { status: 404 });
             })
         );
         return;
