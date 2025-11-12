@@ -256,8 +256,9 @@ export class SongInfo extends LitElement {
         if (appearance.leader) {
             metaParts.push(appearance.leader);
         }
-        if (appearance.playedInKey) {
-            metaParts.push(`Key: ${appearance.playedInKey}`);
+        const keyPlayed = appearance.playedInKey || this.song?.metadata?.key;
+        if (keyPlayed) {
+            metaParts.push(`Key: ${keyPlayed}`);
         }
 
         if (metaParts.length > 0) {

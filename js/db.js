@@ -1,13 +1,13 @@
+import { ensurePersistentStorage } from './utils/persistence.js';
+
 // IndexedDB wrapper for Setalight
-// Manages organisation-specific setlists and song usage tracking
+// Manages organisation-specific setlists.
 //
 // NOTE: Song content (ChordPro, metadata) is stored in the global SongsDB (songs-db.js)
-// This organisation DB only stores:
-// - Setlists
-// - Song usage history (which setlists a song appears in)
+// This organisation DB only stores setlists. Song usage is derived on demand.
 
 const DB_NAME = 'SetalightDB';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Setlist types
 export const SETLIST_TYPES = {
@@ -40,6 +40,7 @@ export class SetalightDB {
             request.onsuccess = (event) => {
                 this.db = event.target.result;
                 resolve();
+                ensurePersistentStorage('setlists');
             };
 
             request.onupgradeneeded = (event) => {
@@ -52,7 +53,6 @@ export class SetalightDB {
                     setlistStore.createIndex('date', 'date', { unique: false });
                     setlistStore.createIndex('type', 'type', { unique: false });
                 } else if (oldVersion < 2) {
-                    // Upgrade from v1 to v2: add type index
                     const transaction = event.target.transaction;
                     const setlistStore = transaction.objectStore('setlists');
                     if (!setlistStore.indexNames.contains('type')) {
@@ -68,10 +68,9 @@ export class SetalightDB {
                     songStore.createIndex('textHash', 'textHash', { unique: false });
                 }
 
-                // Create Song Usage store (v3)
-                // Tracks which setlists a song appears in (no analytics indexes)
-                if (!db.objectStoreNames.contains('song_usage')) {
-                    db.createObjectStore('song_usage', { keyPath: 'songId' });
+                // v4: remove song_usage store (usage derived from setlists now)
+                if (db.objectStoreNames.contains('song_usage')) {
+                    db.deleteObjectStore('song_usage');
                 }
             };
         });
@@ -196,116 +195,60 @@ export class SetalightDB {
     }
 
     // Song Usage operations (workspace-specific)
-    async getSongUsage(songId) {
-        const tx = this.db.transaction(['song_usage'], 'readonly');
-        const store = tx.objectStore('song_usage');
-        const request = store.get(songId);
-        return new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => reject(request.error);
-        });
-    }
+    async getSongUsageFromSetlists(songId) {
+        if (!songId) return [];
 
-    async saveSongUsage(usage) {
-        const tx = this.db.transaction(['song_usage'], 'readwrite');
-        const store = tx.objectStore('song_usage');
-        await store.put(usage);
-        return new Promise((resolve, reject) => {
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-        });
-    }
-
-    async getAllSongUsage() {
-        const tx = this.db.transaction(['song_usage'], 'readonly');
-        const store = tx.objectStore('song_usage');
+        const tx = this.db.transaction(['setlists'], 'readonly');
+        const store = tx.objectStore('setlists');
         const request = store.getAll();
+
         return new Promise((resolve, reject) => {
-            request.onsuccess = () => resolve(request.result);
+            request.onsuccess = () => {
+                const setlists = request.result || [];
+                const appearances = [];
+
+                for (const setlist of setlists) {
+                    if (!Array.isArray(setlist.songs)) continue;
+
+                    setlist.songs.forEach((song, index) => {
+                        if (song.songId !== songId) return;
+
+                        appearances.push({
+                            setlistId: setlist.id,
+                            setlistDate: setlist.date,
+                            setlistName: setlist.name,
+                            leader: setlist.leader,
+                            type: setlist.type,
+                            playedInKey: song.modifications?.targetKey || null,
+                            order: index
+                        });
+                    });
+                }
+
+                appearances.sort((a, b) => (b.setlistDate || '').localeCompare(a.setlistDate || ''));
+                resolve(appearances);
+            };
             request.onerror = () => reject(request.error);
         });
     }
 
-    /**
-     * Update song usage when a setlist is saved
-     * Tracks which setlists a song appears in
-     */
-    async updateSongUsageOnSetlistSave(setlist) {
-        for (const song of setlist.songs) {
-            let usage = await this.getSongUsage(song.songId) || {
-                songId: song.songId,
-                workspaceName: this.workspaceName,
-                usageHistory: []
-            };
-
-            // Add/update this setlist in usage history
-            const historyIndex = usage.usageHistory.findIndex(h => h.setlistId === setlist.id);
-            const historyEntry = {
-                setlistId: setlist.id,
-                setlistDate: setlist.date,
-                setlistName: setlist.name,
-                leader: setlist.leader,
-                type: setlist.type,
-                playedInKey: song.modifications?.targetKey || null
-            };
-
-            if (historyIndex >= 0) {
-                // Update existing entry
-                usage.usageHistory[historyIndex] = historyEntry;
-            } else {
-                // New entry
-                usage.usageHistory.push(historyEntry);
-            }
-
-            // Sort by date descending
-            usage.usageHistory.sort((a, b) => b.setlistDate.localeCompare(a.setlistDate));
-
-            await this.saveSongUsage(usage);
-        }
-    }
-
-    /**
-     * Update song usage when a setlist is deleted
-     * Remove the setlist from song usage histories
-     */
-    async updateSongUsageOnSetlistDelete(setlist) {
-        for (const song of setlist.songs) {
-            const usage = await this.getSongUsage(song.songId);
-            if (!usage) continue;
-
-            // Remove this setlist from history
-            usage.usageHistory = usage.usageHistory.filter(h => h.setlistId !== setlist.id);
-
-            if (usage.usageHistory.length === 0) {
-                // No more usage, delete the record
-                const tx = this.db.transaction(['song_usage'], 'readwrite');
-                const store = tx.objectStore('song_usage');
-                await store.delete(song.songId);
-            } else {
-                // Re-sort by date descending
-                usage.usageHistory.sort((a, b) => b.setlistDate.localeCompare(a.setlistDate));
-                await this.saveSongUsage(usage);
-            }
-        }
-    }
 
     // Clear all data (for re-import)
     async clearAll() {
-        const tx = this.db.transaction(['setlists', 'songs', 'song_usage'], 'readwrite');
+        const tx = this.db.transaction(['setlists', 'songs'], 'readwrite');
 
         const setlistStore = tx.objectStore('setlists');
         const songStore = tx.objectStore('songs');
-        const usageStore = tx.objectStore('song_usage');
 
         await setlistStore.clear();
         await songStore.clear();
-        await usageStore.clear();
 
         return new Promise((resolve, reject) => {
             tx.oncomplete = () => resolve();
             tx.onerror = () => reject(tx.error);
         });
     }
+
 }
 
 // Utility functions
@@ -326,6 +269,13 @@ export function hashText(text) {
         hash = hash & hash; // Convert to 32bit integer
     }
     return hash.toString(36);
+}
+
+function extractSongIds(record) {
+    if (!record?.songs) return [];
+    return record.songs
+        .map(song => song?.songId)
+        .filter(id => typeof id === 'string' && id.length > 0);
 }
 
 /**

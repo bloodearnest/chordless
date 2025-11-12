@@ -481,16 +481,14 @@ export class DriveSyncManager {
      * Pull songs from Drive
      *
      * Validation: Handle user-copied files
-     * When users copy files in Drive, appProperties are also copied, which can create:
-     * - Duplicate versionId values (multiple files with same versionId but different driveFileId)
-     * - Incorrect versionLabel (filename says "alternative1" but appProperties say "Original")
+     * When users copy files in Drive, appProperties are also copied, which can create
+     * duplicate versionId values (multiple files with same versionId but different driveFileId)
      *
      * Detection and auto-fix strategy:
      * 1. List all chordpro files in songs/ folder with appProperties
      * 2. Group by songId
      * 3. For each song, detect duplicate versionId values:
      *    - If multiple files have same versionId but different driveFileId
-     *    - Parse filename to determine actual versionLabel (e.g., "alternative1" from filename)
      *    - Generate new unique versionId for the duplicate
      *    - Update Drive file's appProperties with corrected versionId and versionLabel
      * 4. Download/update local database with corrected metadata
@@ -504,10 +502,9 @@ export class DriveSyncManager {
         // 1. List all files: driveRequest(`/files?q='${songsFolderId}' in parents and mimeType='text/plain'&fields=files(id,name,appProperties,modifiedTime)`)
         // 2. Group by songId from appProperties
         // 3. Detect duplicates: const versionIdMap = new Map(); // versionId -> [driveFileId1, driveFileId2...]
-        // 4. For duplicates, parse filename with regex to extract versionLabel
-        // 5. Generate new versionId: `version-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        // 6. Update Drive file: driveRequest(`/files/${fileId}`, { method: 'PATCH', body: { appProperties: { versionId, versionLabel } } })
-        // 7. Download content and save to local database
+        // 4. Generate new versionId: `version-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        // 5. Update Drive file metadata via PATCH request
+        // 6. Download content and save to local database
         console.log('[DriveSync] Song pulling not yet implemented');
     }
 

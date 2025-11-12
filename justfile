@@ -14,7 +14,16 @@ test: test-node test-browser-headless
 # Run Node.js tests
 test-node:
     @echo "Running Node.js tests..."
-    node tests/transpose.test.js
+    node --test \
+        tests/transpose.test.js \
+        tests/db.test.js \
+        tests/db-usage.test.js \
+        tests/sync-reconciler.test.js
+
+# Lint/format JS files (basic syntax checks)
+lint:
+    @echo "Checking JavaScript syntax..."
+    @find js components -name '*.js' -print0 | xargs -0 -I{} node --check {}
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:

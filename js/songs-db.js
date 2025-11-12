@@ -1,3 +1,5 @@
+import { ensurePersistentStorage } from './utils/persistence.js';
+
 /**
  * Global Songs Database
  *
@@ -42,6 +44,7 @@ export class SongsDB {
             request.onsuccess = (event) => {
                 this.db = event.target.result;
                 resolve();
+                ensurePersistentStorage('songs');
             };
 
             request.onupgradeneeded = (event) => {

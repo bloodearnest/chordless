@@ -44,15 +44,11 @@ export function generateSongFolderName(title, ccliNumber) {
 
 /**
  * Generate human-readable chordpro filename
- * Format: title-ccli.versionlabel.txt (e.g., "amazing-grace-4779.original.txt")
+ * Format: title-ccli.txt (e.g., "amazing-grace-4779.txt")
  */
 export function generateChordProFilename(title, ccliNumber, versionLabel) {
     const baseName = generateSongFolderName(title, ccliNumber);
-    const normalizedLabel = versionLabel.toLowerCase()
-        .replace(/[^\w\s-]/g, '')
-        .replace(/\s+/g, '-');
-
-    return `${baseName}.${normalizedLabel}.txt`;
+    return `${baseName}.txt`;
 }
 
 /**
@@ -66,19 +62,10 @@ export function generateMetadataFilename(title, ccliNumber) {
 
 /**
  * Generate human-readable setlist filename
- * Format: date-type-leader-name.json (e.g., "2025-11-10-sunday-john-smith-morning-service.json")
+ * Format: date-leader-type[-name].json (e.g., "2025-11-10-john-smith-sunday-morning-service.json")
  */
 export function generateSetlistFilename(date, type, leader, name) {
     const parts = [date];
-
-    // Add type (Sunday, Midweek, Special, etc.)
-    if (type) {
-        const normalizedType = type.toLowerCase()
-            .replace(/[^\w\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .trim();
-        if (normalizedType) parts.push(normalizedType);
-    }
 
     // Add leader name
     if (leader) {
@@ -87,6 +74,15 @@ export function generateSetlistFilename(date, type, leader, name) {
             .replace(/\s+/g, '-')
             .trim();
         if (normalizedLeader) parts.push(normalizedLeader);
+    }
+
+    // Add type (Sunday, Midweek, Special, etc.)
+    if (type) {
+        const normalizedType = type.toLowerCase()
+            .replace(/[^\w\s-]/g, '')
+            .replace(/\s+/g, '-')
+            .trim();
+        if (normalizedType) parts.push(normalizedType);
     }
 
     // Add event name
@@ -558,7 +554,7 @@ export async function getSetlistsFolder(orgFolderId) {
  * @param {string} versionId - Internal version ID (for appProperties)
  * @param {string} title - Song title (for filename)
  * @param {string} ccliNumber - CCLI number (for filename)
- * @param {string} versionLabel - Version label (e.g., "Original", for filename)
+ * @param {string} versionLabel - Version label stored in appProperties (e.g., "Original")
  * @param {string} content - ChordPro file content
  * @param {object} metadata - Complete metadata object
  */

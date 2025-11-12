@@ -41,6 +41,7 @@ class PageApp {
         this.overviewEditMode = false; // Track whether overview is in edit mode
         this.settingsImportHandler = null;
         this.storageImportHandler = null;
+        this.globalImportHandler = null;
         this.init();
     }
 
@@ -342,10 +343,9 @@ class PageApp {
                     const fullSong = await getSongWithContent(songRecord.id);
 
                     // Get usage data from organisation DB
-                    const usage = await this.db.getSongUsage(songRecord.id);
-                    if (usage && usage.usageHistory && usage.usageHistory.length > 0) {
-                        // Most recent is first (already sorted by date descending)
-                        const lastUsage = usage.usageHistory[0];
+                    const usage = await this.db.getSongUsageFromSetlists(songRecord.id);
+                    if (usage && usage.length > 0) {
+                        const lastUsage = usage[0];
                         fullSong.lastUsageInfo = {
                             date: lastUsage.setlistDate,
                             leader: lastUsage.leader,
@@ -831,16 +831,15 @@ class PageApp {
         songInfoEl.loading = true;
 
         // Load song usage data to get appearances
-        const songUsage = await this.db.getSongUsage(song.id);
+        const songUsage = await this.db.getSongUsageFromSetlists(song.id);
 
-        // Convert usage history to appearances format
-        const appearances = songUsage?.usageHistory?.map(entry => ({
+        const appearances = songUsage.map(entry => ({
             setlistId: entry.setlistId,
             date: entry.setlistDate,
             playedInKey: entry.playedInKey,
             leader: entry.leader,
             setlistName: entry.setlistName
-        })) || [];
+        }));
 
         // Create song data object
         const songData = {
@@ -1094,14 +1093,15 @@ class PageApp {
 
     setupStorageImportButton() {
         const storagePage = document.getElementById('storage-page');
+        console.log('[PageApp] setupStorageImportButton', !!storagePage);
         if (!storagePage) return;
 
-        if (this.storageImportHandler) {
-            storagePage.removeEventListener('import-requested', this.storageImportHandler);
+        if (!this.globalImportHandler) {
+            this.globalImportHandler = () => {
+                this.runImport();
+            };
+            document.addEventListener('import-requested', this.globalImportHandler);
         }
-
-        this.storageImportHandler = () => this.runImport();
-        storagePage.addEventListener('import-requested', this.storageImportHandler);
     }
 
     async runImport() {
@@ -1798,26 +1798,31 @@ class PageApp {
         // Show loading state
         songInfoEl.loading = true;
 
-        // Load full song data from database to get appearances
-        const fullSong = await this.db.getSong(song.songId);
+        // Load full song data from SongsDB to get metadata/versions
+        let fullSong = null;
+        try {
+            const { getSongWithContent } = await import('./song-utils.js');
+            const versionId = song.versionId || song.currentVersionId || null;
+            fullSong = await getSongWithContent(song.songId, versionId);
+        } catch (error) {
+            console.error('Could not load full song data for:', song.songId, error);
+        }
+
         if (!fullSong) {
-            console.error('Could not load full song data for:', song.songId);
             songInfoEl.loading = false;
             songInfoEl.song = null;
             return;
         }
 
         // Load song usage data to get appearances
-        const songUsage = await this.db.getSongUsage(song.songId);
-
-        // Convert usage history to appearances format
-        const appearances = songUsage?.usageHistory?.map(entry => ({
+        const songUsage = await this.db.getSongUsageFromSetlists(song.songId);
+        const appearances = songUsage.map(entry => ({
             setlistId: entry.setlistId,
             date: entry.setlistDate,
             playedInKey: entry.playedInKey,
             leader: entry.leader,
             setlistName: entry.setlistName
-        })) || [];
+        }));
 
         // Merge the display song data with the full database song data
         const songData = {
@@ -1832,7 +1837,7 @@ class PageApp {
         songInfoEl.appearances = appearances;
     }
 
-    showSetlistInfo() {
+    async showSetlistInfo() {
         const modal = document.getElementById('song-info-modal');
         const modalBody = document.getElementById('modal-body');
 
@@ -1890,8 +1895,9 @@ class PageApp {
             addInfoItem('Name', this.currentSetlist.name);
         }
 
-        if (this.currentSetlist.leader) {
-            addInfoItem('Leader', this.currentSetlist.leader);
+        const leader = await this.getSetlistLeader();
+        if (leader) {
+            addInfoItem('Leader', leader);
         }
 
         if (this.currentSetlist.venue) {
@@ -3582,29 +3588,53 @@ class PageApp {
 
             modal.show();
 
+            // Focus search input and wire events when modal opens successfully
+            setTimeout(() => searchInput.focus(), 100);
+
+            const handleSearch = (e) => {
+                this.filterAddSongResults(e.target.value, resultsContainer);
+            };
+
+            searchInput.addEventListener('input', handleSearch);
+
+            const handleClose = () => {
+                searchInput.removeEventListener('input', handleSearch);
+                this.addSongModalSongs = null;
+            };
+
+            modal.addEventListener('close', handleClose, { once: true });
+
         } catch (error) {
             console.error('[Add Song Modal] Error loading songs:', error);
             resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error loading songs. Please try again.</p>';
             modal.show();
         }
+    }
 
-        // Focus search input
-        setTimeout(() => searchInput.focus(), 100);
+    async getSetlistLeader() {
+        if (this.currentSetlist?.leader && this.currentSetlist.leader.trim()) {
+            return this.currentSetlist.leader.trim();
+        }
 
-        // Setup search handler - same pattern as song library
-        const handleSearch = (e) => {
-            this.filterAddSongResults(e.target.value, resultsContainer);
-        };
+        // Fallback: scan song usage entries for this setlist
+        if (!this.currentSetlist?.songs?.length) {
+            return null;
+        }
 
-        searchInput.addEventListener('input', handleSearch);
+        for (const songEntry of this.currentSetlist.songs) {
+            if (!songEntry.songId) continue;
+            try {
+                const usage = await this.db.getSongUsageFromSetlists(songEntry.songId);
+                const historyEntry = usage.find(h => h.setlistId === this.currentSetlist.id);
+                if (historyEntry?.leader && historyEntry.leader.trim()) {
+                    return historyEntry.leader.trim();
+                }
+            } catch (error) {
+                console.warn('[SetlistInfo] Failed to load usage for song', songEntry.songId, error);
+            }
+        }
 
-        // Setup close handler to clean up
-        const handleClose = () => {
-            searchInput.removeEventListener('input', handleSearch);
-            this.addSongModalSongs = null;
-        };
-
-        modal.addEventListener('close', handleClose, { once: true });
+        return null;
     }
 
     filterAddSongResults(searchTerm, resultsContainer) {

@@ -6,6 +6,7 @@ import { createSong, findExistingSong, hashText } from './song-utils.js';
 import { getGlobalSongsDB } from './songs-db.js';
 import { getGlobalChordProDB } from './chordpro-db.js';
 import { getCurrentUserInfo } from './google-auth.js';
+import { parseHtml } from './utils/html-parser.js';
 
 export class SetlistImporter {
     constructor(organisationName = null) {
@@ -28,8 +29,7 @@ export class SetlistImporter {
      * @returns {Array<string>} - Array of file/directory names
      */
     _parseDirectoryListing(html) {
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
+        const doc = parseHtml(html);
         const links = doc.querySelectorAll('a');
         const items = [];
 
@@ -69,6 +69,11 @@ export class SetlistImporter {
         // Get current user info for leader field
         const userInfo = await getCurrentUserInfo();
         const defaultLeader = userInfo?.name || userInfo?.email || '';
+
+        if (!defaultLeader) {
+            throw new Error('Google account required. Connect with Google before importing setlists.');
+        }
+
         console.log(`[Import] Using default leader: ${defaultLeader}`);
         this.defaultLeader = defaultLeader;
 
@@ -283,9 +288,6 @@ export class SetlistImporter {
 
         // Save setlist to workspace database
         await this.organisationDb.saveSetlist(setlist);
-
-        // Update song usage tracking
-        await this.organisationDb.updateSongUsageOnSetlistSave(setlist);
 
         return setlist;
     }
