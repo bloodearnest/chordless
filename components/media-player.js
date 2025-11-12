@@ -51,6 +51,7 @@ export class MediaPlayer extends LitElement {
         _activeSongTitle: { type: String, state: true },
         _metronomeRunning: { type: Boolean, state: true },
         _padLoadFailed: { type: Boolean, state: true },
+        _isPadLoading: { type: Boolean, state: true },
         _activePadSet: { type: Object, state: true }
     };
 
@@ -260,6 +261,18 @@ export class MediaPlayer extends LitElement {
             color: #ff5c5c;
             text-shadow: 0 0 3px #ff5c5c, 0 0 6px #ff5c5c;
             font-weight: 700;
+        }
+
+        .led-value.status-downloading {
+            color: #ffd479;
+            animation: pad-download-blink 1s linear infinite;
+            font-weight: 700;
+        }
+
+        @keyframes pad-download-blink {
+            0% { opacity: 1; }
+            50% { opacity: 0.25; }
+            100% { opacity: 1; }
         }
 
         .led-header {
@@ -719,6 +732,8 @@ export class MediaPlayer extends LitElement {
         this._activeOscillators = []; // Track active oscillators for cleanup
         this._metronomeRunning = false;
         this._padLoadFailed = false;
+        this._isPadLoading = false;
+        this._padLoadingCount = 0;
         this._boundPadAudioErrorHandler = (event) => this._handlePadAudioError(event);
     }
 
@@ -788,9 +803,15 @@ export class MediaPlayer extends LitElement {
             this.currentKey = null;
         }
         // Store current song's tempo/time signature metadata
-        this._currentBpm = song?.metadata?.tempo ? Number(song.metadata.tempo) : null;
-        this._currentTempoNote = song?.metadata?.tempoNote || '1/4';
-        this._currentTimeSignature = song?.metadata?.timeSignature || null;
+        if (song?.metadata && 'tempo' in song.metadata) {
+            this._currentBpm = song.metadata.tempo ? Number(song.metadata.tempo) : null;
+        }
+        if (song?.metadata && 'tempoNote' in song.metadata) {
+            this._currentTempoNote = song.metadata.tempoNote || '1/4';
+        }
+        if (song?.metadata && 'timeSignature' in song.metadata) {
+            this._currentTimeSignature = song.metadata.timeSignature || null;
+        }
     }
 
     _handlePadSetChange(event) {
@@ -887,6 +908,38 @@ export class MediaPlayer extends LitElement {
         return normalizePadKey(key);
     }
 
+    _normalizeTempoNote(value) {
+        if (!value) return '1/4';
+        if (typeof value === 'number') {
+            return `1/${value}`;
+        }
+
+        let candidate = `${value}`.trim();
+        const parenMatch = candidate.match(/\(([^)]+)\)/);
+        if (parenMatch) {
+            candidate = parenMatch[1].trim();
+        }
+
+        const fractionMatch = candidate.match(/(\d+)\s*\/\s*(\d+)/);
+        if (fractionMatch) {
+            const numerator = Number(fractionMatch[1]);
+            const denominator = Number(fractionMatch[2]);
+            if (numerator > 0 && denominator > 0) {
+                return `${numerator}/${denominator}`;
+            }
+        }
+
+        const denomOnlyMatch = candidate.match(/^(\d+)$/);
+        if (denomOnlyMatch) {
+            const denom = Number(denomOnlyMatch[1]);
+            if (denom > 0) {
+                return `1/${denom}`;
+            }
+        }
+
+        return '1/4';
+    }
+
     async _resolvePadUrlForKey(key) {
         if (!key) return null;
         const padKey = this._getPadFilenameKey(key);
@@ -895,11 +948,18 @@ export class MediaPlayer extends LitElement {
         }
 
         if (this._activePadSet && this._activePadSet.type === 'drive') {
+            this._padLoadingCount++;
+            this._isPadLoading = true;
             try {
                 await ensurePadKeyCached(this._activePadSet, padKey);
             } catch (error) {
                 console.error('[MediaPlayer] Failed to cache pad audio from Drive:', error);
                 return null;
+            } finally {
+                this._padLoadingCount = Math.max(0, this._padLoadingCount - 1);
+                if (this._padLoadingCount === 0) {
+                    this._isPadLoading = false;
+                }
             }
             return getPadCacheUrl(this._activePadSet.id, padKey);
         }
@@ -1053,7 +1113,7 @@ export class MediaPlayer extends LitElement {
     _startMetronome() {
         const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm;
         const timeSignature = this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature;
-        const tempoNote = this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4';
+        const tempoNote = this._normalizeTempoNote(this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4');
 
         if (!bpmValue || !timeSignature) {
             console.warn('[MediaPlayer] Cannot start metronome: missing BPM or time signature');
@@ -1337,6 +1397,19 @@ export class MediaPlayer extends LitElement {
         this._activeSongTimeSignature = this._currentTimeSignature;
         this._activeSongTitle = this._currentSongTitle;
 
+        // Handle click immediately so metronome isn't blocked by pad loading
+        if (needsTempoChange && this._clickOn && wasPlayingClick) {
+            console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm);
+            this._stopMetronome();
+            this._startMetronome();
+        } else if (this._clickOn && !wasPlayingClick) {
+            console.log('[MediaPlayer] Starting click for first time');
+            this._startMetronome();
+        } else if (!this._clickOn && wasPlayingClick) {
+            console.log('[MediaPlayer] Click toggle off, stopping');
+            this._stopMetronome();
+        }
+
         // If we're currently fading out, cancel it and fade back in
         if (this._fadingOut) {
             console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in');
@@ -1359,7 +1432,7 @@ export class MediaPlayer extends LitElement {
             // Click will be started below in the normal flow if needed
         } else if (needsKeyChange && this._padsOn && wasPlayingPads) {
             // Handle pads: crossfade if key changed and pads toggle is on
-            console.log('[MediaPlayer] Crossfading pads from', this._activeSongKey, 'to', this.currentKey);
+            console.log('[MediaPlayer] Crossfading pads from', oldActiveKey, 'to', this.currentKey);
             await this._crossfadeToNewSong();
         } else if (this._padsOn && !wasPlayingPads) {
             // Pads toggle is on but not playing yet, start them
@@ -1381,21 +1454,6 @@ export class MediaPlayer extends LitElement {
             this._updateAudioSource().catch((error) => {
                 console.error('[MediaPlayer] Failed to preload pad source while pads off:', error);
             });
-        }
-
-        // Handle click: restart with new tempo if needed
-        if (needsTempoChange && this._clickOn && wasPlayingClick) {
-            console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm);
-            this._stopMetronome();
-            this._startMetronome();
-        } else if (this._clickOn && !wasPlayingClick) {
-            // Click toggle is on but not playing yet, start it
-            console.log('[MediaPlayer] Starting click for first time');
-            this._startMetronome();
-        } else if (!this._clickOn && wasPlayingClick) {
-            // Click toggle was turned off while playing, stop it
-            console.log('[MediaPlayer] Click toggle off, stopping');
-            this._stopMetronome();
         }
 
         // Active song properties already set at the beginning of this method
@@ -2028,6 +2086,9 @@ export class MediaPlayer extends LitElement {
         const padsPlaying = this._audio && !this._audio.paused;
         const clickPlaying = this._metronomeRunning;
         const isPlaying = padsPlaying || clickPlaying;
+        const isDownloading = this._isPadLoading;
+        const statusText = isDownloading ? 'DOWNLOAD' : (isPlaying ? 'PLAYING' : 'STOPPED');
+        const statusClass = isDownloading ? 'status-downloading' : '';
 
         // Check if we're viewing a different song than what's playing
         // Compare song IDs instead of individual properties
@@ -2111,7 +2172,7 @@ export class MediaPlayer extends LitElement {
                         <div class="led-display">
                             <!-- Row 1: Headers -->
                             <div class="led-label"></div>
-                            <div class="led-value led-header">${isPlaying ? 'Playing' : 'Stopped'}</div>
+                            <div class="led-value led-header ${statusClass}">${statusText}</div>
                             <div class="led-value led-header">Next</div>
 
                             <!-- Row 2: Key -->

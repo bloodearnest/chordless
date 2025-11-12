@@ -57,21 +57,28 @@ export function normalizePadKey(key) {
 export function extractPadKeyFromFilename(filename) {
     if (!filename) return null;
     const base = filename.split('/').pop() || filename;
+    const nameWithoutExt = base.replace(/\.[^.]+$/, '');
 
-    // Try matching token at start separated by space, dash, or underscore
-    const startMatch = base.match(/^([A-Ga-g][#b]?)/);
-    if (startMatch) {
-        const normalized = normalizePadKey(startMatch[1]);
-        if (normalized) {
-            return normalized;
+    // Prefer tokens near the end separated by common delimiters
+    const tokens = nameWithoutExt.split(/[\s_\-()]+/).filter(Boolean);
+    for (let i = tokens.length - 1; i >= 0; i--) {
+        const token = tokens[i];
+        const match = token.match(/^([A-Ga-g])([#b♯♭]?)/);
+        if (match && token.length <= 3) {
+            const normalized = normalizePadKey(match[0]);
+            if (normalized) {
+                return normalized;
+            }
         }
     }
 
-    // Fallback: search anywhere in filename
-    const anywhereMatch = base.match(/([A-Ga-g][#b]?)/);
-    if (anywhereMatch) {
-        return normalizePadKey(anywhereMatch[1]);
+    // Fallback: find the last standalone key anywhere in the name
+    const globalPattern = /\b([A-Ga-g])([#b♯♭]?)/g;
+    let match;
+    let candidate = null;
+    while ((match = globalPattern.exec(nameWithoutExt)) !== null) {
+        candidate = match[0];
     }
 
-    return null;
+    return candidate ? normalizePadKey(candidate) : null;
 }

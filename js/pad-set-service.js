@@ -183,7 +183,9 @@ export function getPadCacheUrl(padSetId, key) {
 
 export function derivePadSetName(filename = '') {
     const base = filename.replace(/\.[^.]+$/, '');
-    return base.replace(/[-_]+/g, ' ').trim() || 'New Pad Set';
+    const sanitized = base.replace(/[^a-zA-Z0-9\s-]+/g, '');
+    const spaced = sanitized.replace(/[-_]+/g, ' ').trim();
+    return spaced || 'New Pad Set';
 }
 
 function getCacheState() {
@@ -342,10 +344,17 @@ async function extractPadFiles(zipContext) {
         if (!key) continue;
 
         const data = await extractEntryData(zipContext, entry);
-        padFiles.set(key, data);
+        const existing = padFiles.get(key);
+        if (!existing || entry.fileName.length < existing.pathLength) {
+            padFiles.set(key, { data, pathLength: entry.fileName.length });
+        }
     }
 
-    return padFiles;
+    const normalized = new Map();
+    for (const [key, value] of padFiles.entries()) {
+        normalized.set(key, value.data);
+    }
+    return normalized;
 }
 
 async function extractEntryData(zipContext, entry) {

@@ -1319,16 +1319,24 @@ class PageApp {
                 const originalKey = parsed.metadata.key;
 
                 // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
-                let currentBPM = parsed.metadata.tempo;
+                const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo);
+                let currentBPM = parsedTempoInfo.bpm;
                 let timeSignature = parsed.metadata.time; // ChordPro uses 'time'
+                let tempoNote = parsedTempoInfo.tempoNote || null;
                 if (canonicalSong && canonicalSong.metadata) {
-                    currentBPM = canonicalSong.metadata.tempo || parsed.metadata.tempo;
+                    const canonicalTempoInfo = this._parseTempoMetadata(canonicalSong.metadata.tempo);
+                    if (canonicalTempoInfo.bpm !== null) {
+                        currentBPM = canonicalTempoInfo.bpm;
+                    }
                     timeSignature = canonicalSong.metadata.timeSignature || parsed.metadata.time;
+                    tempoNote = canonicalTempoInfo.tempoNote || tempoNote;
                 }
 
                 // Derive default tempoNote from time signature denominator if not explicitly set
-                let tempoNote = '1/4'; // Default to quarter notes
-                if (timeSignature) {
+                if (!tempoNote) {
+                    tempoNote = '1/4'; // Default to quarter notes
+                }
+                if (timeSignature && (!tempoNote || tempoNote === '1/4')) {
                     const [, denominator] = timeSignature.split('/').map(s => s.trim());
                     if (denominator) {
                         tempoNote = `1/${denominator}`;
@@ -2614,6 +2622,11 @@ class PageApp {
 
         // Repopulate the dropdown with the new key in the middle
         this.populateKeySelector(newKey);
+
+        // Notify media player so it refreshes tempo/time/key data
+        if (this.songs[this.currentSongIndex]) {
+            this.dispatchSongChange(this.songs[this.currentSongIndex]);
+        }
     }
 
     setupFontSizeControls() {
@@ -3785,6 +3798,29 @@ class PageApp {
             console.error('Error deleting song from setlist:', error);
             alert('Failed to delete song. Please try again.');
         }
+    }
+
+    _parseTempoMetadata(raw) {
+        if (raw === undefined || raw === null || raw === '') {
+            return { bpm: null, tempoNote: null };
+        }
+        if (typeof raw === 'number') {
+            return { bpm: raw, tempoNote: null };
+        }
+        const str = `${raw}`.trim();
+        let tempoNote = null;
+        let bpmPart = str;
+        const parenMatch = str.match(/\(([^)]+)\)/);
+        if (parenMatch) {
+            tempoNote = parenMatch[1].trim();
+            bpmPart = str.replace(/\([^)]*\)/g, '').trim();
+        }
+        const bpmMatch = bpmPart.match(/-?\d+(?:\.\d+)?/);
+        const bpm = bpmMatch ? Number(bpmMatch[0]) : null;
+        return {
+            bpm: Number.isFinite(bpm) ? bpm : null,
+            tempoNote
+        };
     }
 }
 

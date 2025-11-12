@@ -133,37 +133,6 @@ export class PadSetManager extends LitElement {
             margin-bottom: 0.5rem;
         }
 
-        .default-block {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 4px;
-            padding: 0.75rem 0.75rem 1rem 0.75rem;
-            margin-top: 0.5rem;
-            display: flex;
-            flex-direction: column;
-            gap: 0.45rem;
-        }
-
-        .default-heading {
-            font-size: 0.95rem;
-            font-weight: 600;
-        }
-
-        .padset-select {
-            width: 100%;
-            padding: 0.55rem 0.65rem;
-            border-radius: 4px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            background: rgba(0, 0, 0, 0.35);
-            color: #f5f5f5;
-            font-size: 1rem;
-            appearance: none;
-        }
-
-        .padset-select option {
-            background: #1f2c3c;
-            color: #f5f5f5;
-        }
-
         .padset-message {
             font-size: 0.85rem;
             opacity: 0.85;
@@ -234,7 +203,15 @@ export class PadSetManager extends LitElement {
     }
 
     _handleNameInput(event) {
-        this.padSetName = event.target.value;
+        const input = event.target;
+        const raw = input.value;
+        const sanitized = raw.replace(/[^a-zA-Z0-9\s-]+/g, '');
+        if (sanitized !== raw) {
+            const pos = input.selectionStart - (raw.length - sanitized.length);
+            input.value = sanitized;
+            input.setSelectionRange(Math.max(0, pos), Math.max(0, pos));
+        }
+        this.padSetName = sanitized;
     }
 
     async _handleUpload(event) {
@@ -323,16 +300,9 @@ export class PadSetManager extends LitElement {
     render() {
         return html`
             ${this.renderPadSetList()}
-
-            <div class="default-block">
-                <div class="default-heading">Default Pad Set</div>
-                <div class="setting-description" style="font-size: 0.85rem; opacity: 0.8;">
-                    Choose which pad library the media player should use for playback.
-                </div>
-                ${this.selectingPadSet ? html`<div class="padset-message">Switching pad set…</div>` : ''}
-                ${this.selectPadSetMessage ? html`<div class="padset-message" style="color: #8fd18f;">${this.selectPadSetMessage}</div>` : ''}
-                ${this.selectPadSetError ? html`<div class="padset-message" style="color: #ffb3b3;">${this.selectPadSetError}</div>` : ''}
-            </div>
+            ${this.selectingPadSet ? html`<div class="padset-message">Switching pad set…</div>` : ''}
+            ${this.selectPadSetMessage ? html`<div class="padset-message" style="color: #8fd18f;">${this.selectPadSetMessage}</div>` : ''}
+            ${this.selectPadSetError ? html`<div class="padset-message" style="color: #ffb3b3;">${this.selectPadSetError}</div>` : ''}
 
             <form @submit=${this._handleUpload}>
                 <div>
