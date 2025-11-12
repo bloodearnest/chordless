@@ -1,4 +1,18 @@
 import { LitElement, html, css } from 'lit';
+import './help-tooltip.js';
+
+const PAD_FILE_KEYS = new Set(['A', 'A#', 'B', 'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#']);
+const ENHARMONIC_KEY_MAP = {
+    Bb: 'A#',
+    Db: 'C#',
+    Eb: 'D#',
+    Gb: 'F#',
+    Ab: 'G#',
+    Cb: 'B',
+    Fb: 'E',
+    'E#': 'F',
+    'B#': 'C'
+};
 
 /**
  * MediaPlayer Component
@@ -45,7 +59,9 @@ export class MediaPlayer extends LitElement {
         _activeSongBpm: { type: Number, state: true },
         _activeSongTempoNote: { type: String, state: true },
         _activeSongTimeSignature: { type: String, state: true },
-        _activeSongTitle: { type: String, state: true }
+        _activeSongTitle: { type: String, state: true },
+        _metronomeRunning: { type: Boolean, state: true },
+        _padLoadFailed: { type: Boolean, state: true }
     };
 
     static styles = css`
@@ -248,6 +264,12 @@ export class MediaPlayer extends LitElement {
 
         .led-value {
             text-align: center;
+        }
+
+        .led-value.pad-error {
+            color: #ff5c5c;
+            text-shadow: 0 0 3px #ff5c5c, 0 0 6px #ff5c5c;
+            font-weight: 700;
         }
 
         .led-header {
@@ -704,6 +726,9 @@ export class MediaPlayer extends LitElement {
         this._audioContext = null;
         this._clickGain = null;
         this._activeOscillators = []; // Track active oscillators for cleanup
+        this._metronomeRunning = false;
+        this._padLoadFailed = false;
+        this._boundPadAudioErrorHandler = (event) => this._handlePadAudioError(event);
     }
 
     connectedCallback() {
@@ -796,9 +821,7 @@ export class MediaPlayer extends LitElement {
                 this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            this._audio = new Audio();
-            this._audio.loop = true;
-            this._audio.crossOrigin = 'anonymous';
+            this._audio = this._createPadAudioElement();
 
             // Create Web Audio nodes for pad audio
             this._padSource = this._audioContext.createMediaElementSource(this._audio);
@@ -814,14 +837,6 @@ export class MediaPlayer extends LitElement {
             this._padSource.connect(this._padGain);
             this._padGain.connect(this._audioContext.destination);
 
-            // Handle audio errors
-            this._audio.addEventListener('error', (e) => {
-                console.error('[MediaPlayer] Audio error:', e);
-                this._padsOn = false;
-                this._fadingIn = false;
-                this._fadingOut = false;
-            });
-
             // Update source if we have a key
             if (this.currentKey) {
                 this._updateAudioSource();
@@ -829,12 +844,95 @@ export class MediaPlayer extends LitElement {
         }
     }
 
-    _updateAudioSource() {
-        if (!this._audio || !this.currentKey) return;
+    _createPadAudioElement() {
+        const audio = new Audio();
+        audio.loop = true;
+        audio.crossOrigin = 'anonymous';
+        audio.addEventListener('error', this._boundPadAudioErrorHandler);
+        return audio;
+    }
 
-        const url = `/pads/${encodeURIComponent(this.currentKey)} - WARM - CHURCHFRONT PADS.mp3`;
+    _handlePadAudioError(event) {
+        const source = event?.target?.currentSrc || event?.target?.src || this._audio?.currentSrc || this._audio?.src;
+        console.warn('[MediaPlayer] Pad audio error:', source || this.currentKey || 'unknown source', event?.error || event);
+        this._padLoadFailed = true;
+        this._fadingIn = false;
+        this._fadingOut = false;
+
+        if (this._padGain) {
+            this._padGain.gain.value = 0;
+        }
+
+        if (event?.target && !event.target.paused) {
+            try {
+                event.target.pause();
+            } catch (err) {
+                console.debug('[MediaPlayer] Unable to pause errored pad audio source:', err);
+            }
+        }
+    }
+
+    _getPadFilenameKey(key) {
+        if (!key) return null;
+
+        const normalized = `${key}`.trim()
+            .replace(/♭/g, 'b')
+            .replace(/♯/g, '#');
+        const match = normalized.match(/^([A-Ga-g])([#b]?)/);
+
+        if (!match) {
+            const upper = normalized.toUpperCase();
+            const fallback = ENHARMONIC_KEY_MAP[upper] || upper;
+            return PAD_FILE_KEYS.has(fallback) ? fallback : null;
+        }
+
+        const letter = match[1].toUpperCase();
+        const accidentalRaw = match[2] || '';
+        const accidental = accidentalRaw === '#'
+            ? '#'
+            : (accidentalRaw.toLowerCase() === 'b' ? 'b' : '');
+        const canonical = `${letter}${accidental}`;
+        const padKey = ENHARMONIC_KEY_MAP[canonical] || canonical;
+
+        if (!PAD_FILE_KEYS.has(padKey)) {
+            return null;
+        }
+
+        if (padKey !== canonical) {
+            console.debug(`[MediaPlayer] Using enharmonic pad key "${padKey}" for "${key}"`);
+        }
+
+        return padKey;
+    }
+
+    _getPadUrl(key = this.currentKey) {
+        const padKey = this._getPadFilenameKey(key);
+        if (!padKey) {
+            return null;
+        }
+        return `/pads/${encodeURIComponent(padKey)} - WARM - CHURCHFRONT PADS.mp3`;
+    }
+
+    _updateAudioSource() {
+        if (!this._audio || !this.currentKey) return false;
+
+        const isActiveKey = this._activeSongKey && this.currentKey === this._activeSongKey;
+        const url = this._getPadUrl(this.currentKey);
+        if (!url) {
+            console.warn(`[MediaPlayer] No pad audio available for key "${this.currentKey}"`);
+            this._audio.removeAttribute('src');
+            if (isActiveKey) {
+                this._padLoadFailed = true;
+            }
+            return false;
+        }
+
         console.log('[MediaPlayer] Setting audio source:', url);
         this._audio.src = url;
+        if (isActiveKey) {
+            this._padLoadFailed = false;
+        }
+        return true;
     }
 
     _cleanup() {
@@ -844,6 +942,7 @@ export class MediaPlayer extends LitElement {
         }
         if (this._audio) {
             this._audio.pause();
+            this._audio.removeEventListener('error', this._boundPadAudioErrorHandler);
             this._audio.src = '';
             this._audio = null;
         }
@@ -865,9 +964,10 @@ export class MediaPlayer extends LitElement {
     async _stop() {
         console.log('[MediaPlayer] Stop - stopping click and fading out pads');
 
-        // Check what's actually playing
-        const padsPlaying = this._audio && !this._audio.paused;
-        const clickPlaying = this._metronomeInterval !== null;
+        // Check what's actually playing (panic button semantics: treat existing audio as playing)
+        const padsAvailable = !!this._audio;
+        const padsPlaying = padsAvailable && !this._audio.paused;
+        const clickPlaying = this._metronomeRunning;
 
         // Stop click immediately if playing (but don't change toggle state)
         // This also resets the beat counter so it starts fresh next time
@@ -875,8 +975,8 @@ export class MediaPlayer extends LitElement {
             this._stopMetronome();
         }
 
-        // Fade out pads if playing (but don't change toggle state)
-        if (padsPlaying) {
+        // Fade out pads if we currently have audio wired up
+        if (padsAvailable) {
             await this._fadeOut();
         }
 
@@ -887,6 +987,7 @@ export class MediaPlayer extends LitElement {
         this._activeSongTempoNote = null;
         this._activeSongTimeSignature = null;
         this._activeSongTitle = null;
+        this._padLoadFailed = false;
 
         // Force UI update
         this.requestUpdate();
@@ -956,13 +1057,30 @@ export class MediaPlayer extends LitElement {
     }
 
     _startMetronome() {
-        if (!this.bpm || !this.timeSignature) {
+        const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm;
+        const timeSignature = this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature;
+        const tempoNote = this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4';
+
+        if (!bpmValue || !timeSignature) {
             console.warn('[MediaPlayer] Cannot start metronome: missing BPM or time signature');
+            if (this._metronomeRunning) {
+                this._metronomeRunning = false;
+                this.requestUpdate();
+            }
             return;
         }
 
         // Ensure audio is initialized (this will create _audioContext and _clickGain)
         this._initAudio();
+
+        if (!this._audioContext || !this._clickGain) {
+            console.warn('[MediaPlayer] Cannot start metronome: audio context not ready');
+            if (this._metronomeRunning) {
+                this._metronomeRunning = false;
+                this.requestUpdate();
+            }
+            return;
+        }
 
         // Resume AudioContext if suspended
         if (this._audioContext.state === 'suspended') {
@@ -972,15 +1090,7 @@ export class MediaPlayer extends LitElement {
         // Update gain to current volume setting
         this._clickGain.gain.value = this._clickVolume;
 
-        // Cannot start metronome without active song metadata
-        if (!this._activeSongBpm || !this._activeSongTimeSignature) {
-            console.warn('[MediaPlayer] Cannot start metronome: no active song with tempo/time signature');
-            return;
-        }
-
-        const timeSignature = this._activeSongTimeSignature;
-        const tempoNote = this._activeSongTempoNote || '1/4';
-        const bpm = Number(this._activeSongBpm);
+        const bpm = Number(bpmValue);
 
         console.log(`[MediaPlayer] Starting metronome at ${bpm} BPM, ${tempoNote} notes, ${timeSignature}`);
 
@@ -1049,6 +1159,8 @@ export class MediaPlayer extends LitElement {
 
         // Store the beat interval for the scheduling loop
         this._beatInterval = beatInterval;
+        this._metronomeRunning = true;
+        this.requestUpdate();
 
         // Start the metronome scheduling loop
         // Play first click immediately, then schedule subsequent clicks
@@ -1057,17 +1169,24 @@ export class MediaPlayer extends LitElement {
     }
 
     _scheduleNextClick() {
-        if (!this._beatInterval) return;
+        if (!this._beatInterval || !this._metronomeRunning) return;
 
         // Use setTimeout for the next click
         // This ensures consistent timing even if _playClick() takes some time to execute
         this._metronomeInterval = setTimeout(() => {
+            if (!this._metronomeRunning) {
+                return;
+            }
             this._playClick();
             this._scheduleNextClick(); // Schedule the next one
         }, this._beatInterval);
     }
 
     _stopMetronome() {
+        if (!this._metronomeRunning && !this._metronomeInterval) {
+            return;
+        }
+
         console.log('[MediaPlayer] Stopping metronome, active oscillators:', this._activeOscillators?.length || 0);
 
         // Clear timeout and beat interval
@@ -1093,6 +1212,9 @@ export class MediaPlayer extends LitElement {
             });
             this._activeOscillators = [];
         }
+
+        this._metronomeRunning = false;
+        this.requestUpdate();
 
         console.log('[MediaPlayer] Metronome stopped');
     }
@@ -1196,7 +1318,7 @@ export class MediaPlayer extends LitElement {
         );
 
         const wasPlayingPads = this._padsOn && oldActiveKey && !this._audio?.paused;
-        const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeInterval;
+        const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning;
 
         console.log('[MediaPlayer] _startSong state check:', {
             _padsOn: this._padsOn,
@@ -1208,6 +1330,9 @@ export class MediaPlayer extends LitElement {
             oldActiveKey,
             needsKeyChange
         });
+
+        // Reset pad failure state for the new active selection
+        this._padLoadFailed = false;
 
         // Set this as the active song BEFORE starting pads/click
         // This ensures the metronome has access to the tempo/time signature
@@ -1245,8 +1370,10 @@ export class MediaPlayer extends LitElement {
         } else if (this._padsOn && !wasPlayingPads) {
             // Pads toggle is on but not playing yet, start them
             console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn);
-            this._updateAudioSource(); // Set the audio source before playing
-            await this._fadeIn();
+            const hasSource = this._updateAudioSource(); // Set the audio source before playing
+            if (hasSource) {
+                await this._fadeIn();
+            }
         } else if (!this._padsOn && wasPlayingPads) {
             // Pads toggle was turned off while playing, fade out
             console.log('[MediaPlayer] Pads toggle off, fading out');
@@ -1400,14 +1527,18 @@ export class MediaPlayer extends LitElement {
     async _crossfadeToNewSong() {
         console.log('[MediaPlayer] Crossfading to new song');
 
-        // Store the old audio element
         const oldAudio = this._audio;
         const oldPadGain = this._padGain;
+        const padUrl = this._getPadUrl(this.currentKey);
+        if (!padUrl) {
+            console.warn('[MediaPlayer] Unable to crossfade pads: no pad audio for current key');
+            await this._fadeOut();
+            this._padLoadFailed = true;
+            return;
+        }
 
         // Create new audio element for the new key
-        this._audio = new Audio();
-        this._audio.loop = true;
-        this._audio.crossOrigin = 'anonymous';
+        this._audio = this._createPadAudioElement();
 
         // Create new Web Audio nodes
         const newPadSource = this._audioContext.createMediaElementSource(this._audio);
@@ -1419,7 +1550,8 @@ export class MediaPlayer extends LitElement {
         this._updateAudioRouting();
 
         // Update source to new key
-        this._updateAudioSource();
+        this._audio.src = padUrl;
+        this._padLoadFailed = false;
 
         // Start playing the new audio
         try {
@@ -1427,6 +1559,8 @@ export class MediaPlayer extends LitElement {
             this._padsOn = true;
         } catch (e) {
             console.error('[MediaPlayer] Failed to start new audio:', e);
+            this._padLoadFailed = true;
+            await this._fadeOutPadGain(oldPadGain, oldAudio);
             return;
         }
 
@@ -1533,8 +1667,8 @@ export class MediaPlayer extends LitElement {
                 await this._audio.play();
             } catch (error) {
                 console.error('[MediaPlayer] Play failed:', error);
-                this._padsOn = false;
                 this._fadingIn = false;
+                this._padLoadFailed = true;
                 return;
             }
 
@@ -1625,6 +1759,39 @@ export class MediaPlayer extends LitElement {
         });
     }
 
+    _fadeOutPadGain(padGain, audioElement) {
+        if (!padGain || !audioElement) {
+            return Promise.resolve();
+        }
+
+        const steps = 60;
+        const stepDuration = this._fadeDuration / steps;
+        const startVolume = padGain.gain.value;
+
+        return new Promise((resolve) => {
+            let currentStep = 0;
+            const interval = setInterval(() => {
+                currentStep++;
+                const progress = currentStep / steps;
+                const remaining = 1 - progress;
+                const newVolume = Math.max(startVolume * (remaining * remaining), 0);
+                padGain.gain.value = newVolume;
+
+                if (currentStep >= steps || newVolume < 0.01) {
+                    clearInterval(interval);
+                    padGain.gain.value = 0;
+                    try {
+                        audioElement.pause();
+                        audioElement.currentTime = 0;
+                    } catch (err) {
+                        console.debug('[MediaPlayer] Unable to pause old pad audio during fallback fade:', err);
+                    }
+                    resolve();
+                }
+            }, stepDuration);
+        });
+    }
+
     async _crossfadeToNewKey() {
         console.log('[MediaPlayer] Crossfading to new key:', this.currentKey);
 
@@ -1638,12 +1805,18 @@ export class MediaPlayer extends LitElement {
         this._fadingOut = true;
         this._fadingIn = true;
 
+        const newUrl = this._getPadUrl(this.currentKey);
+        if (!newUrl) {
+            console.warn('[MediaPlayer] Unable to crossfade to new key: no pad audio available');
+            this._fadingOut = false;
+            this._fadingIn = false;
+            return;
+        }
+
         // Create a new Audio element for the new key
-        const newAudio = new Audio();
-        newAudio.loop = true;
-        newAudio.crossOrigin = 'anonymous';
-        const newUrl = `/pads/${encodeURIComponent(this.currentKey)} - WARM - CHURCHFRONT PADS.mp3`;
+        const newAudio = this._createPadAudioElement();
         newAudio.src = newUrl;
+        this._padLoadFailed = false;
 
         // Create Web Audio nodes for new audio
         const newSource = this._audioContext.createMediaElementSource(newAudio);
@@ -1856,7 +2029,7 @@ export class MediaPlayer extends LitElement {
 
     render() {
         const padsPlaying = this._audio && !this._audio.paused;
-        const clickPlaying = this._metronomeInterval !== null;
+        const clickPlaying = this._metronomeRunning;
         const isPlaying = padsPlaying || clickPlaying;
 
         // Check if we're viewing a different song than what's playing
@@ -1866,6 +2039,13 @@ export class MediaPlayer extends LitElement {
 
         // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
         const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong);
+
+        const showPadError = this._padLoadFailed && !!this._activeSongKey;
+        const activeKeyDisplay = showPadError ? html`
+            <help-tooltip message="Could not load pad sound for this key">
+                ${this._activeSongKey}!
+            </help-tooltip>
+        ` : (this._activeSongKey || '-');
 
         // If collapsed, show just the expand button (always bottom-left)
         if (this._collapsed) {
@@ -1939,7 +2119,7 @@ export class MediaPlayer extends LitElement {
 
                             <!-- Row 2: Key -->
                             <div class="led-label">Key</div>
-                            <div class="led-value">${this._activeSongKey || '-'}</div>
+                            <div class="led-value ${showPadError ? 'pad-error' : ''}">${activeKeyDisplay}</div>
                             <div class="led-value">${showNextData ? (this.currentKey || '-') : '-'}</div>
 
                             <!-- Row 3: BPM -->
@@ -1974,7 +2154,6 @@ export class MediaPlayer extends LitElement {
                             @click=${this._stop}
                             aria-label="Stop (Escape)"
                             title="Stop - Press Escape"
-                            ?disabled=${!isPlaying}
                         >
                             ⏹
                         </button>
