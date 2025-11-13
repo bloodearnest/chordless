@@ -92,15 +92,15 @@
 
     <div class="test-controls">
         <h2>Key Selection</h2>
-        <p>Click a key to change the current song key:</p>
+        <p>Click a key to simulate a <code>song-change</code> event:</p>
         <div class="button-group" id="key-buttons">
             <!-- Will be populated by JavaScript -->
         </div>
     </div>
 
     <div class="test-controls">
-        <h2>Tempo & Time Signature</h2>
-        <p>Select a tempo and time signature:</p>
+        <h2>Tempo · Time Signature</h2>
+        <p>Picking a preset dispatches the same event the media player receives in the app:</p>
         <div class="button-group" id="tempo-buttons">
             <!-- Will be populated by JavaScript -->
         </div>
@@ -114,12 +114,11 @@
         <h3>ℹ️ How it works</h3>
         <ul>
             <li>Click the play button (or press <code>Space</code>) to start/stop the pad audio</li>
-            <li>Audio fades in/out over 5 seconds for smooth transitions</li>
-            <li>Change the key while playing to hear a 9-second crossfade effect</li>
-            <li>Toggle the metronome button (🎵) to enable/disable click track</li>
-            <li>First beat of each bar is accented (higher pitch and louder)</li>
-            <li>Press <code>Escape</code> or click the panic button (⏹) to stop everything immediately</li>
-            <li>Audio files are loaded from <code>/pads/$KEY - WARM - CHURCHFRONT PADS.mp3</code></li>
+            <li>Audio fades in/out over 5 seconds and crossfades between keys</li>
+            <li>The key/tempo controls dispatch full <code>song-change</code> payloads (key, tempo, tempo note, time signature)</li>
+            <li>The metronome honours compound signatures and tempo hints such as <code>152 (1/8)</code></li>
+            <li>Pads download lazily; the status LED shows <strong>DOWNLOAD</strong> while a key is caching</li>
+            <li>Press <code>Escape</code> or click ⏹ to stop everything immediately</li>
         </ul>
     </div>
 
@@ -143,71 +142,81 @@
         import '/components/media-player-settings.js';
 
         const player = document.getElementById('player');
+        const state = {
+            key: 'C',
+            tempo: 120,
+            tempoNote: '1/4',
+            timeSignature: '4/4',
+            counter: 0
+        };
 
-        // All musical keys
         const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-        // Populate key buttons
         const keyButtonContainer = document.getElementById('key-buttons');
         keys.forEach(key => {
             const button = document.createElement('button');
             button.textContent = key;
             button.addEventListener('click', () => {
-                // Update active state
-                document.querySelectorAll('#key-buttons button').forEach(b => {
-                    b.classList.remove('active');
-                });
+                document.querySelectorAll('#key-buttons button').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
-
-                // Update player
-                player.currentKey = key;
+                state.key = key;
+                sendSongChange();
             });
-
-            // Set initial active state
-            if (key === 'C') {
+            if (key === state.key) {
                 button.classList.add('active');
             }
-
             keyButtonContainer.appendChild(button);
         });
 
-        // Tempo and time signature presets
         const tempoPresets = [
-            { bpm: 60, time: '4/4', label: '60 BPM (4/4)' },
-            { bpm: 80, time: '3/4', label: '80 BPM (3/4)' },
-            { bpm: 100, time: '6/8', label: '100 BPM (6/8)' },
-            { bpm: 120, time: '4/4', label: '120 BPM (4/4)' },
-            { bpm: 140, time: '4/4', label: '140 BPM (4/4)' },
-            { bpm: 90, time: '3/4', label: '90 BPM (3/4)' },
-            { bpm: 72, time: '6/8', label: '72 BPM (6/8)' }
+            { bpm: 60, time: '4/4', tempoNote: '1/4', label: '60 · 4/4' },
+            { bpm: 80, time: '3/4', tempoNote: '1/4', label: '80 · 3/4' },
+            { bpm: 100, time: '6/8', tempoNote: '1/4', label: '100 · 6/8' },
+            { bpm: 120, time: '4/4', tempoNote: '1/8', label: '120 · 4/4 (1/8 feel)' },
+            { bpm: 152, time: '4/4', tempoNote: '1/8', label: '152 · 4/4 (1/8)' },
+            { bpm: 90, time: '3/4', tempoNote: '1/8', label: '90 · 3/4 (1/8)' },
+            { bpm: 72, time: '6/8', tempoNote: '3/8', label: '72 · 6/8 (3/8)' }
         ];
 
-        // Populate tempo buttons
         const tempoButtonContainer = document.getElementById('tempo-buttons');
         tempoPresets.forEach(preset => {
             const button = document.createElement('button');
             button.textContent = preset.label;
             button.addEventListener('click', () => {
-                // Update active state
-                document.querySelectorAll('#tempo-buttons button').forEach(b => {
-                    b.classList.remove('active');
-                });
+                document.querySelectorAll('#tempo-buttons button').forEach(b => b.classList.remove('active'));
                 button.classList.add('active');
-
-                // Update player
-                player.bpm = preset.bpm;
-                player.timeSignature = preset.time;
+                state.tempo = preset.bpm;
+                state.timeSignature = preset.time;
+                state.tempoNote = preset.tempoNote || '1/4';
+                sendSongChange();
             });
-
-            // Set initial active state
-            if (preset.bpm === 120 && preset.time === '4/4') {
+            if (preset.bpm === state.tempo && preset.time === state.timeSignature) {
                 button.classList.add('active');
             }
-
             tempoButtonContainer.appendChild(button);
         });
 
-        // Log player state changes
+        function sendSongChange() {
+            state.counter += 1;
+            const song = {
+                songId: `demo-song-${state.counter}`,
+                title: `Demo Song ${state.counter}`,
+                metadata: {
+                    key: state.key,
+                    tempo: state.tempo,
+                    tempoNote: state.tempoNote,
+                    timeSignature: state.timeSignature
+                }
+            };
+            document.dispatchEvent(new CustomEvent('song-change', { detail: { song } }));
+        }
+
+        async function initSongFeed() {
+            await customElements.whenDefined('media-player');
+            sendSongChange();
+        }
+
+        initSongFeed();
+
         player.addEventListener('play-state-change', (e) => {
             console.log('Player state changed:', e.detail);
         });

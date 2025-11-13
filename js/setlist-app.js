@@ -5,6 +5,7 @@ import { ChordProParser } from './parser.js';
 import { SetalightDB, formatTempo } from './db.js';
 import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
 import { getCurrentOrganisation } from './workspace.js';
+import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 
 // Configuration constants
 const CONFIG = {
@@ -1374,6 +1375,9 @@ class PageApp {
             this.currentSetlistId = setlistId;
             this.currentSetlist = setlist;
 
+            // Kick off background pad caching for all keys in this setlist
+            preloadPadKeysForSongs(this.songs);
+
             // Load section states from setlist modifications (not localStorage anymore)
             this.sectionState = {};
             setlist.songs.forEach((songEntry, index) => {
@@ -2627,6 +2631,9 @@ class PageApp {
         if (this.songs[this.currentSongIndex]) {
             this.dispatchSongChange(this.songs[this.currentSongIndex]);
         }
+
+        // Ensure the pad for this key is cached for upcoming playback
+        preloadPadKey(newKey);
     }
 
     setupFontSizeControls() {
@@ -3306,14 +3313,35 @@ class PageApp {
             parsed.metadata.tempo = songEntry.modifications.bpmOverride;
         }
 
+        // Normalize tempo + signature so media player gets consistent payloads
+        const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo ?? song.metadata?.tempo);
+        let currentBPM = parsedTempoInfo.bpm ?? song.currentBPM ?? null;
+        let tempoNote = parsedTempoInfo.tempoNote ?? song.metadata?.tempoNote ?? null;
+        let timeSignature = parsed.metadata.time || song.metadata?.timeSignature || null;
+
+        if (!tempoNote) {
+            tempoNote = '1/4';
+        }
+        if (timeSignature && (!tempoNote || tempoNote === '1/4')) {
+            const [, denominator] = timeSignature.split('/').map(s => s.trim());
+            if (denominator) {
+                tempoNote = `1/${denominator}`;
+            }
+        }
+
         // Re-generate HTML
         const htmlContent = this.parser.toHTML(parsed, songIndex);
 
         // Update runtime song object
         song.htmlContent = htmlContent;
-        song.metadata = parsed.metadata;
+        song.metadata = {
+            ...parsed.metadata,
+            tempo: currentBPM,
+            tempoNote,
+            timeSignature
+        };
         song.currentKey = parsed.metadata.key;
-        song.currentBPM = parsed.metadata.tempo;
+        song.currentBPM = currentBPM;
 
         // Update DOM
         const songSection = document.getElementById(`song-${songIndex}`);
@@ -3727,6 +3755,12 @@ class PageApp {
                     sectionStates: {}
                 }
             };
+
+            // Preload pads for the song's default key in the background
+            const songDefaultKey = song?.metadata?.key || song?.parsed?.metadata?.key || null;
+            if (songDefaultKey) {
+                preloadPadKey(songDefaultKey);
+            }
 
             // Add to setlist
             setlist.songs.push(newSongEntry);

@@ -22,6 +22,7 @@ const PAD_CACHE_NAME = 'padsets-cache-v1';
 
 const PAD_SET_METADATA_CACHE = new Map();
 const INFLIGHT_PAD_DOWNLOADS = new Map();
+const PAD_PRELOAD_DELAY_MS = 50;
 
 let padSetListCache = null;
 let padSetListPromise = null;
@@ -146,15 +147,18 @@ export async function ensurePadKeyCached(padSet, key) {
     const request = new Request(getPadCacheUrl(padSet.id, normalizedKey));
     const cached = await cache.match(request);
     if (cached) {
+        console.log(`[PadSetService] Pad key ${normalizedKey} already cached for set ${padSet.name || padSet.id}`);
         return;
     }
 
     const inflightKey = `${padSet.id}:${normalizedKey}`;
     if (INFLIGHT_PAD_DOWNLOADS.has(inflightKey)) {
+        console.log(`[PadSetService] Pad key ${normalizedKey} download already in progress for set ${padSet.name || padSet.id}`);
         return INFLIGHT_PAD_DOWNLOADS.get(inflightKey);
     }
 
     const downloadPromise = (async () => {
+        console.log(`[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name || padSet.id}`);
         const metadata = await ensurePadSetMetadata(padSet);
         const entry = metadata[normalizedKey];
         if (!entry) {
@@ -179,6 +183,57 @@ export async function ensurePadKeyCached(padSet, key) {
 
 export function getPadCacheUrl(padSetId, key) {
     return `/pad-sets/${encodeURIComponent(padSetId)}/${encodeURIComponent(key)}.mp3`;
+}
+
+export async function isPadKeyCached(padSet, key) {
+    if (!padSet || padSet.type !== 'drive' || !key) return false;
+    if (typeof caches === 'undefined') {
+        return false;
+    }
+
+    const normalizedKey = normalizePadKey(key);
+    if (!normalizedKey) {
+        return false;
+    }
+
+    const cache = await caches.open(PAD_CACHE_NAME);
+    const request = new Request(getPadCacheUrl(padSet.id, normalizedKey));
+    const cached = await cache.match(request);
+    return !!cached;
+}
+
+function uniqueNormalizedPadKeys(keys = []) {
+    const normalized = keys
+        .map((key) => normalizePadKey(key))
+        .filter(Boolean);
+    return Array.from(new Set(normalized));
+}
+
+export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
+    if (!padSet || padSet.type !== 'drive') return;
+    const normalizedKeys = uniqueNormalizedPadKeys(keys);
+    if (normalizedKeys.length === 0) return;
+
+    normalizedKeys.forEach((key, index) => {
+        setTimeout(() => {
+            ensurePadKeyCached(padSet, key).catch((error) => {
+                console.warn(`[PadSetService] Failed to preload pad key ${key}:`, error);
+            });
+        }, index * PAD_PRELOAD_DELAY_MS);
+    });
+}
+
+export function preloadPadKey(key, padSet = getActivePadSet()) {
+    if (!key) return;
+    preloadPadKeys([key], padSet);
+}
+
+export function preloadPadKeysForSongs(songs = [], padSet = getActivePadSet()) {
+    if (!songs || songs.length === 0) return;
+    const keys = songs
+        .map((song) => song?.currentKey || song?.metadata?.key || song?.originalKey)
+        .filter(Boolean);
+    preloadPadKeys(keys, padSet);
 }
 
 export function derivePadSetName(filename = '') {

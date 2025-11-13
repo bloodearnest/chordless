@@ -1,7 +1,7 @@
 import { LitElement, html, css } from 'lit';
 import './help-tooltip.js';
 import { normalizePadKey } from '../js/pad-keys.js';
-import { getActivePadSet, getPadCacheUrl, ensurePadKeyCached } from '../js/pad-set-service.js';
+import { getActivePadSet, getPadCacheUrl, ensurePadKeyCached, isPadKeyCached } from '../js/pad-set-service.js';
 
 /**
  * MediaPlayer Component
@@ -812,6 +812,18 @@ export class MediaPlayer extends LitElement {
         if (song?.metadata && 'timeSignature' in song.metadata) {
             this._currentTimeSignature = song.metadata.timeSignature || null;
         }
+
+        // If we're already playing this song and pads/click are active, refresh playback immediately
+        const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId;
+        const padsPlaying = this._padsOn && this._activeSongKey && this._audio && !this._audio.paused;
+        const clickRunning = this._clickOn && this._metronomeRunning;
+
+        if (isActiveSong && (padsPlaying || clickRunning)) {
+            console.log('[MediaPlayer] Active song metadata changed – restarting playback for crossfade/update');
+            this._startSong().catch((error) => {
+                console.error('[MediaPlayer] Failed to restart song after metadata change:', error);
+            });
+        }
     }
 
     _handlePadSetChange(event) {
@@ -948,17 +960,20 @@ export class MediaPlayer extends LitElement {
         }
 
         if (this._activePadSet && this._activePadSet.type === 'drive') {
-            this._padLoadingCount++;
-            this._isPadLoading = true;
-            try {
-                await ensurePadKeyCached(this._activePadSet, padKey);
-            } catch (error) {
-                console.error('[MediaPlayer] Failed to cache pad audio from Drive:', error);
-                return null;
-            } finally {
-                this._padLoadingCount = Math.max(0, this._padLoadingCount - 1);
-                if (this._padLoadingCount === 0) {
-                    this._isPadLoading = false;
+            const alreadyCached = await isPadKeyCached(this._activePadSet, padKey);
+            if (!alreadyCached) {
+                this._padLoadingCount++;
+                this._isPadLoading = true;
+                try {
+                    await ensurePadKeyCached(this._activePadSet, padKey);
+                } catch (error) {
+                    console.error('[MediaPlayer] Failed to cache pad audio from Drive:', error);
+                    return null;
+                } finally {
+                    this._padLoadingCount = Math.max(0, this._padLoadingCount - 1);
+                    if (this._padLoadingCount === 0) {
+                        this._isPadLoading = false;
+                    }
                 }
             }
             return getPadCacheUrl(this._activePadSet.id, padKey);

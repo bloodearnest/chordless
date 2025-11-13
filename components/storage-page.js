@@ -237,7 +237,7 @@ export class StoragePage extends LitElement {
                 ${this._renderLocalSummarySection()}
                 ${this._renderAuthSection()}
                 ${this._renderSyncSection(!this.isAuthenticated)}
-                ${this._renderPadSetSection(!this.isAuthenticated)}
+                ${this._renderPadSetSection()}
                 ${this._renderImportSection()}
                 ${this._renderDangerSection()}
             </div>
@@ -358,12 +358,12 @@ export class StoragePage extends LitElement {
         `;
     }
 
-    _renderPadSetSection(disabled = false) {
+    _renderPadSetSection() {
         return html`
-            <div class="storage-section ${disabled ? 'is-disabled' : ''}">
+            <div class="storage-section">
                 <h3>🎚️ Pad Sets</h3>
                 <p>
-                    Upload zipped pad libraries (with all 12 keys) to Google Drive and switch between them in the media player.
+                    Upload zipped pad libraries (with all 12 keys). They are stored locally for instant use and uploaded to Google Drive when available.
                 </p>
                 <pad-set-manager></pad-set-manager>
             </div>

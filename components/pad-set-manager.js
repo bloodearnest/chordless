@@ -11,7 +11,6 @@ export class PadSetManager extends LitElement {
         fileName: { type: String, state: true },
         loading: { type: Boolean, state: true },
         selectedPadSetId: { type: String, state: true },
-        selectingPadSet: { type: Boolean, state: true },
         selectPadSetMessage: { type: String, state: true },
         selectPadSetError: { type: String, state: true }
     };
@@ -150,7 +149,6 @@ export class PadSetManager extends LitElement {
         this.loading = true;
         this._selectedFile = null;
         this.selectedPadSetId = getActivePadSet().id;
-        this.selectingPadSet = false;
         this.selectPadSetMessage = '';
         this.selectPadSetError = '';
     }
@@ -246,7 +244,6 @@ export class PadSetManager extends LitElement {
         const fallbackTarget = (typeof newIdOrEvent !== 'string') ? newIdOrEvent.target : null;
         const previousId = this.selectedPadSetId;
         this.selectedPadSetId = newId;
-        this.selectingPadSet = true;
         this.selectPadSetMessage = '';
         this.selectPadSetError = '';
 
@@ -260,8 +257,6 @@ export class PadSetManager extends LitElement {
                 fallbackTarget.value = previousId;
             }
             this.selectPadSetError = error.message || 'Unable to set pad set.';
-        } finally {
-            this.selectingPadSet = false;
         }
     }
 
@@ -283,7 +278,6 @@ export class PadSetManager extends LitElement {
                         .value=${set.id}
                         ?checked=${this.selectedPadSetId === set.id}
                         @change=${(e) => this._handleDefaultPadSetChange(e)}
-                        ?disabled=${this.selectingPadSet}
                     >
                     <div>
                         <div class="padset-name">${set.name}</div>
@@ -300,7 +294,6 @@ export class PadSetManager extends LitElement {
     render() {
         return html`
             ${this.renderPadSetList()}
-            ${this.selectingPadSet ? html`<div class="padset-message">Switching pad set…</div>` : ''}
             ${this.selectPadSetMessage ? html`<div class="padset-message" style="color: #8fd18f;">${this.selectPadSetMessage}</div>` : ''}
             ${this.selectPadSetError ? html`<div class="padset-message" style="color: #ffb3b3;">${this.selectPadSetError}</div>` : ''}
 
