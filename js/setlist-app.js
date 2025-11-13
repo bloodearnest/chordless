@@ -1424,6 +1424,7 @@ class PageApp {
             container.textContent = '';
             const fragment = this.renderFullSetlist(setlist, songs);
             container.appendChild(fragment);
+            this._initializeSongSections(container);
 
             // If going directly to a song, scroll to it immediately (before layout/paint)
             if (shouldShowSongDirectly) {
@@ -1613,20 +1614,40 @@ class PageApp {
 
         // Render all songs
         songs.forEach((song, index) => {
-            const songSection = document.createElement('div');
-            songSection.id = `song-${index}`;
-            songSection.className = 'section';
-
-            const songContent = document.createElement('div');
-            songContent.className = 'song-content';
-            // Parser returns DocumentFragment now
-            songContent.appendChild(song.htmlContent);
-
-            songSection.appendChild(songContent);
-            fragment.appendChild(songSection);
+            const songElement = document.createElement('div');
+            songElement.classList.add('section');
+            songElement.id = `song-${index}`;
+            if (song.htmlContent) {
+                const clone = song.htmlContent.cloneNode(true);
+                const songContent = document.createElement('div');
+                songContent.className = 'song-content';
+                songContent.appendChild(clone);
+                songElement.appendChild(songContent);
+            }
+            fragment.appendChild(songElement);
         });
 
         return fragment;
+    }
+
+    _initializeSongSections(root = document) {
+        const isEditMode = document.body.classList.contains('edit-mode');
+        const sections = root.querySelectorAll('song-section');
+        sections.forEach((section) => {
+            const songIndex = Number(section.getAttribute('song-index'));
+            const sectionIndex = Number(section.getAttribute('section-index'));
+            if (Number.isNaN(songIndex) || Number.isNaN(sectionIndex)) {
+                return;
+            }
+            const state = this.getSectionState(songIndex, sectionIndex);
+            if (typeof section.applyState === 'function') {
+                section.applyState(state, isEditMode);
+            }
+        });
+    }
+
+    _getSongSectionComponent(songIndex, sectionIndex) {
+        return document.querySelector(`song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`);
     }
 
     showOverview(instant = false) {
@@ -1671,11 +1692,7 @@ class PageApp {
             }
 
             // Update all sections to reflect non-edit mode
-            document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
-                const songIndex = parseInt(wrapper.dataset.songIndex);
-                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-                this.updateSectionDOM(songIndex, sectionIndex);
-            });
+            this._initializeSongSections();
 
             // Save setlist to IndexedDB
             if (this.currentSetlist) {
@@ -2211,12 +2228,10 @@ class PageApp {
             this.updateSectionDOM(songIndex, sectionIndex);
         } else if (mode === 'collapse') {
             // Simulate clicking the section heading (same behavior as normal mode)
-            const wrapper = document.querySelector(`.song-section-wrapper[data-song-index="${songIndex}"][data-section-index="${sectionIndex}"]`);
-            if (wrapper) {
-                const summary = wrapper.querySelector('.section-label');
-                if (summary) {
-                    summary.click();
-                }
+            const component = this._getSongSectionComponent(songIndex, sectionIndex);
+            const details = component?.getDetailsElement();
+            if (details) {
+                this.animateSectionToggle(songIndex, sectionIndex, details);
             }
         } else {
             // chords or lyrics mode - mutually exclusive with all others
@@ -2238,7 +2253,7 @@ class PageApp {
     animateSectionToggle(songIndex, sectionIndex, details) {
         const state = this.getSectionState(songIndex, sectionIndex);
         const content = details.querySelector('.section-content');
-        const wrapper = details.closest('.song-section-wrapper');
+        const wrapper = details.closest('.song-section-wrapper') || details;
         if (!content) return;
 
         const isEditMode = document.body.classList.contains('edit-mode');
@@ -2255,7 +2270,6 @@ class PageApp {
 
             // Update wrapper classes
             wrapper.classList.remove('section-collapsed');
-            this.updateButtonStates(wrapper, state);
 
             // In normal mode, open details; in edit mode it's always open
             if (!isEditMode) {
@@ -2302,7 +2316,6 @@ class PageApp {
 
                     // Update wrapper classes (adds section-collapsed)
                     wrapper.classList.add('section-collapsed');
-                    this.updateButtonStates(wrapper, state);
 
                     // In normal mode, close details; in edit mode keep it open
                     if (!isEditMode) {
@@ -2318,57 +2331,16 @@ class PageApp {
     }
 
     updateSectionDOM(songIndex, sectionIndex) {
-        const wrapper = document.querySelector(`.song-section-wrapper[data-song-index="${songIndex}"][data-section-index="${sectionIndex}"]`);
-        if (!wrapper) return;
-
+        const component = this._getSongSectionComponent(songIndex, sectionIndex);
+        if (!component || typeof component.applyState !== 'function') {
+            return;
+        }
         const state = this.getSectionState(songIndex, sectionIndex);
-        const details = wrapper.querySelector('.song-section');
-
-        // Update classes based on hideMode
-        wrapper.classList.toggle('section-hidden', state.isHidden);
-        wrapper.classList.toggle('section-collapsed', state.hideMode === 'collapse');
-        wrapper.classList.toggle('chords-hidden', state.hideMode === 'chords');
-        wrapper.classList.toggle('lyrics-hidden', state.hideMode === 'lyrics');
-
-        // Update details open/closed based on edit mode and collapsed state
-        const isEditMode = document.body.classList.contains('edit-mode');
-        if (isEditMode) {
-            details.open = true; // Always open in edit mode
-        } else {
-            details.open = !state.isCollapsed; // Closed if section is collapsed, when not in edit mode
-        }
-
-        // Update button states (active/inactive)
-        this.updateButtonStates(wrapper, state);
-    }
-
-    updateButtonStates(wrapper, state) {
-        const collapseBtn = wrapper.querySelector('.section-collapse-btn');
-        const chordsBtn = wrapper.querySelector('.chords-toggle-btn');
-        const lyricsBtn = wrapper.querySelector('.lyrics-toggle-btn');
-        const hideBtn = wrapper.querySelector('.section-hide-btn');
-
-        if (collapseBtn) {
-            collapseBtn.classList.toggle('active', state.hideMode === 'collapse');
-        }
-        if (chordsBtn) {
-            chordsBtn.classList.toggle('active', state.hideMode === 'chords');
-        }
-        if (lyricsBtn) {
-            lyricsBtn.classList.toggle('active', state.hideMode === 'lyrics');
-        }
-        if (hideBtn) {
-            hideBtn.classList.toggle('active', state.isHidden);
-        }
+        component.applyState(state, document.body.classList.contains('edit-mode'));
     }
 
     applySectionState() {
-        // Apply all saved state to DOM
-        document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
-            const songIndex = parseInt(wrapper.dataset.songIndex);
-            const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-            this.updateSectionDOM(songIndex, sectionIndex);
-        });
+        this._initializeSongSections();
     }
 
     setupEditMode() {
@@ -2412,11 +2384,7 @@ class PageApp {
                 }, 250);
 
                 // Update all sections based on edit mode
-                document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
-                    const songIndex = parseInt(wrapper.dataset.songIndex);
-                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-                    this.updateSectionDOM(songIndex, sectionIndex);
-                });
+                this._initializeSongSections();
             } else {
                 // Exiting edit mode - fade everything simultaneously
                 // Remove edit mode class immediately to trigger all fades
@@ -2442,11 +2410,7 @@ class PageApp {
 
                     // Update all sections to reflect non-edit mode (apply collapsed/open states to <details>)
                     // This must happen AFTER removing edit-mode class so details elements get the right state
-                    document.querySelectorAll('.song-section-wrapper[data-song-index][data-section-index]').forEach(wrapper => {
-                        const songIndex = parseInt(wrapper.dataset.songIndex);
-                        const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-                        this.updateSectionDOM(songIndex, sectionIndex);
-                    });
+                    this._initializeSongSections();
 
                     // Save setlist to IndexedDB
                     if (this.currentSetlist) {
@@ -2515,38 +2479,34 @@ class PageApp {
     }
 
     setupSectionControls() {
-        document.querySelectorAll('.section-control-btn').forEach(button => {
-            button.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const action = button.dataset.action;
-                const wrapper = button.closest('.song-section-wrapper');
+        const container = document.querySelector('.song-container');
+        if (!container) return;
 
-                const songIndex = parseInt(wrapper.dataset.songIndex);
-                const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-
-                // Pass action directly (collapse, chords, lyrics, hide)
+        if (!this._sectionActionHandler) {
+            this._sectionActionHandler = (event) => {
+                const { songIndex, sectionIndex, action } = event.detail || {};
+                if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number' || !action) {
+                    return;
+                }
                 this.setSectionHideMode(songIndex, sectionIndex, action);
-            });
-        });
+            };
+            container.addEventListener('section-action', this._sectionActionHandler);
+        }
 
-        // Listen to native details toggle events with animation
-        document.querySelectorAll('.song-section-wrapper .song-section').forEach(details => {
-            // Click handler for summary to animate the toggle
-            const summary = details.querySelector('.section-label');
-            if (summary) {
-                summary.addEventListener('click', (e) => {
-                    const wrapper = details.closest('.song-section-wrapper');
-                    if (!wrapper) return;
-
-                    const songIndex = parseInt(wrapper.dataset.songIndex);
-                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-
-                    // Always prevent default and use our animation
-                    e.preventDefault();
+        if (!this._sectionToggleHandler) {
+            this._sectionToggleHandler = (event) => {
+                const { songIndex, sectionIndex } = event.detail || {};
+                if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number') {
+                    return;
+                }
+                const component = this._getSongSectionComponent(songIndex, sectionIndex);
+                const details = component?.getDetailsElement();
+                if (details) {
                     this.animateSectionToggle(songIndex, sectionIndex, details);
-                });
-            }
-        });
+                }
+            };
+            container.addEventListener('section-toggle', this._sectionToggleHandler);
+        }
     }
 
     populateKeySelector(selectedKey) {
@@ -3308,6 +3268,8 @@ class PageApp {
                 this._cardPointerDownHandlers.clear();
             }
         }
+
+        this._initializeSongSections();
     }
 
     /**
@@ -3370,41 +3332,26 @@ class PageApp {
         if (songSection) {
             const songContent = songSection.querySelector('.song-content');
             if (songContent) {
-                // Clear and append fragment
                 songContent.textContent = '';
-                songContent.appendChild(htmlContent);
+                songContent.appendChild(htmlContent.cloneNode(true));
+            }
 
-                // Re-apply section states
-                // First, restore section states from the modifications
-                const savedSectionStates = songEntry.modifications.sectionStates || {};
-                for (const [sectionIdx, state] of Object.entries(savedSectionStates)) {
-                    const idx = parseInt(sectionIdx);
-                    if (!this.sectionState[songIndex]) {
-                        this.sectionState[songIndex] = {};
-                    }
-                    this.sectionState[songIndex][idx] = state;
+            // Re-apply section states
+            const savedSectionStates = songEntry.modifications.sectionStates || {};
+            for (const [sectionIdx, state] of Object.entries(savedSectionStates)) {
+                const idx = parseInt(sectionIdx);
+                if (!this.sectionState[songIndex]) {
+                    this.sectionState[songIndex] = {};
                 }
+                this.sectionState[songIndex][idx] = state;
+            }
 
-                // Now apply to DOM
-                document.querySelectorAll(`.song-section-wrapper[data-song-index="${songIndex}"]`).forEach(wrapper => {
-                    const sectionIndex = parseInt(wrapper.dataset.sectionIndex);
-                    this.updateSectionDOM(songIndex, sectionIndex);
-                });
+            this._initializeSongSections(songSection);
 
-                // Re-setup section controls for this song
-                songContent.querySelectorAll('.section-control-btn').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const action = button.dataset.action;
-                        const wrapper = button.closest('.song-section-wrapper');
-                        const si = parseInt(wrapper.dataset.songIndex);
-                        const sectionIdx = parseInt(wrapper.dataset.sectionIndex);
-                        this.setSectionHideMode(si, sectionIdx, action);
-                    });
-                });
-
-                // Re-apply font size
-                songContent.style.fontSize = `${song.currentFontSize}rem`;
+            // Re-apply font size
+            const songContentEl = songSection.querySelector('.song-content');
+            if (songContentEl) {
+                songContentEl.style.fontSize = `${song.currentFontSize}rem`;
             }
         }
 

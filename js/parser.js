@@ -185,6 +185,10 @@ export class ChordProParser {
         // Add sections
         for (let i = 0; i < parsed.sections.length; i++) {
             const section = parsed.sections[i];
+            const sectionElement = document.createElement('song-section');
+            sectionElement.setAttribute('song-index', songIndex);
+            sectionElement.setAttribute('section-index', i);
+            sectionElement.setAttribute('has-label', section.label ? 'true' : 'false');
 
             if (section.label) {
                 const sectionTemplate = document.getElementById('section-with-label-template');
@@ -200,7 +204,7 @@ export class ChordProParser {
                 const sectionContent = sectionClone.querySelector('.section-content');
                 sectionContent.appendChild(this.renderLines(section.lines));
 
-                fragment.appendChild(sectionClone);
+                sectionElement.appendChild(sectionClone);
             } else {
                 const sectionTemplate = document.getElementById('section-without-label-template');
                 const sectionClone = sectionTemplate.content.cloneNode(true);
@@ -212,8 +216,10 @@ export class ChordProParser {
                 const sectionContent = sectionClone.querySelector('.section-content');
                 sectionContent.appendChild(this.renderLines(section.lines));
 
-                fragment.appendChild(sectionClone);
+                sectionElement.appendChild(sectionClone);
             }
+
+            fragment.appendChild(sectionElement);
         }
 
         return fragment;
@@ -438,4 +444,5 @@ export class ChordProParser {
         };
         return text.replace(/[&<>"']/g, m => map[m]);
     }
+
 }
