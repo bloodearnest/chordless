@@ -288,6 +288,10 @@ export class AppHeader extends LitElement {
     updated(changedProperties) {
         super.updated(changedProperties);
 
+        // Cache DOM element references after each render
+        this._cachedTitleEl = this.shadowRoot?.querySelector('.title');
+        this._cachedCenterEl = this.shadowRoot?.querySelector('.header-center');
+
         // Handle title changes
         if (changedProperties.has('title') && this.title !== this._previousTitle) {
             if (this.disableAnimation) {
@@ -309,8 +313,9 @@ export class AppHeader extends LitElement {
         if (this._animating) return;
         this._animating = true;
 
-        const titleEl = this.shadowRoot?.querySelector('.title');
-        const centerEl = this.shadowRoot?.querySelector('.header-center');
+        // Use cached references for initial fade-out
+        const titleEl = this._cachedTitleEl;
+        const centerEl = this._cachedCenterEl;
 
         // Fade out old content
         titleEl?.classList.add('fade-out');

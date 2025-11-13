@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
+import { isBarMarker } from '../js/utils/chord-utils.js';
 import './bar-group.js';
 
 /**
@@ -471,7 +472,7 @@ export class SongSection extends LitElement {
     _renderChord(chordText, isInvalid = false) {
         const classes = classMap({
             chord: true,
-            bar: this._isBar(chordText),
+            bar: isBarMarker(chordText),
             invalid: !!isInvalid
         });
         return html`<span class=${classes}>${chordText}</span>`;
@@ -580,7 +581,7 @@ export class SongSection extends LitElement {
                 if (segment.chord) {
                     items.push({
                         chord: segment.chord,
-                        isBar: this._isBar(segment.chord)
+                        isBar: isBarMarker(segment.chord)
                     });
                 }
             });
@@ -626,21 +627,11 @@ export class SongSection extends LitElement {
         for (const segment of line.segments) {
             const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0;
             if (hasLyrics) return false;
-            if (segment.chord && this._isBar(segment.chord)) {
+            if (segment.chord && isBarMarker(segment.chord)) {
                 hasBar = true;
             }
         }
         return hasBar;
-    }
-
-    /**
-     * Check if a chord is a bar marker
-     * @param {string} chord - Chord text to check
-     * @returns {boolean} True if chord is a bar marker
-     * @private
-     */
-    _isBar(chord) {
-        return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
     }
 
     /**

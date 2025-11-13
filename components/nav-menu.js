@@ -146,13 +146,20 @@ export class NavMenu extends LitElement {
         this.setlistTitle = 'Setlist';
     }
 
+    /**
+     * Get the popover element
+     * @returns {HTMLElement|null} The popover element
+     */
+    get popover() {
+        return this.shadowRoot?.querySelector(`#${this.popoverId}`);
+    }
+
     connectedCallback() {
         super.connectedCallback();
         // Set up positioning after the component is rendered
         this.updateComplete.then(() => {
-            const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
-            if (popover) {
-                popover.addEventListener('toggle', (e) => {
+            if (this.popover) {
+                this.popover.addEventListener('toggle', (e) => {
                     if (e.newState === 'open') {
                         // Position the popover before it becomes visible
                         this._positionPopover();
@@ -182,7 +189,7 @@ export class NavMenu extends LitElement {
     }
 
     _handleClickOutside(e) {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         if (!popover) return;
 
         // Close if clicked outside (browser handles auto-close)
@@ -201,7 +208,7 @@ export class NavMenu extends LitElement {
 
     // Position the popover relative to the trigger button
     _positionPopover() {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         if (!popover || !this.triggerButton) return;
 
         const buttonRect = this.triggerButton.getBoundingClientRect();
@@ -397,24 +404,24 @@ export class NavMenu extends LitElement {
 
     // Public API for controlling the popover
     showPopover() {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         // Position before showing to avoid visual jump
         this._positionPopover();
         popover?.showPopover();
     }
 
     closePopover() {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         popover?.hidePopover();
     }
 
     togglePopover() {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         popover?.togglePopover();
     }
 
     isOpen() {
-        const popover = this.shadowRoot?.querySelector(`#${this.popoverId}`);
+        const popover = this.popover;
         return popover?.matches(':popover-open') || false;
     }
 }

@@ -1,4 +1,6 @@
 import { LitElement, html, css } from 'lit';
+import { getWeeksAgo } from '../js/utils/date-utils.js';
+import { formatArtistNames } from '../js/song-utils.js';
 
 /**
  * SongCard Component
@@ -310,19 +312,7 @@ export class SongCard extends LitElement {
     }
 
     formatArtist(artistString) {
-        if (!artistString) return '';
-
-        // Split by comma, semicolon, or pipe
-        const artists = artistString.split(/[,;|]/).map(a => a.trim());
-
-        // Clean up each artist name by removing "Words by", "Music by", "Music:", etc.
-        const cleanedArtists = artists.map(artist => {
-            return artist
-                .replace(/^Words\s+by\s+/i, '')
-                .replace(/^Music\s+by\s+/i, '')
-                .replace(/^Music:\s*/i, '')
-                .trim();
-        }).filter(a => a.length > 0); // Remove empty strings
+        const cleanedArtists = formatArtistNames(artistString);
 
         if (cleanedArtists.length === 0) return '';
 
@@ -338,7 +328,7 @@ export class SongCard extends LitElement {
 
         // Use new lastUsageInfo if available
         if (lastUsageInfo && lastUsageInfo.date) {
-            const weeksAgo = this.getWeeksAgo(lastUsageInfo.date);
+            const weeksAgo = getWeeksAgo(lastUsageInfo.date);
             const parts = [];
 
             // Add leader if available
@@ -359,30 +349,13 @@ export class SongCard extends LitElement {
 
         // Fallback to old lastUsedAt field
         if (lastUsedAt) {
-            const weeksAgo = this.getWeeksAgo(lastUsedAt);
+            const weeksAgo = getWeeksAgo(lastUsedAt);
             return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`;
         }
 
         return '';
     }
 
-    getWeeksAgo(dateString) {
-        const date = new Date(dateString);
-        const now = new Date();
-        const diffMs = now - date;
-        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-        const diffWeeks = Math.floor(diffDays / 7);
-
-        if (diffDays === 0) return 'today';
-        if (diffDays === 1) return 'yesterday';
-        if (diffDays < 7) return `${diffDays} days ago`;
-        if (diffWeeks === 1) return '1 week ago';
-        if (diffWeeks < 52) return `${diffWeeks} weeks ago`;
-
-        const diffYears = Math.floor(diffWeeks / 52);
-        if (diffYears === 1) return '1 year ago';
-        return `${diffYears} years ago`;
-    }
 
     // Click handler
     handleClick(e) {

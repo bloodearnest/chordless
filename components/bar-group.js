@@ -1,5 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
+import { isBarMarker } from '../js/utils/chord-utils.js';
 
 /**
  * A custom element for rendering aligned bar notation with measures
@@ -150,19 +151,9 @@ export class BarGroup extends LitElement {
     _renderChord(chordText) {
         const classes = classMap({
             chord: true,
-            bar: this._isBar(chordText)
+            bar: isBarMarker(chordText)
         });
         return html`<span class=${classes}>${chordText}</span>`;
-    }
-
-    /**
-     * Check if a chord is a bar marker
-     * @param {string} chord - Chord text to check
-     * @returns {boolean} True if chord is a bar marker
-     * @private
-     */
-    _isBar(chord) {
-        return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
     }
 }
 

@@ -323,5 +323,31 @@ export async function findExistingSong(ccliNumber, title, chordproContent) {
     return null;
 }
 
+/**
+ * Format artist string for display
+ * Cleans up common prefixes like "Words by", "Music by", etc.
+ * Returns array of cleaned artist names
+ *
+ * @param {string} artistString - Raw artist string (may contain multiple artists separated by comma/semicolon/pipe)
+ * @returns {string[]} Array of cleaned artist names
+ */
+export function formatArtistNames(artistString) {
+    if (!artistString) return [];
+
+    // Split by comma, semicolon, or pipe
+    const artists = artistString.split(/[,;|]/).map(a => a.trim());
+
+    // Clean up each artist name by removing "Words by", "Music by", "Music:", etc.
+    const cleanedArtists = artists.map(artist => {
+        return artist
+            .replace(/^Words\s+by\s+/i, '')
+            .replace(/^Music\s+by\s+/i, '')
+            .replace(/^Music:\s*/i, '')
+            .trim();
+    }).filter(a => a.length > 0); // Remove empty strings
+
+    return cleanedArtists;
+}
+
 // Re-export utilities from db.js
 export { normalizeTitle, hashText };

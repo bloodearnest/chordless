@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { getWeeksAgo } from '../js/utils/date-utils.js';
 
 /**
  * SongInfo Component
@@ -352,7 +353,7 @@ export class SongInfo extends LitElement {
             .map(appearance => ({
                 date: appearance.date,
                 formattedDate: this.formatDate(appearance.date),
-                weeksAgo: this.getWeeksAgo(appearance.date),
+                weeksAgo: getWeeksAgo(appearance.date),
                 playedInKey: appearance.playedInKey,
                 leader: appearance.leader
             }));
@@ -368,32 +369,6 @@ export class SongInfo extends LitElement {
         });
     }
 
-    getWeeksAgo(dateStr) {
-        const date = new Date(dateStr);
-        const now = new Date();
-        const diffTime = now - date;
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-        const diffWeeks = Math.floor(diffDays / 7);
-
-        if (diffDays === 0) {
-            return 'Today';
-        } else if (diffDays === 1) {
-            return 'Yesterday';
-        } else if (diffDays < 7) {
-            return `${diffDays} days ago`;
-        } else if (diffWeeks === 1) {
-            return '1 week ago';
-        } else if (diffWeeks < 52) {
-            return `${diffWeeks} weeks ago`;
-        } else {
-            const diffYears = Math.floor(diffWeeks / 52);
-            if (diffYears === 1) {
-                return '1 year ago';
-            } else {
-                return `${diffYears} years ago`;
-            }
-        }
-    }
 }
 
 // Define the custom element
