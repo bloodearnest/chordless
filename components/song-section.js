@@ -1,4 +1,5 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, nothing } from 'lit';
+import { classMap } from 'lit/directives/class-map.js';
 
 const SECTION_STYLES = html`<style>
 .song-section-wrapper {
@@ -18,8 +19,8 @@ const SECTION_STYLES = html`<style>
     }
 }
 
-body.edit-mode .song-section-wrapper,
-body.library-edit-mode .song-section-wrapper {
+:host([editmode]) .song-section-wrapper,
+:host([libraryeditmode]) .song-section-wrapper {
     border-style: dotted;
     border-color: #bdc3c7;
     background-color: #f9f9f9;
@@ -81,8 +82,8 @@ body.library-edit-mode .song-section-wrapper {
     transition: opacity 0.25s ease-in-out;
 }
 
-body.edit-mode .song-section-wrapper .section-controls,
-body.library-edit-mode .song-section-wrapper .section-controls {
+:host([editmode]) .song-section-wrapper .section-controls,
+:host([libraryeditmode]) .song-section-wrapper .section-controls {
     opacity: 1;
     pointer-events: auto;
 }
@@ -96,13 +97,13 @@ body.library-edit-mode .song-section-wrapper .section-controls {
     display: none;
 }
 
-body.edit-mode .song-section-wrapper.section-hidden,
-body.library-edit-mode .song-section-wrapper.section-hidden {
+:host([editmode]) .song-section-wrapper.section-hidden,
+:host([libraryeditmode]) .song-section-wrapper.section-hidden {
     display: block;
 }
 
-body.edit-mode .song-section-wrapper.section-hidden .section-title,
-body.library-edit-mode .song-section-wrapper.section-hidden .section-title {
+:host([editmode]) .song-section-wrapper.section-hidden .section-title,
+:host([libraryeditmode]) .song-section-wrapper.section-hidden .section-title {
     text-decoration: line-through;
     opacity: 0.6;
 }
@@ -145,14 +146,124 @@ body.library-edit-mode .song-section-wrapper.section-hidden .section-title {
 .song-section-wrapper.lyrics-hidden .lyrics {
     display: none;
 }
+
+.song-section-wrapper .section-control-btn .control-label {
+    font-weight: 600;
+    font-size: 0.75rem;
+}
+
+.song-section-wrapper .section-content {
+    margin-top: 0;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-wrap: break-word;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.song-section-wrapper .chord-line {
+    display: flex;
+    margin-bottom: 0.2rem;
+    line-height: 1.5em;
+    flex-wrap: wrap;
+}
+
+.song-section-wrapper .chord-segment {
+    display: inline-flex;
+    flex-direction: column;
+    white-space: pre;
+    padding-right: 0.25em;
+}
+
+.song-section-wrapper .chord-segment.chord-only {
+    padding-right: 0.5em;
+}
+
+.song-section-wrapper .chord {
+    color: #2980b9;
+    font-weight: bold;
+    font-size: 0.9em;
+    min-height: 1.1em;
+    line-height: 1.1em;
+    padding-right: 0.25em;
+    font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+}
+
+.song-section-wrapper .chord.bar {
+    color: #95a5a6;
+    font-weight: normal;
+}
+
+.song-section-wrapper .chord.invalid {
+    color: #bdc3c7;
+    opacity: 0.5;
+    font-style: italic;
+}
+
+.song-section-wrapper .chord-empty {
+    visibility: hidden;
+}
+
+.song-section-wrapper .lyrics {
+    line-height: 1.4em;
+    padding: 0;
+    margin: 0;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+}
+
+.song-section-wrapper .bar-group {
+    margin-bottom: 0.5rem;
+    display: grid;
+    width: fit-content;
+    gap: 0;
+}
+
+.song-section-wrapper .bar-group .chord-line {
+    display: contents;
+}
+
+.song-section-wrapper .measure {
+    display: flex;
+    align-items: flex-start;
+}
+
+.song-section-wrapper .measure.first-measure .bar-marker {
+    margin-left: 0;
+}
+
+.song-section-wrapper .measure.last-measure .bar-marker {
+    margin-left: auto;
+}
+
+.song-section-wrapper .measure:not(.first-measure):not(.last-measure) .bar-marker {
+    margin-left: auto;
+}
+
+.song-section-wrapper .chord-segment.chord-only.bar-marker .chord {
+    color: #95a5a6;
+}
+
+.song-section-wrapper .chord.invalid {
+    color: #e74c3c;
+}
 </style>`;
+
+const DEFAULT_STATE = {
+    hideMode: 'none',
+    isCollapsed: false,
+    isHidden: false
+};
 
 export class SongSection extends LitElement {
     static properties = {
         songIndex: { type: Number, attribute: 'song-index', reflect: true },
         sectionIndex: { type: Number, attribute: 'section-index', reflect: true },
         editMode: { type: Boolean, reflect: true },
-        state: { type: Object, attribute: false }
+        state: { type: Object, attribute: false },
+        label: { type: String },
+        lines: { attribute: false }
     };
 
     constructor() {
@@ -160,59 +271,216 @@ export class SongSection extends LitElement {
         this.songIndex = 0;
         this.sectionIndex = 0;
         this.editMode = false;
-        this.state = {
-            hideMode: 'none',
-            isCollapsed: false,
-            isHidden: false
-        };
+        this.state = this.state ? { ...DEFAULT_STATE, ...this.state } : { ...DEFAULT_STATE };
+        if (this.label === undefined) {
+            this.label = '';
+        }
+        if (!this.lines) {
+            this.lines = [];
+        }
+        this._contentBlocks = this._buildContentBlocks(this.lines);
         this._onControlClick = this._onControlClick.bind(this);
         this._onSummaryClick = this._onSummaryClick.bind(this);
     }
-
-    createRenderRoot() {
-        return this;
+    
+    connectedCallback() {
+        super.connectedCallback();
+        this._hydrateLinesFromDataset();
+        if ((!this.label || !this.label.trim()) && this.dataset?.label) {
+            this.label = this.dataset.label;
+        }
+    }
+    
+    cloneNode(deep = true) {
+        const clone = super.cloneNode(deep);
+        if (clone instanceof SongSection) {
+            clone.lines = this._cloneLines(this.lines);
+            clone.label = this.label;
+        }
+        return clone;
     }
 
     render() {
-        return html`${SECTION_STYLES}<slot></slot>`;
+        const state = { ...DEFAULT_STATE, ...(this.state || {}) };
+        const hideMode = state.hideMode || 'none';
+        const classes = {
+            'song-section-wrapper': true,
+            'section-hidden': !!state.isHidden,
+            'section-collapsed': hideMode === 'collapse',
+            'chords-hidden': hideMode === 'chords',
+            'lyrics-hidden': hideMode === 'lyrics'
+        };
+        const label = (this.label || '').trim();
+        return html`${SECTION_STYLES}
+            <div class=${classMap(classes)} data-song-index=${this.songIndex} data-section-index=${this.sectionIndex}>
+                ${label ? this._renderLabeledSection(label, state) : this._renderPlainSection()}
+            </div>`;
     }
 
-    connectedCallback() {
-        super.connectedCallback();
-        this._wireEvents();
-    }
-
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        this._unwireEvents();
-    }
-
-    _wireEvents() {
-        const root = this._getWrapper();
-        if (!root) return;
-        root.querySelectorAll('.section-control-btn').forEach((btn) => {
-            btn.addEventListener('click', this._onControlClick);
-        });
-        const summary = root.querySelector('.section-label');
-        if (summary) {
-            summary.addEventListener('click', this._onSummaryClick);
+    willUpdate(changed) {
+        if (changed.has('lines')) {
+            this._contentBlocks = this._buildContentBlocks(this.lines);
         }
     }
 
-    _unwireEvents() {
-        const root = this._getWrapper();
-        if (!root) return;
-        root.querySelectorAll('.section-control-btn').forEach((btn) => {
-            btn.removeEventListener('click', this._onControlClick);
+    _renderLabeledSection(label, state) {
+        const detailsOpen = this._shouldDetailsBeOpen(state);
+        return html`
+            <details class="song-section" ?open=${detailsOpen}>
+                <summary class="section-label" @click=${this._onSummaryClick}>
+                    <div class="section-header">
+                        <span class="section-title">${label}</span>
+                        ${this._renderControls(state)}
+                    </div>
+                </summary>
+                <div class="section-content">
+                    ${this._renderContent()}
+                </div>
+            </details>
+        `;
+    }
+
+    _renderPlainSection() {
+        return html`
+            <div class="song-section">
+                <div class="section-content">
+                    ${this._renderContent()}
+                </div>
+            </div>
+        `;
+    }
+
+    _renderControls(state) {
+        return html`
+            <div class="section-controls">
+                ${this._renderControlButton('collapse', '▼', 'Collapse Section', state.hideMode === 'collapse')}
+                ${this._renderControlButton('chords', '♯', 'Hide Chords', state.hideMode === 'chords')}
+                ${this._renderControlButton('lyrics', 'A', 'Hide Lyrics', state.hideMode === 'lyrics')}
+                ${this._renderControlButton('hide', '✕', 'Hide Entire Section', !!state.isHidden)}
+            </div>
+        `;
+    }
+
+    _renderControlButton(action, icon, label, active) {
+        const classes = classMap({
+            'section-control-btn': true,
+            active: !!active
         });
-        const summary = root.querySelector('.section-label');
-        if (summary) {
-            summary.removeEventListener('click', this._onSummaryClick);
+        return html`
+            <button class=${classes} data-action=${action} @click=${this._onControlClick}>
+                <span class="control-icon">${icon}</span>
+                <span class="control-label">${label}</span>
+            </button>
+        `;
+    }
+
+    _renderContent() {
+        if (!this._contentBlocks || this._contentBlocks.length === 0) {
+            return nothing;
         }
+
+        return this._contentBlocks.map((block, index) => {
+            if (block.type === 'bar-group') {
+                return this._renderBarGroup(block.data, index);
+            }
+            return this._renderLine(block.line, index);
+        });
+    }
+
+    _renderLine(line, index) {
+        const segments = line?.segments || [];
+        if (segments.length === 0) {
+            return nothing;
+        }
+
+        return html`
+            <div class="chord-line" data-line-index=${index}>
+                ${segments.map(segment => this._renderSegment(segment))}
+            </div>
+        `;
+    }
+
+    _renderSegment(segment) {
+        const hasLyrics = !!(segment.lyrics && segment.lyrics.trim().length > 0);
+        const chordText = segment.chord || '';
+        const classes = classMap({
+            'chord-segment': true,
+            'chord-only': !hasLyrics
+        });
+
+        return html`
+            <span class=${classes}>
+                ${chordText
+                    ? this._renderChord(chordText, segment.valid === false)
+                    : html`<span class="chord chord-empty">&nbsp;</span>`}
+                ${hasLyrics ? html`<span class="lyrics">${segment.lyrics}</span>` : nothing}
+            </span>
+        `;
+    }
+
+    _renderChord(chordText, isInvalid = false) {
+        const classes = classMap({
+            chord: true,
+            bar: this._isBar(chordText),
+            invalid: !!isInvalid
+        });
+        return html`<span class=${classes}>${chordText}</span>`;
+    }
+
+    _renderBarGroup(data) {
+        if (!data || !data.measuresPerLine?.length) {
+            return nothing;
+        }
+
+        const maxColumns = Math.max(data.maxMeasures || 0, 1);
+
+        return html`
+            <div class="bar-group" style="grid-template-columns: repeat(${maxColumns}, auto);">
+                ${data.measuresPerLine.map((measures, lineIndex) => html`
+                    <div class="chord-line bar-aligned" data-bar-line-index=${lineIndex}>
+                        ${Array.from({ length: maxColumns }).map((_, measureIndex) => {
+                            const measure = measures[measureIndex] || null;
+                            const measureClasses = classMap({
+                                measure: true,
+                                'first-measure': measureIndex === 0,
+                                'last-measure': measureIndex === maxColumns - 1
+                            });
+                            return html`
+                                <span class=${measureClasses}>
+                                    ${measure ? [
+                                        (measure.chords || []).map(chord => this._renderChordOnlySegment(chord)),
+                                        measure.bar ? this._renderBarMarker(measure.bar) : nothing
+                                    ] : nothing}
+                                </span>
+                            `;
+                        })}
+                    </div>
+                `)}
+            </div>
+        `;
+    }
+
+    _renderChordOnlySegment(chordText) {
+        if (!chordText) return nothing;
+        return html`
+            <span class="chord-segment chord-only">
+                ${this._renderChord(chordText)}
+            </span>
+        `;
+    }
+
+    _renderBarMarker(barText) {
+        if (!barText) return nothing;
+        return html`
+            <span class="chord-segment chord-only bar-marker">
+                <span class="chord bar">${barText}</span>
+            </span>
+        `;
     }
 
     _onControlClick(event) {
         event.stopPropagation();
+        event.preventDefault();
         const action = event.currentTarget.dataset.action;
         if (!action) return;
         this.dispatchEvent(new CustomEvent('section-action', {
@@ -231,35 +499,16 @@ export class SongSection extends LitElement {
         }));
     }
 
+    _shouldDetailsBeOpen(state) {
+        if (this.editMode) return true;
+        return !(state.isCollapsed || state.hideMode === 'collapse');
+    }
+
     applyState(state, editMode = false) {
-        const nextState = state ? { ...state } : { hideMode: 'none', isCollapsed: false, isHidden: false };
+        const nextState = state ? { ...DEFAULT_STATE, ...state } : { ...DEFAULT_STATE };
         this.state = nextState;
         this.editMode = !!editMode;
-        const wrapper = this._getWrapper();
-        if (!wrapper) return;
-
-        wrapper.classList.toggle('section-hidden', !!nextState.isHidden);
-        wrapper.classList.toggle('section-collapsed', nextState.hideMode === 'collapse');
-        wrapper.classList.toggle('chords-hidden', nextState.hideMode === 'chords');
-        wrapper.classList.toggle('lyrics-hidden', nextState.hideMode === 'lyrics');
-
-        const details = wrapper.querySelector('details.song-section');
-        if (details) {
-            details.open = this.editMode ? true : !(nextState.isCollapsed || nextState.hideMode === 'collapse');
-        }
-
-        wrapper.querySelectorAll('.section-control-btn').forEach((btn) => {
-            const action = btn.dataset.action;
-            if (action === 'collapse') {
-                btn.classList.toggle('active', nextState.hideMode === 'collapse');
-            } else if (action === 'chords') {
-                btn.classList.toggle('active', nextState.hideMode === 'chords');
-            } else if (action === 'lyrics') {
-                btn.classList.toggle('active', nextState.hideMode === 'lyrics');
-            } else if (action === 'hide') {
-                btn.classList.toggle('active', !!nextState.isHidden);
-            }
-        });
+        this.toggleAttribute('editmode', this.editMode);
     }
 
     getDetailsElement() {
@@ -267,7 +516,129 @@ export class SongSection extends LitElement {
     }
 
     _getWrapper() {
-        return this.querySelector('.song-section-wrapper');
+        return this.renderRoot?.querySelector('.song-section-wrapper') || null;
+    }
+
+    _buildContentBlocks(lines) {
+        if (!Array.isArray(lines) || lines.length === 0) {
+            return [];
+        }
+
+        const blocks = [];
+        let i = 0;
+
+        while (i < lines.length) {
+            const line = lines[i];
+            if (this._isBarLineLine(line)) {
+                const barLines = this._collectBarGroup(lines, i);
+                blocks.push({
+                    type: 'bar-group',
+                    data: this._buildBarGroupData(barLines)
+                });
+                i += barLines.length;
+            } else {
+                blocks.push({ type: 'line', line });
+                i++;
+            }
+        }
+
+        return blocks;
+    }
+
+    _collectBarGroup(lines, startIndex) {
+        const group = [];
+        for (let i = startIndex; i < lines.length; i++) {
+            const candidate = lines[i];
+            if (this._isBarLineLine(candidate)) {
+                group.push(candidate);
+            } else {
+                break;
+            }
+        }
+        return group;
+    }
+
+    _buildBarGroupData(lines) {
+        if (!lines.length) {
+            return { measuresPerLine: [], maxMeasures: 0 };
+        }
+
+        const measuresPerLine = lines.map(line => {
+            const items = [];
+            line.segments?.forEach(segment => {
+                if (segment.chord) {
+                    items.push({
+                        chord: segment.chord,
+                        isBar: this._isBar(segment.chord)
+                    });
+                }
+            });
+
+            const measures = [];
+            let currentMeasure = [];
+
+            items.forEach(item => {
+                if (item.isBar) {
+                    measures.push({
+                        chords: currentMeasure,
+                        bar: item.chord
+                    });
+                    currentMeasure = [];
+                } else {
+                    currentMeasure.push(item.chord);
+                }
+            });
+
+            if (currentMeasure.length > 0 || measures.length === 0) {
+                measures.push({
+                    chords: currentMeasure,
+                    bar: null
+                });
+            }
+
+            return measures;
+        });
+
+        const maxMeasures = measuresPerLine.reduce((max, measures) => Math.max(max, measures.length), 0) || 1;
+        return { measuresPerLine, maxMeasures };
+    }
+
+    _isBarLineLine(line) {
+        if (!line?.segments || line.segments.length === 0) return false;
+        let hasBar = false;
+        for (const segment of line.segments) {
+            const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0;
+            if (hasLyrics) return false;
+            if (segment.chord && this._isBar(segment.chord)) {
+                hasBar = true;
+            }
+        }
+        return hasBar;
+    }
+
+    _isBar(chord) {
+        return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
+    }
+
+    _cloneLines(lines) {
+        if (!Array.isArray(lines)) {
+            return [];
+        }
+        return lines.map(line => ({
+            segments: (line.segments || []).map(segment => ({ ...segment }))
+        }));
+    }
+
+    _hydrateLinesFromDataset() {
+        if (this.lines && this.lines.length > 0) {
+            return;
+        }
+        const key = this.dataset?.linesKey;
+        const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
+        if (key && store && store.has(key)) {
+            const source = store.get(key);
+            this.lines = this._cloneLines(source);
+        }
     }
 }
 

@@ -3,7 +3,7 @@
 
 import { ChordProParser } from './parser.js';
 import { SetalightDB, formatTempo } from './db.js';
-import { transposeSong, getAvailableKeys, getKeyOffset } from './transpose.js';
+import { transposeSong, getAvailableKeys } from './transpose.js';
 import { getCurrentOrganisation } from './workspace.js';
 import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 
@@ -640,12 +640,14 @@ class PageApp {
             if (isEnteringEditMode) {
                 // Enter edit mode
                 document.body.classList.add('library-edit-mode');
+                document.body.setAttribute('data-library-edit-mode', '');
                 newEditToggle.classList.add('active');
 
                 console.log('Entered library edit mode - changes will save to global songs database');
             } else {
                 // Exit edit mode - save to global database
                 document.body.classList.remove('library-edit-mode');
+                document.body.removeAttribute('data-library-edit-mode');
                 newEditToggle.classList.remove('active');
 
                 this.saveLibrarySongToDatabase();
@@ -807,15 +809,24 @@ class PageApp {
         const contentElement = document.getElementById('library-song-content');
         if (!contentElement) return;
 
-        // Calculate semitone offset
-        const originalKey = this.currentLibraryParsedSong.metadata.key;
-        const offset = calculateTransposeOffset(originalKey, targetKey);
+        const originalParsed = this.currentLibraryParsedSong;
+        if (!originalParsed) return;
 
-        // Re-render with transposition
+        const originalKey = originalParsed.metadata.key;
+        const parsedForRender = typeof structuredClone === 'function'
+            ? structuredClone(originalParsed)
+            : JSON.parse(JSON.stringify(originalParsed));
+
+        if (targetKey && originalKey && targetKey !== originalKey) {
+            transposeSong(parsedForRender, originalKey, targetKey);
+            parsedForRender.metadata.key = targetKey;
+        }
+
+        // Re-render with updated data
         contentElement.innerHTML = '';
         const songContent = document.createElement('div');
         songContent.className = 'song-content library-single-song';
-        const fragment = this.parser.toHTML(this.currentLibraryParsedSong, offset);
+        const fragment = this.parser.toHTML(parsedForRender, 0);
         songContent.appendChild(fragment);
         contentElement.appendChild(songContent);
     }
@@ -1687,6 +1698,7 @@ class PageApp {
         if (isEditMode) {
             const appHeader = document.getElementById('app-header');
             document.body.classList.remove('edit-mode');
+            document.body.removeAttribute('data-edit-mode');
             if (appHeader) {
                 appHeader.editMode = false;
             }
@@ -2362,6 +2374,7 @@ class PageApp {
             if (isEnteringEditMode) {
                 // Entering edit mode - fade out normal controls, fade in edit controls
                 document.body.classList.add('edit-mode');
+                document.body.setAttribute('data-edit-mode', '');
                 appHeader.editMode = true;
 
                 // Clear inline display:none if it was set during previous exit
@@ -2389,6 +2402,7 @@ class PageApp {
                 // Exiting edit mode - fade everything simultaneously
                 // Remove edit mode class immediately to trigger all fades
                 document.body.classList.remove('edit-mode');
+                document.body.removeAttribute('data-edit-mode');
                 appHeader.editMode = false;
 
                 // Remove fade-in classes from edit controls (triggers fade out)

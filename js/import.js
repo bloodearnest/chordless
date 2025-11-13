@@ -68,11 +68,7 @@ export class SetlistImporter {
 
         // Get current user info for leader field
         const userInfo = await getCurrentUserInfo();
-        const defaultLeader = userInfo?.name || userInfo?.email || '';
-
-        if (!defaultLeader) {
-            throw new Error('Google account required. Connect with Google before importing setlists.');
-        }
+        const defaultLeader = userInfo?.name || userInfo?.email || 'Simon Davy';
 
         console.log(`[Import] Using default leader: ${defaultLeader}`);
         this.defaultLeader = defaultLeader;

@@ -980,29 +980,6 @@ body.library-edit-mode .key-selector:focus {
     color: #bdc3c7;
     margin-top: 0.5rem;
 }
-
-
-.song-content .section-control-btn .control-label {
-    font-weight: 600;
-    font-size: 0.75rem;
-}
-
-/* Hide chords when active */
-.song-content .song-section-wrapper.chords-hidden .chord {
-    display: none;
-}
-
-/* Hide lyrics when active */
-.song-content .song-section-wrapper.lyrics-hidden .lyrics {
-    display: none;
-}
-
-/* Button labels are now managed dynamically in JavaScript */
-
-.song-content .section-content {
-    margin-top: 0;
-}
-
 .song-content .chord-line {
     display: flex;
     margin-bottom: 0.2rem;
