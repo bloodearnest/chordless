@@ -43,6 +43,27 @@ class PageApp {
         this.settingsImportHandler = null;
         this.storageImportHandler = null;
         this.globalImportHandler = null;
+        this._overviewComponent = null;
+
+        // Bind overview component event handlers once
+        this._onOverviewSongClick = (event) => {
+            const index = event.detail?.index;
+            if (typeof index === 'number') {
+                this.navigateToHash(`song-${index}`);
+            }
+        };
+
+        this._onOverviewSongDelete = (event) => {
+            const index = event.detail?.index;
+            if (typeof index === 'number' && this.songs[index]) {
+                this.showDeleteSongConfirmation(index, this.songs[index]);
+            }
+        };
+
+        this._onOverviewAddSong = () => {
+            this.openAddSongModal();
+        };
+
         this.init();
     }
 
@@ -1258,6 +1279,7 @@ class PageApp {
                 this.songs = [];
                 this.currentSetlistId = setlistId;
                 this.currentSetlist = setlist;
+                this._setOverviewComponent(null);
 
                 // Update header to show setlist info
                 this.updateHeader(null, true);
@@ -1501,7 +1523,55 @@ class PageApp {
             const msg = document.createElement('p');
             msg.textContent = 'Error loading songs. Please check the console.';
             container.appendChild(msg);
+            this._setOverviewComponent(null);
         }
+    }
+
+    _setOverviewComponent(component) {
+        if (this._overviewComponent) {
+            this._overviewComponent.removeEventListener('overview-song-click', this._onOverviewSongClick);
+            this._overviewComponent.removeEventListener('overview-song-delete', this._onOverviewSongDelete);
+            this._overviewComponent.removeEventListener('overview-add-song', this._onOverviewAddSong);
+        }
+
+        this._overviewComponent = component;
+
+        if (component) {
+            component.addEventListener('overview-song-click', this._onOverviewSongClick);
+            component.addEventListener('overview-song-delete', this._onOverviewSongDelete);
+            component.addEventListener('overview-add-song', this._onOverviewAddSong);
+        }
+    }
+
+    _refreshOverviewComponentSongs() {
+        if (this._overviewComponent) {
+            this._overviewComponent.songs = [...this.songs];
+        }
+    }
+
+    _refreshOverviewComponentEditMode() {
+        if (this._overviewComponent) {
+            this._overviewComponent.editMode = this.overviewEditMode;
+        }
+    }
+
+    _replaceHistoryForSong(index) {
+        if (typeof window === 'undefined' || !window.history || !window.location) return;
+        const currentState = history.state || {};
+        const newUrl = `${window.location.pathname}#song-${index}`;
+        const nextState = {
+            ...currentState,
+            view: 'song',
+            index,
+            fromOverview: currentState.fromOverview === true
+        };
+        history.replaceState(nextState, '', newUrl);
+    }
+
+    _replaceHistoryForOverview() {
+        if (typeof window === 'undefined' || !window.history || !window.location) return;
+        const newUrl = `${window.location.pathname}#overview`;
+        history.replaceState({ view: 'overview' }, '', newUrl);
     }
 
     formatDate(dateStr) {
@@ -1524,7 +1594,7 @@ class PageApp {
     renderFullSetlist(setlist, songs) {
         const fragment = document.createDocumentFragment();
 
-        // Create overview section
+        // Create overview section rendered by Lit component
         const overview = document.createElement('div');
         overview.id = 'overview';
         overview.className = 'section';
@@ -1532,61 +1602,12 @@ class PageApp {
         const songContentWrapper = document.createElement('div');
         songContentWrapper.className = 'song-content';
 
-        const setlistOverview = document.createElement('div');
-        setlistOverview.className = 'setlist-overview';
+        const overviewComponent = document.createElement('setlist-overview');
+        overviewComponent.songs = songs;
+        overviewComponent.editMode = this.overviewEditMode;
+        this._setOverviewComponent(overviewComponent);
 
-        const overviewSongs = document.createElement('div');
-        overviewSongs.className = 'overview-songs';
-
-        songs.forEach((song, index) => {
-            // Create the Lit song-card component
-            const card = document.createElement('song-card');
-            card.song = song;
-            card.variant = 'setlist';
-            card.editMode = this.overviewEditMode; // Pass edit mode state
-            card.classList.add('overview-song-card');
-            card.dataset.songIndex = index;
-
-            // Add click handler to navigate to song
-            card.addEventListener('song-click', (e) => {
-                this.navigateToHash(`song-${index}`);
-            });
-
-            // Add delete button handler (for edit mode)
-            card.addEventListener('song-delete', (e) => {
-                this.showDeleteSongConfirmation(index, song);
-            });
-
-            overviewSongs.appendChild(card);
-        });
-
-        // Add "Add Song" button
-        const addSongButton = document.createElement('button');
-        addSongButton.className = 'song-card add-song-button';
-        addSongButton.innerHTML = `
-            <div class="song-card-info">
-                <div class="song-card-title-row">
-                    <div class="song-card-title">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 8px;">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Song
-                    </div>
-                </div>
-            </div>
-        `;
-        addSongButton.addEventListener('click', () => {
-            this.openAddSongModal();
-        });
-
-        // Initially hidden - only show in edit mode
-        addSongButton.style.display = 'none';
-
-        overviewSongs.appendChild(addSongButton);
-
-        setlistOverview.appendChild(overviewSongs);
-        songContentWrapper.appendChild(setlistOverview);
+        songContentWrapper.appendChild(overviewComponent);
         overview.appendChild(songContentWrapper);
         fragment.appendChild(overview);
 
@@ -1624,6 +1645,9 @@ class PageApp {
     showSong(index, instant = false) {
         // Update the last visible section to prevent observer from triggering
         this._lastVisibleSection = `song-${index}`;
+
+        // Leaving overview edit mode when navigating into a song
+        this.setOverviewEditMode(false);
 
         this.scrollToSection(`song-${index}`, index, instant);
         // Update header with animation for programmatic navigation
@@ -2025,13 +2049,16 @@ class PageApp {
                     this.currentSongIndex = -1;
                     this.updateHeader(null, false); // animate=true for smooth transition
                     this.dispatchSongChange(null);
+                    this._replaceHistoryForOverview();
                 } else if (sectionId.startsWith('song-')) {
                     const index = parseInt(sectionId.split('-')[1]);
                     if (index >= 0 && index < this.songs.length) {
+                        this.setOverviewEditMode(false);
                         this.currentSongIndex = index;
                         this.updateHeader(this.songs[index], false); // animate=true for smooth transition
                         this.applyFontSize(index);
                         this.dispatchSongChange(this.songs[index]);
+                        this._replaceHistoryForSong(index);
                     }
                 }
             }
@@ -2048,26 +2075,44 @@ class PageApp {
     }
 
     setupHashNavigation(setlistId, totalSongs) {
-        // Listen for popstate (back/forward button)
-        window.addEventListener('popstate', (event) => {
-            const hash = window.location.hash.substring(1) || 'overview';
-            console.log('Popstate to:', hash, 'state:', event.state);
+        // Clean up previous handlers to avoid duplicates when re-rendering setlist
+        if (this._popstateHandler) {
+            window.removeEventListener('popstate', this._popstateHandler);
+        }
+        if (this._hashChangeHandler) {
+            window.removeEventListener('hashchange', this._hashChangeHandler);
+        }
 
-            if (hash === 'overview' || !hash) {
+        const handleHashNavigation = () => {
+            const hashValue = window.location.hash.substring(1) || 'overview';
+            console.log('[HashNavigation] Handling hash change:', hashValue);
+
+            if (!hashValue || hashValue === 'overview') {
                 this.showOverview(false);
-            } else if (hash.startsWith('song-')) {
-                const index = parseInt(hash.split('-')[1]);
-                if (index >= 0 && index < totalSongs) {
+            } else if (hashValue.startsWith('song-')) {
+                const index = parseInt(hashValue.split('-')[1]);
+                if (!Number.isNaN(index) && index >= 0 && index < totalSongs) {
                     this.showSong(index, false);
                 }
             }
 
-            // Update navigation menu after popstate
             const route = window.__ROUTE__ || this.parseRoute(window.location.pathname);
             this.updateNavigationMenu(route);
-        });
+        };
 
-        console.log('History navigation setup complete for', totalSongs, 'songs');
+        this._popstateHandler = (event) => {
+            console.log('[Popstate] state:', event.state, 'hash:', window.location.hash);
+            handleHashNavigation();
+        };
+        this._hashChangeHandler = () => {
+            console.log('[HashChange] hash changed to:', window.location.hash);
+            handleHashNavigation();
+        };
+
+        window.addEventListener('popstate', this._popstateHandler);
+        window.addEventListener('hashchange', this._hashChangeHandler);
+
+        console.log('History/hash navigation setup complete for', totalSongs, 'songs');
     }
 
     navigateToHash(hash) {
@@ -2994,6 +3039,7 @@ class PageApp {
             const button = dragState.button;
             const startIndex = dragState.startIndex;
             const targetIndex = dragState.currentIndex;
+            let overviewNeedsRefresh = false;
 
             // Tell component that drag happened, suppress its click
             // Clean up visual state
@@ -3029,36 +3075,7 @@ class PageApp {
                 // Save to database
                 this.currentSetlist.updatedAt = new Date().toISOString();
                 await this.db.saveSetlist(this.currentSetlist);
-
-                // Re-render the overview to reflect new order
-                const overviewContainer = document.querySelector('.overview-songs');
-                if (overviewContainer) {
-                    overviewContainer.textContent = '';
-
-                    this.songs.forEach((song, index) => {
-                        // Create the Lit song-card component
-                        const card = document.createElement('song-card');
-                        card.song = song;
-                        card.variant = 'setlist';
-                        card.editMode = this.overviewEditMode; // Preserve edit mode state
-                        card.classList.add('overview-song-card');
-                        card.dataset.songIndex = index;
-
-                        // Add click handler to navigate to song
-                        card.addEventListener('song-click', () => {
-                            this.navigateToHash(`song-${index}`);
-                        });
-
-                        // Add delete button handler (for edit mode)
-                        card.addEventListener('song-delete', () => {
-                            this.showDeleteSongConfirmation(index, song);
-                        });
-
-                        overviewContainer.appendChild(card);
-                    });
-
-                    this.setupOverviewDragDrop();
-                }
+                overviewNeedsRefresh = true;
 
                 // Re-order song sections in the DOM to match new order
                 const container = document.querySelector('.song-container');
@@ -3133,6 +3150,13 @@ class PageApp {
             dragState.lastAcceptedIndex = null;
             dragState.pointerId = null;
             dragState.pointerType = null;
+
+            if (overviewNeedsRefresh) {
+                this._refreshOverviewComponentSongs();
+                if (this.overviewEditMode) {
+                    this.setupOverviewDragDrop();
+                }
+            }
         };
 
         const cancelDrag = () => {
@@ -3244,19 +3268,22 @@ class PageApp {
     }
 
     toggleOverviewEditMode() {
-        this.overviewEditMode = !this.overviewEditMode;
+        this.setOverviewEditMode(!this.overviewEditMode);
+    }
+
+    setOverviewEditMode(enabled) {
+        if (this.overviewEditMode === enabled) {
+            return;
+        }
+
+        this.overviewEditMode = enabled;
 
         // Update button state (use the header edit toggle button)
         const appHeader = document.getElementById('app-header');
         if (appHeader) {
             appHeader.editMode = this.overviewEditMode;
         }
-
-        // Update all song cards with new edit mode
-        const cards = document.querySelectorAll('.overview-song-card');
-        cards.forEach(card => {
-            card.editMode = this.overviewEditMode;
-        });
+        this._refreshOverviewComponentEditMode();
 
         // Toggle drag-drop: only enable in edit mode
         if (this.overviewEditMode) {
@@ -3280,12 +3307,6 @@ class PageApp {
                 });
                 this._cardPointerDownHandlers.clear();
             }
-        }
-
-        // Show/hide add song button based on edit mode (only show in edit mode)
-        const addButton = document.querySelector('.add-song-button');
-        if (addButton) {
-            addButton.style.display = this.overviewEditMode ? 'block' : 'none';
         }
     }
 
@@ -3342,6 +3363,7 @@ class PageApp {
         };
         song.currentKey = parsed.metadata.key;
         song.currentBPM = currentBPM;
+        this._refreshOverviewComponentSongs();
 
         // Update DOM
         const songSection = document.getElementById(`song-${songIndex}`);

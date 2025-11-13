@@ -1306,7 +1306,6 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
 /* Override song card styles for setlist overview context */
 .overview-song-card {
     position: relative; /* Needed for drag and drop pseudo-elements */
-    touch-action: none; /* Prevent browser from handling touch (scrolling, zooming) during drag */
 }
 
 /* Drag and drop states */
@@ -1345,6 +1344,7 @@ body.library-edit-mode .song-content .song-section-wrapper.section-hidden .secti
 }
 
 .overview-songs.reordering .overview-song-card {
+    touch-action: none; /* Prevent native scrolling while reordering */
     transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
