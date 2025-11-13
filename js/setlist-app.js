@@ -67,36 +67,8 @@ class PageApp {
         this.init();
     }
 
-    async loadTemplates() {
-        // Load shared templates if they don't exist yet
-        if (document.getElementById('song-header-template')) {
-            console.log('Templates already loaded');
-            return;
-        }
-
-        try {
-            const response = await fetch('/templates.html');
-            const html = await response.text();
-
-            // Create a temporary container
-            const temp = document.createElement('div');
-            temp.innerHTML = html;
-
-            // Append all templates to the body
-            const templates = temp.querySelectorAll('template');
-            templates.forEach(template => {
-                document.body.appendChild(template);
-            });
-
-            console.log('Loaded', templates.length, 'templates');
-        } catch (error) {
-            console.error('Failed to load templates:', error);
-        }
-    }
 
     async init() {
-        // Load templates first
-        await this.loadTemplates();
 
         // Initialize IndexedDB
         await this.db.init();
@@ -1931,20 +1903,24 @@ class PageApp {
         const infoGrid = document.createElement('div');
         infoGrid.className = 'modal-info-grid';
 
-        // Get template for info items
-        const itemTemplate = document.getElementById('song-info-item-template');
-
         // Helper function to add info items
         const addInfoItem = (label, value) => {
             if (!value) return; // Skip empty values
-            const clone = itemTemplate.content.cloneNode(true);
-            const labelEl = clone.querySelector('.modal-info-label');
-            const valueEl = clone.querySelector('.modal-info-value');
 
+            const item = document.createElement('div');
+            item.className = 'modal-info-item';
+
+            const labelEl = document.createElement('div');
+            labelEl.className = 'modal-info-label';
             labelEl.textContent = label;
+
+            const valueEl = document.createElement('div');
+            valueEl.className = 'modal-info-value';
             valueEl.textContent = value;
 
-            infoGrid.appendChild(clone);
+            item.appendChild(labelEl);
+            item.appendChild(valueEl);
+            infoGrid.appendChild(item);
         };
 
         // Add setlist metadata
