@@ -1,15 +1,32 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
+import './bar-group.js';
 
+/**
+ * A custom element for rendering a section of a song with chords and lyrics.
+ * Supports collapsing, hiding chords/lyrics, and special bar notation rendering.
+ *
+ * @element song-section
+ * @fires {CustomEvent} section-action - Fired when a control button is clicked
+ * @fires {CustomEvent} section-toggle - Fired when section is collapsed/expanded
+ */
 export class SongSection extends LitElement {
     static properties = {
+        /** @type {number} Index of the song this section belongs to */
         songIndex: { type: Number, attribute: 'song-index', reflect: true },
+        /** @type {number} Index of this section within the song */
         sectionIndex: { type: Number, attribute: 'section-index', reflect: true },
+        /** @type {boolean} Whether edit mode is active */
         editMode: { type: Boolean, reflect: true },
+        /** @type {string} Hide mode: 'none', 'collapse', 'chords', or 'lyrics' */
         hideMode: { type: String },
+        /** @type {boolean} Whether the section is collapsed */
         isCollapsed: { type: Boolean },
+        /** @type {boolean} Whether the section is hidden */
         isHidden: { type: Boolean },
+        /** @type {string} Section label (e.g., "Verse 1", "Chorus") */
         label: { type: String },
+        /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
         lines: { attribute: false }
     };
 
@@ -77,6 +94,8 @@ export class SongSection extends LitElement {
             font-weight: bold;
             font-style: italic;
             white-space: nowrap;
+            margin: 0;
+            padding: 0;
         }
 
         .song-section-wrapper .section-content {
@@ -142,6 +161,11 @@ export class SongSection extends LitElement {
         .song-section-wrapper .section-control-btn:hover {
             background-color: rgba(127, 140, 141, 0.1);
             transform: scale(1.02);
+        }
+
+        .song-section-wrapper .section-control-btn:focus-visible {
+            outline: 2px solid #3498db;
+            outline-offset: 2px;
         }
 
         .song-section-wrapper .section-control-btn.active {
@@ -225,38 +249,6 @@ export class SongSection extends LitElement {
             overflow-wrap: break-word;
         }
 
-        .song-section-wrapper .bar-group {
-            margin-bottom: 0.5rem;
-            display: grid;
-            width: fit-content;
-            gap: 0;
-        }
-
-        .song-section-wrapper .bar-group .chord-line {
-            display: contents;
-        }
-
-        .song-section-wrapper .measure {
-            display: flex;
-            align-items: flex-start;
-        }
-
-        .song-section-wrapper .measure.first-measure .bar-marker {
-            margin-left: 0;
-        }
-
-        .song-section-wrapper .measure.last-measure .bar-marker {
-            margin-left: auto;
-        }
-
-        .song-section-wrapper .measure:not(.first-measure):not(.last-measure) .bar-marker {
-            margin-left: auto;
-        }
-
-        .song-section-wrapper .chord-segment.chord-only.bar-marker .chord {
-            color: #95a5a6;
-        }
-
         .song-section-wrapper .chord.invalid {
             color: #e74c3c;
         }
@@ -277,11 +269,18 @@ export class SongSection extends LitElement {
         this._onSummaryClick = this._onSummaryClick.bind(this);
     }
 
-    // Custom getter/setter for lines to ensure content blocks are built
+    /**
+     * Get the lines data for this section
+     * @returns {Array<{segments: Array<{chord: string, lyrics: string}>}>}
+     */
     get lines() {
         return this._lines;
     }
 
+    /**
+     * Set the lines data and rebuild content blocks
+     * @param {Array<{segments: Array<{chord: string, lyrics: string}>}>} value
+     */
     set lines(value) {
         console.log('[SongSection] lines setter called:', value?.length, 'lines');
         const oldValue = this._lines;
@@ -291,7 +290,8 @@ export class SongSection extends LitElement {
         }
         this.requestUpdate('lines', oldValue);
     }
-    
+
+    /** @inheritdoc */
     connectedCallback() {
         super.connectedCallback();
         if ((!this.label || !this.label.trim()) && this.dataset?.label) {
@@ -301,6 +301,7 @@ export class SongSection extends LitElement {
         this._hydrateLinesFromDataset();
     }
 
+    /** @inheritdoc */
     disconnectedCallback() {
         super.disconnectedCallback();
         // Clean up global store entry to prevent memory leaks
@@ -313,6 +314,11 @@ export class SongSection extends LitElement {
         }
     }
 
+    /**
+     * Hydrate lines from the global data store using the data-lines-key attribute.
+     * This is needed because properties set before custom element upgrade are lost.
+     * @private
+     */
     _hydrateLinesFromDataset() {
         if (this._lines && this._lines.length > 0) {
             return; // Already has lines
@@ -343,8 +349,15 @@ export class SongSection extends LitElement {
             'lyrics-hidden': this.hideMode === 'lyrics'
         };
         const label = (this.label || '').trim();
+        const sectionLabel = label || `Section ${this.sectionIndex + 1}`;
+
         return html`
-            <div class=${classMap(classes)} data-song-index=${this.songIndex} data-section-index=${this.sectionIndex}>
+            <div class=${classMap(classes)}
+                 role="region"
+                 aria-label=${sectionLabel}
+                 ?aria-hidden=${this.isHidden && !this.editMode}
+                 data-song-index=${this.songIndex}
+                 data-section-index=${this.sectionIndex}>
                 ${label ? this._renderLabeledSection(label) : this._renderPlainSection()}
             </div>`;
     }
@@ -354,10 +367,12 @@ export class SongSection extends LitElement {
     _renderLabeledSection(label) {
         const detailsOpen = this._shouldDetailsBeOpen();
         return html`
-            <details class="song-section" ?open=${detailsOpen}>
+            <details class="song-section"
+                     ?open=${detailsOpen}
+                     aria-expanded=${detailsOpen ? 'true' : 'false'}>
                 <summary class="section-label" @click=${this._onSummaryClick}>
                     <div class="section-header">
-                        <span class="section-title">${label}</span>
+                        <h3 class="section-title">${label}</h3>
                         ${this._renderControls()}
                     </div>
                 </summary>
@@ -394,9 +409,16 @@ export class SongSection extends LitElement {
             'section-control-btn': true,
             active: !!active
         });
+        const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`;
+        const ariaLabel = `${label} in ${sectionLabel}`;
+
         return html`
-            <button class=${classes} data-action=${action} @click=${this._onControlClick}>
-                <span class="control-icon">${icon}</span>
+            <button class=${classes}
+                    data-action=${action}
+                    aria-label=${ariaLabel}
+                    aria-pressed=${active ? 'true' : 'false'}
+                    @click=${this._onControlClick}>
+                <span class="control-icon" aria-hidden="true">${icon}</span>
                 <span class="control-label">${label}</span>
             </button>
         `;
@@ -409,7 +431,7 @@ export class SongSection extends LitElement {
 
         return this._contentBlocks.map((block, index) => {
             if (block.type === 'bar-group') {
-                return this._renderBarGroup(block.data, index);
+                return html`<bar-group .data=${block.data}></bar-group>`;
             }
             return this._renderLine(block.line, index);
         });
@@ -455,57 +477,6 @@ export class SongSection extends LitElement {
         return html`<span class=${classes}>${chordText}</span>`;
     }
 
-    _renderBarGroup(data) {
-        if (!data || !data.measuresPerLine?.length) {
-            return nothing;
-        }
-
-        const maxColumns = Math.max(data.maxMeasures || 0, 1);
-
-        return html`
-            <div class="bar-group" style="grid-template-columns: repeat(${maxColumns}, auto);">
-                ${data.measuresPerLine.map((measures, lineIndex) => html`
-                    <div class="chord-line bar-aligned" data-bar-line-index=${lineIndex}>
-                        ${Array.from({ length: maxColumns }).map((_, measureIndex) => {
-                            const measure = measures[measureIndex] || null;
-                            const measureClasses = classMap({
-                                measure: true,
-                                'first-measure': measureIndex === 0,
-                                'last-measure': measureIndex === maxColumns - 1
-                            });
-                            return html`
-                                <span class=${measureClasses}>
-                                    ${measure ? [
-                                        (measure.chords || []).map(chord => this._renderChordOnlySegment(chord)),
-                                        measure.bar ? this._renderBarMarker(measure.bar) : nothing
-                                    ] : nothing}
-                                </span>
-                            `;
-                        })}
-                    </div>
-                `)}
-            </div>
-        `;
-    }
-
-    _renderChordOnlySegment(chordText) {
-        if (!chordText) return nothing;
-        return html`
-            <span class="chord-segment chord-only">
-                ${this._renderChord(chordText)}
-            </span>
-        `;
-    }
-
-    _renderBarMarker(barText) {
-        if (!barText) return nothing;
-        return html`
-            <span class="chord-segment chord-only bar-marker">
-                <span class="chord bar">${barText}</span>
-            </span>
-        `;
-    }
-
     _onControlClick(event) {
         event.stopPropagation();
         event.preventDefault();
@@ -540,6 +511,12 @@ export class SongSection extends LitElement {
         return this.renderRoot?.querySelector('.song-section-wrapper') || null;
     }
 
+    /**
+     * Build content blocks from lines, grouping consecutive bar-only lines together
+     * @param {Array<{segments: Array}>} lines - Raw line data
+     * @returns {Array<{type: string, line?: Object, data?: Object}>} Content blocks for rendering
+     * @private
+     */
     _buildContentBlocks(lines) {
         if (!Array.isArray(lines) || lines.length === 0) {
             return [];
@@ -566,6 +543,13 @@ export class SongSection extends LitElement {
         return blocks;
     }
 
+    /**
+     * Collect consecutive bar-only lines into a group
+     * @param {Array} lines - All lines
+     * @param {number} startIndex - Index to start collecting from
+     * @returns {Array} Group of consecutive bar lines
+     * @private
+     */
     _collectBarGroup(lines, startIndex) {
         const group = [];
         for (let i = startIndex; i < lines.length; i++) {
@@ -579,6 +563,12 @@ export class SongSection extends LitElement {
         return group;
     }
 
+    /**
+     * Build structured data for rendering a bar group with aligned measures
+     * @param {Array} lines - Bar-only lines
+     * @returns {{measuresPerLine: Array, maxMeasures: number}} Structured bar group data
+     * @private
+     */
     _buildBarGroupData(lines) {
         if (!lines.length) {
             return { measuresPerLine: [], maxMeasures: 0 };
@@ -624,6 +614,12 @@ export class SongSection extends LitElement {
         return { measuresPerLine, maxMeasures };
     }
 
+    /**
+     * Check if a line contains only chords and bar markers (no lyrics)
+     * @param {Object} line - Line to check
+     * @returns {boolean} True if line is bar-only
+     * @private
+     */
     _isBarLineLine(line) {
         if (!line?.segments || line.segments.length === 0) return false;
         let hasBar = false;
@@ -637,10 +633,22 @@ export class SongSection extends LitElement {
         return hasBar;
     }
 
+    /**
+     * Check if a chord is a bar marker
+     * @param {string} chord - Chord text to check
+     * @returns {boolean} True if chord is a bar marker
+     * @private
+     */
     _isBar(chord) {
         return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
     }
 
+    /**
+     * Deep clone lines data
+     * @param {Array} lines - Lines to clone
+     * @returns {Array} Cloned lines
+     * @private
+     */
     _cloneLines(lines) {
         if (!Array.isArray(lines)) {
             return [];
