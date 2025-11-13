@@ -1651,9 +1651,11 @@ class PageApp {
                 return;
             }
             const state = this.getSectionState(songIndex, sectionIndex);
-            if (typeof section.applyState === 'function') {
-                section.applyState(state, isEditMode);
-            }
+            // Apply state via reactive properties
+            section.hideMode = state.hideMode || 'none';
+            section.isCollapsed = state.isCollapsed || false;
+            section.isHidden = state.isHidden || false;
+            section.editMode = isEditMode;
         });
     }
 
@@ -2344,11 +2346,16 @@ class PageApp {
 
     updateSectionDOM(songIndex, sectionIndex) {
         const component = this._getSongSectionComponent(songIndex, sectionIndex);
-        if (!component || typeof component.applyState !== 'function') {
+        if (!component) {
             return;
         }
         const state = this.getSectionState(songIndex, sectionIndex);
-        component.applyState(state, document.body.classList.contains('edit-mode'));
+        const isEditMode = document.body.classList.contains('edit-mode');
+        // Apply state via reactive properties
+        component.hideMode = state.hideMode || 'none';
+        component.isCollapsed = state.isCollapsed || false;
+        component.isHidden = state.isHidden || false;
+        component.editMode = isEditMode;
     }
 
     applySectionState() {

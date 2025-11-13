@@ -131,9 +131,11 @@ export class ChordProParser {
     toHTML(parsed, songIndex = 0) {
         const fragment = document.createDocumentFragment();
 
+        // Global store needed due to custom element upgrade timing
         const globalLineStore = (typeof window !== 'undefined')
             ? (window.__songSectionDataStore = window.__songSectionDataStore || new Map())
             : null;
+
         for (let i = 0; i < parsed.sections.length; i++) {
             const section = parsed.sections[i];
             const sectionElement = document.createElement('song-section');
@@ -143,12 +145,14 @@ export class ChordProParser {
             sectionElement.setAttribute('data-label', label);
             sectionElement.label = label;
             const clonedLines = this.cloneSectionLines(section.lines);
+
+            // Store in global map and set key for hydration after upgrade
             if (globalLineStore) {
                 const key = `sec-${songIndex}-${i}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
                 globalLineStore.set(key, clonedLines);
                 sectionElement.dataset.linesKey = key;
             }
-            sectionElement.lines = clonedLines;
+
             fragment.appendChild(sectionElement);
         }
 

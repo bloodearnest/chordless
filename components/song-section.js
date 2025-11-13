@@ -1,293 +1,327 @@
-import { LitElement, html, nothing } from 'lit';
+import { LitElement, html, css, nothing } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
-
-const SECTION_STYLES = html`<style>
-.song-section-wrapper {
-    padding: 0;
-    margin: 0 0 0.1rem 0;
-    border: 2px solid transparent;
-    border-radius: 8px;
-    transition: border-color 0.25s ease-in-out, background-color 0.25s ease-in-out;
-}
-
-@media (min-width: 48rem) {
-    .song-section-wrapper {
-        padding: 0.75rem 0.75rem 0.125rem 0.75rem;
-        margin: 0.75rem;
-        margin-top: 0.125rem;
-        margin-bottom: 0.25rem;
-    }
-}
-
-:host([editmode]) .song-section-wrapper,
-:host([libraryeditmode]) .song-section-wrapper {
-    border-style: dotted;
-    border-color: #bdc3c7;
-    background-color: #f9f9f9;
-}
-
-.song-section-wrapper .section-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    min-height: 2rem;
-    width: 100%;
-}
-
-.song-section-wrapper details.song-section summary.section-label {
-    cursor: pointer;
-    list-style: none;
-    user-select: none;
-    margin: 0;
-    outline: none;
-    -webkit-tap-highlight-color: transparent;
-    tap-highlight-color: transparent;
-    line-height: 1.6rem;
-    padding: 0.2rem 0;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    width: 100%;
-}
-
-.song-section-wrapper details.song-section summary.section-label::-webkit-details-marker,
-.song-section-wrapper details.song-section summary.section-label:focus,
-.song-section-wrapper details.song-section summary.section-label:focus-visible,
-.song-section-wrapper details.song-section summary.section-label:active {
-    outline: none;
-    background: none;
-}
-
-.song-section-wrapper .section-title {
-    font-size: 1.6rem;
-    color: #7f8c8d;
-    font-weight: bold;
-    font-style: italic;
-    white-space: nowrap;
-}
-
-.song-section-wrapper .section-content {
-    margin-top: 0;
-}
-
-.song-section-wrapper .section-controls {
-    display: flex;
-    flex-direction: row;
-    gap: 0.3rem;
-    align-items: center;
-    margin-left: auto;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.25s ease-in-out;
-}
-
-:host([editmode]) .song-section-wrapper .section-controls,
-:host([libraryeditmode]) .song-section-wrapper .section-controls {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.song-section-wrapper.section-collapsed .section-content,
-.song-section-wrapper.section-hidden .section-content {
-    display: none;
-}
-
-.song-section-wrapper.section-hidden {
-    display: none;
-}
-
-:host([editmode]) .song-section-wrapper.section-hidden,
-:host([libraryeditmode]) .song-section-wrapper.section-hidden {
-    display: block;
-}
-
-:host([editmode]) .song-section-wrapper.section-hidden .section-title,
-:host([libraryeditmode]) .song-section-wrapper.section-hidden .section-title {
-    text-decoration: line-through;
-    opacity: 0.6;
-}
-
-.song-section-wrapper .section-control-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.2rem;
-    padding: 0.2rem 0.3rem;
-    background-color: rgba(255, 255, 255, 0.95);
-    border: 1.5px solid #7f8c8d;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s, transform 0.2s, border-color 0.2s, box-shadow 0.2s;
-    font-size: 0.85rem;
-    color: #7f8c8d;
-    white-space: nowrap;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-    backdrop-filter: blur(4px);
-    min-height: 1.8rem;
-}
-
-.song-section-wrapper .section-control-btn:hover {
-    background-color: rgba(127, 140, 141, 0.1);
-    transform: scale(1.02);
-}
-
-.song-section-wrapper .section-control-btn.active {
-    background-color: var(--button-bg);
-    border-color: var(--button-bg);
-    color: white;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(52, 152, 219, 0.3);
-}
-
-.song-section-wrapper.chords-hidden .chord {
-    display: none;
-}
-
-.song-section-wrapper.lyrics-hidden .lyrics {
-    display: none;
-}
-
-.song-section-wrapper .section-control-btn .control-label {
-    font-weight: 600;
-    font-size: 0.75rem;
-}
-
-.song-section-wrapper .section-content {
-    margin-top: 0;
-    max-width: 100%;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
-    display: flex;
-    flex-direction: column;
-    gap: 0.2rem;
-}
-
-.song-section-wrapper .chord-line {
-    display: flex;
-    margin-bottom: 0.2rem;
-    line-height: 1.5em;
-    flex-wrap: wrap;
-}
-
-.song-section-wrapper .chord-segment {
-    display: inline-flex;
-    flex-direction: column;
-    white-space: pre;
-    padding-right: 0.25em;
-}
-
-.song-section-wrapper .chord-segment.chord-only {
-    padding-right: 0.5em;
-}
-
-.song-section-wrapper .chord {
-    color: #2980b9;
-    font-weight: bold;
-    font-size: 0.9em;
-    min-height: 1.1em;
-    line-height: 1.1em;
-    padding-right: 0.25em;
-    font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
-}
-
-.song-section-wrapper .chord.bar {
-    color: #95a5a6;
-    font-weight: normal;
-}
-
-.song-section-wrapper .chord.invalid {
-    color: #bdc3c7;
-    opacity: 0.5;
-    font-style: italic;
-}
-
-.song-section-wrapper .chord-empty {
-    visibility: hidden;
-}
-
-.song-section-wrapper .lyrics {
-    line-height: 1.4em;
-    padding: 0;
-    margin: 0;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-}
-
-.song-section-wrapper .bar-group {
-    margin-bottom: 0.5rem;
-    display: grid;
-    width: fit-content;
-    gap: 0;
-}
-
-.song-section-wrapper .bar-group .chord-line {
-    display: contents;
-}
-
-.song-section-wrapper .measure {
-    display: flex;
-    align-items: flex-start;
-}
-
-.song-section-wrapper .measure.first-measure .bar-marker {
-    margin-left: 0;
-}
-
-.song-section-wrapper .measure.last-measure .bar-marker {
-    margin-left: auto;
-}
-
-.song-section-wrapper .measure:not(.first-measure):not(.last-measure) .bar-marker {
-    margin-left: auto;
-}
-
-.song-section-wrapper .chord-segment.chord-only.bar-marker .chord {
-    color: #95a5a6;
-}
-
-.song-section-wrapper .chord.invalid {
-    color: #e74c3c;
-}
-</style>`;
-
-const DEFAULT_STATE = {
-    hideMode: 'none',
-    isCollapsed: false,
-    isHidden: false
-};
 
 export class SongSection extends LitElement {
     static properties = {
         songIndex: { type: Number, attribute: 'song-index', reflect: true },
         sectionIndex: { type: Number, attribute: 'section-index', reflect: true },
         editMode: { type: Boolean, reflect: true },
-        state: { type: Object, attribute: false },
+        hideMode: { type: String },
+        isCollapsed: { type: Boolean },
+        isHidden: { type: Boolean },
         label: { type: String },
         lines: { attribute: false }
     };
+
+    static styles = css`
+        .song-section-wrapper {
+            padding: 0;
+            margin: 0 0 0.1rem 0;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            transition: border-color 0.25s ease-in-out, background-color 0.25s ease-in-out;
+        }
+
+        @media (min-width: 48rem) {
+            .song-section-wrapper {
+                padding: 0.75rem 0.75rem 0.125rem 0.75rem;
+                margin: 0.75rem;
+                margin-top: 0.125rem;
+                margin-bottom: 0.25rem;
+            }
+        }
+
+        :host([editmode]) .song-section-wrapper,
+        :host([libraryeditmode]) .song-section-wrapper {
+            border-style: dotted;
+            border-color: #bdc3c7;
+            background-color: #f9f9f9;
+        }
+
+        .song-section-wrapper .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            min-height: 2rem;
+            width: 100%;
+        }
+
+        .song-section-wrapper details.song-section summary.section-label {
+            cursor: pointer;
+            list-style: none;
+            user-select: none;
+            margin: 0;
+            outline: none;
+            -webkit-tap-highlight-color: transparent;
+            tap-highlight-color: transparent;
+            line-height: 1.6rem;
+            padding: 0.2rem 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .song-section-wrapper details.song-section summary.section-label::-webkit-details-marker,
+        .song-section-wrapper details.song-section summary.section-label:focus,
+        .song-section-wrapper details.song-section summary.section-label:focus-visible,
+        .song-section-wrapper details.song-section summary.section-label:active {
+            outline: none;
+            background: none;
+        }
+
+        .song-section-wrapper .section-title {
+            font-size: 1.6rem;
+            color: #7f8c8d;
+            font-weight: bold;
+            font-style: italic;
+            white-space: nowrap;
+        }
+
+        .song-section-wrapper .section-content {
+            margin-top: 0;
+        }
+
+        .song-section-wrapper .section-controls {
+            display: flex;
+            flex-direction: row;
+            gap: 0.3rem;
+            align-items: center;
+            margin-left: auto;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease-in-out;
+        }
+
+        :host([editmode]) .song-section-wrapper .section-controls,
+        :host([libraryeditmode]) .song-section-wrapper .section-controls {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .song-section-wrapper.section-collapsed .section-content,
+        .song-section-wrapper.section-hidden .section-content {
+            display: none;
+        }
+
+        .song-section-wrapper.section-hidden {
+            display: none;
+        }
+
+        :host([editmode]) .song-section-wrapper.section-hidden,
+        :host([libraryeditmode]) .song-section-wrapper.section-hidden {
+            display: block;
+        }
+
+        :host([editmode]) .song-section-wrapper.section-hidden .section-title,
+        :host([libraryeditmode]) .song-section-wrapper.section-hidden .section-title {
+            text-decoration: line-through;
+            opacity: 0.6;
+        }
+
+        .song-section-wrapper .section-control-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.2rem;
+            padding: 0.2rem 0.3rem;
+            background-color: rgba(255, 255, 255, 0.95);
+            border: 1.5px solid #7f8c8d;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.2s, border-color 0.2s, box-shadow 0.2s;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+            backdrop-filter: blur(4px);
+            min-height: 1.8rem;
+        }
+
+        .song-section-wrapper .section-control-btn:hover {
+            background-color: rgba(127, 140, 141, 0.1);
+            transform: scale(1.02);
+        }
+
+        .song-section-wrapper .section-control-btn.active {
+            background-color: var(--button-bg);
+            border-color: var(--button-bg);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2), 0 0 0 2px rgba(52, 152, 219, 0.3);
+        }
+
+        .song-section-wrapper.chords-hidden .chord {
+            display: none;
+        }
+
+        .song-section-wrapper.lyrics-hidden .lyrics {
+            display: none;
+        }
+
+        .song-section-wrapper .section-control-btn .control-label {
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+
+        .song-section-wrapper .section-content {
+            margin-top: 0;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .song-section-wrapper .chord-line {
+            display: flex;
+            margin-bottom: 0.2rem;
+            line-height: 1.5em;
+            flex-wrap: wrap;
+        }
+
+        .song-section-wrapper .chord-segment {
+            display: inline-flex;
+            flex-direction: column;
+            white-space: pre;
+            padding-right: 0.25em;
+        }
+
+        .song-section-wrapper .chord-segment.chord-only {
+            padding-right: 0.5em;
+        }
+
+        .song-section-wrapper .chord {
+            color: #2980b9;
+            font-weight: bold;
+            font-size: 0.9em;
+            min-height: 1.1em;
+            line-height: 1.1em;
+            padding-right: 0.25em;
+            font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+        }
+
+        .song-section-wrapper .chord.bar {
+            color: #95a5a6;
+            font-weight: normal;
+        }
+
+        .song-section-wrapper .chord.invalid {
+            color: #bdc3c7;
+            opacity: 0.5;
+            font-style: italic;
+        }
+
+        .song-section-wrapper .chord-empty {
+            visibility: hidden;
+        }
+
+        .song-section-wrapper .lyrics {
+            line-height: 1.4em;
+            padding: 0;
+            margin: 0;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .song-section-wrapper .bar-group {
+            margin-bottom: 0.5rem;
+            display: grid;
+            width: fit-content;
+            gap: 0;
+        }
+
+        .song-section-wrapper .bar-group .chord-line {
+            display: contents;
+        }
+
+        .song-section-wrapper .measure {
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .song-section-wrapper .measure.first-measure .bar-marker {
+            margin-left: 0;
+        }
+
+        .song-section-wrapper .measure.last-measure .bar-marker {
+            margin-left: auto;
+        }
+
+        .song-section-wrapper .measure:not(.first-measure):not(.last-measure) .bar-marker {
+            margin-left: auto;
+        }
+
+        .song-section-wrapper .chord-segment.chord-only.bar-marker .chord {
+            color: #95a5a6;
+        }
+
+        .song-section-wrapper .chord.invalid {
+            color: #e74c3c;
+        }
+    `;
 
     constructor() {
         super();
         this.songIndex = 0;
         this.sectionIndex = 0;
         this.editMode = false;
-        this.state = this.state ? { ...DEFAULT_STATE, ...this.state } : { ...DEFAULT_STATE };
-        if (this.label === undefined) {
-            this.label = '';
-        }
-        if (!this.lines) {
-            this.lines = [];
-        }
-        this._contentBlocks = this._buildContentBlocks(this.lines);
+        this.hideMode = 'none';
+        this.isCollapsed = false;
+        this.isHidden = false;
+        this.label = '';
+        this._lines = undefined; // Private storage for lines
+        this._contentBlocks = [];
         this._onControlClick = this._onControlClick.bind(this);
         this._onSummaryClick = this._onSummaryClick.bind(this);
+    }
+
+    // Custom getter/setter for lines to ensure content blocks are built
+    get lines() {
+        return this._lines;
+    }
+
+    set lines(value) {
+        console.log('[SongSection] lines setter called:', value?.length, 'lines');
+        const oldValue = this._lines;
+        this._lines = value;
+        if (value && value.length > 0) {
+            this._contentBlocks = this._buildContentBlocks(value);
+        }
+        this.requestUpdate('lines', oldValue);
     }
     
     connectedCallback() {
         super.connectedCallback();
-        this._hydrateLinesFromDataset();
         if ((!this.label || !this.label.trim()) && this.dataset?.label) {
             this.label = this.dataset.label;
+        }
+        // Hydrate lines from global store (needed due to custom element upgrade timing)
+        this._hydrateLinesFromDataset();
+    }
+
+    disconnectedCallback() {
+        super.disconnectedCallback();
+        // Clean up global store entry to prevent memory leaks
+        const key = this.dataset?.linesKey;
+        if (key) {
+            const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
+            if (store && store.has(key)) {
+                store.delete(key);
+            }
+        }
+    }
+
+    _hydrateLinesFromDataset() {
+        if (this._lines && this._lines.length > 0) {
+            return; // Already has lines
+        }
+        const key = this.dataset?.linesKey;
+        const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
+        if (key && store && store.has(key)) {
+            const source = store.get(key);
+            this.lines = this._cloneLines(source); // Use setter to trigger content block building
         }
     }
     
@@ -301,36 +335,30 @@ export class SongSection extends LitElement {
     }
 
     render() {
-        const state = { ...DEFAULT_STATE, ...(this.state || {}) };
-        const hideMode = state.hideMode || 'none';
         const classes = {
             'song-section-wrapper': true,
-            'section-hidden': !!state.isHidden,
-            'section-collapsed': hideMode === 'collapse',
-            'chords-hidden': hideMode === 'chords',
-            'lyrics-hidden': hideMode === 'lyrics'
+            'section-hidden': !!this.isHidden,
+            'section-collapsed': this.hideMode === 'collapse',
+            'chords-hidden': this.hideMode === 'chords',
+            'lyrics-hidden': this.hideMode === 'lyrics'
         };
         const label = (this.label || '').trim();
-        return html`${SECTION_STYLES}
+        return html`
             <div class=${classMap(classes)} data-song-index=${this.songIndex} data-section-index=${this.sectionIndex}>
-                ${label ? this._renderLabeledSection(label, state) : this._renderPlainSection()}
+                ${label ? this._renderLabeledSection(label) : this._renderPlainSection()}
             </div>`;
     }
 
-    willUpdate(changed) {
-        if (changed.has('lines')) {
-            this._contentBlocks = this._buildContentBlocks(this.lines);
-        }
-    }
+    // willUpdate not needed - lines setter handles content block building
 
-    _renderLabeledSection(label, state) {
-        const detailsOpen = this._shouldDetailsBeOpen(state);
+    _renderLabeledSection(label) {
+        const detailsOpen = this._shouldDetailsBeOpen();
         return html`
             <details class="song-section" ?open=${detailsOpen}>
                 <summary class="section-label" @click=${this._onSummaryClick}>
                     <div class="section-header">
                         <span class="section-title">${label}</span>
-                        ${this._renderControls(state)}
+                        ${this._renderControls()}
                     </div>
                 </summary>
                 <div class="section-content">
@@ -350,13 +378,13 @@ export class SongSection extends LitElement {
         `;
     }
 
-    _renderControls(state) {
+    _renderControls() {
         return html`
             <div class="section-controls">
-                ${this._renderControlButton('collapse', '▼', 'Collapse Section', state.hideMode === 'collapse')}
-                ${this._renderControlButton('chords', '♯', 'Hide Chords', state.hideMode === 'chords')}
-                ${this._renderControlButton('lyrics', 'A', 'Hide Lyrics', state.hideMode === 'lyrics')}
-                ${this._renderControlButton('hide', '✕', 'Hide Entire Section', !!state.isHidden)}
+                ${this._renderControlButton('collapse', '▼', 'Collapse Section', this.hideMode === 'collapse')}
+                ${this._renderControlButton('chords', '♯', 'Hide Chords', this.hideMode === 'chords')}
+                ${this._renderControlButton('lyrics', 'A', 'Hide Lyrics', this.hideMode === 'lyrics')}
+                ${this._renderControlButton('hide', '✕', 'Hide Entire Section', !!this.isHidden)}
             </div>
         `;
     }
@@ -499,16 +527,9 @@ export class SongSection extends LitElement {
         }));
     }
 
-    _shouldDetailsBeOpen(state) {
+    _shouldDetailsBeOpen() {
         if (this.editMode) return true;
-        return !(state.isCollapsed || state.hideMode === 'collapse');
-    }
-
-    applyState(state, editMode = false) {
-        const nextState = state ? { ...DEFAULT_STATE, ...state } : { ...DEFAULT_STATE };
-        this.state = nextState;
-        this.editMode = !!editMode;
-        this.toggleAttribute('editmode', this.editMode);
+        return !(this.isCollapsed || this.hideMode === 'collapse');
     }
 
     getDetailsElement() {
@@ -629,17 +650,6 @@ export class SongSection extends LitElement {
         }));
     }
 
-    _hydrateLinesFromDataset() {
-        if (this.lines && this.lines.length > 0) {
-            return;
-        }
-        const key = this.dataset?.linesKey;
-        const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
-        if (key && store && store.has(key)) {
-            const source = store.get(key);
-            this.lines = this._cloneLines(source);
-        }
-    }
 }
 
 customElements.define('song-section', SongSection);
