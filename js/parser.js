@@ -132,55 +132,7 @@ export class ChordProParser {
         const fragment = document.createDocumentFragment();
 
         // Add title
-        if (parsed.metadata.title) {
-            const headerTemplate = document.getElementById('song-header-template');
-            const headerClone = headerTemplate.content.cloneNode(true);
-
-            const title = headerClone.querySelector('.song-title');
-            title.textContent = parsed.metadata.title;
-
-            const artist = headerClone.querySelector('.song-artist');
-            if (parsed.metadata.artist) {
-                artist.textContent = parsed.metadata.artist;
-            } else {
-                artist.remove();
-            }
-
-            const metaDiv = headerClone.querySelector('.song-meta');
-            if (parsed.metadata.key || parsed.metadata.tempo || parsed.metadata.time) {
-                const keySpan = headerClone.querySelector('.song-key');
-                if (parsed.metadata.key) {
-                    keySpan.textContent = `Key: ${parsed.metadata.key}`;
-                } else {
-                    keySpan.remove();
-                }
-
-                const tempoSpan = headerClone.querySelector('.song-tempo');
-                if (parsed.metadata.tempo) {
-                    tempoSpan.textContent = `Tempo: ${parsed.metadata.tempo}`;
-                } else {
-                    tempoSpan.remove();
-                }
-
-                const timeSpan = headerClone.querySelector('.song-time');
-                if (parsed.metadata.time) {
-                    timeSpan.textContent = `Time: ${parsed.metadata.time}`;
-                } else {
-                    timeSpan.remove();
-                }
-            } else {
-                metaDiv.remove();
-            }
-
-            const ccliDiv = headerClone.querySelector('.song-ccli');
-            if (parsed.metadata.ccliSongNumber) {
-                ccliDiv.textContent = `CCLI Song # ${parsed.metadata.ccliSongNumber}`;
-            } else {
-                ccliDiv.remove();
-            }
-
-            fragment.appendChild(headerClone);
-        }
+        // No song header needed (app-header displays it)
 
         // Add sections
         for (let i = 0; i < parsed.sections.length; i++) {
