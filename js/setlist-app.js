@@ -154,6 +154,9 @@ class PageApp {
         // Render the standalone songs page
         await this.renderSongLibraryTab();
 
+        // Set up header event listeners (once)
+        this.setupLibraryHeaderEvents();
+
         // Set up hash change handler for navigation
         this.setupLibraryHashNavigation();
 
@@ -501,21 +504,21 @@ class PageApp {
         this.currentLibraryKey = parsed.metadata.key;
 
         // Update title in header
-        const titleElement = document.getElementById('library-song-title');
-        if (titleElement) {
-            titleElement.textContent = parsed.metadata.title || 'Untitled';
+        const appHeader = document.getElementById('library-app-header');
+        if (appHeader) {
+            appHeader.title = parsed.metadata.title || 'Untitled';
         }
 
         // Show all header controls
-        const editToggle = document.getElementById('library-edit-toggle');
-        const infoButton = document.getElementById('library-info-button');
         const keySelector = document.getElementById('library-key-selector');
         const metaHeader = document.getElementById('library-song-meta-header');
+        const resetButton = document.getElementById('library-reset-button');
+        const fontSizeControls = document.getElementById('library-font-size-controls');
 
-        if (editToggle) editToggle.style.display = 'flex';
-        if (infoButton) infoButton.style.display = 'flex';
         if (keySelector) keySelector.style.display = '';
         if (metaHeader) metaHeader.style.display = 'flex';
+        if (resetButton) resetButton.style.display = 'none'; // Initially hidden
+        if (fontSizeControls) fontSizeControls.style.display = 'none'; // Initially hidden
 
         // Update key selector
         if (keySelector && parsed.metadata.key) {
@@ -553,14 +556,8 @@ class PageApp {
         await customElements.whenDefined('song-section');
         this._initializeSongSections(contentElement);
 
-        // Setup edit mode for library song
-        this.setupLibrarySongEditMode();
-
         // Setup key selector for library
         this.setupLibraryKeySelector(parsed);
-
-        // Setup info button for library
-        this.setupLibraryInfoButton(parsed, song);
 
         // Setup font size controls
         this.setupLibraryFontSizeControls();
@@ -591,29 +588,30 @@ class PageApp {
         }
 
         // Hide all header controls
-        const editToggle = document.getElementById('library-edit-toggle');
-        const infoButton = document.getElementById('library-info-button');
         const keySelector = document.getElementById('library-key-selector');
         const metaHeader = document.getElementById('library-song-meta-header');
         const resetButton = document.getElementById('library-reset-button');
         const fontSizeControls = document.getElementById('library-font-size-controls');
 
-        if (editToggle) editToggle.style.display = 'none';
-        if (infoButton) infoButton.style.display = 'none';
         if (keySelector) keySelector.style.display = 'none';
         if (metaHeader) metaHeader.style.display = 'none';
         if (resetButton) resetButton.style.display = 'none';
         if (fontSizeControls) fontSizeControls.style.display = 'none';
 
         // Restore "Song Library" title
-        const titleElement = document.getElementById('library-song-title');
-        if (titleElement) {
-            titleElement.textContent = 'Song Library';
+        const appHeader = document.getElementById('library-app-header');
+        if (appHeader) {
+            appHeader.title = 'Song Library';
         }
 
         // Clear edit mode state
-        if (editToggle && editToggle.classList.contains('active')) {
-            editToggle.click(); // Exit edit mode if active
+        const isEditMode = document.body.classList.contains('edit-mode');
+        if (isEditMode && appHeader) {
+            appHeader.editMode = false;
+            document.body.classList.remove('edit-mode');
+            document.body.removeAttribute('data-edit-mode');
+            const keySel = document.getElementById('library-key-selector');
+            if (keySel) keySel.editMode = false;
         }
 
         this.currentLibrarySong = null;
@@ -628,15 +626,24 @@ class PageApp {
         this.updateNavigationMenu({ type: 'songs' });
     }
 
-    setupLibrarySongEditMode() {
-        const editToggle = document.getElementById('library-edit-toggle');
-        if (!editToggle) return;
+    setupLibraryHeaderEvents() {
+        const appHeader = document.getElementById('library-app-header');
+        const navMenu = document.getElementById('nav-menu');
+        if (!appHeader) return;
 
-        // Remove old listeners by cloning
-        const newEditToggle = editToggle.cloneNode(true);
-        editToggle.parentNode.replaceChild(newEditToggle, editToggle);
+        // Only set up listeners once
+        if (this._libraryHeaderEventsSetup) return;
+        this._libraryHeaderEventsSetup = true;
 
-        newEditToggle.addEventListener('click', () => {
+        // Listen for nav-menu-click event
+        appHeader.addEventListener('nav-menu-click', () => {
+            if (navMenu) {
+                navMenu.togglePopover();
+            }
+        });
+
+        // Listen for edit-mode-toggle event
+        appHeader.addEventListener('edit-mode-toggle', () => {
             const isEnteringEditMode = !document.body.classList.contains('edit-mode');
             const keySelector = document.getElementById('library-key-selector');
 
@@ -644,7 +651,7 @@ class PageApp {
                 // Enter edit mode
                 document.body.classList.add('edit-mode');
                 document.body.setAttribute('data-edit-mode', '');
-                newEditToggle.classList.add('active');
+                appHeader.editMode = true;
 
                 // Update key selector edit mode
                 if (keySelector) {
@@ -659,7 +666,7 @@ class PageApp {
                 // Exit edit mode - save to global database
                 document.body.classList.remove('edit-mode');
                 document.body.removeAttribute('data-edit-mode');
-                newEditToggle.classList.remove('active');
+                appHeader.editMode = false;
 
                 // Update key selector edit mode
                 if (keySelector) {
@@ -670,6 +677,13 @@ class PageApp {
 
                 // Update all section components
                 this._initializeSongSections();
+            }
+        });
+
+        // Listen for info-click event
+        appHeader.addEventListener('info-click', () => {
+            if (this.currentLibraryParsedSong && this.currentLibrarySong) {
+                this.showLibrarySongInfo(this.currentLibraryParsedSong, this.currentLibrarySong);
             }
         });
     }
@@ -790,17 +804,6 @@ class PageApp {
 
         songContent.appendChild(songDisplay);
         contentElement.appendChild(songContent);
-    }
-
-    setupLibraryInfoButton(parsed, song) {
-        const infoButton = document.getElementById('library-info-button');
-        if (!infoButton) return;
-
-        // Remove old listener by cloning
-        const newInfoButton = infoButton.cloneNode(true);
-        infoButton.parentNode.replaceChild(newInfoButton, infoButton);
-
-        newInfoButton.onclick = () => this.showLibrarySongInfo(parsed, song);
     }
 
     async showLibrarySongInfo(parsed, song) {
