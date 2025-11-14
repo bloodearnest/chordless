@@ -691,6 +691,18 @@ class PageApp {
                 this.showLibrarySongInfo(this.currentLibraryParsedSong, this.currentLibrarySong);
             }
         });
+
+        // Listen for header-expand-toggle event
+        appHeader.addEventListener('header-expand-toggle', (e) => {
+            const { expanded } = e.detail;
+            if (expanded) {
+                document.body.classList.add('header-expanded');
+                document.documentElement.style.setProperty('--header-expanded', '1');
+            } else {
+                document.body.classList.remove('header-expanded');
+                document.documentElement.style.setProperty('--header-expanded', '0');
+            }
+        });
     }
 
     async saveLibrarySongToDatabase() {
@@ -2360,6 +2372,18 @@ class PageApp {
                     navMenu.setTriggerButton(navButton);
                 }
                 navMenu.togglePopover();
+            }
+        });
+
+        // Listen for header-expand-toggle event
+        appHeader.addEventListener('header-expand-toggle', (e) => {
+            const { expanded } = e.detail;
+            if (expanded) {
+                document.body.classList.add('header-expanded');
+                document.documentElement.style.setProperty('--header-expanded', '1');
+            } else {
+                document.body.classList.remove('header-expanded');
+                document.documentElement.style.setProperty('--header-expanded', '0');
             }
         });
     }

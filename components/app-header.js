@@ -18,6 +18,7 @@ import { LitElement, html, css } from 'lit';
  * @fires edit-mode-toggle - When edit toggle button is clicked
  * @fires info-click - When info button is clicked
  * @fires nav-menu-click - When nav menu button is clicked
+ * @fires header-expand-toggle - When header expand toggle is clicked (detail: {expanded: boolean})
  *
  * CSS Parts:
  * @csspart header - The main header element
@@ -173,6 +174,7 @@ export class AppHeader extends LitElement {
 
             .header-row-1 .title {
                 flex: 1;
+                min-width: 0;
             }
 
             /* Row 2: hidden by default */
@@ -181,8 +183,8 @@ export class AppHeader extends LitElement {
             }
 
             /* Always show expand toggle on mobile */
-            .expand-toggle {
-                display: flex;
+            .header-row-1 .expand-toggle {
+                display: flex !important;
             }
 
             /* When expanded: show row 2 */
@@ -229,6 +231,8 @@ export class AppHeader extends LitElement {
             color: var(--header-text, white);
             width: calc(2.5rem * var(--font-scale, 1));
             height: calc(2.5rem * var(--font-scale, 1));
+            min-width: calc(2.5rem * var(--font-scale, 1));
+            min-height: calc(2.5rem * var(--font-scale, 1));
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -237,6 +241,11 @@ export class AppHeader extends LitElement {
             font-size: calc(1.3rem * var(--font-scale, 1));
             font-weight: bold;
             transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .expand-toggle {
+            display: flex;
         }
 
         .icon-button:hover {
@@ -463,17 +472,13 @@ export class AppHeader extends LitElement {
     _handleExpandToggle(e) {
         this.expanded = !this.expanded;
         console.log('[AppHeader] Expanded state:', this.expanded);
-        // Toggle a class on body so main CSS can respond
-        if (this.expanded) {
-            document.body.classList.add('header-expanded');
-            document.documentElement.style.setProperty('--header-expanded', '1');
-            console.log('[AppHeader] Added header-expanded class to body');
-        } else {
-            document.body.classList.remove('header-expanded');
-            document.documentElement.style.setProperty('--header-expanded', '0');
-            console.log('[AppHeader] Removed header-expanded class from body');
-        }
-        console.log('[AppHeader] Body classes:', document.body.className);
+
+        // Emit custom event instead of direct DOM manipulation
+        this.dispatchEvent(new CustomEvent('header-expand-toggle', {
+            detail: { expanded: this.expanded },
+            bubbles: true,
+            composed: true
+        }));
     }
 }
 
