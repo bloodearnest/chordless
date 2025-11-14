@@ -1,7 +1,8 @@
 import { LitElement, html, css } from 'lit';
 import './help-tooltip.js';
-import { normalizePadKey } from '../js/pad-keys.js';
-import { getActivePadSet, getPadCacheUrl, ensurePadKeyCached, isPadKeyCached } from '../js/pad-set-service.js';
+import { getActivePadSet } from '../js/pad-set-service.js';
+import { MetronomeController } from '../js/metronome-controller.js';
+import { PadAudioController } from '../js/pad-audio-controller.js';
 
 /**
  * MediaPlayer Component
@@ -655,11 +656,6 @@ export class MediaPlayer extends LitElement {
         this.bpm = 120;
         this.tempoNote = '1/4'; // Default to quarter notes
         this.timeSignature = '4/4';
-        this._fadingOut = false;
-        this._fadingIn = false;
-        this._audio = null;
-        this._fadeInterval = null;
-        this._fadeDuration = 5000; // 5 seconds
 
         // Load global settings from localStorage
         const savedSettings = localStorage.getItem('setalight-media-settings');
@@ -723,18 +719,18 @@ export class MediaPlayer extends LitElement {
         this._sliderX = 0;
         this._sliderY = 0;
 
-        // Metronome properties
-        this._metronomeInterval = null;
-        this._beatInterval = null; // Stores the calculated beat interval in ms
-        this._metronomeBeat = 0;
+        // Controllers (initialized in connectedCallback)
         this._audioContext = null;
         this._clickGain = null;
-        this._activeOscillators = []; // Track active oscillators for cleanup
+        this._metronomeController = null;
+        this._padController = null;
+
+        // State mirrored from controllers
         this._metronomeRunning = false;
         this._padLoadFailed = false;
         this._isPadLoading = false;
-        this._padLoadingCount = 0;
-        this._boundPadAudioErrorHandler = (event) => this._handlePadAudioError(event);
+        this._fadingIn = false;
+        this._fadingOut = false;
     }
 
     connectedCallback() {
@@ -752,6 +748,15 @@ export class MediaPlayer extends LitElement {
 
     disconnectedCallback() {
         super.disconnectedCallback();
+
+        // Cleanup controllers
+        if (this._metronomeController) {
+            this._metronomeController.cleanup();
+        }
+        if (this._padController) {
+            this._padController.cleanup();
+        }
+
         this._cleanup();
         document.removeEventListener('keydown', this._boundHandleKeydown);
         document.removeEventListener('settings-change', this._boundHandleSettingsChange);
@@ -815,7 +820,7 @@ export class MediaPlayer extends LitElement {
 
         // If we're already playing this song and pads/click are active, refresh playback immediately
         const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId;
-        const padsPlaying = this._padsOn && this._activeSongKey && this._audio && !this._audio.paused;
+        const padsPlaying = this._padsOn && this._activeSongKey && this._padController && this._padController.isPlaying;
         const clickRunning = this._clickOn && this._metronomeRunning;
 
         if (isActiveSong && (padsPlaying || clickRunning)) {
@@ -856,68 +861,32 @@ export class MediaPlayer extends LitElement {
     }
 
     _initAudio() {
-        if (!this._audio) {
-            // Initialize Web Audio API context for pads routing
-            if (!this._audioContext) {
-                this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
+        if (!this._audioContext) {
+            // Initialize Web Audio API context
+            this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
 
-            this._audio = this._createPadAudioElement();
-
-            // Create Web Audio nodes for pad audio
-            this._padSource = this._audioContext.createMediaElementSource(this._audio);
-            this._padGain = this._audioContext.createGain();
-            this._padGain.gain.value = 0; // Start silent
-
-            // Create Web Audio gain node for metronome clicks
+            // Create click gain node for metronome
             this._clickGain = this._audioContext.createGain();
             this._clickGain.gain.value = this._clickVolume;
-            this._clickGain.connect(this._audioContext.destination);
 
-            // Initial routing (will be updated by _updateAudioRouting)
-            this._padSource.connect(this._padGain);
-            this._padGain.connect(this._audioContext.destination);
+            // Initialize controllers
+            this._metronomeController = new MetronomeController(this._audioContext, this._clickGain);
+            this._padController = new PadAudioController(this._audioContext, { fadeDuration: 5000 });
 
-            // Update source if we have a key
+            // Set initial volumes
+            this._padController.setVolume(this._padVolume);
+            this._metronomeController.setVolume(this._clickVolume);
+
+            // Set stereo mode
+            this._updateStereoMode();
+
+            // Load pad if we have a key
             if (this.currentKey) {
-                this._updateAudioSource().catch((error) => {
-                    console.error('[MediaPlayer] Failed to prepare pad source during init:', error);
+                this._padController.loadPad(this.currentKey, this._activePadSet).catch((error) => {
+                    console.error('[MediaPlayer] Failed to load pad during init:', error);
                 });
             }
         }
-    }
-
-    _createPadAudioElement() {
-        const audio = new Audio();
-        audio.loop = true;
-        audio.crossOrigin = 'anonymous';
-        audio.addEventListener('error', this._boundPadAudioErrorHandler);
-        return audio;
-    }
-
-    _handlePadAudioError(event) {
-        const source = event?.target?.currentSrc || event?.target?.src || this._audio?.currentSrc || this._audio?.src;
-        console.warn('[MediaPlayer] Pad audio error:', source || this.currentKey || 'unknown source', event?.error || event);
-        this._padLoadFailed = true;
-        this._fadingIn = false;
-        this._fadingOut = false;
-
-        if (this._padGain) {
-            this._padGain.gain.value = 0;
-        }
-
-        if (event?.target && !event.target.paused) {
-            try {
-                event.target.pause();
-            } catch (err) {
-                console.debug('[MediaPlayer] Unable to pause errored pad audio source:', err);
-            }
-        }
-    }
-
-    _getPadFilenameKey(key) {
-        if (!key) return null;
-        return normalizePadKey(key);
     }
 
     _normalizeTempoNote(value) {
@@ -952,69 +921,27 @@ export class MediaPlayer extends LitElement {
         return '1/4';
     }
 
-    async _resolvePadUrlForKey(key) {
-        if (!key) return null;
-        const padKey = this._getPadFilenameKey(key);
-        if (!padKey) {
-            return null;
-        }
-
-        if (this._activePadSet && this._activePadSet.type === 'drive') {
-            const alreadyCached = await isPadKeyCached(this._activePadSet, padKey);
-            if (!alreadyCached) {
-                this._padLoadingCount++;
-                this._isPadLoading = true;
-                try {
-                    await ensurePadKeyCached(this._activePadSet, padKey);
-                } catch (error) {
-                    console.error('[MediaPlayer] Failed to cache pad audio from Drive:', error);
-                    return null;
-                } finally {
-                    this._padLoadingCount = Math.max(0, this._padLoadingCount - 1);
-                    if (this._padLoadingCount === 0) {
-                        this._isPadLoading = false;
-                    }
-                }
-            }
-            return getPadCacheUrl(this._activePadSet.id, padKey);
-        }
-
-        return `/pads/${encodeURIComponent(padKey)} - WARM - CHURCHFRONT PADS.mp3`;
-    }
-
     async _updateAudioSource() {
-        if (!this._audio || !this.currentKey) return false;
+        if (!this.currentKey) return false;
 
-        const isActiveKey = this._activeSongKey && this.currentKey === this._activeSongKey;
-        const url = await this._resolvePadUrlForKey(this.currentKey);
-        if (!url) {
-            console.warn(`[MediaPlayer] No pad audio available for key "${this.currentKey}"`);
-            this._audio.removeAttribute('src');
-            if (isActiveKey) {
-                this._padLoadFailed = true;
-            }
+        // Ensure audio is initialized
+        this._initAudio();
+
+        if (!this._padController) {
+            console.warn('[MediaPlayer] Cannot load pad: controller not initialized');
             return false;
         }
 
-        console.log('[MediaPlayer] Setting audio source:', url);
-        this._audio.src = url;
-        if (isActiveKey) {
-            this._padLoadFailed = false;
-        }
-        return true;
+        // Load pad using controller
+        const loaded = await this._padController.loadPad(this.currentKey, this._activePadSet);
+        this._padLoadFailed = !loaded;
+        this._isPadLoading = this._padController.isLoading;
+        return loaded;
     }
 
     _cleanup() {
-        if (this._fadeInterval) {
-            clearInterval(this._fadeInterval);
-            this._fadeInterval = null;
-        }
-        if (this._audio) {
-            this._audio.pause();
-            this._audio.removeEventListener('error', this._boundPadAudioErrorHandler);
-            this._audio.src = '';
-            this._audio = null;
-        }
+        // Cleanup is now handled by controllers in disconnectedCallback
+        // This method kept for compatibility
     }
 
     _handleKeydown(event) {
@@ -1034,8 +961,8 @@ export class MediaPlayer extends LitElement {
         console.log('[MediaPlayer] Stop - stopping click and fading out pads');
 
         // Check what's actually playing (panic button semantics: treat existing audio as playing)
-        const padsAvailable = !!this._audio;
-        const padsPlaying = padsAvailable && !this._audio.paused;
+        const padsAvailable = !!this._padController;
+        const padsPlaying = padsAvailable && this._padController.isPlaying;
         const clickPlaying = this._metronomeRunning;
 
         // Stop click immediately if playing (but don't change toggle state)
@@ -1073,56 +1000,47 @@ export class MediaPlayer extends LitElement {
     }
 
 
+    _updateStereoMode() {
+        if (!this._padController) return;
+
+        if (this.stereoSplitEnabled) {
+            this._padController.setStereoMode('left');
+        } else {
+            this._padController.setStereoMode('both');
+        }
+
+        // Click routing - handled manually since it's simpler
+        this._updateClickRouting();
+    }
+
+    _updateClickRouting() {
+        if (!this._audioContext || !this._clickGain) return;
+
+        this._clickGain.disconnect();
+
+        if (this.stereoSplitEnabled) {
+            // Route click to right channel only
+            const splitter = this._audioContext.createChannelSplitter(2);
+            const merger = this._audioContext.createChannelMerger(2);
+
+            this._clickGain.connect(splitter);
+            splitter.connect(merger, 0, 1); // Left input to right output
+            merger.connect(this._audioContext.destination);
+
+            // Store for cleanup
+            this._clickMerger = merger;
+            this._clickSplitter = splitter;
+        } else {
+            // Normal stereo routing
+            this._clickGain.connect(this._audioContext.destination);
+            this._clickMerger = null;
+            this._clickSplitter = null;
+        }
+    }
+
     _updateAudioRouting() {
-        if (!this._audioContext) return;
-
-        // Update pad audio routing
-        if (this._padGain) {
-            this._padGain.disconnect();
-
-            if (this.stereoSplitEnabled) {
-                // Route pads to left channel only
-                const splitter = this._audioContext.createChannelSplitter(2);
-                const merger = this._audioContext.createChannelMerger(2);
-
-                this._padGain.connect(splitter);
-                splitter.connect(merger, 0, 0); // Left input to left output
-                merger.connect(this._audioContext.destination);
-
-                // Store for cleanup
-                this._padMerger = merger;
-                this._padSplitter = splitter;
-            } else {
-                // Normal stereo routing
-                this._padGain.connect(this._audioContext.destination);
-                this._padMerger = null;
-                this._padSplitter = null;
-            }
-        }
-
-        // Update click routing
-        if (this._clickGain) {
-            this._clickGain.disconnect();
-
-            if (this.stereoSplitEnabled) {
-                // Route click to right channel only
-                const splitter = this._audioContext.createChannelSplitter(2);
-                const merger = this._audioContext.createChannelMerger(2);
-
-                this._clickGain.connect(splitter);
-                splitter.connect(merger, 0, 1); // Left input to right output
-                merger.connect(this._audioContext.destination);
-
-                // Store for cleanup
-                this._clickMerger = merger;
-                this._clickSplitter = splitter;
-            } else {
-                // Normal stereo routing
-                this._clickGain.connect(this._audioContext.destination);
-                this._clickMerger = null;
-                this._clickSplitter = null;
-            }
-        }
+        // Legacy method - redirect to new method
+        this._updateStereoMode();
     }
 
     _startMetronome() {
@@ -1130,235 +1048,28 @@ export class MediaPlayer extends LitElement {
         const timeSignature = this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature;
         const tempoNote = this._normalizeTempoNote(this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4');
 
-        if (!bpmValue || !timeSignature) {
-            console.warn('[MediaPlayer] Cannot start metronome: missing BPM or time signature');
-            if (this._metronomeRunning) {
-                this._metronomeRunning = false;
-                this.requestUpdate();
-            }
-            return;
-        }
-
-        // Ensure audio is initialized (this will create _audioContext and _clickGain)
+        // Ensure audio is initialized
         this._initAudio();
 
-        if (!this._audioContext || !this._clickGain) {
-            console.warn('[MediaPlayer] Cannot start metronome: audio context not ready');
-            if (this._metronomeRunning) {
-                this._metronomeRunning = false;
-                this.requestUpdate();
-            }
+        if (!this._metronomeController) {
+            console.warn('[MediaPlayer] Cannot start metronome: controller not initialized');
             return;
         }
 
-        // Resume AudioContext if suspended
-        if (this._audioContext.state === 'suspended') {
-            this._audioContext.resume();
-        }
-
-        // Update gain to current volume setting
-        this._clickGain.gain.value = this._clickVolume;
-
-        const bpm = Number(bpmValue);
-
-        console.log(`[MediaPlayer] Starting metronome at ${bpm} BPM, ${tempoNote} notes, ${timeSignature}`);
-
-        // Parse and log time signature
-        const [beatsPerBar] = timeSignature.split('/').map(Number);
-        console.log(`[MediaPlayer] Time signature parsed: ${timeSignature} -> beatsPerBar: ${beatsPerBar}`);
-
-        // Reset beat counter
-        this._metronomeBeat = 0;
-
-        // Calculate interval based on BPM and note subdivision
-        // First, convert BPM to quarter note tempo based on tempoNote and time signature
-        // The stored BPM represents beats per minute for whatever note value is in tempoNote
-        let quarterNoteBpm = bpm; // Default assumes quarter notes
-
-        // Special case: compound time signatures (6/8, 9/8, 12/8) with default tempo note
-        // In compound time, "plain BPM" (quarter note default) means the dotted quarter note (compound beat)
-        const [beatsPerMeasure, noteValue] = timeSignature.split('/').map(Number);
-        const isCompoundTime = noteValue === 8 && beatsPerMeasure % 3 === 0;
-        console.log(`[MediaPlayer] Compound time check: beatsPerMeasure=${beatsPerMeasure}, noteValue=${noteValue}, isCompoundTime=${isCompoundTime}, tempoNote=${tempoNote}`);
-
-        if (tempoNote === '1/4' && isCompoundTime) {
-            // BPM refers to dotted quarter notes (3 eighths)
-            // Convert to eighth note tempo: bpm × 3
-            // Then convert to quarter note tempo: (bpm × 3) / 2 = bpm × 1.5
-            quarterNoteBpm = bpm * 1.5;
-            console.log(`[MediaPlayer] Applied compound time conversion: ${bpm} -> ${quarterNoteBpm}`);
-        } else if (tempoNote && tempoNote !== '1/4') {
-            const [numerator, denominator] = tempoNote.split('/').map(Number);
-            if (numerator && denominator) {
-                // Convert to quarter note tempo
-                // 1/8 note tempo: multiply by 0.5 (eighth notes are twice as fast as quarters)
-                // 1/16 note tempo: multiply by 0.25
-                // 1/2 note tempo: multiply by 2
-                // Formula: quarterNoteBpm = bpm * (tempoNote / quarterNote)
-                //        = bpm * (numerator/denominator) / (1/4)
-                //        = bpm * (numerator * 4 / denominator)
-                quarterNoteBpm = bpm * (numerator * 4 / denominator);
-            }
-        }
-
-        // Now calculate quarter note interval using the converted BPM
-        const quarterNoteInterval = 60000 / quarterNoteBpm; // milliseconds per quarter note
-
-        // Calculate multiplier based on note subdivision for the actual clicks
-        // We click on the note value from the time signature (e.g., 8th notes in 6/8)
-        // 1/4 = 1.0 (quarter notes)
-        // 1/8 = 0.5 (eighth notes, twice as fast)
-        // 1/16 = 0.25 (sixteenth notes, four times as fast)
-        // 1/2 = 2.0 (half notes, half as fast)
-
-        // For compound time, we click on eighth notes regardless of tempo note
-        let clickNoteValue;
-        if (isCompoundTime) {
-            clickNoteValue = 8; // Always click on eighth notes in compound time
-        } else {
-            // Use the note value from time signature, or tempo note if specified differently
-            clickNoteValue = noteValue;
-        }
-
-        // Convert click note value to multiplier relative to quarter notes
-        const multiplier = (1 / clickNoteValue) * 4; // e.g., 1/8 * 4 = 0.5
-
-        const beatInterval = quarterNoteInterval * multiplier;
-        console.log(`[MediaPlayer] BPM: ${bpm} (${tempoNote}) -> Quarter note BPM: ${quarterNoteBpm.toFixed(1)} -> Clicking on 1/${clickNoteValue} notes -> Click interval: ${beatInterval.toFixed(1)}ms (multiplier: ${multiplier})`);
-
-        // Store the beat interval for the scheduling loop
-        this._beatInterval = beatInterval;
-        this._metronomeRunning = true;
+        // Start the metronome using controller
+        const started = this._metronomeController.start(bpmValue, timeSignature, tempoNote);
+        this._metronomeRunning = started;
         this.requestUpdate();
-
-        // Start the metronome scheduling loop
-        // Play first click immediately, then schedule subsequent clicks
-        this._playClick();
-        this._scheduleNextClick();
-    }
-
-    _scheduleNextClick() {
-        if (!this._beatInterval || !this._metronomeRunning) return;
-
-        // Use setTimeout for the next click
-        // This ensures consistent timing even if _playClick() takes some time to execute
-        this._metronomeInterval = setTimeout(() => {
-            if (!this._metronomeRunning) {
-                return;
-            }
-            this._playClick();
-            this._scheduleNextClick(); // Schedule the next one
-        }, this._beatInterval);
     }
 
     _stopMetronome() {
-        if (!this._metronomeRunning && !this._metronomeInterval) {
+        if (!this._metronomeController) {
             return;
         }
 
-        console.log('[MediaPlayer] Stopping metronome, active oscillators:', this._activeOscillators?.length || 0);
-
-        // Clear timeout and beat interval
-        if (this._metronomeInterval) {
-            clearTimeout(this._metronomeInterval);
-            this._metronomeInterval = null;
-        }
-        this._beatInterval = null;
-
-        // Reset beat counter
-        this._metronomeBeat = 0;
-
-        // Stop all active oscillators immediately
-        if (this._activeOscillators && this._activeOscillators.length > 0) {
-            this._activeOscillators.forEach(oscillator => {
-                try {
-                    oscillator.stop();
-                    oscillator.disconnect();
-                } catch (e) {
-                    // Oscillator may have already stopped
-                    console.log('[MediaPlayer] Error stopping oscillator (may be already stopped):', e.message);
-                }
-            });
-            this._activeOscillators = [];
-        }
-
+        this._metronomeController.stop();
         this._metronomeRunning = false;
         this.requestUpdate();
-
-        console.log('[MediaPlayer] Metronome stopped');
-    }
-
-    _playClick() {
-        if (!this._audioContext) return;
-        if (!this._activeSongTimeSignature) return; // No active song
-
-        // Parse time signature to get beats per bar and note value
-        const timeSignature = this._activeSongTimeSignature;
-        const [beatsPerBar, noteValue] = timeSignature.split('/').map(Number);
-
-        // Determine accent level based on beat position and time signature
-        let clickType = 'light'; // Default: light
-
-        if (this._metronomeBeat === 0) {
-            // First beat is always heavy (downbeat)
-            clickType = 'heavy';
-        } else if (beatsPerBar === 6 && noteValue === 8 && this._metronomeBeat === 3) {
-            // Special case: 6/8 gets medium accent on beat 4 (index 3)
-            // This represents two groups of three eighth notes
-            clickType = 'medium';
-        } else if (beatsPerBar === 12 && noteValue === 8) {
-            // Special case: 12/8 - treat like 4/4 with medium accents every 3 beats
-            // Pattern: Heavy - light - light - Medium - light - light - Medium - light - light - Medium - light - light
-            if (this._metronomeBeat === 3 || this._metronomeBeat === 6 || this._metronomeBeat === 9) {
-                clickType = 'medium';
-            }
-        }
-        // General pattern for everything else:
-        // First beat: heavy
-        // All other beats: light
-        // Works for: 4/4, 3/4, 5/8, 7/8, etc.
-
-        // Create oscillator for click sound
-        const oscillator = this._audioContext.createOscillator();
-        const envelope = this._audioContext.createGain();
-
-        oscillator.connect(envelope);
-        envelope.connect(this._clickGain);
-
-        // Set frequency and gain based on accent type
-        if (clickType === 'heavy') {
-            oscillator.frequency.value = 1000;
-            envelope.gain.value = 2.0;
-        } else if (clickType === 'medium') {
-            oscillator.frequency.value = 900;
-            envelope.gain.value = 1.5;
-        } else { // light
-            oscillator.frequency.value = 800;
-            envelope.gain.value = 1.0;
-        }
-
-        const now = this._audioContext.currentTime;
-        oscillator.start(now);
-
-        // Quick decay envelope for sharp click
-        envelope.gain.setValueAtTime(envelope.gain.value, now);
-        envelope.gain.exponentialRampToValueAtTime(0.01, now + 0.03);
-
-        oscillator.stop(now + 0.03);
-
-        // Track this oscillator for cleanup
-        this._activeOscillators.push(oscillator);
-
-        // Remove from tracking after it stops
-        setTimeout(() => {
-            const index = this._activeOscillators.indexOf(oscillator);
-            if (index > -1) {
-                this._activeOscillators.splice(index, 1);
-            }
-        }, 50);
-
-        // Increment beat counter
-        this._metronomeBeat = (this._metronomeBeat + 1) % beatsPerBar;
     }
 
     async _startSong() {
@@ -1386,7 +1097,7 @@ export class MediaPlayer extends LitElement {
             this._activeSongTimeSignature !== this._currentTimeSignature
         );
 
-        const wasPlayingPads = this._padsOn && oldActiveKey && !this._audio?.paused;
+        const wasPlayingPads = this._padsOn && oldActiveKey && this._padController && this._padController.isPlaying;
         const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning;
 
         console.log('[MediaPlayer] _startSong state check:', {
@@ -1436,11 +1147,7 @@ export class MediaPlayer extends LitElement {
 
             // Restart pads if they're toggled on
             if (this._padsOn) {
-                // Resume playback if paused
-                if (this._audio?.paused) {
-                    await this._audio.play();
-                }
-                // Fade in from current volume
+                // Fade in (controller will handle playback)
                 await this._fadeIn();
             }
 
@@ -1594,75 +1301,16 @@ export class MediaPlayer extends LitElement {
     }
 
     async _crossfadeToNewSong() {
+        if (!this._padController) {
+            console.warn('[MediaPlayer] Cannot crossfade: controller not initialized');
+            return;
+        }
+
         console.log('[MediaPlayer] Crossfading to new song');
 
-        const oldAudio = this._audio;
-        const oldPadGain = this._padGain;
-        const padUrl = await this._resolvePadUrlForKey(this.currentKey);
-        if (!padUrl) {
-            console.warn('[MediaPlayer] Unable to crossfade pads: no pad audio for current key');
-            await this._fadeOut();
-            this._padLoadFailed = true;
-            return;
-        }
-
-        // Create new audio element for the new key
-        this._audio = this._createPadAudioElement();
-
-        // Create new Web Audio nodes
-        const newPadSource = this._audioContext.createMediaElementSource(this._audio);
-        this._padGain = this._audioContext.createGain();
-        this._padGain.gain.value = 0; // Start silent
-
-        // Connect new audio
-        newPadSource.connect(this._padGain);
-        this._updateAudioRouting();
-
-        // Update source to new key
-        this._audio.src = padUrl;
-        this._padLoadFailed = false;
-
-        // Start playing the new audio
-        try {
-            await this._audio.play();
-            this._padsOn = true;
-        } catch (e) {
-            console.error('[MediaPlayer] Failed to start new audio:', e);
-            this._padLoadFailed = true;
-            await this._fadeOutPadGain(oldPadGain, oldAudio);
-            return;
-        }
-
-        // Crossfade: fade out old, fade in new
-        const fadeDuration = 2000; // 2 seconds
-        const fadeSteps = 50;
-        const fadeInterval = fadeDuration / fadeSteps;
-
-        let step = 0;
-        const crossfadeInterval = setInterval(() => {
-            step++;
-            const progress = step / fadeSteps;
-
-            // Fade out old
-            if (oldPadGain) {
-                oldPadGain.gain.value = this._padVolume * (1 - progress);
-            }
-
-            // Fade in new
-            this._padGain.gain.value = this._padVolume * progress;
-
-            if (step >= fadeSteps) {
-                clearInterval(crossfadeInterval);
-
-                // Clean up old audio
-                if (oldAudio) {
-                    oldAudio.pause();
-                    oldAudio.currentTime = 0;
-                }
-
-                console.log('[MediaPlayer] Crossfade complete');
-            }
-        }, fadeInterval);
+        await this._padController.crossfadeTo(this.currentKey, this._activePadSet);
+        this._padLoadFailed = this._padController.loadFailed;
+        this._padsOn = !this._padLoadFailed;
     }
 
     async _togglePlay() {
@@ -1703,310 +1351,39 @@ export class MediaPlayer extends LitElement {
     }
 
     async _fadeIn() {
-        if (!this._audio) {
-            console.error('[MediaPlayer] _fadeIn called but _audio is null!');
+        if (!this._padController) {
+            console.error('[MediaPlayer] Cannot fade in: controller not initialized');
             return;
-        }
-
-        console.log('[MediaPlayer] Fading in, audio src:', this._audio.src);
-
-        // Resume AudioContext if suspended (required for autoplay policies)
-        if (this._audioContext && this._audioContext.state === 'suspended') {
-            console.log('[MediaPlayer] Resuming AudioContext');
-            await this._audioContext.resume();
-        }
-
-        // Clear any existing fade interval
-        if (this._fadeInterval) {
-            clearInterval(this._fadeInterval);
-            this._fadeInterval = null;
         }
 
         this._fadingIn = true;
         this._padsOn = true;
-
-        // Check if audio is already playing (e.g., interrupted from fade-out)
-        const alreadyPlaying = !this._audio.paused;
-        const startVolume = this._padGain.gain.value;
-
-        if (!alreadyPlaying) {
-            // Start playing at volume 0
-            this._padGain.gain.value = 0;
-            try {
-                await this._audio.play();
-            } catch (error) {
-                console.error('[MediaPlayer] Play failed:', error);
-                this._fadingIn = false;
-                this._padLoadFailed = true;
-                return;
-            }
-
-            // Wait for audio to actually start playing
-            // This ensures we don't start fading in before audio has buffered
-            await new Promise((resolve) => {
-                const handlePlaying = () => {
-                    this._audio.removeEventListener('playing', handlePlaying);
-                    resolve();
-                };
-
-                // If already playing, resolve immediately
-                if (!this._audio.paused && this._audio.currentTime > 0) {
-                    resolve();
-                } else {
-                    this._audio.addEventListener('playing', handlePlaying);
-                    // Timeout fallback in case 'playing' event doesn't fire
-                    setTimeout(resolve, 200);
-                }
-            });
-        } else {
-            console.log('[MediaPlayer] Audio already playing at volume', startVolume);
-        }
-
-        // Fade in over _fadeDuration using exponential curve
-        // Start from current volume (may be mid-fade)
-        const currentVolume = this._padGain.gain.value;
-        const volumeRange = this._padVolume - currentVolume;
-        const steps = 60; // 60 steps for smooth fade
-        const stepDuration = this._fadeDuration / steps;
-
-        let currentStep = 0;
-        this._fadeInterval = setInterval(() => {
-            currentStep++;
-            // Use exponential curve: progress^2 for smooth fade-in
-            const progress = currentStep / steps;
-            const newVolume = Math.min(currentVolume + (volumeRange * (progress * progress)), this._padVolume);
-            this._padGain.gain.value = newVolume;
-
-            if (currentStep >= steps || newVolume >= this._padVolume) {
-                clearInterval(this._fadeInterval);
-                this._fadeInterval = null;
-                this._padGain.gain.value = this._padVolume; // Ensure we hit target
-                this._fadingIn = false;
-                console.log('[MediaPlayer] Fade in complete');
-            }
-        }, stepDuration);
+        await this._padController.play();
+        this._fadingIn = false;
     }
 
     async _fadeOut() {
-        if (!this._audio) return;
+        if (!this._padController) return;
 
-        console.log('[MediaPlayer] Fading out');
         this._fadingOut = true;
-
-        // Clear any existing fade interval
-        if (this._fadeInterval) {
-            clearInterval(this._fadeInterval);
-            this._fadeInterval = null;
-        }
-
-        // Fade out over _fadeDuration using exponential curve
-        const steps = 60;
-        const stepDuration = this._fadeDuration / steps;
-        const startVolume = this._padGain.gain.value;
-
-        let currentStep = 0;
-        return new Promise((resolve) => {
-            this._fadeInterval = setInterval(() => {
-                currentStep++;
-                // Use inverse exponential curve: (1-progress)^2 for smooth fade-out
-                const progress = currentStep / steps;
-                const remaining = 1 - progress;
-                const newVolume = Math.max(startVolume * (remaining * remaining), 0);
-                this._padGain.gain.value = newVolume;
-
-                // Complete when we've done all steps or volume is effectively zero
-                if (currentStep >= steps || newVolume < 0.01) {
-                    clearInterval(this._fadeInterval);
-                    this._fadeInterval = null;
-                    this._padGain.gain.value = 0; // Ensure it's actually zero
-                    this._audio.pause();
-                    this._fadingOut = false;
-                    console.log('[MediaPlayer] Fade out complete');
-                    resolve();
-                }
-            }, stepDuration);
-        });
-    }
-
-    _fadeOutPadGain(padGain, audioElement) {
-        if (!padGain || !audioElement) {
-            return Promise.resolve();
-        }
-
-        const steps = 60;
-        const stepDuration = this._fadeDuration / steps;
-        const startVolume = padGain.gain.value;
-
-        return new Promise((resolve) => {
-            let currentStep = 0;
-            const interval = setInterval(() => {
-                currentStep++;
-                const progress = currentStep / steps;
-                const remaining = 1 - progress;
-                const newVolume = Math.max(startVolume * (remaining * remaining), 0);
-                padGain.gain.value = newVolume;
-
-                if (currentStep >= steps || newVolume < 0.01) {
-                    clearInterval(interval);
-                    padGain.gain.value = 0;
-                    try {
-                        audioElement.pause();
-                        audioElement.currentTime = 0;
-                    } catch (err) {
-                        console.debug('[MediaPlayer] Unable to pause old pad audio during fallback fade:', err);
-                    }
-                    resolve();
-                }
-            }, stepDuration);
-        });
+        await this._padController.stop();
+        this._fadingOut = false;
     }
 
     async _crossfadeToNewKey() {
-        console.log('[MediaPlayer] Crossfading to new key:', this.currentKey);
-
-        // Clear any existing fade interval
-        if (this._fadeInterval) {
-            clearInterval(this._fadeInterval);
-            this._fadeInterval = null;
+        if (!this._padController) {
+            console.warn('[MediaPlayer] Cannot crossfade: controller not initialized');
+            return;
         }
 
-        // Set fading state
         this._fadingOut = true;
         this._fadingIn = true;
 
-        const newUrl = await this._resolvePadUrlForKey(this.currentKey);
-        if (!newUrl) {
-            console.warn('[MediaPlayer] Unable to crossfade to new key: no pad audio available');
-            this._fadingOut = false;
-            this._fadingIn = false;
-            this._padLoadFailed = true;
-            return;
-        }
+        await this._padController.crossfadeTo(this.currentKey, this._activePadSet);
+        this._padLoadFailed = this._padController.loadFailed;
 
-        // Create a new Audio element for the new key
-        const newAudio = this._createPadAudioElement();
-        newAudio.src = newUrl;
-        this._padLoadFailed = false;
-
-        // Create Web Audio nodes for new audio
-        const newSource = this._audioContext.createMediaElementSource(newAudio);
-        const newGain = this._audioContext.createGain();
-        newGain.gain.value = 0; // Start silent
-
-        // Connect new audio through gain to destination
-        newSource.connect(newGain);
-        newGain.connect(this._audioContext.destination);
-
-        // Keep reference to old audio and gain
-        const oldAudio = this._audio;
-        const oldGain = this._padGain;
-
-        // Wait for new audio to be loaded enough to play through
-        await new Promise((resolve, reject) => {
-            const handleCanPlayThrough = () => {
-                newAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
-                newAudio.removeEventListener('error', handleError);
-                resolve();
-            };
-            const handleError = (e) => {
-                newAudio.removeEventListener('canplaythrough', handleCanPlayThrough);
-                newAudio.removeEventListener('error', handleError);
-                reject(e);
-            };
-
-            if (newAudio.readyState >= 4) { // HAVE_ENOUGH_DATA
-                resolve();
-            } else {
-                newAudio.addEventListener('canplaythrough', handleCanPlayThrough);
-                newAudio.addEventListener('error', handleError);
-            }
-        });
-
-        console.log('[MediaPlayer] New audio loaded, starting playback');
-
-        // Now start playing the new audio at volume 0
-        try {
-            await newAudio.play();
-        } catch (error) {
-            console.error('[MediaPlayer] Failed to play new audio:', error);
-            this._fadingOut = false;
-            this._fadingIn = false;
-            return;
-        }
-
-        console.log('[MediaPlayer] New audio playing, starting crossfade');
-
-        // Switch to the new audio element and gain
-        this._audio = newAudio;
-        this._padSource = newSource;
-        this._padGain = newGain;
-
-        // Crossfade strategy: 5s fade-out + 5s fade-in with 1s overlap = 9s total
-        // Timeline:
-        // 0-4s: Old fades out only
-        // 4-5s: Both playing (1s overlap)
-        // 5-9s: New fades in only
-        const fadeOutDuration = this._fadeDuration; // 5s
-        const fadeInDuration = this._fadeDuration; // 5s
-        const overlapDuration = 1000; // 1s
-        const totalDuration = fadeOutDuration + fadeInDuration - overlapDuration; // 9s
-
-        const steps = 60;
-        const stepDuration = totalDuration / steps;
-        const oldStartVolume = oldGain.gain.value;
-
-        // Calculate step boundaries
-        const fadeOutSteps = Math.floor((fadeOutDuration / totalDuration) * steps); // ~33 steps for 5s
-        const fadeInStartStep = Math.floor(((fadeOutDuration - overlapDuration) / totalDuration) * steps); // ~27 steps (4s mark)
-
-        let currentStep = 0;
-        this._fadeInterval = setInterval(() => {
-            currentStep++;
-            const totalProgress = currentStep / steps;
-
-            // Fade out old audio over first 5 seconds
-            if (currentStep <= fadeOutSteps) {
-                const fadeOutProgress = currentStep / fadeOutSteps;
-                const remaining = 1 - fadeOutProgress;
-                const oldVolume = Math.max(oldStartVolume * (remaining * remaining), 0);
-                oldGain.gain.value = oldVolume;
-            } else {
-                // Old audio finished fading, stop it
-                if (oldGain.gain.value > 0) {
-                    oldGain.gain.value = 0;
-                    oldAudio.pause();
-                }
-            }
-
-            // Fade in new audio starting at 4 seconds (1s overlap with old)
-            if (currentStep >= fadeInStartStep) {
-                const fadeInProgress = (currentStep - fadeInStartStep) / (steps - fadeInStartStep);
-                const newVolume = Math.min(this._padVolume * (fadeInProgress * fadeInProgress), this._padVolume);
-                newGain.gain.value = newVolume;
-            }
-
-            if (currentStep >= steps) {
-                clearInterval(this._fadeInterval);
-                this._fadeInterval = null;
-
-                // Cleanup old audio
-                oldAudio.pause();
-                oldGain.gain.value = 0;
-                oldGain.disconnect();
-
-                // Ensure new audio is at target volume
-                newGain.gain.value = this._padVolume;
-
-                // Update routing for stereo split if enabled
-                this._updateAudioRouting();
-
-                // Clear fading state
-                this._fadingOut = false;
-                this._fadingIn = false;
-
-                console.log('[MediaPlayer] Crossfade complete (9s)');
-            }
-        }, stepDuration);
+        this._fadingOut = false;
+        this._fadingIn = false;
     }
 
     _getStatusText() {
@@ -2074,18 +1451,17 @@ export class MediaPlayer extends LitElement {
         // Update volume
         if (this._activeVolumeControl === 'pad') {
             this._padVolume = newVolume;
-            // Update current audio gain if playing AND not currently fading
-            // If fading, just update the target - the fade will reach the new target
-            if (this._padGain && this._padsOn && !this._fadingIn && !this._fadingOut) {
-                this._padGain.gain.value = this._padVolume;
+            // Update pad controller volume
+            if (this._padController) {
+                this._padController.setVolume(this._padVolume);
             }
             // Save to localStorage
             localStorage.setItem('setalight-pad-volume', this._padVolume.toString());
         } else if (this._activeVolumeControl === 'click') {
             this._clickVolume = newVolume;
-            // Update metronome gain if active
-            if (this._clickGain) {
-                this._clickGain.gain.value = this._clickVolume;
+            // Update metronome controller volume
+            if (this._metronomeController) {
+                this._metronomeController.setVolume(this._clickVolume);
             }
             // Save to localStorage
             localStorage.setItem('setalight-click-volume', this._clickVolume.toString());
@@ -2098,7 +1474,7 @@ export class MediaPlayer extends LitElement {
     }
 
     render() {
-        const padsPlaying = this._audio && !this._audio.paused;
+        const padsPlaying = this._padController && this._padController.isPlaying;
         const clickPlaying = this._metronomeRunning;
         const isPlaying = padsPlaying || clickPlaying;
         const isDownloading = this._isPadLoading;

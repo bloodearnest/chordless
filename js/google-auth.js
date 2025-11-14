@@ -33,7 +33,7 @@
 const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com';
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile';
 
-const AUTH_PROXY_URL = window.location.hostname === 'localhost'
+const AUTH_PROXY_URL = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
     ? 'http://localhost:8787'
     : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
 

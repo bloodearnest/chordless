@@ -14,11 +14,12 @@ test: test-node test-browser-headless
 # Run Node.js tests
 test-node:
     @echo "Running Node.js tests..."
-    node --test \
-        tests/transpose.test.js \
-        tests/db.test.js \
-        tests/db-usage.test.js \
-        tests/sync-reconciler.test.js
+    node tests/transpose.test.js
+    node tests/db.test.js
+    node tests/db-usage.test.js
+    node tests/sync-reconciler.test.js
+    node tests/metronome-controller.test.js
+    node tests/pad-audio-controller.test.js
 
 # Lint/format JS files (basic syntax checks)
 lint:
