@@ -29,18 +29,8 @@
                         <button class="font-size-btn" id="library-font-size-decrease" aria-label="Decrease font size">A−</button>
                         <button class="font-size-btn" id="library-font-size-increase" aria-label="Increase font size">A+</button>
                     </div>
-                    <!-- Key display/selector -->
-                    <div class="key-display-wrapper" id="library-key-display" style="display: none;">
-                        <label class="meta-label">Key:</label>
-                        <button id="library-key-selector-button" class="key-selector" popovertarget="library-key-selector-popover">
-                            <span id="library-key-selector-value">-</span>
-                        </button>
-                        <div id="library-key-selector-popover" class="key-popover" popover>
-                            <div id="library-key-options-list" class="key-options-list">
-                                <!-- Options populated by JavaScript -->
-                            </div>
-                        </div>
-                    </div>
+                    <!-- Key display/selector component -->
+                    <key-selector id="library-key-selector" label="Key" style="display: none;"></key-selector>
                     <div class="song-meta-compact" id="library-song-meta-header" style="display: none;"></div>
                 </div>
                 <div class="header-right">
@@ -152,6 +142,7 @@
     <!-- Import the components -->
     <script type="module" src="/components/song-card.js"></script>
     <script type="module" src="/components/song-info.js"></script>
+    <script type="module" src="/components/key-selector.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-modal.js"></script>
     <script type="module" src="/components/song-display.js"></script>

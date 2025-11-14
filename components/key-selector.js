@@ -5,6 +5,19 @@ import { LitElement, html, css } from 'lit';
  *
  * Displays the current key and lets the user select a new key with
  * +/- offset indicators and original-key highlighting.
+ *
+ * Uses shadow DOM with encapsulated styles.
+ * Uses native Popover API for the dropdown.
+ *
+ * Properties:
+ * @property {string} label - Label text (default: 'Key')
+ * @property {string} value - Currently selected key
+ * @property {Array<string>} keys - Available keys to select from
+ * @property {string} originalKey - Original key of the song (marked with *)
+ * @property {boolean} editMode - Whether component is in edit mode (affects styling)
+ *
+ * Events:
+ * @fires key-change - When a new key is selected (detail: {value: string})
  */
 export class KeySelector extends LitElement {
     static properties = {
@@ -12,8 +25,123 @@ export class KeySelector extends LitElement {
         value: { type: String },
         keys: { type: Array },
         originalKey: { type: String },
-        open: { type: Boolean, reflect: true }
+        editMode: { type: Boolean }
     };
+
+    static styles = css`
+        :host {
+            display: inline-flex;
+        }
+
+        .key-display-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+
+        .meta-label {
+            opacity: 0.8;
+            font-size: 1.3rem;
+            color: var(--header-text, #fff);
+        }
+
+        .key-selector {
+            background: transparent;
+            color: var(--header-text, #fff);
+            border: 2px solid transparent;
+            border-radius: 6px;
+            padding: 0.3rem 0.5rem;
+            font-size: 1.3rem;
+            cursor: default;
+            transition: all 0.2s;
+            font-family: inherit;
+            min-width: 3rem;
+            text-align: center;
+            pointer-events: none;
+            white-space: nowrap;
+        }
+
+        /* In edit mode, make it look and behave like a button */
+        :host([edit-mode]) .key-selector {
+            background-color: rgba(255, 255, 255, 0.2);
+            border-color: rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            pointer-events: auto;
+        }
+
+        :host([edit-mode]) .key-selector:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+
+        :host([edit-mode]) .key-selector:focus {
+            outline: none;
+            background-color: rgba(255, 255, 255, 0.3);
+            border-color: var(--header-text, #fff);
+        }
+
+        /* Popover container */
+        .key-popover {
+            background-color: var(--header-bg, #2c3e50);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 8px;
+            padding: 0.5rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            max-height: 80vh;
+            overflow-y: auto;
+            margin: 0;
+            inset: unset;
+        }
+
+        .key-popover::backdrop {
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+
+        /* Key options list */
+        .key-options-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+
+        /* Individual key option */
+        .key-option-item {
+            background-color: transparent;
+            color: var(--header-text, #fff);
+            border: none;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            font-size: 1.4rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            font-family: inherit;
+            text-align: left;
+            width: 100%;
+            white-space: nowrap;
+        }
+
+        .key-option-item:hover {
+            background-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .key-option-item.selected {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        .key-option-item .key-name {
+            flex: 0 0 auto;
+        }
+
+        .key-option-item .key-offset {
+            flex: 0 0 auto;
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.5);
+        }
+    `;
 
     constructor() {
         super();
@@ -21,116 +149,68 @@ export class KeySelector extends LitElement {
         this.value = '-';
         this.keys = [];
         this.originalKey = '';
-        this.open = false;
-
-        this._outsideClickHandler = (event) => {
-            if (!this.open) return;
-            if (!this.shadowRoot) return;
-            if (event.composedPath().includes(this.shadowRoot.host)) return;
-            this.open = false;
-        };
+        this.editMode = false;
+        // Generate unique ID for popover
+        this._popoverId = `key-popover-${Math.random().toString(36).substr(2, 9)}`;
     }
 
     connectedCallback() {
         super.connectedCallback();
-        window.addEventListener('click', this._outsideClickHandler, true);
+        // Reflect edit-mode as attribute for CSS selectors
+        this._updateEditModeAttribute();
     }
 
-    disconnectedCallback() {
-        window.removeEventListener('click', this._outsideClickHandler, true);
-        super.disconnectedCallback();
+    updated(changedProperties) {
+        super.updated(changedProperties);
+
+        if (changedProperties.has('editMode')) {
+            this._updateEditModeAttribute();
+        }
+
+        // Setup popover positioning after render
+        if (changedProperties.has('keys') || changedProperties.has('value')) {
+            this._setupPopoverPositioning();
+        }
     }
 
-    static styles = css`
-        :host {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.8rem;
-            position: relative;
-            font-family: var(--font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+    _updateEditModeAttribute() {
+        if (this.editMode) {
+            this.setAttribute('edit-mode', '');
+        } else {
+            this.removeAttribute('edit-mode');
         }
-
-        .meta-label {
-            font-size: 1.2rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: #95a5a6;
-        }
-
-        .key-selector-btn {
-            min-width: 64px;
-            padding: 0.8rem 1.4rem;
-            border-radius: 999px;
-            border: 2px solid transparent;
-            background: rgba(236, 240, 241, 0.4);
-            color: inherit;
-            font-size: 1.4rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s, border-color 0.2s;
-        }
-
-        .key-selector-btn:hover,
-        :host([open]) .key-selector-btn {
-            background: rgba(236, 240, 241, 0.9);
-            border-color: rgba(52, 152, 219, 0.4);
-        }
-
-        .popover {
-            position: absolute;
-            top: calc(100% + 0.8rem);
-            left: 0;
-            width: max-content;
-            min-width: 160px;
-            z-index: 10;
-            background: #ffffff;
-            border-radius: 12px;
-            box-shadow: 0 18px 30px rgba(0, 0, 0, 0.18);
-            padding: 0.6rem;
-            display: none;
-        }
-
-        :host([open]) .popover {
-            display: block;
-        }
-
-        .option {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border: none;
-            background: transparent;
-            color: inherit;
-            font-size: 1.4rem;
-            padding: 0.6rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-        }
-
-        .option:hover,
-        .option.selected {
-            background: rgba(236, 240, 241, 0.7);
-        }
-
-        .key-name {
-            font-weight: 600;
-        }
-
-        .key-offset {
-            font-size: 1.2rem;
-            color: #95a5a6;
-        }
-    `;
-
-    toggleDropdown(event) {
-        event?.stopPropagation();
-        this.open = !this.open;
     }
 
-    handleSelection(key) {
-        this.open = false;
+    _setupPopoverPositioning() {
+        const button = this.shadowRoot.querySelector('.key-selector');
+        const popover = this.shadowRoot.querySelector('.key-popover');
+
+        if (button && popover) {
+            // Position popover when it opens
+            const toggleHandler = (e) => {
+                if (e.newState === 'open') {
+                    const buttonRect = button.getBoundingClientRect();
+                    popover.style.top = `${buttonRect.bottom + 4}px`;
+                    popover.style.left = `${buttonRect.left}px`;
+                }
+            };
+
+            // Remove old listener if exists
+            popover.removeEventListener('toggle', toggleHandler);
+            popover.addEventListener('toggle', toggleHandler);
+        }
+    }
+
+    _handleSelection(key) {
         if (!key || key === this.value) return;
+
+        // Close the popover
+        const popover = this.shadowRoot.querySelector('.key-popover');
+        if (popover) {
+            popover.hidePopover();
+        }
+
+        // Dispatch event
         this.dispatchEvent(new CustomEvent('key-change', {
             detail: { value: key },
             bubbles: true,
@@ -138,25 +218,25 @@ export class KeySelector extends LitElement {
         }));
     }
 
-    renderOptionsList() {
+    _renderOptions() {
         if (!this.keys || this.keys.length === 0) {
-            return html`<div class="option" disabled>No keys</div>`;
+            return html``;
         }
 
         const currentIndex = this.keys.indexOf(this.value);
         return this.keys.map((key, index) => {
-            const offset = currentIndex === -1 ? 0 : currentIndex - index;
-            const offsetText = offset === 0 ? '' : `${offset > 0 ? '+' : '-'}${Math.abs(offset)}`;
-            const label = key === this.originalKey ? `${key}*` : key;
+            const positionOffset = currentIndex === -1 ? 0 : currentIndex - index;
+            const offsetText = positionOffset === 0 ? '' : `${positionOffset > 0 ? '+' : '-'}${Math.abs(positionOffset)}`;
+            const keyText = key === this.originalKey ? `${key}*` : key;
+            const isSelected = key === this.value;
+
             return html`
                 <button
-                    class="option ${key === this.value ? 'selected' : ''}"
-                    @click=${() => this.handleSelection(key)}
+                    class="key-option-item ${isSelected ? 'selected' : ''}"
+                    @click=${() => this._handleSelection(key)}
                     type="button"
-                    role="option"
-                    aria-selected=${key === this.value}
                 >
-                    <span class="key-name">${label}</span>
+                    <span class="key-name">${keyText}</span>
                     <span class="key-offset">${offsetText}</span>
                 </button>
             `;
@@ -166,18 +246,20 @@ export class KeySelector extends LitElement {
     render() {
         const displayValue = this.value || '-';
         return html`
-            ${this.label ? html`<span class="meta-label">${this.label}</span>` : null}
-            <button
-                class="key-selector-btn"
-                @click=${(event) => this.toggleDropdown(event)}
-                aria-haspopup="listbox"
-                aria-expanded=${this.open ? 'true' : 'false'}
-                type="button"
-            >
-                ${displayValue}
-            </button>
-            <div class="popover" role="listbox">
-                ${this.renderOptionsList()}
+            <div class="key-display-wrapper">
+                ${this.label ? html`<label class="meta-label">${this.label}:</label>` : ''}
+                <button
+                    class="key-selector"
+                    popovertarget=${this._popoverId}
+                    type="button"
+                >
+                    <span>${displayValue}</span>
+                </button>
+                <div id=${this._popoverId} class="key-popover" popover>
+                    <div class="key-options-list">
+                        ${this._renderOptions()}
+                    </div>
+                </div>
             </div>
         `;
     }

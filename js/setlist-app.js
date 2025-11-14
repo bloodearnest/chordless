@@ -509,18 +509,17 @@ class PageApp {
         // Show all header controls
         const editToggle = document.getElementById('library-edit-toggle');
         const infoButton = document.getElementById('library-info-button');
-        const keyDisplay = document.getElementById('library-key-display');
+        const keySelector = document.getElementById('library-key-selector');
         const metaHeader = document.getElementById('library-song-meta-header');
 
         if (editToggle) editToggle.style.display = 'flex';
         if (infoButton) infoButton.style.display = 'flex';
-        if (keyDisplay) keyDisplay.style.display = 'flex';
+        if (keySelector) keySelector.style.display = '';
         if (metaHeader) metaHeader.style.display = 'flex';
 
-        // Update key display
-        const keyValue = document.getElementById('library-key-selector-value');
-        if (keyValue) {
-            keyValue.textContent = parsed.metadata.key || '-';
+        // Update key selector
+        if (keySelector && parsed.metadata.key) {
+            this.updateLibraryKeySelector(parsed.metadata.key);
         }
 
         // Update meta display (tempo, time signature)
@@ -594,14 +593,14 @@ class PageApp {
         // Hide all header controls
         const editToggle = document.getElementById('library-edit-toggle');
         const infoButton = document.getElementById('library-info-button');
-        const keyDisplay = document.getElementById('library-key-display');
+        const keySelector = document.getElementById('library-key-selector');
         const metaHeader = document.getElementById('library-song-meta-header');
         const resetButton = document.getElementById('library-reset-button');
         const fontSizeControls = document.getElementById('library-font-size-controls');
 
         if (editToggle) editToggle.style.display = 'none';
         if (infoButton) infoButton.style.display = 'none';
-        if (keyDisplay) keyDisplay.style.display = 'none';
+        if (keySelector) keySelector.style.display = 'none';
         if (metaHeader) metaHeader.style.display = 'none';
         if (resetButton) resetButton.style.display = 'none';
         if (fontSizeControls) fontSizeControls.style.display = 'none';
@@ -639,12 +638,18 @@ class PageApp {
 
         newEditToggle.addEventListener('click', () => {
             const isEnteringEditMode = !document.body.classList.contains('edit-mode');
+            const keySelector = document.getElementById('library-key-selector');
 
             if (isEnteringEditMode) {
                 // Enter edit mode
                 document.body.classList.add('edit-mode');
                 document.body.setAttribute('data-edit-mode', '');
                 newEditToggle.classList.add('active');
+
+                // Update key selector edit mode
+                if (keySelector) {
+                    keySelector.editMode = true;
+                }
 
                 console.log('Entered edit mode - changes will save to global songs database');
 
@@ -655,6 +660,11 @@ class PageApp {
                 document.body.classList.remove('edit-mode');
                 document.body.removeAttribute('data-edit-mode');
                 newEditToggle.classList.remove('active');
+
+                // Update key selector edit mode
+                if (keySelector) {
+                    keySelector.editMode = false;
+                }
 
                 this.saveLibrarySongToDatabase();
 
@@ -701,39 +711,25 @@ class PageApp {
     }
 
     setupLibraryKeySelector(parsed) {
-        const keyValue = document.getElementById('library-key-selector-value');
-        const keyOptionsList = document.getElementById('library-key-options-list');
-        const popover = document.getElementById('library-key-selector-popover');
-        const button = document.getElementById('library-key-selector-button');
+        const keySelector = document.getElementById('library-key-selector');
+        if (!keySelector) return;
 
-        if (!keyValue || !keyOptionsList) return;
+        // Listen for key-change events
+        keySelector.addEventListener('key-change', async (e) => {
+            const newKey = e.detail.value;
+            await this.handleLibraryKeyChange(newKey);
+        });
 
         // Populate key selector with current key
         const currentKey = parsed.metadata.key || this.currentLibraryKey;
         if (currentKey) {
-            this.populateLibraryKeySelector(currentKey);
-        }
-
-        // Set up popover positioning
-        if (button && popover) {
-            const toggleHandler = (e) => {
-                if (e.newState === 'open') {
-                    const buttonRect = button.getBoundingClientRect();
-                    popover.style.top = `${buttonRect.bottom + 4}px`;
-                    popover.style.left = `${buttonRect.left}px`;
-                }
-            };
-
-            // Remove old listener if exists
-            popover.removeEventListener('toggle', toggleHandler);
-            popover.addEventListener('toggle', toggleHandler);
+            this.updateLibraryKeySelector(currentKey);
         }
     }
 
-    populateLibraryKeySelector(selectedKey) {
-        const keyOptionsList = document.getElementById('library-key-options-list');
-        const keySelectorValue = document.getElementById('library-key-selector-value');
-        if (!keyOptionsList || !keySelectorValue) return;
+    updateLibraryKeySelector(selectedKey) {
+        const keySelector = document.getElementById('library-key-selector');
+        if (!keySelector) return;
 
         // Get available keys rotated around the selected key
         const keys = getAvailableKeys(selectedKey);
@@ -741,70 +737,17 @@ class PageApp {
         // Get original key from current song
         const originalKey = this.currentLibraryParsedSong?.metadata?.key;
 
-        // Clear existing options
-        keyOptionsList.textContent = '';
-
-        // Find the index of the current key in the list
-        const currentIndex = keys.indexOf(selectedKey);
-
-        // Add available keys as clickable items with offset indicators
-        keys.forEach((key, index) => {
-            const item = document.createElement('button');
-            item.className = 'key-option-item';
-            if (key === selectedKey) {
-                item.classList.add('selected');
-            }
-
-            // Calculate offset based on position in list
-            const positionOffset = currentIndex - index;
-
-            // Format key name with * suffix if original
-            let keyText = key === originalKey ? `${key}*` : key;
-
-            // Create key name span
-            const keyNameSpan = document.createElement('span');
-            keyNameSpan.className = 'key-name';
-            keyNameSpan.textContent = keyText;
-
-            // Create offset span
-            const offsetSpan = document.createElement('span');
-            offsetSpan.className = 'key-offset';
-            if (positionOffset !== 0) {
-                const sign = positionOffset > 0 ? '+' : '-';
-                offsetSpan.textContent = `${sign}${Math.abs(positionOffset)}`;
-            }
-
-            item.appendChild(keyNameSpan);
-            item.appendChild(offsetSpan);
-
-            // Click handler
-            item.addEventListener('click', async () => {
-                await this.selectLibraryKey(key);
-            });
-
-            keyOptionsList.appendChild(item);
-        });
-
-        // Update button text to show selected key
-        keySelectorValue.textContent = selectedKey;
+        // Update component properties
+        keySelector.value = selectedKey;
+        keySelector.keys = keys;
+        keySelector.originalKey = originalKey;
+        keySelector.editMode = document.body.classList.contains('edit-mode');
     }
 
-    async selectLibraryKey(newKey) {
+    async handleLibraryKeyChange(newKey) {
         if (!newKey || !this.currentLibraryParsedSong) return;
 
         console.log(`Library key changed to: ${newKey}`);
-
-        // Close the popover
-        const popover = document.getElementById('library-key-selector-popover');
-        if (popover) {
-            popover.hidePopover();
-        }
-
-        // Update the displayed key value
-        const keyValueDisplay = document.getElementById('library-key-selector-value');
-        if (keyValueDisplay) {
-            keyValueDisplay.textContent = newKey;
-        }
 
         // Update current key
         this.currentLibraryKey = newKey;
@@ -812,8 +755,8 @@ class PageApp {
         // Re-render the song with transposition
         await this.reRenderLibrarySong(newKey);
 
-        // Repopulate the dropdown with the new key in the middle
-        this.populateLibraryKeySelector(newKey);
+        // Update the key selector with the new key
+        this.updateLibraryKeySelector(newKey);
     }
 
     async reRenderLibrarySong(targetKey) {
@@ -975,15 +918,9 @@ class PageApp {
         // Re-render with original key
         await this.reRenderLibrarySong(this.currentLibraryKey);
 
-        // Update key display
-        const keyValue = document.getElementById('library-key-selector-value');
-        if (keyValue) {
-            keyValue.textContent = this.currentLibraryKey || '-';
-        }
-
         // Update key selector
         if (this.currentLibraryKey) {
-            this.populateLibraryKeySelector(this.currentLibraryKey);
+            this.updateLibraryKeySelector(this.currentLibraryKey);
         }
 
         // Apply font size
@@ -1630,10 +1567,14 @@ class PageApp {
         const isEditMode = document.body.classList.contains('edit-mode');
         if (isEditMode) {
             const appHeader = document.getElementById('app-header');
+            const keySelector = document.getElementById('key-selector');
             document.body.classList.remove('edit-mode');
             document.body.removeAttribute('data-edit-mode');
             if (appHeader) {
                 appHeader.editMode = false;
+            }
+            if (keySelector) {
+                keySelector.editMode = false;
             }
 
             // Update all sections to reflect non-edit mode
@@ -1668,10 +1609,9 @@ class PageApp {
     async updateHeader(song, instant = false) {
         const appHeader = document.getElementById('app-header');
         const metaEl = document.getElementById('song-meta-header');
-        const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
+        const keySelector = document.getElementById('key-selector');
         const resetButton = document.getElementById('reset-button');
         const fontSizeControls = document.querySelector('.font-size-controls');
-        const keySelectorValue = document.getElementById('key-selector-value');
 
         // Determine new title
         let newTitle;
@@ -1697,24 +1637,27 @@ class PageApp {
         if (instant) {
             // Instant update - no animation
             appHeader.setTitleInstant(newTitle);
-            this._updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue);
+            this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
         } else {
             // Animated update - fade out old, swap content, fade in new
             appHeader.title = newTitle;
 
             await this._animateSlottedContent(async () => {
-                this._updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue);
+                this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
             });
         }
     }
 
-    _updateHeaderContent(song, metaEl, keyDisplayWrapper, resetButton, fontSizeControls, keySelectorValue) {
+    _updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls) {
         if (song) {
-            // Update key selector value
+            // Update key selector
             if (song.currentKey) {
-                this.populateKeySelector(song.currentKey);
+                this.updateKeySelector(song.currentKey);
             } else {
-                if (keySelectorValue) keySelectorValue.textContent = '-';
+                if (keySelector) {
+                    keySelector.value = '-';
+                    keySelector.keys = [];
+                }
             }
 
             // Update BPM
@@ -1734,7 +1677,7 @@ class PageApp {
             }
 
             // Show song-specific controls
-            if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'flex';
+            if (keySelector) keySelector.style.display = '';
             if (resetButton) resetButton.style.display = 'block';
             if (fontSizeControls) fontSizeControls.style.display = 'flex';
 
@@ -1742,8 +1685,9 @@ class PageApp {
             this._currentSongForInfo = song;
         } else {
             // Overview - clear key
-            if (keySelectorValue) {
-                keySelectorValue.textContent = '-';
+            if (keySelector) {
+                keySelector.value = '-';
+                keySelector.keys = [];
             }
 
             // Show setlist type in metadata
@@ -1756,7 +1700,7 @@ class PageApp {
             }
 
             // Hide song-specific controls on overview
-            if (keyDisplayWrapper) keyDisplayWrapper.style.display = 'none';
+            if (keySelector) keySelector.style.display = 'none';
             if (resetButton) resetButton.style.display = 'none';
             if (fontSizeControls) fontSizeControls.style.display = 'none';
 
@@ -1842,98 +1786,25 @@ class PageApp {
         // Clear previous content
         modalBody.textContent = '';
 
-        if (!this.currentSetlist) {
-            modalBody.textContent = 'No setlist information available.';
-            modal.show();
-            return;
-        }
-
         modal.show();
 
-        // Create title
-        const title = document.createElement('h2');
-        const formattedDate = this.formatSetlistName(this.currentSetlist.date);
-        title.textContent = this.currentSetlist.name
-            ? `${formattedDate} - ${this.currentSetlist.name}`
-            : formattedDate;
-        modalBody.appendChild(title);
-
-        // Create info grid
-        const infoGrid = document.createElement('div');
-        infoGrid.className = 'modal-info-grid';
-
-        // Helper function to add info items
-        const addInfoItem = (label, value) => {
-            if (!value) return; // Skip empty values
-
-            const item = document.createElement('div');
-            item.className = 'modal-info-item';
-
-            const labelEl = document.createElement('div');
-            labelEl.className = 'modal-info-label';
-            labelEl.textContent = label;
-
-            const valueEl = document.createElement('div');
-            valueEl.className = 'modal-info-value';
-            valueEl.textContent = value;
-
-            item.appendChild(labelEl);
-            item.appendChild(valueEl);
-            infoGrid.appendChild(item);
-        };
-
-        // Add setlist metadata
-        addInfoItem('Date', this.formatSetlistName(this.currentSetlist.date));
-
-        if (this.currentSetlist.time) {
-            addInfoItem('Time', this.currentSetlist.time);
+        // Create or get setlist-info component
+        let setlistInfoEl = modalBody.querySelector('setlist-info');
+        if (!setlistInfoEl) {
+            setlistInfoEl = document.createElement('setlist-info');
+            modalBody.appendChild(setlistInfoEl);
         }
 
-        if (this.currentSetlist.type) {
-            addInfoItem('Type', this.currentSetlist.type);
-        }
+        // Show loading state
+        setlistInfoEl.loading = true;
 
-        if (this.currentSetlist.name) {
-            addInfoItem('Name', this.currentSetlist.name);
-        }
-
+        // Get leader asynchronously
         const leader = await this.getSetlistLeader();
-        if (leader) {
-            addInfoItem('Leader', leader);
-        }
 
-        if (this.currentSetlist.venue) {
-            addInfoItem('Venue', this.currentSetlist.venue);
-        }
-
-        // Add song count
-        const songCount = this.currentSetlist.songs ? this.currentSetlist.songs.length : 0;
-        addInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`);
-
-        // Add timestamps
-        if (this.currentSetlist.createdAt) {
-            const created = new Date(this.currentSetlist.createdAt);
-            addInfoItem('Created', created.toLocaleString());
-        }
-
-        if (this.currentSetlist.updatedAt) {
-            const updated = new Date(this.currentSetlist.updatedAt);
-            addInfoItem('Last Modified', updated.toLocaleString());
-        }
-
-        modalBody.appendChild(infoGrid);
-
-        // Show modal
-        modal.classList.add('active');
-
-        // Close modal handlers
-        const closeBtn = document.getElementById('modal-close');
-        closeBtn.onclick = () => modal.classList.remove('active');
-        modal.onclick = (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-            }
-        };
+        // Update component with data
+        setlistInfoEl.loading = false;
+        setlistInfoEl.setlist = this.currentSetlist;
+        setlistInfoEl.leader = leader;
     }
 
     scrollToSection(sectionId, newIndex, instant = false) {
@@ -2319,6 +2190,12 @@ class PageApp {
                 document.body.setAttribute('data-edit-mode', '');
                 appHeader.editMode = true;
 
+                // Update key selector edit mode
+                const keySelector = document.getElementById('key-selector');
+                if (keySelector) {
+                    keySelector.editMode = true;
+                }
+
                 // Clear inline display:none if it was set during previous exit
                 document.querySelectorAll('.edit-mode-control').forEach(el => {
                     el.style.display = '';
@@ -2346,6 +2223,12 @@ class PageApp {
                 document.body.classList.remove('edit-mode');
                 document.body.removeAttribute('data-edit-mode');
                 appHeader.editMode = false;
+
+                // Update key selector edit mode
+                const keySelector = document.getElementById('key-selector');
+                if (keySelector) {
+                    keySelector.editMode = false;
+                }
 
                 // Remove fade-in classes from edit controls (triggers fade out)
                 document.querySelectorAll('.edit-mode-control').forEach(el => {
@@ -2465,10 +2348,9 @@ class PageApp {
         }
     }
 
-    populateKeySelector(selectedKey) {
-        const keyOptionsList = document.getElementById('key-options-list');
-        const keySelectorValue = document.getElementById('key-selector-value');
-        if (!keyOptionsList || !keySelectorValue) return;
+    updateKeySelector(selectedKey) {
+        const keySelector = document.getElementById('key-selector');
+        if (!keySelector) return;
 
         // Get available keys rotated around the selected key
         const keys = getAvailableKeys(selectedKey);
@@ -2479,105 +2361,36 @@ class PageApp {
             originalKey = this.songs[this.currentSongIndex].originalKey;
         }
 
-        // Clear existing options
-        keyOptionsList.textContent = '';
-
-        // Unicode superscript mapping for smaller offset numbers
-        const toSuperscript = (num) => {
-            const superscripts = {
-                '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴',
-                '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹',
-                '+': '⁺', '-': '⁻'
-            };
-            return String(num).split('').map(c => superscripts[c] || c).join('');
-        };
-
-        // Find the index of the current key in the list
-        const currentIndex = keys.indexOf(selectedKey);
-
-        // Add available keys as clickable items with offset indicators
-        keys.forEach((key, index) => {
-            const item = document.createElement('button');
-            item.className = 'key-option-item';
-            if (key === selectedKey) {
-                item.classList.add('selected');
-            }
-
-            // Calculate offset based on position in list
-            const positionOffset = currentIndex - index;
-
-            // Format key name with * suffix if original
-            let keyText = key === originalKey ? `${key}*` : key;
-
-            // Create key name span
-            const keyNameSpan = document.createElement('span');
-            keyNameSpan.className = 'key-name';
-            keyNameSpan.textContent = keyText;
-
-            // Create offset span
-            const offsetSpan = document.createElement('span');
-            offsetSpan.className = 'key-offset';
-            if (positionOffset !== 0) {
-                const sign = positionOffset > 0 ? '+' : '-';
-                offsetSpan.textContent = `${sign}${Math.abs(positionOffset)}`;
-            }
-
-            item.appendChild(keyNameSpan);
-            item.appendChild(offsetSpan);
-
-            // Click handler
-            item.addEventListener('click', async () => {
-                await this.selectKey(key);
-            });
-
-            keyOptionsList.appendChild(item);
-        });
-
-        // Update button text to show selected key
-        keySelectorValue.textContent = selectedKey;
+        // Update component properties
+        keySelector.value = selectedKey;
+        keySelector.keys = keys;
+        keySelector.originalKey = originalKey;
+        keySelector.editMode = document.body.classList.contains('edit-mode');
     }
 
     setupKeySelector() {
+        const keySelector = document.getElementById('key-selector');
+        if (!keySelector) return;
+
+        // Listen for key-change events
+        keySelector.addEventListener('key-change', async (e) => {
+            const newKey = e.detail.value;
+            await this.handleKeyChange(newKey);
+        });
+
         // Initialize with current song's key
         if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
             const currentKey = this.songs[this.currentSongIndex].currentKey;
             if (currentKey) {
-                this.populateKeySelector(currentKey);
+                this.updateKeySelector(currentKey);
             }
-        }
-
-        // Set up popover positioning
-        const button = document.getElementById('key-selector-button');
-        const popover = document.getElementById('key-selector-popover');
-
-        if (button && popover) {
-            // Position popover when it opens
-            popover.addEventListener('toggle', (e) => {
-                if (e.newState === 'open') {
-                    const buttonRect = button.getBoundingClientRect();
-                    popover.style.top = `${buttonRect.bottom + 4}px`;
-                    popover.style.left = `${buttonRect.left}px`;
-                }
-            });
         }
     }
 
-    async selectKey(newKey) {
+    async handleKeyChange(newKey) {
         if (!newKey || this.currentSongIndex < 0) return;
 
         console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
-
-        // Close the popover
-        const popover = document.getElementById('key-selector-popover');
-        if (popover) {
-            popover.hidePopover();
-        }
-
-        // Update the displayed key value
-        const keyValueDisplay = document.getElementById('key-value-display');
-        if (keyValueDisplay) {
-            keyValueDisplay.textContent = newKey;
-        }
 
         // Update modification in setlist
         this.currentSetlist.songs[this.currentSongIndex].modifications.targetKey = newKey;
@@ -2585,8 +2398,8 @@ class PageApp {
         // Re-render the song with transposition
         await this.reRenderSong(this.currentSongIndex);
 
-        // Repopulate the dropdown with the new key in the middle
-        this.populateKeySelector(newKey);
+        // Update the key selector with the new key
+        this.updateKeySelector(newKey);
 
         // Notify media player so it refreshes tempo/time/key data
         if (this.songs[this.currentSongIndex]) {
@@ -2704,7 +2517,7 @@ class PageApp {
 
         // Update key selector
         if (song.currentKey) {
-            this.populateKeySelector(song.currentKey);
+            this.updateKeySelector(song.currentKey);
         }
 
         // Reapply section states (all back to default)
