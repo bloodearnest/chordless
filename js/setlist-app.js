@@ -9,6 +9,7 @@ import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 import '../components/status-message.js';
 import '../components/song-list.js';
 import '../components/progress-modal.js';
+import '../components/setlist-group.js';
 
 // Configuration constants
 const CONFIG = {
@@ -314,7 +315,22 @@ class PageApp {
 
             // Render grouped setlists (only current year expanded by default)
             for (const year of years) {
-                const yearSection = this.createYearSection(year, groupedByYear[year], year == currentYear);
+                const formattedSetlists = groupedByYear[year].map((setlist) => {
+                    const songCount = Array.isArray(setlist.songs) ? setlist.songs.length : 0;
+                    const baseName = this.formatSetlistName(setlist.date);
+                    const displayName = setlist.name ? `${baseName} - ${setlist.name}` : baseName;
+                    return {
+                        id: setlist.id,
+                        url: `/setlist/${setlist.id}`,
+                        displayName,
+                        songCount
+                    };
+                });
+
+                const yearSection = document.createElement('setlist-group');
+                yearSection.year = year;
+                yearSection.setlists = formattedSetlists;
+                yearSection.expanded = year == currentYear;
                 listContainer.appendChild(yearSection);
             }
         } catch (error) {
@@ -1040,55 +1056,6 @@ class PageApp {
                 playedInKey: appearance.playedInKey,
                 leader: appearance.leader
             }));
-    }
-
-    createYearSection(year, setlists, expanded = false) {
-        const section = document.createElement('div');
-        section.className = 'year-section';
-
-        const header = document.createElement('button');
-        header.className = 'year-header';
-        header.textContent = year;
-        header.addEventListener('click', () => {
-            section.classList.toggle('expanded');
-        });
-
-        const list = document.createElement('div');
-        list.className = 'year-list';
-
-        for (const setlist of setlists) {
-            const link = document.createElement('a');
-            link.href = `/setlist/${setlist.id}`;
-            link.className = 'setlist-button';
-
-            // Format name: use custom name if present, otherwise format date
-            const displayName = setlist.name
-                ? `${this.formatSetlistName(setlist.date)} - ${setlist.name}`
-                : this.formatSetlistName(setlist.date);
-
-            // Create content wrapper with name and song count
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'setlist-name';
-            nameSpan.textContent = displayName;
-
-            const countSpan = document.createElement('span');
-            countSpan.className = 'setlist-song-count';
-            const songCount = setlist.songs ? setlist.songs.length : 0;
-            countSpan.textContent = `${songCount} song${songCount !== 1 ? 's' : ''}`;
-
-            link.appendChild(nameSpan);
-            link.appendChild(countSpan);
-            list.appendChild(link);
-        }
-
-        section.appendChild(header);
-        section.appendChild(list);
-
-        if (expanded) {
-            section.classList.add('expanded');
-        }
-
-        return section;
     }
 
     setupImportButton() {
