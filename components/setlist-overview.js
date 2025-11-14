@@ -41,7 +41,7 @@ export class SetlistOverview extends LitElement {
 
                     <button
                         class="song-card add-song-button"
-                        style=${this.editMode ? '' : 'display: none;'}
+                        ?hidden=${!this.editMode}
                         @click=${this._handleAddSong}
                     >
                         <div class="song-card-info">
