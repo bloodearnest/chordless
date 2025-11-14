@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { LitElement, html, css } from 'lit';
 import './song-section.js';
 
 /**
@@ -17,11 +17,11 @@ export class SongDisplay extends LitElement {
         songIndex: { type: Number }
     };
 
-    // Render into light DOM (no shadow DOM)
-    // This matches the original behavior and keeps CSS working
-    createRenderRoot() {
-        return this;
-    }
+    static styles = css`
+        :host {
+            display: block;
+        }
+    `;
 
     constructor() {
         super();

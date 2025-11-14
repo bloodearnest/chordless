@@ -638,6 +638,11 @@ class PageApp {
         // Listen for nav-menu-click event
         appHeader.addEventListener('nav-menu-click', () => {
             if (navMenu) {
+                // Get the nav button from the app-header component's shadow root
+                const navButton = appHeader.shadowRoot?.querySelector('.nav-menu-button');
+                if (navButton) {
+                    navMenu.setTriggerButton(navButton);
+                }
                 navMenu.togglePopover();
             }
         });
@@ -804,6 +809,18 @@ class PageApp {
 
         songContent.appendChild(songDisplay);
         contentElement.appendChild(songContent);
+
+        // Wait for Lit to render the shadow DOM contents
+        await songDisplay.updateComplete;
+
+        // Wait for song-section elements to be ready before initializing
+        await customElements.whenDefined('song-section');
+
+        // Re-initialize sections with current edit mode state
+        this._initializeSongSections(contentElement);
+
+        // Re-apply font size
+        this.applyLibraryFontSize();
     }
 
     async showLibrarySongInfo(parsed, song) {
@@ -1514,7 +1531,21 @@ class PageApp {
 
     _initializeSongSections(root = document) {
         const isEditMode = document.body.classList.contains('edit-mode');
-        const sections = root.querySelectorAll('song-section');
+
+        // Find all song-section elements, including those inside song-display shadow DOMs
+        const sections = [];
+
+        // First, get any song-sections directly in the root
+        sections.push(...root.querySelectorAll('song-section'));
+
+        // Then, query into song-display shadow roots
+        const songDisplays = root.querySelectorAll('song-display');
+        songDisplays.forEach(songDisplay => {
+            if (songDisplay.shadowRoot) {
+                sections.push(...songDisplay.shadowRoot.querySelectorAll('song-section'));
+            }
+        });
+
         sections.forEach((section) => {
             const songIndex = Number(section.getAttribute('song-index'));
             const sectionIndex = Number(section.getAttribute('section-index'));
@@ -1531,7 +1562,20 @@ class PageApp {
     }
 
     _getSongSectionComponent(songIndex, sectionIndex) {
-        return document.querySelector(`song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`);
+        // First try direct query (in case not in shadow DOM)
+        let section = document.querySelector(`song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`);
+        if (section) return section;
+
+        // Query into song-display shadow roots
+        const songDisplays = document.querySelectorAll('song-display');
+        for (const songDisplay of songDisplays) {
+            if (songDisplay.shadowRoot) {
+                section = songDisplay.shadowRoot.querySelector(`song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`);
+                if (section) return section;
+            }
+        }
+
+        return null;
     }
 
     showOverview(instant = false) {
@@ -3107,6 +3151,9 @@ class PageApp {
                 songDisplay.parsed = song.parsed;
                 songDisplay.songIndex = song.songIndex;
                 songContent.appendChild(songDisplay);
+
+                // Wait for Lit to render the shadow DOM contents
+                await songDisplay.updateComplete;
             }
 
             // Re-apply section states
@@ -3119,6 +3166,8 @@ class PageApp {
                 this.sectionState[songIndex][idx] = state;
             }
 
+            // Wait for song-section elements to be ready before initializing
+            await customElements.whenDefined('song-section');
             this._initializeSongSections(songSection);
 
             // Re-apply font size
