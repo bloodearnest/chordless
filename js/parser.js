@@ -128,44 +128,4 @@ export class ChordProParser {
         return { segments };
     }
 
-    toHTML(parsed, songIndex = 0) {
-        const fragment = document.createDocumentFragment();
-
-        // Global store needed due to custom element upgrade timing
-        const globalLineStore = (typeof window !== 'undefined')
-            ? (window.__songSectionDataStore = window.__songSectionDataStore || new Map())
-            : null;
-
-        for (let i = 0; i < parsed.sections.length; i++) {
-            const section = parsed.sections[i];
-            const sectionElement = document.createElement('song-section');
-            sectionElement.setAttribute('song-index', songIndex);
-            sectionElement.setAttribute('section-index', i);
-            const label = section.label || '';
-            sectionElement.setAttribute('data-label', label);
-            sectionElement.label = label;
-            const clonedLines = this.cloneSectionLines(section.lines);
-
-            // Store in global map and set key for hydration after upgrade
-            if (globalLineStore) {
-                const key = `sec-${songIndex}-${i}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-                globalLineStore.set(key, clonedLines);
-                sectionElement.dataset.linesKey = key;
-            }
-
-            fragment.appendChild(sectionElement);
-        }
-
-        return fragment;
-    }
-
-    cloneSectionLines(lines) {
-        if (!Array.isArray(lines)) {
-            return [];
-        }
-        return lines.map(line => ({
-            segments: (line.segments || []).map(segment => ({ ...segment }))
-        }));
-    }
-
 }

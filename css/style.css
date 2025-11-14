@@ -502,8 +502,8 @@ header {
 /* Mobile header expansion - show all controls when header is expanded */
 @media (max-width: 47.99rem) {
     /* Show normal controls when header is expanded (not in edit mode) */
-    body.header-expanded:not(.edit-mode):not(.library-edit-mode) .key-display-wrapper,
-    body.header-expanded:not(.edit-mode):not(.library-edit-mode) .song-meta-compact {
+    body.header-expanded:not(.edit-mode) .key-display-wrapper,
+    body.header-expanded:not(.edit-mode) .song-meta-compact {
         display: flex !important;
         opacity: 1 !important;
     }
@@ -557,8 +557,7 @@ header {
     }
 
     /* Show edit controls when header is expanded AND in edit mode */
-    body.header-expanded.edit-mode .edit-mode-control,
-    body.header-expanded.library-edit-mode .edit-mode-control {
+    body.header-expanded.edit-mode .edit-mode-control {
         display: flex !important;
         opacity: 1 !important;
     }
@@ -571,14 +570,12 @@ header {
     transition: opacity 0.25s ease-in-out;
 }
 
-body.edit-mode .normal-mode-control,
-body.library-edit-mode .normal-mode-control {
+body.edit-mode .normal-mode-control {
     opacity: 0;
     transition: opacity 0.25s ease-in-out;
 }
 
-body.edit-mode .normal-mode-control.fade-complete,
-body.library-edit-mode .normal-mode-control.fade-complete {
+body.edit-mode .normal-mode-control.fade-complete {
     display: none;
 }
 
@@ -589,23 +586,19 @@ body.library-edit-mode .normal-mode-control.fade-complete {
 }
 
 /* When entering edit mode, show controls but keep opacity 0 initially */
-body.edit-mode .edit-mode-control,
-body.library-edit-mode .edit-mode-control {
+body.edit-mode .edit-mode-control {
     opacity: 0;
     transition: opacity 0.25s ease-in-out;
 }
 
 /* For flex containers (divs, buttons with flex layout) */
 body.edit-mode .font-size-controls,
-body.edit-mode .reset-button,
-body.library-edit-mode .font-size-controls,
-body.library-edit-mode .reset-button {
+body.edit-mode .reset-button {
     display: flex;
 }
 
 /* Fade in when class is added */
-body.edit-mode .edit-mode-control.fade-in,
-body.library-edit-mode .edit-mode-control.fade-in {
+body.edit-mode .edit-mode-control.fade-in {
     opacity: 1;
 }
 
@@ -714,22 +707,19 @@ body.library-edit-mode .edit-mode-control.fade-in {
 }
 
 /* In edit mode, make it look and behave like a button */
-body.edit-mode .key-selector,
-body.library-edit-mode .key-selector {
+body.edit-mode .key-selector {
     background-color: rgba(255, 255, 255, 0.2);
     border-color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
     pointer-events: auto;
 }
 
-body.edit-mode .key-selector:hover,
-body.library-edit-mode .key-selector:hover {
+body.edit-mode .key-selector:hover {
     background-color: rgba(255, 255, 255, 0.3);
     border-color: rgba(255, 255, 255, 0.5);
 }
 
-body.edit-mode .key-selector:focus,
-body.library-edit-mode .key-selector:focus {
+body.edit-mode .key-selector:focus {
     outline: none;
     background-color: rgba(255, 255, 255, 0.3);
     border-color: var(--header-text);

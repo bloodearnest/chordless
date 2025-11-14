@@ -298,38 +298,6 @@ export class SongSection extends LitElement {
         if ((!this.label || !this.label.trim()) && this.dataset?.label) {
             this.label = this.dataset.label;
         }
-        // Hydrate lines from global store (needed due to custom element upgrade timing)
-        this._hydrateLinesFromDataset();
-    }
-
-    /** @inheritdoc */
-    disconnectedCallback() {
-        super.disconnectedCallback();
-        // Clean up global store entry to prevent memory leaks
-        const key = this.dataset?.linesKey;
-        if (key) {
-            const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
-            if (store && store.has(key)) {
-                store.delete(key);
-            }
-        }
-    }
-
-    /**
-     * Hydrate lines from the global data store using the data-lines-key attribute.
-     * This is needed because properties set before custom element upgrade are lost.
-     * @private
-     */
-    _hydrateLinesFromDataset() {
-        if (this._lines && this._lines.length > 0) {
-            return; // Already has lines
-        }
-        const key = this.dataset?.linesKey;
-        const store = typeof window !== 'undefined' ? window.__songSectionDataStore : null;
-        if (key && store && store.has(key)) {
-            const source = store.get(key);
-            this.lines = this._cloneLines(source); // Use setter to trigger content block building
-        }
     }
     
     cloneNode(deep = true) {

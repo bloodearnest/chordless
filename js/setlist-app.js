@@ -541,10 +541,18 @@ class PageApp {
 
         const songContent = document.createElement('div');
         songContent.className = 'song-content library-single-song';
-        // Use toHTML method (returns DocumentFragment, not HTML string)
-        const fragment = this.parser.toHTML(parsed, 0);
-        songContent.appendChild(fragment);
+
+        // Create song-display component
+        const songDisplay = document.createElement('song-display');
+        songDisplay.parsed = parsed;
+        songDisplay.songIndex = 0;
+
+        songContent.appendChild(songDisplay);
         contentElement.appendChild(songContent);
+
+        // Initialize song sections (must happen after DOM is attached)
+        await customElements.whenDefined('song-section');
+        this._initializeSongSections(contentElement);
 
         // Setup edit mode for library song
         this.setupLibrarySongEditMode();
@@ -630,22 +638,28 @@ class PageApp {
         editToggle.parentNode.replaceChild(newEditToggle, editToggle);
 
         newEditToggle.addEventListener('click', () => {
-            const isEnteringEditMode = !document.body.classList.contains('library-edit-mode');
+            const isEnteringEditMode = !document.body.classList.contains('edit-mode');
 
             if (isEnteringEditMode) {
                 // Enter edit mode
-                document.body.classList.add('library-edit-mode');
-                document.body.setAttribute('data-library-edit-mode', '');
+                document.body.classList.add('edit-mode');
+                document.body.setAttribute('data-edit-mode', '');
                 newEditToggle.classList.add('active');
 
-                console.log('Entered library edit mode - changes will save to global songs database');
+                console.log('Entered edit mode - changes will save to global songs database');
+
+                // Update all section components
+                this._initializeSongSections();
             } else {
                 // Exit edit mode - save to global database
-                document.body.classList.remove('library-edit-mode');
-                document.body.removeAttribute('data-library-edit-mode');
+                document.body.classList.remove('edit-mode');
+                document.body.removeAttribute('data-edit-mode');
                 newEditToggle.classList.remove('active');
 
                 this.saveLibrarySongToDatabase();
+
+                // Update all section components
+                this._initializeSongSections();
             }
         });
     }
@@ -657,8 +671,12 @@ class PageApp {
         }
 
         try {
+            // Use SongsDB for song content
+            const { getGlobalSongsDB } = await import('./songs-db.js');
+            const songsDB = await getGlobalSongsDB();
+
             // Get the updated song from database (in case it was modified)
-            const song = await this.db.getSong(this.currentLibrarySongId);
+            const song = await songsDB.getSong(this.currentLibrarySongId);
 
             if (!song) {
                 console.error('Song not found in database');
@@ -669,7 +687,7 @@ class PageApp {
             song.updatedAt = new Date().toISOString();
 
             // Save back to global songs database
-            await this.db.saveSong(song);
+            await songsDB.saveSong(song);
 
             console.log('Saved song to global database:', song.title);
 
@@ -821,8 +839,13 @@ class PageApp {
         contentElement.innerHTML = '';
         const songContent = document.createElement('div');
         songContent.className = 'song-content library-single-song';
-        const fragment = this.parser.toHTML(parsedForRender, 0);
-        songContent.appendChild(fragment);
+
+        // Create song-display component
+        const songDisplay = document.createElement('song-display');
+        songDisplay.parsed = parsedForRender;
+        songDisplay.songIndex = 0;
+
+        songContent.appendChild(songDisplay);
         contentElement.appendChild(songContent);
     }
 
@@ -1254,9 +1277,6 @@ class PageApp {
                     parsed.metadata.tempo = songEntry.modifications.bpmOverride;
                 }
 
-                // Generate HTML
-                const htmlContent = this.parser.toHTML(parsed, songEntry.order);
-
                 // Store original key for transposition reference
                 const originalKey = parsed.metadata.key;
 
@@ -1292,7 +1312,8 @@ class PageApp {
                 // Create song object for runtime
                 songs.push({
                     title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
-                    htmlContent: htmlContent,
+                    parsed: parsed,
+                    songIndex: songEntry.order,
                     metadata: {
                         ...parsed.metadata,
                         tempo: currentBPM,
@@ -1536,11 +1557,13 @@ class PageApp {
             const songElement = document.createElement('div');
             songElement.classList.add('section');
             songElement.id = `song-${index}`;
-            if (song.htmlContent) {
-                const clone = song.htmlContent.cloneNode(true);
+            if (song.parsed) {
+                const songDisplay = document.createElement('song-display');
+                songDisplay.parsed = song.parsed;
+                songDisplay.songIndex = song.songIndex;
                 const songContent = document.createElement('div');
                 songContent.className = 'song-content';
-                songContent.appendChild(clone);
+                songContent.appendChild(songDisplay);
                 songElement.appendChild(songContent);
             }
             fragment.appendChild(songElement);
@@ -3245,11 +3268,9 @@ class PageApp {
             }
         }
 
-        // Re-generate HTML
-        const htmlContent = this.parser.toHTML(parsed, songIndex);
-
         // Update runtime song object
-        song.htmlContent = htmlContent;
+        song.parsed = parsed;
+        song.songIndex = songIndex;
         song.metadata = {
             ...parsed.metadata,
             tempo: currentBPM,
@@ -3266,7 +3287,10 @@ class PageApp {
             const songContent = songSection.querySelector('.song-content');
             if (songContent) {
                 songContent.textContent = '';
-                songContent.appendChild(htmlContent.cloneNode(true));
+                const songDisplay = document.createElement('song-display');
+                songDisplay.parsed = song.parsed;
+                songDisplay.songIndex = song.songIndex;
+                songContent.appendChild(songDisplay);
             }
 
             // Re-apply section states
