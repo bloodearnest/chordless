@@ -6,6 +6,7 @@ import { SetalightDB, formatTempo } from './db.js';
 import { transposeSong, getAvailableKeys } from './transpose.js';
 import { getCurrentOrganisation } from './workspace.js';
 import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
+import '../components/status-message.js';
 
 // Configuration constants
 const CONFIG = {
@@ -213,6 +214,35 @@ class PageApp {
         window.addEventListener('hashchange', this.libraryHashHandler);
     }
 
+    /**
+     * Render a consistent status message in the target container.
+     * @param {HTMLElement} container
+     * @param {{message?: string, detail?: string, state?: string, slotContent?: Node|Node[]}} options
+     */
+    showStatusMessage(container, options = {}) {
+        if (!container) return null;
+        container.textContent = '';
+        const element = this.createStatusMessageElement(options);
+        container.appendChild(element);
+        return element;
+    }
+
+    createStatusMessageElement({ message = '', detail = '', state = 'info', slotContent = null } = {}) {
+        const element = document.createElement('status-message');
+        if (message) element.message = message;
+        if (detail) element.detail = detail;
+        element.state = state;
+
+        const slotItems = Array.isArray(slotContent) ? slotContent : (slotContent ? [slotContent] : []);
+        slotItems.forEach(node => {
+            if (node) {
+                element.appendChild(node);
+            }
+        });
+
+        return element;
+    }
+
     setupTabs() {
         const tabButtons = document.querySelectorAll('.tab-button');
         tabButtons.forEach(button => {
@@ -240,27 +270,20 @@ class PageApp {
 
         try {
             // Show loading message
-            listContainer.textContent = '';
-            const loadingMsg = document.createElement('p');
-            loadingMsg.textContent = 'Loading setlists...';
-            listContainer.appendChild(loadingMsg);
+            this.showStatusMessage(listContainer, {
+                message: 'Loading setlists...',
+                state: 'loading'
+            });
 
             const setlists = await this.db.getAllSetlists();
 
             if (setlists.length === 0) {
-                // No setlists - show import button
-                listContainer.textContent = '';
-
-                const container = document.createElement('div');
-                container.style.textAlign = 'center';
-                container.style.padding = '2rem';
-
-                const message = document.createElement('p');
-                message.style.marginBottom = '2rem';
-                message.textContent = 'No setlists found in database. Go to Settings to import setlists.';
-                container.appendChild(message);
-
-                listContainer.appendChild(container);
+                // No setlists - show import guidance
+                this.showStatusMessage(listContainer, {
+                    message: 'No setlists found in database.',
+                    detail: 'Go to Settings to import setlists.',
+                    state: 'empty'
+                });
                 return;
             }
 
@@ -294,11 +317,10 @@ class PageApp {
             }
         } catch (error) {
             console.error('Error loading setlists:', error);
-            listContainer.textContent = '';
-            const errorMsg = document.createElement('p');
-            errorMsg.className = 'error';
-            errorMsg.textContent = 'Error loading setlists. Please check the console.';
-            listContainer.appendChild(errorMsg);
+            this.showStatusMessage(listContainer, {
+                message: 'Error loading setlists. Please check the console.',
+                state: 'error'
+            });
         }
     }
 
@@ -308,10 +330,10 @@ class PageApp {
 
         try {
             // Show loading message
-            libraryContainer.textContent = '';
-            const loadingMsg = document.createElement('p');
-            loadingMsg.textContent = 'Loading songs...';
-            libraryContainer.appendChild(loadingMsg);
+            this.showStatusMessage(libraryContainer, {
+                message: 'Loading songs...',
+                state: 'loading'
+            });
 
             // Load songs from global songs DB
             const { getGlobalSongsDB } = await import('./songs-db.js');
@@ -321,12 +343,11 @@ class PageApp {
             console.log('Loaded song records:', songRecords.length);
 
             if (songRecords.length === 0) {
-                libraryContainer.textContent = '';
-                const message = document.createElement('p');
-                message.style.textAlign = 'center';
-                message.style.color = '#7f8c8d';
-                message.textContent = 'No songs in library. Import setlists to populate the song library.';
-                libraryContainer.appendChild(message);
+                this.showStatusMessage(libraryContainer, {
+                    message: 'No songs in library.',
+                    detail: 'Import setlists to populate the song library.',
+                    state: 'empty'
+                });
                 return;
             }
 
@@ -376,11 +397,10 @@ class PageApp {
 
         } catch (error) {
             console.error('Error loading songs:', error);
-            libraryContainer.textContent = '';
-            const errorMsg = document.createElement('p');
-            errorMsg.className = 'error';
-            errorMsg.textContent = 'Error loading songs. Please check the console.';
-            libraryContainer.appendChild(errorMsg);
+            this.showStatusMessage(libraryContainer, {
+                message: 'Error loading songs. Please check the console.',
+                state: 'error'
+            });
         }
     }
 
@@ -418,11 +438,10 @@ class PageApp {
         libraryContainer.textContent = '';
 
         if (songs.length === 0) {
-            const message = document.createElement('p');
-            message.style.textAlign = 'center';
-            message.style.color = '#7f8c8d';
-            message.textContent = 'No songs match your search.';
-            libraryContainer.appendChild(message);
+            libraryContainer.appendChild(this.createStatusMessageElement({
+                message: 'No songs match your search.',
+                state: 'empty'
+            }));
             return;
         }
 
@@ -1248,10 +1267,10 @@ class PageApp {
             if (!setlist) {
                 console.error('[ERROR] Setlist not found in IndexedDB:', setlistId);
                 const container = document.querySelector('.song-container');
-                container.textContent = '';
-                const msg = document.createElement('p');
-                msg.textContent = 'Setlist not found.';
-                container.appendChild(msg);
+                this.showStatusMessage(container, {
+                    message: 'Setlist not found.',
+                    state: 'error'
+                });
                 return;
             }
 
@@ -1503,10 +1522,10 @@ class PageApp {
         } catch (error) {
             console.error('Error loading setlist:', error);
             const container = document.querySelector('.song-container');
-            container.textContent = '';
-            const msg = document.createElement('p');
-            msg.textContent = 'Error loading songs. Please check the console.';
-            container.appendChild(msg);
+            this.showStatusMessage(container, {
+                message: 'Error loading songs. Please check the console.',
+                state: 'error'
+            });
             this._setOverviewComponent(null);
         }
     }
@@ -3549,7 +3568,10 @@ class PageApp {
 
         // Load all songs for searching
         try {
-            resultsContainer.innerHTML = '<p style="text-align: center; color: #95a5a6;">Loading songs...</p>';
+            this.showStatusMessage(resultsContainer, {
+                message: 'Loading songs...',
+                state: 'loading'
+            });
 
             // Load songs from global songs DB and parse titles
             const { getGlobalSongsDB } = await import('./songs-db.js');
@@ -3559,12 +3581,11 @@ class PageApp {
             console.log('[Add Song Modal] Loaded song records:', songRecords.length);
 
             if (songRecords.length === 0) {
-                resultsContainer.innerHTML = `
-                    <div style="text-align: center; padding: 2rem; color: #7f8c8d;">
-                        <p style="font-size: 1.3rem; margin-bottom: 1rem;">No songs in library</p>
-                        <p>Import setlists from the Settings page to populate the song library.</p>
-                    </div>
-                `;
+                this.showStatusMessage(resultsContainer, {
+                    message: 'No songs in library',
+                    detail: 'Import setlists from the Settings page to populate the song library.',
+                    state: 'empty'
+                });
                 return;
             }
 
@@ -3613,7 +3634,10 @@ class PageApp {
 
         } catch (error) {
             console.error('[Add Song Modal] Error loading songs:', error);
-            resultsContainer.innerHTML = '<p style="text-align: center; color: #e74c3c;">Error loading songs. Please try again.</p>';
+            this.showStatusMessage(resultsContainer, {
+                message: 'Error loading songs. Please try again.',
+                state: 'error'
+            });
             modal.show();
         }
     }
@@ -3676,11 +3700,10 @@ class PageApp {
 
         if (songs.length === 0) {
             console.log('[Add Song Modal] No songs to display');
-            const message = document.createElement('p');
-            message.style.textAlign = 'center';
-            message.style.color = '#95a5a6';
-            message.textContent = 'No songs match your search.';
-            resultsContainer.appendChild(message);
+            resultsContainer.appendChild(this.createStatusMessageElement({
+                message: 'No songs match your search.',
+                state: 'empty'
+            }));
             return;
         }
 
