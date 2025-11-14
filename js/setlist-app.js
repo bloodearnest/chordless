@@ -8,6 +8,7 @@ import { getCurrentOrganisation } from './workspace.js';
 import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 import '../components/status-message.js';
 import '../components/song-list.js';
+import '../components/progress-modal.js';
 
 // Configuration constants
 const CONFIG = {
@@ -1122,75 +1123,37 @@ class PageApp {
         await importer.init();
 
         // Show progress modal
-        const modal = document.createElement('div');
-        modal.className = 'modal-overlay active';
-
-        const modalContent = document.createElement('div');
-        modalContent.className = 'modal-content';
-
-        const title = document.createElement('h2');
-        title.textContent = 'Importing Setlists';
-        modalContent.appendChild(title);
-
-        const progressContainer = document.createElement('div');
-        progressContainer.id = 'import-progress';
-        progressContainer.style.margin = '2rem 0';
-
-        const message = document.createElement('p');
-        message.id = 'import-message';
-        message.textContent = 'Initializing...';
-        progressContainer.appendChild(message);
-
-        const progressBarContainer = document.createElement('div');
-        progressBarContainer.style.background = '#ecf0f1';
-        progressBarContainer.style.borderRadius = '4px';
-        progressBarContainer.style.height = '20px';
-        progressBarContainer.style.marginTop = '1rem';
-        progressBarContainer.style.overflow = 'hidden';
-
-        const progressBar = document.createElement('div');
-        progressBar.id = 'import-progress-bar';
-        progressBar.style.background = 'var(--button-bg)';
-        progressBar.style.height = '100%';
-        progressBar.style.width = '0%';
-        progressBar.style.transition = 'width 0.3s';
-        progressBarContainer.appendChild(progressBar);
-
-        progressContainer.appendChild(progressBarContainer);
-        modalContent.appendChild(progressContainer);
-        modal.appendChild(modalContent);
-        document.body.appendChild(modal);
-
-        // progressBar and message are already defined above, no need to query DOM
+        const progressModal = document.createElement('progress-modal');
+        progressModal.title = 'Importing Setlists';
+        progressModal.message = 'Initializing...';
+        progressModal.progress = 0;
+        document.body.appendChild(progressModal);
 
         try {
             const result = await importer.importFromServer((progress) => {
-                message.textContent = progress.message;
-
-                if (progress.current && progress.total) {
-                    const percent = (progress.current / progress.total) * 100;
-                    progressBar.style.width = `${percent}%`;
-                }
+                progressModal.updateProgress({
+                    message: progress.message,
+                    current: progress.current,
+                    total: progress.total
+                });
             });
 
             if (result.cancelled) {
-                modal.remove();
+                progressModal.close();
                 return;
             }
 
-            message.textContent = `Import complete! ${result.setlists} setlists, ${result.songs} songs`;
-            progressBar.style.width = '100%';
+            progressModal.setComplete(`Import complete! ${result.setlists} setlists, ${result.songs} songs`);
 
             // Wait a moment then navigate to home to see imported setlists
             setTimeout(() => {
-                modal.remove();
+                progressModal.close();
                 window.location.href = '/';
             }, 1500);
 
         } catch (error) {
             console.error('Import failed:', error);
-            message.textContent = `Import failed: ${error.message}`;
-            message.style.color = '#e74c3c';
+            progressModal.setError(`Import failed: ${error.message}`);
         }
     }
 
