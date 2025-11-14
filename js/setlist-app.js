@@ -7,6 +7,7 @@ import { transposeSong, getAvailableKeys } from './transpose.js';
 import { getCurrentOrganisation } from './workspace.js';
 import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 import '../components/status-message.js';
+import '../components/song-list.js';
 
 // Configuration constants
 const CONFIG = {
@@ -437,32 +438,18 @@ class PageApp {
 
         libraryContainer.textContent = '';
 
-        if (songs.length === 0) {
-            libraryContainer.appendChild(this.createStatusMessageElement({
-                message: 'No songs match your search.',
-                state: 'empty'
-            }));
-            return;
-        }
-
-        for (const song of songs) {
-            // Create the Lit song-card component
-            const songCard = document.createElement('song-card');
-            songCard.song = song;
-            songCard.variant = 'library';
-
-            // Add some bottom margin
-            songCard.style.marginBottom = '1rem';
-
-            // Make card clickable - view and edit song
-            songCard.addEventListener('song-click', (e) => {
-                console.log('Song clicked:', song.title, song);
-                console.log('Event:', e);
+        const songList = document.createElement('song-list');
+        songList.songs = songs;
+        songList.variant = 'library';
+        songList.emptyMessage = 'No songs match your search.';
+        songList.addEventListener('song-select', (event) => {
+            const { song } = event.detail || {};
+            if (song) {
                 this.viewLibrarySong(song);
-            });
+            }
+        });
 
-            libraryContainer.appendChild(songCard);
-        }
+        libraryContainer.appendChild(songList);
         console.log('Finished rendering', songs.length, 'songs');
     }
 
@@ -3698,28 +3685,19 @@ class PageApp {
 
         resultsContainer.textContent = '';
 
-        if (songs.length === 0) {
-            console.log('[Add Song Modal] No songs to display');
-            resultsContainer.appendChild(this.createStatusMessageElement({
-                message: 'No songs match your search.',
-                state: 'empty'
-            }));
-            return;
-        }
-
-        for (const song of songs) {
-            // Create the Lit song-card component
-            const card = document.createElement('song-card');
-            card.song = song;
-            card.variant = 'library';
-
-            // Make card clickable to add to setlist
-            card.addEventListener('song-click', () => {
+        const songList = document.createElement('song-list');
+        songList.songs = songs;
+        songList.variant = 'library';
+        songList.emptyMessage = 'No songs match your search.';
+        songList.dense = true;
+        songList.addEventListener('song-select', (event) => {
+            const { song } = event.detail || {};
+            if (song) {
                 this.addSongToSetlist(song);
-            });
+            }
+        });
 
-            resultsContainer.appendChild(card);
-        }
+        resultsContainer.appendChild(songList);
         console.log('[Add Song Modal] Finished rendering', songs.length, 'songs');
     }
 
