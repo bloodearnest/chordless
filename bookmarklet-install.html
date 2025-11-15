@@ -1,217 +1,265 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Install Setalight CCLI Bookmarklet">
-    <meta name="view-transition" content="same-origin">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Install Setalight CCLI Bookmarklet" />
+    <meta name="view-transition" content="same-origin" />
     <title>Bookmarklet - Setalight</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/style.css" />
     <style>
-        .bookmarklet-link {
-            display: inline-block;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white !important;
-            padding: 12px 24px;
-            border-radius: 8px;
-            text-decoration: none !important;
-            font-weight: 600;
-            margin: 20px 0;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            cursor: move;
-        }
-        .bookmarklet-link:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-        }
-        #bookmarkletCode {
-            width: 100%;
-            height: 150px;
-            font-family: monospace;
-            font-size: 12px;
-            padding: 10px;
-            border: 2px solid #667eea;
-            border-radius: 4px;
-            margin: 10px 0;
-            background: #f8f9fa;
-        }
-        .copy-btn {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-        .copy-btn:hover {
-            background: #218838;
-        }
-        .install-step {
-            margin: 15px 0;
-            padding-left: 2rem;
-        }
-        .step-number {
-            display: inline-block;
-            background: #667eea;
-            color: white;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            text-align: center;
-            line-height: 24px;
-            margin-left: -2rem;
-            margin-right: 0.5rem;
-            font-weight: bold;
-            float: left;
-        }
+      .bookmarklet-link {
+        display: inline-block;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
+        padding: 12px 24px;
+        border-radius: 8px;
+        text-decoration: none !important;
+        font-weight: 600;
+        margin: 20px 0;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        cursor: move;
+      }
+      .bookmarklet-link:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+      }
+      #bookmarkletCode {
+        width: 100%;
+        height: 150px;
+        font-family: monospace;
+        font-size: 12px;
+        padding: 10px;
+        border: 2px solid #667eea;
+        border-radius: 4px;
+        margin: 10px 0;
+        background: #f8f9fa;
+      }
+      .copy-btn {
+        background: #28a745;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .copy-btn:hover {
+        background: #218838;
+      }
+      .install-step {
+        margin: 15px 0;
+        padding-left: 2rem;
+      }
+      .step-number {
+        display: inline-block;
+        background: #667eea;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 24px;
+        margin-left: -2rem;
+        margin-right: 0.5rem;
+        font-weight: bold;
+        float: left;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <div class="app-container">
-        <div id="bookmarklet-view" class="view">
-            <header>
-                <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </button>
-                <h1>Bookmarklet</h1>
-                <div></div>
-            </header>
+      <div id="bookmarklet-view" class="view">
+        <header>
+          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1>Bookmarklet</h1>
+          <div></div>
+        </header>
 
-            <!-- Navigation menu component -->
-            <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
+        <!-- Navigation menu component -->
+        <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
 
-            <main class="home-content">
-                <div class="settings-content">
-                    <h2>CCLI SongSelect Importer</h2>
-                    <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 2rem;">
-                        Import songs from SongSelect directly into your Setalight library with one click using this bookmarklet.
-                    </p>
+        <main class="home-content">
+          <div class="settings-content">
+            <h2>CCLI SongSelect Importer</h2>
+            <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 2rem">
+              Import songs from SongSelect directly into your Setalight library with one click using
+              this bookmarklet.
+            </p>
 
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-bottom: 1rem; color: var(--header-bg);">Install Bookmarklet</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem;">
-                            <strong>Drag this button to your bookmarks bar:</strong>
-                        </p>
-                        <p>
-                            <a href="" id="bookmarkletLink" class="bookmarklet-link">📝 Import to Setalight</a>
-                        </p>
+            <div class="settings-section">
+              <h3 style="font-size: 1.6rem; margin-bottom: 1rem; color: var(--header-bg)">
+                Install Bookmarklet
+              </h3>
+              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem">
+                <strong>Drag this button to your bookmarks bar:</strong>
+              </p>
+              <p>
+                <a href="" id="bookmarkletLink" class="bookmarklet-link">📝 Import to Setalight</a>
+              </p>
 
-                        <h4 style="font-size: 1.4rem; margin-top: 2rem; margin-bottom: 1rem; color: var(--header-bg);">Alternative Method</h4>
-                        <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem;">
-                            If dragging doesn't work, you can manually create a bookmark:
-                        </p>
-                        <ol style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem;">
-                            <li>Create a new bookmark (Ctrl+D or Cmd+D)</li>
-                            <li>Name it "Import to Setalight"</li>
-                            <li>Copy the code below and paste it as the URL</li>
-                        </ol>
-                        <textarea id="bookmarkletCode" readonly></textarea>
-                        <button class="copy-btn" onclick="copyToClipboard()">📋 Copy Code</button>
-                    </div>
+              <h4
+                style="
+                  font-size: 1.4rem;
+                  margin-top: 2rem;
+                  margin-bottom: 1rem;
+                  color: var(--header-bg);
+                "
+              >
+                Alternative Method
+              </h4>
+              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+                If dragging doesn't work, you can manually create a bookmark:
+              </p>
+              <ol style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+                <li>Create a new bookmark (Ctrl+D or Cmd+D)</li>
+                <li>Name it "Import to Setalight"</li>
+                <li>Copy the code below and paste it as the URL</li>
+              </ol>
+              <textarea id="bookmarkletCode" readonly></textarea>
+              <button class="copy-btn" onclick="copyToClipboard()">📋 Copy Code</button>
+            </div>
 
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">Desktop Installation</h3>
-                        <div class="install-step">
-                            <span class="step-number">1</span>
-                            <strong>Show your bookmarks bar:</strong> Press <code>Ctrl+Shift+B</code> (Windows) or <code>Cmd+Shift+B</code> (Mac)
-                        </div>
-                        <div class="install-step">
-                            <span class="step-number">2</span>
-                            <strong>Drag the purple button above</strong> to your bookmarks bar
-                        </div>
-                        <div class="install-step">
-                            <span class="step-number">3</span>
-                            Navigate to a song page on SongSelect
-                        </div>
-                        <div class="install-step">
-                            <span class="step-number">4</span>
-                            Click the bookmark
-                        </div>
-                    </div>
+            <div class="settings-section">
+              <h3
+                style="
+                  font-size: 1.6rem;
+                  margin-top: 3rem;
+                  margin-bottom: 1rem;
+                  color: var(--header-bg);
+                "
+              >
+                Desktop Installation
+              </h3>
+              <div class="install-step">
+                <span class="step-number">1</span>
+                <strong>Show your bookmarks bar:</strong> Press <code>Ctrl+Shift+B</code> (Windows)
+                or <code>Cmd+Shift+B</code> (Mac)
+              </div>
+              <div class="install-step">
+                <span class="step-number">2</span>
+                <strong>Drag the purple button above</strong> to your bookmarks bar
+              </div>
+              <div class="install-step">
+                <span class="step-number">3</span>
+                Navigate to a song page on SongSelect
+              </div>
+              <div class="install-step">
+                <span class="step-number">4</span>
+                Click the bookmark
+              </div>
+            </div>
 
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">Mobile Installation</h3>
-                        <p style="color: #7f8c8d; font-size: 1.1rem;">
-                            Use the "Alternative method" above to copy the code and paste it into a bookmark's URL field.
-                        </p>
-                    </div>
+            <div class="settings-section">
+              <h3
+                style="
+                  font-size: 1.6rem;
+                  margin-top: 3rem;
+                  margin-bottom: 1rem;
+                  color: var(--header-bg);
+                "
+              >
+                Mobile Installation
+              </h3>
+              <p style="color: #7f8c8d; font-size: 1.1rem">
+                Use the "Alternative method" above to copy the code and paste it into a bookmark's
+                URL field.
+              </p>
+            </div>
 
-                    <div class="settings-section">
-                        <h3 style="font-size: 1.6rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--header-bg);">How It Works</h3>
-                        <ol style="color: #7f8c8d; font-size: 1.1rem;">
-                            <li>Navigate to a song on SongSelect</li>
-                            <li>Click the bookmarklet in your bookmarks bar</li>
-                            <li>The bookmarklet fetches the ChordPro file from SongSelect</li>
-                            <li>Opens Setalight (or reuses existing tab) and imports the song</li>
-                            <li>Song is saved to your IndexedDB library</li>
-                        </ol>
-                    </div>
-                </div>
-            </main>
-        </div>
+            <div class="settings-section">
+              <h3
+                style="
+                  font-size: 1.6rem;
+                  margin-top: 3rem;
+                  margin-bottom: 1rem;
+                  color: var(--header-bg);
+                "
+              >
+                How It Works
+              </h3>
+              <ol style="color: #7f8c8d; font-size: 1.1rem">
+                <li>Navigate to a song on SongSelect</li>
+                <li>Click the bookmarklet in your bookmarks bar</li>
+                <li>The bookmarklet fetches the ChordPro file from SongSelect</li>
+                <li>Opens Setalight (or reuses existing tab) and imports the song</li>
+                <li>Song is saved to your IndexedDB library</li>
+              </ol>
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <script>
-        // Set window name so bookmarklet can find and reuse this tab
-        window.name = 'setalight';
+      // Set window name so bookmarklet can find and reuse this tab
+      window.name = 'setalight';
 
-        // The bookmarklet code
-        const bookmarkletCode = `javascript:(async function(){const SETALIGHT_URL='http://localhost:8000';if(!window.location.href.includes('songselect.ccli.com')){alert('Please navigate to a SongSelect song page first.');return;}const urlMatch=window.location.href.match(/\\/songs\\/(\\d+)/);if(!urlMatch){alert('❌ Could not extract song number from URL');return;}const songNumber=urlMatch[1];const title=document.querySelector('h1')?.textContent.trim();let key='C';const keyMatch=document.body.textContent.match(/Key:\\s*([A-G][b#]?)/i);if(keyMatch)key=keyMatch[1];try{const apiUrl=\`https://songselect.ccli.com/api/GetSongChordPro?songNumber=\${songNumber}&key=\${key}&style=Number&columns=1\`;const response=await fetch(apiUrl,{headers:{'accept':'*/*','client-locale':'en-GB'},credentials:'include'});if(!response.ok)throw new Error(\`API failed: \${response.status}\`);const data=await response.json();const chordproText=data.payload;if(!chordproText||chordproText.trim().length===0)throw new Error('Empty ChordPro file. Do you have access?');const metadata={ccliNumber:songNumber,title:title,key:key};let tab=window.open('','setalight');if(!tab||tab.closed){tab=window.open(\`\${SETALIGHT_URL}/import-song\`,'setalight');}else{tab.location.href=\`\${SETALIGHT_URL}/import-song\`;}if(!tab){alert('⚠️ Popup blocked. Please allow popups.');return;}const timeout=setTimeout(()=>alert('⚠️ Timeout waiting for Setalight'),10000);const handler=(event)=>{if(event.origin!==SETALIGHT_URL)return;if(event.data&&event.data.type==='SETALIGHT_READY'){clearTimeout(timeout);window.removeEventListener('message',handler);tab.postMessage({type:'SETALIGHT_IMPORT',data:{chordproText:chordproText,metadata:metadata,source:'songselect'}},SETALIGHT_URL);}};window.addEventListener('message',handler);}catch(error){alert('❌ Import failed: '+error.message);}})();`;
+      // The bookmarklet code
+      const bookmarkletCode = `javascript:(async function(){const SETALIGHT_URL='http://localhost:8000';if(!window.location.href.includes('songselect.ccli.com')){alert('Please navigate to a SongSelect song page first.');return;}const urlMatch=window.location.href.match(/\\/songs\\/(\\d+)/);if(!urlMatch){alert('❌ Could not extract song number from URL');return;}const songNumber=urlMatch[1];const title=document.querySelector('h1')?.textContent.trim();let key='C';const keyMatch=document.body.textContent.match(/Key:\\s*([A-G][b#]?)/i);if(keyMatch)key=keyMatch[1];try{const apiUrl=\`https://songselect.ccli.com/api/GetSongChordPro?songNumber=\${songNumber}&key=\${key}&style=Number&columns=1\`;const response=await fetch(apiUrl,{headers:{'accept':'*/*','client-locale':'en-GB'},credentials:'include'});if(!response.ok)throw new Error(\`API failed: \${response.status}\`);const data=await response.json();const chordproText=data.payload;if(!chordproText||chordproText.trim().length===0)throw new Error('Empty ChordPro file. Do you have access?');const metadata={ccliNumber:songNumber,title:title,key:key};let tab=window.open('','setalight');if(!tab||tab.closed){tab=window.open(\`\${SETALIGHT_URL}/import-song\`,'setalight');}else{tab.location.href=\`\${SETALIGHT_URL}/import-song\`;}if(!tab){alert('⚠️ Popup blocked. Please allow popups.');return;}const timeout=setTimeout(()=>alert('⚠️ Timeout waiting for Setalight'),10000);const handler=(event)=>{if(event.origin!==SETALIGHT_URL)return;if(event.data&&event.data.type==='SETALIGHT_READY'){clearTimeout(timeout);window.removeEventListener('message',handler);tab.postMessage({type:'SETALIGHT_IMPORT',data:{chordproText:chordproText,metadata:metadata,source:'songselect'}},SETALIGHT_URL);}};window.addEventListener('message',handler);}catch(error){alert('❌ Import failed: '+error.message);}})();`;
 
-        // Set the href and textarea
-        document.getElementById('bookmarkletLink').href = bookmarkletCode;
-        document.getElementById('bookmarkletCode').value = bookmarkletCode;
+      // Set the href and textarea
+      document.getElementById('bookmarkletLink').href = bookmarkletCode;
+      document.getElementById('bookmarkletCode').value = bookmarkletCode;
 
-        // Copy function
-        function copyToClipboard() {
-            const textarea = document.getElementById('bookmarkletCode');
-            textarea.select();
-            document.execCommand('copy');
-            alert('✅ Copied to clipboard! Now paste this as the URL when creating a bookmark.');
+      // Copy function
+      function copyToClipboard() {
+        const textarea = document.getElementById('bookmarkletCode');
+        textarea.select();
+        document.execCommand('copy');
+        alert('✅ Copied to clipboard! Now paste this as the URL when creating a bookmark.');
+      }
+
+      // Initialize nav menu button - wait for custom element to be defined
+      customElements.whenDefined('nav-menu').then(() => {
+        const navMenuButton = document.getElementById('nav-menu-button');
+        const navMenu = document.getElementById('nav-menu');
+
+        if (navMenuButton && navMenu) {
+          // Set the trigger button for positioning
+          navMenu.setTriggerButton(navMenuButton);
+
+          navMenuButton.addEventListener('click', () => {
+            navMenu.togglePopover();
+          });
+
+          // Handle back button click from nav-menu component
+          navMenu.addEventListener('back-click', () => {
+            window.history.back();
+          });
         }
-
-        // Initialize nav menu button - wait for custom element to be defined
-        customElements.whenDefined('nav-menu').then(() => {
-            const navMenuButton = document.getElementById('nav-menu-button');
-            const navMenu = document.getElementById('nav-menu');
-
-            if (navMenuButton && navMenu) {
-                // Set the trigger button for positioning
-                navMenu.setTriggerButton(navMenuButton);
-
-                navMenuButton.addEventListener('click', () => {
-                    navMenu.togglePopover();
-                });
-
-                // Handle back button click from nav-menu component
-                navMenu.addEventListener('back-click', () => {
-                    window.history.back();
-                });
-            }
-        });
+      });
     </script>
     <!-- Import the nav-menu component -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
-</body>
+  </body>
 </html>

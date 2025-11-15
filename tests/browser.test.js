@@ -59,7 +59,9 @@ test.describe('Service Worker Tests', () => {
       console.log('Service Worker status:', statusText);
 
       // If SW not registered, try to register it
-      const hasRegisterButton = await page.locator('button:text("Register Service Worker")').count();
+      const hasRegisterButton = await page
+        .locator('button:text("Register Service Worker")')
+        .count();
       if (hasRegisterButton > 0) {
         console.log('Service Worker not registered, registering now...');
         await page.click('button:text("Register Service Worker")');

@@ -1,154 +1,183 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Setlist arrangement for worship songs">
-    <meta name="view-transition" content="same-origin">
-    <link rel="manifest" href="/manifest.webmanifest">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="description" content="Setlist arrangement for worship songs" />
+    <meta name="view-transition" content="same-origin" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Setalight</title>
-    <link rel="stylesheet" href="css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
     <div class="app-container">
-        <div id="home-view" class="view">
-            <header>
-                <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </button>
-                <h1 id="page-title">Setalight</h1>
-                <button class="create-setlist-button" id="create-setlist-button" aria-label="Create new setlist">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="12" y1="5" x2="12" y2="19"></line>
-                        <line x1="5" y1="12" x2="19" y2="12"></line>
-                    </svg>
-                </button>
-            </header>
+      <div id="home-view" class="view">
+        <header>
+          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1 id="page-title">Setalight</h1>
+          <button
+            class="create-setlist-button"
+            id="create-setlist-button"
+            aria-label="Create new setlist"
+          >
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+          </button>
+        </header>
 
-            <!-- Navigation menu component -->
-            <nav-menu id="nav-menu"></nav-menu>
+        <!-- Navigation menu component -->
+        <nav-menu id="nav-menu"></nav-menu>
 
-            <main class="home-content">
-                <div id="setlist-list" class="setlist-list">
-                    <p>Loading setlists...</p>
-                </div>
-            </main>
-        </div>
+        <main class="home-content">
+          <div id="setlist-list" class="setlist-list">
+            <p>Loading setlists...</p>
+          </div>
+        </main>
+      </div>
 
-        <!-- Create Setlist Modal -->
-        <app-modal id="create-setlist-modal" heading="Create New Setlist">
-            <form id="create-setlist-form">
-                <div class="form-field">
-                    <label for="setlist-date">Date</label>
-                    <input type="date" id="setlist-date" name="date" required>
-                </div>
-                <div class="form-field">
-                    <label for="setlist-time">Time</label>
-                    <input type="time" id="setlist-time" name="time" value="10:30" required>
-                </div>
-                <div class="form-field">
-                    <label for="setlist-type">Type</label>
-                    <select id="setlist-type" name="type" required>
-                        <option value="Church Service">Church Service</option>
-                        <option value="Prayer Meeting">Prayer Meeting</option>
-                        <option value="Event">Event</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div class="form-field">
-                    <label for="setlist-name">Name (optional)</label>
-                    <input type="text" id="setlist-name" name="name" placeholder="e.g. Youth Service, Christmas Special">
-                </div>
-                <div class="form-field">
-                    <label for="setlist-leader">Leader (optional)</label>
-                    <input type="text" id="setlist-leader" name="leader" placeholder="e.g. John Smith">
-                </div>
-                <div slot="actions" class="modal-actions">
-                    <button type="button" class="modal-btn modal-btn-cancel" id="create-cancel">Cancel</button>
-                    <button type="submit" class="modal-btn modal-btn-primary">Create Setlist</button>
-                </div>
-            </form>
-        </app-modal>
+      <!-- Create Setlist Modal -->
+      <app-modal id="create-setlist-modal" heading="Create New Setlist">
+        <form id="create-setlist-form">
+          <div class="form-field">
+            <label for="setlist-date">Date</label>
+            <input type="date" id="setlist-date" name="date" required />
+          </div>
+          <div class="form-field">
+            <label for="setlist-time">Time</label>
+            <input type="time" id="setlist-time" name="time" value="10:30" required />
+          </div>
+          <div class="form-field">
+            <label for="setlist-type">Type</label>
+            <select id="setlist-type" name="type" required>
+              <option value="Church Service">Church Service</option>
+              <option value="Prayer Meeting">Prayer Meeting</option>
+              <option value="Event">Event</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="setlist-name">Name (optional)</label>
+            <input
+              type="text"
+              id="setlist-name"
+              name="name"
+              placeholder="e.g. Youth Service, Christmas Special"
+            />
+          </div>
+          <div class="form-field">
+            <label for="setlist-leader">Leader (optional)</label>
+            <input type="text" id="setlist-leader" name="leader" placeholder="e.g. John Smith" />
+          </div>
+          <div slot="actions" class="modal-actions">
+            <button type="button" class="modal-btn modal-btn-cancel" id="create-cancel">
+              Cancel
+            </button>
+            <button type="submit" class="modal-btn modal-btn-primary">Create Setlist</button>
+          </div>
+        </form>
+      </app-modal>
     </div>
 
     <!-- Template for setlist item -->
     <template id="setlist-item-template">
-        <div class="setlist-item">
-            <div class="setlist-date"></div>
-            <div class="setlist-name"></div>
-            <div class="setlist-song-count"></div>
-        </div>
+      <div class="setlist-item">
+        <div class="setlist-date"></div>
+        <div class="setlist-name"></div>
+        <div class="setlist-song-count"></div>
+      </div>
     </template>
 
     <!-- Template for year section -->
     <template id="year-section-template">
-        <div class="year-section">
-            <button class="year-header"></button>
-            <div class="year-list"></div>
-        </div>
+      <div class="year-section">
+        <button class="year-header"></button>
+        <div class="year-list"></div>
+      </div>
     </template>
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <script>
-        // Set window name so bookmarklet can find and reuse this tab
-        window.name = 'setalight';
+      // Set window name so bookmarklet can find and reuse this tab
+      window.name = 'setalight';
 
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js', { type: 'module' })
-                .then(registration => {
-                    console.log('Service Worker registered:', registration);
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/service-worker.js', { type: 'module' })
+          .then(registration => {
+            console.log('Service Worker registered:', registration);
 
-                    // If no controller, this is first install - reload once to activate
-                    if (!navigator.serviceWorker.controller) {
-                        console.log('First install - reloading page to activate Service Worker');
-                        // Set flag to avoid reload loop
-                        if (!sessionStorage.getItem('sw-first-load')) {
-                            sessionStorage.setItem('sw-first-load', '1');
-                            window.location.reload();
-                        }
-                    } else {
-                        console.log('Service Worker is active and controlling page');
-                        // Clear the first load flag since we have a controller now
-                        sessionStorage.removeItem('sw-first-load');
-                    }
-                })
-                .catch(error => {
-                    console.error('Service Worker registration failed:', error);
-                });
-        }
+            // If no controller, this is first install - reload once to activate
+            if (!navigator.serviceWorker.controller) {
+              console.log('First install - reloading page to activate Service Worker');
+              // Set flag to avoid reload loop
+              if (!sessionStorage.getItem('sw-first-load')) {
+                sessionStorage.setItem('sw-first-load', '1');
+                window.location.reload();
+              }
+            } else {
+              console.log('Service Worker is active and controlling page');
+              // Clear the first load flag since we have a controller now
+              sessionStorage.removeItem('sw-first-load');
+            }
+          })
+          .catch(error => {
+            console.error('Service Worker registration failed:', error);
+          });
+      }
     </script>
 
     <script type="module">
-        // Initialize theme manager (loads saved preferences automatically)
-        import '/js/theme-manager.js';
+      // Initialize theme manager (loads saved preferences automatically)
+      import '/js/theme-manager.js';
 
-        // Update page title with church name
-        import { getCurrentOrganisation } from '/js/workspace.js';
+      // Update page title with church name
+      import { getCurrentOrganisation } from '/js/workspace.js';
 
-        const churchName = getCurrentOrganisation();
-        const titleElement = document.getElementById('page-title');
-        if (titleElement) {
-            titleElement.textContent = `Setlists - ${churchName}`;
-        }
+      const churchName = getCurrentOrganisation();
+      const titleElement = document.getElementById('page-title');
+      if (titleElement) {
+        titleElement.textContent = `Setlists - ${churchName}`;
+      }
     </script>
 
     <!-- Import the components -->
@@ -156,5 +185,5 @@
     <script type="module" src="/components/app-modal.js"></script>
     <script type="module" src="js/create-setlist.js"></script>
     <script type="module" src="js/setlist-app.js"></script>
-</body>
+  </body>
 </html>

@@ -1,524 +1,554 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Components Test - Setalight</title>
-    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/style.css" />
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <style>
-        /* Test page specific styles only */
-        body {
-            overflow: auto;
-            padding: 2rem;
-            background: #f5f7fa;
-        }
+      /* Test page specific styles only */
+      body {
+        overflow: auto;
+        padding: 2rem;
+        background: #f5f7fa;
+      }
 
-        h1 {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
-            color: #3498db;
-        }
+      h1 {
+        font-size: 2.5rem;
+        margin-bottom: 2rem;
+        color: #3498db;
+      }
 
-        h2 {
-            font-size: 1.8rem;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-            color: #2c3e50;
-            border-bottom: 2px solid #ecf0f1;
-            padding-bottom: 0.5rem;
-        }
+      h2 {
+        font-size: 1.8rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        color: #2c3e50;
+        border-bottom: 2px solid #ecf0f1;
+        padding-bottom: 0.5rem;
+      }
 
-        h3 {
-            font-size: 1.5rem;
-            margin-top: 2rem;
-            margin-bottom: 1rem;
-        }
+      h3 {
+        font-size: 1.5rem;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+      }
 
-        .test-section {
-            background: white;
-            padding: 2rem;
-            border-radius: 8px;
-            margin-bottom: 2rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
+      .test-section {
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        margin-bottom: 2rem;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
 
-        .test-description {
-            color: #7f8c8d;
-            font-size: 1.2rem;
-            margin-bottom: 1.5rem;
-            font-style: italic;
-        }
+      .test-description {
+        color: #7f8c8d;
+        font-size: 1.2rem;
+        margin-bottom: 1.5rem;
+        font-style: italic;
+      }
 
-        .test-list {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            max-width: 800px;
-        }
+      .test-list {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        max-width: 800px;
+      }
 
-        .test-label {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #7f8c8d;
-            margin-bottom: 0.5rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
+      .test-label {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #7f8c8d;
+        margin-bottom: 0.5rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
 
-        .mode-toggle {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            align-items: center;
-        }
+      .mode-toggle {
+        display: flex;
+        gap: 1rem;
+        margin-bottom: 2rem;
+        align-items: center;
+      }
 
-        .mode-toggle button {
-            padding: 0.8rem 1.5rem;
-            font-size: 1.2rem;
-            border: 2px solid #3498db;
-            background: white;
-            color: #3498db;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
+      .mode-toggle button {
+        padding: 0.8rem 1.5rem;
+        font-size: 1.2rem;
+        border: 2px solid #3498db;
+        background: white;
+        color: #3498db;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
 
-        .mode-toggle button.active {
-            background: #3498db;
-            color: white;
-        }
+      .mode-toggle button.active {
+        background: #3498db;
+        color: white;
+      }
 
-        .mode-toggle button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
-        }
+      .mode-toggle button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
+      }
 
-        /* Modal styles */
-        .modal-overlay {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
+      /* Modal styles */
+      .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+      }
 
-        .modal-overlay.active {
-            display: flex;
-        }
+      .modal-overlay.active {
+        display: flex;
+      }
 
-        .modal-content {
-            background: white;
-            border-radius: 12px;
-            padding: 2rem;
-            max-width: 500px;
-            width: 90%;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
+      .modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem;
+        max-width: 500px;
+        width: 90%;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
 
-        .modal-content h2 {
-            margin-top: 0;
-            margin-bottom: 1rem;
-            font-size: 1.8rem;
-            color: #e74c3c;
-        }
+      .modal-content h2 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.8rem;
+        color: #e74c3c;
+      }
 
-        .modal-content p {
-            margin-bottom: 2rem;
-            font-size: 1.2rem;
-            color: #2c3e50;
-            line-height: 1.5;
-        }
+      .modal-content p {
+        margin-bottom: 2rem;
+        font-size: 1.2rem;
+        color: #2c3e50;
+        line-height: 1.5;
+      }
 
-        .modal-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: flex-end;
-        }
+      .modal-actions {
+        display: flex;
+        gap: 1rem;
+        justify-content: flex-end;
+      }
 
-        .modal-btn {
-            padding: 0.8rem 1.5rem;
-            font-size: 1.2rem;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.2s ease;
-        }
+      .modal-btn {
+        padding: 0.8rem 1.5rem;
+        font-size: 1.2rem;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
 
-        .modal-btn-cancel {
-            background: #95a5a6;
-            color: white;
-        }
+      .modal-btn-cancel {
+        background: #95a5a6;
+        color: white;
+      }
 
-        .modal-btn-cancel:hover {
-            background: #7f8c8d;
-        }
+      .modal-btn-cancel:hover {
+        background: #7f8c8d;
+      }
 
-        .modal-btn-confirm {
-            background: #e74c3c;
-            color: white;
-        }
+      .modal-btn-confirm {
+        background: #e74c3c;
+        color: white;
+      }
 
-        .modal-btn-confirm:hover {
-            background: #c0392b;
-        }
+      .modal-btn-confirm:hover {
+        background: #c0392b;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>🧪 Component Test Page</h1>
 
     <div class="test-section">
-        <h2>AppHeader Component</h2>
-        <p class="test-description">
-            Testing the flexible header component in different configurations.
-        </p>
+      <h2>AppHeader Component</h2>
+      <p class="test-description">
+        Testing the flexible header component in different configurations.
+      </p>
 
-        <h3>Settings Header (No edit, no info)</h3>
-        <app-header heading="Settings"></app-header>
+      <h3>Settings Header (No edit, no info)</h3>
+      <app-header heading="Settings"></app-header>
 
-        <h3 style="margin-top: 2rem;">Overview Header (With edit and info)</h3>
-        <div class="mode-toggle" style="margin-bottom: 1rem;">
-            <span style="font-weight: 600;">Edit Mode:</span>
-            <button id="header-overview-edit-toggle">Toggle Edit Mode</button>
+      <h3 style="margin-top: 2rem">Overview Header (With edit and info)</h3>
+      <div class="mode-toggle" style="margin-bottom: 1rem">
+        <span style="font-weight: 600">Edit Mode:</span>
+        <button id="header-overview-edit-toggle">Toggle Edit Mode</button>
+      </div>
+      <app-header
+        id="overview-header"
+        heading="Sunday Service - 2025-10-30"
+        show-edit-toggle
+        show-info-button
+      >
+      </app-header>
+
+      <h3 style="margin-top: 2rem">Song Header (With controls slot)</h3>
+      <div class="mode-toggle" style="margin-bottom: 1rem">
+        <span style="font-weight: 600">Edit Mode:</span>
+        <button id="header-song-edit-toggle">Toggle Edit Mode</button>
+      </div>
+      <app-header id="song-header" heading="Amazing Grace" show-edit-toggle show-info-button>
+        <div slot="controls" style="display: flex; gap: 1rem; align-items: center">
+          <button
+            style="
+              padding: 0.5rem 1rem;
+              border: 1px solid #ccc;
+              background: white;
+              border-radius: 4px;
+              cursor: pointer;
+            "
+          >
+            ↺
+          </button>
+          <div style="display: flex; gap: 0.5rem">
+            <button
+              style="
+                padding: 0.5rem 1rem;
+                border: 1px solid #ccc;
+                background: white;
+                border-radius: 4px;
+                cursor: pointer;
+              "
+            >
+              A−
+            </button>
+            <button
+              style="
+                padding: 0.5rem 1rem;
+                border: 1px solid #ccc;
+                background: white;
+                border-radius: 4px;
+                cursor: pointer;
+              "
+            >
+              A+
+            </button>
+          </div>
+          <div
+            style="
+              padding: 0.5rem 1rem;
+              border: 1px solid #ccc;
+              background: white;
+              border-radius: 4px;
+            "
+          >
+            Key: <strong>G</strong>
+          </div>
+          <div style="color: #7f8c8d">BPM: 90 | Time: 3/4</div>
         </div>
-        <app-header
-            id="overview-header"
-            heading="Sunday Service - 2025-10-30"
-            show-edit-toggle
-            show-info-button>
-        </app-header>
-
-        <h3 style="margin-top: 2rem;">Song Header (With controls slot)</h3>
-        <div class="mode-toggle" style="margin-bottom: 1rem;">
-            <span style="font-weight: 600;">Edit Mode:</span>
-            <button id="header-song-edit-toggle">Toggle Edit Mode</button>
-        </div>
-        <app-header
-            id="song-header"
-            heading="Amazing Grace"
-            show-edit-toggle
-            show-info-button>
-            <div slot="controls" style="display: flex; gap: 1rem; align-items: center;">
-                <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">↺</button>
-                <div style="display: flex; gap: 0.5rem;">
-                    <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">A−</button>
-                    <button style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px; cursor: pointer;">A+</button>
-                </div>
-                <div style="padding: 0.5rem 1rem; border: 1px solid #ccc; background: white; border-radius: 4px;">
-                    Key: <strong>G</strong>
-                </div>
-                <div style="color: #7f8c8d;">BPM: 90 | Time: 3/4</div>
-            </div>
-        </app-header>
+      </app-header>
     </div>
 
     <div class="test-section">
-        <h2>SongCard Component - Library View</h2>
-        <p class="test-description">
-            Library variant with full information (artist, last played).
-        </p>
+      <h2>SongCard Component - Library View</h2>
+      <p class="test-description">Library variant with full information (artist, last played).</p>
 
-        <div class="mode-toggle">
-            <span style="font-weight: 600;">Edit Mode:</span>
-            <button id="library-edit-toggle">Toggle Edit Mode</button>
-        </div>
+      <div class="mode-toggle">
+        <span style="font-weight: 600">Edit Mode:</span>
+        <button id="library-edit-toggle">Toggle Edit Mode</button>
+      </div>
 
-        <div class="test-list" id="library-list">
-            <!-- Cards will be populated by JavaScript -->
-        </div>
+      <div class="test-list" id="library-list">
+        <!-- Cards will be populated by JavaScript -->
+      </div>
     </div>
 
     <div class="test-section">
-        <h2>SongCard Component - Setlist View</h2>
-        <p class="test-description">
-            Setlist variant with compact view (no artist, no last played).
-        </p>
+      <h2>SongCard Component - Setlist View</h2>
+      <p class="test-description">Setlist variant with compact view (no artist, no last played).</p>
 
-        <div class="mode-toggle">
-            <span style="font-weight: 600;">Edit Mode:</span>
-            <button id="setlist-edit-toggle">Toggle Edit Mode</button>
-        </div>
+      <div class="mode-toggle">
+        <span style="font-weight: 600">Edit Mode:</span>
+        <button id="setlist-edit-toggle">Toggle Edit Mode</button>
+      </div>
 
-        <div class="test-list" id="setlist-list">
-            <!-- Cards will be populated by JavaScript -->
-        </div>
+      <div class="test-list" id="setlist-list">
+        <!-- Cards will be populated by JavaScript -->
+      </div>
     </div>
 
     <!-- Delete confirmation modal -->
     <div class="modal-overlay" id="delete-modal">
-        <div class="modal-content">
-            <h2 id="modal-title">Delete Song?</h2>
-            <p id="modal-message"></p>
-            <div class="modal-actions">
-                <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
-                <button class="modal-btn modal-btn-confirm" id="modal-confirm">Delete</button>
-            </div>
+      <div class="modal-content">
+        <h2 id="modal-title">Delete Song?</h2>
+        <p id="modal-message"></p>
+        <div class="modal-actions">
+          <button class="modal-btn modal-btn-cancel" id="modal-cancel">Cancel</button>
+          <button class="modal-btn modal-btn-confirm" id="modal-confirm">Delete</button>
         </div>
+      </div>
     </div>
 
     <script type="module">
-        // Sample song data for testing
-        const sampleSongs = [
-            {
-                id: 'song-1',
-                title: 'How Great Thou Art',
-                artist: 'Words by Stuart Wesley Keene Hine | Music: Swedish Folk Melody',
-                ccliNumber: '14181',
-                metadata: {
-                    key: 'A',
-                    tempo: 110,
-                    timeSignature: '4/4'
-                },
-                lastUsedAt: '2025-10-20T10:30:00Z'
-            },
-            {
-                id: 'song-2',
-                title: 'Amazing Grace',
-                artist: 'John Newton',
-                ccliNumber: '22025',
-                metadata: {
-                    key: 'G',
-                    tempo: 90,
-                    timeSignature: '3/4'
-                },
-                lastUsedAt: '2025-10-13T14:00:00Z'
-            },
-            {
-                id: 'song-3',
-                title: 'Cornerstone',
-                artist: 'Hillsong Worship',
-                ccliNumber: '6158927',
-                metadata: {
-                    key: 'C',
-                    tempo: 73,
-                    timeSignature: '4/4'
-                },
-                lastUsedAt: '2025-10-06T11:00:00Z'
-            },
-            {
-                id: 'song-4',
-                title: 'Ancient Hymn',
-                artist: null,
-                ccliNumber: '123456',
-                metadata: {
-                    key: 'D',
-                    tempo: 120,
-                    timeSignature: '4/4'
-                },
-                lastUsedAt: '2025-09-28T10:00:00Z'
-            },
-            {
-                id: 'song-5',
-                title: 'Blessed Be Your Name',
-                artist: 'Matt Redman, Beth Redman',
-                ccliNumber: '3798438',
-                metadata: {
-                    key: 'B',
-                    tempo: 130,
-                    timeSignature: '4/4'
-                },
-                lastUsedAt: '2025-09-15T09:30:00Z'
-            },
-            {
-                id: 'song-6',
-                title: 'How Deep The Father\'s Love',
-                artist: 'Stuart Townend, Keith Getty, Kristyn Getty, John Smith, Another Person',
-                ccliNumber: '1558110',
-                metadata: {
-                    key: 'D',
-                    tempo: 68,
-                    timeSignature: '3/4'
-                },
-                lastUsedAt: '2024-12-20T10:00:00Z'
-            },
-            {
-                id: 'song-7',
-                title: 'Simple Song',
-                artist: 'Unknown',
-                ccliNumber: null,
-                metadata: {
-                    key: null,
-                    tempo: null,
-                    timeSignature: null
-                },
-                lastUsedAt: null
-            }
-        ];
+      // Sample song data for testing
+      const sampleSongs = [
+        {
+          id: 'song-1',
+          title: 'How Great Thou Art',
+          artist: 'Words by Stuart Wesley Keene Hine | Music: Swedish Folk Melody',
+          ccliNumber: '14181',
+          metadata: {
+            key: 'A',
+            tempo: 110,
+            timeSignature: '4/4',
+          },
+          lastUsedAt: '2025-10-20T10:30:00Z',
+        },
+        {
+          id: 'song-2',
+          title: 'Amazing Grace',
+          artist: 'John Newton',
+          ccliNumber: '22025',
+          metadata: {
+            key: 'G',
+            tempo: 90,
+            timeSignature: '3/4',
+          },
+          lastUsedAt: '2025-10-13T14:00:00Z',
+        },
+        {
+          id: 'song-3',
+          title: 'Cornerstone',
+          artist: 'Hillsong Worship',
+          ccliNumber: '6158927',
+          metadata: {
+            key: 'C',
+            tempo: 73,
+            timeSignature: '4/4',
+          },
+          lastUsedAt: '2025-10-06T11:00:00Z',
+        },
+        {
+          id: 'song-4',
+          title: 'Ancient Hymn',
+          artist: null,
+          ccliNumber: '123456',
+          metadata: {
+            key: 'D',
+            tempo: 120,
+            timeSignature: '4/4',
+          },
+          lastUsedAt: '2025-09-28T10:00:00Z',
+        },
+        {
+          id: 'song-5',
+          title: 'Blessed Be Your Name',
+          artist: 'Matt Redman, Beth Redman',
+          ccliNumber: '3798438',
+          metadata: {
+            key: 'B',
+            tempo: 130,
+            timeSignature: '4/4',
+          },
+          lastUsedAt: '2025-09-15T09:30:00Z',
+        },
+        {
+          id: 'song-6',
+          title: "How Deep The Father's Love",
+          artist: 'Stuart Townend, Keith Getty, Kristyn Getty, John Smith, Another Person',
+          ccliNumber: '1558110',
+          metadata: {
+            key: 'D',
+            tempo: 68,
+            timeSignature: '3/4',
+          },
+          lastUsedAt: '2024-12-20T10:00:00Z',
+        },
+        {
+          id: 'song-7',
+          title: 'Simple Song',
+          artist: 'Unknown',
+          ccliNumber: null,
+          metadata: {
+            key: null,
+            tempo: null,
+            timeSignature: null,
+          },
+          lastUsedAt: null,
+        },
+      ];
 
-        // Import the components
-        import './components/song-card.js';
-        import './components/app-header.js';
+      // Import the components
+      import './components/song-card.js';
+      import './components/app-header.js';
 
-        let libraryEditMode = false;
-        let setlistEditMode = false;
-        let songToDelete = null;
-        let deleteContext = null;
+      let libraryEditMode = false;
+      let setlistEditMode = false;
+      let songToDelete = null;
+      let deleteContext = null;
 
-        // Modal elements
-        const modal = document.getElementById('delete-modal');
-        const modalTitle = document.getElementById('modal-title');
-        const modalMessage = document.getElementById('modal-message');
-        const modalCancel = document.getElementById('modal-cancel');
-        const modalConfirm = document.getElementById('modal-confirm');
+      // Modal elements
+      const modal = document.getElementById('delete-modal');
+      const modalTitle = document.getElementById('modal-title');
+      const modalMessage = document.getElementById('modal-message');
+      const modalCancel = document.getElementById('modal-cancel');
+      const modalConfirm = document.getElementById('modal-confirm');
 
-        function showDeleteModal(song, context) {
-            songToDelete = song;
-            deleteContext = context;
+      function showDeleteModal(song, context) {
+        songToDelete = song;
+        deleteContext = context;
 
-            if (context === 'setlist') {
-                modalTitle.textContent = 'Remove from Setlist?';
-                modalMessage.textContent = `Remove "${song.title}" from this setlist? The song will remain in your library.`;
-            } else {
-                modalTitle.textContent = 'Delete Song?';
-                modalMessage.textContent = `Permanently delete "${song.title}" from your library? This will also remove it from all setlists. This cannot be undone.`;
-            }
-
-            modal.classList.add('active');
+        if (context === 'setlist') {
+          modalTitle.textContent = 'Remove from Setlist?';
+          modalMessage.textContent = `Remove "${song.title}" from this setlist? The song will remain in your library.`;
+        } else {
+          modalTitle.textContent = 'Delete Song?';
+          modalMessage.textContent = `Permanently delete "${song.title}" from your library? This will also remove it from all setlists. This cannot be undone.`;
         }
 
-        function hideDeleteModal() {
-            modal.classList.remove('active');
-            songToDelete = null;
-            deleteContext = null;
-        }
+        modal.classList.add('active');
+      }
 
-        function deleteSong() {
-            if (songToDelete) {
-                console.log(`Deleting song from ${deleteContext}:`, songToDelete.title);
-                // In the real app, this would call the appropriate delete function
-                // For now, just remove from the test list
-                const index = sampleSongs.findIndex(s => s.id === songToDelete.id);
-                if (index !== -1) {
-                    sampleSongs.splice(index, 1);
-                    renderLibraryCards();
-                    renderSetlistCards();
-                }
-            }
-            hideDeleteModal();
-        }
+      function hideDeleteModal() {
+        modal.classList.remove('active');
+        songToDelete = null;
+        deleteContext = null;
+      }
 
-        function renderLibraryCards() {
-            const container = document.getElementById('library-list');
-            container.textContent = '';
-
-            for (const song of sampleSongs) {
-                const card = document.createElement('song-card');
-                card.song = song;
-                card.variant = 'library';
-                card.editMode = libraryEditMode;
-
-                // Add event listeners
-                card.addEventListener('song-click', (e) => {
-                    console.log('Library - Song clicked:', e.detail.song.title);
-                });
-
-                card.addEventListener('song-delete', (e) => {
-                    console.log('Library - Song delete clicked:', e.detail.song.title);
-                    showDeleteModal(e.detail.song, 'library');
-                });
-
-                container.appendChild(card);
-            }
-        }
-
-        function renderSetlistCards() {
-            const container = document.getElementById('setlist-list');
-            container.textContent = '';
-
-            for (const song of sampleSongs) {
-                const card = document.createElement('song-card');
-                card.song = song;
-                card.variant = 'setlist';
-                card.editMode = setlistEditMode;
-
-                // Add event listeners
-                card.addEventListener('song-click', (e) => {
-                    console.log('Setlist - Song clicked:', e.detail.song.title);
-                });
-
-                card.addEventListener('song-delete', (e) => {
-                    console.log('Setlist - Song delete clicked:', e.detail.song.title);
-                    showDeleteModal(e.detail.song, 'setlist');
-                });
-
-                container.appendChild(card);
-            }
-        }
-
-        // Wait for components to be defined, then render
-        customElements.whenDefined('song-card').then(() => {
+      function deleteSong() {
+        if (songToDelete) {
+          console.log(`Deleting song from ${deleteContext}:`, songToDelete.title);
+          // In the real app, this would call the appropriate delete function
+          // For now, just remove from the test list
+          const index = sampleSongs.findIndex(s => s.id === songToDelete.id);
+          if (index !== -1) {
+            sampleSongs.splice(index, 1);
             renderLibraryCards();
             renderSetlistCards();
+          }
+        }
+        hideDeleteModal();
+      }
 
-            // Set up library edit mode toggle
-            document.getElementById('library-edit-toggle').addEventListener('click', () => {
-                libraryEditMode = !libraryEditMode;
-                renderLibraryCards();
-            });
+      function renderLibraryCards() {
+        const container = document.getElementById('library-list');
+        container.textContent = '';
 
-            // Set up setlist edit mode toggle
-            document.getElementById('setlist-edit-toggle').addEventListener('click', () => {
-                setlistEditMode = !setlistEditMode;
-                renderSetlistCards();
-            });
+        for (const song of sampleSongs) {
+          const card = document.createElement('song-card');
+          card.song = song;
+          card.variant = 'library';
+          card.editMode = libraryEditMode;
 
-            // Set up app-header test interactions
-            const overviewHeader = document.getElementById('overview-header');
-            const songHeader = document.getElementById('song-header');
+          // Add event listeners
+          card.addEventListener('song-click', e => {
+            console.log('Library - Song clicked:', e.detail.song.title);
+          });
 
-            document.getElementById('header-overview-edit-toggle').addEventListener('click', () => {
-                overviewHeader.editMode = !overviewHeader.editMode;
-            });
+          card.addEventListener('song-delete', e => {
+            console.log('Library - Song delete clicked:', e.detail.song.title);
+            showDeleteModal(e.detail.song, 'library');
+          });
 
-            document.getElementById('header-song-edit-toggle').addEventListener('click', () => {
-                songHeader.editMode = !songHeader.editMode;
-            });
+          container.appendChild(card);
+        }
+      }
 
-            // Listen to header events
-            document.addEventListener('nav-menu-click', () => {
-                console.log('Nav menu clicked');
-            });
+      function renderSetlistCards() {
+        const container = document.getElementById('setlist-list');
+        container.textContent = '';
 
-            document.addEventListener('edit-mode-toggle', (e) => {
-                console.log('Edit mode toggled on:', e.target.title);
-            });
+        for (const song of sampleSongs) {
+          const card = document.createElement('song-card');
+          card.song = song;
+          card.variant = 'setlist';
+          card.editMode = setlistEditMode;
 
-            document.addEventListener('info-click', (e) => {
-                console.log('Info clicked on:', e.target.title);
-            });
+          // Add event listeners
+          card.addEventListener('song-click', e => {
+            console.log('Setlist - Song clicked:', e.detail.song.title);
+          });
 
-            // Set up modal buttons
-            modalCancel.addEventListener('click', hideDeleteModal);
-            modalConfirm.addEventListener('click', deleteSong);
+          card.addEventListener('song-delete', e => {
+            console.log('Setlist - Song delete clicked:', e.detail.song.title);
+            showDeleteModal(e.detail.song, 'setlist');
+          });
 
-            // Close modal on background click
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    hideDeleteModal();
-                }
-            });
+          container.appendChild(card);
+        }
+      }
+
+      // Wait for components to be defined, then render
+      customElements.whenDefined('song-card').then(() => {
+        renderLibraryCards();
+        renderSetlistCards();
+
+        // Set up library edit mode toggle
+        document.getElementById('library-edit-toggle').addEventListener('click', () => {
+          libraryEditMode = !libraryEditMode;
+          renderLibraryCards();
         });
+
+        // Set up setlist edit mode toggle
+        document.getElementById('setlist-edit-toggle').addEventListener('click', () => {
+          setlistEditMode = !setlistEditMode;
+          renderSetlistCards();
+        });
+
+        // Set up app-header test interactions
+        const overviewHeader = document.getElementById('overview-header');
+        const songHeader = document.getElementById('song-header');
+
+        document.getElementById('header-overview-edit-toggle').addEventListener('click', () => {
+          overviewHeader.editMode = !overviewHeader.editMode;
+        });
+
+        document.getElementById('header-song-edit-toggle').addEventListener('click', () => {
+          songHeader.editMode = !songHeader.editMode;
+        });
+
+        // Listen to header events
+        document.addEventListener('nav-menu-click', () => {
+          console.log('Nav menu clicked');
+        });
+
+        document.addEventListener('edit-mode-toggle', e => {
+          console.log('Edit mode toggled on:', e.target.title);
+        });
+
+        document.addEventListener('info-click', e => {
+          console.log('Info clicked on:', e.target.title);
+        });
+
+        // Set up modal buttons
+        modalCancel.addEventListener('click', hideDeleteModal);
+        modalConfirm.addEventListener('click', deleteSong);
+
+        // Close modal on background click
+        modal.addEventListener('click', e => {
+          if (e.target === modal) {
+            hideDeleteModal();
+          }
+        });
+      });
     </script>
-</body>
+  </body>
 </html>

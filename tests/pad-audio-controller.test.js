@@ -3,75 +3,76 @@
 
 // Mock browser globals before importing modules
 global.window = {
-    location: {
-        hostname: 'localhost'
-    },
-    addEventListener: () => {},
-    removeEventListener: () => {}
+  location: {
+    hostname: 'localhost',
+  },
+  addEventListener: () => {},
+  removeEventListener: () => {},
 };
 
 global.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {}
+  getItem: () => null,
+  setItem: () => {},
+  removeItem: () => {},
 };
 
 global.caches = {
-    open: () => Promise.resolve({
-        match: () => Promise.resolve(undefined),
-        put: () => Promise.resolve()
-    })
+  open: () =>
+    Promise.resolve({
+      match: () => Promise.resolve(undefined),
+      put: () => Promise.resolve(),
+    }),
 };
 
 // Mock Audio element
 global.Audio = class MockAudio {
-    constructor() {
-        this.src = '';
-        this.loop = false;
-        this.crossOrigin = null;
-        this.paused = true;
-        this.currentTime = 0;
-        this.currentSrc = '';
-        this._eventListeners = {};
-    }
+  constructor() {
+    this.src = '';
+    this.loop = false;
+    this.crossOrigin = null;
+    this.paused = true;
+    this.currentTime = 0;
+    this.currentSrc = '';
+    this._eventListeners = {};
+  }
 
-    addEventListener(event, handler) {
-        if (!this._eventListeners[event]) {
-            this._eventListeners[event] = [];
-        }
-        this._eventListeners[event].push(handler);
+  addEventListener(event, handler) {
+    if (!this._eventListeners[event]) {
+      this._eventListeners[event] = [];
     }
+    this._eventListeners[event].push(handler);
+  }
 
-    removeEventListener(event, handler) {
-        if (this._eventListeners[event]) {
-            const index = this._eventListeners[event].indexOf(handler);
-            if (index > -1) {
-                this._eventListeners[event].splice(index, 1);
-            }
-        }
+  removeEventListener(event, handler) {
+    if (this._eventListeners[event]) {
+      const index = this._eventListeners[event].indexOf(handler);
+      if (index > -1) {
+        this._eventListeners[event].splice(index, 1);
+      }
     }
+  }
 
-    play() {
-        this.paused = false;
-        this.currentSrc = this.src;
-        // Simulate 'playing' event
-        setTimeout(() => {
-            if (this._eventListeners['playing']) {
-                this._eventListeners['playing'].forEach(handler => handler());
-            }
-        }, 10);
-        return Promise.resolve();
-    }
+  play() {
+    this.paused = false;
+    this.currentSrc = this.src;
+    // Simulate 'playing' event
+    setTimeout(() => {
+      if (this._eventListeners['playing']) {
+        this._eventListeners['playing'].forEach(handler => handler());
+      }
+    }, 10);
+    return Promise.resolve();
+  }
 
-    pause() {
-        this.paused = true;
-    }
+  pause() {
+    this.paused = true;
+  }
 
-    removeAttribute(attr) {
-        if (attr === 'src') {
-            this.src = '';
-        }
+  removeAttribute(attr) {
+    if (attr === 'src') {
+      this.src = '';
     }
+  }
 };
 
 import { PadAudioController } from '../js/pad-audio-controller.js';
@@ -82,109 +83,112 @@ let passCount = 0;
 let failCount = 0;
 
 function assert(condition, message) {
-    testCount++;
-    if (condition) {
-        passCount++;
-        console.log(`✓ ${message}`);
-    } else {
-        failCount++;
-        console.error(`✗ ${message}`);
-    }
+  testCount++;
+  if (condition) {
+    passCount++;
+    console.log(`✓ ${message}`);
+  } else {
+    failCount++;
+    console.error(`✗ ${message}`);
+  }
 }
 
 function assertEquals(actual, expected, message) {
-    const matches = JSON.stringify(actual) === JSON.stringify(expected);
-    assert(matches, `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`);
+  const matches = JSON.stringify(actual) === JSON.stringify(expected);
+  assert(
+    matches,
+    `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`
+  );
 }
 
 // Mock Web Audio API
 class MockAudioContext {
-    constructor() {
-        this.state = 'running';
-        this.currentTime = 0;
-        this.resumeCalled = false;
-        this.destination = {};
-    }
+  constructor() {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.resumeCalled = false;
+    this.destination = {};
+  }
 
-    resume() {
-        this.resumeCalled = true;
-        return Promise.resolve();
-    }
+  resume() {
+    this.resumeCalled = true;
+    return Promise.resolve();
+  }
 
-    createMediaElementSource(element) {
-        return new MockMediaElementSource(element);
-    }
+  createMediaElementSource(element) {
+    return new MockMediaElementSource(element);
+  }
 
-    createGain() {
-        return new MockGainNode();
-    }
+  createGain() {
+    return new MockGainNode();
+  }
 
-    createChannelSplitter(_channels) {
-        return new MockChannelNode();
-    }
+  createChannelSplitter(_channels) {
+    return new MockChannelNode();
+  }
 
-    createChannelMerger(_channels) {
-        return new MockChannelNode();
-    }
+  createChannelMerger(_channels) {
+    return new MockChannelNode();
+  }
 }
 
 class MockMediaElementSource {
-    constructor(element) {
-        this.element = element;
-        this.connected = false;
-    }
+  constructor(element) {
+    this.element = element;
+    this.connected = false;
+  }
 
-    connect(destination) {
-        this.connected = true;
-        this.destination = destination;
-    }
+  connect(destination) {
+    this.connected = true;
+    this.destination = destination;
+  }
 
-    disconnect() {
-        this.connected = false;
-    }
+  disconnect() {
+    this.connected = false;
+  }
 }
 
 class MockGainNode {
-    constructor() {
-        this.gain = {
-            value: 1.0,
-            setValueAtTime: function(value, _time) {
-                this.value = value;
-            },
-            exponentialRampToValueAtTime: function(value, _time) {
-                this.value = value;
-            }
-        };
-        this.connected = false;
-        this.destinations = [];
-    }
+  constructor() {
+    this.gain = {
+      value: 1.0,
+      setValueAtTime: function (value, _time) {
+        this.value = value;
+      },
+      exponentialRampToValueAtTime: function (value, _time) {
+        this.value = value;
+      },
+    };
+    this.connected = false;
+    this.destinations = [];
+  }
 
-    connect(destination, outputIndex, inputIndex) {
-        this.connected = true;
-        this.destinations.push({ destination, outputIndex, inputIndex });
-    }
+  connect(destination, outputIndex, inputIndex) {
+    this.connected = true;
+    this.destinations.push({ destination, outputIndex, inputIndex });
+  }
 
-    disconnect() {
-        this.connected = false;
-        this.destinations = [];
-    }
+  disconnect() {
+    this.connected = false;
+    this.destinations = [];
+  }
 }
 
 class MockChannelNode {
-    constructor() {
-        this.connected = false;
-        this.destinations = [];
-    }
+  constructor() {
+    this.connected = false;
+    this.destinations = [];
+  }
 
-    connect(destination, outputIndex, inputIndex) {
-        this.connected = true;
-        this.destinations.push({ destination, outputIndex, inputIndex });
-    }
+  connect(destination, outputIndex, inputIndex) {
+    this.connected = true;
+    this.destinations.push({ destination, outputIndex, inputIndex });
+  }
 
-    disconnect() {
-        this.connected = false;
-        this.destinations = [];
-    }
+  disconnect() {
+    this.connected = false;
+    this.destinations = [];
+  }
 }
 
 console.log('Running pad-audio-controller.js tests...\n');
@@ -193,21 +197,21 @@ console.log('Running pad-audio-controller.js tests...\n');
 console.log('=== Testing Constructor ===');
 
 try {
-    const context = new MockAudioContext();
-    const controller = new PadAudioController(context);
-    assert(true, 'Constructor accepts valid arguments');
-    assert(!controller.isPlaying, 'Controller starts in stopped state');
-    assert(!controller.loadFailed, 'Controller starts with loadFailed=false');
-    assert(controller.currentKey === null, 'Controller starts with no key');
+  const context = new MockAudioContext();
+  const controller = new PadAudioController(context);
+  assert(true, 'Constructor accepts valid arguments');
+  assert(!controller.isPlaying, 'Controller starts in stopped state');
+  assert(!controller.loadFailed, 'Controller starts with loadFailed=false');
+  assert(controller.currentKey === null, 'Controller starts with no key');
 } catch (e) {
-    assert(false, `Constructor accepts valid arguments: ${e.message}`);
+  assert(false, `Constructor accepts valid arguments: ${e.message}`);
 }
 
 try {
-    new PadAudioController(null);
-    assert(false, 'Constructor throws error for null AudioContext');
+  new PadAudioController(null);
+  assert(false, 'Constructor throws error for null AudioContext');
 } catch {
-    assert(true, 'Constructor throws error for null AudioContext');
+  assert(true, 'Constructor throws error for null AudioContext');
 }
 
 // ===== Test Custom Fade Duration =====
@@ -296,10 +300,10 @@ const context6 = new MockAudioContext();
 const controller6 = new PadAudioController(context6);
 
 for (let i = 0; i < 3; i++) {
-    const keys = ['C', 'D', 'E'];
-    const key = keys[i];
-    await controller6.loadPad(key);
-    assertEquals(controller6.currentKey, key, `Current key is ${key} after load cycle ${i + 1}`);
+  const keys = ['C', 'D', 'E'];
+  const key = keys[i];
+  await controller6.loadPad(key);
+  assertEquals(controller6.currentKey, key, `Current key is ${key} after load cycle ${i + 1}`);
 }
 
 // ===== Test Cleanup =====
@@ -361,8 +365,8 @@ console.log(`Passed: ${passCount}`);
 console.log(`Failed: ${failCount}`);
 
 if (failCount === 0) {
-    console.log('\n✓ All tests passed!');
+  console.log('\n✓ All tests passed!');
 } else {
-    console.log(`\n✗ ${failCount} test(s) failed`);
-    process.exit(1);
+  console.log(`\n✗ ${failCount} test(s) failed`);
+  process.exit(1);
 }

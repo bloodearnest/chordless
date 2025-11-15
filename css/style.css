@@ -1,1791 +1,1805 @@
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 html {
-    overflow-x: hidden;
-    width: 100%;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 :root {
-    /* Theme colors - set by theme-manager.js */
-    /* Light mode defaults (will be overridden by theme manager) */
-    --bg-color: #ffffff;
-    --bg-secondary: #f5f6f7;
-    --bg-tertiary: #ecf0f1;
-    --text-color: #1a1a1a;
-    --text-secondary: #7f8c8d;
-    --text-tertiary: #95a5a6;
-    --text-muted: #bdc3c7;
-    --header-bg: #2c3e50;
-    --header-text: #ecf0f1;
-    --button-bg: #3498db;
-    --button-hover: #2980b9;
-    --button-text: #ffffff;
-    --color-primary: #3498db;
-    --color-success: #27ae60;
-    --color-warning: #f39c12;
-    --color-danger: #e74c3c;
-    --color-info: #2980b9;
-    --chord-color: #2980b9;
-    --border-color: #d5dbdb;
-    --border-light: #ecf0f1;
-    --overlay-bg: rgba(0, 0, 0, 0.7);
-    --overlay-light: rgba(0, 0, 0, 0.3);
-    --hover-bg: rgba(255, 255, 255, 0.2);
-    --active-bg: rgba(255, 255, 255, 0.3);
-    --focus-ring: #3498db;
+  /* Theme colors - set by theme-manager.js */
+  /* Light mode defaults (will be overridden by theme manager) */
+  --bg-color: #ffffff;
+  --bg-secondary: #f5f6f7;
+  --bg-tertiary: #ecf0f1;
+  --text-color: #1a1a1a;
+  --text-secondary: #7f8c8d;
+  --text-tertiary: #95a5a6;
+  --text-muted: #bdc3c7;
+  --header-bg: #2c3e50;
+  --header-text: #ecf0f1;
+  --button-bg: #3498db;
+  --button-hover: #2980b9;
+  --button-text: #ffffff;
+  --color-primary: #3498db;
+  --color-success: #27ae60;
+  --color-warning: #f39c12;
+  --color-danger: #e74c3c;
+  --color-info: #2980b9;
+  --chord-color: #2980b9;
+  --border-color: #d5dbdb;
+  --border-light: #ecf0f1;
+  --overlay-bg: rgba(0, 0, 0, 0.7);
+  --overlay-light: rgba(0, 0, 0, 0.3);
+  --hover-bg: rgba(255, 255, 255, 0.2);
+  --active-bg: rgba(255, 255, 255, 0.3);
+  --focus-ring: #3498db;
 
-    /* Typography */
-    --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography */
+  --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-    /* Responsive font size multiplier for components */
-    /* This allows shadow DOM components to scale with viewport */
-    /* Default is for tablets (1.125 = 18/16) */
-    --font-scale: 1.125;
+  /* Responsive font size multiplier for components */
+  /* This allows shadow DOM components to scale with viewport */
+  /* Default is for tablets (1.125 = 18/16) */
+  --font-scale: 1.125;
 }
 
 /* Scale factor for phones - smaller */
-@media (max-width: 48rem) { /* 768px */
-    :root {
-        --font-scale: 0.65; /* 10.4/16 - much smaller for mobile */
-    }
+@media (max-width: 48rem) {
+  /* 768px */
+  :root {
+    --font-scale: 0.65; /* 10.4/16 - much smaller for mobile */
+  }
 }
 
 /* Scale factor for desktop */
-@media (min-width: 64rem) { /* 1024px */
-    :root {
-        --font-scale: 1; /* 16/16 - standard desktop size */
-    }
+@media (min-width: 64rem) {
+  /* 1024px */
+  :root {
+    --font-scale: 1; /* 16/16 - standard desktop size */
+  }
 }
 
 body {
-    font-family: var(--font-family-base);
-    background-color: var(--bg-color);
-    color: var(--text-color);
-    line-height: 1.6;
-    overflow: hidden;
-    width: 100%;
-    height: 100vh;
+  font-family: var(--font-family-base);
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  line-height: 1.6;
+  overflow: hidden;
+  width: 100%;
+  height: 100vh;
 
-    /* Responsive base font size */
-    /* Phone: 0.65rem (10.4px) - Very small for fitting lyrics */
-    /* Tablet: 1.125rem (18px) - Larger for performance/touch */
-    /* Desktop: 1rem (16px) - Standard for readability */
-    font-size: 0.65rem; /* Mobile default - smaller */
+  /* Responsive base font size */
+  /* Phone: 0.65rem (10.4px) - Very small for fitting lyrics */
+  /* Tablet: 1.125rem (18px) - Larger for performance/touch */
+  /* Desktop: 1rem (16px) - Standard for readability */
+  font-size: 0.65rem; /* Mobile default - smaller */
 }
 
 /* Tablet: larger for touch */
-@media (min-width: 48rem) and (max-width: 64rem) { /* 768px - 1024px */
-    body {
-        font-size: 1.125rem;
-    }
+@media (min-width: 48rem) and (max-width: 64rem) {
+  /* 768px - 1024px */
+  body {
+    font-size: 1.125rem;
+  }
 }
 
 /* Desktop: standard size */
-@media (min-width: 64rem) { /* 1024px */
-    body {
-        font-size: 1rem;
-    }
+@media (min-width: 64rem) {
+  /* 1024px */
+  body {
+    font-size: 1rem;
+  }
 }
 
 /* View Transitions */
 @view-transition {
-    navigation: auto;
+  navigation: auto;
 }
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
-    animation-duration: 0.3s;
+  animation-duration: 0.3s;
 }
 
 ::view-transition-old(root) {
-    animation-name: fade-out;
+  animation-name: fade-out;
 }
 
 ::view-transition-new(root) {
-    animation-name: fade-in;
+  animation-name: fade-in;
 }
 
 @keyframes fade-out {
-    to {
-        opacity: 0;
-    }
+  to {
+    opacity: 0;
+  }
 }
 
 @keyframes fade-in {
-    from {
-        opacity: 0;
-    }
+  from {
+    opacity: 0;
+  }
 }
 
 .app-container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100%;
-    overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
 }
 
 .view {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    width: 100%;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
 }
 
 /* Home view styles */
 .home-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0.5rem;
-    box-sizing: border-box;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+  box-sizing: border-box;
 }
 
 .home-content h2 {
-    font-size: 2rem;
-    margin-bottom: 2rem;
-    color: var(--header-bg);
+  font-size: 2rem;
+  margin-bottom: 2rem;
+  color: var(--header-bg);
 }
 
 /* Container for sliding between library and song view */
 .home-content-container,
 .songs-content-container {
-    display: flex;
-    height: 100%;
-    width: 100%;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+  display: flex;
+  height: 100%;
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
 .songs-content-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+  display: none; /* Chrome, Safari, Opera */
 }
 
 /* Songs page main content */
 .songs-main {
-    flex: 1;
-    overflow: hidden;
-    position: relative;
+  flex: 1;
+  overflow: hidden;
+  position: relative;
 }
 
 .library-view {
-    min-width: 100%;
-    width: 100%;
-    flex-shrink: 0;
-    overflow-y: auto;
-    padding: 0.5rem;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    box-sizing: border-box;
+  min-width: 100%;
+  width: 100%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  padding: 0.5rem;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
 }
 
 .library-song-view {
-    min-width: 100%;
-    width: 100%;
-    flex-shrink: 0;
-    display: flex;
-    flex-direction: column;
-    background-color: var(--bg-color);
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    box-sizing: border-box;
+  min-width: 100%;
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-color);
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  box-sizing: border-box;
 }
 
 .back-button {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    padding: 0.5rem 1rem;
-    font-size: 1.2rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  padding: 0.5rem 1rem;
+  font-size: 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
 .back-button:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .back-button:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 .library-song-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
 }
 
 .setlist-list {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 /* Year sections */
 .year-section {
-    border: 2px solid #ecf0f1;
-    border-radius: 8px;
-    overflow: hidden;
+  border: 2px solid #ecf0f1;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .year-header {
-    width: 100%;
-    padding: 1.5rem 2rem;
-    background-color: var(--header-bg);
-    color: var(--header-text);
-    border: none;
-    font-size: 1.8rem;
-    font-weight: 600;
-    cursor: pointer;
-    text-align: left;
-    display: flex;
-    align-items: center;
-    transition: background-color 0.2s;
-    min-height: 70px;
+  width: 100%;
+  padding: 1.5rem 2rem;
+  background-color: var(--header-bg);
+  color: var(--header-text);
+  border: none;
+  font-size: 1.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s;
+  min-height: 70px;
 }
 
 .year-header:hover {
-    background-color: #34495e;
+  background-color: #34495e;
 }
 
 .year-header::after {
-    content: '▼';
-    margin-left: auto;
-    transition: transform 0.3s;
+  content: '▼';
+  margin-left: auto;
+  transition: transform 0.3s;
 }
 
 .year-section.expanded .year-header::after {
-    transform: rotate(-180deg);
+  transform: rotate(-180deg);
 }
 
 .year-list {
-    display: none;
-    flex-direction: column;
-    gap: 0;
-    padding: 0.5rem;
+  display: none;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.5rem;
 }
 
 .year-section.expanded .year-list {
-    display: flex;
+  display: flex;
 }
 
 .setlist-button {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    padding: 1.5rem 2rem;
-    background-color: white;
-    border: none;
-    border-bottom: 1px solid #ecf0f1;
-    font-size: 1.3rem;
-    color: var(--text-color);
-    cursor: pointer;
-    transition: all 0.2s;
-    text-align: left;
-    text-decoration: none;
-    min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  background-color: white;
+  border: none;
+  border-bottom: 1px solid #ecf0f1;
+  font-size: 1.3rem;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  text-decoration: none;
+  min-height: 70px;
 }
 
 .setlist-button:last-child {
-    border-bottom: none;
+  border-bottom: none;
 }
 
 .setlist-button:hover {
-    background-color: #ecf0f1;
-    padding-left: 2rem;
+  background-color: #ecf0f1;
+  padding-left: 2rem;
 }
 
 .setlist-button:active {
-    transform: scale(0.98);
+  transform: scale(0.98);
 }
 
 .setlist-name {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .setlist-song-count {
-    flex-shrink: 0;
-    padding: 0.3rem 0.8rem;
-    background-color: #ecf0f1;
-    color: #7f8c8d;
-    font-size: 1rem;
-    font-weight: 600;
-    border-radius: 12px;
-    transition: all 0.2s;
+  flex-shrink: 0;
+  padding: 0.3rem 0.8rem;
+  background-color: #ecf0f1;
+  color: #7f8c8d;
+  font-size: 1rem;
+  font-weight: 600;
+  border-radius: 12px;
+  transition: all 0.2s;
 }
 
 .setlist-button:hover .setlist-song-count {
-    background-color: var(--button-bg);
-    color: white;
+  background-color: var(--button-bg);
+  color: white;
 }
 
 .error {
-    color: #e74c3c;
+  color: #e74c3c;
 }
 
 /* Navigation menu button */
 .nav-menu-button {
-    background: none;
-    border: none;
-    color: var(--header-text);
-    cursor: pointer;
-    padding: 0.5rem;
-    margin-right: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.2s, background-color 0.2s;
-    border-radius: 4px;
-    min-width: 44px;
-    min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--header-text);
+  cursor: pointer;
+  padding: 0.5rem;
+  margin-right: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 0.2s,
+    background-color 0.2s;
+  border-radius: 4px;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .nav-menu-button:hover {
-    background-color: rgba(255, 255, 255, 0.15);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.15);
+  transform: scale(1.05);
 }
 
 .nav-menu-button:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 /* Navigation menu popover */
 .nav-menu-popover {
-    background-color: var(--header-bg);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    padding: 0.5rem 0;
-    margin: 0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    position: fixed;
-    inset: unset;
-    min-width: 250px;
+  background-color: var(--header-bg);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  margin: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  position: fixed;
+  inset: unset;
+  min-width: 250px;
 }
 
 .nav-menu-popover::backdrop {
-    background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 .nav-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .nav-menu-item {
-    background-color: transparent;
-    color: var(--header-text);
-    border: none;
-    padding: 1rem 1.5rem;
-    font-size: 1.4rem;
-    font-family: inherit;
-    font-weight: normal;
-    cursor: pointer;
-    text-align: left;
-    transition: background-color 0.2s;
-    min-height: 50px;
-    display: flex;
-    align-items: center;
-    gap: 1rem;
-    text-decoration: none;
-    width: 100%;
+  background-color: transparent;
+  color: var(--header-text);
+  border: none;
+  padding: 1rem 1.5rem;
+  font-size: 1.4rem;
+  font-family: inherit;
+  font-weight: normal;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  text-decoration: none;
+  width: 100%;
 }
 
 .nav-menu-item:hover {
-    background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .nav-menu-item:active {
-    background-color: rgba(255, 255, 255, 0.25);
+  background-color: rgba(255, 255, 255, 0.25);
 }
 
 .nav-icon {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 header {
-    background-color: var(--header-bg);
-    color: var(--header-text);
-    padding: 0.5rem 0.5rem;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: space-between;
-    align-items: center;
-    flex-shrink: 0;
-    gap: 0.5rem;
-    width: 100%;
-    box-sizing: border-box;
-    max-width: 100%;
-    min-width: 0;
-    overflow: visible;
+  background-color: var(--header-bg);
+  color: var(--header-text);
+  padding: 0.5rem 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  overflow: visible;
 }
 
 /* Larger padding and gap on tablet/desktop */
 @media (min-width: 48rem) {
-    header {
-        padding: 0.5rem 1.5rem;
-        gap: 1.5rem;
-        flex-wrap: nowrap;
-    }
+  header {
+    padding: 0.5rem 1.5rem;
+    gap: 1.5rem;
+    flex-wrap: nowrap;
+  }
 }
 
 /* Songs library link button */
 .songs-link-button {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    padding: 0.5rem 1rem;
-    font-size: 1.2rem;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s;
-    white-space: nowrap;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  padding: 0.5rem 1rem;
+  font-size: 1.2rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
 }
 
 .songs-link-button:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .songs-link-button:active {
-    transform: scale(0.95);
+  transform: scale(0.95);
 }
 
 .header-left {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    flex: 1;
-    min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .header-center {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex: 0 0 auto;
-    justify-content: flex-end;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  justify-content: flex-end;
 }
 
 .header-right {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .song-title-compact {
-    font-size: 1.4rem;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    transition: opacity 0.2s ease-in-out;
+  font-size: 1.4rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: opacity 0.2s ease-in-out;
 }
 
 .song-meta-compact {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.3rem;
-    white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.3rem;
+  white-space: nowrap;
 }
 
 .meta-item {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .meta-label {
-    opacity: 0.8;
-    font-size: 1.3rem;
+  opacity: 0.8;
+  font-size: 1.3rem;
 }
-
 
 /* Mobile header expansion - show all controls when header is expanded */
 @media (max-width: 47.99rem) {
-    /* Show normal controls when header is expanded (not in edit mode) */
-    body.header-expanded:not(.edit-mode) .key-display-wrapper,
-    body.header-expanded:not(.edit-mode) .song-meta-compact {
-        display: flex !important;
-        opacity: 1 !important;
-    }
+  /* Show normal controls when header is expanded (not in edit mode) */
+  body.header-expanded:not(.edit-mode) .key-display-wrapper,
+  body.header-expanded:not(.edit-mode) .song-meta-compact {
+    display: flex !important;
+    opacity: 1 !important;
+  }
 
-    /* Make controls more compact when expanded */
-    body.header-expanded .key-display-wrapper {
-        gap: 0.15rem !important;
-        flex-shrink: 0 !important;
-        min-width: 0 !important;
-        font-size: 0.9rem !important;
-    }
+  /* Make controls more compact when expanded */
+  body.header-expanded .key-display-wrapper {
+    gap: 0.15rem !important;
+    flex-shrink: 0 !important;
+    min-width: 0 !important;
+    font-size: 0.9rem !important;
+  }
 
-    body.header-expanded .meta-label {
-        font-size: 0.9rem !important;
-    }
+  body.header-expanded .meta-label {
+    font-size: 0.9rem !important;
+  }
 
-    body.header-expanded .key-selector {
-        min-width: 2.2rem !important;
-        font-size: 1rem !important;
-        padding: 0.2rem 0.35rem !important;
-        min-height: auto !important;
-        border-width: 1px !important;
-    }
+  body.header-expanded .key-selector {
+    min-width: 2.2rem !important;
+    font-size: 1rem !important;
+    padding: 0.2rem 0.35rem !important;
+    min-height: auto !important;
+    border-width: 1px !important;
+  }
 
-    body.header-expanded .song-meta-compact {
-        flex-shrink: 1 !important;
-        min-width: 0 !important;
-        max-width: 6rem !important;
-        font-size: 0.9rem !important;
-        white-space: nowrap !important;
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-    }
+  body.header-expanded .song-meta-compact {
+    flex-shrink: 1 !important;
+    min-width: 0 !important;
+    max-width: 6rem !important;
+    font-size: 0.9rem !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
 
-    /* Make edit mode buttons match the size of edit/info buttons */
-    body.header-expanded .reset-button,
-    body.header-expanded .font-size-btn {
-        width: 1.8rem !important;
-        height: 1.8rem !important;
-        font-size: 0.9rem !important;
-        border-width: 1px !important;
-        padding: 0.2rem !important;
-        flex-shrink: 0 !important;
-    }
+  /* Make edit mode buttons match the size of edit/info buttons */
+  body.header-expanded .reset-button,
+  body.header-expanded .font-size-btn {
+    width: 1.8rem !important;
+    height: 1.8rem !important;
+    font-size: 0.9rem !important;
+    border-width: 1px !important;
+    padding: 0.2rem !important;
+    flex-shrink: 0 !important;
+  }
 
-    /* Ensure the header-controls-slot doesn't wrap */
-    body.header-expanded .header-controls-slot {
-        flex-wrap: nowrap !important;
-        overflow-x: auto !important;
-        gap: 0.2rem !important;
-    }
+  /* Ensure the header-controls-slot doesn't wrap */
+  body.header-expanded .header-controls-slot {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    gap: 0.2rem !important;
+  }
 
-    /* Show edit controls when header is expanded AND in edit mode */
-    body.header-expanded.edit-mode .edit-mode-control {
-        display: flex !important;
-        opacity: 1 !important;
-    }
+  /* Show edit controls when header is expanded AND in edit mode */
+  body.header-expanded.edit-mode .edit-mode-control {
+    display: flex !important;
+    opacity: 1 !important;
+  }
 }
 
 /* Edit mode control visibility system */
 /* Controls visible in normal mode, hidden in edit mode */
 .normal-mode-control {
-    opacity: 1;
-    transition: opacity 0.25s ease-in-out;
+  opacity: 1;
+  transition: opacity 0.25s ease-in-out;
 }
 
 body.edit-mode .normal-mode-control {
-    opacity: 0;
-    transition: opacity 0.25s ease-in-out;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
 }
 
 body.edit-mode .normal-mode-control.fade-complete {
-    display: none;
+  display: none;
 }
 
 /* Controls hidden in normal mode, visible in edit mode */
 .edit-mode-control {
-    display: none;
-    opacity: 0;
+  display: none;
+  opacity: 0;
 }
 
 /* When entering edit mode, show controls but keep opacity 0 initially */
 body.edit-mode .edit-mode-control {
-    opacity: 0;
-    transition: opacity 0.25s ease-in-out;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out;
 }
 
 /* For flex containers (divs, buttons with flex layout) */
 body.edit-mode .font-size-controls,
 body.edit-mode .reset-button {
-    display: flex;
+  display: flex;
 }
 
 /* Fade in when class is added */
 body.edit-mode .edit-mode-control.fade-in {
-    opacity: 1;
+  opacity: 1;
 }
 
 /* When exiting edit mode - keep visible during fade out */
 .edit-mode-control:not(.fade-in) {
-    transition: opacity 0.25s ease-in-out;
+  transition: opacity 0.25s ease-in-out;
 }
 
 /* For flex containers during fade out */
 .font-size-controls:not(.fade-in),
 .reset-button:not(.fade-in) {
-    display: flex;
+  display: flex;
 }
 
 /* Key display wrapper - shared label between modes */
 .key-display-wrapper {
-    display: flex;
-    align-items: center;
-    gap: 0.3rem;
-    transition: opacity 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: opacity 0.3s ease-in-out;
 }
 
 /* Header controls slot - add transition for animations */
 .header-controls-slot {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    transition: opacity 0.3s ease-in-out;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: opacity 0.3s ease-in-out;
 }
-
 
 /* Expand toggle button styling */
 .expand-toggle {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    display: none; /* Hidden by default, shown on mobile */
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    font-weight: bold;
-    transition: all 0.2s;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: none; /* Hidden by default, shown on mobile */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.3rem;
+  font-weight: bold;
+  transition: all 0.2s;
 }
 
 .expand-toggle:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 /* Mobile: show expand toggle, hide controls by default */
 @media (max-width: 47.99rem) {
-    .expand-toggle {
-        display: flex;
-    }
+  .expand-toggle {
+    display: flex;
+  }
 
-    header {
-        overflow: visible;
-    }
+  header {
+    overflow: visible;
+  }
 
-    header .header-center,
-    header .header-right .edit-mode-toggle,
-    header .header-right .info-button {
-        display: none !important;
-    }
+  header .header-center,
+  header .header-right .edit-mode-toggle,
+  header .header-right .info-button {
+    display: none !important;
+  }
 
-    /* When expanded on regular header (for songs.html, etc) */
-    body.header-expanded header .header-center {
-        display: flex !important;
-        flex-basis: 100%;
-        order: 3;
-        width: 100%;
-    }
+  /* When expanded on regular header (for songs.html, etc) */
+  body.header-expanded header .header-center {
+    display: flex !important;
+    flex-basis: 100%;
+    order: 3;
+    width: 100%;
+  }
 
-    body.header-expanded header .header-right .edit-mode-toggle,
-    body.header-expanded header .header-right .info-button {
-        display: flex !important;
-    }
+  body.header-expanded header .header-right .edit-mode-toggle,
+  body.header-expanded header .header-right .info-button {
+    display: flex !important;
+  }
 }
 
 /* Tablet/desktop: hide expand toggle, always show controls */
 @media (min-width: 48rem) {
-    .expand-toggle {
-        display: none !important;
-    }
+  .expand-toggle {
+    display: none !important;
+  }
 }
 
 /* Key selector - appears as plain text in normal mode, interactive button in edit mode */
 .key-selector {
-    background: transparent;
-    color: var(--header-text);
-    border: 2px solid transparent;
-    padding: 0.25rem 0.3rem;
-    font-size: 1.3rem;
-    border-radius: 4px;
-    cursor: default;
-    transition: all 0.25s ease-in-out;
-    min-width: 3rem;
-    min-height: 44px;
-    font-weight: normal;
-    text-align: center;
-    pointer-events: none;
+  background: transparent;
+  color: var(--header-text);
+  border: 2px solid transparent;
+  padding: 0.25rem 0.3rem;
+  font-size: 1.3rem;
+  border-radius: 4px;
+  cursor: default;
+  transition: all 0.25s ease-in-out;
+  min-width: 3rem;
+  min-height: 44px;
+  font-weight: normal;
+  text-align: center;
+  pointer-events: none;
 }
 
 /* In edit mode, make it look and behave like a button */
 body.edit-mode .key-selector {
-    background-color: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.3);
-    cursor: pointer;
-    pointer-events: auto;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  pointer-events: auto;
 }
 
 body.edit-mode .key-selector:hover {
-    background-color: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
 }
 
 body.edit-mode .key-selector:focus {
-    outline: none;
-    background-color: rgba(255, 255, 255, 0.3);
-    border-color: var(--header-text);
+  outline: none;
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--header-text);
 }
 
 /* Popover container */
 .key-popover {
-    background-color: var(--header-bg);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
-    padding: 0.5rem 0;
-    margin: 0;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-    max-height: 70vh;
-    overflow-y: auto;
-    position: fixed;
-    inset: unset;
+  background-color: var(--header-bg);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 0.5rem 0;
+  margin: 0;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  max-height: 70vh;
+  overflow-y: auto;
+  position: fixed;
+  inset: unset;
 }
 
 .key-popover::backdrop {
-    background-color: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 
 /* Key options list */
 .key-options-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 /* Individual key option */
 .key-option-item {
-    background-color: transparent;
-    color: var(--header-text);
-    border: none;
-    padding: 0.5rem 1rem;
-    font-size: 1.5rem;
-    font-family: inherit;
-    font-weight: normal;
-    cursor: pointer;
-    text-align: left;
-    transition: background-color 0.2s;
-    min-height: 44px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    white-space: nowrap;
+  background-color: transparent;
+  color: var(--header-text);
+  border: none;
+  padding: 0.5rem 1rem;
+  font-size: 1.5rem;
+  font-family: inherit;
+  font-weight: normal;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s;
+  min-height: 44px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  white-space: nowrap;
 }
 
 .key-option-item:hover {
-    background-color: rgba(255, 255, 255, 0.2);
+  background-color: rgba(255, 255, 255, 0.2);
 }
 
 .key-option-item.selected {
-    background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 .key-option-item .key-name {
-    flex: 0 0 auto;
+  flex: 0 0 auto;
 }
 
 .key-option-item .key-offset {
-    flex: 0 0 auto;
-    font-size: 1rem;
-    color: rgba(255, 255, 255, 0.5);
-    margin-left: 1rem;
+  flex: 0 0 auto;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-left: 1rem;
 }
 
 .font-size-controls {
-    align-items: center;
-    gap: 0.3rem;
+  align-items: center;
+  gap: 0.3rem;
 }
 
 .font-size-btn {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1rem;
-    font-weight: bold;
-    transition: opacity 0.25s ease-in-out, background-color 0.2s, transform 0.2s, border-color 0.2s, color 0.2s;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  transition:
+    opacity 0.25s ease-in-out,
+    background-color 0.2s,
+    transform 0.2s,
+    border-color 0.2s,
+    color 0.2s;
 }
 
 .font-size-btn:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .font-size-btn:active {
-    background-color: var(--button-bg);
-    border-color: var(--button-bg);
-    color: white;
+  background-color: var(--button-bg);
+  border-color: var(--button-bg);
+  color: white;
 }
 
 .reset-button {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.5rem;
-    font-weight: bold;
-    transition: opacity 0.25s ease-in-out, background-color 0.2s, transform 0.2s;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.5rem;
+  font-weight: bold;
+  transition:
+    opacity 0.25s ease-in-out,
+    background-color 0.2s,
+    transform 0.2s;
 }
 
 .reset-button:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .edit-mode-toggle {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    font-weight: bold;
-    transition: all 0.2s;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.3rem;
+  font-weight: bold;
+  transition: all 0.2s;
 }
 
 .edit-mode-toggle:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .edit-mode-toggle.active {
-    background-color: var(--button-bg);
-    border-color: var(--button-bg);
-    color: white;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+  background-color: var(--button-bg);
+  border-color: var(--button-bg);
+  color: white;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
 }
 
 .edit-mode-toggle.active:hover {
-    background-color: var(--button-hover);
-    border-color: var(--button-hover);
-    transform: scale(1.05);
+  background-color: var(--button-hover);
+  border-color: var(--button-hover);
+  transform: scale(1.05);
 }
 
 .info-button {
-    background: none;
-    border: 2px solid var(--header-text);
-    color: var(--header-text);
-    width: 2.5rem;
-    height: 2.5rem;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 1.3rem;
-    font-weight: bold;
-    transition: all 0.2s;
+  background: none;
+  border: 2px solid var(--header-text);
+  color: var(--header-text);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1.3rem;
+  font-weight: bold;
+  transition: all 0.2s;
 }
 
 .info-button:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    transform: scale(1.05);
+  background-color: rgba(255, 255, 255, 0.2);
+  transform: scale(1.05);
 }
 
 .info-button.active {
-    background-color: var(--button-bg);
-    border-color: var(--button-bg);
-    color: white;
-    box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
+  background-color: var(--button-bg);
+  border-color: var(--button-bg);
+  color: white;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.3);
 }
 
 .info-button.active:hover {
-    background-color: var(--button-hover);
-    border-color: var(--button-hover);
-    transform: scale(1.05);
+  background-color: var(--button-hover);
+  border-color: var(--button-hover);
+  transform: scale(1.05);
 }
 
 #main-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 0;
-    position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding: 0;
+  position: relative;
 }
 
 .song-container {
-    margin: 0;
-    font-size: 1rem;
-    height: 100%;
-    width: 100%;
+  margin: 0;
+  font-size: 1rem;
+  height: 100%;
+  width: 100%;
 }
 
 /* Larger font on tablet/desktop */
 @media (min-width: 48rem) {
-    .song-container {
-        font-size: 1.6rem;
-    }
+  .song-container {
+    font-size: 1.6rem;
+  }
 }
 
 .song {
-    margin-bottom: 2rem;
+  margin-bottom: 2rem;
 }
 
 .song-title {
-    font-size: 2rem;
-    margin-bottom: 1.5rem;
-    color: var(--header-bg);
+  font-size: 2rem;
+  margin-bottom: 1.5rem;
+  color: var(--header-bg);
 }
 
 /* Custom ChordPro styling */
 .song-content .song-header {
-    display: none; /* Hidden - info now in compact header */
+  display: none; /* Hidden - info now in compact header */
 }
 
 .song-content .song-title {
-    font-size: 2rem;
-    font-weight: 600;
-    color: var(--header-bg);
-    margin-bottom: 0.5rem;
+  font-size: 2rem;
+  font-weight: 600;
+  color: var(--header-bg);
+  margin-bottom: 0.5rem;
 }
 
 .song-content .song-artist {
-    font-size: 1rem;
-    color: #7f8c8d;
-    margin-bottom: 0.5rem;
+  font-size: 1rem;
+  color: #7f8c8d;
+  margin-bottom: 0.5rem;
 }
 
 .song-content .song-meta {
-    font-size: 0.9rem;
-    color: #95a5a6;
-    display: flex;
-    gap: 1.5rem;
-    margin-top: 0.5rem;
+  font-size: 0.9rem;
+  color: #95a5a6;
+  display: flex;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
 }
 
 .song-content .song-ccli {
-    font-size: 0.85rem;
-    color: #bdc3c7;
-    margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #bdc3c7;
+  margin-top: 0.5rem;
 }
 .song-content .chord-line {
-    display: flex;
-    margin-bottom: 0.2rem;
-    line-height: 1.5em;
+  display: flex;
+  margin-bottom: 0.2rem;
+  line-height: 1.5em;
 }
 
 .song-content .bar-group {
-    margin-bottom: 0.5rem;
-    display: grid;
-    width: fit-content;
-    gap: 0;
+  margin-bottom: 0.5rem;
+  display: grid;
+  width: fit-content;
+  gap: 0;
 }
 
 .song-content .bar-group .chord-line {
-    display: contents;
+  display: contents;
 }
 
 .song-content .measure {
-    display: flex;
-    align-items: flex-start;
+  display: flex;
+  align-items: flex-start;
 }
 
 .song-content .measure.first-measure .bar-marker {
-    margin-left: 0;
+  margin-left: 0;
 }
 
 .song-content .measure.last-measure .bar-marker {
-    margin-left: auto;
+  margin-left: auto;
 }
 
 .song-content .measure:not(.first-measure):not(.last-measure) .bar-marker {
-    margin-left: auto;
+  margin-left: auto;
 }
 
 .song-content .chord-segment {
-    display: inline-flex;
-    flex-direction: column;
-    white-space: pre;
+  display: inline-flex;
+  flex-direction: column;
+  white-space: pre;
 }
 
 .song-content .chord-segment.chord-only {
-    padding-right: 0.5em;
+  padding-right: 0.5em;
 }
 
 .song-content .chord {
-    color: var(--chord-color);
-    font-weight: bold;
-    font-size: 0.9em;
-    min-height: 1.1em;
-    line-height: 1.1em;
-    padding-right: 0.25em;
+  color: var(--chord-color);
+  font-weight: bold;
+  font-size: 0.9em;
+  min-height: 1.1em;
+  line-height: 1.1em;
+  padding-right: 0.25em;
 }
 
 .song-content .chord.bar {
-    color: var(--text-tertiary);
-    font-weight: normal;
+  color: var(--text-tertiary);
+  font-weight: normal;
 }
 
 .song-content .chord.invalid {
-    color: var(--text-muted);
-    opacity: 0.5;
-    font-style: italic;
+  color: var(--text-muted);
+  opacity: 0.5;
+  font-style: italic;
 }
 
 .song-content .lyrics {
-    line-height: 1.4em;
-    padding: 0;
-    margin: 0;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
+  line-height: 1.4em;
+  padding: 0;
+  margin: 0;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
 .song-content .chord-line {
-    flex-wrap: wrap;
+  flex-wrap: wrap;
 }
 
 .song-content .section-content {
-    max-width: 100%;
-    overflow-wrap: break-word;
-    word-wrap: break-word;
+  max-width: 100%;
+  overflow-wrap: break-word;
+  word-wrap: break-word;
 }
 
 /* Setlist overview */
 .setlist-overview {
-    padding: 1.5rem 0;
+  padding: 1.5rem 0;
 }
 
 .overview-songs {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 900px;
-    margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 900px;
+  margin: 0 auto;
 }
 
 /* Override song card styles for setlist overview context */
 .overview-song-card {
-    position: relative; /* Needed for drag and drop pseudo-elements */
+  position: relative; /* Needed for drag and drop pseudo-elements */
 }
 
 /* Drag and drop states */
 .overview-song-card.dragging {
-    opacity: 0.9;
-    background-color: #ecf0f1;
-    border-color: var(--button-bg);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    cursor: grabbing;
-    pointer-events: none;
-    position: relative;
-    /* transform is applied via JS to follow cursor */
+  opacity: 0.9;
+  background-color: #ecf0f1;
+  border-color: var(--button-bg);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  cursor: grabbing;
+  pointer-events: none;
+  position: relative;
+  /* transform is applied via JS to follow cursor */
 }
 
 .overview-song-card.drag-over-above::before,
 .overview-song-card.drag-over-below::after {
-    content: '';
-    position: absolute;
-    left: 0;
-    right: 0;
-    height: calc(var(--drag-card-height, 70px) + 0.5rem); /* Match dragged card height + gap */
-    background-color: #d5dbdb;
-    border: 2px dashed #95a5a6;
-    border-radius: 12px;
-    opacity: 0.6;
-    pointer-events: none;
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(var(--drag-card-height, 70px) + 0.5rem); /* Match dragged card height + gap */
+  background-color: #d5dbdb;
+  border: 2px dashed #95a5a6;
+  border-radius: 12px;
+  opacity: 0.6;
+  pointer-events: none;
 }
 
 .overview-song-card.drag-over-above::before {
-    top: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position above with gap */
+  top: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position above with gap */
 }
 
 .overview-song-card.drag-over-below::after {
-    bottom: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position below with gap */
+  bottom: calc(-1 * var(--drag-card-height, 70px) - 1rem); /* Position below with gap */
 }
 
 .overview-songs.reordering .overview-song-card {
-    touch-action: none; /* Prevent native scrolling while reordering */
-    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: none; /* Prevent native scrolling while reordering */
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Remove transition from dragged card so it follows cursor immediately */
 .overview-songs.reordering .overview-song-card.dragging {
-    transition: none;
+  transition: none;
 }
 
 .overview-song-card.will-move-down {
-    transform: translateY(calc(100% + 0.5rem));
+  transform: translateY(calc(100% + 0.5rem));
 }
 
 .overview-song-card.will-move-up {
-    transform: translateY(calc(-100% - 0.5rem));
+  transform: translateY(calc(-100% - 0.5rem));
 }
 
 /* Horizontal scroll-based navigation */
 .song-container {
-    display: flex;
-    overflow-x: auto;
-    overflow-y: hidden;
-    scroll-snap-type: x mandatory;
-    scroll-behavior: smooth;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
 .song-container::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .section {
-    min-width: 100%;
-    width: 100%;
-    max-width: 100%;
-    height: 100%;
-    flex-shrink: 0;
-    scroll-snap-align: start;
-    scroll-snap-stop: always;
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding: 0;
-    padding-bottom: 2rem;
-    box-sizing: border-box;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE and Edge */
+  min-width: 100%;
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+  padding-bottom: 2rem;
+  box-sizing: border-box;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }
 
 .section > * {
-    padding-left: 0 !important;
-    margin-left: 0 !important;
+  padding-left: 0 !important;
+  margin-left: 0 !important;
 }
 
 /* Larger padding on tablet/desktop */
 @media (min-width: 48rem) {
-    .section {
-        padding: 0 0.5rem 3rem 0.5rem;
-    }
+  .section {
+    padding: 0 0.5rem 3rem 0.5rem;
+  }
 
-    .section > * {
-        padding-left: unset !important;
-        margin-left: unset !important;
-    }
+  .section > * {
+    padding-left: unset !important;
+    margin-left: unset !important;
+  }
 }
 
 .section::-webkit-scrollbar {
-    display: none; /* Chrome, Safari, Opera */
+  display: none; /* Chrome, Safari, Opera */
 }
 
 .section .song-content {
-    flex-shrink: 0;
+  flex-shrink: 0;
 }
 
 /* Song info modal */
 .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0, 0, 0, 0.7);
-    display: none;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
 
 .modal-overlay.active {
-    display: flex;
+  display: flex;
 }
 
 .modal-content {
-    background-color: white;
-    color: var(--text-color);
-    border-radius: 12px;
-    padding: 3rem;
-    width: 90%;
-    max-width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
-    position: relative;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  background-color: white;
+  color: var(--text-color);
+  border-radius: 12px;
+  padding: 3rem;
+  width: 90%;
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 /* Add Song modal - nearly fullscreen */
 .add-song-modal-content {
-    width: 98%;
-    max-width: 98vw;
-    height: 95vh;
-    max-height: 95vh;
-    display: flex;
-    flex-direction: column;
-    padding: 2rem 0;
+  width: 98%;
+  max-width: 98vw;
+  height: 95vh;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 0;
 }
 
 .add-song-modal-content h2 {
-    margin-bottom: 1.5rem;
-    flex-shrink: 0;
-    max-width: 800px;
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 0 2rem;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+  max-width: 800px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
 }
 
 .add-song-modal-content .song-library-header {
-    margin-bottom: 1.5rem;
-    flex-shrink: 0;
-    max-width: 800px;
-    width: 100%;
-    margin-left: auto;
-    margin-right: auto;
-    padding: 0 2rem;
+  margin-bottom: 1.5rem;
+  flex-shrink: 0;
+  max-width: 800px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 2rem;
 }
 
 .add-song-modal-content #add-song-results {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
-    width: 100%;
-    max-width: none;
-    margin: 0;
-    padding: 0 2rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .add-song-modal-content .modal-close {
-    top: 1rem;
-    right: 1rem;
+  top: 1rem;
+  right: 1rem;
 }
 
 /* Import Song Choice Buttons */
 .choice-button {
-    display: flex;
-    align-items: center;
-    gap: 1.5rem;
-    padding: 1.5rem;
-    background: white;
-    border: 2px solid #ecf0f1;
-    border-radius: 12px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.2s;
-    width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: white;
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  width: 100%;
 }
 
 .choice-button:hover {
-    background: #f8f9fa;
-    border-color: var(--button-bg);
-    transform: translateX(5px);
+  background: #f8f9fa;
+  border-color: var(--button-bg);
+  transform: translateX(5px);
 }
 
 .choice-button:active {
-    transform: scale(0.98);
+  transform: scale(0.98);
 }
 
 .choice-button-icon {
-    font-size: 2rem;
-    flex-shrink: 0;
+  font-size: 2rem;
+  flex-shrink: 0;
 }
 
 .choice-button-content {
-    flex: 1;
+  flex: 1;
 }
 
 .choice-button-title {
-    font-size: 1.3rem;
-    font-weight: 600;
-    color: var(--text-color);
-    margin-bottom: 0.25rem;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--text-color);
+  margin-bottom: 0.25rem;
 }
 
 .choice-button-subtitle {
-    font-size: 1rem;
-    color: #7f8c8d;
+  font-size: 1rem;
+  color: #7f8c8d;
 }
 
 /* Recent setlist dropdown inline */
 .recent-setlist-select-inline {
-    width: 100%;
-    padding: 0.5rem 0.75rem;
-    margin-top: 0.5rem;
-    font-size: 1rem;
-    border: 2px solid #ecf0f1;
-    border-radius: 6px;
-    background-color: #f8f9fa;
-    color: var(--text-color);
-    cursor: pointer;
-    transition: all 0.2s;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  margin-top: 0.5rem;
+  font-size: 1rem;
+  border: 2px solid #ecf0f1;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .recent-setlist-select-inline:hover {
-    border-color: var(--button-bg);
-    background-color: white;
+  border-color: var(--button-bg);
+  background-color: white;
 }
 
 .recent-setlist-select-inline:focus {
-    outline: none;
-    border-color: var(--button-bg);
-    background-color: white;
+  outline: none;
+  border-color: var(--button-bg);
+  background-color: white;
 }
 
 .choice-button-with-select:hover .recent-setlist-select-inline {
-    border-color: var(--button-bg);
+  border-color: var(--button-bg);
 }
 
 .modal-close {
-    position: absolute;
-    top: 1.5rem;
-    right: 1.5rem;
-    background: none;
-    border: none;
-    font-size: 2rem;
-    cursor: pointer;
-    color: var(--text-color);
-    opacity: 0.6;
-    transition: opacity 0.2s;
-    min-width: 44px;
-    min-height: 44px;
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--text-color);
+  opacity: 0.6;
+  transition: opacity 0.2s;
+  min-width: 44px;
+  min-height: 44px;
 }
 
 .modal-close:hover {
-    opacity: 1;
+  opacity: 1;
 }
 
 .modal-content h2 {
-    margin-top: 0;
-    color: var(--header-bg);
-    font-size: 2rem;
+  margin-top: 0;
+  color: var(--header-bg);
+  font-size: 2rem;
 }
 
 .modal-info-grid {
-    display: grid;
-    gap: 1.5rem;
+  display: grid;
+  gap: 1.5rem;
 }
 
 .modal-info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 
 .modal-info-label {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #7f8c8d;
-    text-transform: uppercase;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #7f8c8d;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .info-tooltip-wrapper {
-    position: relative;
-    display: inline-flex;
+  position: relative;
+  display: inline-flex;
 }
 
 .info-tooltip-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.4rem;
-    height: 1.4rem;
-    font-size: 1rem;
-    color: #95a5a6;
-    cursor: pointer;
-    border-radius: 50%;
-    background-color: #ecf0f1;
-    font-style: normal;
-    transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  font-size: 1rem;
+  color: #95a5a6;
+  cursor: pointer;
+  border-radius: 50%;
+  background-color: #ecf0f1;
+  font-style: normal;
+  transition: all 0.2s;
 }
 
 .info-tooltip-icon:active {
-    background-color: var(--button-bg);
-    color: white;
+  background-color: var(--button-bg);
+  color: white;
 }
 
 .info-tooltip-text {
-    position: absolute;
-    left: 50%;
-    top: calc(100% + 0.5rem);
-    transform: translateX(-50%);
-    background-color: var(--header-bg);
-    color: var(--header-text);
-    padding: 0.75rem 1rem;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: normal;
-    text-transform: none;
-    white-space: normal;
-    max-width: 300px;
-    min-width: 200px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    z-index: 1000;
-    pointer-events: none;
-    opacity: 0;
-    visibility: hidden;
-    transition: opacity 0.2s, visibility 0.2s;
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.5rem);
+  transform: translateX(-50%);
+  background-color: var(--header-bg);
+  color: var(--header-text);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: normal;
+  text-transform: none;
+  white-space: normal;
+  max-width: 300px;
+  min-width: 200px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s,
+    visibility 0.2s;
 }
 
 .info-tooltip-wrapper.active .info-tooltip-text {
-    opacity: 1;
-    visibility: visible;
+  opacity: 1;
+  visibility: visible;
 }
 
 .info-tooltip-wrapper.active .info-tooltip-icon {
-    background-color: var(--button-bg);
-    color: white;
+  background-color: var(--button-bg);
+  color: white;
 }
 
 .info-tooltip-text::before {
-    content: '';
-    position: absolute;
-    bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
-    border: 6px solid transparent;
-    border-bottom-color: var(--header-bg);
+  content: '';
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 6px solid transparent;
+  border-bottom-color: var(--header-bg);
 }
 
 .modal-info-value {
-    font-size: 1.3rem;
-    color: var(--text-color);
+  font-size: 1.3rem;
+  color: var(--text-color);
 }
 
 .modal-actions {
-    display: flex;
-    gap: 1rem;
-    margin-top: 2rem;
-    justify-content: flex-end;
+  display: flex;
+  gap: 1rem;
+  margin-top: 2rem;
+  justify-content: flex-end;
 }
 
 .modal-btn {
-    padding: 0.75rem 1.5rem;
-    border: none;
-    border-radius: 6px;
-    font-size: 1.1rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    min-width: 100px;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 6px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 100px;
 }
 
 .modal-btn-cancel {
-    background-color: var(--bg-tertiary, #ecf0f1);
-    color: var(--text-color);
+  background-color: var(--bg-tertiary, #ecf0f1);
+  color: var(--text-color);
 }
 
 .modal-btn-cancel:hover {
-    filter: brightness(1.2);
+  filter: brightness(1.2);
 }
 
 .modal-btn-confirm {
-    background-color: #e74c3c;
-    color: white;
+  background-color: #e74c3c;
+  color: white;
 }
 
 .modal-btn-confirm:hover {
-    background-color: #c0392b;
+  background-color: #c0392b;
 }
 
 .modal-btn-primary {
-    background-color: var(--button-bg, #3498db);
-    color: var(--button-text, white);
+  background-color: var(--button-bg, #3498db);
+  color: var(--button-text, white);
 }
 
 .modal-btn-primary:hover {
-    background-color: var(--button-hover, #2980b9);
+  background-color: var(--button-hover, #2980b9);
 }
 
 #reset-confirm-modal .modal-content {
-    max-width: 500px;
+  max-width: 500px;
 }
 
 #create-setlist-modal .modal-content {
-    max-width: 500px;
+  max-width: 500px;
 }
 
 /* Form styles */
 .form-field {
-    margin-bottom: 1.5rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-field label {
-    display: block;
-    margin-bottom: 0.5rem;
-    color: var(--text-color);
-    font-weight: 600;
-    font-size: 1rem;
+  display: block;
+  margin-bottom: 0.5rem;
+  color: var(--text-color);
+  font-weight: 600;
+  font-size: 1rem;
 }
 
-.form-field input[type="date"],
-.form-field input[type="time"],
-.form-field input[type="text"],
+.form-field input[type='date'],
+.form-field input[type='time'],
+.form-field input[type='text'],
 .form-field select {
-    width: 100%;
-    padding: 0.75rem;
-    border: 2px solid var(--border-light, #e0e0e0);
-    border-radius: 6px;
-    font-size: 1rem;
-    font-family: inherit;
-    background-color: var(--bg-tertiary, white);
-    color: var(--text-color);
-    transition: border-color 0.2s ease;
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid var(--border-light, #e0e0e0);
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  background-color: var(--bg-tertiary, white);
+  color: var(--text-color);
+  transition: border-color 0.2s ease;
 }
 
-.form-field input[type="date"]:focus,
-.form-field input[type="time"]:focus,
-.form-field input[type="text"]:focus,
+.form-field input[type='date']:focus,
+.form-field input[type='time']:focus,
+.form-field input[type='text']:focus,
 .form-field select:focus {
-    outline: none;
-    border-color: var(--button-bg);
+  outline: none;
+  border-color: var(--button-bg);
 }
 
 .form-field input::placeholder {
-    color: var(--text-secondary, #95a5a6);
+  color: var(--text-secondary, #95a5a6);
 }
 
 /* Create setlist button in header */
 .create-setlist-button {
-    background: none;
-    border: none;
-    color: white;
-    cursor: pointer;
-    padding: 0.5rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 4px;
-    transition: background-color 0.2s ease;
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
 }
 
 .create-setlist-button:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+  background-color: rgba(255, 255, 255, 0.1);
 }
 
 #reset-confirm-modal p {
-    margin: 1.5rem 0;
-    line-height: 1.6;
-    color: #7f8c8d;
+  margin: 1.5rem 0;
+  line-height: 1.6;
+  color: #7f8c8d;
 }
 
 /* Home page tabs */
 .home-tabs {
-    display: flex;
-    gap: 0;
-    background-color: #ecf0f1;
-    border-bottom: 3px solid var(--header-bg);
+  display: flex;
+  gap: 0;
+  background-color: #ecf0f1;
+  border-bottom: 3px solid var(--header-bg);
 }
 
 .tab-button {
-    flex: 1;
-    padding: 1.2rem 2rem;
-    background-color: transparent;
-    border: none;
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: #7f8c8d;
-    cursor: pointer;
-    transition: all 0.2s;
-    border-bottom: 3px solid transparent;
-    margin-bottom: -3px;
-    min-height: 60px;
+  flex: 1;
+  padding: 1.2rem 2rem;
+  background-color: transparent;
+  border: none;
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #7f8c8d;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -3px;
+  min-height: 60px;
 }
 
 .tab-button:hover {
-    background-color: rgba(44, 62, 80, 0.05);
-    color: var(--header-bg);
+  background-color: rgba(44, 62, 80, 0.05);
+  color: var(--header-bg);
 }
 
 .tab-button.active {
-    color: var(--header-bg);
-    background-color: white;
-    border-bottom-color: var(--button-bg);
+  color: var(--header-bg);
+  background-color: white;
+  border-bottom-color: var(--button-bg);
 }
 
 /* Tab content */
 .tab-content {
-    display: none;
+  display: none;
 }
 
 .tab-content.active {
-    display: block;
+  display: block;
 }
 
 /* Unified song card component (used in both setlist overview and song library) */
 .song-card {
-    display: flex;
-    align-items: center;
-    gap: 2rem;
-    padding: 1.2rem 2rem;
-    background-color: white;
-    border: 2px solid #ecf0f1;
-    border-radius: 12px;
-    cursor: pointer;
-    text-align: left;
-    text-decoration: none;
-    color: inherit;
-    min-height: 70px;
-    transition: all 0.2s;
-    user-select: none;
-    -webkit-user-select: none;
-    -webkit-touch-callout: none;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  padding: 1.2rem 2rem;
+  background-color: white;
+  border: 2px solid #ecf0f1;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  color: inherit;
+  min-height: 70px;
+  transition: all 0.2s;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .song-card:hover {
-    background-color: #f8f9fa;
-    border-color: var(--button-bg);
-    transform: translateX(5px);
+  background-color: #f8f9fa;
+  border-color: var(--button-bg);
+  transform: translateX(5px);
 }
 
 .song-card:active {
-    transform: scale(0.98);
+  transform: scale(0.98);
 }
 
 .song-card-info {
-    display: flex;
-    flex-direction: column;
-    gap: 0.25rem;
-    flex: 1;
-    min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
 }
 
 .song-card-title-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    gap: 1rem;
-    min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .song-card-title {
-    font-size: 1.5rem;
-    font-weight: 600;
-    color: var(--text-color);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex: 1;
-    min-width: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
 }
 
 .song-card-last-played {
-    font-size: 1rem;
-    color: #95a5a6;
-    white-space: nowrap;
-    flex-shrink: 0;
+  font-size: 1rem;
+  color: #95a5a6;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .song-card-meta {
-    font-size: 1.1rem;
-    color: #7f8c8d;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  font-size: 1.1rem;
+  color: #7f8c8d;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Add Song button */
 .add-song-button {
-    margin-top: 1.5rem;
-    border: 2px dashed var(--border-color, #bdc3c7) !important;
-    background-color: var(--bg-tertiary, #f8f9fa) !important;
-    color: var(--text-secondary, #7f8c8d);
+  margin-top: 1.5rem;
+  border: 2px dashed var(--border-color, #bdc3c7) !important;
+  background-color: var(--bg-tertiary, #f8f9fa) !important;
+  color: var(--text-secondary, #7f8c8d);
 }
 
 .add-song-button:hover {
-    background-color: var(--bg-secondary, white) !important;
-    border-color: var(--button-bg) !important;
-    color: var(--button-bg);
+  background-color: var(--bg-secondary, white) !important;
+  border-color: var(--button-bg) !important;
+  color: var(--button-bg);
 }
 
 .add-song-button .song-card-title {
-    color: inherit;
+  color: inherit;
 }
 
 /* Song library */
 .song-library-header {
-    max-width: 800px;
-    margin: 0 auto 2rem auto;
+  max-width: 800px;
+  margin: 0 auto 2rem auto;
 }
 
 .song-search-input {
-    width: 100%;
-    padding: 1rem 1.5rem;
-    font-size: 1.3rem;
-    border: 2px solid var(--border-light, #ecf0f1);
-    border-radius: 8px;
-    background-color: var(--bg-secondary, white);
-    color: var(--text-color);
-    transition: border-color 0.2s;
+  width: 100%;
+  padding: 1rem 1.5rem;
+  font-size: 1.3rem;
+  border: 2px solid var(--border-light, #ecf0f1);
+  border-radius: 8px;
+  background-color: var(--bg-secondary, white);
+  color: var(--text-color);
+  transition: border-color 0.2s;
 }
 
 .song-search-input:focus {
-    outline: none;
-    border-color: var(--button-bg);
+  outline: none;
+  border-color: var(--button-bg);
 }
 
 .song-search-input::placeholder {
-    color: var(--text-secondary, #95a5a6);
+  color: var(--text-secondary, #95a5a6);
 }
 
 .song-library-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-    max-width: 800px;
-    margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 /* Settings page */
 .settings-content {
-    max-width: 800px;
-    margin: 0 auto;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .settings-section {
-    margin-bottom: 3rem;
+  margin-bottom: 3rem;
 }
 
 /* Touch-friendly spacing */
 @media (max-width: 768px) {
-    #main-content {
-        padding: 1rem;
-    }
+  #main-content {
+    padding: 1rem;
+  }
 
-    .controls button {
-        padding: 1rem 2rem;
-        font-size: 1.5rem;
-    }
+  .controls button {
+    padding: 1rem 2rem;
+    font-size: 1.5rem;
+  }
 
-    .modal-content {
-        margin: 1rem;
-        max-width: calc(100% - 2rem);
-    }
+  .modal-content {
+    margin: 1rem;
+    max-width: calc(100% - 2rem);
+  }
 }

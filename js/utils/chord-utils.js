@@ -8,5 +8,5 @@
  * @returns {boolean} True if chord is a bar marker (|, ||, ||:, :||)
  */
 export function isBarMarker(chord) {
-    return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
+  return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
 }

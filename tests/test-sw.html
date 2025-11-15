@@ -1,16 +1,30 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
+  <head>
     <title>Service Worker Test</title>
     <style>
-        body { font-family: monospace; padding: 20px; }
-        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
-        .ok { background: #d4edda; }
-        .error { background: #f8d7da; }
-        button { padding: 10px 20px; margin: 5px; }
+      body {
+        font-family: monospace;
+        padding: 20px;
+      }
+      .status {
+        padding: 10px;
+        margin: 10px 0;
+        border-radius: 4px;
+      }
+      .ok {
+        background: #d4edda;
+      }
+      .error {
+        background: #f8d7da;
+      }
+      button {
+        padding: 10px 20px;
+        margin: 5px;
+      }
     </style>
-</head>
-<body>
+  </head>
+  <body>
     <h1>Service Worker Diagnostics</h1>
 
     <div id="status"></div>
@@ -24,62 +38,64 @@
     <pre id="logs"></pre>
 
     <script>
-        const statusDiv = document.getElementById('status');
-        const logsDiv = document.getElementById('logs');
+      const statusDiv = document.getElementById('status');
+      const logsDiv = document.getElementById('logs');
 
-        function log(msg) {
-            console.log(msg);
-            logsDiv.textContent += msg + '\n';
+      function log(msg) {
+        console.log(msg);
+        logsDiv.textContent += msg + '\n';
+      }
+
+      async function checkSW() {
+        if (!('serviceWorker' in navigator)) {
+          statusDiv.innerHTML = '<div class="status error">❌ Service Workers not supported</div>';
+          return;
         }
 
-        async function checkSW() {
-            if (!('serviceWorker' in navigator)) {
-                statusDiv.innerHTML = '<div class="status error">❌ Service Workers not supported</div>';
-                return;
-            }
+        const registration = await navigator.serviceWorker.getRegistration();
 
-            const registration = await navigator.serviceWorker.getRegistration();
-
-            if (!registration) {
-                statusDiv.innerHTML = '<div class="status error">❌ No Service Worker registered</div>';
-                statusDiv.innerHTML += '<button onclick="registerSW()">Register Service Worker</button>';
-                return;
-            }
-
-            const controller = navigator.serviceWorker.controller;
-
-            if (!controller) {
-                statusDiv.innerHTML = '<div class="status error">⚠️ Service Worker registered but not controlling page</div>';
-                statusDiv.innerHTML += '<button onclick="location.reload()">Reload Page</button>';
-                return;
-            }
-
-            statusDiv.innerHTML = '<div class="status ok">✅ Service Worker is active and controlling page</div>';
-            log('SW active, scope: ' + registration.scope);
-            log('SW state: ' + registration.active?.state);
+        if (!registration) {
+          statusDiv.innerHTML = '<div class="status error">❌ No Service Worker registered</div>';
+          statusDiv.innerHTML += '<button onclick="registerSW()">Register Service Worker</button>';
+          return;
         }
 
-        async function registerSW() {
-            log('Registering service worker...');
-            try {
-                const registration = await navigator.serviceWorker.register('/service-worker.js');
-                log('Registered: ' + registration.scope);
+        const controller = navigator.serviceWorker.controller;
 
-                await navigator.serviceWorker.ready;
-                log('Service worker ready');
-
-                location.reload();
-            } catch (error) {
-                log('Error: ' + error);
-            }
+        if (!controller) {
+          statusDiv.innerHTML =
+            '<div class="status error">⚠️ Service Worker registered but not controlling page</div>';
+          statusDiv.innerHTML += '<button onclick="location.reload()">Reload Page</button>';
+          return;
         }
 
-        function testNav(url) {
-            log('Testing navigation to: ' + url);
-            window.location.href = url;
-        }
+        statusDiv.innerHTML =
+          '<div class="status ok">✅ Service Worker is active and controlling page</div>';
+        log('SW active, scope: ' + registration.scope);
+        log('SW state: ' + registration.active?.state);
+      }
 
-        checkSW();
+      async function registerSW() {
+        log('Registering service worker...');
+        try {
+          const registration = await navigator.serviceWorker.register('/service-worker.js');
+          log('Registered: ' + registration.scope);
+
+          await navigator.serviceWorker.ready;
+          log('Service worker ready');
+
+          location.reload();
+        } catch (error) {
+          log('Error: ' + error);
+        }
+      }
+
+      function testNav(url) {
+        log('Testing navigation to: ' + url);
+        window.location.href = url;
+      }
+
+      checkSW();
     </script>
-</body>
+  </body>
 </html>

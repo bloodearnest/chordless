@@ -3,11 +3,11 @@
 // Or load in browser console
 
 import {
-    parseChord,
-    transposeNote,
-    transposeChord,
-    getAvailableKeys,
-    getKeyOffset
+  parseChord,
+  transposeNote,
+  transposeChord,
+  getAvailableKeys,
+  getKeyOffset,
 } from '../js/transpose.js';
 
 // Simple test framework
@@ -16,19 +16,22 @@ let passCount = 0;
 let failCount = 0;
 
 function assert(condition, message) {
-    testCount++;
-    if (condition) {
-        passCount++;
-        console.log(`✓ ${message}`);
-    } else {
-        failCount++;
-        console.error(`✗ ${message}`);
-    }
+  testCount++;
+  if (condition) {
+    passCount++;
+    console.log(`✓ ${message}`);
+  } else {
+    failCount++;
+    console.error(`✗ ${message}`);
+  }
 }
 
 function assertEquals(actual, expected, message) {
-    const matches = JSON.stringify(actual) === JSON.stringify(expected);
-    assert(matches, `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`);
+  const matches = JSON.stringify(actual) === JSON.stringify(expected);
+  assert(
+    matches,
+    `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`
+  );
 }
 
 console.log('Running transpose.js tests...\n');
@@ -606,8 +609,8 @@ console.log(`Passed: ${passCount}`);
 console.log(`Failed: ${failCount}`);
 
 if (failCount === 0) {
-    console.log('\n✓ All tests passed!');
+  console.log('\n✓ All tests passed!');
 } else {
-    console.error(`\n✗ ${failCount} test(s) failed`);
-    process.exit(1);
+  console.error(`\n✗ ${failCount} test(s) failed`);
+  process.exit(1);
 }

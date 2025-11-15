@@ -9,94 +9,97 @@ let passCount = 0;
 let failCount = 0;
 
 function assert(condition, message) {
-    testCount++;
-    if (condition) {
-        passCount++;
-        console.log(`✓ ${message}`);
-    } else {
-        failCount++;
-        console.error(`✗ ${message}`);
-    }
+  testCount++;
+  if (condition) {
+    passCount++;
+    console.log(`✓ ${message}`);
+  } else {
+    failCount++;
+    console.error(`✗ ${message}`);
+  }
 }
 
 function assertEquals(actual, expected, message) {
-    const matches = JSON.stringify(actual) === JSON.stringify(expected);
-    assert(matches, `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`);
+  const matches = JSON.stringify(actual) === JSON.stringify(expected);
+  assert(
+    matches,
+    `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`
+  );
 }
 
 // Mock Web Audio API
 class MockAudioContext {
-    constructor() {
-        this.state = 'running';
-        this.currentTime = 0;
-        this.resumeCalled = false;
-    }
+  constructor() {
+    this.state = 'running';
+    this.currentTime = 0;
+    this.resumeCalled = false;
+  }
 
-    resume() {
-        this.resumeCalled = true;
-        return Promise.resolve();
-    }
+  resume() {
+    this.resumeCalled = true;
+    return Promise.resolve();
+  }
 
-    createOscillator() {
-        return new MockOscillator(this);
-    }
+  createOscillator() {
+    return new MockOscillator(this);
+  }
 
-    createGain() {
-        return new MockGainNode();
-    }
+  createGain() {
+    return new MockGainNode();
+  }
 }
 
 class MockOscillator {
-    constructor(context) {
-        this.context = context;
-        this.frequency = { value: 440 };
-        this.connected = false;
-        this.started = false;
-        this.stopped = false;
-    }
+  constructor(context) {
+    this.context = context;
+    this.frequency = { value: 440 };
+    this.connected = false;
+    this.started = false;
+    this.stopped = false;
+  }
 
-    connect(destination) {
-        this.connected = true;
-        this.destination = destination;
-    }
+  connect(destination) {
+    this.connected = true;
+    this.destination = destination;
+  }
 
-    disconnect() {
-        this.connected = false;
-    }
+  disconnect() {
+    this.connected = false;
+  }
 
-    start(when) {
-        this.started = true;
-        this.startTime = when;
-    }
+  start(when) {
+    this.started = true;
+    this.startTime = when;
+  }
 
-    stop(when) {
-        this.stopped = true;
-        this.stopTime = when;
-    }
+  stop(when) {
+    this.stopped = true;
+    this.stopTime = when;
+  }
 }
 
 class MockGainNode {
-    constructor() {
-        this.gain = {
-            value: 1.0,
-            setValueAtTime: function(value, _time) {
-                this.value = value;
-            },
-            exponentialRampToValueAtTime: function(value, _time) {
-                this.value = value;
-            }
-        };
-        this.connected = false;
-    }
+  constructor() {
+    this.gain = {
+      value: 1.0,
+      setValueAtTime: function (value, _time) {
+        this.value = value;
+      },
+      exponentialRampToValueAtTime: function (value, _time) {
+        this.value = value;
+      },
+    };
+    this.connected = false;
+  }
 
-    connect(destination) {
-        this.connected = true;
-        this.destination = destination;
-    }
+  connect(destination) {
+    this.connected = true;
+    this.destination = destination;
+  }
 
-    disconnect() {
-        this.connected = false;
-    }
+  disconnect() {
+    this.connected = false;
+  }
 }
 
 console.log('Running metronome-controller.js tests...\n');
@@ -105,27 +108,27 @@ console.log('Running metronome-controller.js tests...\n');
 console.log('=== Testing Constructor ===');
 
 try {
-    const context = new MockAudioContext();
-    const gain = new MockGainNode();
-    const controller = new MetronomeController(context, gain);
-    assert(true, 'Constructor accepts valid arguments');
-    assert(!controller.isRunning, 'Controller starts in stopped state');
+  const context = new MockAudioContext();
+  const gain = new MockGainNode();
+  const controller = new MetronomeController(context, gain);
+  assert(true, 'Constructor accepts valid arguments');
+  assert(!controller.isRunning, 'Controller starts in stopped state');
 } catch (e) {
-    assert(false, `Constructor accepts valid arguments: ${e.message}`);
+  assert(false, `Constructor accepts valid arguments: ${e.message}`);
 }
 
 try {
-    new MetronomeController(null, new MockGainNode());
-    assert(false, 'Constructor throws error for null AudioContext');
+  new MetronomeController(null, new MockGainNode());
+  assert(false, 'Constructor throws error for null AudioContext');
 } catch {
-    assert(true, 'Constructor throws error for null AudioContext');
+  assert(true, 'Constructor throws error for null AudioContext');
 }
 
 try {
-    new MetronomeController(new MockAudioContext(), null);
-    assert(false, 'Constructor throws error for null GainNode');
+  new MetronomeController(new MockAudioContext(), null);
+  assert(false, 'Constructor throws error for null GainNode');
 } catch {
-    assert(true, 'Constructor throws error for null GainNode');
+  assert(true, 'Constructor throws error for null GainNode');
 }
 
 // ===== Test Start/Stop =====
@@ -238,7 +241,10 @@ const bpmController = new MetronomeController(bpmContext, bpmGain);
 bpmController.start(120, '4/4', '1/4');
 const interval1 = bpmController.beatInterval;
 const expected1 = 500;
-assert(Math.abs(interval1 - expected1) < 0.1, `4/4 at 120 BPM (1/4): ${interval1}ms (expected ${expected1}ms)`);
+assert(
+  Math.abs(interval1 - expected1) < 0.1,
+  `4/4 at 120 BPM (1/4): ${interval1}ms (expected ${expected1}ms)`
+);
 bpmController.stop();
 
 // Test 2: 4/4 at 120 BPM with 1/8 tempo
@@ -247,7 +253,10 @@ bpmController.stop();
 bpmController.start(120, '4/4', '1/8');
 const interval2 = bpmController.beatInterval;
 const expected2 = 1000;
-assert(Math.abs(interval2 - expected2) < 0.1, `4/4 at 120 BPM (1/8): ${interval2}ms (expected ${expected2}ms)`);
+assert(
+  Math.abs(interval2 - expected2) < 0.1,
+  `4/4 at 120 BPM (1/8): ${interval2}ms (expected ${expected2}ms)`
+);
 bpmController.stop();
 
 // Test 3: 4/4 at 60 BPM with 1/2 tempo
@@ -256,7 +265,10 @@ bpmController.stop();
 bpmController.start(60, '4/4', '1/2');
 const interval3 = bpmController.beatInterval;
 const expected3 = 500;
-assert(Math.abs(interval3 - expected3) < 0.1, `4/4 at 60 BPM (1/2): ${interval3}ms (expected ${expected3}ms)`);
+assert(
+  Math.abs(interval3 - expected3) < 0.1,
+  `4/4 at 60 BPM (1/2): ${interval3}ms (expected ${expected3}ms)`
+);
 bpmController.stop();
 
 // Test 4: 6/8 at 60 BPM with 1/4 tempo (compound time)
@@ -265,7 +277,10 @@ bpmController.stop();
 bpmController.start(60, '6/8', '1/4');
 const interval4 = bpmController.beatInterval;
 const expected4 = 333.33;
-assert(Math.abs(interval4 - expected4) < 0.1, `6/8 at 60 BPM (1/4, compound): ${interval4}ms (expected ${expected4}ms)`);
+assert(
+  Math.abs(interval4 - expected4) < 0.1,
+  `6/8 at 60 BPM (1/4, compound): ${interval4}ms (expected ${expected4}ms)`
+);
 bpmController.stop();
 
 // Test 5: 12/8 at 120 BPM with 1/4 tempo (compound time)
@@ -274,7 +289,10 @@ bpmController.stop();
 bpmController.start(120, '12/8', '1/4');
 const interval5 = bpmController.beatInterval;
 const expected5 = 166.67;
-assert(Math.abs(interval5 - expected5) < 0.1, `12/8 at 120 BPM (1/4, compound): ${interval5}ms (expected ${expected5}ms)`);
+assert(
+  Math.abs(interval5 - expected5) < 0.1,
+  `12/8 at 120 BPM (1/4, compound): ${interval5}ms (expected ${expected5}ms)`
+);
 bpmController.stop();
 
 // Test 6: 3/4 at 90 BPM with 1/4 tempo
@@ -283,7 +301,10 @@ bpmController.stop();
 bpmController.start(90, '3/4', '1/4');
 const interval6 = bpmController.beatInterval;
 const expected6 = 666.67;
-assert(Math.abs(interval6 - expected6) < 0.1, `3/4 at 90 BPM (1/4): ${interval6}ms (expected ${expected6}ms)`);
+assert(
+  Math.abs(interval6 - expected6) < 0.1,
+  `3/4 at 90 BPM (1/4): ${interval6}ms (expected ${expected6}ms)`
+);
 bpmController.stop();
 
 // Test 7: 7/8 at 140 BPM with 1/4 tempo (odd time)
@@ -292,7 +313,10 @@ bpmController.stop();
 bpmController.start(140, '7/8', '1/4');
 const interval7 = bpmController.beatInterval;
 const expected7 = 214.29;
-assert(Math.abs(interval7 - expected7) < 0.1, `7/8 at 140 BPM (1/4): ${interval7}ms (expected ${expected7}ms)`);
+assert(
+  Math.abs(interval7 - expected7) < 0.1,
+  `7/8 at 140 BPM (1/4): ${interval7}ms (expected ${expected7}ms)`
+);
 bpmController.stop();
 
 // Test 8: 4/4 at 180 BPM with 1/8 tempo (fast tempo)
@@ -301,7 +325,10 @@ bpmController.stop();
 bpmController.start(180, '4/4', '1/8');
 const interval8 = bpmController.beatInterval;
 const expected8 = 666.67;
-assert(Math.abs(interval8 - expected8) < 0.1, `4/4 at 180 BPM (1/8): ${interval8}ms (expected ${expected8}ms)`);
+assert(
+  Math.abs(interval8 - expected8) < 0.1,
+  `4/4 at 180 BPM (1/8): ${interval8}ms (expected ${expected8}ms)`
+);
 bpmController.stop();
 
 // ===== Test Cleanup =====
@@ -335,10 +362,10 @@ const gain7 = new MockGainNode();
 const controller7 = new MetronomeController(context7, gain7);
 
 for (let i = 0; i < 5; i++) {
-    controller7.start(120, '4/4', '1/4');
-    assert(controller7.isRunning, `Controller running after start cycle ${i + 1}`);
-    controller7.stop();
-    assert(!controller7.isRunning, `Controller stopped after stop cycle ${i + 1}`);
+  controller7.start(120, '4/4', '1/4');
+  assert(controller7.isRunning, `Controller running after start cycle ${i + 1}`);
+  controller7.stop();
+  assert(!controller7.isRunning, `Controller stopped after stop cycle ${i + 1}`);
 }
 
 // ===== Summary =====
@@ -348,8 +375,8 @@ console.log(`Passed: ${passCount}`);
 console.log(`Failed: ${failCount}`);
 
 if (failCount === 0) {
-    console.log('\n✓ All tests passed!');
+  console.log('\n✓ All tests passed!');
 } else {
-    console.log(`\n✗ ${failCount} test(s) failed`);
-    process.exit(1);
+  console.log(`\n✗ ${failCount} test(s) failed`);
+  process.exit(1);
 }

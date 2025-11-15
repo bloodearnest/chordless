@@ -9,7 +9,7 @@ const DEFAULT_ORGANISATION = 'TEST';
  * @returns {string} Current organisation name
  */
 export function getCurrentOrganisation() {
-    return localStorage.getItem(ORGANISATION_KEY) || DEFAULT_ORGANISATION;
+  return localStorage.getItem(ORGANISATION_KEY) || DEFAULT_ORGANISATION;
 }
 
 /**
@@ -17,7 +17,7 @@ export function getCurrentOrganisation() {
  * @param {string} organisationName - Name of organisation to set as current
  */
 export function setCurrentOrganisation(organisationName) {
-    localStorage.setItem(ORGANISATION_KEY, organisationName);
+  localStorage.setItem(ORGANISATION_KEY, organisationName);
 }
 
 /**
@@ -25,13 +25,13 @@ export function setCurrentOrganisation(organisationName) {
  * @returns {Promise<string[]>} Array of organisation names
  */
 export async function listOrganisations() {
-    const databases = await indexedDB.databases();
-    const organisations = databases
-        .filter(db => db.name && db.name.startsWith('SetalightDB-'))
-        .map(db => db.name.replace('SetalightDB-', ''))
-        .filter(name => name !== ''); // Filter out legacy DB without organisation name
+  const databases = await indexedDB.databases();
+  const organisations = databases
+    .filter(db => db.name && db.name.startsWith('SetalightDB-'))
+    .map(db => db.name.replace('SetalightDB-', ''))
+    .filter(name => name !== ''); // Filter out legacy DB without organisation name
 
-    return organisations.sort();
+  return organisations.sort();
 }
 
 /**
@@ -40,6 +40,6 @@ export async function listOrganisations() {
  * @returns {Promise<boolean>} True if organisation exists
  */
 export async function organisationExists(organisationName) {
-    const organisations = await listOrganisations();
-    return organisations.includes(organisationName);
+  const organisations = await listOrganisations();
+  return organisations.includes(organisationName);
 }

@@ -1,7 +1,3 @@
-lit migration
- - finish it
- - test page for each component
-
 live mode
  - button on setlist
  - fullscreen
@@ -13,7 +9,7 @@ tests
  - more unit tests
  - component tests (using test page?)
 
-import
+ccli import
  - don't go back to import page (history)
  - adding the same song twice to set lists
  - try importing in original key, but record the key that it was set to in the songselect page, and add to setlist in that key
@@ -26,12 +22,11 @@ sharing
 
 player
  - click stuttering start
- - survive pageloads
+ - survive pageloads? -maybe migrate to SPA
 
 storage/sync
-- oauth
-- gdrive as source of truth
- - syncing
+- song db persistance
+- background syncing
 
 UI
 - device type fonts (mobile, tablet, desktop) - partially done.

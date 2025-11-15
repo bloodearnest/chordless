@@ -1,146 +1,163 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Setlist arrangement for worship songs">
-    <meta name="view-transition" content="same-origin">
-    <link rel="manifest" href="/manifest.webmanifest">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="description" content="Setlist arrangement for worship songs" />
+    <meta name="view-transition" content="same-origin" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Setlist - Setalight</title>
-    <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
     <div class="app-container">
-        <div id="song-view" class="view">
-            <app-header
-                id="app-header"
-                heading="Loading..."
-                show-edit-toggle
-                show-info-button>
-                <div slot="controls" class="header-controls-slot">
-                    <button class="reset-button edit-mode-control" id="reset-button" aria-label="Reset song">↺</button>
-                    <div class="font-size-controls edit-mode-control">
-                        <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">A−</button>
-                        <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">A+</button>
-                    </div>
-                    <!-- Key display/selector component -->
-                    <key-selector id="key-selector" label="Key"></key-selector>
-                    <div class="song-meta-compact" id="song-meta-header"></div>
-                </div>
-            </app-header>
+      <div id="song-view" class="view">
+        <app-header id="app-header" heading="Loading..." show-edit-toggle show-info-button>
+          <div slot="controls" class="header-controls-slot">
+            <button
+              class="reset-button edit-mode-control"
+              id="reset-button"
+              aria-label="Reset song"
+            >
+              ↺
+            </button>
+            <div class="font-size-controls edit-mode-control">
+              <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">
+                A−
+              </button>
+              <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">
+                A+
+              </button>
+            </div>
+            <!-- Key display/selector component -->
+            <key-selector id="key-selector" label="Key"></key-selector>
+            <div class="song-meta-compact" id="song-meta-header"></div>
+          </div>
+        </app-header>
 
-            <!-- Navigation menu component -->
-            <nav-menu id="nav-menu" show-back-button></nav-menu>
+        <!-- Navigation menu component -->
+        <nav-menu id="nav-menu" show-back-button></nav-menu>
 
-            <main id="main-content">
-                <div class="song-container">
-                    <p>Loading setlist...</p>
-                </div>
-            </main>
+        <main id="main-content">
+          <div class="song-container">
+            <p>Loading setlist...</p>
+          </div>
+        </main>
+      </div>
+
+      <!-- Song info modal -->
+      <app-modal id="song-info-modal" size="fullscreen">
+        <div id="modal-body"></div>
+      </app-modal>
+
+      <!-- Reset confirmation modal -->
+      <app-modal
+        id="reset-confirm-modal"
+        type="confirm"
+        heading="Reset Song?"
+        message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+        confirm-label="Reset"
+        cancel-label="Cancel"
+      >
+      </app-modal>
+
+      <!-- Add Song modal -->
+      <app-modal id="add-song-modal" size="fullscreen">
+        <div slot="header" class="song-library-header">
+          <input
+            type="text"
+            id="add-song-search-input"
+            class="song-search-input"
+            placeholder="Search songs by title, artist, or lyrics..."
+            autocomplete="off"
+          />
         </div>
+        <div id="add-song-results" class="song-library-list">
+          <p style="text-align: center; color: #95a5a6">Start typing to search songs...</p>
+        </div>
+      </app-modal>
 
-        <!-- Song info modal -->
-        <app-modal id="song-info-modal" size="fullscreen">
-            <div id="modal-body"></div>
-        </app-modal>
+      <!-- Delete Song confirmation modal -->
+      <app-modal
+        id="delete-song-modal"
+        type="confirm"
+        heading="Remove Song from Setlist?"
+        confirm-label="Remove"
+        cancel-label="Cancel"
+      >
+        <p>
+          Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this
+          setlist?
+        </p>
+      </app-modal>
 
-        <!-- Reset confirmation modal -->
-        <app-modal
-            id="reset-confirm-modal"
-            type="confirm"
-            heading="Reset Song?"
-            message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
-            confirm-label="Reset"
-            cancel-label="Cancel">
-        </app-modal>
+      <!-- Share modal -->
+      <app-modal id="share-modal" size="fullscreen">
+        <div slot="header">
+          <h2 style="margin: 0; font-size: 1.8rem">Share Setlist</h2>
+        </div>
+        <share-setlist id="share-setlist"></share-setlist>
+      </app-modal>
 
-        <!-- Add Song modal -->
-        <app-modal id="add-song-modal" size="fullscreen">
-            <div slot="header" class="song-library-header">
-                <input
-                    type="text"
-                    id="add-song-search-input"
-                    class="song-search-input"
-                    placeholder="Search songs by title, artist, or lyrics..."
-                    autocomplete="off"
-                >
-            </div>
-            <div id="add-song-results" class="song-library-list">
-                <p style="text-align: center; color: #95a5a6;">Start typing to search songs...</p>
-            </div>
-        </app-modal>
-
-        <!-- Delete Song confirmation modal -->
-        <app-modal
-            id="delete-song-modal"
-            type="confirm"
-            heading="Remove Song from Setlist?"
-            confirm-label="Remove"
-            cancel-label="Cancel">
-            <p>Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this setlist?</p>
-        </app-modal>
-
-        <!-- Share modal -->
-        <app-modal id="share-modal" size="fullscreen">
-            <div slot="header">
-                <h2 style="margin: 0; font-size: 1.8rem;">Share Setlist</h2>
-            </div>
-            <share-setlist id="share-setlist"></share-setlist>
-        </app-modal>
-
-        <!-- Media Player (floating bottom-right) -->
-        <media-player id="media-player" style="position: fixed; bottom: 1rem; right: 1rem; z-index: 1000;"></media-player>
+      <!-- Media Player (floating bottom-right) -->
+      <media-player
+        id="media-player"
+        style="position: fixed; bottom: 1rem; right: 1rem; z-index: 1000"
+      ></media-player>
     </div>
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <script>
-        // Set window name so bookmarklet can find and reuse this tab
-        window.name = 'setalight';
+      // Set window name so bookmarklet can find and reuse this tab
+      window.name = 'setalight';
 
-        // Check media player settings and conditionally render
-        function updateMediaPlayerVisibility() {
-            const mediaPlayer = document.getElementById('media-player');
-            if (!mediaPlayer) return;
+      // Check media player settings and conditionally render
+      function updateMediaPlayerVisibility() {
+        const mediaPlayer = document.getElementById('media-player');
+        if (!mediaPlayer) return;
 
-            const savedSettings = localStorage.getItem('mediaPlayerSettings');
-            const settings = savedSettings ? JSON.parse(savedSettings) : { mediaPlayerEnabled: true };
+        const savedSettings = localStorage.getItem('mediaPlayerSettings');
+        const settings = savedSettings ? JSON.parse(savedSettings) : { mediaPlayerEnabled: true };
 
-            // Hide/show media player based on global setting
-            if (settings.mediaPlayerEnabled === false) {
-                mediaPlayer.style.display = 'none';
-            } else {
-                mediaPlayer.style.display = '';
-            }
+        // Hide/show media player based on global setting
+        if (settings.mediaPlayerEnabled === false) {
+          mediaPlayer.style.display = 'none';
+        } else {
+          mediaPlayer.style.display = '';
         }
+      }
 
-        // Update on page load
-        customElements.whenDefined('media-player').then(() => {
-            updateMediaPlayerVisibility();
-        });
+      // Update on page load
+      customElements.whenDefined('media-player').then(() => {
+        updateMediaPlayerVisibility();
+      });
 
-        // Update when settings change (from settings page)
-        window.addEventListener('media-player-settings-changed', () => {
-            updateMediaPlayerVisibility();
-        });
+      // Update when settings change (from settings page)
+      window.addEventListener('media-player-settings-changed', () => {
+        updateMediaPlayerVisibility();
+      });
     </script>
 
     <!-- Initialize theme manager (loads saved preferences automatically) -->
     <script type="module">
-        import '/js/theme-manager.js';
+      import '/js/theme-manager.js';
     </script>
 
     <!-- Import the components -->
@@ -161,9 +178,9 @@
 
     <!-- Initialize Google Auth for ID token requests from Service Worker -->
     <script type="module">
-        import * as GoogleAuth from '/js/google-auth.js';
-        // Listen for ID token requests from Service Worker
-        GoogleAuth.listenForIdTokenRequests();
+      import * as GoogleAuth from '/js/google-auth.js';
+      // Listen for ID token requests from Service Worker
+      GoogleAuth.listenForIdTokenRequests();
     </script>
-</body>
+  </body>
 </html>

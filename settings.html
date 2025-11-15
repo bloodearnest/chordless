@@ -1,167 +1,182 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Settings for Setalight">
-    <meta name="view-transition" content="same-origin">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="description" content="Settings for Setalight" />
+    <meta name="view-transition" content="same-origin" />
     <title>Settings - Setalight</title>
-    <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
     <div class="app-container">
-        <div id="settings-view" class="view">
-            <header>
-                <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"></line>
-                        <line x1="3" y1="6" x2="21" y2="6"></line>
-                        <line x1="3" y1="18" x2="21" y2="18"></line>
-                    </svg>
-                </button>
-                <h1>Settings</h1>
-                <div></div>
-            </header>
+      <div id="settings-view" class="view">
+        <header>
+          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+            >
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1>Settings</h1>
+          <div></div>
+        </header>
 
-            <!-- Navigation menu component -->
-            <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
+        <!-- Navigation menu component -->
+        <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
 
-            <main class="home-content">
-                <h2 style="margin: 2rem 1rem 1rem 1rem;">Settings</h2>
-                <app-settings id="app-settings"></app-settings>
-            </main>
-        </div>
+        <main class="home-content">
+          <h2 style="margin: 2rem 1rem 1rem 1rem">Settings</h2>
+          <app-settings id="app-settings"></app-settings>
+        </main>
+      </div>
     </div>
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <script type="module">
-        // Initialize theme manager (loads saved preferences automatically)
-        import '/js/theme-manager.js';
+      // Initialize theme manager (loads saved preferences automatically)
+      import '/js/theme-manager.js';
 
-        import { SetalightDB } from '/js/db.js';
-        import { getCurrentOrganisation } from '/js/workspace.js';
+      import { SetalightDB } from '/js/db.js';
+      import { getCurrentOrganisation } from '/js/workspace.js';
 
-        // Set window name for bookmarklet
-        window.name = 'setalight';
+      // Set window name for bookmarklet
+      window.name = 'setalight';
 
-        // Initialize nav menu button - wait for custom element to be defined
-        customElements.whenDefined('nav-menu').then(() => {
-            const navMenuButton = document.getElementById('nav-menu-button');
-            const navMenu = document.getElementById('nav-menu');
+      // Initialize nav menu button - wait for custom element to be defined
+      customElements.whenDefined('nav-menu').then(() => {
+        const navMenuButton = document.getElementById('nav-menu-button');
+        const navMenu = document.getElementById('nav-menu');
 
-            if (navMenuButton && navMenu) {
-                // Set the trigger button for positioning
-                navMenu.setTriggerButton(navMenuButton);
+        if (navMenuButton && navMenu) {
+          // Set the trigger button for positioning
+          navMenu.setTriggerButton(navMenuButton);
 
-                navMenuButton.addEventListener('click', () => {
-                    navMenu.togglePopover();
-                });
-            }
-        });
-
-        // Initialize media player settings - wait for custom element to be defined
-        customElements.whenDefined('media-player-settings').then(() => {
-            const settingsComponent = document.getElementById('media-player-settings');
-
-            if (settingsComponent) {
-                // Load saved settings from localStorage
-                const savedSettings = localStorage.getItem('mediaPlayerSettings');
-                if (savedSettings) {
-                    const settings = JSON.parse(savedSettings);
-                    settingsComponent.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false;
-                    settingsComponent.padsEnabled = settings.padsEnabled !== false;
-                    settingsComponent.metronomeEnabled = settings.metronomeEnabled !== false;
-                    settingsComponent.stereoSplitEnabled = settings.stereoSplitEnabled === true;
-                }
-
-                // Listen for settings changes and save to localStorage
-                settingsComponent.addEventListener('settings-change', (event) => {
-                    console.log('[Settings] Media player settings changed:', event.detail);
-                    localStorage.setItem('mediaPlayerSettings', JSON.stringify(event.detail));
-
-                    // Dispatch custom event that media player can listen to
-                    window.dispatchEvent(new CustomEvent('media-player-settings-changed', {
-                        detail: event.detail
-                    }));
-                });
-            }
-        });
-
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js', { type: 'module' })
-                .then(registration => {
-                    console.log('Service Worker registered:', registration);
-
-                    // If no controller, this is first install - reload once to activate
-                    if (!navigator.serviceWorker.controller) {
-                        console.log('First install - reloading page to activate Service Worker');
-                        // Set flag to avoid reload loop
-                        if (!sessionStorage.getItem('sw-first-load')) {
-                            sessionStorage.setItem('sw-first-load', '1');
-                            window.location.reload();
-                        }
-                    } else {
-                        console.log('Service Worker is active and controlling page');
-                        // Clear the first load flag since we have a controller now
-                        sessionStorage.removeItem('sw-first-load');
-                    }
-                })
-                .catch(error => {
-                    console.error('Service Worker registration failed:', error);
-                });
+          navMenuButton.addEventListener('click', () => {
+            navMenu.togglePopover();
+          });
         }
+      });
 
-        // Handle app-settings component events
-        customElements.whenDefined('app-settings').then(() => {
-            const appSettings = document.getElementById('app-settings');
+      // Initialize media player settings - wait for custom element to be defined
+      customElements.whenDefined('media-player-settings').then(() => {
+        const settingsComponent = document.getElementById('media-player-settings');
 
-            if (appSettings) {
-                // Handle clear database request
-                appSettings.addEventListener('clear-database-requested', async () => {
-                    const confirmed = confirm('⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!');
+        if (settingsComponent) {
+          // Load saved settings from localStorage
+          const savedSettings = localStorage.getItem('mediaPlayerSettings');
+          if (savedSettings) {
+            const settings = JSON.parse(savedSettings);
+            settingsComponent.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false;
+            settingsComponent.padsEnabled = settings.padsEnabled !== false;
+            settingsComponent.metronomeEnabled = settings.metronomeEnabled !== false;
+            settingsComponent.stereoSplitEnabled = settings.stereoSplitEnabled === true;
+          }
 
-                    if (!confirmed) return;
+          // Listen for settings changes and save to localStorage
+          settingsComponent.addEventListener('settings-change', event => {
+            console.log('[Settings] Media player settings changed:', event.detail);
+            localStorage.setItem('mediaPlayerSettings', JSON.stringify(event.detail));
 
-                    try {
-                        // Clear IndexedDB
-                        const db = new SetalightDB(getCurrentOrganisation());
-                        await db.init();
-                        await db.clearAll();
+            // Dispatch custom event that media player can listen to
+            window.dispatchEvent(
+              new CustomEvent('media-player-settings-changed', {
+                detail: event.detail,
+              })
+            );
+          });
+        }
+      });
 
-                        // Clear localStorage
-                        localStorage.clear();
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/service-worker.js', { type: 'module' })
+          .then(registration => {
+            console.log('Service Worker registered:', registration);
 
-                        // Clear sessionStorage
-                        sessionStorage.clear();
-
-                        alert('✅ Database cleared successfully!\n\nThe page will now reload.');
-
-                        // Reload the page
-                        window.location.reload();
-                    } catch (error) {
-                        console.error('Failed to clear database:', error);
-                        alert('❌ Failed to clear database: ' + error.message);
-                    }
-                });
-
-                // Handle import request - handled by setlist-app.js
+            // If no controller, this is first install - reload once to activate
+            if (!navigator.serviceWorker.controller) {
+              console.log('First install - reloading page to activate Service Worker');
+              // Set flag to avoid reload loop
+              if (!sessionStorage.getItem('sw-first-load')) {
+                sessionStorage.setItem('sw-first-load', '1');
+                window.location.reload();
+              }
+            } else {
+              console.log('Service Worker is active and controlling page');
+              // Clear the first load flag since we have a controller now
+              sessionStorage.removeItem('sw-first-load');
             }
-        });
+          })
+          .catch(error => {
+            console.error('Service Worker registration failed:', error);
+          });
+      }
+
+      // Handle app-settings component events
+      customElements.whenDefined('app-settings').then(() => {
+        const appSettings = document.getElementById('app-settings');
+
+        if (appSettings) {
+          // Handle clear database request
+          appSettings.addEventListener('clear-database-requested', async () => {
+            const confirmed = confirm(
+              '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
+            );
+
+            if (!confirmed) return;
+
+            try {
+              // Clear IndexedDB
+              const db = new SetalightDB(getCurrentOrganisation());
+              await db.init();
+              await db.clearAll();
+
+              // Clear localStorage
+              localStorage.clear();
+
+              // Clear sessionStorage
+              sessionStorage.clear();
+
+              alert('✅ Database cleared successfully!\n\nThe page will now reload.');
+
+              // Reload the page
+              window.location.reload();
+            } catch (error) {
+              console.error('Failed to clear database:', error);
+              alert('❌ Failed to clear database: ' + error.message);
+            }
+          });
+
+          // Handle import request - handled by setlist-app.js
+        }
+      });
     </script>
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
@@ -169,5 +184,5 @@
     <script type="module" src="/components/select-organisation.js"></script>
     <script type="module" src="/components/app-settings.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
-</body>
+  </body>
 </html>

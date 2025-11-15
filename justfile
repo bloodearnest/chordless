@@ -23,8 +23,15 @@ test-node:
 
 # Lint/format JS files (basic syntax checks)
 lint:
+    @echo "Checking formatting..."
+    npx prettier --check .
     @echo "Running ESLint..."
     npx eslint components js tests service-worker.js
+
+# Format project files with Prettier
+format:
+    @echo "Formatting with Prettier..."
+    npx prettier --write .
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:

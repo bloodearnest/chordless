@@ -1,0 +1,10 @@
+auth-proxy
+node_modules
+sets
+notes
+test-results
+**/.wrangler
+**/.wrangler/**
+**/tmp/**
+**/dist/**
+AGENTS.md

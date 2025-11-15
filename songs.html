@@ -1,136 +1,181 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="description" content="Song library for worship songs">
-    <meta name="view-transition" content="same-origin">
-    <link rel="manifest" href="/manifest.webmanifest">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <meta name="description" content="Song library for worship songs" />
+    <meta name="view-transition" content="same-origin" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Song Library - Setalight</title>
-    <link rel="stylesheet" href="/css/style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="/css/style.css" />
+  </head>
+  <body>
     <div class="app-container">
-        <div id="songs-view" class="view">
-            <app-header
-                id="library-app-header"
-                heading="Song Library"
-                show-edit-toggle
-                show-info-button>
-                <div slot="controls" class="header-controls-slot">
-                    <button class="reset-button edit-mode-control" id="library-reset-button" aria-label="Reset song" style="display: none;">↺</button>
-                    <div class="font-size-controls edit-mode-control" id="library-font-size-controls" style="display: none;">
-                        <button class="font-size-btn" id="library-font-size-decrease" aria-label="Decrease font size">A−</button>
-                        <button class="font-size-btn" id="library-font-size-increase" aria-label="Increase font size">A+</button>
-                    </div>
-                    <!-- Key display/selector component -->
-                    <key-selector id="library-key-selector" label="Key" style="display: none;"></key-selector>
-                    <div class="song-meta-compact" id="library-song-meta-header" style="display: none;"></div>
-                </div>
-            </app-header>
+      <div id="songs-view" class="view">
+        <app-header
+          id="library-app-header"
+          heading="Song Library"
+          show-edit-toggle
+          show-info-button
+        >
+          <div slot="controls" class="header-controls-slot">
+            <button
+              class="reset-button edit-mode-control"
+              id="library-reset-button"
+              aria-label="Reset song"
+              style="display: none"
+            >
+              ↺
+            </button>
+            <div
+              class="font-size-controls edit-mode-control"
+              id="library-font-size-controls"
+              style="display: none"
+            >
+              <button
+                class="font-size-btn"
+                id="library-font-size-decrease"
+                aria-label="Decrease font size"
+              >
+                A−
+              </button>
+              <button
+                class="font-size-btn"
+                id="library-font-size-increase"
+                aria-label="Increase font size"
+              >
+                A+
+              </button>
+            </div>
+            <!-- Key display/selector component -->
+            <key-selector
+              id="library-key-selector"
+              label="Key"
+              style="display: none"
+            ></key-selector>
+            <div
+              class="song-meta-compact"
+              id="library-song-meta-header"
+              style="display: none"
+            ></div>
+          </div>
+        </app-header>
 
-            <!-- Navigation menu component -->
-            <nav-menu id="nav-menu"></nav-menu>
+        <!-- Navigation menu component -->
+        <nav-menu id="nav-menu"></nav-menu>
 
-            <main class="songs-main">
-                <div class="songs-content-container" id="songs-content-container">
-                    <!-- Library view (slides left when viewing song) -->
-                    <div class="library-view">
-                        <div class="song-library-header">
-                            <input type="search" id="song-search" class="song-search-input" placeholder="Search songs by title, artist, or lyrics..." />
-                        </div>
-                        <div id="song-library-list" class="song-library-list">
-                            <p>Loading songs...</p>
-                        </div>
-                    </div>
+        <main class="songs-main">
+          <div class="songs-content-container" id="songs-content-container">
+            <!-- Library view (slides left when viewing song) -->
+            <div class="library-view">
+              <div class="song-library-header">
+                <input
+                  type="search"
+                  id="song-search"
+                  class="song-search-input"
+                  placeholder="Search songs by title, artist, or lyrics..."
+                />
+              </div>
+              <div id="song-library-list" class="song-library-list">
+                <p>Loading songs...</p>
+              </div>
+            </div>
 
-                    <!-- Single song view (slides in from right) -->
-                    <div id="library-song-view" class="library-song-view">
-                        <div id="library-song-content" class="library-song-content">
-                            <p>Select a song to view</p>
-                        </div>
-                    </div>
-                </div>
-                <script>
-                    // Immediate scroll to song view if hash is present
-                    (function() {
-                        if (window.location.hash) {
-                            const container = document.getElementById('songs-content-container');
-                            const libraryView = container?.querySelector('.library-song-view');
-                            if (libraryView) {
-                                // Scroll immediately without animation on initial load
-                                libraryView.scrollIntoView({ behavior: 'instant', block: 'nearest', inline: 'start' });
-                            }
-                        }
-                    })();
-                </script>
-            </main>
-        </div>
+            <!-- Single song view (slides in from right) -->
+            <div id="library-song-view" class="library-song-view">
+              <div id="library-song-content" class="library-song-content">
+                <p>Select a song to view</p>
+              </div>
+            </div>
+          </div>
+          <script>
+            // Immediate scroll to song view if hash is present
+            (function () {
+              if (window.location.hash) {
+                const container = document.getElementById('songs-content-container');
+                const libraryView = container?.querySelector('.library-song-view');
+                if (libraryView) {
+                  // Scroll immediately without animation on initial load
+                  libraryView.scrollIntoView({
+                    behavior: 'instant',
+                    block: 'nearest',
+                    inline: 'start',
+                  });
+                }
+              }
+            })();
+          </script>
+        </main>
+      </div>
 
-        <!-- Song info modal -->
-        <app-modal id="library-song-info-modal" size="fullscreen">
-            <div id="library-modal-body"></div>
-        </app-modal>
+      <!-- Song info modal -->
+      <app-modal id="library-song-info-modal" size="fullscreen">
+        <div id="library-modal-body"></div>
+      </app-modal>
 
-        <!-- Reset confirmation modal -->
-        <app-modal
-            id="library-reset-confirm-modal"
-            type="confirm"
-            heading="Reset Song?"
-            message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
-            confirm-label="Reset"
-            cancel-label="Cancel">
-        </app-modal>
+      <!-- Reset confirmation modal -->
+      <app-modal
+        id="library-reset-confirm-modal"
+        type="confirm"
+        heading="Reset Song?"
+        message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+        confirm-label="Reset"
+        cancel-label="Cancel"
+      >
+      </app-modal>
     </div>
-
 
     <!-- Import map for Lit -->
     <script type="importmap">
-    {
+      {
         "imports": {
-            "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-            "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-            "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-            "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-            "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-            "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-            "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
         }
-    }
+      }
     </script>
 
     <script>
-        // Set window name so bookmarklet can find and reuse this tab
-        window.name = 'setalight';
+      // Set window name so bookmarklet can find and reuse this tab
+      window.name = 'setalight';
 
-        // Register service worker
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js', { type: 'module' })
-                .then(registration => {
-                    console.log('Service Worker registered:', registration);
+      // Register service worker
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .register('/service-worker.js', { type: 'module' })
+          .then(registration => {
+            console.log('Service Worker registered:', registration);
 
-                    // If no controller, this is first install - reload once to activate
-                    if (!navigator.serviceWorker.controller) {
-                        console.log('First install - reloading page to activate Service Worker');
-                        // Set flag to avoid reload loop
-                        if (!sessionStorage.getItem('sw-first-load')) {
-                            sessionStorage.setItem('sw-first-load', '1');
-                            window.location.reload();
-                        }
-                    } else {
-                        console.log('Service Worker is active and controlling page');
-                        // Clear the first load flag since we have a controller now
-                        sessionStorage.removeItem('sw-first-load');
-                    }
-                })
-                .catch(error => {
-                    console.error('Service Worker registration failed:', error);
-                });
-        }
+            // If no controller, this is first install - reload once to activate
+            if (!navigator.serviceWorker.controller) {
+              console.log('First install - reloading page to activate Service Worker');
+              // Set flag to avoid reload loop
+              if (!sessionStorage.getItem('sw-first-load')) {
+                sessionStorage.setItem('sw-first-load', '1');
+                window.location.reload();
+              }
+            } else {
+              console.log('Service Worker is active and controlling page');
+              // Clear the first load flag since we have a controller now
+              sessionStorage.removeItem('sw-first-load');
+            }
+          })
+          .catch(error => {
+            console.error('Service Worker registration failed:', error);
+          });
+      }
     </script>
     <!-- Initialize theme manager (loads saved preferences automatically) -->
     <script type="module">
-        import '/js/theme-manager.js';
+      import '/js/theme-manager.js';
     </script>
 
     <!-- Import the components -->
@@ -143,5 +188,5 @@
     <script type="module" src="/components/song-display.js"></script>
     <script type="module" src="/components/song-section.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
-</body>
+  </body>
 </html>

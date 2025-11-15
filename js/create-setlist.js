@@ -6,119 +6,119 @@ let db = null;
 
 // Initialize the database
 async function initDB() {
-    if (!db) {
-        db = new SetalightDB(getCurrentOrganisation());
-        await db.init();
-    }
-    return db;
+  if (!db) {
+    db = new SetalightDB(getCurrentOrganisation());
+    await db.init();
+  }
+  return db;
 }
 
 // Initialize the modal
 export async function initCreateSetlistModal() {
-    await initDB();
+  await initDB();
 
-    const modal = document.getElementById('create-setlist-modal');
-    const createButton = document.getElementById('create-setlist-button');
-    const cancelButton = document.getElementById('create-cancel');
-    const form = document.getElementById('create-setlist-form');
-    const dateInput = document.getElementById('setlist-date');
-    const typeSelect = document.getElementById('setlist-type');
-    const nameInput = document.getElementById('setlist-name');
+  const modal = document.getElementById('create-setlist-modal');
+  const createButton = document.getElementById('create-setlist-button');
+  const cancelButton = document.getElementById('create-cancel');
+  const form = document.getElementById('create-setlist-form');
+  const dateInput = document.getElementById('setlist-date');
+  const typeSelect = document.getElementById('setlist-type');
+  const nameInput = document.getElementById('setlist-name');
 
-    if (!modal || !createButton || !form) {
-        console.error('Create setlist modal elements not found');
-        return;
+  if (!modal || !createButton || !form) {
+    console.error('Create setlist modal elements not found');
+    return;
+  }
+
+  // Show modal and initialize form
+  createButton.addEventListener('click', () => {
+    // Set default date to next Sunday
+    const nextSunday = getNextSunday();
+    const dateString = nextSunday.toISOString().split('T')[0];
+    dateInput.value = dateString;
+
+    // Set default type to Church Service
+    typeSelect.value = 'Church Service';
+
+    // Clear optional fields
+    nameInput.value = '';
+    document.getElementById('setlist-leader').value = '';
+
+    modal.show();
+  });
+
+  // Close modal handler
+  cancelButton.addEventListener('click', () => {
+    modal.close();
+  });
+
+  // Auto-detect type when date or name changes
+  const updateType = () => {
+    const date = dateInput.value;
+    const name = nameInput.value;
+    if (date) {
+      const detectedType = determineSetlistType(date, name);
+      typeSelect.value = detectedType;
     }
+  };
 
-    // Show modal and initialize form
-    createButton.addEventListener('click', () => {
-        // Set default date to next Sunday
-        const nextSunday = getNextSunday();
-        const dateString = nextSunday.toISOString().split('T')[0];
-        dateInput.value = dateString;
+  dateInput.addEventListener('change', updateType);
+  nameInput.addEventListener('input', updateType);
 
-        // Set default type to Church Service
-        typeSelect.value = 'Church Service';
+  // Handle form submission
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
 
-        // Clear optional fields
-        nameInput.value = '';
-        document.getElementById('setlist-leader').value = '';
-
-        modal.show();
-    });
-
-    // Close modal handler
-    cancelButton.addEventListener('click', () => {
-        modal.close();
-    });
-
-    // Auto-detect type when date or name changes
-    const updateType = () => {
-        const date = dateInput.value;
-        const name = nameInput.value;
-        if (date) {
-            const detectedType = determineSetlistType(date, name);
-            typeSelect.value = detectedType;
-        }
+    const formData = new FormData(form);
+    const setlistData = {
+      date: formData.get('date'),
+      time: formData.get('time'),
+      type: formData.get('type'),
+      name: formData.get('name'),
+      leader: formData.get('leader'),
     };
 
-    dateInput.addEventListener('change', updateType);
-    nameInput.addEventListener('input', updateType);
+    try {
+      // Create the setlist
+      const newSetlist = createSetlist(setlistData);
 
-    // Handle form submission
-    form.addEventListener('submit', async (e) => {
-        e.preventDefault();
+      // Save to database
+      await db.saveSetlist(newSetlist);
 
-        const formData = new FormData(form);
-        const setlistData = {
-            date: formData.get('date'),
-            time: formData.get('time'),
-            type: formData.get('type'),
-            name: formData.get('name'),
-            leader: formData.get('leader')
-        };
+      console.log('Setlist created:', newSetlist);
 
-        try {
-            // Create the setlist
-            const newSetlist = createSetlist(setlistData);
+      // Close modal
+      modal.close();
 
-            // Save to database
-            await db.saveSetlist(newSetlist);
-
-            console.log('Setlist created:', newSetlist);
-
-            // Close modal
-            modal.close();
-
-            // Redirect to the new setlist
-            window.location.href = `/setlist/${newSetlist.id}`;
-        } catch (error) {
-            console.error('Failed to create setlist:', error);
-            alert('Failed to create setlist: ' + error.message);
-        }
-    });
+      // Redirect to the new setlist
+      window.location.href = `/setlist/${newSetlist.id}`;
+    } catch (error) {
+      console.error('Failed to create setlist:', error);
+      alert('Failed to create setlist: ' + error.message);
+    }
+  });
 }
 
 // Initialize nav menu button
 async function initNavMenuButton() {
-    // Wait for custom element to be defined
-    await customElements.whenDefined('nav-menu');
+  // Wait for custom element to be defined
+  await customElements.whenDefined('nav-menu');
 
-    const navMenuButton = document.getElementById('nav-menu-button');
-    const navMenu = document.getElementById('nav-menu');
+  const navMenuButton = document.getElementById('nav-menu-button');
+  const navMenu = document.getElementById('nav-menu');
 
-    if (navMenuButton && navMenu) {
-        // Set the trigger button for positioning
-        navMenu.setTriggerButton(navMenuButton);
+  if (navMenuButton && navMenu) {
+    // Set the trigger button for positioning
+    navMenu.setTriggerButton(navMenuButton);
 
-        navMenuButton.addEventListener('click', () => {
-            navMenu.togglePopover();
-        });
-    }
+    navMenuButton.addEventListener('click', () => {
+      navMenu.togglePopover();
+    });
+  }
 }
 
 // Auto-initialize if we're on the home page
 if (document.getElementById('create-setlist-modal')) {
-    initCreateSetlistModal();
-    initNavMenuButton();
+  initCreateSetlistModal();
+  initNavMenuButton();
 }
