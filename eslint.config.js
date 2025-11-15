@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import globals from 'globals';
 import lit from 'eslint-plugin-lit';
+import compat from 'eslint-plugin-compat';
 
 const browserFiles = [
     '*.js',
@@ -43,6 +44,9 @@ export default [
                 google: 'readonly'
             }
         },
+        plugins: {
+            compat
+        },
         rules: {
             'no-unused-vars': [
                 'warn',
@@ -51,7 +55,8 @@ export default [
                     varsIgnorePattern: '^_'
                 }
             ],
-            'no-console': 'off'
+            'no-console': 'off',
+            'compat/compat': 'error'
         }
     },
     {
