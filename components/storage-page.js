@@ -13,9 +13,9 @@ import './pad-set-manager.js';
  */
 export class StoragePage extends LitElement {
     static properties = {
-        isAuthenticated: { type: Boolean },
-        authStatus: { type: String },
-        userInfo: { type: Object }
+        isAuthenticated: { type: Boolean, attribute: false },
+        authStatus: { type: String, attribute: 'auth-status' },
+        userInfo: { type: Object, attribute: false }
     };
 
     static styles = css`

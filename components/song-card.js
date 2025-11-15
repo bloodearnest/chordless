@@ -28,9 +28,9 @@ import { formatArtistNames } from '../js/song-utils.js';
  */
 export class SongCard extends LitElement {
     static properties = {
-        song: { type: Object },
+        song: { type: Object, attribute: false },
         variant: { type: String, reflect: true },
-        editMode: { type: Boolean, reflect: true }
+        editMode: { type: Boolean, reflect: true, attribute: 'editmode' }
     };
 
     static styles = css`

@@ -18,15 +18,15 @@ export class SongSection extends LitElement {
         /** @type {number} Index of this section within the song */
         sectionIndex: { type: Number, attribute: 'section-index', reflect: true },
         /** @type {boolean} Whether edit mode is active */
-        editMode: { type: Boolean, reflect: true },
+        editMode: { type: Boolean, reflect: true, attribute: 'editmode' },
         /** @type {string} Hide mode: 'none', 'collapse', 'chords', or 'lyrics' */
-        hideMode: { type: String },
+        hideMode: { type: String, attribute: 'hide-mode' },
         /** @type {boolean} Whether the section is collapsed */
-        isCollapsed: { type: Boolean },
+        isCollapsed: { type: Boolean, attribute: false },
         /** @type {boolean} Whether the section is hidden */
-        isHidden: { type: Boolean },
+        isHidden: { type: Boolean, attribute: false },
         /** @type {string} Section label (e.g., "Verse 1", "Chorus") */
-        label: { type: String },
+        label: { type: String, attribute: 'label' },
         /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
         lines: { attribute: false }
     };

@@ -8,7 +8,7 @@ import { LitElement, html, css } from 'lit';
  */
 export class ProgressModal extends LitElement {
     static properties = {
-        title: { type: String },
+        heading: { type: String, attribute: 'heading' },
         message: { type: String },
         progress: { type: Number },
         status: { type: String, reflect: true }
@@ -16,7 +16,7 @@ export class ProgressModal extends LitElement {
 
     constructor() {
         super();
-        this.title = 'Processing';
+        this.heading = 'Processing';
         this.message = 'Working...';
         this.progress = 0;
         this.status = 'in-progress'; // in-progress | complete | error
@@ -150,7 +150,7 @@ export class ProgressModal extends LitElement {
     render() {
         return html`
             <div class="modal" role="status" aria-live="polite">
-                <h2>${this.title}</h2>
+                <h2>${this.heading}</h2>
                 <p class="message">${this.message}</p>
                 <div class="progress-track" aria-valuemin="0" aria-valuemax="100" aria-valuenow=${this.progressPercent}>
                     <div class="progress-fill" style="width: ${this.progressPercent}%;"></div>

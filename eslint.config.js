@@ -23,7 +23,12 @@ export default [
     js.configs.recommended,
     {
         ...litRecommended,
-        files: ['components/**/*.js']
+        files: ['components/**/*.js'],
+        rules: {
+            ...litRecommended.rules,
+            'lit/attribute-names': 'error',
+            'lit/no-native-attributes': 'error'
+        }
     },
     {
         files: browserFiles,

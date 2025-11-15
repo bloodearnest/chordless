@@ -42,7 +42,7 @@ import { LitElement, html, css } from 'lit';
 export class AppModal extends LitElement {
     static properties = {
         open: { type: Boolean, reflect: true },
-        title: { type: String },
+        heading: { type: String, attribute: 'heading' },
         message: { type: String },
         type: { type: String },
         size: { type: String, reflect: true },
@@ -217,7 +217,7 @@ export class AppModal extends LitElement {
     constructor() {
         super();
         this.open = false;
-        this.title = '';
+        this.heading = '';
         this.message = '';
         this.type = 'custom';
         this.size = 'medium';
@@ -273,10 +273,10 @@ export class AppModal extends LitElement {
             `;
         }
 
-        if (this.title || !this.hideCloseButton) {
+        if (this.heading || !this.hideCloseButton) {
             return html`
                 <div class="modal-header" part="header">
-                    ${this.title ? html`<h2 class="modal-title" part="title">${this.title}</h2>` : ''}
+                    ${this.heading ? html`<h2 class="modal-title" part="title">${this.heading}</h2>` : ''}
                     ${!this.hideCloseButton ? html`
                         <button class="modal-close" part="close-button" @click=${this.close}>&times;</button>
                     ` : ''}

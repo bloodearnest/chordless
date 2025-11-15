@@ -10,10 +10,10 @@ import './status-message.js';
  */
 export class SongList extends LitElement {
     static properties = {
-        songs: { type: Array },
-        variant: { type: String },
-        emptyMessage: { type: String },
-        emptyDetail: { type: String },
+        songs: { type: Array, attribute: false },
+        variant: { type: String, attribute: 'variant' },
+        emptyMessage: { type: String, attribute: 'empty-message' },
+        emptyDetail: { type: String, attribute: 'empty-detail' },
         dense: { type: Boolean, reflect: true }
     };
 
@@ -46,9 +46,9 @@ export class SongList extends LitElement {
         }
     `;
 
-    handleSongClick(event, song, index) {
+    handleSongClick(song, index, originalEvent) {
         this.dispatchEvent(new CustomEvent('song-select', {
-            detail: { song, index, originalEvent: event },
+            detail: { song, index, originalEvent },
             bubbles: true,
             composed: true
         }));
@@ -75,7 +75,7 @@ export class SongList extends LitElement {
                     <song-card
                         .song=${song}
                         .variant=${this.variant}
-                        @song-click=${(event) => this.handleSongClick(event, song, index)}>
+                        @song-click=${(event) => this.handleSongClick(song, index, event)}>
                     </song-card>
                 `)}
             </div>

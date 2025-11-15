@@ -14,7 +14,7 @@
         <div id="song-view" class="view">
             <app-header
                 id="app-header"
-                title="Loading..."
+                heading="Loading..."
                 show-edit-toggle
                 show-info-button>
                 <div slot="controls" class="header-controls-slot">
@@ -48,7 +48,7 @@
         <app-modal
             id="reset-confirm-modal"
             type="confirm"
-            title="Reset Song?"
+            heading="Reset Song?"
             message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
             confirm-label="Reset"
             cancel-label="Cancel">
@@ -74,7 +74,7 @@
         <app-modal
             id="delete-song-modal"
             type="confirm"
-            title="Remove Song from Setlist?"
+            heading="Remove Song from Setlist?"
             confirm-label="Remove"
             cancel-label="Cancel">
             <p>Are you sure you want to remove "<strong id="delete-song-title"></strong>" from this setlist?</p>

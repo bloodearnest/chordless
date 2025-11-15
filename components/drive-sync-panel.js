@@ -9,11 +9,11 @@ import { getCurrentOrganisation } from '../js/workspace.js';
  */
 export class DriveSyncPanel extends LitElement {
     static properties = {
-        syncAvailable: { type: Boolean },
-        syncing: { type: Boolean },
-        syncProgress: { type: Object },
-        lastSyncTime: { type: String },
-        syncError: { type: String },
+        syncAvailable: { type: Boolean, attribute: false },
+        syncing: { type: Boolean, attribute: false },
+        syncProgress: { type: Object, attribute: false },
+        lastSyncTime: { type: String, attribute: false },
+        syncError: { type: String, attribute: false },
         disabled: { type: Boolean, reflect: true }
     };
 

@@ -21,11 +21,11 @@ import { LitElement, html, css } from 'lit';
  */
 export class KeySelector extends LitElement {
     static properties = {
-        label: { type: String },
-        value: { type: String },
-        keys: { type: Array },
-        originalKey: { type: String },
-        editMode: { type: Boolean }
+        label: { type: String, attribute: 'label' },
+        value: { type: String, attribute: 'value' },
+        keys: { type: Array, attribute: false },
+        originalKey: { type: String, attribute: 'original-key' },
+        editMode: { type: Boolean, attribute: false }
     };
 
     static styles = css`

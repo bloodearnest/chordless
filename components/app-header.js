@@ -29,11 +29,11 @@ import { LitElement, html, css } from 'lit';
  */
 export class AppHeader extends LitElement {
     static properties = {
-        title: { type: String },
+        heading: { type: String, attribute: 'heading' },
         showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
         showInfoButton: { type: Boolean, attribute: 'show-info-button' },
         showShareButton: { type: Boolean, attribute: 'show-share-button' },
-        editMode: { type: Boolean, reflect: true },
+        editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
         disableAnimation: { type: Boolean, attribute: 'disable-animation' },
         expanded: { type: Boolean, reflect: true }
     };
@@ -269,7 +269,7 @@ export class AppHeader extends LitElement {
 
     constructor() {
         super();
-        this.title = '';
+        this.heading = '';
         this.showEditToggle = false;
         this.showInfoButton = false;
         this.showShareButton = false;
@@ -285,8 +285,8 @@ export class AppHeader extends LitElement {
     connectedCallback() {
         super.connectedCallback();
         // Initialize display title
-        this._displayTitle = this.title;
-        this._previousTitle = this.title;
+        this._displayTitle = this.heading;
+        this._previousTitle = this.heading;
         console.log('[AppHeader] Connected with props:', {
             showEditToggle: this.showEditToggle,
             showInfoButton: this.showInfoButton,
@@ -302,18 +302,18 @@ export class AppHeader extends LitElement {
         this._cachedCenterEl = this.shadowRoot?.querySelector('.header-center');
 
         // Handle title changes
-        if (changedProperties.has('title') && this.title !== this._previousTitle) {
+        if (changedProperties.has('heading') && this.heading !== this._previousTitle) {
             if (this.disableAnimation) {
                 // No animation - update immediately
-                this._displayTitle = this.title;
-                this._previousTitle = this.title;
+                this._displayTitle = this.heading;
+                this._previousTitle = this.heading;
                 this.requestUpdate();
             } else if (!this._animating) {
                 // Animate the transition
                 this._animateTransition();
             } else {
                 // Animation in progress - queue this update
-                this._pendingTitle = this.title;
+                this._pendingTitle = this.heading;
             }
         }
     }
@@ -334,8 +334,8 @@ export class AppHeader extends LitElement {
         await new Promise(resolve => setTimeout(resolve, 300));
 
         // Update the displayed title
-        this._displayTitle = this.title;
-        this._previousTitle = this.title;
+        this._displayTitle = this.heading;
+        this._previousTitle = this.heading;
         this.requestUpdate();
 
         // Wait for re-render
@@ -357,7 +357,7 @@ export class AppHeader extends LitElement {
         this._animating = false;
 
         // Handle any pending updates
-        if (this._pendingTitle && this._pendingTitle !== this.title) {
+        if (this._pendingTitle && this._pendingTitle !== this.heading) {
             this._pendingTitle = null;
             this._animateTransition();
         }
@@ -366,7 +366,7 @@ export class AppHeader extends LitElement {
     // Public method to update without animation
     setTitleInstant(newTitle) {
         this.disableAnimation = true;
-        this.title = newTitle;
+        this.heading = newTitle;
         // Re-enable after a tick
         setTimeout(() => {
             this.disableAnimation = false;

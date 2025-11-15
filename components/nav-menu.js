@@ -31,9 +31,9 @@ export class NavMenu extends LitElement {
         showBackButton: { type: Boolean, attribute: 'show-back-button' },
         backLabel: { type: String, attribute: 'back-label' },
         popoverId: { type: String, attribute: 'popover-id' },
-        songs: { type: Array },
-        showOverviewLink: { type: Boolean },
-        setlistTitle: { type: String }
+        songs: { type: Array, attribute: false },
+        showOverviewLink: { type: Boolean, attribute: 'show-overview-link' },
+        setlistTitle: { type: String, attribute: 'setlist-title' }
     };
 
     static styles = css`

@@ -48,6 +48,8 @@ class PageApp {
         this.storageImportHandler = null;
         this.globalImportHandler = null;
         this._overviewComponent = null;
+        this._suppressLibraryScrollReset = false;
+        this._libraryScrollResetTimeout = null;
 
         // Bind overview component event handlers once
         this._onOverviewSongClick = (event) => {
@@ -236,6 +238,9 @@ class PageApp {
         // Create observer to detect when library view becomes visible (from swipe)
         this.libraryScrollObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
+                if (this._suppressLibraryScrollReset) {
+                    return;
+                }
                 // When library view becomes fully visible
                 if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
                     // Check if we have a hash (song is open)
@@ -253,6 +258,17 @@ class PageApp {
 
         // Start observing the library view
         this.libraryScrollObserver.observe(libraryView);
+    }
+
+    _suppressLibraryScrollResetTemporarily(duration = 600) {
+        this._suppressLibraryScrollReset = true;
+        if (this._libraryScrollResetTimeout) {
+            clearTimeout(this._libraryScrollResetTimeout);
+        }
+        this._libraryScrollResetTimeout = setTimeout(() => {
+            this._suppressLibraryScrollReset = false;
+            this._libraryScrollResetTimeout = null;
+        }, duration);
     }
 
     /**
@@ -541,7 +557,7 @@ class PageApp {
         // Update title in header
         const appHeader = document.getElementById('library-app-header');
         if (appHeader) {
-            appHeader.title = parsed.metadata.title || 'Untitled';
+            appHeader.heading = parsed.metadata.title || 'Untitled';
         }
 
         // Show all header controls
@@ -610,6 +626,7 @@ class PageApp {
         const container = document.querySelector('.home-content-container, .songs-content-container');
         const libraryView = container?.querySelector('.library-song-view');
         if (libraryView) {
+            this._suppressLibraryScrollResetTemporarily();
             libraryView.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
         }
     }
@@ -636,7 +653,7 @@ class PageApp {
         // Restore "Song Library" title
         const appHeader = document.getElementById('library-app-header');
         if (appHeader) {
-            appHeader.title = 'Song Library';
+            appHeader.heading = 'Song Library';
         }
 
         // Clear edit mode state
@@ -1108,7 +1125,7 @@ class PageApp {
 
         // Show progress modal
         const progressModal = document.createElement('progress-modal');
-        progressModal.title = 'Importing Setlists';
+        progressModal.heading = 'Importing Setlists';
         progressModal.message = 'Initializing...';
         progressModal.progress = 0;
         document.body.appendChild(progressModal);
@@ -1713,7 +1730,7 @@ class PageApp {
         }
 
         // Check if content is actually changing
-        const titleChanged = appHeader.title !== newTitle;
+        const titleChanged = appHeader.heading !== newTitle;
         if (!titleChanged && !instant) {
             return; // No change needed
         }
@@ -1724,7 +1741,7 @@ class PageApp {
             this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
         } else {
             // Animated update - fade out old, swap content, fade in new
-            appHeader.title = newTitle;
+            appHeader.heading = newTitle;
 
             await this._animateSlottedContent(async () => {
                 this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
