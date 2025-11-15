@@ -137,7 +137,7 @@ export class SongInfo extends LitElement {
         }
 
         .ccli-link:hover {
-            color: #2980b9;
+            color: var(--color-info, #2980b9);
             text-decoration: underline;
         }
 

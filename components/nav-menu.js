@@ -50,7 +50,7 @@ export class NavMenu extends LitElement {
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
             padding: 0;
-            background: white;
+            background: var(--bg-secondary, white);
             min-width: 250px;
             max-width: 90vw;
             max-height: 80vh;
@@ -80,7 +80,7 @@ export class NavMenu extends LitElement {
             gap: 1rem;
             padding: 1rem 1.5rem;
             text-decoration: none;
-            color: var(--color-text, #2c3e50);
+            color: var(--text-color, #2c3e50);
             background: transparent;
             border: none;
             font-size: 1.4rem;
@@ -93,11 +93,11 @@ export class NavMenu extends LitElement {
         }
 
         .nav-menu-item:hover {
-            background-color: #ecf0f1;
+            background-color: var(--bg-tertiary, #ecf0f1);
         }
 
         .nav-menu-item:active {
-            background-color: #d5dbdb;
+            background-color: var(--hover-bg, rgba(0, 0, 0, 0.1));
         }
 
         .nav-icon {
@@ -118,14 +118,14 @@ export class NavMenu extends LitElement {
             left: 0;
             right: 0;
             height: 3px;
-            background: #ecf0f1;
+            background: var(--border-light, #ecf0f1);
         }
 
         .section-title {
             padding: 0.5rem 1.5rem;
             font-size: 1rem;
             font-weight: 600;
-            color: #7f8c8d;
+            color: var(--text-secondary, #7f8c8d);
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }

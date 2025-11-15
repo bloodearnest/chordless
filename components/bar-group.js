@@ -55,11 +55,11 @@ export class BarGroup extends LitElement {
         }
 
         .chord-segment.chord-only.bar-marker .chord {
-            color: #95a5a6;
+            color: var(--text-tertiary, #95a5a6);
         }
 
         .chord {
-            color: #2980b9;
+            color: var(--chord-color, #2980b9);
             font-weight: bold;
             font-size: 0.9em;
             min-height: 1.1em;
@@ -69,7 +69,7 @@ export class BarGroup extends LitElement {
         }
 
         .chord.bar {
-            color: #95a5a6;
+            color: var(--text-tertiary, #95a5a6);
             font-weight: normal;
         }
     `;

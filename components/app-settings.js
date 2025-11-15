@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import './theme-settings.js';
 import './media-player-settings.js';
 import './select-organisation.js';
 
@@ -87,6 +88,14 @@ export class AppSettings extends LitElement {
     render() {
         return html`
             <div class="settings-content">
+                <div class="settings-section">
+                    <h3>Appearance</h3>
+                    <p>
+                        Customize the look and feel of the app with theme and display settings.
+                    </p>
+                    <theme-settings></theme-settings>
+                </div>
+
                 <div class="settings-section">
                     <h3>Church</h3>
                     <p>

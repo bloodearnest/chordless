@@ -25,15 +25,15 @@ export class SetlistGroup extends LitElement {
         }
 
         .year-section {
-            border: 2px solid #ecf0f1;
+            border: 2px solid var(--border-light, #ecf0f1);
             border-radius: 8px;
             overflow: hidden;
-            background: #ffffff;
+            background: var(--bg-secondary, #ffffff);
         }
 
         .year-header {
             width: 100%;
-            padding: 1.5rem 2rem;
+            padding: 1rem 2rem;
             background-color: var(--header-bg, #2c3e50);
             color: var(--header-text, #ecf0f1);
             border: none;
@@ -48,7 +48,7 @@ export class SetlistGroup extends LitElement {
         }
 
         .year-header:hover {
-            background-color: #34495e;
+            filter: brightness(1.1);
         }
 
         .year-header::after {
@@ -75,10 +75,10 @@ export class SetlistGroup extends LitElement {
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
-            padding: 1.5rem 2rem;
-            background-color: white;
+            padding: 0.2rem 2rem;
+            background-color: var(--bg-secondary, white);
             border: none;
-            border-bottom: 1px solid #ecf0f1;
+            border-bottom: 1px solid var(--border-light, #ecf0f1);
             font-size: 1.3rem;
             color: var(--text-color, #2c3e50);
             text-decoration: none;
@@ -91,7 +91,7 @@ export class SetlistGroup extends LitElement {
         }
 
         .setlist-button:hover {
-            background-color: #f9f9f9;
+            background-color: var(--bg-tertiary, #f9f9f9);
         }
 
         .setlist-name {
@@ -101,7 +101,7 @@ export class SetlistGroup extends LitElement {
 
         .setlist-song-count {
             font-size: 1.2rem;
-            color: #7f8c8d;
+            color: var(--text-secondary, #7f8c8d);
             white-space: nowrap;
         }
     `;

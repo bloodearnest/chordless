@@ -49,6 +49,9 @@
     </script>
 
     <script type="module">
+        // Initialize theme manager (loads saved preferences automatically)
+        import '/js/theme-manager.js';
+
         import { SetalightDB } from '/js/db.js';
         import { getCurrentOrganisation } from '/js/workspace.js';
 

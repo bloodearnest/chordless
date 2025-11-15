@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Theme System Demo - Setalight</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .demo-container {
+            padding: 2rem;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .demo-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background-color: var(--bg-secondary);
+            border-radius: 8px;
+        }
+
+        .demo-section h2 {
+            color: var(--color-primary);
+            margin-bottom: 1rem;
+        }
+
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .color-swatch {
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+            font-size: 0.85rem;
+        }
+
+        .color-swatch.bg { background-color: var(--bg-color); color: var(--text-color); border: 1px solid var(--border-color); }
+        .color-swatch.bg-secondary { background-color: var(--bg-secondary); color: var(--text-color); }
+        .color-swatch.text { background-color: var(--text-color); color: var(--bg-color); }
+        .color-swatch.header { background-color: var(--header-bg); color: var(--header-text); }
+        .color-swatch.primary { background-color: var(--color-primary); color: white; }
+        .color-swatch.success { background-color: var(--color-success); color: white; }
+        .color-swatch.warning { background-color: var(--color-warning); color: white; }
+        .color-swatch.danger { background-color: var(--color-danger); color: white; }
+
+        .theme-controls {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background-color: var(--button-bg);
+            color: var(--button-text);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--button-hover);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-secondary);
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--hover-bg);
+        }
+
+        .current-theme {
+            font-weight: bold;
+            color: var(--color-primary);
+        }
+
+        code {
+            background-color: var(--bg-tertiary);
+            padding: 0.2rem 0.4rem;
+            border-radius: 3px;
+            font-family: monospace;
+            color: var(--color-info);
+        }
+
+        pre {
+            background-color: var(--bg-tertiary);
+            padding: 1rem;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+
+        .font-scale-demo {
+            font-size: calc(1rem * var(--font-scale));
+            padding: 1rem;
+            background-color: var(--bg-tertiary);
+            border-radius: 4px;
+            margin-top: 1rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <h1>Theme System Demo</h1>
+        <p>This page demonstrates the centralized theme system using CSS Custom Properties that work across shadow DOM boundaries.</p>
+
+        <!-- Theme Controls -->
+        <div class="demo-section">
+            <h2>Theme Controls</h2>
+            <p>Current theme: <span class="current-theme" id="current-theme">light</span></p>
+            <div class="theme-controls">
+                <button class="btn btn-primary" id="toggle-theme">Toggle Light/Dark</button>
+                <button class="btn btn-secondary" id="set-light">Set Light</button>
+                <button class="btn btn-secondary" id="set-dark">Set Dark</button>
+                <button class="btn btn-secondary" id="detect-system">Use System Preference</button>
+            </div>
+        </div>
+
+        <!-- Color Palette -->
+        <div class="demo-section">
+            <h2>Color Palette</h2>
+            <p>All colors automatically update when theme changes:</p>
+            <div class="color-grid">
+                <div class="color-swatch bg">Background</div>
+                <div class="color-swatch bg-secondary">BG Secondary</div>
+                <div class="color-swatch text">Text</div>
+                <div class="color-swatch header">Header</div>
+                <div class="color-swatch primary">Primary</div>
+                <div class="color-swatch success">Success</div>
+                <div class="color-swatch warning">Warning</div>
+                <div class="color-swatch danger">Danger</div>
+            </div>
+        </div>
+
+        <!-- Font Scaling -->
+        <div class="demo-section">
+            <h2>Font Scaling</h2>
+            <p>Font scale is: <span id="font-scale">1.0</span></p>
+            <div class="theme-controls">
+                <button class="btn btn-secondary" onclick="setFontScale(0.8)">80%</button>
+                <button class="btn btn-secondary" onclick="setFontScale(1.0)">100%</button>
+                <button class="btn btn-secondary" onclick="setFontScale(1.2)">120%</button>
+                <button class="btn btn-secondary" onclick="setFontScale(1.5)">150%</button>
+            </div>
+            <div class="font-scale-demo">
+                This text scales with <code>var(--font-scale)</code>
+            </div>
+        </div>
+
+        <!-- Usage Example -->
+        <div class="demo-section">
+            <h2>Usage in Components</h2>
+            <p>Components with shadow DOM can access these variables:</p>
+            <pre><code>// In your Lit component
+static styles = css\`
+  :host {
+    font-family: var(--font-family-base);
+    color: var(--text-color);
+    background: var(--bg-color);
+  }
+
+  .header {
+    background: var(--header-bg);
+    color: var(--header-text);
+  }
+
+  .button-primary {
+    background: var(--button-bg);
+    color: var(--button-text);
+  }
+
+  .button-primary:hover {
+    background: var(--button-hover);
+  }
+
+  /* Use font-scale for responsive sizing */
+  .content {
+    font-size: calc(1rem * var(--font-scale));
+  }
+\`;</code></pre>
+        </div>
+
+        <!-- JavaScript API -->
+        <div class="demo-section">
+            <h2>JavaScript API</h2>
+            <pre><code>// Import the theme manager
+import { themeManager } from '/js/theme-manager.js';
+
+// Set theme
+themeManager.setTheme('dark');
+themeManager.toggleTheme();
+
+// Get current theme
+const theme = themeManager.getCurrentTheme(); // 'light' or 'dark'
+
+// Set custom variable
+themeManager.setVariable('my-custom-color', '#ff0000');
+
+// Get variable
+const color = themeManager.getVariable('color-primary');
+
+// Font scaling
+themeManager.setFontScale(1.2);
+themeManager.updateResponsiveFontScale(containerWidth);
+
+// Observe theme changes
+themeManager.addObserver((themeName) => {
+    console.log('Theme changed to:', themeName);
+});</code></pre>
+        </div>
+    </div>
+
+    <script type="module">
+        import { themeManager } from '/js/theme-manager.js';
+
+        // Update display
+        function updateThemeDisplay() {
+            document.getElementById('current-theme').textContent = themeManager.getCurrentTheme();
+            document.getElementById('font-scale').textContent = themeManager.getVariable('font-scale') || '1.0';
+        }
+
+        // Initial update
+        updateThemeDisplay();
+
+        // Theme change observer
+        themeManager.addObserver(updateThemeDisplay);
+
+        // Toggle theme
+        document.getElementById('toggle-theme').addEventListener('click', () => {
+            themeManager.toggleTheme();
+        });
+
+        // Set light theme
+        document.getElementById('set-light').addEventListener('click', () => {
+            themeManager.setTheme('light');
+        });
+
+        // Set dark theme
+        document.getElementById('set-dark').addEventListener('click', () => {
+            themeManager.setTheme('dark');
+        });
+
+        // Use system preference
+        document.getElementById('detect-system').addEventListener('click', () => {
+            themeManager.setTheme('system');
+            const systemTheme = themeManager.detectSystemPreference();
+            alert(`Now following system preference (currently: ${systemTheme})`);
+        });
+
+        // Font scale functions (global for onclick)
+        window.setFontScale = (scale) => {
+            themeManager.setFontScale(scale);
+            updateThemeDisplay();
+        };
+    </script>
+</body>
+</html>

@@ -160,6 +160,9 @@ class PageApp {
         // Set up hash change handler for navigation
         this.setupLibraryHashNavigation();
 
+        // Set up scroll observer to detect swipe back to library
+        this.setupLibraryScrollObserver();
+
         // If hash is provided, load that song
         if (hash) {
             const { getSongWithContent } = await import('./song-utils.js');
@@ -218,6 +221,38 @@ class PageApp {
         };
 
         window.addEventListener('hashchange', this.libraryHashHandler);
+    }
+
+    setupLibraryScrollObserver() {
+        // Disconnect any existing observer
+        if (this.libraryScrollObserver) {
+            this.libraryScrollObserver.disconnect();
+        }
+
+        // Get the library view element
+        const libraryView = document.querySelector('.library-view');
+        if (!libraryView) return;
+
+        // Create observer to detect when library view becomes visible (from swipe)
+        this.libraryScrollObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                // When library view becomes fully visible
+                if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+                    // Check if we have a hash (song is open)
+                    const hash = window.location.hash.substring(1);
+                    if (hash) {
+                        // User swiped back to library, clear the hash
+                        // This will trigger the hashchange handler which calls closeLibrarySongView
+                        window.location.hash = '';
+                    }
+                }
+            });
+        }, {
+            threshold: [0.5, 1.0]
+        });
+
+        // Start observing the library view
+        this.libraryScrollObserver.observe(libraryView);
     }
 
     /**

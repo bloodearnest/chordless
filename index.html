@@ -138,6 +138,9 @@
     </script>
 
     <script type="module">
+        // Initialize theme manager (loads saved preferences automatically)
+        import '/js/theme-manager.js';
+
         // Update page title with church name
         import { getCurrentOrganisation } from '/js/workspace.js';
 

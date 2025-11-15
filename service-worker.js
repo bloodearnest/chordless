@@ -8,7 +8,7 @@ const DEV_MODE = self.location.hostname === 'localhost'
     || self.location.hostname.startsWith('10.')
     || self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v229';
+const CACHE_NAME = 'setalight-v250';
 const PAD_CACHE_NAME = 'padsets-cache-v1';
 const ASSETS = [
     '/',
@@ -18,6 +18,7 @@ const ASSETS = [
     '/js/db.js',
     '/js/import.js',
     '/js/transpose.js',
+    '/js/theme-manager.js',
     '/components/media-player.js',
     '/components/media-player-settings.js'
 ];

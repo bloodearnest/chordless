@@ -10,12 +10,36 @@ html {
 }
 
 :root {
+    /* Theme colors - set by theme-manager.js */
+    /* Light mode defaults (will be overridden by theme manager) */
     --bg-color: #ffffff;
+    --bg-secondary: #f5f6f7;
+    --bg-tertiary: #ecf0f1;
     --text-color: #1a1a1a;
+    --text-secondary: #7f8c8d;
+    --text-tertiary: #95a5a6;
+    --text-muted: #bdc3c7;
     --header-bg: #2c3e50;
     --header-text: #ecf0f1;
     --button-bg: #3498db;
     --button-hover: #2980b9;
+    --button-text: #ffffff;
+    --color-primary: #3498db;
+    --color-success: #27ae60;
+    --color-warning: #f39c12;
+    --color-danger: #e74c3c;
+    --color-info: #2980b9;
+    --chord-color: #2980b9;
+    --border-color: #d5dbdb;
+    --border-light: #ecf0f1;
+    --overlay-bg: rgba(0, 0, 0, 0.7);
+    --overlay-light: rgba(0, 0, 0, 0.3);
+    --hover-bg: rgba(255, 255, 255, 0.2);
+    --active-bg: rgba(255, 255, 255, 0.3);
+    --focus-ring: #3498db;
+
+    /* Typography */
+    --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
     /* Responsive font size multiplier for components */
     /* This allows shadow DOM components to scale with viewport */
@@ -38,7 +62,7 @@ html {
 }
 
 body {
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-family-base);
     background-color: var(--bg-color);
     color: var(--text-color);
     line-height: 1.6;
@@ -1015,7 +1039,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .chord {
-    color: #2980b9;
+    color: var(--chord-color);
     font-weight: bold;
     font-size: 0.9em;
     min-height: 1.1em;
@@ -1024,12 +1048,12 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .chord.bar {
-    color: #95a5a6;
+    color: var(--text-tertiary);
     font-weight: normal;
 }
 
 .song-content .chord.invalid {
-    color: #bdc3c7;
+    color: var(--text-muted);
     opacity: 0.5;
     font-style: italic;
 }
@@ -1474,12 +1498,12 @@ body.edit-mode .key-selector:focus {
 }
 
 .modal-btn-cancel {
-    background-color: #ecf0f1;
+    background-color: var(--bg-tertiary, #ecf0f1);
     color: var(--text-color);
 }
 
 .modal-btn-cancel:hover {
-    background-color: #d5dbdb;
+    filter: brightness(1.2);
 }
 
 .modal-btn-confirm {
@@ -1492,12 +1516,12 @@ body.edit-mode .key-selector:focus {
 }
 
 .modal-btn-primary {
-    background-color: var(--header-bg);
-    color: white;
+    background-color: var(--button-bg, #3498db);
+    color: var(--button-text, white);
 }
 
 .modal-btn-primary:hover {
-    background-color: #5a6c8a;
+    background-color: var(--button-hover, #2980b9);
 }
 
 #reset-confirm-modal .modal-content {
@@ -1527,11 +1551,11 @@ body.edit-mode .key-selector:focus {
 .form-field select {
     width: 100%;
     padding: 0.75rem;
-    border: 2px solid #e0e0e0;
+    border: 2px solid var(--border-light, #e0e0e0);
     border-radius: 6px;
     font-size: 1rem;
     font-family: inherit;
-    background-color: white;
+    background-color: var(--bg-tertiary, white);
     color: var(--text-color);
     transition: border-color 0.2s ease;
 }
@@ -1541,11 +1565,11 @@ body.edit-mode .key-selector:focus {
 .form-field input[type="text"]:focus,
 .form-field select:focus {
     outline: none;
-    border-color: var(--header-bg);
+    border-color: var(--button-bg);
 }
 
 .form-field input::placeholder {
-    color: #95a5a6;
+    color: var(--text-secondary, #95a5a6);
 }
 
 /* Create setlist button in header */
@@ -1690,13 +1714,13 @@ body.edit-mode .key-selector:focus {
 /* Add Song button */
 .add-song-button {
     margin-top: 1.5rem;
-    border: 2px dashed #bdc3c7 !important;
-    background-color: #f8f9fa !important;
-    color: #7f8c8d;
+    border: 2px dashed var(--border-color, #bdc3c7) !important;
+    background-color: var(--bg-tertiary, #f8f9fa) !important;
+    color: var(--text-secondary, #7f8c8d);
 }
 
 .add-song-button:hover {
-    background-color: white !important;
+    background-color: var(--bg-secondary, white) !important;
     border-color: var(--button-bg) !important;
     color: var(--button-bg);
 }
@@ -1715,9 +1739,9 @@ body.edit-mode .key-selector:focus {
     width: 100%;
     padding: 1rem 1.5rem;
     font-size: 1.3rem;
-    border: 2px solid #ecf0f1;
+    border: 2px solid var(--border-light, #ecf0f1);
     border-radius: 8px;
-    background-color: white;
+    background-color: var(--bg-secondary, white);
     color: var(--text-color);
     transition: border-color 0.2s;
 }
@@ -1728,7 +1752,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-search-input::placeholder {
-    color: #95a5a6;
+    color: var(--text-secondary, #95a5a6);
 }
 
 .song-library-list {

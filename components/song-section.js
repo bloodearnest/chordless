@@ -52,8 +52,8 @@ export class SongSection extends LitElement {
         :host([editmode]) .song-section-wrapper,
         :host([libraryeditmode]) .song-section-wrapper {
             border-style: dotted;
-            border-color: #bdc3c7;
-            background-color: #f9f9f9;
+            border-color: var(--border-color, #bdc3c7);
+            background-color: var(--bg-secondary, #f9f9f9);
         }
 
         .song-section-wrapper .section-header {
@@ -218,7 +218,7 @@ export class SongSection extends LitElement {
         }
 
         .song-section-wrapper .chord {
-            color: #2980b9;
+            color: var(--chord-color, #2980b9);
             font-weight: bold;
             font-size: 0.9em;
             min-height: 1.1em;
@@ -228,12 +228,12 @@ export class SongSection extends LitElement {
         }
 
         .song-section-wrapper .chord.bar {
-            color: #95a5a6;
+            color: var(--text-tertiary, #95a5a6);
             font-weight: normal;
         }
 
         .song-section-wrapper .chord.invalid {
-            color: #bdc3c7;
+            color: var(--text-muted, #bdc3c7);
             opacity: 0.5;
             font-style: italic;
         }
@@ -251,7 +251,7 @@ export class SongSection extends LitElement {
         }
 
         .song-section-wrapper .chord.invalid {
-            color: #e74c3c;
+            color: var(--color-danger, #e74c3c);
         }
     `;
 

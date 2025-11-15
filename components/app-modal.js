@@ -80,7 +80,7 @@ export class AppModal extends LitElement {
 
         .modal-content {
             position: relative;
-            background: white;
+            background: var(--bg-color, white);
             border-radius: 8px;
             max-width: 90%;
             max-height: 90vh;
@@ -115,13 +115,13 @@ export class AppModal extends LitElement {
         .modal-header {
             position: relative;
             padding: 2rem 2rem 1rem 2rem;
-            border-bottom: 1px solid #ecf0f1;
+            border-bottom: 1px solid var(--border-light, #ecf0f1);
         }
 
         .modal-title {
             font-size: 2rem;
             font-weight: 600;
-            color: #2c3e50;
+            color: var(--text-color, #2c3e50);
             margin: 0;
             padding-right: 3rem;
         }
@@ -134,7 +134,7 @@ export class AppModal extends LitElement {
             border: none;
             font-size: 2.5rem;
             line-height: 1;
-            color: #95a5a6;
+            color: var(--text-secondary, #95a5a6);
             cursor: pointer;
             padding: 0.5rem;
             width: 3.5rem;
@@ -147,8 +147,8 @@ export class AppModal extends LitElement {
         }
 
         .modal-close:hover {
-            background-color: #ecf0f1;
-            color: #2c3e50;
+            background-color: var(--bg-tertiary, #ecf0f1);
+            color: var(--text-color, #2c3e50);
         }
 
         .modal-body {
@@ -159,7 +159,7 @@ export class AppModal extends LitElement {
 
         .modal-message {
             font-size: 1.4rem;
-            color: #34495e;
+            color: var(--text-color, #34495e);
             line-height: 1.6;
             margin: 0;
         }
@@ -169,7 +169,7 @@ export class AppModal extends LitElement {
             gap: 1rem;
             justify-content: flex-end;
             padding: 1.5rem 2rem 2rem 2rem;
-            border-top: 1px solid #ecf0f1;
+            border-top: 1px solid var(--border-light, #ecf0f1);
         }
 
         .modal-btn {
@@ -183,29 +183,29 @@ export class AppModal extends LitElement {
         }
 
         .modal-btn-cancel {
-            background-color: #ecf0f1;
-            color: #2c3e50;
+            background-color: var(--bg-tertiary, #ecf0f1);
+            color: var(--text-color, #2c3e50);
         }
 
         .modal-btn-cancel:hover {
-            background-color: #d5dbdb;
+            filter: brightness(1.2);
         }
 
         .modal-btn-confirm {
-            background-color: #3498db;
-            color: white;
+            background-color: var(--button-bg, #3498db);
+            color: var(--button-text, white);
         }
 
         .modal-btn-confirm:hover {
-            background-color: #2980b9;
+            background-color: var(--button-hover, #2980b9);
         }
 
         .modal-btn-confirm.danger {
-            background-color: #e74c3c;
+            background-color: var(--color-danger, #e74c3c);
         }
 
         .modal-btn-confirm.danger:hover {
-            background-color: #c0392b;
+            filter: brightness(0.9);
         }
 
         /* Hide elements based on configuration */
