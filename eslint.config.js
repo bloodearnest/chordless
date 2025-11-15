@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import globals from 'globals';
+import lit from 'eslint-plugin-lit';
 
 const browserFiles = [
     '*.js',
@@ -7,6 +8,8 @@ const browserFiles = [
     'js/**/*.js',
     'service-worker.js'
 ];
+
+const litRecommended = lit.configs['flat/recommended'];
 
 export default [
     {
@@ -18,6 +21,10 @@ export default [
         ]
     },
     js.configs.recommended,
+    {
+        ...litRecommended,
+        files: ['components/**/*.js']
+    },
     {
         files: browserFiles,
         languageOptions: {
