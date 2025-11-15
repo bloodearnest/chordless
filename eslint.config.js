@@ -9,7 +9,7 @@ const litRecommended = lit.configs['flat/recommended'];
 
 export default [
   {
-    ignores: ['auth-proxy/**', 'node_modules/**', 'test-results/**', 'tests/fixtures/**'],
+    ignores: ['node_modules/**', 'test-results/**', 'tests/fixtures/**'],
   },
   js.configs.recommended,
   {
@@ -91,6 +91,28 @@ export default [
         ...globals.browser,
         ...globals.es2021,
       },
+    },
+  },
+  {
+    files: ['auth-proxy/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.serviceworker,
+      },
+    },
+    rules: {
+      'no-console': 'off',
+      'compat/compat': 'off',
+      'no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+        },
+      ],
     },
   },
 ];

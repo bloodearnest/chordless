@@ -26,7 +26,7 @@ lint:
     @echo "Checking formatting..."
     npx prettier --check .
     @echo "Running ESLint..."
-    npx eslint components js tests service-worker.js
+    npx eslint components js tests service-worker.js auth-proxy/src
 
 # Format project files with Prettier
 format:

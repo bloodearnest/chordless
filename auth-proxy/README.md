@@ -12,9 +12,11 @@ Stateless OAuth proxy for Google Drive integration, deployed as a Cloudflare Wor
 ## Endpoints
 
 ### `POST /oauth/callback`
+
 Exchange authorization code for encrypted token blob.
 
 **Request:**
+
 ```json
 {
   "code": "auth-code-from-gsi",
@@ -23,6 +25,7 @@ Exchange authorization code for encrypted token blob.
 ```
 
 **Response:**
+
 ```json
 {
   "blob": "eyJhbGc...",
@@ -41,9 +44,11 @@ Exchange authorization code for encrypted token blob.
 ```
 
 ### `POST /session/invite`
+
 Add user as reader to a Drive file.
 
 **Request:**
+
 ```json
 {
   "blob": "eyJhbGc...",
@@ -54,6 +59,7 @@ Add user as reader to a Drive file.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -62,9 +68,11 @@ Add user as reader to a Drive file.
 ```
 
 ### `POST /session/revoke`
+
 Remove user permission from Drive file.
 
 **Request:**
+
 ```json
 {
   "blob": "eyJhbGc...",
@@ -75,6 +83,7 @@ Remove user permission from Drive file.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true
@@ -82,16 +91,21 @@ Remove user permission from Drive file.
 ```
 
 ### `POST /api/share`
+
 Store setlist for sharing.
 
 **Request:**
+
 ```json
 {
-  "setlist": { /* complete setlist data */ }
+  "setlist": {
+    /* complete setlist data */
+  }
 }
 ```
 
 **Response:**
+
 ```json
 {
   "id": "abc123de",
@@ -100,12 +114,16 @@ Store setlist for sharing.
 ```
 
 ### `GET /api/share/:id`
+
 Retrieve shared setlist.
 
 **Response:**
+
 ```json
 {
-  "setlist": { /* setlist data */ },
+  "setlist": {
+    /* setlist data */
+  },
   "created_at": "2024-11-08T00:00:00Z"
 }
 ```
@@ -195,11 +213,13 @@ To rotate encryption keys:
 ## Monitoring
 
 View logs:
+
 ```bash
 wrangler tail
 ```
 
 View KV storage:
+
 ```bash
 wrangler kv:key list --namespace-id=YOUR_KV_ID
 ```
