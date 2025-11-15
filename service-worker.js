@@ -1,4 +1,5 @@
 // Service Worker for Setalight
+import * as AuthDB from '/js/auth-db.js';
 // Handles routing and generates pages for offline-first operation
 
 // Auto-detect development mode based on hostname
@@ -9,7 +10,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v250';
+const CACHE_NAME = 'setalight-v252';
 const PAD_CACHE_NAME = 'padsets-cache-v1';
 const ASSETS = [
   '/',
@@ -88,9 +89,6 @@ self.addEventListener('activate', event => {
   );
   self.clients.claim();
 });
-
-// Import auth-db module
-import * as AuthDB from '/js/auth-db.js';
 
 // Handle messages from clients
 self.addEventListener('message', async event => {

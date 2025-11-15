@@ -10,6 +10,19 @@
     <meta name="view-transition" content="same-origin" />
     <title>Storage - Setalight</title>
     <link rel="stylesheet" href="/css/style.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "https://unpkg.com/lit@3.1.0/index.js",
+          "lit/": "https://unpkg.com/lit@3.1.0/",
+          "@lit/reactive-element": "https://unpkg.com/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://unpkg.com/@lit/reactive-element@2.0.4/",
+          "lit-element/lit-element.js": "https://unpkg.com/lit-element@4.0.4/lit-element.js",
+          "lit-html": "https://unpkg.com/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://unpkg.com/lit-html@3.1.0/"
+        }
+      }
+    </script>
   </head>
   <body>
     <div class="app-container">
@@ -43,19 +56,7 @@
     </div>
 
     <!-- Import map for Lit -->
-    <script type="importmap">
-      {
-        "imports": {
-          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
-          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
-          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
-          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/",
-          "lit-element/lit-element.js": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
-          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
-          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/"
-        }
-      }
-    </script>
+    <script type="importmap" src="./importmap.json"></script>
 
     <script type="module">
       import { SetalightDB } from '/js/db.js';

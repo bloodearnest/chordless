@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import globals from 'globals';
 import lit from 'eslint-plugin-lit';
 import compat from 'eslint-plugin-compat';
+import importPlugin from 'eslint-plugin-import';
 
 const browserFiles = ['*.js', 'components/**/*.js', 'js/**/*.js', 'service-worker.js'];
 
@@ -36,6 +37,7 @@ export default [
     },
     plugins: {
       compat,
+      import: importPlugin,
     },
     rules: {
       'no-unused-vars': [
@@ -47,6 +49,16 @@ export default [
       ],
       'no-console': 'off',
       'compat/compat': 'error',
+      'import/first': 'error',
+      'import/no-duplicates': 'error',
+      'import/newline-after-import': 'error',
+      'import/no-unresolved': [
+        'error',
+        {
+          ignore: ['^lit', '^/js/'],
+        },
+      ],
+      'import/no-cycle': 'warn',
     },
   },
   {

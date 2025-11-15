@@ -3,20 +3,12 @@
   "mcp": {
     "playwright-test": {
       "type": "local",
-      "command": [
-        "npx",
-        "playwright",
-        "run-test-mcp-server"
-      ],
+      "command": ["npx", "playwright", "run-test-mcp-server"],
       "enabled": true
     },
     "chrome-devtools": {
       "type": "global",
-      "command": [
-        "chrome-devtools-mcp",
-        "--browserUrl",
-        "http://127.0.0.1:9222"
-      ],
+      "command": ["chrome-devtools-mcp", "--browserUrl", "http://127.0.0.1:9222"],
       "enabled": true
     }
   },
