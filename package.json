@@ -8,6 +8,12 @@
     "test:browser:ui": "playwright test --ui",
     "test:browser:headed": "playwright test --headed"
   },
+  "dependencies": {
+    "@lit/reactive-element": "2.0.4",
+    "lit": "3.1.0",
+    "lit-element": "4.0.4",
+    "lit-html": "3.1.0"
+  },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
     "eslint": "^9.39.1",

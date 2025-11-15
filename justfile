@@ -33,6 +33,10 @@ format:
     @echo "Formatting with Prettier..."
     npx prettier --write .
 
+# Copy vendored dependencies from node_modules to vendor/
+vendor:
+    node scripts/vendor-deps.mjs
+
 # Run browser tests with Playwright (headless)
 test-browser-headless:
     @echo "Running browser tests with Playwright..."

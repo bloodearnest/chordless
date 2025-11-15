@@ -291,7 +291,6 @@ export class SongSection extends LitElement {
    * @param {Array<{segments: Array<{chord: string, lyrics: string}>}>} value
    */
   set lines(value) {
-    console.log('[SongSection] lines setter called:', value?.length, 'lines');
     const oldValue = this._lines;
     this._lines = value;
     if (value && value.length > 0) {
