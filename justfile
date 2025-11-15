@@ -23,8 +23,8 @@ test-node:
 
 # Lint/format JS files (basic syntax checks)
 lint:
-    @echo "Checking JavaScript syntax..."
-    @find js components -name '*.js' -print0 | xargs -0 -I{} node --check {}
+    @echo "Running ESLint..."
+    npx eslint components js tests service-worker.js
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:

@@ -120,12 +120,12 @@ class PageApp {
             return { type: 'storage' };
         }
 
-        const setlistMatch = pathname.match(/^\/setlist\/([^\/]+)$/);
+        const setlistMatch = pathname.match(/^\/setlist\/([^/]+)$/);
         if (setlistMatch) {
             return { type: 'setlist', setlistId: setlistMatch[1], songIndex: -1 };
         }
 
-        const songMatch = pathname.match(/^\/setlist\/([^\/]+)\/song\/(-?\d+)$/);
+        const songMatch = pathname.match(/^\/setlist\/([^/]+)\/song\/(-?\d+)$/);
         if (songMatch) {
             return {
                 type: 'song',
@@ -200,7 +200,7 @@ class PageApp {
         }
 
         // Create new handler
-        this.libraryHashHandler = async (event) => {
+        this.libraryHashHandler = async () => {
             const hash = window.location.hash.substring(1);
 
             if (!hash) {
@@ -1035,16 +1035,6 @@ class PageApp {
         };
     }
 
-    formatDate(dateStr) {
-        // Parse YYYY-MM-DD format and convert to readable format
-        const date = new Date(dateStr);
-        return date.toLocaleDateString('en-US', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        });
-    }
-
     getWeeksAgo(dateStr) {
         const date = new Date(dateStr);
         const now = new Date();
@@ -1181,7 +1171,7 @@ class PageApp {
             const formattedDate = `${dayNum}${ordinalSuffix} ${monthName} (${dayName})`;
 
             return eventName ? `${formattedDate} - ${eventName}` : formattedDate;
-        } catch (error) {
+        } catch {
             return dateStr;
         }
     }
@@ -1531,7 +1521,7 @@ class PageApp {
                 month: 'long',
                 day: 'numeric'
             });
-        } catch (error) {
+        } catch {
             return dateStr;
         }
     }
@@ -2398,7 +2388,7 @@ class PageApp {
         });
 
         // Listen to nav menu clicks - toggle the popover
-        appHeader.addEventListener('nav-menu-click', (e) => {
+        appHeader.addEventListener('nav-menu-click', () => {
             const navMenu = document.getElementById('nav-menu');
             if (navMenu) {
                 // Get the nav button from the app-header component
@@ -2540,8 +2530,6 @@ class PageApp {
     }
 
     async _animateSlottedContent(updateCallback) {
-        const keyDisplayWrapper = document.querySelector('.key-display-wrapper');
-        const metaEl = document.getElementById('song-meta-header');
         const controlsSlot = document.querySelector('.header-controls-slot');
 
         // Fade out (use the controls slot to fade everything together)
@@ -2760,16 +2748,6 @@ class PageApp {
             let shouldUpdatePosition = false;
 
             if (proposedIndex !== dragState.lastAcceptedIndex) {
-                // Find Y position of the proposed target
-                let targetY;
-                if (proposedIndex === 0) {
-                    targetY = buttonsArray[0]?.getBoundingClientRect().top || 0;
-                } else if (proposedIndex >= buttonsArray.length) {
-                    targetY = buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect().bottom || clientY;
-                } else {
-                    targetY = buttonsArray[proposedIndex]?.getBoundingClientRect().top || clientY;
-                }
-
                 // Find Y position of current accepted target
                 let currentY;
                 if (dragState.lastAcceptedIndex === 0) {
@@ -2846,7 +2824,7 @@ class PageApp {
 
                 // Apply preview animations only if position actually changes
                 if (targetIndex !== dragState.startIndex && targetIndex !== dragState.startIndex + 1) {
-                    buttonsArray.forEach((btn, i) => {
+                    buttonsArray.forEach((btn) => {
                         const btnIndex = parseInt(btn.dataset.songIndex);
                         if (btnIndex === dragState.startIndex) return; // Skip dragged item
 
@@ -3301,20 +3279,22 @@ class PageApp {
                         this.navigateToHash(`song-${this.currentSongIndex + 1}`);
                     }
                     break;
-                case 'ArrowUp':
+                case 'ArrowUp': {
                     e.preventDefault();
                     const currentSectionUp = this.currentSongIndex >= 0
                         ? document.getElementById(`song-${this.currentSongIndex}`)
                         : document.getElementById('overview');
                     currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' });
                     break;
-                case 'ArrowDown':
+                }
+                case 'ArrowDown': {
                     e.preventDefault();
                     const currentSectionDown = this.currentSongIndex >= 0
                         ? document.getElementById(`song-${this.currentSongIndex}`)
                         : document.getElementById('overview');
                     currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' });
                     break;
+                }
             }
         });
     }
@@ -3704,4 +3684,4 @@ class PageApp {
 }
 
 // Initialize the app
-const app = new PageApp();
+new PageApp();

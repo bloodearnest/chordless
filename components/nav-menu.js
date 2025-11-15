@@ -325,7 +325,7 @@ export class NavMenu extends LitElement {
         `;
     }
 
-    _handleBackClick(e) {
+    _handleBackClick() {
         this.dispatchEvent(new CustomEvent('back-click', {
             bubbles: true,
             composed: true
@@ -391,7 +391,7 @@ export class NavMenu extends LitElement {
         }
     }
 
-    async _handleImportRequested(event) {
+    async _handleImportRequested() {
         // If we're already on the settings page, don't navigate
         // Let the event bubble to setlist-app which will handle the import
         if (window.location.pathname === '/settings') {

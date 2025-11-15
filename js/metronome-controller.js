@@ -106,7 +106,7 @@ export class MetronomeController {
                 try {
                     oscillator.stop();
                     oscillator.disconnect();
-                } catch (e) {
+                } catch {
                     // Oscillator may already be stopped
                 }
             });

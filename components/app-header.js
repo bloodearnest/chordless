@@ -441,35 +441,35 @@ export class AppHeader extends LitElement {
         `;
     }
 
-    _handleNavMenuClick(e) {
+    _handleNavMenuClick() {
         this.dispatchEvent(new CustomEvent('nav-menu-click', {
             bubbles: true,
             composed: true
         }));
     }
 
-    _handleEditToggle(e) {
+    _handleEditToggle() {
         this.dispatchEvent(new CustomEvent('edit-mode-toggle', {
             bubbles: true,
             composed: true
         }));
     }
 
-    _handleInfoClick(e) {
+    _handleInfoClick() {
         this.dispatchEvent(new CustomEvent('info-click', {
             bubbles: true,
             composed: true
         }));
     }
 
-    _handleShareClick(e) {
+    _handleShareClick() {
         this.dispatchEvent(new CustomEvent('share-click', {
             bubbles: true,
             composed: true
         }));
     }
 
-    _handleExpandToggle(e) {
+    _handleExpandToggle() {
         this.expanded = !this.expanded;
         console.log('[AppHeader] Expanded state:', this.expanded);
 

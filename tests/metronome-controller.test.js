@@ -79,10 +79,10 @@ class MockGainNode {
     constructor() {
         this.gain = {
             value: 1.0,
-            setValueAtTime: function(value, time) {
+            setValueAtTime: function(value, _time) {
                 this.value = value;
             },
-            exponentialRampToValueAtTime: function(value, time) {
+            exponentialRampToValueAtTime: function(value, _time) {
                 this.value = value;
             }
         };
@@ -117,14 +117,14 @@ try {
 try {
     new MetronomeController(null, new MockGainNode());
     assert(false, 'Constructor throws error for null AudioContext');
-} catch (e) {
+} catch {
     assert(true, 'Constructor throws error for null AudioContext');
 }
 
 try {
     new MetronomeController(new MockAudioContext(), null);
     assert(false, 'Constructor throws error for null GainNode');
-} catch (e) {
+} catch {
     assert(true, 'Constructor throws error for null GainNode');
 }
 
@@ -231,14 +231,6 @@ console.log('\n=== Testing BPM Calculations ===');
 const bpmContext = new MockAudioContext();
 const bpmGain = new MockGainNode();
 const bpmController = new MetronomeController(bpmContext, bpmGain);
-
-// Helper function to calculate expected interval
-function expectedInterval(quarterNoteBpm, clickNoteValue) {
-    // Interval between clicks in milliseconds
-    const quarterNoteInterval = 60000 / quarterNoteBpm;
-    const multiplier = 4 / clickNoteValue; // e.g., 4/4 = 1, 4/8 = 0.5
-    return quarterNoteInterval * multiplier;
-}
 
 // Test 1: Simple 4/4 at 120 BPM with 1/4 tempo
 // Quarter note BPM = 120, clicking on 1/4 notes

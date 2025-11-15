@@ -345,7 +345,6 @@ async function readZipEntries(file) {
         throw new Error('Invalid ZIP file (EOCD not found)');
     }
 
-    const centralDirSize = view.getUint32(eocdOffset + 12, true);
     const centralDirOffset = view.getUint32(eocdOffset + 16, true);
     const totalEntries = view.getUint16(eocdOffset + 10, true);
 
@@ -447,7 +446,7 @@ async function inflateRaw(data) {
             const decompressedStream = blob.stream().pipeThrough(new DecompressionStream(algo));
             const arrayBuffer = await new Response(decompressedStream).arrayBuffer();
             return new Uint8Array(arrayBuffer);
-        } catch (error) {
+        } catch {
             // Try next algorithm
         }
     }

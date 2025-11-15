@@ -119,11 +119,11 @@ class MockAudioContext {
         return new MockGainNode();
     }
 
-    createChannelSplitter(channels) {
+    createChannelSplitter(_channels) {
         return new MockChannelNode();
     }
 
-    createChannelMerger(channels) {
+    createChannelMerger(_channels) {
         return new MockChannelNode();
     }
 }
@@ -148,10 +148,10 @@ class MockGainNode {
     constructor() {
         this.gain = {
             value: 1.0,
-            setValueAtTime: function(value, time) {
+            setValueAtTime: function(value, _time) {
                 this.value = value;
             },
-            exponentialRampToValueAtTime: function(value, time) {
+            exponentialRampToValueAtTime: function(value, _time) {
                 this.value = value;
             }
         };
@@ -206,7 +206,7 @@ try {
 try {
     new PadAudioController(null);
     assert(false, 'Constructor throws error for null AudioContext');
-} catch (e) {
+} catch {
     assert(true, 'Constructor throws error for null AudioContext');
 }
 
@@ -214,7 +214,7 @@ try {
 console.log('\n=== Testing Custom Fade Duration ===');
 
 const context1 = new MockAudioContext();
-const controller1 = new PadAudioController(context1, { fadeDuration: 5000 });
+new PadAudioController(context1, { fadeDuration: 5000 });
 assert(true, 'Constructor accepts custom fade duration');
 
 // ===== Test Load Pad =====

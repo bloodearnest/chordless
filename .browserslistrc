@@ -1,0 +1,10 @@
+# Core PWA target: browsers that support import maps, module service workers,
+# CSS View Transitions, and the HTML Popover API without polyfills.
+Chrome >= 120
+ChromeAndroid >= 120
+Edge >= 120
+
+# Minimum Apple stack for live iPad use: first release where Safari/iOS keep
+# PWA install working while also supporting import maps, module SW, and popover.
+Safari >= 17.5
+iOS >= 17.5

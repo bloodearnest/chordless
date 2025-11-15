@@ -110,11 +110,12 @@ self.addEventListener('message', async (event) => {
                 respondToClient(event, messageId, { success: true });
                 break;
 
-            case 'GET_BLOB':
+            case 'GET_BLOB': {
                 // Retrieve blob
                 const blobData = await AuthDB.getBlob();
                 respondToClient(event, messageId, { success: true, data: blobData });
                 break;
+            }
 
             case 'DELETE_BLOB':
                 // Delete blob (logout)
@@ -122,7 +123,7 @@ self.addEventListener('message', async (event) => {
                 respondToClient(event, messageId, { success: true });
                 break;
 
-            case 'QUEUE_INVITE':
+            case 'QUEUE_INVITE': {
                 // Queue an invite operation
                 const inviteId = await AuthDB.queueOperation({
                     type: 'invite',
@@ -133,8 +134,9 @@ self.addEventListener('message', async (event) => {
                 // Trigger processing
                 processOperationQueue();
                 break;
+            }
 
-            case 'QUEUE_REVOKE':
+            case 'QUEUE_REVOKE': {
                 // Queue a revoke operation
                 const revokeId = await AuthDB.queueOperation({
                     type: 'revoke',
@@ -145,18 +147,21 @@ self.addEventListener('message', async (event) => {
                 // Trigger processing
                 processOperationQueue();
                 break;
+            }
 
-            case 'GET_PENDING_OPERATIONS':
+            case 'GET_PENDING_OPERATIONS': {
                 // Get all pending operations
                 const pending = await AuthDB.getPendingOperations();
                 respondToClient(event, messageId, { success: true, operations: pending });
                 break;
+            }
 
-            case 'EXPORT_BLOB':
+            case 'EXPORT_BLOB': {
                 // Export blob as backup
                 const backup = await AuthDB.exportBlobBackup();
                 respondToClient(event, messageId, { success: true, backup });
                 break;
+            }
 
             case 'IMPORT_BLOB':
                 // Import blob from backup
@@ -602,7 +607,7 @@ async function handleRoute(url) {
     }
 
     // Setlist page: /setlist/{uuid} (ignore hash)
-    const setlistMatch = path.match(/^\/setlist\/([^\/]+)$/);
+    const setlistMatch = path.match(/^\/setlist\/([^/]+)$/);
     if (setlistMatch) {
         console.log('[SW] Serving setlist.html');
         if (DEV_MODE) {

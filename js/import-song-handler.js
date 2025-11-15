@@ -3,7 +3,6 @@
 
 import { SetalightDB, createSetlist, getNextSunday, determineSetlistType } from './db.js';
 import { createSong, findExistingSong } from './song-utils.js';
-import { ChordProParser } from './parser.js';
 import { getCurrentOrganisation } from './workspace.js';
 
 (async function() {
@@ -13,11 +12,7 @@ import { getCurrentOrganisation } from './workspace.js';
     const db = new SetalightDB(getCurrentOrganisation());
     await db.init();
 
-    const parser = new ChordProParser();
-
     let pendingSong = null;
-    let pendingChordproText = null;
-    let isDuplicate = false;
     let duplicateChoice = null; // 'update' or 'use-existing'
 
     // Listen for messages from the bookmarklet
@@ -65,9 +60,7 @@ import { getCurrentOrganisation } from './workspace.js';
 
             if (existing) {
                 console.log('[Import] Song already exists:', title, `(${existing.matchType})`);
-                isDuplicate = true;
                 pendingSong = existing.song;
-                pendingChordproText = chordproText;
                 await showChoices(existing.song, existing.song);
                 return;
             }
@@ -85,7 +78,6 @@ import { getCurrentOrganisation } from './workspace.js';
 
             // Store pending song
             pendingSong = song;
-            pendingChordproText = chordproText;
 
             // Show choices UI
             await showChoices(song, null);

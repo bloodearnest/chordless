@@ -962,7 +962,6 @@ export class MediaPlayer extends LitElement {
 
         // Check what's actually playing (panic button semantics: treat existing audio as playing)
         const padsAvailable = !!this._padController;
-        const padsPlaying = padsAvailable && this._padController.isPlaying;
         const clickPlaying = this._metronomeRunning;
 
         // Stop click immediately if playing (but don't change toggle state)

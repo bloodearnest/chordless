@@ -1,5 +1,5 @@
 import { LitElement, html, css } from 'lit';
-import { isSyncAvailable, createSyncOrchestrator, listenForSyncProgress } from '../js/sync-orchestrator.js';
+import { isSyncAvailable, createSyncOrchestrator } from '../js/sync-orchestrator.js';
 import { getCurrentOrganisation } from '../js/workspace.js';
 
 /**

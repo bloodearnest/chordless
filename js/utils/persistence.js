@@ -13,9 +13,9 @@ export function ensurePersistentStorage(reason = 'app data') {
                 }
                 const granted = await navigator.storage.persist();
                 if (!granted) {
-                    console.warn('[Storage] Persistent storage not granted');
+                    console.warn(`[Storage] Persistent storage not granted (${reason})`);
                 } else {
-                    console.log('[Storage] Persistent storage granted');
+                    console.log(`[Storage] Persistent storage granted (${reason})`);
                 }
                 return granted;
             } catch (error) {

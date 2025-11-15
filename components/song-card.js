@@ -356,7 +356,7 @@ export class SongCard extends LitElement {
 
 
     // Click handler
-    handleClick(e) {
+    handleClick() {
         // In edit mode, don't fire click (avoid accidental navigation)
         if (this.editMode) {
             return;

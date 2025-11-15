@@ -271,13 +271,6 @@ export function hashText(text) {
     return hash.toString(36);
 }
 
-function extractSongIds(record) {
-    if (!record?.songs) return [];
-    return record.songs
-        .map(song => song?.songId)
-        .filter(id => typeof id === 'string' && id.length > 0);
-}
-
 /**
  * Parse tempo string into BPM number and note subdivision
  * Examples:

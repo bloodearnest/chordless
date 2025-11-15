@@ -49,7 +49,7 @@ export function generateSongFolderName(title, ccliNumber) {
  * Generate human-readable chordpro filename
  * Format: title-ccli.txt (e.g., "amazing-grace-4779.txt")
  */
-export function generateChordProFilename(title, ccliNumber, versionLabel) {
+export function generateChordProFilename(title, ccliNumber, _versionLabel) {
     const baseName = generateSongFolderName(title, ccliNumber);
     return `${baseName}.txt`;
 }
@@ -243,33 +243,6 @@ export async function batchUploadFiles(files) {
     }
 
     console.log(`[DriveAPI] Completed: ${results.length}/${files.length} files uploaded successfully`);
-    return results;
-}
-
-/**
- * Parse batch API response
- */
-function parseBatchResponse(responseText) {
-    const results = [];
-
-    // Split by boundary and extract JSON responses
-    const parts = responseText.split(/--batch_[\w=]+/);
-
-    for (const part of parts) {
-        // Look for JSON in each part
-        const jsonMatch = part.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-            try {
-                const data = JSON.parse(jsonMatch[0]);
-                if (data.id) {
-                    results.push(data);
-                }
-            } catch (error) {
-                // Skip invalid JSON
-            }
-        }
-    }
-
     return results;
 }
 

@@ -538,7 +538,7 @@ export class StoragePage extends LitElement {
             });
 
             console.log('[Test] Token expiry set to past, now calling getAccessToken()...');
-            const newToken = await getAccessToken();
+            await getAccessToken();
             console.log('[Test] ✅ Token refresh successful!');
 
             const updatedBlob = await getStoredBlob();
