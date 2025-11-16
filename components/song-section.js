@@ -44,7 +44,7 @@ export class SongSection extends LitElement {
 
     @media (min-width: 48rem) {
       .song-section-wrapper {
-        padding: 0.75rem 0.75rem 0.125rem 0.75rem;
+        padding: 0.25rem 0.5rem;
         margin: 0.75rem;
         margin-top: 0.125rem;
         margin-bottom: 0.25rem;
@@ -218,11 +218,14 @@ export class SongSection extends LitElement {
       display: inline-flex;
       flex-direction: column;
       white-space: pre;
-      padding-right: 0.25em;
     }
 
     .song-section-wrapper .chord-segment.chord-only {
       padding-right: 0.5em;
+    }
+
+    .song-section-wrapper.chords-hidden .chord-segment.chord-only {
+      display: none;
     }
 
     .song-section-wrapper .chord {
@@ -413,6 +416,9 @@ export class SongSection extends LitElement {
 
     return this._contentBlocks.map((block, index) => {
       if (block.type === 'bar-group') {
+        if (this.hideMode === 'chords') {
+          return nothing;
+        }
         return html`<bar-group .data=${block.data}></bar-group>`;
       }
       return this._renderLine(block.line, index);
@@ -425,27 +431,40 @@ export class SongSection extends LitElement {
       return nothing;
     }
 
+    const normalizedSegments = this._normalizeSegmentLyrics(segments);
+    let hasPreviousLyrics = false;
+
     return html`
       <div class="chord-line" data-line-index=${index}>
-        ${segments.map(segment => this._renderSegment(segment))}
+        ${normalizedSegments.map(segment => {
+          const joinWithPrev = !!segment.__joinWithPrev;
+          const rendered = this._renderSegment(segment, hasPreviousLyrics, joinWithPrev);
+          if (this._segmentHasLyrics(segment)) {
+            hasPreviousLyrics = true;
+          }
+          return rendered;
+        })}
       </div>
     `;
   }
 
-  _renderSegment(segment) {
-    const hasLyrics = !!(segment.lyrics && segment.lyrics.trim().length > 0);
+  _renderSegment(segment, previousHadLyrics = false, joinWithPrev = false) {
+    const hasLyrics = this._segmentHasLyrics(segment);
     const chordText = segment.chord || '';
     const classes = classMap({
       'chord-segment': true,
       'chord-only': !hasLyrics,
     });
 
+    const lyricsText = hasLyrics
+      ? this._formatLyricsText(segment.lyrics || '', previousHadLyrics, joinWithPrev)
+      : '';
     return html`
       <span class=${classes}>
         ${chordText
           ? this._renderChord(chordText, segment.valid === false)
           : html`<span class="chord chord-empty">&nbsp;</span>`}
-        ${hasLyrics ? html`<span class="lyrics">${segment.lyrics}</span>` : nothing}
+        ${hasLyrics ? html`<span class="lyrics">${lyricsText}</span>` : nothing}
       </span>
     `;
   }
@@ -633,6 +652,77 @@ export class SongSection extends LitElement {
     return lines.map(line => ({
       segments: (line.segments || []).map(segment => ({ ...segment })),
     }));
+  }
+
+  /**
+   * When chords are hidden, collapse filler hyphen markers (e.g. " - ")
+   * so lyrics read naturally.
+   * @param {string} text
+   * @returns {string}
+   */
+  _formatLyricsText(text, previousHadLyrics = false, joinWithPrev = false) {
+    if (!text) {
+      return '';
+    }
+    if (this.hideMode !== 'chords') {
+      return text;
+    }
+    let normalized = text;
+    if (previousHadLyrics && !joinWithPrev) {
+      normalized = ` ${normalized}`;
+    }
+    return normalized;
+  }
+
+  _segmentHasLyrics(segment) {
+    const value = segment?.lyrics;
+    if (typeof value !== 'string') {
+      return false;
+    }
+    const normalized = value.replace(/\s*-\s*/g, '').trim();
+    return normalized.length > 0;
+  }
+
+  _normalizeSegmentLyrics(segments) {
+    if (!Array.isArray(segments) || segments.length === 0) {
+      return [];
+    }
+    if (this.hideMode !== 'chords') {
+      return segments;
+    }
+
+    const normalized = [];
+    let carryJoin = false;
+
+    for (const segment of segments) {
+      const clone = { ...segment };
+      const original = clone.lyrics || '';
+      const hasLeadingGlue = /^\s*-\s*/.test(original);
+      const hasTrailingGlue = /\s*-\s*$/.test(original);
+      const isGlueOnly = /-/.test(original) && original.replace(/[\s-]/g, '') === '';
+
+      clone.__joinWithPrev = carryJoin || hasLeadingGlue;
+
+      let text = original;
+      if (text) {
+        text = text.replace(/\s*-\s*/g, '');
+        text = text.replace(/\s+/g, ' ').trim();
+      } else {
+        text = '';
+      }
+
+      clone.lyrics = text;
+      normalized.push(clone);
+
+      const producesLyrics = text.length > 0;
+      if (producesLyrics) {
+        carryJoin = hasTrailingGlue || isGlueOnly;
+      } else {
+        carryJoin = carryJoin || hasTrailingGlue || isGlueOnly;
+      }
+    }
+
+    return normalized;
   }
 }
 
