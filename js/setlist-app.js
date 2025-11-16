@@ -2164,40 +2164,57 @@ class PageApp {
   setSectionHideMode(songIndex, sectionIndex, mode) {
     const state = this.getSectionState(songIndex, sectionIndex);
 
-    if (mode === 'hide') {
-      // Toggle hide state - mutually exclusive with all others
-      state.isHidden = !state.isHidden;
-      if (state.isHidden) {
-        // Clear other modes when hiding entire section
-        state.hideMode = 'hide';
-        state.isCollapsed = false;
-      } else {
-        state.hideMode = 'none';
-      }
-      this.saveState();
-      this.updateSectionDOM(songIndex, sectionIndex);
-    } else if (mode === 'collapse') {
-      // Simulate clicking the section heading (same behavior as normal mode)
+    if (mode === 'collapse') {
       const component = this._getSongSectionComponent(songIndex, sectionIndex);
       const details = component?.getDetailsElement();
       if (details) {
         this.animateSectionToggle(songIndex, sectionIndex, details);
       }
-    } else {
-      // chords or lyrics mode - mutually exclusive with all others
-      if (state.isHidden) {
-        // If entire section is hidden, unhide it first
-        state.isHidden = false;
-      }
-      if (state.isCollapsed) {
-        // If collapsed, uncollapse it first
+      return;
+    }
+
+    const explicitShowMap = {
+      'show-all': 'none',
+      'show-lyrics': 'chords',
+      'show-chords': 'lyrics',
+      'show-none': 'hide',
+    };
+    const mappedMode = explicitShowMap[mode] || mode;
+    const isExplicit = Boolean(explicitShowMap[mode]);
+
+    if (mappedMode === 'hide') {
+      if (isExplicit) {
+        state.isHidden = true;
+        state.hideMode = 'hide';
         state.isCollapsed = false;
+      } else {
+        state.isHidden = !state.isHidden;
+        if (state.isHidden) {
+          state.hideMode = 'hide';
+          state.isCollapsed = false;
+        } else {
+          state.hideMode = 'none';
+        }
       }
-      // Toggle: if clicking the same mode, turn it off
-      state.hideMode = state.hideMode === mode ? 'none' : mode;
       this.saveState();
       this.updateSectionDOM(songIndex, sectionIndex);
+      return;
     }
+
+    if (state.isHidden) {
+      state.isHidden = false;
+    }
+    if (state.isCollapsed) {
+      state.isCollapsed = false;
+    }
+
+    if (isExplicit || mappedMode === 'none') {
+      state.hideMode = mappedMode || 'none';
+    } else {
+      state.hideMode = state.hideMode === mappedMode ? 'none' : mappedMode;
+    }
+    this.saveState();
+    this.updateSectionDOM(songIndex, sectionIndex);
   }
 
   animateSectionToggle(songIndex, sectionIndex, details) {
@@ -2370,16 +2387,15 @@ class PageApp {
           el.classList.remove('fade-complete');
         });
 
+        // Refresh song sections immediately so their controls begin fading out in sync
+        this._initializeSongSections();
+
         // Wait for fade to complete, then save and cleanup
         setTimeout(async () => {
           // Hide edit controls completely now that fade is done
           document.querySelectorAll('.edit-mode-control').forEach(el => {
             el.style.display = 'none';
           });
-
-          // Update all sections to reflect non-edit mode (apply collapsed/open states to <details>)
-          // This must happen AFTER removing edit-mode class so details elements get the right state
-          this._initializeSongSections();
 
           // Save setlist to IndexedDB
           if (this.currentSetlist) {

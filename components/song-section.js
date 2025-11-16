@@ -44,10 +44,8 @@ export class SongSection extends LitElement {
 
     @media (min-width: 48rem) {
       .song-section-wrapper {
-        padding: 0.25rem 0.5rem;
-        margin: 0.75rem;
-        margin-top: 0.125rem;
-        margin-bottom: 0.25rem;
+        padding: 0rem 0.5rem;
+        margin: 0.25rem 0.5rem;
       }
     }
 
@@ -67,9 +65,15 @@ export class SongSection extends LitElement {
       width: 100%;
     }
 
+    .song-section-wrapper .section-title-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      min-width: 0;
+    }
+
     .song-section-wrapper details.song-section summary.section-label {
       cursor: pointer;
-      list-style: none;
       user-select: none;
       margin: 0;
       outline: none;
@@ -101,6 +105,53 @@ export class SongSection extends LitElement {
       padding: 0;
     }
 
+    .song-section-wrapper .section-collapse-toggle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border: none;
+      background: none;
+      color: #7f8c8d;
+      font-size: 1.4rem;
+      line-height: 1;
+      cursor: pointer;
+      width: 1.75rem;
+      height: 1.75rem;
+      padding: 0.05rem 0.25rem;
+      opacity: 0;
+      transition:
+        opacity 0.25s ease-in-out,
+        color 0.2s,
+        transform 0.2s;
+    }
+
+    :host([editmode]) .song-section-wrapper .section-collapse-toggle {
+      opacity: 1;
+    }
+
+    :host(:not([editmode])) .song-section-wrapper .section-collapse-toggle {
+      pointer-events: none;
+    }
+
+    .song-section-wrapper .section-collapse-toggle:hover {
+      color: #34495e;
+    }
+
+    .song-section-wrapper .section-collapse-toggle:focus-visible {
+      outline: 2px solid #3498db;
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+
+    .song-section-wrapper .section-collapse-toggle .collapse-icon {
+      display: inline-block;
+      transition: transform 0.2s ease-in-out;
+    }
+
+    .song-section-wrapper.section-collapsed .section-collapse-toggle .collapse-icon {
+      transform: rotate(-90deg);
+    }
+
     .song-section-wrapper .section-content {
       margin-top: 0;
     }
@@ -108,7 +159,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .section-controls {
       display: flex;
       flex-direction: row;
-      gap: 0.3rem;
+      gap: 0.6rem;
       align-items: center;
       margin-left: auto;
       opacity: 0;
@@ -142,46 +193,52 @@ export class SongSection extends LitElement {
       opacity: 0.6;
     }
 
-    .song-section-wrapper .section-control-btn {
+    .song-section-wrapper .section-controls .hide-label {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text-secondary, #7f8c8d);
+    }
+
+    .song-section-wrapper .hide-pill {
+      display: grid;
+      grid-template-columns: repeat(var(--pill-option-count, 4), minmax(4rem, 1fr));
+      border: 1.5px solid var(--border-color, #7f8c8d);
+      border-radius: 0.5rem;
+      overflow: hidden;
+      background: var(--bg-tertiary, rgba(255, 255, 255, 0.9));
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(4px);
+    }
+
+    .song-section-wrapper .hide-pill button {
+      border: none;
+      background: var(--bg-secondary, rgba(255, 255, 255, 0.95));
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.2rem;
-      padding: 0.2rem 0.3rem;
-      background-color: rgba(255, 255, 255, 0.95);
-      border: 1.5px solid #7f8c8d;
-      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-secondary, #7f8c8d);
+      padding: 0.3rem 0rem;
       cursor: pointer;
       transition:
         background-color 0.2s,
-        transform 0.2s,
-        border-color 0.2s,
-        box-shadow 0.2s;
-      font-size: 0.85rem;
-      color: #7f8c8d;
-      white-space: nowrap;
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
-      backdrop-filter: blur(4px);
-      min-height: 1.8rem;
+        color 0.2s;
+      min-width: 4.75rem;
     }
 
-    .song-section-wrapper .section-control-btn:hover {
-      background-color: rgba(127, 140, 141, 0.1);
-      transform: scale(1.02);
+    .song-section-wrapper .hide-pill button + button {
+      border-left: 1px solid var(--border-light, rgba(189, 195, 199, 0.6));
     }
 
-    .song-section-wrapper .section-control-btn:focus-visible {
-      outline: 2px solid #3498db;
-      outline-offset: 2px;
+    .song-section-wrapper .hide-pill button:focus-visible {
+      outline: 2px solid var(--focus-ring, #3498db);
+      outline-offset: -2px;
     }
 
-    .song-section-wrapper .section-control-btn.active {
+    .song-section-wrapper .hide-pill button.active {
       background-color: var(--button-bg);
-      border-color: var(--button-bg);
-      color: white;
-      box-shadow:
-        0 2px 8px rgba(0, 0, 0, 0.2),
-        0 0 0 2px rgba(52, 152, 219, 0.3);
+      color: var(--button-text, #fff);
     }
 
     .song-section-wrapper.chords-hidden .chord {
@@ -194,7 +251,7 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .section-control-btn .control-label {
       font-weight: 600;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
     }
 
     .song-section-wrapper .section-content {
@@ -326,6 +383,7 @@ export class SongSection extends LitElement {
       'section-collapsed': this.hideMode === 'collapse',
       'chords-hidden': this.hideMode === 'chords',
       'lyrics-hidden': this.hideMode === 'lyrics',
+      'edit-mode-active': !!this.editMode,
     };
     const label = (this.label || '').trim();
     const sectionLabel = label || `Section ${this.sectionIndex + 1}`;
@@ -354,7 +412,10 @@ export class SongSection extends LitElement {
       >
         <summary class="section-label" @click=${this._onSummaryClick}>
           <div class="section-header">
-            <h3 class="section-title">${label}</h3>
+            <div class="section-title-wrapper">
+              <h3 class="section-title">${label}</h3>
+              ${this._renderCollapseToggle()}
+            </div>
             ${this._renderControls()}
           </div>
         </summary>
@@ -372,39 +433,61 @@ export class SongSection extends LitElement {
   }
 
   _renderControls() {
+    const showAllActive = !this.isHidden && (!this.hideMode || this.hideMode === 'none');
+    const showLyricsActive = !this.isHidden && this.hideMode === 'chords';
+    const showChordsActive = !this.isHidden && this.hideMode === 'lyrics';
+    const showNoneActive = this.isHidden || this.hideMode === 'hide';
+
+    if (this.style) {
+      this.style.setProperty('--pill-option-count', 4);
+    }
     return html`
-      <div class="section-controls">
-        ${this._renderControlButton(
-          'collapse',
-          '▼',
-          'Collapse Section',
-          this.hideMode === 'collapse'
-        )}
-        ${this._renderControlButton('chords', '♯', 'Hide Chords', this.hideMode === 'chords')}
-        ${this._renderControlButton('lyrics', 'A', 'Hide Lyrics', this.hideMode === 'lyrics')}
-        ${this._renderControlButton('hide', '✕', 'Hide Entire Section', !!this.isHidden)}
+      <div class="section-controls" role="radiogroup" aria-label="Show content options">
+        <span class="hide-label">Show:</span>
+        <div class="hide-pill">
+          ${this._renderControlButton('show-all', 'All', showAllActive)}
+          ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive)}
+          ${this._renderControlButton('show-chords', 'Chords', showChordsActive)}
+          ${this._renderControlButton('show-none', 'None', showNoneActive)}
+        </div>
       </div>
     `;
   }
 
-  _renderControlButton(action, icon, label, active) {
-    const classes = classMap({
-      'section-control-btn': true,
-      active: !!active,
-    });
+  _renderControlButton(action, label, active) {
     const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`;
-    const ariaLabel = `${label} in ${sectionLabel}`;
-
+    const ariaLabel = `Show ${label} in ${sectionLabel}`;
     return html`
       <button
-        class=${classes}
+        class=${classMap({ active: !!active })}
         data-action=${action}
         aria-label=${ariaLabel}
         aria-pressed=${active ? 'true' : 'false'}
+        role="radio"
+        aria-checked=${active ? 'true' : 'false'}
         @click=${this._onControlClick}
       >
-        <span class="control-icon" aria-hidden="true">${icon}</span>
-        <span class="control-label">${label}</span>
+        ${label}
+      </button>
+    `;
+  }
+
+  _renderCollapseToggle() {
+    const isCollapsed = this.hideMode === 'collapse' || this.isCollapsed;
+    const ariaLabel = isCollapsed ? 'Expand section' : 'Collapse section';
+    const classes = classMap({
+      'section-collapse-toggle': true,
+      active: isCollapsed,
+    });
+    return html`
+      <button
+        class=${classes}
+        data-action="collapse"
+        aria-label=${ariaLabel}
+        aria-pressed=${isCollapsed ? 'true' : 'false'}
+        @click=${this._onControlClick}
+      >
+        <span class="collapse-icon" aria-hidden="true">▾</span>
       </button>
     `;
   }
