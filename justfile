@@ -4,10 +4,6 @@
 default:
     @just --list
 
-# Run the development server
-run:
-    python3 api.py
-
 # Run all tests
 test: test-node test-browser-headless
 
@@ -36,6 +32,15 @@ format:
 # Copy vendored dependencies from node_modules to vendor/
 vendor:
     node scripts/vendor-deps.mjs
+
+serve:
+    caddy run --config Caddyfile --watch
+
+setup-dev-https:
+    @bash scripts/setup-dev-https.sh
+
+remove-dev-https:
+    @bash scripts/remove-dev-https.sh
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:

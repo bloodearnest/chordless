@@ -32,10 +32,12 @@ echo "$GOOGLE_CLIENT_ID" | npx wrangler secret put GOOGLE_CLIENT_ID --env=""
 echo "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET --env=""
 echo "$GOOGLE_REDIRECT_URI" | npx wrangler secret put GOOGLE_REDIRECT_URI --env=""
 
+# use same secrets in dev
+ln -sf .env .dev.vars
+
 echo ""
 echo "✅ All secrets pushed successfully!"
 echo ""
 echo "Next steps:"
-echo "  1. Copy .env to .dev.vars for local development"
-echo "  2. Run 'npm run dev' to test locally"
-echo "  3. Run 'npm run deploy' to deploy to Cloudflare"
+echo "  1. Run 'npm run dev' to test locally"
+echo "  2. Run 'npm run deploy' to deploy to Cloudflare"

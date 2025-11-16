@@ -33,12 +33,50 @@ export class SetlistImporter {
     const links = doc.querySelectorAll('a');
     const items = [];
 
+    const seen = new Set();
+
+    const nameNodes = doc.querySelectorAll('.listing .name');
+    if (nameNodes.length) {
+      nameNodes.forEach(node => {
+        const text = (node.textContent || '').trim();
+        if (!text) return;
+        const candidate = text.replace(/\/$/, '');
+        if (!candidate || seen.has(candidate)) return;
+        seen.add(candidate);
+        items.push(candidate);
+      });
+      return items;
+    }
+
     for (const link of links) {
-      const href = link.getAttribute('href');
-      // Skip parent directory link and absolute URLs
-      if (href && href !== '../' && !href.startsWith('http') && !href.startsWith('/')) {
-        items.push(href.replace(/\/$/, '')); // Remove trailing slash
+      let href = link.getAttribute('href') || '';
+      const text = (link.textContent || '').trim();
+
+      if (href === '../' || text === 'Parent Directory') continue;
+      if (!href || href.startsWith('#')) continue;
+
+      let candidate = '';
+      if (href.startsWith('http')) {
+        try {
+          const url = new URL(href);
+          candidate = url.pathname.split('/').filter(Boolean).pop() || '';
+        } catch (error) {
+          console.warn('[Import] Invalid link href:', href, error);
+        }
+      } else if (href.startsWith('/')) {
+        candidate = href.split('/').filter(Boolean).pop() || '';
+      } else {
+        candidate = href;
       }
+
+      if (!candidate && text) {
+        candidate = text;
+      }
+
+      candidate = candidate.replace(/\/$/, '');
+      if (!candidate || seen.has(candidate)) continue;
+      seen.add(candidate);
+      items.push(candidate);
     }
 
     return items;

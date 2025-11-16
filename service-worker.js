@@ -376,9 +376,9 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Directory listings in /sets/ - pass through to get real directory listing
-  if (url.pathname.startsWith('/sets/') && url.pathname.endsWith('/')) {
-    console.log('[SW] Passing through directory listing request:', url.pathname);
+  // Always pass through sets directory/files to get real filesystem contents
+  if (url.pathname === '/sets' || url.pathname === '/sets/' || url.pathname.startsWith('/sets/')) {
+    console.log('[SW] Passing through sets request:', url.pathname);
     event.respondWith(fetch(event.request));
     return;
   }

@@ -1,0 +1,14 @@
+{
+    admin off
+    auto_https off
+}
+
+https://localhost:8443, https://127.0.0.1:8443 {
+    root * .
+    encode zstd gzip
+    file_server browse
+    tls certs/dev.crt certs/dev.key
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+    }
+}

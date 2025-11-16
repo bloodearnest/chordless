@@ -5,6 +5,7 @@
 
 # Node modules (dev dependencies only)
 node_modules/
+certs/
 
 # Playwright
 /test-results/
