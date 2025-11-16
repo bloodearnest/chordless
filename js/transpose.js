@@ -108,9 +108,18 @@ export function parseChord(chordString) {
   }
 
   const original = chordString;
+  let coreChord = (chordString || '').trim();
+  let wrapperPrefix = '';
+  let wrapperSuffix = '';
+
+  if (coreChord.startsWith('(') && coreChord.endsWith(')') && coreChord.length > 2) {
+    wrapperPrefix = '(';
+    wrapperSuffix = ')';
+    coreChord = coreChord.slice(1, -1).trim();
+  }
 
   // Split on slash to separate bass note
-  const parts = chordString.split('/');
+  const parts = coreChord.split('/');
   const mainPart = parts[0];
   const bassPart = parts.length > 1 ? parts[1] : null;
 
@@ -145,6 +154,8 @@ export function parseChord(chordString) {
     isValid: true,
     isSpecial: false,
     original,
+    wrapperPrefix,
+    wrapperSuffix,
   };
 }
 
@@ -332,6 +343,10 @@ export function transposeChord(chordString, fromKey, toKey) {
   let newChord = newRoot + parsed.extensions;
   if (newBass) {
     newChord += '/' + newBass;
+  }
+
+  if (parsed.wrapperPrefix || parsed.wrapperSuffix) {
+    newChord = `${parsed.wrapperPrefix || ''}${newChord}${parsed.wrapperSuffix || ''}`;
   }
 
   return {

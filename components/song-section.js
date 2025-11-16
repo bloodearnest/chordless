@@ -1,6 +1,11 @@
 import { LitElement, html, css, nothing } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { isBarMarker } from '../js/utils/chord-utils.js';
+import {
+  normalizeSegmentsForHiddenChords,
+  segmentHasVisibleLyrics,
+  formatHiddenLyricsText,
+} from '../js/utils/lyrics-normalizer.js';
 import './bar-group.js';
 
 /**
@@ -750,20 +755,11 @@ export class SongSection extends LitElement {
     if (this.hideMode !== 'chords') {
       return text;
     }
-    let normalized = text;
-    if (previousHadLyrics && !joinWithPrev) {
-      normalized = ` ${normalized}`;
-    }
-    return normalized;
+    return formatHiddenLyricsText(text, previousHadLyrics, joinWithPrev);
   }
 
   _segmentHasLyrics(segment) {
-    const value = segment?.lyrics;
-    if (typeof value !== 'string') {
-      return false;
-    }
-    const normalized = value.replace(/\s*-\s*/g, '').trim();
-    return normalized.length > 0;
+    return segmentHasVisibleLyrics(segment);
   }
 
   _normalizeSegmentLyrics(segments) {
@@ -773,39 +769,7 @@ export class SongSection extends LitElement {
     if (this.hideMode !== 'chords') {
       return segments;
     }
-
-    const normalized = [];
-    let carryJoin = false;
-
-    for (const segment of segments) {
-      const clone = { ...segment };
-      const original = clone.lyrics || '';
-      const hasLeadingGlue = /^\s*-\s*/.test(original);
-      const hasTrailingGlue = /\s*-\s*$/.test(original);
-      const isGlueOnly = /-/.test(original) && original.replace(/[\s-]/g, '') === '';
-
-      clone.__joinWithPrev = carryJoin || hasLeadingGlue;
-
-      let text = original;
-      if (text) {
-        text = text.replace(/\s*-\s*/g, '');
-        text = text.replace(/\s+/g, ' ').trim();
-      } else {
-        text = '';
-      }
-
-      clone.lyrics = text;
-      normalized.push(clone);
-
-      const producesLyrics = text.length > 0;
-      if (producesLyrics) {
-        carryJoin = hasTrailingGlue || isGlueOnly;
-      } else {
-        carryJoin = carryJoin || hasTrailingGlue || isGlueOnly;
-      }
-    }
-
-    return normalized;
+    return normalizeSegmentsForHiddenChords(segments);
   }
 }
 

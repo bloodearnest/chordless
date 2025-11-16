@@ -112,6 +112,12 @@ assert(!parsed.isValid, 'Parse X as invalid');
 parsed = parseChord('123');
 assert(!parsed.isValid, 'Parse 123 as invalid');
 
+parsed = parseChord('(A2)');
+assertEquals(parsed.wrapperPrefix, '(', 'Parse optional chord prefix');
+assertEquals(parsed.wrapperSuffix, ')', 'Parse optional chord suffix');
+assertEquals(parsed.root, 'A', 'Parse optional chord root');
+assertEquals(parsed.extensions, '2', 'Parse optional chord extension');
+
 // ===== Test transposeNote =====
 console.log('\n=== Testing transposeNote ===');
 
