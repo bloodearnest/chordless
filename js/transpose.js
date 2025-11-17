@@ -391,6 +391,8 @@ const DEGREE_OFFSETS = {
   7: 11,
 };
 
+const DISALLOWED_DEGREE_ACCIDENTALS = new Set(['#3', 'b4', '#7', 'b1']);
+
 const NASHVILLE_CORE_REGEX = /^([#b♯♭]?)([1-7])(.*)$/;
 
 function extractKeyRoot(key) {
@@ -469,27 +471,62 @@ export function convertNashvilleChordToStandard(chordText, key) {
   return chord;
 }
 
-function findDegreeForSemitone(diff) {
-  const normalized = ((diff % 12) + 12) % 12;
+function determineAccidentalPreference(note) {
+  if (!note) return null;
+  if (note.includes('b')) return 'flat';
+  if (note.includes('#')) return 'sharp';
+  return null;
+}
 
-  // Prefer exact matches so diatonic chords stay natural
+function findDegreeForSemitone(diff, preference = null) {
+  const normalized = ((diff % 12) + 12) % 12;
+  const candidates = [];
+
   for (const [degree, offset] of Object.entries(DEGREE_OFFSETS)) {
     if (normalized === offset) {
-      return { accidental: '', degree };
+      candidates.push({ accidental: '', degree, distance: 0 });
+      continue;
     }
-  }
-
-  // Fall back to nearest sharp/flat if we're one semitone away
-  for (const [degree, offset] of Object.entries(DEGREE_OFFSETS)) {
     if ((offset + 1) % 12 === normalized) {
-      return { accidental: '#', degree };
+      candidates.push({ accidental: '#', degree, distance: 1 });
     }
     if ((offset + 11) % 12 === normalized) {
-      return { accidental: 'b', degree };
+      candidates.push({ accidental: 'b', degree, distance: 1 });
     }
   }
 
-  return null;
+  const filtered = candidates.filter(candidate => {
+    const key = `${candidate.accidental}${candidate.degree}`;
+    return !DISALLOWED_DEGREE_ACCIDENTALS.has(key);
+  });
+
+  if (filtered.length === 0) {
+    return null;
+  }
+
+  filtered.sort((a, b) => a.distance - b.distance);
+
+  const natural = filtered.find(candidate => candidate.accidental === '');
+  if (natural) {
+    return { accidental: natural.accidental, degree: natural.degree };
+  }
+
+  if (preference === 'sharp') {
+    const sharpCandidate = filtered.find(candidate => candidate.accidental === '#');
+    if (sharpCandidate) {
+      return { accidental: sharpCandidate.accidental, degree: sharpCandidate.degree };
+    }
+  }
+
+  if (preference === 'flat') {
+    const flatCandidate = filtered.find(candidate => candidate.accidental === 'b');
+    if (flatCandidate) {
+      return { accidental: flatCandidate.accidental, degree: flatCandidate.degree };
+    }
+  }
+
+  const best = filtered[0];
+  return { accidental: best.accidental, degree: best.degree };
 }
 
 export function convertChordToNashville(chordText, key) {
@@ -510,14 +547,14 @@ export function convertChordToNashville(chordText, key) {
     return chordText;
   }
   const diff = chordSemitone - keySemitone;
-  const degreeInfo = findDegreeForSemitone(diff);
+  const degreeInfo = findDegreeForSemitone(diff, determineAccidentalPreference(parsed.root));
   if (!degreeInfo) {
     return chordText;
   }
   let result = `${degreeInfo.accidental}${degreeInfo.degree}${parsed.extensions || ''}`;
   if (parsed.bass) {
     const bassDiff = noteToSemitone(parsed.bass) - keySemitone;
-    const bassDegree = findDegreeForSemitone(bassDiff);
+    const bassDegree = findDegreeForSemitone(bassDiff, determineAccidentalPreference(parsed.bass));
     if (bassDegree) {
       result += `/${bassDegree.accidental}${bassDegree.degree}`;
     }
