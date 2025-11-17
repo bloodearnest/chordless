@@ -315,6 +315,8 @@ export class MediaPlayerSettings extends LitElement {
               <div class="setting-label">Pad Sound Set</div>
               <div class="setting-description">Select which pad audio library to use</div>
               <select
+                id="padset-select"
+                name="padset-select"
                 class="padset-select"
                 .value=${this.selectedPadSetId || ''}
                 @change=${this._handlePadSetChange}

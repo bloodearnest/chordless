@@ -120,18 +120,22 @@ export class AppSettings extends LitElement {
         <div class="settings-section">
           <h3>Chords</h3>
           <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
-          <label class="toggle">
+          <label class="toggle" for="toggle-use-nashville">
             <input
               type="checkbox"
+              id="toggle-use-nashville"
+              name="use-nashville-numbers"
               ?checked=${this.useNashville}
               @change=${this._onNashvilleToggle}
             />
             <span>Use Nashville numbers</span>
           </label>
           <p>Choose how accidentals are rendered.</p>
-          <label class="toggle">
+          <label class="toggle" for="toggle-unicode-accidentals">
             <input
               type="checkbox"
+              id="toggle-unicode-accidentals"
+              name="use-unicode-accidentals"
               ?checked=${this.useUnicodeAccidentals}
               @change=${this._onAccidentalToggle}
             />
