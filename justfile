@@ -5,14 +5,12 @@ default:
     @just --list
 
 # Run all tests
-test: test-node test-browser-headless
+test: test-unit
 
-# Run Node.js tests
-test-node:
-    @echo "Running Node.js tests..."
-    @bash -lc 'files=$(ls tests/*.test.js 2>/dev/null | grep -v "transpose\\.legacy\\.test\\.js" || true); if [ -n "$files" ]; then node --test $files; else echo "No Node.js test files found for node --test"; fi'
-    @echo "Running legacy transpose tests..."
-    node tests/transpose.legacy.test.js
+# Run browser unit tests
+test-unit:
+    @echo "Running browser unit tests with Web Test Runner..."
+    @npm run test:web
 
 # Lint/format JS files (basic syntax checks)
 lint:

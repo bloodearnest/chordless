@@ -4,6 +4,7 @@
   "description": "Worship setlist management app",
   "type": "module",
   "scripts": {
+    "test:web": "web-test-runner --config web-test-runner.config.js",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",
     "test:browser:headed": "playwright test --headed"
@@ -15,7 +16,11 @@
     "lit-html": "3.1.0"
   },
   "devDependencies": {
+    "@esm-bundle/chai": "^4.3.4-fix.0",
     "@playwright/test": "^1.48.0",
+    "@web/test-runner": "^0.20.2",
+    "@web/test-runner-mocha": "^0.9.0",
+    "@web/test-runner-playwright": "^0.11.1",
     "eslint": "^9.39.1",
     "eslint-plugin-compat": "^6.0.2",
     "eslint-plugin-import": "^2.32.0",

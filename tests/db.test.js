@@ -1,26 +1,48 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import 'fake-indexeddb/auto';
+import { expect } from '@esm-bundle/chai';
+import { suppressConsoleLogs } from './test-helpers.js';
+const { describe, it } = window;
+
+suppressConsoleLogs();
 import { SetalightDB, createSetlist } from '../js/db.js';
 
-test('SetalightDB saves and retrieves setlist', async () => {
-  const db = new SetalightDB('TEST');
-  await db.init();
+const uniqueName = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
 
-  const setlist = createSetlist({
-    date: '2024-09-01',
-    time: '09:30',
-    type: 'Church Service',
-    name: 'Morning Service',
-    leader: 'Alice',
+const deleteDatabase = name =>
+  new Promise(resolve => {
+    const request = indexedDB.deleteDatabase(name);
+    request.onsuccess = request.onerror = request.onblocked = () => resolve();
   });
 
-  setlist.songs.push({ songId: 'song-1', modifications: {} });
+describe('SetalightDB', () => {
+  let db;
 
-  await db.saveSetlist(setlist);
+  afterEach(async () => {
+    if (db?.dbName) {
+      await deleteDatabase(db.dbName);
+      db = null;
+    }
+  });
 
-  const loaded = await db.getSetlist(setlist.id);
-  assert.deepEqual(loaded.name, 'Morning Service');
-  assert.equal(loaded.leader, 'Alice');
-  assert.equal(loaded.songs.length, 1);
+  it('saves and retrieves setlist', async () => {
+    const orgName = `TEST-${uniqueName()}`;
+    db = new SetalightDB(orgName);
+    await db.init();
+
+    const setlist = createSetlist({
+      date: '2024-09-01',
+      time: '09:30',
+      type: 'Church Service',
+      name: 'Morning Service',
+      leader: 'Alice',
+    });
+
+    setlist.songs.push({ songId: 'song-1', modifications: {} });
+
+    await db.saveSetlist(setlist);
+
+    const loaded = await db.getSetlist(setlist.id);
+    expect(loaded.name).to.equal('Morning Service');
+    expect(loaded.leader).to.equal('Alice');
+    expect(loaded.songs).to.have.lengthOf(1);
+  });
 });

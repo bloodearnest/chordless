@@ -1,6 +1,8 @@
-// Unit tests for transpose.js
-// Run this file with: node transpose.test.js
-// Or load in browser console
+import { expect } from '@esm-bundle/chai';
+import { suppressConsoleLogs } from './test-helpers.js';
+const { describe, it } = window;
+
+suppressConsoleLogs();
 
 import {
   parseChord,
@@ -13,34 +15,16 @@ import {
   isNashvilleChord,
 } from '../js/transpose.js';
 
-// Simple test framework
-let testCount = 0;
-let passCount = 0;
-let failCount = 0;
-
 function assert(condition, message) {
-  testCount++;
-  if (condition) {
-    passCount++;
-    console.log(`✓ ${message}`);
-  } else {
-    failCount++;
-    console.error(`✗ ${message}`);
-  }
+  expect(condition, message).to.be.true;
 }
 
 function assertEquals(actual, expected, message) {
-  const matches = JSON.stringify(actual) === JSON.stringify(expected);
-  assert(
-    matches,
-    `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`
-  );
+  expect(actual, message).to.deep.equal(expected);
 }
 
-console.log('Running transpose.js tests...\n');
-
-// ===== Test parseChord =====
-console.log('=== Testing parseChord ===');
+describe('transpose legacy regression suite', () => {
+  it('runs regression assertions', () => {
 
 // Basic chords
 let parsed = parseChord('C');
@@ -122,8 +106,6 @@ assertEquals(parsed.root, 'A', 'Parse optional chord root');
 assertEquals(parsed.extensions, '2', 'Parse optional chord extension');
 
 // ===== Test transposeNote =====
-console.log('\n=== Testing transposeNote ===');
-
 // Transposing with sharps
 assertEquals(transposeNote('C', 2, false), 'D', 'C up 2 semitones = D');
 assertEquals(transposeNote('D', 2, false), 'E', 'D up 2 semitones = E');
@@ -148,8 +130,6 @@ assertEquals(transposeNote('B', 2, false), 'C#', 'B up 2 wraps to C#');
 assertEquals(transposeNote('C', -2, false), 'A#', 'C down 2 wraps to A#');
 
 // ===== Test getKeyOffset =====
-console.log('\n=== Testing getKeyOffset ===');
-
 assertEquals(getKeyOffset('C', 'D'), 2, 'C to D = +2 semitones');
 assertEquals(getKeyOffset('C', 'G'), 7, 'C to G = +7 semitones');
 assertEquals(getKeyOffset('G', 'C'), -7, 'G to C = -7 semitones');
@@ -158,8 +138,6 @@ assertEquals(getKeyOffset('Am', 'Em'), -5, 'Am to Em = -5 semitones');
 assertEquals(getKeyOffset('Dm', 'Gm'), 5, 'Dm to Gm = +5 semitones');
 
 // ===== Test getAvailableKeys =====
-console.log('\n=== Testing getAvailableKeys ===');
-
 let keys = getAvailableKeys('C');
 assert(keys.includes('C'), 'C major includes C');
 assert(keys.includes('G'), 'C major includes G');
@@ -175,8 +153,6 @@ assert(!keys.includes('C'), 'A minor excludes C');
 assert(!keys.includes('G'), 'A minor excludes G');
 
 // ===== Test transposeChord =====
-console.log('\n=== Testing transposeChord ===');
-
 // Basic major chords C to D (sharps)
 let result = transposeChord('C', 'C', 'D');
 assertEquals(result.chord, 'D', 'Transpose C to D');
@@ -324,7 +300,6 @@ result = transposeChord('E/G#', 'C', 'D');
 assertEquals(result.chord, 'F#/A#', 'Transpose E/G# (C) to F#/A# (D)');
 
 // Comprehensive transposition tests
-console.log('\n=== Testing Comprehensive Transpositions ===');
 
 // Basic major chords (I) - transposing C to various keys
 result = transposeChord('C', 'C', 'D');
@@ -612,8 +587,6 @@ assertEquals(result.chord, 'F7b9', 'F#7b9 (B) to F7b9 (Bb) - not E#7b9');
 result = transposeChord('Abmaj9', 'Eb', 'E');
 assertEquals(result.chord, 'Amaj9', 'Abmaj9 (Eb) to Amaj9 (E) - not G##maj9');
 
-console.log('\n=== Testing Nashville conversions ===');
-
 assert(isNashvilleChord('1m7'), 'Detect Nashville chord 1m7');
 assert(!isNashvilleChord('Cmaj7'), 'Do not detect normal chords as Nashville');
 
@@ -690,14 +663,5 @@ assertEquals(convertChordToNashville('F#', 'C'), '#4', 'No #3 is produced for F#
 assertEquals(convertChordToNashville('Cb', 'C'), '7', 'No ♭1 is produced for C♭');
 
 // ===== Summary =====
-console.log('\n=== Test Summary ===');
-console.log(`Total tests: ${testCount}`);
-console.log(`Passed: ${passCount}`);
-console.log(`Failed: ${failCount}`);
-
-if (failCount === 0) {
-  console.log('\n✓ All tests passed!');
-} else {
-  console.error(`\n✗ ${failCount} test(s) failed`);
-  process.exit(1);
-}
+  });
+});
