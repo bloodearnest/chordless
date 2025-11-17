@@ -2,6 +2,7 @@ import {
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
   formatHiddenLyricsText,
+  splitChordDisplaySegments,
 } from '../js/utils/lyrics-normalizer.js';
 
 let testCount = 0;
@@ -21,7 +22,10 @@ function assert(condition, message) {
 
 function assertEquals(actual, expected, message) {
   const matches = JSON.stringify(actual) === JSON.stringify(expected);
-  assert(matches, `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`);
+  assert(
+    matches,
+    `${message} (expected: ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)})`
+  );
 }
 
 console.log('Running lyrics-normalizer tests...');
@@ -29,13 +33,13 @@ console.log('Running lyrics-normalizer tests...');
 assert(!segmentHasVisibleLyrics({ lyrics: ' - ' }), 'Hyphen-only lyrics hidden');
 assert(segmentHasVisibleLyrics({ lyrics: 'Ho - ' }), 'Lyrics containing text are detected');
 
-const segments = [
-  { lyrics: 'Ho - ' },
-  { lyrics: ' san - ' },
-  { lyrics: ' na ' },
-];
+const segments = [{ lyrics: 'Ho - ' }, { lyrics: ' san - ' }, { lyrics: ' na ' }];
 const normalized = normalizeSegmentsForHiddenChords(segments);
-assertEquals(normalized.map(s => s.lyrics), ['Ho', 'san', 'na'], 'Normalize lyrics strips glue markers');
+assertEquals(
+  normalized.map(s => s.lyrics),
+  ['Ho', 'san', 'na'],
+  'Normalize lyrics strips glue markers'
+);
 assertEquals(
   normalized.map(s => !!s.__joinWithPrev),
   [false, true, true],
@@ -46,6 +50,41 @@ const formatted1 = formatHiddenLyricsText('san', true, false);
 assertEquals(formatted1, ' san', 'Formatter inserts leading space between words');
 const formatted2 = formatHiddenLyricsText('na', true, true);
 assertEquals(formatted2, 'na', 'Formatter suppresses space when line should join');
+
+const chordSegments = splitChordDisplaySegments('Emaj7sus4add9');
+assertEquals(
+  chordSegments,
+  [
+    { type: 'base', value: 'E' },
+    { type: 'extension', value: 'maj7' },
+    { type: 'extension', value: 'sus4' },
+    { type: 'extension', value: 'add9' },
+  ],
+  'Split chained extensions into base + extensions'
+);
+
+const bracketChord = splitChordDisplaySegments('Bsus(2)');
+assertEquals(
+  bracketChord,
+  [
+    { type: 'base', value: 'B' },
+    { type: 'extension', value: 'sus' },
+    { type: 'extension', value: '(2)' },
+  ],
+  'Split bracketed extension tokens'
+);
+
+const optionalChord = splitChordDisplaySegments('(A2)');
+assertEquals(
+  optionalChord,
+  [
+    { type: 'base', value: '(' },
+    { type: 'base', value: 'A' },
+    { type: 'extension', value: '2' },
+    { type: 'base', value: ')' },
+  ],
+  'Split wrapped optional chord tokens'
+);
 
 console.log(`\n${passCount}/${testCount} assertions passed. Failures: ${failCount}`);
 if (failCount > 0) {

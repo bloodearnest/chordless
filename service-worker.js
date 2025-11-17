@@ -10,7 +10,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v252';
+const CACHE_NAME = 'setalight-v253';
 const PAD_CACHE_NAME = 'padsets-cache-v1';
 const ASSETS = [
   '/',

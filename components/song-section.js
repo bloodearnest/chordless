@@ -5,6 +5,7 @@ import {
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
   formatHiddenLyricsText,
+  splitChordDisplaySegments,
 } from '../js/utils/lyrics-normalizer.js';
 import './bar-group.js';
 
@@ -294,10 +295,11 @@ export class SongSection extends LitElement {
       color: var(--chord-color, #2980b9);
       font-weight: bold;
       font-size: 0.9em;
-      min-height: 1.1em;
       line-height: 1.1em;
       padding-right: 0.25em;
       font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+      display: inline-block;
+      white-space: nowrap;
     }
 
     .song-section-wrapper .chord.bar {
@@ -325,6 +327,15 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .chord.invalid {
       color: var(--color-danger, #e74c3c);
+    }
+
+    .song-section-wrapper .chord sup.chord-extension {
+      display: inline-block;
+      font-size: 0.75em;
+      line-height: 1;
+      vertical-align: baseline;
+      transform: translateY(-0.3em);
+      margin-left: 0.05em;
     }
   `;
 
@@ -563,7 +574,18 @@ export class SongSection extends LitElement {
       bar: isBarMarker(chordText),
       invalid: !!isInvalid,
     });
-    return html`<span class=${classes}>${chordText}</span>`;
+    const segments = splitChordDisplaySegments(chordText);
+    return html`
+      <span class=${classes}>
+        ${segments.length
+          ? segments.map(segment =>
+              segment.type === 'extension'
+                ? html`<sup class="chord-extension">${segment.value}</sup>`
+                : segment.value
+            )
+          : chordText}
+      </span>
+    `;
   }
 
   _onControlClick(event) {

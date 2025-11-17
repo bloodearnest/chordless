@@ -1,16 +1,10 @@
 import { LitElement, html, css } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { isBarMarker } from '../js/utils/chord-utils.js';
+import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.js';
 
-/**
- * A custom element for rendering aligned bar notation with measures
- * Used for displaying chord progressions in a grid layout
- *
- * @element bar-group
- */
 export class BarGroup extends LitElement {
   static properties = {
-    /** @type {{measuresPerLine: Array, maxMeasures: number}} Bar group data with measures */
     data: { type: Object, attribute: false },
   };
 
@@ -62,15 +56,25 @@ export class BarGroup extends LitElement {
       color: var(--chord-color, #2980b9);
       font-weight: bold;
       font-size: 0.9em;
-      min-height: 1.1em;
       line-height: 1.1em;
       padding-right: 0.25em;
       font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
+      display: inline-block;
+      white-space: nowrap;
     }
 
     .chord.bar {
       color: var(--text-tertiary, #95a5a6);
       font-weight: normal;
+    }
+
+    .chord sup.chord-extension {
+      display: inline-block;
+      font-size: 0.75em;
+      line-height: 1;
+      vertical-align: baseline;
+      transform: translateY(-0.3em);
+      margin-left: 0.05em;
     }
   `;
 
@@ -116,23 +120,11 @@ export class BarGroup extends LitElement {
     `;
   }
 
-  /**
-   * Render a chord-only segment (no lyrics)
-   * @param {string} chordText - Chord text
-   * @returns {import('lit').TemplateResult}
-   * @private
-   */
   _renderChordOnlySegment(chordText) {
     if (!chordText) return html``;
     return html` <span class="chord-segment chord-only"> ${this._renderChord(chordText)} </span> `;
   }
 
-  /**
-   * Render a bar marker
-   * @param {string} barText - Bar marker text (|, ||, etc)
-   * @returns {import('lit').TemplateResult}
-   * @private
-   */
   _renderBarMarker(barText) {
     if (!barText) return html``;
     return html`
@@ -142,18 +134,23 @@ export class BarGroup extends LitElement {
     `;
   }
 
-  /**
-   * Render a chord
-   * @param {string} chordText - Chord text
-   * @returns {import('lit').TemplateResult}
-   * @private
-   */
   _renderChord(chordText) {
     const classes = classMap({
       chord: true,
       bar: isBarMarker(chordText),
     });
-    return html`<span class=${classes}>${chordText}</span>`;
+    const segments = splitChordDisplaySegments(chordText);
+    return html`
+      <span class=${classes}>
+        ${segments.length
+          ? segments.map(segment =>
+              segment.type === 'extension'
+                ? html`<sup class="chord-extension">${segment.value}</sup>`
+                : segment.value
+            )
+          : chordText}
+      </span>
+    `;
   }
 }
 
