@@ -1,6 +1,7 @@
 import { LitElement, html } from 'lit';
 import { convertChordToNashville, isNashvilleChord } from '../js/transpose.js';
-import { isBarMarker } from '../js/utils/chord-utils.js';
+import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.js';
+import { getUseUnicodeAccidentals } from '../js/preferences.js';
 import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.js';
 
 /**
@@ -13,6 +14,7 @@ export class ChordDisplay extends LitElement {
     invalid: { type: Boolean, reflect: true },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     displayKey: { type: String, attribute: 'display-key' },
+    useUnicodeAccidentals: { type: Boolean, state: true },
   };
 
   constructor() {
@@ -21,11 +23,26 @@ export class ChordDisplay extends LitElement {
     this.invalid = false;
     this.displayAsNashville = false;
     this.displayKey = '';
+    this.useUnicodeAccidentals = getUseUnicodeAccidentals();
+    this._onAccidentalPreferenceChange = event => {
+      this.useUnicodeAccidentals = !!event.detail;
+      this.requestUpdate();
+    };
   }
 
   createRenderRoot() {
     // Render into light DOM so existing chord styles continue to apply
     return this;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('accidental-preference-changed', this._onAccidentalPreferenceChange);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('accidental-preference-changed', this._onAccidentalPreferenceChange);
+    super.disconnectedCallback();
   }
 
   render() {
@@ -40,11 +57,14 @@ export class ChordDisplay extends LitElement {
     if (!segments.length) {
       return html`${text}`;
     }
-    return html`${segments.map(segment =>
-      segment.type === 'extension'
-        ? html`<sup class="chord-extension">${segment.value}</sup>`
-        : segment.value
-    )}`;
+    return html`${segments.map(segment => {
+      const value = this.useUnicodeAccidentals
+        ? convertAccidentalsToSymbols(segment.value)
+        : segment.value;
+      return segment.type === 'extension'
+        ? html`<sup class="chord-extension">${value}</sup>`
+        : value;
+    })}`;
   }
 
   _getDisplayText() {

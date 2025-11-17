@@ -1,5 +1,10 @@
 import { LitElement, html, css } from 'lit';
-import { getUseNashvilleNumbers, setUseNashvilleNumbers } from '../js/preferences.js';
+import {
+  getUseNashvilleNumbers,
+  setUseNashvilleNumbers,
+  getUseUnicodeAccidentals,
+  setUseUnicodeAccidentals,
+} from '../js/preferences.js';
 import './theme-settings.js';
 import './media-player-settings.js';
 import './select-organisation.js';
@@ -12,6 +17,7 @@ import './select-organisation.js';
 export class AppSettings extends LitElement {
   static properties = {
     useNashville: { type: Boolean, attribute: false },
+    useUnicodeAccidentals: { type: Boolean, attribute: false },
   };
 
   static styles = css`
@@ -99,6 +105,7 @@ export class AppSettings extends LitElement {
   constructor() {
     super();
     this.useNashville = getUseNashvilleNumbers();
+    this.useUnicodeAccidentals = getUseUnicodeAccidentals();
   }
 
   render() {
@@ -120,6 +127,15 @@ export class AppSettings extends LitElement {
               @change=${this._onNashvilleToggle}
             />
             <span>Use Nashville numbers</span>
+          </label>
+          <p>Choose how accidentals are rendered.</p>
+          <label class="toggle">
+            <input
+              type="checkbox"
+              ?checked=${this.useUnicodeAccidentals}
+              @change=${this._onAccidentalToggle}
+            />
+            <span>Use unicode accidentals (♯/♭)</span>
           </label>
         </div>
 
@@ -144,6 +160,12 @@ export class AppSettings extends LitElement {
     const value = event.currentTarget.checked;
     this.useNashville = value;
     setUseNashvilleNumbers(value);
+  }
+
+  _onAccidentalToggle(event) {
+    const value = event.currentTarget.checked;
+    this.useUnicodeAccidentals = value;
+    setUseUnicodeAccidentals(value);
   }
 }
 

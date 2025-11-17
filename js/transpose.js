@@ -70,12 +70,32 @@ function noteToSemitone(note) {
  * Convert semitone number to note name
  * Special handling: B becomes Cb in very flat keys (Gb, Cb)
  */
-function semitoneToNote(semitone, useFlats, targetKey) {
+function semitoneToNote(semitone, useFlats, targetKey, preferredAccidental = null) {
   const normalized = ((semitone % 12) + 12) % 12;
-  let note = useFlats ? NOTES_FLAT[normalized] : NOTES_SHARP[normalized];
+  let useFlatNaming = useFlats;
+
+  if (preferredAccidental === 'flat') {
+    useFlatNaming = true;
+  } else if (preferredAccidental === 'sharp') {
+    useFlatNaming = false;
+  } else if (targetKey) {
+    const keyRoot = extractKeyRoot(targetKey);
+    const targetSemitone = keyRoot ? noteToSemitone(keyRoot) : -1;
+    if (targetSemitone !== -1) {
+      const diff = (((normalized - targetSemitone) % 12) + 12) % 12;
+      const defaultAccidental = getDefaultAccidentalForDiff(diff);
+      if (defaultAccidental === 'flat') {
+        useFlatNaming = true;
+      } else if (defaultAccidental === 'sharp') {
+        useFlatNaming = false;
+      }
+    }
+  }
+
+  let note = useFlatNaming ? NOTES_FLAT[normalized] : NOTES_SHARP[normalized];
 
   // In keys Gb and Cb, use Cb instead of B
-  if (note === 'B' && useFlats && targetKey && (targetKey === 'Gb' || targetKey === 'Cb')) {
+  if (note === 'B' && useFlatNaming && targetKey && (targetKey === 'Gb' || targetKey === 'Cb')) {
     note = 'Cb';
   }
 
@@ -162,12 +182,12 @@ export function parseChord(chordString) {
 /**
  * Transpose a single note by semitones
  */
-export function transposeNote(note, semitones, useFlats, targetKey) {
+export function transposeNote(note, semitones, useFlats, targetKey, preferredAccidental = null) {
   if (!note) return null;
   const originalSemitone = noteToSemitone(note);
   if (originalSemitone === -1) return null;
   const newSemitone = originalSemitone + semitones;
-  return semitoneToNote(newSemitone, useFlats, targetKey);
+  return semitoneToNote(newSemitone, useFlats, targetKey, preferredAccidental);
 }
 
 /**
@@ -317,7 +337,8 @@ export function transposeChord(chordString, fromKey, toKey) {
   const useFlats = toKeyInfo ? toKeyInfo.useFlats : false;
 
   // Transpose root
-  const newRoot = transposeNote(parsed.root, semitones, useFlats, toKey);
+  const rootPreference = determineAccidentalPreference(parsed.root);
+  const newRoot = transposeNote(parsed.root, semitones, useFlats, toKey, rootPreference);
   if (!newRoot) {
     return {
       chord: parsed.original,
@@ -329,7 +350,8 @@ export function transposeChord(chordString, fromKey, toKey) {
   // Transpose bass if present
   let newBass = null;
   if (parsed.bass) {
-    newBass = transposeNote(parsed.bass, semitones, useFlats, toKey);
+    const bassPreference = determineAccidentalPreference(parsed.bass);
+    newBass = transposeNote(parsed.bass, semitones, useFlats, toKey, bassPreference);
     if (!newBass) {
       return {
         chord: parsed.original,
@@ -392,6 +414,13 @@ const DEGREE_OFFSETS = {
 };
 
 const DISALLOWED_DEGREE_ACCIDENTALS = new Set(['#3', 'b4', '#7', 'b1']);
+const DEFAULT_ACCIDENTAL_BY_DIFF = {
+  1: 'sharp',
+  3: 'flat',
+  6: 'sharp',
+  8: 'flat',
+  10: 'flat',
+};
 
 const NASHVILLE_CORE_REGEX = /^([#b♯♭]?)([1-7])(.*)$/;
 
@@ -473,9 +502,16 @@ export function convertNashvilleChordToStandard(chordText, key) {
 
 function determineAccidentalPreference(note) {
   if (!note) return null;
-  if (note.includes('b')) return 'flat';
-  if (note.includes('#')) return 'sharp';
+  if (note.includes('b') || note.includes('♭')) return 'flat';
+  if (note.includes('#') || note.includes('♯')) return 'sharp';
   return null;
+}
+
+function getDefaultAccidentalForDiff(diff) {
+  if (typeof diff !== 'number') {
+    return null;
+  }
+  return DEFAULT_ACCIDENTAL_BY_DIFF[diff] || null;
 }
 
 function findDegreeForSemitone(diff, preference = null) {
@@ -511,14 +547,17 @@ function findDegreeForSemitone(diff, preference = null) {
     return { accidental: natural.accidental, degree: natural.degree };
   }
 
-  if (preference === 'sharp') {
+  const defaultPreference = getDefaultAccidentalForDiff(normalized);
+  const effectivePreference = preference || defaultPreference;
+
+  if (effectivePreference === 'sharp') {
     const sharpCandidate = filtered.find(candidate => candidate.accidental === '#');
     if (sharpCandidate) {
       return { accidental: sharpCandidate.accidental, degree: sharpCandidate.degree };
     }
   }
 
-  if (preference === 'flat') {
+  if (effectivePreference === 'flat') {
     const flatCandidate = filtered.find(candidate => candidate.accidental === 'b');
     if (flatCandidate) {
       return { accidental: flatCandidate.accidental, degree: flatCandidate.degree };

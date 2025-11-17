@@ -7,7 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'browser.test.js',
+  testMatch: 'browser.playwright.js',
 
   // Maximum time one test can run
   timeout: 30 * 1000,

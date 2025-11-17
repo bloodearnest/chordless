@@ -10,12 +10,9 @@ test: test-node test-browser-headless
 # Run Node.js tests
 test-node:
     @echo "Running Node.js tests..."
-    node tests/transpose.test.js
-    node tests/db.test.js
-    node tests/db-usage.test.js
-    node tests/sync-reconciler.test.js
-    node tests/metronome-controller.test.js
-    node tests/pad-audio-controller.test.js
+    @bash -lc 'files=$(ls tests/*.test.js 2>/dev/null | grep -v "transpose\\.legacy\\.test\\.js" || true); if [ -n "$files" ]; then node --test $files; else echo "No Node.js test files found for node --test"; fi'
+    @echo "Running legacy transpose tests..."
+    node tests/transpose.legacy.test.js
 
 # Lint/format JS files (basic syntax checks)
 lint:

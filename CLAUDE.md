@@ -48,8 +48,8 @@ To do that, you have to enter edit mode explicitly. This has several goals
 
 ## Development Standards
 
-- Do not use npm at all.
-- Only use vanilla js. There should be no build step at all, ever.
+- Use `just format lint test-node` to verify all changes. This will run formatting, linting and unit tests.
+- Only use vanilla js. There should be no build step at all, ever. We use npm to manage versions to _vendor_.
 - Only use js libraries that can be hosted locally within the project and loaded as modules
-- Use modern HTML/CSS/JS. Do not care about old browser support
+- Use modern HTML/CSS/JS. Use .browserlistrc.
 - Always try to use browser native features as much as possible
