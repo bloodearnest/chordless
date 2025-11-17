@@ -5,9 +5,9 @@ import {
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
   formatHiddenLyricsText,
-  splitChordDisplaySegments,
 } from '../js/utils/lyrics-normalizer.js';
 import './bar-group.js';
+import './chord-display.js';
 
 /**
  * A custom element for rendering a section of a song with chords and lyrics.
@@ -35,6 +35,10 @@ export class SongSection extends LitElement {
     label: { type: String, attribute: 'label' },
     /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
     lines: { attribute: false },
+    /** @type {boolean} Display chords as Nashville numbers */
+    displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
+    /** @type {string} Key used for Nashville conversion */
+    displayKey: { type: String, attribute: 'display-key' },
   };
 
   static styles = css`
@@ -352,6 +356,8 @@ export class SongSection extends LitElement {
     this._contentBlocks = [];
     this._onControlClick = this._onControlClick.bind(this);
     this._onSummaryClick = this._onSummaryClick.bind(this);
+    this.displayAsNashville = false;
+    this.displayKey = '';
   }
 
   /**
@@ -518,7 +524,11 @@ export class SongSection extends LitElement {
         if (this.hideMode === 'chords') {
           return nothing;
         }
-        return html`<bar-group .data=${block.data}></bar-group>`;
+        return html`<bar-group
+          .data=${block.data}
+          .displayAsNashville=${this.displayAsNashville}
+          .displayKey=${this.displayKey}
+        ></bar-group>`;
       }
       return this._renderLine(block.line, index);
     });
@@ -574,16 +584,14 @@ export class SongSection extends LitElement {
       bar: isBarMarker(chordText),
       invalid: !!isInvalid,
     });
-    const segments = splitChordDisplaySegments(chordText);
     return html`
       <span class=${classes}>
-        ${segments.length
-          ? segments.map(segment =>
-              segment.type === 'extension'
-                ? html`<sup class="chord-extension">${segment.value}</sup>`
-                : segment.value
-            )
-          : chordText}
+        <chord-display
+          .chord=${chordText}
+          .displayKey=${this.displayKey}
+          .displayAsNashville=${this.displayAsNashville}
+          .invalid=${!!isInvalid}
+        ></chord-display>
       </span>
     `;
   }

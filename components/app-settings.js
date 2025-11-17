@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import { getUseNashvilleNumbers, setUseNashvilleNumbers } from '../js/preferences.js';
 import './theme-settings.js';
 import './media-player-settings.js';
 import './select-organisation.js';
@@ -9,7 +10,9 @@ import './select-organisation.js';
  * Settings interface for the application
  */
 export class AppSettings extends LitElement {
-  static properties = {};
+  static properties = {
+    useNashville: { type: Boolean, attribute: false },
+  };
 
   static styles = css`
     :host {
@@ -76,6 +79,18 @@ export class AppSettings extends LitElement {
       background-color: rgba(231, 76, 60, 0.3);
     }
 
+    .toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-weight: 600;
+    }
+
+    .toggle input[type='checkbox'] {
+      width: 1.25rem;
+      height: 1.25rem;
+    }
+
     a {
       text-decoration: none;
     }
@@ -83,6 +98,7 @@ export class AppSettings extends LitElement {
 
   constructor() {
     super();
+    this.useNashville = getUseNashvilleNumbers();
   }
 
   render() {
@@ -92,6 +108,19 @@ export class AppSettings extends LitElement {
           <h3>Appearance</h3>
           <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
+        </div>
+
+        <div class="settings-section">
+          <h3>Chords</h3>
+          <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
+          <label class="toggle">
+            <input
+              type="checkbox"
+              ?checked=${this.useNashville}
+              @change=${this._onNashvilleToggle}
+            />
+            <span>Use Nashville numbers</span>
+          </label>
         </div>
 
         <div class="settings-section">
@@ -109,6 +138,12 @@ export class AppSettings extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  _onNashvilleToggle(event) {
+    const value = event.currentTarget.checked;
+    this.useNashville = value;
+    setUseNashvilleNumbers(value);
   }
 }
 

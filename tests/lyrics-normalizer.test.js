@@ -86,6 +86,37 @@ assertEquals(
   'Split wrapped optional chord tokens'
 );
 
+const minorTriad = splitChordDisplaySegments('Bm');
+assertEquals(
+  minorTriad,
+  [
+    { type: 'base', value: 'B' },
+    { type: 'base', value: 'm' },
+  ],
+  'Minor chord keeps quality marker outside extension'
+);
+
+const minorSeventh = splitChordDisplaySegments('Am7');
+assertEquals(
+  minorSeventh,
+  [
+    { type: 'base', value: 'A' },
+    { type: 'base', value: 'm' },
+    { type: 'extension', value: '7' },
+  ],
+  'Minor 7 chord only wraps numeric extension'
+);
+
+const minorSeventhExtensionOnly = splitChordDisplaySegments('Cm7').slice(1);
+assertEquals(
+  minorSeventhExtensionOnly,
+  [
+    { type: 'base', value: 'm' },
+    { type: 'extension', value: '7' },
+  ],
+  'Nashville chord helpers (which drop the root) still keep minor quality inline'
+);
+
 console.log(`\n${passCount}/${testCount} assertions passed. Failures: ${failCount}`);
 if (failCount > 0) {
   process.exit(1);

@@ -1,5 +1,6 @@
 import { LitElement, html, css, nothing } from 'lit';
 import './song-section.js';
+import { getUseNashvilleNumbers } from '../js/preferences.js';
 
 /**
  * Song Display Component
@@ -15,6 +16,7 @@ export class SongDisplay extends LitElement {
     parsed: { type: Object, attribute: false },
     /** @type {number} Song index in setlist */
     songIndex: { type: Number, attribute: 'song-index' },
+    useNashville: { type: Boolean, state: true },
   };
 
   static styles = css`
@@ -27,6 +29,21 @@ export class SongDisplay extends LitElement {
     super();
     this.parsed = null;
     this.songIndex = 0;
+    this.useNashville = getUseNashvilleNumbers();
+    this._onNashvilleChange = event => {
+      this.useNashville = !!event.detail;
+      this.requestUpdate();
+    };
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    window.addEventListener('nashville-preference-changed', this._onNashvilleChange);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('nashville-preference-changed', this._onNashvilleChange);
+    super.disconnectedCallback();
   }
 
   render() {
@@ -42,12 +59,15 @@ export class SongDisplay extends LitElement {
   }
 
   _renderSection(section, index) {
+    const displayKey = this.parsed?.metadata?.key || '';
     return html`
       <song-section
         .lines=${section.lines}
         .label=${section.label || ''}
         .songIndex=${this.songIndex}
         .sectionIndex=${index}
+        .displayAsNashville=${this.useNashville}
+        .displayKey=${displayKey}
         song-index=${this.songIndex}
         section-index=${index}
         data-label=${section.label || ''}

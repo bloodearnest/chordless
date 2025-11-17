@@ -367,10 +367,176 @@ export function transposeSong(parsed, fromKey, toKey) {
     for (const line of section.lines) {
       for (const segment of line.segments) {
         if (segment.chord) {
+          if (isNashvilleChord(segment.chord) && fromKey) {
+            const converted = convertNashvilleChordToStandard(segment.chord, fromKey);
+            segment.chord = converted;
+          }
           const result = transposeChord(segment.chord, fromKey, toKey);
           segment.chord = result.chord;
           segment.transposed = result.transposed;
           segment.valid = result.valid;
+        }
+      }
+    }
+  }
+}
+
+const DEGREE_OFFSETS = {
+  1: 0,
+  2: 2,
+  3: 4,
+  4: 5,
+  5: 7,
+  6: 9,
+  7: 11,
+};
+
+const NASHVILLE_CORE_REGEX = /^([#b♯♭]?)([1-7])(.*)$/;
+
+function extractKeyRoot(key) {
+  if (!key) return null;
+  const match = key.match(/^([A-G][#b♯♭]?)/);
+  return match ? match[1].replace(/♯/, '#').replace(/♭/, 'b') : null;
+}
+
+function getKeyInfo(key) {
+  return KEY_INFO[key] || KEY_INFO[key?.replace(/m$/, '')] || null;
+}
+
+function accidentToOffset(accidental) {
+  if (!accidental) return 0;
+  const clean = accidental.replace('♯', '#').replace('♭', 'b');
+  if (clean === '#') return 1;
+  if (clean === 'b') return -1;
+  return 0;
+}
+
+export function isNashvilleChord(chordText) {
+  if (!chordText) return false;
+  let text = chordText.trim();
+  if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
+    text = text.slice(1, -1).trim();
+  }
+  const parts = text.split('/');
+  if (!NASHVILLE_CORE_REGEX.test(parts[0])) return false;
+  if (parts[1] && !NASHVILLE_CORE_REGEX.test(parts[1])) return false;
+  return true;
+}
+
+function convertDegreeToNote(degreeMatch, key) {
+  if (!degreeMatch || !key) return null;
+  const keyRoot = extractKeyRoot(key);
+  if (!keyRoot) return null;
+  const keySemitone = noteToSemitone(keyRoot);
+  if (keySemitone === -1) return null;
+  const accidental = accidentToOffset(degreeMatch[1]);
+  const degreeNumber = parseInt(degreeMatch[2], 10);
+  const offset = DEGREE_OFFSETS[degreeNumber];
+  if (typeof offset !== 'number') return null;
+  const targetSemitone = keySemitone + offset + accidental;
+  const keyInfo = getKeyInfo(key);
+  const useFlats = keyInfo?.useFlats ?? false;
+  return semitoneToNote(targetSemitone, useFlats, key);
+}
+
+export function convertNashvilleChordToStandard(chordText, key) {
+  if (!isNashvilleChord(chordText) || !key) {
+    return chordText;
+  }
+  let text = chordText.trim();
+  let prefix = '';
+  let suffix = '';
+  if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
+    prefix = '(';
+    suffix = ')';
+    text = text.slice(1, -1).trim();
+  }
+  const parts = text.split('/');
+  const mainMatch = parts[0].match(NASHVILLE_CORE_REGEX);
+  const rootNote = convertDegreeToNote(mainMatch, key);
+  if (!rootNote) return chordText;
+  let chord = rootNote + (mainMatch[3] || '');
+  if (parts[1]) {
+    const bassMatch = parts[1].match(NASHVILLE_CORE_REGEX);
+    const bassNote = convertDegreeToNote(bassMatch, key);
+    if (bassNote) {
+      chord += `/${bassNote}`;
+    }
+  }
+  if (prefix || suffix) {
+    chord = `${prefix}${chord}${suffix}`;
+  }
+  return chord;
+}
+
+function findDegreeForSemitone(diff) {
+  const normalized = ((diff % 12) + 12) % 12;
+
+  // Prefer exact matches so diatonic chords stay natural
+  for (const [degree, offset] of Object.entries(DEGREE_OFFSETS)) {
+    if (normalized === offset) {
+      return { accidental: '', degree };
+    }
+  }
+
+  // Fall back to nearest sharp/flat if we're one semitone away
+  for (const [degree, offset] of Object.entries(DEGREE_OFFSETS)) {
+    if ((offset + 1) % 12 === normalized) {
+      return { accidental: '#', degree };
+    }
+    if ((offset + 11) % 12 === normalized) {
+      return { accidental: 'b', degree };
+    }
+  }
+
+  return null;
+}
+
+export function convertChordToNashville(chordText, key) {
+  if (!key || !chordText) return chordText;
+  let text = chordText;
+  if (isNashvilleChord(text)) {
+    return text;
+  }
+  const parsed = parseChord(text);
+  if (!parsed?.root) {
+    return chordText;
+  }
+  const keyRoot = extractKeyRoot(key);
+  if (!keyRoot) return chordText;
+  const chordSemitone = noteToSemitone(parsed.root);
+  const keySemitone = noteToSemitone(keyRoot);
+  if (chordSemitone === -1 || keySemitone === -1) {
+    return chordText;
+  }
+  const diff = chordSemitone - keySemitone;
+  const degreeInfo = findDegreeForSemitone(diff);
+  if (!degreeInfo) {
+    return chordText;
+  }
+  let result = `${degreeInfo.accidental}${degreeInfo.degree}${parsed.extensions || ''}`;
+  if (parsed.bass) {
+    const bassDiff = noteToSemitone(parsed.bass) - keySemitone;
+    const bassDegree = findDegreeForSemitone(bassDiff);
+    if (bassDegree) {
+      result += `/${bassDegree.accidental}${bassDegree.degree}`;
+    }
+  }
+  if (parsed.wrapperPrefix || parsed.wrapperSuffix) {
+    result = `${parsed.wrapperPrefix || ''}${result}${parsed.wrapperSuffix || ''}`;
+  }
+  return result;
+}
+
+export function normalizeSongChordsToStandard(parsed, key) {
+  if (!parsed?.sections || !key) {
+    return;
+  }
+  for (const section of parsed.sections) {
+    for (const line of section.lines) {
+      for (const segment of line.segments) {
+        if (segment.chord && isNashvilleChord(segment.chord)) {
+          segment.chord = convertNashvilleChordToStandard(segment.chord, key);
         }
       }
     }

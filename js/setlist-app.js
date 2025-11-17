@@ -1290,20 +1290,23 @@ class PageApp {
         // Parse the chordpro
         const parsed = this.parser.parse(sourceText);
 
-        // Apply transposition if targetKey is set
-        if (songEntry.modifications.targetKey) {
-          // TODO: Implement transposition
-          // For now, just update the displayed key
-          parsed.metadata.key = songEntry.modifications.targetKey;
+        // Capture original key before any transposition so we can always return to it
+        const originalKey = parsed.metadata.key || null;
+        const targetKey = songEntry.modifications.targetKey || null;
+
+        // Apply transposition if requested and we have a reference key
+        if (targetKey && originalKey && targetKey !== originalKey) {
+          transposeSong(parsed, originalKey, targetKey);
+          parsed.metadata.key = targetKey;
+        } else if (targetKey && !originalKey) {
+          // Still reflect the requested key in metadata even if we can't transpose
+          parsed.metadata.key = targetKey;
         }
 
         // Apply BPM override
         if (songEntry.modifications.bpmOverride) {
           parsed.metadata.tempo = songEntry.modifications.bpmOverride;
         }
-
-        // Store original key for transposition reference
-        const originalKey = parsed.metadata.key;
 
         // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
         const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo);

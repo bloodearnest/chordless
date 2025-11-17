@@ -1,3 +1,5 @@
+import { normalizeSongChordsToStandard } from './transpose.js';
+
 // Custom ChordPro parser for SongSelect format files
 
 export class ChordProParser {
@@ -84,7 +86,11 @@ export class ChordProParser {
       metadata.ccliTrailer = trailerLines.join('\n');
     }
 
-    return { metadata, sections };
+    const parsed = { metadata, sections };
+    if (parsed.metadata.key) {
+      normalizeSongChordsToStandard(parsed, parsed.metadata.key);
+    }
+    return parsed;
   }
 
   parseLine(line) {

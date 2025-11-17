@@ -1,11 +1,13 @@
 import { LitElement, html, css } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { isBarMarker } from '../js/utils/chord-utils.js';
-import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.js';
+import './chord-display.js';
 
 export class BarGroup extends LitElement {
   static properties = {
     data: { type: Object, attribute: false },
+    displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
+    displayKey: { type: String, attribute: 'display-key' },
   };
 
   static styles = css`
@@ -81,6 +83,8 @@ export class BarGroup extends LitElement {
   constructor() {
     super();
     this.data = null;
+    this.displayAsNashville = false;
+    this.displayKey = '';
   }
 
   render() {
@@ -139,16 +143,13 @@ export class BarGroup extends LitElement {
       chord: true,
       bar: isBarMarker(chordText),
     });
-    const segments = splitChordDisplaySegments(chordText);
     return html`
       <span class=${classes}>
-        ${segments.length
-          ? segments.map(segment =>
-              segment.type === 'extension'
-                ? html`<sup class="chord-extension">${segment.value}</sup>`
-                : segment.value
-            )
-          : chordText}
+        <chord-display
+          .chord=${chordText}
+          .displayKey=${this.displayKey}
+          .displayAsNashville=${this.displayAsNashville}
+        ></chord-display>
       </span>
     `;
   }

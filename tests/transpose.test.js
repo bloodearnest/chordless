@@ -8,6 +8,9 @@ import {
   transposeChord,
   getAvailableKeys,
   getKeyOffset,
+  convertNashvilleChordToStandard,
+  convertChordToNashville,
+  isNashvilleChord,
 } from '../js/transpose.js';
 
 // Simple test framework
@@ -607,6 +610,66 @@ assertEquals(result.chord, 'F7b9', 'F#7b9 (B) to F7b9 (Bb) - not E#7b9');
 
 result = transposeChord('Abmaj9', 'Eb', 'E');
 assertEquals(result.chord, 'Amaj9', 'Abmaj9 (Eb) to Amaj9 (E) - not G##maj9');
+
+console.log('\n=== Testing Nashville conversions ===');
+
+assert(isNashvilleChord('1m7'), 'Detect Nashville chord 1m7');
+assert(!isNashvilleChord('Cmaj7'), 'Do not detect normal chords as Nashville');
+
+let converted = convertNashvilleChordToStandard('1', 'C');
+assertEquals(converted, 'C', 'Nashville 1 in C -> C');
+
+converted = convertNashvilleChordToStandard('#4sus', 'C');
+assertEquals(converted, 'F#sus', 'Nashville #4sus in C -> F#sus');
+
+let nashville = convertChordToNashville('F#sus', 'C');
+assertEquals(nashville, '#4sus', 'Chord to Nashville with accidental');
+
+nashville = convertChordToNashville('(A2)', 'A');
+assertEquals(nashville, '(12)', 'Bracketed chord retains wrapper when converting to Nashville');
+
+const diatonicInA = [
+  { chord: 'A', nashville: '1' },
+  { chord: 'Bm', nashville: '2m' },
+  { chord: 'C#m', nashville: '3m' },
+  { chord: 'D', nashville: '4' },
+  { chord: 'E', nashville: '5' },
+  { chord: 'F#m', nashville: '6m' },
+  { chord: 'G#dim', nashville: '7dim' },
+];
+
+diatonicInA.forEach(({ chord, nashville: expected }, index) => {
+  assertEquals(
+    convertChordToNashville(chord, 'A'),
+    expected,
+    `A major diatonic chord ${index + 1} converts to Nashville`
+  );
+  assertEquals(
+    convertNashvilleChordToStandard(expected, 'A'),
+    chord,
+    `A major Nashville chord ${index + 1} converts back to letter names`
+  );
+});
+
+assertEquals(
+  convertChordToNashville('E/G#', 'A'),
+  '5/7',
+  'Slash chords convert both root and bass to Nashville numbers'
+);
+assertEquals(
+  convertNashvilleChordToStandard('5/7', 'A'),
+  'E/G#',
+  'Slash Nashville chords convert back to original root/bass notes'
+);
+
+const keyAProgression = ['A', 'A/C#', 'D', 'D/F#', 'E/G#', 'A'];
+const expectedNashville = ['1', '1/3', '4', '4/6', '5/7', '1'];
+const convertedProgression = keyAProgression.map(chord => convertChordToNashville(chord, 'A'));
+assertEquals(
+  convertedProgression,
+  expectedNashville,
+  'Common A major progression converts to expected Nashville sequence'
+);
 
 // ===== Summary =====
 console.log('\n=== Test Summary ===');
