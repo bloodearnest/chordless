@@ -674,8 +674,16 @@ assertEquals(
 assertEquals(convertChordToNashville('Ab', 'C'), 'b6', 'Borrowed ♭6 uses flat accidental');
 assertEquals(convertChordToNashville('Bb', 'C'), 'b7', 'Borrowed ♭7 uses flat accidental');
 assertEquals(convertChordToNashville('Eb', 'C'), 'b3', 'Borrowed ♭3 uses flat accidental');
-assertEquals(convertChordToNashville('F#7', 'C'), '#47', 'Secondary dominant uses sharp accidental');
-assertEquals(convertChordToNashville('D#dim', 'C'), '#2dim', 'Secondary leading-tone uses sharp accidental');
+assertEquals(
+  convertChordToNashville('F#7', 'C'),
+  '#47',
+  'Secondary dominant uses sharp accidental'
+);
+assertEquals(
+  convertChordToNashville('D#dim', 'C'),
+  '#2dim',
+  'Secondary leading-tone uses sharp accidental'
+);
 assertEquals(convertChordToNashville('G#7', 'C'), '#57', 'V/vi defaults to sharp accidental');
 assertEquals(convertChordToNashville('F#', 'C'), '#4', 'No #3 is produced for F#');
 assertEquals(convertChordToNashville('Cb', 'C'), '7', 'No ♭1 is produced for C♭');

@@ -58,7 +58,7 @@ export function formatHiddenLyricsText(text, previousHadLyrics = false, joinWith
 }
 
 const CHORD_EXTENSION_PATTERN =
-  /(maj7|maj9|maj11|maj13|add(?:9|11|13)?|sus(?:2|4)?|sus|dim7|dim|aug|mMaj7|\(\d+\)|\d+)/gi;
+  /(maj7|maj9|maj11|maj13|add(?:9|11|13)?|sus(?:2|4)?|sus|dim7|dim|aug(?:\d+)?|\+(?:\d+)?|mMaj7|°7|°|ø7|\(\d+\)|[#b♯♭]?\d+(?:[#b♯♭]\d+)?)/gi;
 
 export function splitChordDisplaySegments(chordText) {
   if (!chordText) {

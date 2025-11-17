@@ -117,6 +117,110 @@ assertEquals(
   'Nashville chord helpers (which drop the root) still keep minor quality inline'
 );
 
+const diminishedSymbol = splitChordDisplaySegments('B°');
+assertEquals(
+  diminishedSymbol,
+  [
+    { type: 'base', value: 'B' },
+    { type: 'extension', value: '°' },
+  ],
+  'Recognize ° symbol as diminished extension'
+);
+
+const diminishedSeventhSymbol = splitChordDisplaySegments('F°7');
+assertEquals(
+  diminishedSeventhSymbol,
+  [
+    { type: 'base', value: 'F' },
+    { type: 'extension', value: '°7' },
+  ],
+  'Recognize °7 symbol as diminished seventh extension'
+);
+
+const halfDiminishedSymbol = splitChordDisplaySegments('Eø7');
+assertEquals(
+  halfDiminishedSymbol,
+  [
+    { type: 'base', value: 'E' },
+    { type: 'extension', value: 'ø7' },
+  ],
+  'Recognize ø7 as half-diminished extension'
+);
+
+const halfDiminishedText = splitChordDisplaySegments('Cm7b5');
+assertEquals(
+  halfDiminishedText,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'base', value: 'm' },
+    { type: 'extension', value: '7b5' },
+  ],
+  'Treat 7b5 as a single extension token'
+);
+
+const alteredNinth = splitChordDisplaySegments('Cm9#11');
+assertEquals(
+  alteredNinth,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'base', value: 'm' },
+    { type: 'extension', value: '9#11' },
+  ],
+  'Treat 9#11 as a single extension token'
+);
+
+const standaloneSharp = splitChordDisplaySegments('C(#11)');
+assertEquals(
+  standaloneSharp,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'base', value: '(' },
+    { type: 'extension', value: '#11' },
+    { type: 'base', value: ')' },
+  ],
+  'Support standalone #11 extension via wrapped notation'
+);
+
+const augmentedText = splitChordDisplaySegments('Caug');
+assertEquals(
+  augmentedText,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'extension', value: 'aug' },
+  ],
+  'Recognize aug as extension'
+);
+
+const augmentedPlus = splitChordDisplaySegments('C+');
+assertEquals(
+  augmentedPlus,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'extension', value: '+' },
+  ],
+  'Recognize + as augmented extension'
+);
+
+const augmentedSeventh = splitChordDisplaySegments('Caug7');
+assertEquals(
+  augmentedSeventh,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'extension', value: 'aug7' },
+  ],
+  'Treat aug7 as single extension'
+);
+
+const augmentedPlusSeventh = splitChordDisplaySegments('C+7');
+assertEquals(
+  augmentedPlusSeventh,
+  [
+    { type: 'base', value: 'C' },
+    { type: 'extension', value: '+7' },
+  ],
+  'Treat +7 as single extension'
+);
+
 console.log(`\n${passCount}/${testCount} assertions passed. Failures: ${failCount}`);
 if (failCount > 0) {
   process.exit(1);
