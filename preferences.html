@@ -6,9 +6,9 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <meta name="description" content="Settings for Setalight" />
+    <meta name="description" content="Preferences for Setalight" />
     <meta name="view-transition" content="same-origin" />
-    <title>Settings - Setalight</title>
+    <title>Preferences - Setalight</title>
     <link rel="stylesheet" href="/css/style.css" />
     <script type="importmap">
       {
@@ -26,7 +26,7 @@
   </head>
   <body>
     <div class="app-container">
-      <div id="settings-view" class="view">
+      <div id="preferences-view" class="view">
         <header>
           <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
             <svg
@@ -42,16 +42,16 @@
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <h1>Settings</h1>
+          <h1>Preferences</h1>
           <div></div>
         </header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu" show-back-button back-label="Back to Home"></nav-menu>
+        <nav-menu id="nav-menu"></nav-menu>
 
         <main class="home-content">
-          <h2 style="margin: 2rem 1rem 1rem 1rem">Settings</h2>
-          <app-settings id="app-settings"></app-settings>
+          <h2 style="margin: 2rem 1rem 1rem 1rem">Preferences</h2>
+          <app-preferences id="app-preferences"></app-preferences>
         </main>
       </div>
     </div>
@@ -96,7 +96,7 @@
 
           // Listen for settings changes and save to localStorage
           settingsComponent.addEventListener('settings-change', event => {
-            console.log('[Settings] Media player settings changed:', event.detail);
+            console.log('[Preferences] Media player settings changed:', event.detail);
             localStorage.setItem('mediaPlayerSettings', JSON.stringify(event.detail));
 
             // Dispatch custom event that media player can listen to
@@ -135,13 +135,13 @@
           });
       }
 
-      // Handle app-settings component events
-      customElements.whenDefined('app-settings').then(() => {
-        const appSettings = document.getElementById('app-settings');
+      // Handle app-preferences component events
+      customElements.whenDefined('app-preferences').then(() => {
+        const appPreferences = document.getElementById('app-preferences');
 
-        if (appSettings) {
+        if (appPreferences) {
           // Handle clear database request
-          appSettings.addEventListener('clear-database-requested', async () => {
+          appPreferences.addEventListener('clear-database-requested', async () => {
             const confirmed = confirm(
               '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
             );
@@ -178,7 +178,7 @@
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/media-player-settings.js"></script>
-    <script type="module" src="/components/app-settings.js"></script>
+    <script type="module" src="/components/app-preferences.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
   </body>
 </html>

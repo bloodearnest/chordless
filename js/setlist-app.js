@@ -116,8 +116,12 @@ class PageApp {
       return { type: 'songs' };
     }
 
-    if (pathname === '/settings' || pathname === '/settings/' || pathname === '/settings.html') {
-      return { type: 'settings' };
+    if (
+      pathname === '/preferences' ||
+      pathname === '/preferences/' ||
+      pathname === '/preferences.html'
+    ) {
+      return { type: 'preferences' };
     }
 
     if (pathname === '/storage' || pathname === '/storage/' || pathname === '/storage.html') {
@@ -3464,15 +3468,8 @@ class PageApp {
       navMenu.showOverviewLink = showOverviewLink;
 
       // Set back button visibility
-      if (route.type === 'setlist') {
-        const hash = window.location.hash;
-        const isViewingSong = hash && hash.startsWith('#song-');
-        navMenu.showBackButton = !isViewingSong; // Only show when viewing overview
-      } else if (route.type === 'songs') {
-        navMenu.showBackButton = false; // No back button for song library
-      } else {
-        navMenu.showBackButton = true;
-      }
+      // Only show back button when viewing a song from the library
+      navMenu.showBackButton = route.type === 'librarySong';
       navMenu.setAttribute('back-label', backLabel);
     }
 

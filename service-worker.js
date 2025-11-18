@@ -10,7 +10,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local');
 
-const CACHE_NAME = 'setalight-v253';
+const CACHE_NAME = 'setalight-v254';
 const PAD_CACHE_NAME = 'padsets-cache-v1';
 const ASSETS = [
   '/',
@@ -537,24 +537,24 @@ async function handleRoute(url) {
     }
   }
 
-  // Settings page: /settings
-  if (path === '/settings' || path === '/settings/' || path === '/settings.html') {
-    console.log('[SW] Serving settings.html');
+  // Preferences page: /preferences
+  if (path === '/preferences' || path === '/preferences/' || path === '/preferences.html') {
+    console.log('[SW] Serving preferences.html');
     if (DEV_MODE) {
       // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/settings.html', { cache: 'no-cache' })
+      return fetch('/preferences.html', { cache: 'no-cache' })
         .then(response => {
           const responseToCache = response.clone();
           caches.open(CACHE_NAME).then(cache => {
-            cache.put('/settings.html', responseToCache);
+            cache.put('/preferences.html', responseToCache);
           });
           return response;
         })
         .catch(() => {
-          return caches.match('/settings.html');
+          return caches.match('/preferences.html');
         });
     } else {
-      return fetch('/settings.html');
+      return fetch('/preferences.html');
     }
   }
 

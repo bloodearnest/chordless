@@ -1,12 +1,12 @@
 import { LitElement, html, css } from 'lit';
 import './app-modal.js';
-import './app-settings.js';
+import './app-preferences.js';
 
 /**
  * NavMenu Component
  *
  * A navigation menu popover used across the application.
- * Contains links to main sections (Setlists, Songs, Settings, Bookmarklet)
+ * Contains links to main sections (Setlists, Songs, Preferences, Bookmarklet)
  * and optionally a back button.
  *
  * Properties:
@@ -333,7 +333,7 @@ export class NavMenu extends LitElement {
             <span>Song Library</span>
           </a>
 
-          <button class="nav-menu-item" part="nav-item" @click=${this._handleSettingsClick}>
+          <button class="nav-menu-item" part="nav-item" @click=${this._handlePreferencesClick}>
             <svg
               class="nav-icon"
               width="20"
@@ -350,7 +350,7 @@ export class NavMenu extends LitElement {
               ></path>
               <circle cx="12" cy="12" r="3"></circle>
             </svg>
-            <span>Settings</span>
+            <span>Preferences</span>
           </button>
 
           <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
@@ -385,11 +385,11 @@ export class NavMenu extends LitElement {
         </nav>
       </div>
 
-      <app-modal id="nav-settings-modal" size="fullscreen">
+      <app-modal id="nav-preferences-modal" size="fullscreen">
         <div slot="header">
-          <h2 style="margin: 0; font-size: 1.8rem;">Settings</h2>
+          <h2 style="margin: 0; font-size: 1.8rem;">Preferences</h2>
         </div>
-        <app-settings></app-settings>
+        <app-preferences></app-preferences>
       </app-modal>
     `;
   }
@@ -431,11 +431,11 @@ export class NavMenu extends LitElement {
     this.closePopover();
   }
 
-  _handleSettingsClick() {
+  _handlePreferencesClick() {
     this.closePopover();
     // Wait for next frame to ensure popover is closed before showing modal
     requestAnimationFrame(() => {
-      const modal = this.shadowRoot?.querySelector('#nav-settings-modal');
+      const modal = this.shadowRoot?.querySelector('#nav-preferences-modal');
       if (modal) {
         modal.show();
       }
@@ -466,14 +466,14 @@ export class NavMenu extends LitElement {
   }
 
   async _handleImportRequested() {
-    // If we're already on the settings page, don't navigate
+    // If we're already on the preferences page, don't navigate
     // Let the event bubble to setlist-app which will handle the import
-    if (window.location.pathname === '/settings') {
+    if (window.location.pathname === '/preferences') {
       return;
     }
 
-    // Navigate to settings page which handles the actual import
-    window.location.href = '/settings';
+    // Navigate to preferences page which handles the actual import
+    window.location.href = '/preferences';
   }
 
   // Public API for controlling the popover

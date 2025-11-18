@@ -9,11 +9,11 @@ import './theme-settings.js';
 import './media-player-settings.js';
 
 /**
- * AppSettings Component
+ * AppPreferences Component
  *
- * Settings interface for the application
+ * Preferences interface for the application
  */
-export class AppSettings extends LitElement {
+export class AppPreferences extends LitElement {
   static properties = {
     useNashville: { type: Boolean, attribute: false },
     useUnicodeAccidentals: { type: Boolean, attribute: false },
@@ -24,14 +24,14 @@ export class AppSettings extends LitElement {
       display: block;
     }
 
-    .settings-content {
+    .preferences-content {
       padding: 1rem;
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
     }
 
-    .settings-section {
+    .preferences-section {
       background: var(--settings-bg, #34495e);
       border-radius: 8px;
       padding: 1.5rem;
@@ -109,14 +109,14 @@ export class AppSettings extends LitElement {
 
   render() {
     return html`
-      <div class="settings-content">
-        <div class="settings-section">
+      <div class="preferences-content">
+        <div class="preferences-section">
           <h3>Appearance</h3>
           <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
         </div>
 
-        <div class="settings-section">
+        <div class="preferences-section">
           <h3>Chords</h3>
           <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
           <label class="toggle" for="toggle-use-nashville">
@@ -142,7 +142,7 @@ export class AppSettings extends LitElement {
           </label>
         </div>
 
-        <div class="settings-section">
+        <div class="preferences-section">
           <h3>Media Player</h3>
           <p>Configure global media player settings. These settings apply to all setlists.</p>
           <media-player-settings></media-player-settings>
@@ -164,4 +164,4 @@ export class AppSettings extends LitElement {
   }
 }
 
-customElements.define('app-settings', AppSettings);
+customElements.define('app-preferences', AppPreferences);
