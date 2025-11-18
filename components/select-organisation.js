@@ -9,8 +9,7 @@ import {
 /**
  * SelectOrganisation Component
  *
- * Displays current church/organisation and allows switching between them.
- * Uses "organisation" internally but displays "Church" to users.
+ * Displays current organisation and allows switching between them.
  */
 export class SelectOrganisation extends LitElement {
   static properties = {
@@ -18,7 +17,7 @@ export class SelectOrganisation extends LitElement {
     _organisations: { type: Array, state: true },
     _loading: { type: Boolean, state: true },
     _showCreateForm: { type: Boolean, state: true },
-    _newChurchName: { type: String, state: true },
+    _newOrganisationName: { type: String, state: true },
     _creating: { type: Boolean, state: true },
   };
 
@@ -207,7 +206,7 @@ export class SelectOrganisation extends LitElement {
     this._organisations = [];
     this._loading = true;
     this._showCreateForm = false;
-    this._newChurchName = '';
+    this._newOrganisationName = '';
     this._creating = false;
   }
 
@@ -234,7 +233,9 @@ export class SelectOrganisation extends LitElement {
       return;
     }
 
-    const confirmed = confirm(`Switch to church "${org.name}"?\n\nThis will reload the page.`);
+    const confirmed = confirm(
+      `Switch to organisation "${org.name}"?\n\nThis will reload the page.`
+    );
 
     if (confirmed) {
       await switchOrganisation(org.id);
@@ -243,25 +244,25 @@ export class SelectOrganisation extends LitElement {
 
   _toggleCreateForm() {
     this._showCreateForm = !this._showCreateForm;
-    this._newChurchName = '';
+    this._newOrganisationName = '';
   }
 
   _handleNameInput(e) {
-    this._newChurchName = e.target.value;
+    this._newOrganisationName = e.target.value;
   }
 
   async _handleCreate(e) {
     e.preventDefault();
 
-    const name = this._newChurchName.trim();
+    const name = this._newOrganisationName.trim();
     if (!name) {
-      alert('Please enter a church name');
+      alert('Please enter an organisation name');
       return;
     }
 
     // Check if already exists
     if (this._organisations.some(org => org.name === name)) {
-      alert('A church with this name already exists');
+      alert('An organisation with this name already exists');
       return;
     }
 
@@ -271,17 +272,17 @@ export class SelectOrganisation extends LitElement {
       // Create organisation (already imported at top)
       await createOrganisation(name);
 
-      alert(`✅ Church "${name}" created!`);
+      alert(`✅ Organisation "${name}" created!`);
 
       // Reload organisations list
       await this._loadOrganisations();
 
       // Hide form
       this._showCreateForm = false;
-      this._newChurchName = '';
+      this._newOrganisationName = '';
     } catch (error) {
-      console.error('Failed to create church:', error);
-      alert(`❌ Failed to create church: ${error.message}`);
+      console.error('Failed to create organisation:', error);
+      alert(`❌ Failed to create organisation: ${error.message}`);
     } finally {
       this._creating = false;
     }
@@ -289,13 +290,13 @@ export class SelectOrganisation extends LitElement {
 
   render() {
     if (this._loading) {
-      return html`<div class="loading">Loading churches...</div>`;
+      return html`<div class="loading">Loading organisations...</div>`;
     }
 
     if (this._organisations.length === 0) {
       return html`
         <div class="empty-state">
-          <p>No churches found. Create your first church to get started.</p>
+          <p>No organisations found. Create your first organisation to get started.</p>
         </div>
       `;
     }
@@ -331,8 +332,8 @@ export class SelectOrganisation extends LitElement {
               <form class="create-form" @submit=${this._handleCreate}>
                 <input
                   type="text"
-                  placeholder="New church name..."
-                  .value=${this._newChurchName}
+                  placeholder="New organisation name..."
+                  .value=${this._newOrganisationName}
                   @input=${this._handleNameInput}
                   ?disabled=${this._creating}
                   required
@@ -347,7 +348,7 @@ export class SelectOrganisation extends LitElement {
                     Cancel
                   </button>
                   <button type="submit" class="submit" ?disabled=${this._creating}>
-                    ${this._creating ? 'Creating...' : 'Create Church'}
+                    ${this._creating ? 'Creating...' : 'Create Organisation'}
                   </button>
                 </div>
               </form>
@@ -365,7 +366,7 @@ export class SelectOrganisation extends LitElement {
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                Create New Church
+                Create New Organisation
               </button>
             `}
       </div>

@@ -2,6 +2,7 @@ import { LitElement, html, css } from 'lit';
 import './drive-sync-panel.js';
 import './storage-summary.js';
 import './pad-set-manager.js';
+import './select-organisation.js';
 
 /**
  * StoragePage Component
@@ -238,9 +239,9 @@ export class StoragePage extends LitElement {
   render() {
     return html`
       <div class="storage-content">
-        ${this._renderLocalSummarySection()} ${this._renderAuthSection()}
-        ${this._renderSyncSection(!this.isAuthenticated)} ${this._renderPadSetSection()}
-        ${this._renderImportSection()} ${this._renderDangerSection()}
+        ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
+        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated)}
+        ${this._renderPadSetSection()} ${this._renderImportSection()} ${this._renderDangerSection()}
       </div>
     `;
   }
@@ -351,6 +352,19 @@ export class StoragePage extends LitElement {
           estimating offline storage impact before clearing data.
         </p>
         <storage-summary></storage-summary>
+      </div>
+    `;
+  }
+
+  _renderOrganisationSection() {
+    return html`
+      <div class="storage-section">
+        <h3>🏢 Organisation</h3>
+        <p>
+          Select which organisation you're currently working with. Each organisation has its own
+          setlists.
+        </p>
+        <select-organisation></select-organisation>
       </div>
     `;
   }

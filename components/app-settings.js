@@ -7,7 +7,6 @@ import {
 } from '../js/preferences.js';
 import './theme-settings.js';
 import './media-player-settings.js';
-import './select-organisation.js';
 
 /**
  * AppSettings Component
@@ -141,14 +140,6 @@ export class AppSettings extends LitElement {
             />
             <span>Use unicode accidentals (♯/♭)</span>
           </label>
-        </div>
-
-        <div class="settings-section">
-          <h3>Church</h3>
-          <p>
-            Select which church you're currently working with. Each church has its own setlists.
-          </p>
-          <select-organisation></select-organisation>
         </div>
 
         <div class="settings-section">
