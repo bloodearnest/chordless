@@ -1635,8 +1635,20 @@ class PageApp {
         return;
       }
       const state = this.getSectionState(songIndex, sectionIndex);
+
+      // Use smart default if saved hideMode is 'none'
+      let hideMode = state.hideMode || 'none';
+      if (hideMode === 'none' && typeof section.getRecommendedHideMode === 'function') {
+        hideMode = section.getRecommendedHideMode();
+        // Update saved state with the smart default
+        if (state.hideMode !== hideMode) {
+          state.hideMode = hideMode;
+          this.saveState();
+        }
+      }
+
       // Apply state via reactive properties
-      section.hideMode = state.hideMode || 'none';
+      section.hideMode = hideMode;
       section.isCollapsed = state.isCollapsed || false;
       section.isHidden = state.isHidden || false;
       section.editMode = isEditMode;
@@ -2143,8 +2155,15 @@ class PageApp {
       this.sectionState[songIndex] = {};
     }
     if (!this.sectionState[songIndex][sectionIndex]) {
+      // Get smart default based on content if section exists
+      let defaultHideMode = 'none';
+      const section = this._getSongSectionComponent(songIndex, sectionIndex);
+      if (section && typeof section.getRecommendedHideMode === 'function') {
+        defaultHideMode = section.getRecommendedHideMode();
+      }
+
       this.sectionState[songIndex][sectionIndex] = {
-        hideMode: 'none', // 'none', 'collapse', 'chords', 'lyrics', 'hide'
+        hideMode: defaultHideMode, // 'none', 'collapse', 'chords', 'lyrics', 'hide'
         isCollapsed: false,
         isHidden: false,
       };

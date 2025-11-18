@@ -251,6 +251,13 @@ export class SongSection extends LitElement {
       color: var(--button-text, #fff);
     }
 
+    .song-section-wrapper .hide-pill button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      background-color: var(--bg-tertiary, rgba(255, 255, 255, 0.5));
+      color: var(--text-muted, #bdc3c7);
+    }
+
     .song-section-wrapper.chords-hidden .chord {
       display: none;
     }
@@ -354,6 +361,8 @@ export class SongSection extends LitElement {
     this.label = '';
     this._lines = undefined; // Private storage for lines
     this._contentBlocks = [];
+    this._hasAnyChords = false;
+    this._hasAnyLyrics = false;
     this._onControlClick = this._onControlClick.bind(this);
     this._onSummaryClick = this._onSummaryClick.bind(this);
     this.displayAsNashville = false;
@@ -377,8 +386,51 @@ export class SongSection extends LitElement {
     this._lines = value;
     if (value && value.length > 0) {
       this._contentBlocks = this._buildContentBlocks(value);
+      this._analyzeContent(value);
     }
     this.requestUpdate('lines', oldValue);
+  }
+
+  /**
+   * Analyze the content to determine what controls should be available
+   * @param {Array} lines - Lines to analyze
+   * @private
+   */
+  _analyzeContent(lines) {
+    this._hasAnyChords = false;
+    this._hasAnyLyrics = false;
+
+    for (const line of lines) {
+      const segments = line?.segments || [];
+      for (const segment of segments) {
+        if (segment.chord && segment.chord.trim()) {
+          this._hasAnyChords = true;
+        }
+        if (this._segmentHasLyrics(segment)) {
+          this._hasAnyLyrics = true;
+        }
+        // Early exit if we've found both
+        if (this._hasAnyChords && this._hasAnyLyrics) {
+          return;
+        }
+      }
+    }
+  }
+
+  /**
+   * Get the recommended hideMode based on content analysis
+   * @returns {string} Recommended hideMode: 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
+   */
+  getRecommendedHideMode() {
+    if (!this._hasAnyLyrics && this._hasAnyChords) {
+      // Only chords, show chords only
+      return 'lyrics';
+    } else if (!this._hasAnyChords && this._hasAnyLyrics) {
+      // Only lyrics, show lyrics only
+      return 'chords';
+    }
+    // Has both or neither, show all
+    return 'none';
   }
 
   /** @inheritdoc */
@@ -460,6 +512,11 @@ export class SongSection extends LitElement {
     const showChordsActive = !this.isHidden && this.hideMode === 'lyrics';
     const showNoneActive = this.isHidden || this.hideMode === 'hide';
 
+    // Disable controls based on content
+    const canShowLyrics = this._hasAnyLyrics;
+    const canShowChords = this._hasAnyChords;
+    const canShowAll = canShowLyrics && canShowChords;
+
     if (this.style) {
       this.style.setProperty('--pill-option-count', 4);
     }
@@ -467,16 +524,16 @@ export class SongSection extends LitElement {
       <div class="section-controls" role="radiogroup" aria-label="Show content options">
         <span class="hide-label">Show:</span>
         <div class="hide-pill">
-          ${this._renderControlButton('show-all', 'All', showAllActive)}
-          ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive)}
-          ${this._renderControlButton('show-chords', 'Chords', showChordsActive)}
+          ${this._renderControlButton('show-all', 'All', showAllActive, !canShowAll)}
+          ${this._renderControlButton('show-lyrics', 'Lyrics', showLyricsActive, !canShowLyrics)}
+          ${this._renderControlButton('show-chords', 'Chords', showChordsActive, !canShowChords)}
           ${this._renderControlButton('show-none', 'None', showNoneActive)}
         </div>
       </div>
     `;
   }
 
-  _renderControlButton(action, label, active) {
+  _renderControlButton(action, label, active, disabled = false) {
     const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`;
     const ariaLabel = `Show ${label} in ${sectionLabel}`;
     return html`
@@ -487,6 +544,7 @@ export class SongSection extends LitElement {
         aria-pressed=${active ? 'true' : 'false'}
         role="radio"
         aria-checked=${active ? 'true' : 'false'}
+        ?disabled=${disabled}
         @click=${this._onControlClick}
       >
         ${label}
@@ -541,13 +599,22 @@ export class SongSection extends LitElement {
     }
 
     const normalizedSegments = this._normalizeSegmentLyrics(segments);
+
+    // Check if this line has ANY chords
+    const lineHasChords = normalizedSegments.some(seg => seg.chord && seg.chord.trim());
+
     let hasPreviousLyrics = false;
 
     return html`
       <div class="chord-line" data-line-index=${index}>
         ${normalizedSegments.map(segment => {
           const joinWithPrev = !!segment.__joinWithPrev;
-          const rendered = this._renderSegment(segment, hasPreviousLyrics, joinWithPrev);
+          const rendered = this._renderSegment(
+            segment,
+            hasPreviousLyrics,
+            joinWithPrev,
+            lineHasChords
+          );
           if (this._segmentHasLyrics(segment)) {
             hasPreviousLyrics = true;
           }
@@ -557,7 +624,7 @@ export class SongSection extends LitElement {
     `;
   }
 
-  _renderSegment(segment, previousHadLyrics = false, joinWithPrev = false) {
+  _renderSegment(segment, previousHadLyrics = false, joinWithPrev = false, lineHasChords = true) {
     const hasLyrics = this._segmentHasLyrics(segment);
     const chordText = segment.chord || '';
     const classes = classMap({
@@ -568,11 +635,17 @@ export class SongSection extends LitElement {
     const lyricsText = hasLyrics
       ? this._formatLyricsText(segment.lyrics || '', previousHadLyrics, joinWithPrev)
       : '';
+
+    // If the line has no chords at all, don't render chord placeholders
+    const shouldRenderChordSpace = lineHasChords;
+
     return html`
       <span class=${classes}>
-        ${chordText
-          ? this._renderChord(chordText, segment.valid === false)
-          : html`<span class="chord chord-empty">&nbsp;</span>`}
+        ${shouldRenderChordSpace
+          ? chordText
+            ? this._renderChord(chordText, segment.valid === false)
+            : html`<span class="chord chord-empty">&nbsp;</span>`
+          : nothing}
         ${hasLyrics ? html`<span class="lyrics">${lyricsText}</span>` : nothing}
       </span>
     `;
