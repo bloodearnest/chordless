@@ -221,7 +221,7 @@ export class AppPreferences extends LitElement {
               />
               <div class="radio-option-content">
                 <span class="radio-option-label">Guitarist</span>
-                <span class="radio-option-description"> Enable capo support (coming soon) </span>
+                <span class="radio-option-description"> Enable capo support </span>
               </div>
             </label>
           </div>

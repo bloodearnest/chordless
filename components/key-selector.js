@@ -34,15 +34,16 @@ export class KeySelector extends LitElement {
     }
 
     .key-display-wrapper {
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      gap: 0.3rem;
+      gap: 0.25rem;
     }
 
     .meta-label {
       opacity: 0.8;
       font-size: 1.3rem;
       color: var(--header-text, #fff);
+      margin: 0;
     }
 
     .key-selector {
@@ -50,15 +51,16 @@ export class KeySelector extends LitElement {
       color: var(--header-text, #fff);
       border: 2px solid transparent;
       border-radius: 6px;
-      padding: 0.3rem 0.5rem;
+      padding: 0.2rem 0.45rem;
       font-size: 1.3rem;
       cursor: default;
       transition: all 0.2s;
       font-family: inherit;
-      min-width: 3rem;
       text-align: center;
       pointer-events: none;
       white-space: nowrap;
+      min-width: 0;
+      width: auto;
     }
 
     /* In edit mode, make it look and behave like a button */

@@ -49,6 +49,9 @@ class PageApp {
     this._overviewComponent = null;
     this._suppressLibraryScrollReset = false;
     this._libraryScrollResetTimeout = null;
+    this._capoEnabled = this._readCapoPreference();
+    this._capoChangeHandler = null;
+    this._currentKeyForCapo = '';
 
     // Bind overview component event handlers once
     this._onOverviewSongClick = event => {
@@ -618,6 +621,7 @@ class PageApp {
     const songDisplay = document.createElement('song-display');
     songDisplay.parsed = parsed;
     songDisplay.songIndex = 0;
+    songDisplay.capo = 0;
 
     songContent.appendChild(songDisplay);
     contentElement.appendChild(songContent);
@@ -888,6 +892,7 @@ class PageApp {
     const songDisplay = document.createElement('song-display');
     songDisplay.parsed = parsedForRender;
     songDisplay.songIndex = 0;
+    songDisplay.capo = 0;
 
     songContent.appendChild(songDisplay);
     contentElement.appendChild(songContent);
@@ -1236,6 +1241,21 @@ class PageApp {
     }
   }
 
+  _readCapoPreference() {
+    try {
+      if (typeof localStorage === 'undefined') {
+        return false;
+      }
+    } catch {
+      return false;
+    }
+    const keys = ['enabled_capo', 'enable_capo'];
+    return keys.some(key => {
+      const value = localStorage.getItem(key);
+      return value === 'true' || value === '1';
+    });
+  }
+
   async renderSetlist(setlistId) {
     console.log('renderSetlist called with:', setlistId);
     try {
@@ -1352,6 +1372,11 @@ class PageApp {
           tempoNote = canonicalSong.metadata.tempoNote;
         }
 
+        const capoValue = this._normalizeCapoValue(songEntry.capo);
+        if (typeof songEntry.capo !== 'number') {
+          songEntry.capo = capoValue;
+        }
+
         // Create song object for runtime
         songs.push({
           title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
@@ -1367,6 +1392,7 @@ class PageApp {
           currentKey: parsed.metadata.key,
           currentBPM: currentBPM,
           currentFontSize: CONFIG.DEFAULT_FONT_SIZE, // fontSize is now in setlist_local, not modifications
+          currentCapo: capoValue,
           songId: songEntry.songId,
           sourceText: sourceText,
           hasLocalEdits: songEntry.chordproEdits !== null,
@@ -1487,6 +1513,7 @@ class PageApp {
 
         // Set up key selector
         this.setupKeySelector();
+        this.setupCapoSelector();
 
         // Set up font size controls
         this.setupFontSizeControls();
@@ -1604,6 +1631,7 @@ class PageApp {
         const songDisplay = document.createElement('song-display');
         songDisplay.parsed = song.parsed;
         songDisplay.songIndex = song.songIndex;
+        songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0;
         const songContent = document.createElement('div');
         songContent.className = 'song-content';
         songContent.appendChild(songDisplay);
@@ -1717,6 +1745,7 @@ class PageApp {
     if (isEditMode) {
       const appHeader = document.getElementById('app-header');
       const keySelector = document.getElementById('key-selector');
+      const capoSelector = document.getElementById('capo-selector');
       document.body.classList.remove('edit-mode');
       document.body.removeAttribute('data-edit-mode');
       if (appHeader) {
@@ -1724,6 +1753,9 @@ class PageApp {
       }
       if (keySelector) {
         keySelector.editMode = false;
+      }
+      if (capoSelector) {
+        capoSelector.editMode = false;
       }
 
       // Update all sections to reflect non-edit mode
@@ -1745,6 +1777,7 @@ class PageApp {
     const appHeader = document.getElementById('app-header');
     const metaEl = document.getElementById('song-meta-header');
     const keySelector = document.getElementById('key-selector');
+    const capoSelector = document.getElementById('capo-selector');
     const resetButton = document.getElementById('reset-button');
     const fontSizeControls = document.querySelector('.font-size-controls');
 
@@ -1772,18 +1805,32 @@ class PageApp {
     if (instant) {
       // Instant update - no animation
       appHeader.setTitleInstant(newTitle);
-      this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
+      this._updateHeaderContent(
+        song,
+        metaEl,
+        keySelector,
+        capoSelector,
+        resetButton,
+        fontSizeControls
+      );
     } else {
       // Animated update - fade out old, swap content, fade in new
       appHeader.heading = newTitle;
 
       await this._animateSlottedContent(async () => {
-        this._updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls);
+        this._updateHeaderContent(
+          song,
+          metaEl,
+          keySelector,
+          capoSelector,
+          resetButton,
+          fontSizeControls
+        );
       });
     }
   }
 
-  _updateHeaderContent(song, metaEl, keySelector, resetButton, fontSizeControls) {
+  _updateHeaderContent(song, metaEl, keySelector, capoSelector, resetButton, fontSizeControls) {
     if (song) {
       // Update key selector
       if (song.currentKey) {
@@ -1792,6 +1839,15 @@ class PageApp {
         if (keySelector) {
           keySelector.value = '-';
           keySelector.keys = [];
+        }
+      }
+
+      if (capoSelector) {
+        if (this._capoEnabled) {
+          capoSelector.style.display = '';
+          this.updateCapoSelector(song.currentCapo ?? 0, song.currentKey);
+        } else {
+          capoSelector.style.display = 'none';
         }
       }
 
@@ -1813,6 +1869,7 @@ class PageApp {
 
       // Show song-specific controls
       if (keySelector) keySelector.style.display = '';
+      if (capoSelector && this._capoEnabled) capoSelector.style.display = '';
       if (resetButton) resetButton.style.display = 'block';
       if (fontSizeControls) fontSizeControls.style.display = 'flex';
 
@@ -1823,6 +1880,10 @@ class PageApp {
       if (keySelector) {
         keySelector.value = '-';
         keySelector.keys = [];
+      }
+      if (capoSelector) {
+        capoSelector.style.display = 'none';
+        capoSelector.referenceKey = '';
       }
 
       // Show setlist type in metadata
@@ -1836,6 +1897,7 @@ class PageApp {
 
       // Hide song-specific controls on overview
       if (keySelector) keySelector.style.display = 'none';
+      if (capoSelector) capoSelector.style.display = 'none';
       if (resetButton) resetButton.style.display = 'none';
       if (fontSizeControls) fontSizeControls.style.display = 'none';
 
@@ -2356,6 +2418,10 @@ class PageApp {
         if (keySelector) {
           keySelector.editMode = true;
         }
+        const capoSelector = document.getElementById('capo-selector');
+        if (capoSelector && this._capoEnabled) {
+          capoSelector.editMode = true;
+        }
 
         // Clear inline display:none if it was set during previous exit
         document.querySelectorAll('.edit-mode-control').forEach(el => {
@@ -2389,6 +2455,10 @@ class PageApp {
         const keySelector = document.getElementById('key-selector');
         if (keySelector) {
           keySelector.editMode = false;
+        }
+        const capoSelector = document.getElementById('capo-selector');
+        if (capoSelector) {
+          capoSelector.editMode = false;
         }
 
         // Remove fade-in classes from edit controls (triggers fade out)
@@ -2526,6 +2596,16 @@ class PageApp {
     keySelector.editMode = document.body.classList.contains('edit-mode');
   }
 
+  updateCapoSelector(value, currentKey = null) {
+    if (!this._capoEnabled) return;
+    const capoSelector = document.getElementById('capo-selector');
+    if (!capoSelector) return;
+    capoSelector.value = this._normalizeCapoValue(value);
+    capoSelector.referenceKey = currentKey || this._currentKeyForCapo || '';
+    this._currentKeyForCapo = capoSelector.referenceKey;
+    capoSelector.editMode = document.body.classList.contains('edit-mode');
+  }
+
   setupKeySelector() {
     const keySelector = document.getElementById('key-selector');
     if (!keySelector) return;
@@ -2543,6 +2623,47 @@ class PageApp {
         this.updateKeySelector(currentKey);
       }
     }
+  }
+
+  setupCapoSelector() {
+    const capoSelector = document.getElementById('capo-selector');
+    if (!capoSelector) return;
+
+    if (!this._capoEnabled) {
+      capoSelector.style.display = 'none';
+      return;
+    }
+
+    capoSelector.style.display = 'none';
+    capoSelector.editMode = document.body.classList.contains('edit-mode');
+
+    if (!this._capoChangeHandler) {
+      this._capoChangeHandler = event => {
+        const newValue = event.detail?.value;
+        this.handleCapoChange(newValue);
+      };
+      capoSelector.addEventListener('capo-change', this._capoChangeHandler);
+    }
+
+    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null;
+    const currentCapo = currentSong?.currentCapo || 0;
+    this.updateCapoSelector(currentCapo, currentSong?.currentKey || null);
+  }
+
+  handleCapoChange(newValue) {
+    if (!this._capoEnabled || this.currentSongIndex < 0) return;
+    const normalized = this._normalizeCapoValue(newValue);
+    const song = this.songs[this.currentSongIndex];
+    if (!song || song.currentCapo === normalized) return;
+
+    song.currentCapo = normalized;
+
+    if (this.currentSetlist?.songs?.[this.currentSongIndex]) {
+      this.currentSetlist.songs[this.currentSongIndex].capo = normalized;
+    }
+
+    this.updateCapoSelector(normalized, song.currentKey);
+    this._updateSongDisplayCapo(this.currentSongIndex, normalized);
   }
 
   async handleKeyChange(newKey) {
@@ -2664,6 +2785,15 @@ class PageApp {
 
     // Reset font size to default
     song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE;
+
+    if (this._capoEnabled) {
+      song.currentCapo = 0;
+      if (this.currentSetlist?.songs?.[this.currentSongIndex]) {
+        this.currentSetlist.songs[this.currentSongIndex].capo = 0;
+      }
+      this.updateCapoSelector(0, song.currentKey);
+      this._updateSongDisplayCapo(this.currentSongIndex, 0);
+    }
 
     // Reset all section states for this song
     if (this.sectionState[this.currentSongIndex]) {
@@ -3273,6 +3403,7 @@ class PageApp {
         const songDisplay = document.createElement('song-display');
         songDisplay.parsed = song.parsed;
         songDisplay.songIndex = song.songIndex;
+        songDisplay.capo = this._capoEnabled ? song.currentCapo || 0 : 0;
         songContent.appendChild(songDisplay);
 
         // Wait for Lit to render the shadow DOM contents
@@ -3297,6 +3428,30 @@ class PageApp {
     if (this.currentSongIndex === songIndex) {
       this.updateHeader(song);
     }
+  }
+
+  _updateSongDisplayCapo(songIndex, capoValue) {
+    if (songIndex < 0) return;
+    const normalized = this._capoEnabled ? this._normalizeCapoValue(capoValue) : 0;
+    const songSection = document.getElementById(`song-${songIndex}`);
+    const songDisplay = songSection?.querySelector('song-display');
+    if (songDisplay) {
+      songDisplay.capo = normalized;
+    }
+  }
+
+  _normalizeCapoValue(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) {
+      return 0;
+    }
+    if (num <= 0) {
+      return 0;
+    }
+    if (num >= 11) {
+      return 11;
+    }
+    return Math.round(num);
   }
 
   escapeHtml(text) {

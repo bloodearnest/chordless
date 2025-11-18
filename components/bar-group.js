@@ -8,6 +8,8 @@ export class BarGroup extends LitElement {
     data: { type: Object, attribute: false },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     displayKey: { type: String, attribute: 'display-key' },
+    capo: { type: Number },
+    capoKey: { type: String, attribute: 'capo-key' },
   };
 
   static styles = css`
@@ -85,6 +87,8 @@ export class BarGroup extends LitElement {
     this.data = null;
     this.displayAsNashville = false;
     this.displayKey = '';
+    this.capo = 0;
+    this.capoKey = '';
   }
 
   render() {
@@ -149,6 +153,8 @@ export class BarGroup extends LitElement {
           .chord=${chordText}
           .displayKey=${this.displayKey}
           .displayAsNashville=${this.displayAsNashville}
+          .capo=${this.capo}
+          .capoKey=${this.capoKey}
         ></chord-display>
       </span>
     `;

@@ -3,6 +3,7 @@ const ACCIDENTAL_PREF_KEY = 'setalight-use-unicode-accidentals';
 const MUSICIAN_TYPE_KEY = 'musician_type';
 const SECTION_DEFAULTS_KEY = 'section_defaults';
 const ENABLE_CAPO_KEY = 'enable_capo';
+const ENABLED_CAPO_FLAG_KEY = 'enabled_capo';
 
 let cachedUseNashville = null;
 let cachedUseUnicodeAccidentals = null;
@@ -88,13 +89,16 @@ export function setMusicianType(value) {
       // Clear all special settings
       localStorage.removeItem(SECTION_DEFAULTS_KEY);
       localStorage.removeItem(ENABLE_CAPO_KEY);
+      localStorage.removeItem(ENABLED_CAPO_FLAG_KEY);
     } else if (normalized === 'singer' || normalized === 'drummer') {
       // Hide chords by default
       localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'lyrics' }));
       localStorage.removeItem(ENABLE_CAPO_KEY);
+      localStorage.removeItem(ENABLED_CAPO_FLAG_KEY);
     } else if (normalized === 'guitarist') {
       // Enable capo
       localStorage.setItem(ENABLE_CAPO_KEY, 'true');
+      localStorage.setItem(ENABLED_CAPO_FLAG_KEY, 'true');
       localStorage.removeItem(SECTION_DEFAULTS_KEY);
     }
   }

@@ -378,6 +378,75 @@ export function transposeChord(chordString, fromKey, toKey) {
   };
 }
 
+export function transposeChordBySemitones(chordString, semitones, targetKey = null) {
+  const parsed = parseChord(chordString);
+
+  if (parsed.isSpecial) {
+    return {
+      chord: parsed.original,
+      transposed: true,
+      valid: true,
+    };
+  }
+
+  if (!parsed.isValid) {
+    return {
+      chord: parsed.original,
+      transposed: false,
+      valid: false,
+    };
+  }
+
+  if (!semitones) {
+    return {
+      chord: parsed.original,
+      transposed: false,
+      valid: true,
+    };
+  }
+
+  const toKeyInfo = targetKey ? KEY_INFO[targetKey] : null;
+  const useFlats = toKeyInfo ? toKeyInfo.useFlats : false;
+
+  const rootPreference = determineAccidentalPreference(parsed.root);
+  const newRoot = transposeNote(parsed.root, semitones, useFlats, targetKey, rootPreference);
+  if (!newRoot) {
+    return {
+      chord: parsed.original,
+      transposed: false,
+      valid: false,
+    };
+  }
+
+  let newBass = null;
+  if (parsed.bass) {
+    const bassPreference = determineAccidentalPreference(parsed.bass);
+    newBass = transposeNote(parsed.bass, semitones, useFlats, targetKey, bassPreference);
+    if (!newBass) {
+      return {
+        chord: parsed.original,
+        transposed: false,
+        valid: false,
+      };
+    }
+  }
+
+  let newChord = newRoot + parsed.extensions;
+  if (newBass) {
+    newChord += '/' + newBass;
+  }
+
+  if (parsed.wrapperPrefix || parsed.wrapperSuffix) {
+    newChord = `${parsed.wrapperPrefix || ''}${newChord}${parsed.wrapperSuffix || ''}`;
+  }
+
+  return {
+    chord: newChord,
+    transposed: true,
+    valid: true,
+  };
+}
+
 /**
  * Transpose all chords in parsed song structure
  * Modifies the parsed structure in place
@@ -401,6 +470,38 @@ export function transposeSong(parsed, fromKey, toKey) {
       }
     }
   }
+}
+
+export function transposeKeyName(key, semitones) {
+  if (!key || !semitones) return key;
+  const mode = KEY_INFO[key]?.mode || (key.endsWith('m') ? 'minor' : 'major');
+  const root = extractKeyRoot(key);
+  const rootSemitone = noteToSemitone(root);
+  if (!mode || rootSemitone === -1) {
+    return key;
+  }
+  const targetSemitone = (((rootSemitone + semitones) % 12) + 12) % 12;
+  const candidates = Object.keys(KEY_INFO).filter(candidate => {
+    const info = KEY_INFO[candidate];
+    if (info.mode !== mode) return false;
+    const candidateRoot = extractKeyRoot(candidate);
+    return noteToSemitone(candidateRoot) === targetSemitone;
+  });
+  if (candidates.length === 0) {
+    const fallback = transposeChordBySemitones(key, semitones);
+    return fallback.chord;
+  }
+  const preference = determineAccidentalPreference(root);
+  if (preference === 'flat') {
+    const flatCandidate = candidates.find(name => name.includes('b'));
+    if (flatCandidate) return flatCandidate;
+  } else if (preference === 'sharp') {
+    const sharpCandidate = candidates.find(name => name.includes('#'));
+    if (sharpCandidate) return sharpCandidate;
+  }
+  const naturalCandidate = candidates.find(name => !name.includes('#') && !name.includes('b'));
+  if (naturalCandidate) return naturalCandidate;
+  return candidates[0];
 }
 
 const DEGREE_OFFSETS = {

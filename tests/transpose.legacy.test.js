@@ -8,6 +8,8 @@ import {
   parseChord,
   transposeNote,
   transposeChord,
+  transposeChordBySemitones,
+  transposeKeyName,
   getAvailableKeys,
   getKeyOffset,
   convertNashvilleChordToStandard,
@@ -660,6 +662,20 @@ describe('transpose legacy regression suite', () => {
     assertEquals(convertChordToNashville('G#7', 'C'), '#57', 'V/vi defaults to sharp accidental');
     assertEquals(convertChordToNashville('F#', 'C'), '#4', 'No #3 is produced for F#');
     assertEquals(convertChordToNashville('Cb', 'C'), '7', 'No ♭1 is produced for C♭');
+
+    // ===== Test transposeChordBySemitones =====
+    result = transposeChordBySemitones('C', -2, 'Bb');
+    assertEquals(result.chord, 'Bb', 'C down 2 semitones = Bb');
+    result = transposeChordBySemitones('G/B', -1, 'F#');
+    assertEquals(result.chord, 'F#/A#', 'G/B down 1 semitone = F#/A#');
+    result = transposeChordBySemitones('Am7', -3, 'F#m');
+    assertEquals(result.chord, 'F#m7', 'Am7 down 3 semitones = F#m7');
+
+    // ===== Test transposeKeyName =====
+    assertEquals(transposeKeyName('C', -1), 'B', 'C down 1 semitone = B');
+    assertEquals(transposeKeyName('G', -1), 'F#', 'G down 1 semitone = F#');
+    assertEquals(transposeKeyName('Eb', -1), 'D', 'Eb down 1 semitone = D');
+    assertEquals(transposeKeyName('Am', -3), 'F#m', 'Am down 3 semitones = F#m');
 
     // ===== Summary =====
   });

@@ -1,6 +1,7 @@
 import { LitElement, html, css, nothing } from 'lit';
 import './song-section.js';
 import { getUseNashvilleNumbers } from '../js/preferences.js';
+import { transposeKeyName } from '../js/transpose.js';
 
 /**
  * Song Display Component
@@ -17,6 +18,8 @@ export class SongDisplay extends LitElement {
     /** @type {number} Song index in setlist */
     songIndex: { type: Number, attribute: 'song-index' },
     useNashville: { type: Boolean, state: true },
+    /** @type {number} Current capo value */
+    capo: { type: Number },
   };
 
   static styles = css`
@@ -30,6 +33,7 @@ export class SongDisplay extends LitElement {
     this.parsed = null;
     this.songIndex = 0;
     this.useNashville = getUseNashvilleNumbers();
+    this.capo = 0;
     this._onNashvilleChange = event => {
       this.useNashville = !!event.detail;
       this.requestUpdate();
@@ -60,6 +64,10 @@ export class SongDisplay extends LitElement {
 
   _renderSection(section, index) {
     const displayKey = this.parsed?.metadata?.key || '';
+    const capoValue = Number.isFinite(this.capo)
+      ? Math.min(Math.max(Math.round(this.capo), 0), 11)
+      : 0;
+    const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : '';
     return html`
       <song-section
         .lines=${section.lines}
@@ -68,6 +76,8 @@ export class SongDisplay extends LitElement {
         .sectionIndex=${index}
         .displayAsNashville=${this.useNashville}
         .displayKey=${displayKey}
+        .capo=${capoValue}
+        .capoKey=${capoKey}
         song-index=${this.songIndex}
         section-index=${index}
         data-label=${section.label || ''}

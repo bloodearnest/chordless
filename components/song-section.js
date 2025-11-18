@@ -39,6 +39,10 @@ export class SongSection extends LitElement {
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     /** @type {string} Key used for Nashville conversion */
     displayKey: { type: String, attribute: 'display-key' },
+    /** @type {number} Capo value for display-only transposition */
+    capo: { type: Number },
+    /** @type {string} Target key after applying capo */
+    capoKey: { type: String, attribute: 'capo-key' },
   };
 
   static styles = css`
@@ -367,6 +371,8 @@ export class SongSection extends LitElement {
     this._onSummaryClick = this._onSummaryClick.bind(this);
     this.displayAsNashville = false;
     this.displayKey = '';
+    this.capo = 0;
+    this.capoKey = '';
   }
 
   /**
@@ -586,6 +592,8 @@ export class SongSection extends LitElement {
           .data=${block.data}
           .displayAsNashville=${this.displayAsNashville}
           .displayKey=${this.displayKey}
+          .capo=${this.capo}
+          .capoKey=${this.capoKey}
         ></bar-group>`;
       }
       return this._renderLine(block.line, index);
@@ -664,6 +672,8 @@ export class SongSection extends LitElement {
           .displayKey=${this.displayKey}
           .displayAsNashville=${this.displayAsNashville}
           .invalid=${!!isInvalid}
+          .capo=${this.capo}
+          .capoKey=${this.capoKey}
         ></chord-display>
       </span>
     `;

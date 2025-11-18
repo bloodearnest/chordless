@@ -1,5 +1,9 @@
 import { LitElement, html } from 'lit';
-import { convertChordToNashville, isNashvilleChord } from '../js/transpose.js';
+import {
+  convertChordToNashville,
+  isNashvilleChord,
+  transposeChordBySemitones,
+} from '../js/transpose.js';
 import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.js';
 import { getUseUnicodeAccidentals } from '../js/preferences.js';
 import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.js';
@@ -15,6 +19,8 @@ export class ChordDisplay extends LitElement {
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     displayKey: { type: String, attribute: 'display-key' },
     useUnicodeAccidentals: { type: Boolean, state: true },
+    capo: { type: Number },
+    capoKey: { type: String, attribute: 'capo-key' },
   };
 
   constructor() {
@@ -24,6 +30,8 @@ export class ChordDisplay extends LitElement {
     this.displayAsNashville = false;
     this.displayKey = '';
     this.useUnicodeAccidentals = getUseUnicodeAccidentals();
+    this.capo = 0;
+    this.capoKey = '';
     this._onAccidentalPreferenceChange = event => {
       this.useUnicodeAccidentals = !!event.detail;
       this.requestUpdate();
@@ -72,7 +80,22 @@ export class ChordDisplay extends LitElement {
     if (this.displayAsNashville && this.displayKey) {
       return convertChordToNashville(this.chord, this.displayKey);
     }
+    const capoShift = this._getCapoShift();
+    if (capoShift !== 0) {
+      const result = transposeChordBySemitones(this.chord, capoShift, this.capoKey || null);
+      if (result?.chord) {
+        return result.chord;
+      }
+    }
     return this.chord;
+  }
+
+  _getCapoShift() {
+    const capoValue = Number.isFinite(this.capo) ? Math.round(this.capo) : 0;
+    if (capoValue <= 0) {
+      return 0;
+    }
+    return -Math.min(capoValue, 11);
   }
 
   _buildSegments(text) {
