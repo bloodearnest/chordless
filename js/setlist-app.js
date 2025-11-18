@@ -32,6 +32,8 @@ const CONFIG = {
   DEFAULT_IMPORT_CUTOFF: '2000-01-01', // Default date for importing setlists (imports all)
 };
 
+const SECTION_DEFAULTS_KEY = 'section_defaults';
+
 class PageApp {
   constructor() {
     this.db = null; // Will be initialized in init()
@@ -49,9 +51,13 @@ class PageApp {
     this._overviewComponent = null;
     this._suppressLibraryScrollReset = false;
     this._libraryScrollResetTimeout = null;
+    this._sectionDefaultsCache = null;
+    this._sectionDefaultsRaw = null;
     this._capoEnabled = this._readCapoPreference();
     this._capoChangeHandler = null;
     this._currentKeyForCapo = '';
+    this._onSectionDefaultsChanged = this._handleSectionDefaultsChanged.bind(this);
+    this._onCapoPreferenceChange = this._handleCapoPreferenceChange.bind(this);
 
     // Bind overview component event handlers once
     this._onOverviewSongClick = event => {
@@ -108,6 +114,11 @@ class PageApp {
 
     // Set up navigation menu
     this.setupNavigationMenu(route);
+
+    window.addEventListener('storage', this._onSectionDefaultsChanged);
+    window.addEventListener('section-defaults-changed', this._onSectionDefaultsChanged);
+    window.addEventListener('storage', this._onCapoPreferenceChange);
+    window.addEventListener('capo-preference-changed', this._onCapoPreferenceChange);
   }
 
   parseRoute(pathname) {
@@ -1409,8 +1420,9 @@ class PageApp {
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs);
 
-      // Initialize section states (now loaded from setlist_local, not from setlist modifications)
+      // Initialize section states (load saved overrides for this setlist)
       this.sectionState = {};
+      this.loadState();
 
       // Check hash BEFORE rendering to determine initial view state
       const hash = window.location.hash;
@@ -1666,19 +1678,8 @@ class PageApp {
       if (Number.isNaN(songIndex) || Number.isNaN(sectionIndex)) {
         return;
       }
-      const state = this.getSectionState(songIndex, sectionIndex);
-
-      // Use smart default if saved hideMode is 'none'
-      let hideMode = state.hideMode || 'none';
-      if (hideMode === 'none' && typeof section.getRecommendedHideMode === 'function') {
-        hideMode = section.getRecommendedHideMode();
-        // Update saved state with the smart default
-        if (state.hideMode !== hideMode) {
-          state.hideMode = hideMode;
-          this.saveState();
-        }
-      }
-
+      const state = this._resolveSectionState(songIndex, sectionIndex, section);
+      const hideMode = state.hideMode || 'none';
       // Apply state via reactive properties
       section.hideMode = hideMode;
       section.isCollapsed = state.isCollapsed || false;
@@ -2216,32 +2217,145 @@ class PageApp {
     localStorage.setItem(stateKey, JSON.stringify(this.sectionState));
   }
 
-  getSectionState(songIndex, sectionIndex) {
+  _getSectionDefaultsConfig() {
+    let stored = null;
+    try {
+      stored = localStorage.getItem(SECTION_DEFAULTS_KEY);
+    } catch (error) {
+      console.error('Failed to read section defaults:', error);
+      stored = null;
+    }
+    if (stored === this._sectionDefaultsRaw) {
+      return this._sectionDefaultsCache;
+    }
+    this._sectionDefaultsRaw = stored;
+    if (!stored) {
+      this._sectionDefaultsCache = null;
+      return null;
+    }
+    try {
+      this._sectionDefaultsCache = JSON.parse(stored);
+    } catch (error) {
+      console.error('Failed to parse section defaults:', error);
+      this._sectionDefaultsCache = null;
+    }
+    return this._sectionDefaultsCache;
+  }
+
+  _resolveSectionState(songIndex, sectionIndex, sectionElement = null) {
+    const overridesForSong = this.sectionState[songIndex] || {};
+    const override = overridesForSong[sectionIndex] || null;
+    const defaults = {
+      hideMode: this._resolveDefaultHideMode(sectionElement, songIndex, sectionIndex),
+      isCollapsed: false,
+      isHidden: false,
+    };
+    if (!override) {
+      return defaults;
+    }
+    return {
+      hideMode: override.hideMode ?? defaults.hideMode,
+      isCollapsed: override.isCollapsed ?? defaults.isCollapsed,
+      isHidden: override.isHidden ?? defaults.isHidden,
+    };
+  }
+
+  _ensureSectionOverride(songIndex, sectionIndex, sectionElement = null) {
     if (!this.sectionState[songIndex]) {
       this.sectionState[songIndex] = {};
     }
     if (!this.sectionState[songIndex][sectionIndex]) {
-      // Get smart default based on content if section exists
-      let defaultHideMode = 'none';
-      const section = this._getSongSectionComponent(songIndex, sectionIndex);
-      if (section && typeof section.getRecommendedHideMode === 'function') {
-        defaultHideMode = section.getRecommendedHideMode();
-      }
-
+      const resolved = this._resolveSectionState(songIndex, sectionIndex, sectionElement);
       this.sectionState[songIndex][sectionIndex] = {
-        hideMode: defaultHideMode, // 'none', 'collapse', 'chords', 'lyrics', 'hide'
-        isCollapsed: false,
-        isHidden: false,
+        hideMode: resolved.hideMode,
+        isCollapsed: resolved.isCollapsed,
+        isHidden: resolved.isHidden,
       };
     }
     return this.sectionState[songIndex][sectionIndex];
   }
 
+  _resolveDefaultHideMode(sectionElement, songIndex, sectionIndex) {
+    if (!sectionElement) {
+      sectionElement = this._getSongSectionComponent(songIndex, sectionIndex);
+    }
+    const recommended =
+      sectionElement && typeof sectionElement.getRecommendedHideMode === 'function'
+        ? sectionElement.getRecommendedHideMode() || 'none'
+        : 'none';
+    let defaultsConfig = this._getSectionDefaultsConfig();
+    if (!defaultsConfig || typeof defaultsConfig !== 'object') {
+      defaultsConfig = { all: 'all' };
+      this._sectionDefaultsCache = defaultsConfig;
+      this._sectionDefaultsRaw = JSON.stringify(defaultsConfig);
+      try {
+        localStorage.setItem(SECTION_DEFAULTS_KEY, this._sectionDefaultsRaw);
+      } catch (error) {
+        console.error('Failed to persist default section defaults:', error);
+      }
+    }
+    let hideMode = null;
+    if (defaultsConfig) {
+      const label = this._normalizeSectionLabel(sectionElement);
+      if (label && Object.prototype.hasOwnProperty.call(defaultsConfig, label)) {
+        hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig[label]);
+      } else if (Object.prototype.hasOwnProperty.call(defaultsConfig, 'all')) {
+        hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig.all);
+      }
+    }
+
+    if (!hideMode || hideMode === 'none') {
+      return recommended || 'none';
+    }
+
+    if (hideMode === 'chords' && recommended === 'lyrics') {
+      // User wants lyrics-only view, but section has only chords
+      return 'collapse';
+    }
+
+    if (hideMode === 'lyrics' && recommended === 'chords') {
+      // User wants chords-only view, but section has only lyrics
+      return 'collapse';
+    }
+
+    return hideMode;
+  }
+
+  _mapDefaultChoiceToHideMode(choice) {
+    const value = (choice || '').toString().toLowerCase();
+    switch (value) {
+      case 'all':
+      case 'show-all':
+      case 'default':
+      case 'none':
+        return 'none';
+      case 'lyrics':
+        return 'chords';
+      case 'chords':
+        return 'lyrics';
+      case 'collapse':
+        return 'collapse';
+      case 'hide':
+      case 'hidden':
+        return 'hide';
+      default:
+        return 'none';
+    }
+  }
+
+  _normalizeSectionLabel(sectionElement) {
+    if (!sectionElement) {
+      return '';
+    }
+    const label = sectionElement.dataset?.label || sectionElement.label || '';
+    return label.trim().toLowerCase();
+  }
+
   setSectionHideMode(songIndex, sectionIndex, mode) {
-    const state = this.getSectionState(songIndex, sectionIndex);
+    const component = this._getSongSectionComponent(songIndex, sectionIndex);
+    const state = this._ensureSectionOverride(songIndex, sectionIndex, component);
 
     if (mode === 'collapse') {
-      const component = this._getSongSectionComponent(songIndex, sectionIndex);
       const details = component?.getDetailsElement();
       if (details) {
         this.animateSectionToggle(songIndex, sectionIndex, details);
@@ -2294,7 +2408,7 @@ class PageApp {
   }
 
   animateSectionToggle(songIndex, sectionIndex, details) {
-    const state = this.getSectionState(songIndex, sectionIndex);
+    const state = this._ensureSectionOverride(songIndex, sectionIndex);
     const content = details.querySelector('.section-content');
     const wrapper = details.closest('.song-section-wrapper') || details;
     if (!content) return;
@@ -2378,7 +2492,7 @@ class PageApp {
     if (!component) {
       return;
     }
-    const state = this.getSectionState(songIndex, sectionIndex);
+    const state = this._resolveSectionState(songIndex, sectionIndex, component);
     const isEditMode = document.body.classList.contains('edit-mode');
     // Apply state via reactive properties
     component.hideMode = state.hideMode || 'none';
@@ -3891,6 +4005,53 @@ class PageApp {
       console.error('Error deleting song from setlist:', error);
       alert('Failed to delete song. Please try again.');
     }
+  }
+
+  _handleSectionDefaultsChanged() {
+    this._sectionDefaultsCache = null;
+    this._sectionDefaultsRaw = null;
+    if (this.currentSongIndex === undefined) {
+      return;
+    }
+    this.applySectionState();
+  }
+
+  _handleCapoPreferenceChange() {
+    const previous = this._capoEnabled;
+    this._capoEnabled = this._readCapoPreference();
+    if (previous === this._capoEnabled) {
+      return;
+    }
+    this._applyCapoPreferenceToDisplays();
+  }
+
+  _applyCapoPreferenceToDisplays() {
+    const capoSelector = document.getElementById('capo-selector');
+    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null;
+    if (capoSelector) {
+      if (this._capoEnabled && currentSong) {
+        capoSelector.style.display = '';
+        this.updateCapoSelector(currentSong.currentCapo ?? 0, currentSong.currentKey);
+      } else {
+        capoSelector.style.display = 'none';
+        capoSelector.referenceKey = '';
+      }
+    }
+
+    const songDisplays = document.querySelectorAll('song-display');
+    songDisplays.forEach(display => {
+      const attrIndex = Number(display.getAttribute('song-index'));
+      const fallbackIndex =
+        Number.isNaN(attrIndex) && typeof display.songIndex === 'number'
+          ? display.songIndex
+          : attrIndex;
+      const index = Number.isNaN(fallbackIndex) ? -1 : fallbackIndex;
+      if (this._capoEnabled && index >= 0 && this.songs[index]) {
+        display.capo = this.songs[index].currentCapo || 0;
+      } else {
+        display.capo = 0;
+      }
+    });
   }
 
   _parseTempoMetadata(raw) {

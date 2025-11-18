@@ -8,6 +8,7 @@ const ENABLED_CAPO_FLAG_KEY = 'enabled_capo';
 let cachedUseNashville = null;
 let cachedUseUnicodeAccidentals = null;
 let cachedMusicianType = null;
+let cachedCapoPreference = null;
 
 function readPreference() {
   if (cachedUseNashville !== null) return cachedUseNashville;
@@ -86,24 +87,63 @@ export function setMusicianType(value) {
 
     // Update dependent settings based on musician type
     if (normalized === 'general') {
-      // Clear all special settings
-      localStorage.removeItem(SECTION_DEFAULTS_KEY);
-      localStorage.removeItem(ENABLE_CAPO_KEY);
-      localStorage.removeItem(ENABLED_CAPO_FLAG_KEY);
+      localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'all' }));
     } else if (normalized === 'singer' || normalized === 'drummer') {
-      // Hide chords by default
       localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'lyrics' }));
-      localStorage.removeItem(ENABLE_CAPO_KEY);
-      localStorage.removeItem(ENABLED_CAPO_FLAG_KEY);
     } else if (normalized === 'guitarist') {
-      // Enable capo
-      localStorage.setItem(ENABLE_CAPO_KEY, 'true');
-      localStorage.setItem(ENABLED_CAPO_FLAG_KEY, 'true');
-      localStorage.removeItem(SECTION_DEFAULTS_KEY);
+      localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'all' }));
     }
   }
 
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('musician-type-changed', { detail: normalized }));
+    let defaultsDetail = null;
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const storedDefaults = localStorage.getItem(SECTION_DEFAULTS_KEY);
+        defaultsDetail = storedDefaults ? JSON.parse(storedDefaults) : null;
+      } catch {
+        defaultsDetail = null;
+      }
+    }
+    window.dispatchEvent(
+      new CustomEvent('section-defaults-changed', {
+        detail: { musicianType: normalized, defaults: defaultsDetail },
+      })
+    );
+  }
+}
+
+function readCapoPreferenceFromStorage() {
+  if (typeof localStorage === 'undefined') {
+    return false;
+  }
+  const keys = [ENABLE_CAPO_KEY, ENABLED_CAPO_FLAG_KEY];
+  return keys.some(key => {
+    const value = localStorage.getItem(key);
+    return value === 'true' || value === '1';
+  });
+}
+
+export function getCapoPreference() {
+  if (cachedCapoPreference === null) {
+    cachedCapoPreference = readCapoPreferenceFromStorage();
+  }
+  return cachedCapoPreference;
+}
+
+export function setCapoPreference(value) {
+  const enabled = !!value;
+  cachedCapoPreference = enabled;
+  if (typeof localStorage !== 'undefined') {
+    const storageValue = enabled ? 'true' : 'false';
+    try {
+      localStorage.setItem(ENABLE_CAPO_KEY, storageValue);
+      localStorage.setItem(ENABLED_CAPO_FLAG_KEY, storageValue);
+    } catch (error) {
+      console.error('Failed to save capo preference', error);
+    }
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('capo-preference-changed', { detail: enabled }));
   }
 }

@@ -6,6 +6,8 @@ import {
   setUseUnicodeAccidentals,
   getMusicianType,
   setMusicianType,
+  getCapoPreference,
+  setCapoPreference,
 } from '../js/preferences.js';
 import './theme-settings.js';
 import './media-player-settings.js';
@@ -20,6 +22,7 @@ export class AppPreferences extends LitElement {
     useNashville: { type: Boolean, attribute: false },
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
+    capoEnabled: { type: Boolean, attribute: false },
   };
 
   static styles = css`
@@ -147,6 +150,7 @@ export class AppPreferences extends LitElement {
     this.useNashville = getUseNashvilleNumbers();
     this.useUnicodeAccidentals = getUseUnicodeAccidentals();
     this.musicianType = getMusicianType();
+    this.capoEnabled = getCapoPreference();
   }
 
   render() {
@@ -159,11 +163,8 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="preferences-section">
-          <h3>Musician Type</h3>
-          <p>
-            Customize your experience based on your role. This adjusts default visibility and
-            features.
-          </p>
+          <h3>Display Defaults</h3>
+          <p>Choose how each section appears when you open a setlist.</p>
           <div class="radio-group">
             <label class="radio-option">
               <input
@@ -174,8 +175,8 @@ export class AppPreferences extends LitElement {
                 @change=${this._onMusicianTypeChange}
               />
               <div class="radio-option-content">
-                <span class="radio-option-label">General</span>
-                <span class="radio-option-description">Show all features and information</span>
+                <span class="radio-option-label">Show chords and lyrics</span>
+                <span class="radio-option-description">General musician</span>
               </div>
             </label>
 
@@ -184,47 +185,32 @@ export class AppPreferences extends LitElement {
                 type="radio"
                 name="musician-type"
                 value="singer"
-                ?checked=${this.musicianType === 'singer'}
+                ?checked=${this._isLyricsOnlySelection()}
                 @change=${this._onMusicianTypeChange}
               />
               <div class="radio-option-content">
-                <span class="radio-option-label">Singer</span>
+                <span class="radio-option-label">Show only lyrics</span>
                 <span class="radio-option-description">
-                  Hide chords by default, focus on lyrics
+                  Great for singers and drummers who don't need chords
                 </span>
-              </div>
-            </label>
-
-            <label class="radio-option">
-              <input
-                type="radio"
-                name="musician-type"
-                value="drummer"
-                ?checked=${this.musicianType === 'drummer'}
-                @change=${this._onMusicianTypeChange}
-              />
-              <div class="radio-option-content">
-                <span class="radio-option-label">Drummer</span>
-                <span class="radio-option-description">
-                  Hide chords by default, focus on song structure
-                </span>
-              </div>
-            </label>
-
-            <label class="radio-option">
-              <input
-                type="radio"
-                name="musician-type"
-                value="guitarist"
-                ?checked=${this.musicianType === 'guitarist'}
-                @change=${this._onMusicianTypeChange}
-              />
-              <div class="radio-option-content">
-                <span class="radio-option-label">Guitarist</span>
-                <span class="radio-option-description"> Enable capo support </span>
               </div>
             </label>
           </div>
+        </div>
+
+        <div class="preferences-section">
+          <h3>Capo</h3>
+          <p>Show a capo control so guitarists can view transposed chords without changing pads.</p>
+          <label class="toggle" for="toggle-capo">
+            <input
+              type="checkbox"
+              id="toggle-capo"
+              name="enable-capo"
+              ?checked=${this.capoEnabled}
+              @change=${this._onCapoToggle}
+            />
+            <span>Enable capo adjustments</span>
+          </label>
         </div>
 
         <div class="preferences-section">
@@ -262,6 +248,10 @@ export class AppPreferences extends LitElement {
     `;
   }
 
+  _isLyricsOnlySelection() {
+    return this.musicianType === 'singer' || this.musicianType === 'drummer';
+  }
+
   _onMusicianTypeChange(event) {
     const value = event.currentTarget.value;
     this.musicianType = value;
@@ -278,6 +268,12 @@ export class AppPreferences extends LitElement {
     const value = event.currentTarget.checked;
     this.useUnicodeAccidentals = value;
     setUseUnicodeAccidentals(value);
+  }
+
+  _onCapoToggle(event) {
+    const value = event.currentTarget.checked;
+    this.capoEnabled = value;
+    setCapoPreference(value);
   }
 }
 
