@@ -363,9 +363,7 @@ export class DriveSyncManager {
     // Check timestamp first (fast path). Comparing dates is far cheaper than
     // re-hashing the entire setlist payload, so we bail out quickly when the
     // local record hasn't changed since the last sync.
-    // `modifiedDate` is our local edit timestamp; Drive's `modifiedTime`
-    // (stored in driveModifiedTime) is compared when pulling.
-    const localModified = new Date(setlist.modifiedDate || setlist.updatedAt);
+    const localModified = new Date(setlist.modifiedDate);
     const lastSynced = setlist.lastSyncedAt ? new Date(setlist.lastSyncedAt) : new Date(0);
 
     if (localModified <= lastSynced) {
@@ -466,7 +464,7 @@ export class DriveSyncManager {
           downloadQueue.push({ driveFile, setlistId });
         } else if (localSetlist.driveFileId === driveFile.id) {
           // Existing setlist, check if Drive version is newer
-          const localModified = new Date(localSetlist.modifiedDate || localSetlist.updatedAt);
+          const localModified = new Date(localSetlist.modifiedDate);
           const lastSynced = localSetlist.lastSyncedAt
             ? new Date(localSetlist.lastSyncedAt)
             : new Date(0);
@@ -892,7 +890,7 @@ export class DriveSyncManager {
           const filename = generateSetlistFilename(
             setlist.date,
             setlist.type,
-            setlist.owner || setlist.leader,
+            setlist.owner,
             setlist.name
           );
 

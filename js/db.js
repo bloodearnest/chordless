@@ -415,10 +415,9 @@ export class SetalightDB {
               setlistId: setlist.id,
               setlistDate: setlist.date,
               setlistName: setlist.name,
-              leader: setlist.owner || setlist.leader, // Support both old and new schema
+              leader: setlist.owner,
               type: setlist.type,
-              playedInKey:
-                song.key !== undefined ? song.key : song.modifications?.targetKey || null, // Support both schemas
+              playedInKey: song.key,
               order: index,
             });
           });
@@ -698,20 +697,20 @@ export function determineSetlistType(dateString, name) {
 /**
  * Create a new setlist object with defaults
  */
-export function createSetlist({ date, time, type, name, owner, leader } = {}) {
+export function createSetlist({ date, time, type, name, owner } = {}) {
   const setlistDate = date || getNextSunday();
   const dateString =
     typeof setlistDate === 'string' ? setlistDate : setlistDate.toISOString().split('T')[0];
 
   return {
-    id: crypto.randomUUID(), // Use UUID instead of date-based ID
+    id: crypto.randomUUID(),
     date: dateString,
     time: time || '10:30',
     type: type || determineSetlistType(dateString, name),
     name: name || '',
-    owner: owner || leader || '', // Support both owner and leader (backward compat)
+    owner: owner || '',
     songs: [],
-    createdDate: new Date().toISOString(), // Renamed from createdAt
-    modifiedDate: new Date().toISOString(), // Renamed from updatedAt
+    createdDate: new Date().toISOString(),
+    modifiedDate: new Date().toISOString(),
   };
 }

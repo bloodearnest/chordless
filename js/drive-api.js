@@ -828,7 +828,7 @@ export async function uploadSetlist(organisationFolderId, setlistId, setlistData
   const fileName = generateSetlistFilename(
     setlistData.date || setlistId,
     setlistData.type || '',
-    setlistData.owner || setlistData.leader || '',
+    setlistData.owner || '',
     setlistData.name || ''
   );
 

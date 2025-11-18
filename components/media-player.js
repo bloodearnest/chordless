@@ -592,8 +592,8 @@ export class MediaPlayer extends LitElement {
       width: 4rem;
       height: 4rem;
       border-radius: 50%;
-      border: 2px solid var(--player-text, white);
-      background: rgba(52, 73, 94, 0.6);
+      border: 0;
+      background: rgba(52, 73, 94, 0.4);
       color: var(--player-text, white);
       cursor: pointer;
       display: flex;

@@ -453,7 +453,7 @@ class PageApp {
             const lastUsage = usage[0];
             fullSong.lastUsageInfo = {
               date: lastUsage.setlistDate,
-              leader: lastUsage.owner || lastUsage.leader, // Use owner with fallback to leader
+              leader: lastUsage.owner,
               key: lastUsage.playedInKey,
             };
           }
@@ -929,7 +929,7 @@ class PageApp {
       setlistId: entry.setlistId,
       date: entry.setlistDate,
       playedInKey: entry.playedInKey,
-      leader: entry.owner || entry.leader, // Use owner with fallback to leader
+      leader: entry.owner,
       setlistName: entry.setlistName,
     }));
 
@@ -1106,7 +1106,7 @@ class PageApp {
         formattedDate: this.formatDate(appearance.date),
         weeksAgo: this.getWeeksAgo(appearance.date),
         playedInKey: appearance.playedInKey,
-        leader: appearance.owner || appearance.leader, // Use owner with fallback to leader
+        leader: appearance.owner,
       }));
   }
 
@@ -1302,7 +1302,7 @@ class PageApp {
 
         // Capture original key before any transposition so we can always return to it
         const originalKey = parsed.metadata.key || null;
-        const targetKey = songEntry.key || songEntry.modifications.targetKey || null; // Use key with fallback
+        const targetKey = songEntry.key;
 
         // Apply transposition if requested and we have a reference key
         if (targetKey && originalKey && targetKey !== originalKey) {
@@ -1314,7 +1314,7 @@ class PageApp {
         }
 
         // Apply BPM override
-        const bpmOverride = songEntry.tempo || songEntry.modifications.bpmOverride; // Use tempo with fallback
+        const bpmOverride = songEntry.tempo;
         if (bpmOverride) {
           parsed.metadata.tempo = bpmOverride;
         }
@@ -1880,7 +1880,7 @@ class PageApp {
       setlistId: entry.setlistId,
       date: entry.setlistDate,
       playedInKey: entry.playedInKey,
-      leader: entry.owner || entry.leader, // Use owner with fallback to leader
+      leader: entry.owner,
       setlistName: entry.setlistName,
     }));
 
@@ -3199,15 +3199,15 @@ class PageApp {
     // Re-parse from source
     const parsed = this.parser.parse(song.sourceText);
 
-    // Apply transposition if targetKey is set (use new schema with fallback)
-    const targetKey = songEntry.key || songEntry.modifications.targetKey || song.originalKey;
+    // Apply transposition if targetKey is set
+    const targetKey = songEntry.key;
     if (targetKey && targetKey !== song.originalKey) {
       transposeSong(parsed, song.originalKey, targetKey);
       parsed.metadata.key = targetKey;
     }
 
-    // Apply BPM override (use new schema with fallback)
-    const bpmOverride = songEntry.tempo || songEntry.modifications.bpmOverride;
+    // Apply BPM override
+    const bpmOverride = songEntry.tempo;
     if (bpmOverride) {
       parsed.metadata.tempo = bpmOverride;
     }
@@ -3551,13 +3551,12 @@ class PageApp {
   }
 
   async getSetlistLeader() {
-    // Use owner with fallback to leader for backward compatibility
-    const ownerOrLeader = this.currentSetlist?.owner || this.currentSetlist?.leader;
-    if (ownerOrLeader && ownerOrLeader.trim()) {
-      return ownerOrLeader.trim();
+    const owner = this.currentSetlist?.owner;
+    if (owner && owner.trim()) {
+      return owner.trim();
     }
 
-    // Fallback: scan song usage entries for this setlist
+    // Scan song usage entries for this setlist
     if (!this.currentSetlist?.songs?.length) {
       return null;
     }
@@ -3567,9 +3566,9 @@ class PageApp {
       try {
         const usage = await this.db.getSongUsageFromSetlists(songEntry.songId);
         const historyEntry = usage.find(h => h.setlistId === this.currentSetlist.id);
-        const historyOwnerOrLeader = historyEntry?.owner || historyEntry?.leader;
-        if (historyOwnerOrLeader && historyOwnerOrLeader.trim()) {
-          return historyOwnerOrLeader.trim();
+        const historyOwner = historyEntry?.owner;
+        if (historyOwner && historyOwner.trim()) {
+          return historyOwner.trim();
         }
       } catch (error) {
         console.warn('[SetlistInfo] Failed to load usage for song', songEntry.songId, error);
