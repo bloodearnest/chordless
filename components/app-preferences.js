@@ -4,6 +4,8 @@ import {
   setUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   setUseUnicodeAccidentals,
+  getMusicianType,
+  setMusicianType,
 } from '../js/preferences.js';
 import './theme-settings.js';
 import './media-player-settings.js';
@@ -17,6 +19,7 @@ export class AppPreferences extends LitElement {
   static properties = {
     useNashville: { type: Boolean, attribute: false },
     useUnicodeAccidentals: { type: Boolean, attribute: false },
+    musicianType: { type: String, attribute: false },
   };
 
   static styles = css`
@@ -96,6 +99,44 @@ export class AppPreferences extends LitElement {
       height: 1.25rem;
     }
 
+    .radio-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .radio-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      cursor: pointer;
+    }
+
+    .radio-option input[type='radio'] {
+      width: 1.25rem;
+      height: 1.25rem;
+      margin-top: 0.15rem;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .radio-option-content {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+
+    .radio-option-label {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .radio-option-description {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      line-height: 1.3;
+    }
+
     a {
       text-decoration: none;
     }
@@ -105,6 +146,7 @@ export class AppPreferences extends LitElement {
     super();
     this.useNashville = getUseNashvilleNumbers();
     this.useUnicodeAccidentals = getUseUnicodeAccidentals();
+    this.musicianType = getMusicianType();
   }
 
   render() {
@@ -114,6 +156,75 @@ export class AppPreferences extends LitElement {
           <h3>Appearance</h3>
           <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
+        </div>
+
+        <div class="preferences-section">
+          <h3>Musician Type</h3>
+          <p>
+            Customize your experience based on your role. This adjusts default visibility and
+            features.
+          </p>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="musician-type"
+                value="general"
+                ?checked=${this.musicianType === 'general'}
+                @change=${this._onMusicianTypeChange}
+              />
+              <div class="radio-option-content">
+                <span class="radio-option-label">General</span>
+                <span class="radio-option-description">Show all features and information</span>
+              </div>
+            </label>
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="musician-type"
+                value="singer"
+                ?checked=${this.musicianType === 'singer'}
+                @change=${this._onMusicianTypeChange}
+              />
+              <div class="radio-option-content">
+                <span class="radio-option-label">Singer</span>
+                <span class="radio-option-description">
+                  Hide chords by default, focus on lyrics
+                </span>
+              </div>
+            </label>
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="musician-type"
+                value="drummer"
+                ?checked=${this.musicianType === 'drummer'}
+                @change=${this._onMusicianTypeChange}
+              />
+              <div class="radio-option-content">
+                <span class="radio-option-label">Drummer</span>
+                <span class="radio-option-description">
+                  Hide chords by default, focus on song structure
+                </span>
+              </div>
+            </label>
+
+            <label class="radio-option">
+              <input
+                type="radio"
+                name="musician-type"
+                value="guitarist"
+                ?checked=${this.musicianType === 'guitarist'}
+                @change=${this._onMusicianTypeChange}
+              />
+              <div class="radio-option-content">
+                <span class="radio-option-label">Guitarist</span>
+                <span class="radio-option-description"> Enable capo support (coming soon) </span>
+              </div>
+            </label>
+          </div>
         </div>
 
         <div class="preferences-section">
@@ -149,6 +260,12 @@ export class AppPreferences extends LitElement {
         </div>
       </div>
     `;
+  }
+
+  _onMusicianTypeChange(event) {
+    const value = event.currentTarget.value;
+    this.musicianType = value;
+    setMusicianType(value);
   }
 
   _onNashvilleToggle(event) {
