@@ -118,11 +118,17 @@ export class SetlistInfo extends LitElement {
         ${this.leader ? this.renderInfoItem('Leader', this.leader) : ''}
         ${this.setlist.venue ? this.renderInfoItem('Venue', this.setlist.venue) : ''}
         ${this.renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
-        ${this.setlist.createdAt
-          ? this.renderInfoItem('Created', this.formatDateTime(this.setlist.createdAt))
+        ${this.setlist.createdDate || this.setlist.createdAt
+          ? this.renderInfoItem(
+              'Created',
+              this.formatDateTime(this.setlist.createdDate || this.setlist.createdAt)
+            )
           : ''}
-        ${this.setlist.updatedAt
-          ? this.renderInfoItem('Last Modified', this.formatDateTime(this.setlist.updatedAt))
+        ${this.setlist.modifiedDate || this.setlist.updatedAt
+          ? this.renderInfoItem(
+              'Last Modified',
+              this.formatDateTime(this.setlist.modifiedDate || this.setlist.updatedAt)
+            )
           : ''}
       </div>
     `;

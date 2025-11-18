@@ -1,7 +1,4 @@
 import { LitElement, html, css } from 'lit';
-import { SetalightDB } from '../js/db.js';
-import { getCurrentOrganisation } from '../js/workspace.js';
-import { getGlobalSongsDB } from '../js/songs-db.js';
 
 /**
  * storage-summary
@@ -159,16 +156,10 @@ export class StorageSummary extends LitElement {
 
   async _loadStats() {
     try {
-      const organisation = getCurrentOrganisation();
-      const setlistDb = new SetalightDB(organisation);
-      await setlistDb.init();
+      const { getCurrentDB } = await import('../js/db.js');
+      const db = await getCurrentDB();
 
-      const songsDb = await getGlobalSongsDB();
-
-      const [setlists, songs] = await Promise.all([
-        setlistDb.getAllSetlists(),
-        songsDb.getAllSongs(),
-      ]);
+      const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()]);
 
       const [dbBytesFromEstimate, cacheUsage] = await Promise.all([
         this._estimateIndexedDbUsage(),

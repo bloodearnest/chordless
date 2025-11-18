@@ -3,24 +3,45 @@
 import { ChordProParser } from './parser.js';
 import { SetalightDB, determineSetlistType } from './db.js';
 import { createSong, findExistingSong, hashText } from './song-utils.js';
-import { getGlobalSongsDB } from './songs-db.js';
-import { getGlobalChordProDB } from './chordpro-db.js';
 import { getCurrentUserInfo } from './google-auth.js';
 import { parseHtml } from './utils/html-parser.js';
+import {
+  setCurrentOrganisation,
+  createOrganisation,
+  getOrganisationByName,
+} from './organisation.js';
+
+const DEFAULT_ORG_NAME = 'Personal';
 
 export class SetlistImporter {
-  constructor(organisationName = null) {
-    this.organisationDb = new SetalightDB(organisationName);
-    this.songsDb = null; // Will be initialized in init()
-    this.chordproDb = null; // Will be initialized in init()
+  constructor(organisationName = DEFAULT_ORG_NAME) {
+    this.organisationName = organisationName;
+    this.organisationId = null; // Will be set in init()
+    this.db = null; // Will be initialized in init()
     this.parser = new ChordProParser();
     this.songsCache = new Map(); // In-memory cache during import
   }
 
   async init() {
-    await this.organisationDb.init();
-    this.songsDb = await getGlobalSongsDB();
-    this.chordproDb = await getGlobalChordProDB();
+    // Get or create organisation
+    let org = await getOrganisationByName(this.organisationName);
+
+    if (!org) {
+      console.log(`[Import] Creating organisation: ${this.organisationName}`);
+      org = await createOrganisation(this.organisationName);
+    }
+
+    this.organisationId = org.id;
+
+    // Set as current organisation in localStorage so the app uses it
+    await setCurrentOrganisation(org.id, org.name);
+    console.log(`[Import] Set current organisation to: ${org.name} (${org.id})`);
+
+    // Initialize the organisation's database
+    this.db = new SetalightDB(org.id);
+    await this.db.init();
+
+    console.log(`[Import] Using organisation: ${org.name}, database: ${this.db.dbName}`);
   }
 
   /**
@@ -118,14 +139,8 @@ export class SetlistImporter {
 
     console.log('[Import] Clearing all data from databases...');
 
-    // Clear songs database (without deleting - works with multiple tabs)
-    await this.songsDb.clearAll();
-
-    // Clear organisation database
-    await this.organisationDb.clearAll();
-
-    // Clear chordpro database
-    await this.chordproDb.clearAll();
+    // Clear all data from organisation database (songs, chordpro, setlists, local state)
+    await this.db.clearAll();
 
     // Clear caches
     this.songsCache.clear();
@@ -279,39 +294,34 @@ export class SetlistImporter {
         if (!hasSections) {
           console.log(`[Import] Skipping song without sections: ${parsed.metadata.title}`);
           // Keep in setlist but don't add to song database
-          // Use a placeholder songId and store text inline
+          // Use a placeholder songId/songUuid
+          const placeholderId = `placeholder-${hashText(songData.filename)}`;
           songs.push({
             order: order,
-            songId: `placeholder-${hashText(songData.filename)}`,
-            chordproEdits: chordproText, // Store inline since not in DB
-            modifications: {
-              targetKey: null,
-              bpmOverride: null,
-              fontSize: 1.6,
-              sectionStates: {},
-            },
+            songId: placeholderId,
+            songUuid: placeholderId, // Use same value for placeholder
+            key: null,
+            tempo: null,
+            notes: `ChordPro inline: ${songData.filename}`,
           });
         } else {
           // Find or create song in collection
-          const songId = await this.findOrCreateSong(
+          const { songId, songUuid } = await this.findOrCreateSong(
             parsed,
             chordproText,
             setlistData.id,
             setlistData.date
           );
-          console.log(`[Import] Song ID: ${songId}`);
+          console.log(`[Import] Song ID: ${songId}, UUID: ${songUuid}`);
 
-          // Add to setlist
+          // Add to setlist with new flattened schema
           songs.push({
             order: order,
             songId: songId,
-            chordproEdits: null,
-            modifications: {
-              targetKey: null,
-              bpmOverride: null,
-              fontSize: 1.6,
-              sectionStates: {},
-            },
+            songUuid: songUuid, // Required in new schema
+            key: null, // Transposition override (was modifications.targetKey)
+            tempo: null, // Tempo override (was modifications.bpmOverride)
+            notes: '', // Performance notes
           });
         }
       } catch (err) {
@@ -327,28 +337,28 @@ export class SetlistImporter {
     // Extract name from setlist ID
     const name = this.extractSetlistName(setlistData.id);
 
-    // Create setlist object with new fields
+    // Create setlist object with new schema
     const setlist = {
-      id: setlistData.id,
+      id: crypto.randomUUID(), // UUID instead of date
       date: setlistData.date,
       time: '10:30', // Default time
       type: determineSetlistType(setlistData.date, name),
       name: name || '',
-      leader: this.defaultLeader || '', // Populate with current user's name
+      owner: this.defaultLeader || '', // Renamed from leader
       songs: songs,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdDate: new Date().toISOString(), // Renamed from createdAt
+      modifiedDate: new Date().toISOString(), // Renamed from updatedAt
     };
 
     // Save setlist to workspace database
-    await this.organisationDb.saveSetlist(setlist);
+    await this.db.saveSetlist(setlist);
 
     return setlist;
   }
 
   /**
    * Find existing song or create new one in global database
-   * Returns songId
+   * Returns {songId, songUuid}
    */
   async findOrCreateSong(parsed, chordproText, setlistId, setlistDate) {
     const ccliNumber = parsed.metadata.ccliSongNumber || parsed.metadata.ccli || null;
@@ -362,12 +372,13 @@ export class SetlistImporter {
     }
 
     // Check if song already exists in database
-    const existing = await findExistingSong(ccliNumber, title, chordproText);
+    const existing = await findExistingSong(ccliNumber, title, this.db);
 
     if (existing) {
-      console.log(`[Import] Found existing song: ${title} (${existing.matchType})`);
-      this.songsCache.set(contentHash, existing.song.id);
-      return existing.song.id;
+      console.log(`[Import] Found existing song: ${title}`);
+      const result = { songId: existing.id, songUuid: existing.uuid };
+      this.songsCache.set(contentHash, result);
+      return result;
     }
 
     // Create new song using new model
@@ -382,9 +393,10 @@ export class SetlistImporter {
     console.log(`[Import] Created new song: ${title} (${song.id})`);
 
     // Add to cache
-    this.songsCache.set(contentHash, song.id);
+    const result = { songId: song.id, songUuid: song.uuid };
+    this.songsCache.set(contentHash, result);
 
-    return song.id;
+    return result;
   }
 
   /**

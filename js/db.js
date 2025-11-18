@@ -1,13 +1,12 @@
 import { ensurePersistentStorage } from './utils/persistence.js';
 
 // IndexedDB wrapper for Setalight
-// Manages organisation-specific setlists.
+// Manages organisation-specific data: songs, chordpro content, setlists, and local state
 //
-// NOTE: Song content (ChordPro, metadata) is stored in the global SongsDB (songs-db.js)
-// This organisation DB only stores setlists. Song usage is derived on demand.
+// NOTE: This now stores ALL organisation data in one database per organisation.
+// Organisation metadata is stored separately in SetalightDB-organisations.
 
-const DB_NAME = 'SetalightDB';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 
 // Setlist types
 export const SETLIST_TYPES = {
@@ -17,13 +16,65 @@ export const SETLIST_TYPES = {
   OTHER: 'Other',
 };
 
-export class SetalightDB {
-  constructor(organisationName = null) {
-    // Use organisation-specific database name
-    const dbName = organisationName ? `SetalightDB-${organisationName}` : DB_NAME; // Fallback for backward compatibility
+function cloneForStorage(value, path = '') {
+  if (value === null || value === undefined) {
+    return value;
+  }
 
-    this.dbName = dbName;
-    this.organisationName = organisationName;
+  // Primitive values can be stored as-is
+  const type = typeof value;
+  if (type === 'string' || type === 'number' || type === 'boolean') {
+    return value;
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((item, index) => cloneForStorage(item, `${path}[${index}]`));
+  }
+
+  if (type === 'object') {
+    if (typeof value.then === 'function' && typeof value.catch === 'function') {
+      console.warn(`[SetalightDB] Dropping Promise at ${path || '<root>'} before storage`);
+      return null;
+    }
+
+    const cloned = {};
+    for (const [key, val] of Object.entries(value)) {
+      if (typeof val === 'function' || typeof val === 'symbol') {
+        console.warn(
+          `[SetalightDB] Dropping non-serializable property ${path ? `${path}.` : ''}${key}`
+        );
+        continue;
+      }
+      const sanitized = cloneForStorage(val, path ? `${path}.${key}` : key);
+      if (sanitized !== undefined) {
+        cloned[key] = sanitized;
+      }
+    }
+    return cloned;
+  }
+
+  // Anything else (e.g., BigInt) -> convert to string
+  if (type === 'bigint') {
+    return value.toString();
+  }
+
+  return value;
+}
+
+export class SetalightDB {
+  constructor(organisationId) {
+    if (!organisationId) {
+      throw new Error('organisationId is required for SetalightDB');
+    }
+
+    // Database name is just the organisation ID
+    // This allows renaming organisations without database migration
+    this.dbName = organisationId;
+    this.organisationId = organisationId;
     this.db = null;
   }
 
@@ -38,36 +89,60 @@ export class SetalightDB {
       request.onsuccess = event => {
         this.db = event.target.result;
         resolve();
-        ensurePersistentStorage('setlists');
+        ensurePersistentStorage(this.organisationId);
       };
 
       request.onupgradeneeded = event => {
         const db = event.target.result;
         const oldVersion = event.oldVersion;
 
-        // Create Setlists store
+        console.log(`[SetalightDB] Upgrading ${this.dbName} from v${oldVersion} to v${DB_VERSION}`);
+
+        // Create Songs store (moved from global SongsDB)
+        // Now uses uuid as keyPath instead of id
+        if (!db.objectStoreNames.contains('songs')) {
+          console.log('[SetalightDB] Creating songs store');
+          const songStore = db.createObjectStore('songs', { keyPath: 'uuid' });
+          songStore.createIndex('id', 'id', { unique: false });
+          songStore.createIndex('ccliNumber', 'ccliNumber', { unique: false });
+          songStore.createIndex('titleNormalized', 'titleNormalized', { unique: false });
+          songStore.createIndex('isDefault', 'isDefault', { unique: false });
+          songStore.createIndex('importDate', 'importDate', { unique: false });
+        }
+
+        // Create ChordPro store (moved from global ChordProDB)
+        if (!db.objectStoreNames.contains('chordpro')) {
+          console.log('[SetalightDB] Creating chordpro store');
+          const chordproStore = db.createObjectStore('chordpro', { keyPath: 'id' });
+          chordproStore.createIndex('contentHash', 'contentHash', { unique: false });
+        }
+
+        // Create/Update Setlists store
         if (!db.objectStoreNames.contains('setlists')) {
+          console.log('[SetalightDB] Creating setlists store');
           const setlistStore = db.createObjectStore('setlists', { keyPath: 'id' });
           setlistStore.createIndex('date', 'date', { unique: false });
           setlistStore.createIndex('type', 'type', { unique: false });
-        } else if (oldVersion < 2) {
+          setlistStore.createIndex('owner', 'owner', { unique: false });
+        } else {
+          // Add owner index if upgrading from old version
           const transaction = event.target.transaction;
           const setlistStore = transaction.objectStore('setlists');
-          if (!setlistStore.indexNames.contains('type')) {
-            setlistStore.createIndex('type', 'type', { unique: false });
+          if (!setlistStore.indexNames.contains('owner')) {
+            console.log('[SetalightDB] Adding owner index to setlists');
+            setlistStore.createIndex('owner', 'owner', { unique: false });
           }
         }
 
-        // LEGACY: Keep songs store for backward compatibility (migrate to SongsDB separately)
-        if (!db.objectStoreNames.contains('songs')) {
-          const songStore = db.createObjectStore('songs', { keyPath: 'id' });
-          songStore.createIndex('ccliNumber', 'ccliNumber', { unique: false });
-          songStore.createIndex('titleNormalized', 'titleNormalized', { unique: false });
-          songStore.createIndex('textHash', 'textHash', { unique: false });
+        // Create setlist_local store (new in v5)
+        if (!db.objectStoreNames.contains('setlist_local')) {
+          console.log('[SetalightDB] Creating setlist_local store');
+          db.createObjectStore('setlist_local', { keyPath: 'setlistId' });
         }
 
-        // v4: remove song_usage store (usage derived from setlists now)
+        // Clean up old stores
         if (db.objectStoreNames.contains('song_usage')) {
+          console.log('[SetalightDB] Removing song_usage store');
           db.deleteObjectStore('song_usage');
         }
       };
@@ -78,7 +153,7 @@ export class SetalightDB {
   async saveSetlist(setlist) {
     const tx = this.db.transaction(['setlists'], 'readwrite');
     const store = tx.objectStore('setlists');
-    await store.put(setlist);
+    await store.put(cloneForStorage(setlist));
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
@@ -95,7 +170,7 @@ export class SetalightDB {
     const store = tx.objectStore('setlists');
 
     // Queue all puts in one transaction
-    setlists.forEach(setlist => store.put(setlist));
+    setlists.forEach(setlist => store.put(cloneForStorage(setlist)));
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
@@ -133,10 +208,8 @@ export class SetalightDB {
     });
   }
 
-  // LEGACY: Song operations (deprecated - use SongsDB instead)
-  // Kept for backward compatibility during migration
+  // Song operations (per-organisation)
   async saveSong(song) {
-    // console.warn('[DB] saveSong is deprecated - use SongsDB for song content');
     const tx = this.db.transaction(['songs'], 'readwrite');
     const store = tx.objectStore('songs');
     await store.put(song);
@@ -146,35 +219,24 @@ export class SetalightDB {
     });
   }
 
-  async getSong(id) {
-    console.warn('[DB] getSong is deprecated - use SongsDB for song content');
-    const tx = this.db.transaction(['songs'], 'readonly');
+  async saveSongsBatch(songs) {
+    if (songs.length === 0) return;
+
+    const tx = this.db.transaction(['songs'], 'readwrite');
     const store = tx.objectStore('songs');
-    const request = store.get(id);
+
+    songs.forEach(song => store.put(song));
+
     return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
   }
 
-  async findSongByCCLI(ccliNumber) {
-    console.warn('[DB] findSongByCCLI is deprecated - use SongsDB for song content');
+  async getSong(uuid) {
     const tx = this.db.transaction(['songs'], 'readonly');
     const store = tx.objectStore('songs');
-    const index = store.index('ccliNumber');
-    const request = index.get(ccliNumber);
-    return new Promise((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async findSongByNormalizedTitle(titleNormalized) {
-    console.warn('[DB] findSongByNormalizedTitle is deprecated - use SongsDB for song content');
-    const tx = this.db.transaction(['songs'], 'readonly');
-    const store = tx.objectStore('songs');
-    const index = store.index('titleNormalized');
-    const request = index.get(titleNormalized);
+    const request = store.get(uuid);
     return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
@@ -182,13 +244,151 @@ export class SetalightDB {
   }
 
   async getAllSongs() {
-    console.warn('[DB] getAllSongs is deprecated - use SongsDB for song content');
     const tx = this.db.transaction(['songs'], 'readonly');
     const store = tx.objectStore('songs');
     const request = store.getAll();
     return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async findSongByCCLI(ccliNumber) {
+    const tx = this.db.transaction(['songs'], 'readonly');
+    const store = tx.objectStore('songs');
+    const index = store.index('ccliNumber');
+    const request = index.getAll(ccliNumber);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async findSongByNormalizedTitle(titleNormalized) {
+    const tx = this.db.transaction(['songs'], 'readonly');
+    const store = tx.objectStore('songs');
+    const index = store.index('titleNormalized');
+    const request = index.getAll(titleNormalized);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getSongVariants(songId) {
+    const tx = this.db.transaction(['songs'], 'readonly');
+    const store = tx.objectStore('songs');
+    const index = store.index('id');
+    const request = index.getAll(songId);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result || []);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async getDefaultSongVariant(songId) {
+    const variants = await this.getSongVariants(songId);
+    return variants.find(v => v.isDefault) || variants[0] || null;
+  }
+
+  async deleteSong(uuid) {
+    const tx = this.db.transaction(['songs'], 'readwrite');
+    const store = tx.objectStore('songs');
+    await store.delete(uuid);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  // ChordPro operations (per-organisation)
+  async saveChordPro(chordpro) {
+    const tx = this.db.transaction(['chordpro'], 'readwrite');
+    const store = tx.objectStore('chordpro');
+    await store.put(chordpro);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async getChordPro(id) {
+    const tx = this.db.transaction(['chordpro'], 'readonly');
+    const store = tx.objectStore('chordpro');
+    const request = store.get(id);
+    return new Promise((resolve, reject) => {
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
+    });
+  }
+
+  async deleteChordPro(id) {
+    const tx = this.db.transaction(['chordpro'], 'readwrite');
+    const store = tx.objectStore('chordpro');
+    await store.delete(id);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async findChordProByContentHash(contentHash) {
+    const tx = this.db.transaction(['chordpro'], 'readonly');
+    const store = tx.objectStore('chordpro');
+    const index = store.index('contentHash');
+    const request = index.get(contentHash);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  // Local state operations (per-setlist, per-user)
+  async getLocalState(setlistId) {
+    const tx = this.db.transaction(['setlist_local'], 'readonly');
+    const store = tx.objectStore('setlist_local');
+    const request = store.get(setlistId);
+    return new Promise((resolve, reject) => {
+      request.onsuccess = () => {
+        // Return defaults if not found
+        resolve(
+          request.result || {
+            setlistId,
+            padsEnabled: false,
+            padSound: null,
+            clickEnabled: false,
+            sectionVisibility: {},
+            lastUsedDate: new Date().toISOString(),
+          }
+        );
+      };
+      request.onerror = () => reject(request.error);
+    });
+  }
+
+  async saveLocalState(localState) {
+    const tx = this.db.transaction(['setlist_local'], 'readwrite');
+    const store = tx.objectStore('setlist_local');
+    await store.put(localState);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  async updateLastUsed(setlistId) {
+    const state = await this.getLocalState(setlistId);
+    state.lastUsedDate = new Date().toISOString();
+    return this.saveLocalState(state);
+  }
+
+  async deleteLocalState(setlistId) {
+    const tx = this.db.transaction(['setlist_local'], 'readwrite');
+    const store = tx.objectStore('setlist_local');
+    await store.delete(setlistId);
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
     });
   }
 
@@ -215,9 +415,10 @@ export class SetalightDB {
               setlistId: setlist.id,
               setlistDate: setlist.date,
               setlistName: setlist.name,
-              leader: setlist.leader,
+              leader: setlist.owner || setlist.leader, // Support both old and new schema
               type: setlist.type,
-              playedInKey: song.modifications?.targetKey || null,
+              playedInKey:
+                song.key !== undefined ? song.key : song.modifications?.targetKey || null, // Support both schemas
               order: index,
             });
           });
@@ -230,15 +431,83 @@ export class SetalightDB {
     });
   }
 
+  // Migrate a setlist from old schema to new schema
+  migrateSetlist(oldSetlist) {
+    // Generate UUID if setlist has date-based ID
+    const needsNewId = /^\d{4}-\d{2}-\d{2}/.test(oldSetlist.id);
+
+    const newSetlist = {
+      id: needsNewId ? crypto.randomUUID() : oldSetlist.id,
+      date: oldSetlist.date,
+      time: oldSetlist.time || '10:30',
+      type: oldSetlist.type || 'Church Service',
+      name: oldSetlist.name || '',
+      owner: oldSetlist.owner || oldSetlist.leader || '', // Rename leader → owner
+      songs: (oldSetlist.songs || []).map(song => ({
+        order: song.order,
+        songId: song.songId,
+        songUuid: song.songUuid || song.songId, // Use songId as fallback if songUuid missing
+        key: song.key !== undefined ? song.key : song.modifications?.targetKey || null,
+        tempo: song.tempo !== undefined ? song.tempo : song.modifications?.bpmOverride || null,
+        notes: song.notes || '',
+      })),
+      createdDate: oldSetlist.createdDate || oldSetlist.createdAt || new Date().toISOString(),
+      modifiedDate: oldSetlist.modifiedDate || oldSetlist.updatedAt || new Date().toISOString(),
+      driveFileId: oldSetlist.driveFileId || null,
+      driveModifiedTime: oldSetlist.driveModifiedTime || null,
+      lastSyncedAt: oldSetlist.lastSyncedAt || null,
+      _lastSyncHash: oldSetlist._lastSyncHash || null,
+    };
+
+    return newSetlist;
+  }
+
+  // Migrate all setlists in database to new schema
+  async migrateAllSetlists() {
+    const allSetlists = await this.getAllSetlists();
+    let migratedCount = 0;
+
+    for (const setlist of allSetlists) {
+      // Check if setlist needs migration
+      const needsMigration =
+        setlist.leader !== undefined ||
+        setlist.createdAt !== undefined ||
+        setlist.updatedAt !== undefined ||
+        (setlist.songs && setlist.songs.some(s => s.modifications !== undefined));
+
+      if (needsMigration) {
+        const migrated = this.migrateSetlist(setlist);
+
+        // If ID changed, delete old one and save new one
+        if (migrated.id !== setlist.id) {
+          await this.deleteSetlist(setlist.id);
+        }
+
+        await this.saveSetlist(migrated);
+        migratedCount++;
+        console.log(
+          `[Migration] Migrated setlist: ${setlist.date} (${setlist.id} → ${migrated.id})`
+        );
+      }
+    }
+
+    console.log(`[Migration] Migrated ${migratedCount} setlists`);
+    return migratedCount;
+  }
+
   // Clear all data (for re-import)
   async clearAll() {
-    const tx = this.db.transaction(['setlists', 'songs'], 'readwrite');
+    const tx = this.db.transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite');
 
     const setlistStore = tx.objectStore('setlists');
     const songStore = tx.objectStore('songs');
+    const chordproStore = tx.objectStore('chordpro');
+    const localStore = tx.objectStore('setlist_local');
 
     await setlistStore.clear();
     await songStore.clear();
+    await chordproStore.clear();
+    await localStore.clear();
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve();
@@ -349,8 +618,11 @@ export function formatTempo(bpm, tempoNote = '1/4') {
  * Returns a database instance for the currently active organisation
  */
 export async function getCurrentDB() {
-  const { getCurrentOrganisation } = await import('./workspace.js');
-  return new SetalightDB(getCurrentOrganisation());
+  const { ensureCurrentOrganisation } = await import('./organisation.js');
+  const { id } = await ensureCurrentOrganisation();
+  const db = new SetalightDB(id);
+  await db.init();
+  return db;
 }
 
 export function generateSongId(parsed) {
@@ -426,33 +698,20 @@ export function determineSetlistType(dateString, name) {
 /**
  * Create a new setlist object with defaults
  */
-export function createSetlist({ date, time, type, name, leader } = {}) {
+export function createSetlist({ date, time, type, name, owner, leader } = {}) {
   const setlistDate = date || getNextSunday();
   const dateString =
     typeof setlistDate === 'string' ? setlistDate : setlistDate.toISOString().split('T')[0];
 
-  // Generate ID from date and optional name (matching import format)
-  let id = dateString;
-  if (name && name.trim()) {
-    // Convert name to kebab-case for ID
-    const namePart = name
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '') // Remove special chars
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-+/g, '-'); // Remove duplicate hyphens
-    id = `${dateString}-${namePart}`;
-  }
-
   return {
-    id: id,
+    id: crypto.randomUUID(), // Use UUID instead of date-based ID
     date: dateString,
     time: time || '10:30',
     type: type || determineSetlistType(dateString, name),
     name: name || '',
-    leader: leader || '',
+    owner: owner || leader || '', // Support both owner and leader (backward compat)
     songs: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdDate: new Date().toISOString(), // Renamed from createdAt
+    modifiedDate: new Date().toISOString(), // Renamed from updatedAt
   };
 }

@@ -2,9 +2,8 @@
 // Works with service worker routing and Navigation API
 
 import { ChordProParser } from './parser.js';
-import { SetalightDB, formatTempo } from './db.js';
+import { getCurrentDB, formatTempo } from './db.js';
 import { transposeSong, getAvailableKeys } from './transpose.js';
-import { getCurrentOrganisation } from './workspace.js';
 import { preloadPadKeysForSongs, preloadPadKey } from './pad-set-service.js';
 import '../components/status-message.js';
 import '../components/song-list.js';
@@ -35,7 +34,7 @@ const CONFIG = {
 
 class PageApp {
   constructor() {
-    this.db = new SetalightDB(getCurrentOrganisation());
+    this.db = null; // Will be initialized in init()
     this.parser = new ChordProParser();
     this.currentSongIndex = undefined;
     this.songs = [];
@@ -74,8 +73,13 @@ class PageApp {
   }
 
   async init() {
-    // Initialize IndexedDB
-    await this.db.init();
+    // Initialize IndexedDB with current organisation
+    this.db = await getCurrentDB();
+
+    // Check for first-time Google auth and rename org if needed
+    // This must happen before rendering to avoid showing "Personal" briefly
+    const { checkFirstTimeAuth } = await import('./first-time-auth.js');
+    await checkFirstTimeAuth();
 
     // Set up Navigation API with View Transitions
     this.setupNavigationAPI();
@@ -415,11 +419,9 @@ class PageApp {
         state: 'loading',
       });
 
-      // Load songs from global songs DB
-      const { getGlobalSongsDB } = await import('./songs-db.js');
+      // Load songs from per-org database
       const { getSongWithContent } = await import('./song-utils.js');
-      const songsDB = await getGlobalSongsDB();
-      const songRecords = await songsDB.getAllSongs();
+      const songRecords = await this.db.getAllSongs();
       console.log('Loaded song records:', songRecords.length);
 
       if (songRecords.length === 0) {
@@ -431,26 +433,34 @@ class PageApp {
         return;
       }
 
+      // Group songs by deterministic ID to get unique songs (not all variants)
+      const songsById = new Map();
+      for (const song of songRecords) {
+        if (song.isDefault || !songsById.has(song.id)) {
+          songsById.set(song.id, song);
+        }
+      }
+
       // Parse titles from chordpro and enrich with usage data
       const songs = [];
-      for (const songRecord of songRecords) {
+      for (const songRecord of songsById.values()) {
         try {
-          const fullSong = await getSongWithContent(songRecord.id);
+          const fullSong = await getSongWithContent(songRecord.uuid);
 
-          // Get usage data from organisation DB
-          const usage = await this.db.getSongUsageFromSetlists(songRecord.id);
+          // Get usage data from organisation DB (using deterministic ID)
+          const usage = await this.db.getSongUsageFromSetlists(fullSong.id);
           if (usage && usage.length > 0) {
             const lastUsage = usage[0];
             fullSong.lastUsageInfo = {
               date: lastUsage.setlistDate,
-              leader: lastUsage.leader,
+              leader: lastUsage.owner || lastUsage.leader, // Use owner with fallback to leader
               key: lastUsage.playedInKey,
             };
           }
 
           songs.push(fullSong);
         } catch (error) {
-          console.error(`Error loading song ${songRecord.id}:`, error);
+          console.error(`Error loading song ${songRecord.uuid}:`, error);
           // Continue with next song
         }
       }
@@ -534,18 +544,18 @@ class PageApp {
 
     // Store the current library song for editing
     this.currentLibrarySong = song;
-    this.currentLibrarySongId = song.id;
+    this.currentLibrarySongId = song.uuid; // Use UUID for lookups
 
-    // Update URL hash if requested
+    // Update URL hash if requested (uses UUID)
     if (updateHash) {
-      window.location.hash = song.id;
+      window.location.hash = song.uuid;
     }
 
-    // Update navigation menu for library song context
+    // Update navigation menu for library song context (uses deterministic ID for usage tracking)
     this.updateNavigationMenu({ type: 'librarySong', songId: song.id });
 
     // Get chordpro content from new model
-    const chordproContent = song.chordproContent || song.chordproText || song.rawChordPro;
+    const chordproContent = song.chordpro;
     if (!chordproContent) {
       console.error('Song has no ChordPro content!', song);
       console.error('Available fields:', Object.keys(song));
@@ -769,12 +779,9 @@ class PageApp {
     }
 
     try {
-      // Use SongsDB for song content
-      const { getGlobalSongsDB } = await import('./songs-db.js');
-      const songsDB = await getGlobalSongsDB();
-
       // Get the updated song from database (in case it was modified)
-      const song = await songsDB.getSong(this.currentLibrarySongId);
+      // currentLibrarySongId is the UUID
+      const song = await this.db.getSong(this.currentLibrarySongId);
 
       if (!song) {
         console.error('Song not found in database');
@@ -782,16 +789,18 @@ class PageApp {
       }
 
       // Update the timestamp
-      song.updatedAt = new Date().toISOString();
+      song.modifiedDate = new Date().toISOString();
 
-      // Save back to global songs database
-      await songsDB.saveSong(song);
+      // Save back to per-org database
+      await this.db.saveSong(song);
 
-      console.log('Saved song to global database:', song.title);
+      console.log('Saved song to database:', song.title);
 
       // Refresh the library song view with updated data
-      this.currentLibrarySong = song;
-      await this.viewLibrarySong(song);
+      const { getSongWithContent } = await import('./song-utils.js');
+      const fullSong = await getSongWithContent(song.uuid, this.db);
+      this.currentLibrarySong = fullSong;
+      await this.viewLibrarySong(fullSong);
     } catch (error) {
       console.error('Error saving library song:', error);
     }
@@ -920,7 +929,7 @@ class PageApp {
       setlistId: entry.setlistId,
       date: entry.setlistDate,
       playedInKey: entry.playedInKey,
-      leader: entry.leader,
+      leader: entry.owner || entry.leader, // Use owner with fallback to leader
       setlistName: entry.setlistName,
     }));
 
@@ -1097,7 +1106,7 @@ class PageApp {
         formattedDate: this.formatDate(appearance.date),
         weeksAgo: this.getWeeksAgo(appearance.date),
         playedInKey: appearance.playedInKey,
-        leader: appearance.leader,
+        leader: appearance.owner || appearance.leader, // Use owner with fallback to leader
       }));
   }
 
@@ -1129,7 +1138,7 @@ class PageApp {
   async runImport() {
     // Dynamically import the importer
     const { SetlistImporter } = await import('./import.js');
-    const importer = new SetlistImporter(getCurrentOrganisation());
+    const importer = new SetlistImporter(); // Defaults to 'TEST' organisation
     await importer.init();
 
     // Show progress modal
@@ -1269,6 +1278,8 @@ class PageApp {
 
       // Parse each song on-demand
       const songs = [];
+      const { getSongById } = await import('./song-utils.js');
+
       for (const songEntry of setlist.songs) {
         // Get source text (local edits or from Songs collection)
         let sourceText;
@@ -1276,11 +1287,10 @@ class PageApp {
         if (songEntry.chordproEdits) {
           sourceText = songEntry.chordproEdits;
         } else {
-          // Use new model - get song with content
-          const { getSongWithContent } = await import('./song-utils.js');
+          // Get song with content using deterministic ID
           try {
-            canonicalSong = await getSongWithContent(songEntry.songId, songEntry.versionId || null);
-            sourceText = canonicalSong.chordproContent;
+            canonicalSong = await getSongById(songEntry.songId, this.db);
+            sourceText = canonicalSong.chordpro;
           } catch (error) {
             console.error('[ERROR] Song not found in DB:', songEntry.songId, error);
             continue;
@@ -1292,7 +1302,7 @@ class PageApp {
 
         // Capture original key before any transposition so we can always return to it
         const originalKey = parsed.metadata.key || null;
-        const targetKey = songEntry.modifications.targetKey || null;
+        const targetKey = songEntry.key || songEntry.modifications.targetKey || null; // Use key with fallback
 
         // Apply transposition if requested and we have a reference key
         if (targetKey && originalKey && targetKey !== originalKey) {
@@ -1304,8 +1314,9 @@ class PageApp {
         }
 
         // Apply BPM override
-        if (songEntry.modifications.bpmOverride) {
-          parsed.metadata.tempo = songEntry.modifications.bpmOverride;
+        const bpmOverride = songEntry.tempo || songEntry.modifications.bpmOverride; // Use tempo with fallback
+        if (bpmOverride) {
+          parsed.metadata.tempo = bpmOverride;
         }
 
         // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
@@ -1351,7 +1362,7 @@ class PageApp {
           originalKey: originalKey, // Immutable original
           currentKey: parsed.metadata.key,
           currentBPM: currentBPM,
-          currentFontSize: songEntry.modifications.fontSize || CONFIG.DEFAULT_FONT_SIZE,
+          currentFontSize: CONFIG.DEFAULT_FONT_SIZE, // fontSize is now in setlist_local, not modifications
           songId: songEntry.songId,
           sourceText: sourceText,
           hasLocalEdits: songEntry.chordproEdits !== null,
@@ -1368,16 +1379,8 @@ class PageApp {
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs);
 
-      // Load section states from setlist modifications (not localStorage anymore)
+      // Initialize section states (now loaded from setlist_local, not from setlist modifications)
       this.sectionState = {};
-      setlist.songs.forEach((songEntry, index) => {
-        if (songEntry.modifications.sectionStates) {
-          this.sectionState[index] = {};
-          for (const [sectionIdx, state] of Object.entries(songEntry.modifications.sectionStates)) {
-            this.sectionState[index][parseInt(sectionIdx)] = state;
-          }
-        }
-      });
 
       // Check hash BEFORE rendering to determine initial view state
       const hash = window.location.hash;
@@ -1712,22 +1715,8 @@ class PageApp {
 
       // Save setlist to IndexedDB
       if (this.currentSetlist) {
-        // Update modifications for each song
-        this.songs.forEach((song, index) => {
-          this.currentSetlist.songs[index].modifications.fontSize = song.currentFontSize;
-
-          // Save section states
-          const sectionStates = {};
-          if (this.sectionState[index]) {
-            for (const [sectionIdx, state] of Object.entries(this.sectionState[index])) {
-              sectionStates[sectionIdx] = state;
-            }
-          }
-          this.currentSetlist.songs[index].modifications.sectionStates = sectionStates;
-        });
-
         // Update timestamp
-        this.currentSetlist.updatedAt = new Date().toISOString();
+        this.currentSetlist.modifiedDate = new Date().toISOString();
 
         // Save to database
         await this.db.saveSetlist(this.currentSetlist);
@@ -1870,12 +1859,11 @@ class PageApp {
     // Show loading state
     songInfoEl.loading = true;
 
-    // Load full song data from SongsDB to get metadata/versions
+    // Load full song data from database to get metadata/variants
     let fullSong = null;
     try {
-      const { getSongWithContent } = await import('./song-utils.js');
-      const versionId = song.versionId || song.currentVersionId || null;
-      fullSong = await getSongWithContent(song.songId, versionId);
+      const { getSongById } = await import('./song-utils.js');
+      fullSong = await getSongById(song.songId, this.db);
     } catch (error) {
       console.error('Could not load full song data for:', song.songId, error);
     }
@@ -1892,7 +1880,7 @@ class PageApp {
       setlistId: entry.setlistId,
       date: entry.setlistDate,
       playedInKey: entry.playedInKey,
-      leader: entry.leader,
+      leader: entry.owner || entry.leader, // Use owner with fallback to leader
       setlistName: entry.setlistName,
     }));
 
@@ -2402,22 +2390,8 @@ class PageApp {
 
           // Save setlist to IndexedDB
           if (this.currentSetlist) {
-            // Update modifications for each song
-            this.songs.forEach((song, index) => {
-              this.currentSetlist.songs[index].modifications.fontSize = song.currentFontSize;
-
-              // Save section states
-              const sectionStates = {};
-              if (this.sectionState[index]) {
-                for (const [sectionIdx, state] of Object.entries(this.sectionState[index])) {
-                  sectionStates[sectionIdx] = state;
-                }
-              }
-              this.currentSetlist.songs[index].modifications.sectionStates = sectionStates;
-            });
-
             // Update timestamp
-            this.currentSetlist.updatedAt = new Date().toISOString();
+            this.currentSetlist.modifiedDate = new Date().toISOString();
 
             // Save to database
             await this.db.saveSetlist(this.currentSetlist);
@@ -2553,8 +2527,8 @@ class PageApp {
 
     console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`);
 
-    // Update modification in setlist
-    this.currentSetlist.songs[this.currentSongIndex].modifications.targetKey = newKey;
+    // Update key in setlist (use new schema property)
+    this.currentSetlist.songs[this.currentSongIndex].key = newKey;
 
     // Re-render the song with transposition
     await this.reRenderSong(this.currentSongIndex);
@@ -2969,7 +2943,7 @@ class PageApp {
         this.songs.splice(newIndex, 0, movedRuntimeSong);
 
         // Save to database
-        this.currentSetlist.updatedAt = new Date().toISOString();
+        this.currentSetlist.modifiedDate = new Date().toISOString();
         await this.db.saveSetlist(this.currentSetlist);
         overviewNeedsRefresh = true;
 
@@ -3225,16 +3199,17 @@ class PageApp {
     // Re-parse from source
     const parsed = this.parser.parse(song.sourceText);
 
-    // Apply transposition if targetKey is set
-    const targetKey = songEntry.modifications.targetKey || song.originalKey;
+    // Apply transposition if targetKey is set (use new schema with fallback)
+    const targetKey = songEntry.key || songEntry.modifications.targetKey || song.originalKey;
     if (targetKey && targetKey !== song.originalKey) {
       transposeSong(parsed, song.originalKey, targetKey);
       parsed.metadata.key = targetKey;
     }
 
-    // Apply BPM override
-    if (songEntry.modifications.bpmOverride) {
-      parsed.metadata.tempo = songEntry.modifications.bpmOverride;
+    // Apply BPM override (use new schema with fallback)
+    const bpmOverride = songEntry.tempo || songEntry.modifications.bpmOverride;
+    if (bpmOverride) {
+      parsed.metadata.tempo = bpmOverride;
     }
 
     // Normalize tempo + signature so media player gets consistent payloads
@@ -3281,15 +3256,8 @@ class PageApp {
         await songDisplay.updateComplete;
       }
 
-      // Re-apply section states
-      const savedSectionStates = songEntry.modifications.sectionStates || {};
-      for (const [sectionIdx, state] of Object.entries(savedSectionStates)) {
-        const idx = parseInt(sectionIdx);
-        if (!this.sectionState[songIndex]) {
-          this.sectionState[songIndex] = {};
-        }
-        this.sectionState[songIndex][idx] = state;
-      }
+      // Section states are now loaded from setlist_local, not from setlist modifications
+      // No need to re-apply them here during re-render
 
       // Wait for song-section elements to be ready before initializing
       await customElements.whenDefined('song-section');
@@ -3508,11 +3476,9 @@ class PageApp {
         state: 'loading',
       });
 
-      // Load songs from global songs DB and parse titles
-      const { getGlobalSongsDB } = await import('./songs-db.js');
+      // Load songs from per-org database and parse titles
       const { getSongWithContent } = await import('./song-utils.js');
-      const songsDB = await getGlobalSongsDB();
-      const songRecords = await songsDB.getAllSongs();
+      const songRecords = await this.db.getAllSongs();
       console.log('[Add Song Modal] Loaded song records:', songRecords.length);
 
       if (songRecords.length === 0) {
@@ -3524,14 +3490,22 @@ class PageApp {
         return;
       }
 
+      // Group songs by deterministic ID to get unique songs (not all variants)
+      const songsById = new Map();
+      for (const song of songRecords) {
+        if (song.isDefault || !songsById.has(song.id)) {
+          songsById.set(song.id, song);
+        }
+      }
+
       // Parse titles from chordpro
       const songs = [];
-      for (const songRecord of songRecords) {
+      for (const songRecord of songsById.values()) {
         try {
-          const fullSong = await getSongWithContent(songRecord.id);
+          const fullSong = await getSongWithContent(songRecord.uuid);
           songs.push(fullSong);
         } catch (error) {
-          console.error(`Error loading song ${songRecord.id}:`, error);
+          console.error(`Error loading song ${songRecord.uuid}:`, error);
         }
       }
 
@@ -3577,8 +3551,10 @@ class PageApp {
   }
 
   async getSetlistLeader() {
-    if (this.currentSetlist?.leader && this.currentSetlist.leader.trim()) {
-      return this.currentSetlist.leader.trim();
+    // Use owner with fallback to leader for backward compatibility
+    const ownerOrLeader = this.currentSetlist?.owner || this.currentSetlist?.leader;
+    if (ownerOrLeader && ownerOrLeader.trim()) {
+      return ownerOrLeader.trim();
     }
 
     // Fallback: scan song usage entries for this setlist
@@ -3591,8 +3567,9 @@ class PageApp {
       try {
         const usage = await this.db.getSongUsageFromSetlists(songEntry.songId);
         const historyEntry = usage.find(h => h.setlistId === this.currentSetlist.id);
-        if (historyEntry?.leader && historyEntry.leader.trim()) {
-          return historyEntry.leader.trim();
+        const historyOwnerOrLeader = historyEntry?.owner || historyEntry?.leader;
+        if (historyOwnerOrLeader && historyOwnerOrLeader.trim()) {
+          return historyOwnerOrLeader.trim();
         }
       } catch (error) {
         console.warn('[SetlistInfo] Failed to load usage for song', songEntry.songId, error);
@@ -3676,7 +3653,7 @@ class PageApp {
 
       // Add to setlist
       setlist.songs.push(newSongEntry);
-      setlist.updatedAt = new Date().toISOString();
+      setlist.modifiedDate = new Date().toISOString();
 
       // Save to database
       await this.db.saveSetlist(setlist);
@@ -3731,7 +3708,7 @@ class PageApp {
         song.order = i;
       });
 
-      setlist.updatedAt = new Date().toISOString();
+      setlist.modifiedDate = new Date().toISOString();
 
       // Save to database
       await this.db.saveSetlist(setlist);

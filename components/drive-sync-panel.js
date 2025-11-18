@@ -1,6 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import { isSyncAvailable, createSyncOrchestrator } from '../js/sync-orchestrator.js';
-import { getCurrentOrganisation } from '../js/workspace.js';
+import { getCurrentOrganisation } from '../js/organisation.js';
 
 /**
  * DriveSyncPanel Component
@@ -195,11 +195,10 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Initializing...' };
 
     try {
-      const orgName = getCurrentOrganisation();
-      const orgId = `org-${orgName.toLowerCase().replace(/\s+/g, '-')}`;
+      const { id, name } = getCurrentOrganisation();
 
       // Use the SW-compatible orchestrator
-      const orchestrator = await createSyncOrchestrator(orgName, orgId);
+      const orchestrator = await createSyncOrchestrator(name, id);
 
       await orchestrator.sync(progress => {
         this.syncProgress = progress;
@@ -241,11 +240,10 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting clear and re-upload...' };
 
     try {
-      const orgName = getCurrentOrganisation();
-      const orgId = `org-${orgName.toLowerCase().replace(/\s+/g, '-')}`;
+      const { id, name } = getCurrentOrganisation();
 
       // Use the SW-compatible orchestrator
-      const orchestrator = await createSyncOrchestrator(orgName, orgId);
+      const orchestrator = await createSyncOrchestrator(name, id);
 
       await orchestrator.clearAndReupload(progress => {
         this.syncProgress = progress;
@@ -348,13 +346,19 @@ export class DriveSyncPanel extends LitElement {
           <span class="status-icon"> ${isError ? '❌' : isSuccess ? '✓' : '🔄'} </span>
           <span class="status-text">${message}</span>
         </div>
-        ${!isError && !isSuccess
-          ? html`
-              <div class="progress-bar">
-                <div class="progress-fill" style="width: 50%"></div>
-              </div>
-            `
-          : ''}
+        ${!isError && !isSuccess ? this.renderProgressBar() : ''}
+      </div>
+    `;
+  }
+
+  renderProgressBar() {
+    const { current, total } = this.syncProgress || {};
+    const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0;
+    const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null;
+    const width = percent !== null ? `${percent}%` : '50%';
+    return html`
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${width}"></div>
       </div>
     `;
   }

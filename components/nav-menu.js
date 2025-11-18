@@ -1,9 +1,6 @@
 import { LitElement, html, css } from 'lit';
 import './app-modal.js';
 import './app-settings.js';
-import { SetalightDB } from '../js/db.js';
-import { getGlobalSongsDB } from '../js/songs-db.js';
-import { getCurrentOrganisation } from '../js/workspace.js'; // Used in _handleClearDatabaseRequested
 
 /**
  * NavMenu Component
@@ -453,12 +450,9 @@ export class NavMenu extends LitElement {
     if (!confirmed) return;
 
     try {
-      const db = new SetalightDB(getCurrentOrganisation());
-      await db.init();
+      const { getCurrentDB } = await import('../js/db.js');
+      const db = await getCurrentDB();
       await db.clearAll();
-
-      const songsDb = await getGlobalSongsDB();
-      await songsDb.clearAll();
 
       localStorage.clear();
       sessionStorage.clear();

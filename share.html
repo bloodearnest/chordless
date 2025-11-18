@@ -136,8 +136,9 @@
           // Import into database
           showLoading('Importing into your library...');
 
-          const { getCurrentOrganisation } = await import('/js/workspace.js');
-          const db = new SetalightDB(getCurrentOrganisation());
+          const { getCurrentOrganisation } = await import('/js/organisation.js');
+          const { getCurrentDB } = await import('/js/db.js');
+          const db = await getCurrentDB();
           await db.init();
 
           // Check if setlist already exists

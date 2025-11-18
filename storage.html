@@ -59,8 +59,6 @@
     <script type="importmap" src="./importmap.json"></script>
 
     <script type="module">
-      import { SetalightDB } from '/js/db.js';
-      import { getCurrentOrganisation } from '/js/workspace.js';
       // Set window name for bookmarklet
       window.name = 'setalight';
 
@@ -122,8 +120,8 @@
           if (!confirmed) return;
 
           try {
-            const db = new SetalightDB(getCurrentOrganisation());
-            await db.init();
+            const { getCurrentDB } = await import('/js/db.js');
+            const db = await getCurrentDB();
             await db.clearAll();
 
             localStorage.clear();

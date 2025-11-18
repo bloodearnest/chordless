@@ -1,16 +1,14 @@
 // Import Song Handler for Setalight
 // Handles bookmarklet imports with user choice UI
 
-import { SetalightDB, createSetlist, getNextSunday, determineSetlistType } from './db.js';
+import { getCurrentDB, createSetlist, getNextSunday, determineSetlistType } from './db.js';
 import { createSong, findExistingSong } from './song-utils.js';
-import { getCurrentOrganisation } from './workspace.js';
 
 (async function () {
   'use strict';
 
   // Initialize database
-  const db = new SetalightDB(getCurrentOrganisation());
-  await db.init();
+  const db = await getCurrentDB();
 
   let pendingSong = null;
   let duplicateChoice = null; // 'update' or 'use-existing'
@@ -59,12 +57,12 @@ import { getCurrentOrganisation } from './workspace.js';
       const title = metadata.title || 'Untitled';
 
       // Check if song already exists
-      const existing = await findExistingSong(ccliNumber, title, chordproText);
+      const existing = await findExistingSong(ccliNumber, title, db);
 
       if (existing) {
-        console.log('[Import] Song already exists:', title, `(${existing.matchType})`);
-        pendingSong = existing.song;
-        await showChoices(existing.song, existing.song);
+        console.log('[Import] Song already exists:', title);
+        pendingSong = existing;
+        await showChoices(existing, existing);
         return;
       }
 
@@ -174,7 +172,7 @@ import { getCurrentOrganisation } from './workspace.js';
 
   async function saveSongAndAddToSetlist(setlistId) {
     try {
-      // Song is already saved to global DB when created/found
+      // Song is already saved to per-org DB when created/found
       console.log('[Import] Using song:', pendingSong.id);
 
       // Load setlist
@@ -183,21 +181,18 @@ import { getCurrentOrganisation } from './workspace.js';
         throw new Error('Setlist not found');
       }
 
-      // Add song to setlist
+      // Add song to setlist using new schema
       const newSongEntry = {
         order: setlist.songs.length,
         songId: pendingSong.id,
-        chordproEdits: null,
-        modifications: {
-          targetKey: null,
-          bpmOverride: null,
-          fontSize: 1.6,
-          sectionStates: {},
-        },
+        songUuid: pendingSong.uuid,
+        key: null,
+        tempo: null,
+        notes: '',
       };
 
       setlist.songs.push(newSongEntry);
-      setlist.updatedAt = new Date().toISOString();
+      setlist.modifiedDate = new Date().toISOString();
 
       await db.saveSetlist(setlist);
 
@@ -213,12 +208,12 @@ import { getCurrentOrganisation } from './workspace.js';
 
   async function saveSongOnly() {
     try {
-      // Song is already saved to global DB when created/found
-      console.log('[Import] Song in library:', pendingSong.id);
+      // Song is already saved to per-org DB when created/found
+      console.log('[Import] Song in library:', pendingSong.uuid);
 
       // Get title from song (need to import song-utils to get full song)
       const { getSongWithContent } = await import('./song-utils.js');
-      const fullSong = await getSongWithContent(pendingSong.id);
+      const fullSong = await getSongWithContent(pendingSong.uuid);
 
       if (duplicateChoice !== 'use-existing') {
         alert(`✅ Saved "${fullSong.title}" to song library!`);
@@ -227,7 +222,7 @@ import { getCurrentOrganisation } from './workspace.js';
       }
 
       // Navigate to the specific song in the library
-      window.location.href = `/songs#${pendingSong.id}`;
+      window.location.href = `/songs#${pendingSong.uuid}`;
     } catch (error) {
       console.error('[Import] Error:', error);
       showError(`Failed to save song: ${error.message}`);

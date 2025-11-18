@@ -168,12 +168,12 @@
     <script type="module" src="/js/theme-manager.js"></script>
     <script type="module">
       // Update page title with church name
-      import { getCurrentOrganisation } from '/js/workspace.js';
+      import { getCurrentOrganisation } from '/js/organisation.js';
 
-      const churchName = getCurrentOrganisation();
+      const { name } = getCurrentOrganisation();
       const titleElement = document.getElementById('page-title');
       if (titleElement) {
-        titleElement.textContent = `Setlists - ${churchName}`;
+        titleElement.textContent = `Setlists - ${name}`;
       }
     </script>
 

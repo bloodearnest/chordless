@@ -8,6 +8,10 @@
  * - Push: Upload local changes that haven't been synced
  * - Pull: Download Drive changes that are newer than local
  * - Conflict: If both changed, prefer Drive (or offer manual resolution)
+ *
+ * ⚠️ NOTE ⚠️
+ * Pull-side logic still needs to be brought in line with the new flattened song variant
+ * model, but the push path now targets the per-organisation SetalightDB schema.
  */
 
 import * as DriveAPI from './drive-api.js';
@@ -20,9 +24,7 @@ import {
   generateSetlistFilename,
   generateChordProFilename,
 } from './drive-api.js';
-import { getGlobalSongsDB } from './songs-db.js';
-import { getGlobalChordProDB } from './chordpro-db.js';
-import { SetalightDB } from './db.js';
+import { SetalightDB, getCurrentDB, normalizeTitle } from './db.js';
 import { hashText } from './song-utils.js';
 import { ChordProParser } from './parser.js';
 
@@ -34,8 +36,6 @@ export class DriveSyncManager {
     this.organisationName = organisationName;
     this.organisationId = organisationId;
     this.organisationDb = null;
-    this.songsDb = null;
-    this.chordproDb = null;
     this.driveFolderId = null;
     this.parser = new ChordProParser();
 
@@ -50,11 +50,16 @@ export class DriveSyncManager {
   async init() {
     console.log(`[DriveSync] Initializing sync for: ${this.organisationName}`);
 
-    // Initialize databases
-    this.organisationDb = new SetalightDB(this.organisationName);
-    await this.organisationDb.init();
-    this.songsDb = await getGlobalSongsDB();
-    this.chordproDb = await getGlobalChordProDB();
+    // Initialize database
+    if (typeof window !== 'undefined') {
+      // In main thread we can reuse the same DB instance the UI uses
+      this.organisationDb = await getCurrentDB();
+      // Ensure we keep the actual organisation ID from the DB (in case caller passed null)
+      this.organisationId = this.organisationDb.organisationId;
+    } else {
+      this.organisationDb = new SetalightDB(this.organisationId);
+      await this.organisationDb.init();
+    }
 
     // Find or create organisation folder in Drive
     const result = await DriveAPI.findOrCreateOrganisationFolder(
@@ -255,16 +260,15 @@ export class DriveSyncManager {
     }
 
     // Clear song version sync metadata (batch save)
-    const songs = await this.songsDb.getAllSongs();
+    const songs = await this.organisationDb.getAllSongs();
     for (const song of songs) {
-      for (const version of song.versions) {
-        version.driveChordproFileId = null;
-        version.driveProperties = null;
-        version.lastSyncedAt = null;
-      }
+      song.driveFileId = null;
+      song.driveProperties = null;
+      song.driveModifiedTime = null;
+      song.lastSyncedAt = null;
     }
     if (songs.length > 0) {
-      await this.songsDb.saveSongsBatch(songs);
+      await this.organisationDb.saveSongsBatch(songs);
     }
 
     console.log('[DriveSync] Local sync metadata cleared');
@@ -356,15 +360,19 @@ export class DriveSyncManager {
       return true;
     }
 
-    // Check timestamp first (fast path)
-    const localModified = new Date(setlist.updatedAt);
+    // Check timestamp first (fast path). Comparing dates is far cheaper than
+    // re-hashing the entire setlist payload, so we bail out quickly when the
+    // local record hasn't changed since the last sync.
+    // `modifiedDate` is our local edit timestamp; Drive's `modifiedTime`
+    // (stored in driveModifiedTime) is compared when pulling.
+    const localModified = new Date(setlist.modifiedDate || setlist.updatedAt);
     const lastSynced = setlist.lastSyncedAt ? new Date(setlist.lastSyncedAt) : new Date(0);
 
     if (localModified <= lastSynced) {
       return false; // Not modified since last sync
     }
 
-    // Content might have changed - compare hash
+    // Content might have changed - compare hash (only now, since hashing is more expensive)
     const currentHash = hashText(JSON.stringify(setlist));
     if (setlist._lastSyncHash && setlist._lastSyncHash === currentHash) {
       // Content hasn't actually changed, just timestamp
@@ -378,30 +386,34 @@ export class DriveSyncManager {
    * Smart skip detection: Check if song version needs syncing
    * Uses content hash comparison and Drive existence check
    */
-  async songVersionNeedsSync(song, version, chordproFile) {
+  async songNeedsSync(song, chordproFile) {
     // If never synced, needs sync
-    if (!version.driveChordproFileId) {
+    if (!song.driveFileId) {
       return true;
     }
 
     // Check if file actually exists in Drive
-    if (!this.fileExistsInDrive(version.driveChordproFileId)) {
+    if (!this.fileExistsInDrive(song.driveFileId)) {
+      const songUuid = this.getSongUuid(song);
       console.log(
-        `[DriveSync] Song ${song.id}/${version.id} missing from Drive (driveFileId: ${version.driveChordproFileId}) - forcing re-upload`
+        `[DriveSync] Song ${song.id}/${songUuid} missing from Drive (driveFileId: ${song.driveFileId}) - forcing re-upload`
       );
       return true;
     }
 
-    // Check timestamp first (fast path)
-    const lastSynced = version.lastSyncedAt ? new Date(version.lastSyncedAt) : new Date(0);
-    const localModified = new Date(chordproFile.lastModified);
+    // Check timestamp first (fast path). Comparing dates is cheaper than
+    // re-hashing large chordpro payloads, so we short-circuit when nothing changed.
+    const lastSynced = song.lastSyncedAt ? new Date(song.lastSyncedAt) : new Date(0);
+    const localModified = chordproFile.lastModified
+      ? new Date(chordproFile.lastModified)
+      : new Date(song.modifiedDate || 0);
 
     if (localModified <= lastSynced) {
       return false; // Not modified since last sync
     }
 
-    // Check content hash
-    if (version.driveProperties?.contentHash === chordproFile.contentHash) {
+    // Check content hash (only if timestamps disagree to avoid unnecessary hashing)
+    if (song.driveProperties?.contentHash === chordproFile.contentHash) {
       // Content hash matches, no changes
       return false;
     }
@@ -417,12 +429,13 @@ export class DriveSyncManager {
 
     // Pull setlists
     if (progressCallback)
-      progressCallback({ stage: 'pulling', message: 'Downloading setlists...' });
-    await this.pullSetlists();
+      progressCallback({ stage: 'pulling', message: 'Checking setlists...', current: 0, total: 1 });
+    await this.pullSetlists(progressCallback);
 
     // Pull songs (chordpro files)
-    if (progressCallback) progressCallback({ stage: 'pulling', message: 'Downloading songs...' });
-    await this.pullSongs();
+    if (progressCallback)
+      progressCallback({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 });
+    await this.pullSongs(progressCallback);
 
     console.log('[DriveSync] Pull complete');
   }
@@ -430,18 +443,18 @@ export class DriveSyncManager {
   /**
    * Pull setlists from Drive (with batch database operations)
    */
-  async pullSetlists() {
+  async pullSetlists(progressCallback = null) {
     console.log('[DriveSync] Pulling setlists...');
 
     // Get all setlists from Drive
     const driveSetlists = await DriveAPI.listSetlists(this.driveFolderId);
     console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`);
 
-    const setlistsToSave = [];
+    const downloadQueue = [];
 
     for (const driveFile of driveSetlists) {
       try {
-        const setlistId = driveFile.name.replace('.json', '');
+        const setlistId = driveFile.appProperties?.setlistId || driveFile.name.replace('.json', '');
         const driveModifiedTime = new Date(driveFile.modifiedTime);
 
         // Check if we have this setlist locally
@@ -450,19 +463,10 @@ export class DriveSyncManager {
         if (!localSetlist) {
           // New setlist, download it
           console.log(`[DriveSync] Downloading new setlist: ${setlistId}`);
-          const setlistData = await DriveAPI.downloadSetlist(driveFile.id);
-
-          // Add Drive metadata
-          setlistData.driveFileId = driveFile.id;
-          setlistData.driveModifiedTime = driveFile.modifiedTime;
-          setlistData.lastSyncedAt = new Date().toISOString();
-          setlistData._lastSyncHash = hashText(JSON.stringify(setlistData));
-
-          setlistsToSave.push(setlistData);
-          console.log(`[DriveSync] ✅ Downloaded setlist: ${setlistId}`);
+          downloadQueue.push({ driveFile, setlistId });
         } else if (localSetlist.driveFileId === driveFile.id) {
           // Existing setlist, check if Drive version is newer
-          const localModified = new Date(localSetlist.updatedAt);
+          const localModified = new Date(localSetlist.modifiedDate || localSetlist.updatedAt);
           const lastSynced = localSetlist.lastSyncedAt
             ? new Date(localSetlist.lastSyncedAt)
             : new Date(0);
@@ -477,14 +481,7 @@ export class DriveSyncManager {
               // TODO: Implement proper conflict resolution
             }
 
-            const setlistData = await DriveAPI.downloadSetlist(driveFile.id);
-            setlistData.driveFileId = driveFile.id;
-            setlistData.driveModifiedTime = driveFile.modifiedTime;
-            setlistData.lastSyncedAt = new Date().toISOString();
-            setlistData._lastSyncHash = hashText(JSON.stringify(setlistData));
-
-            setlistsToSave.push(setlistData);
-            console.log(`[DriveSync] ✅ Updated setlist from Drive: ${setlistId}`);
+            downloadQueue.push({ driveFile, setlistId });
           }
         }
       } catch (error) {
@@ -492,10 +489,65 @@ export class DriveSyncManager {
       }
     }
 
-    // Batch save all downloaded/updated setlists
+    if (downloadQueue.length === 0) {
+      if (progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: 'Setlists already up to date',
+          current: 1,
+          total: 1,
+        });
+      }
+      return;
+    }
+
+    if (progressCallback) {
+      progressCallback({
+        stage: 'pulling',
+        message: `Downloading ${downloadQueue.length} setlists...`,
+        current: 0,
+        total: downloadQueue.length,
+      });
+    }
+
+    const setlistsToSave = [];
+    let completed = 0;
+    for (let i = 0; i < downloadQueue.length; i += this.CONCURRENT_LIMIT) {
+      const batch = downloadQueue.slice(i, i + this.CONCURRENT_LIMIT);
+
+      const results = await Promise.allSettled(
+        batch.map(async ({ driveFile, setlistId }) => {
+          const setlistData = await DriveAPI.downloadSetlist(driveFile.id);
+          setlistData.id = setlistData.id || setlistId;
+          setlistData.driveFileId = driveFile.id;
+          setlistData.driveModifiedTime = driveFile.modifiedTime;
+          setlistData.lastSyncedAt = new Date().toISOString();
+          setlistData._lastSyncHash = hashText(JSON.stringify(setlistData));
+          return setlistData;
+        })
+      );
+
+      results.forEach(result => {
+        if (result.status === 'fulfilled') {
+          setlistsToSave.push(result.value);
+          completed++;
+          if (progressCallback) {
+            progressCallback({
+              stage: 'pulling',
+              message: `Downloaded ${completed}/${downloadQueue.length} setlists`,
+              current: completed,
+              total: downloadQueue.length,
+            });
+          }
+        } else {
+          console.error('[DriveSync] Failed to download setlist:', result.reason);
+        }
+      });
+    }
+
     if (setlistsToSave.length > 0) {
       await this.organisationDb.saveSetlistsBatch(setlistsToSave);
-      console.log(`[DriveSync] ✅ Batch saved ${setlistsToSave.length} setlists`);
+      console.log(`[DriveSync] ✅ Synced ${setlistsToSave.length} setlists from Drive`);
     }
   }
 
@@ -516,18 +568,231 @@ export class DriveSyncManager {
    * 4. Download/update local database with corrected metadata
    * 5. Parse chordpro content and create/update song records
    */
-  async pullSongs() {
+  async pullSongs(progressCallback = null) {
     console.log('[DriveSync] Pulling songs...');
-    // TODO: Implement song pulling with duplicate detection
-    //
-    // Implementation steps:
-    // 1. List all files: driveRequest(`/files?q='${songsFolderId}' in parents and mimeType='text/plain'&fields=files(id,name,appProperties,modifiedTime)`)
-    // 2. Group by songId from appProperties
-    // 3. Detect duplicates: const versionIdMap = new Map(); // versionId -> [driveFileId1, driveFileId2...]
-    // 4. Generate new versionId: `version-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    // 5. Update Drive file metadata via PATCH request
-    // 6. Download content and save to local database
-    console.log('[DriveSync] Song pulling not yet implemented');
+
+    const songsFolderId = await this.getCachedSongsFolder();
+    const driveFiles = await this.listDriveSongFiles(songsFolderId);
+    console.log(`[DriveSync] Found ${driveFiles.length} chord charts in Drive`);
+
+    const latestByUuid = new Map();
+    for (const file of driveFiles) {
+      const props = file.appProperties || {};
+      if (props.setalightType && props.setalightType !== 'chordpro') continue;
+      const songUuid = this.getDriveSongUuid(props, file.id);
+      if (!songUuid) {
+        console.warn(`[DriveSync] Skipping chord chart with no song UUID: ${file.name}`);
+        continue;
+      }
+      const driveModified = new Date(file.modifiedTime || file.createdTime || 0);
+      const existing = latestByUuid.get(songUuid);
+      if (existing && driveModified <= existing.driveModified) {
+        if (driveModified.getTime() !== existing.driveModified.getTime()) {
+          console.warn(`[DriveSync] Duplicate chord chart for ${songUuid}, keeping newer file`);
+        }
+        continue;
+      }
+      if (existing) {
+        console.warn(
+          `[DriveSync] Duplicate chord chart for ${songUuid}, replacing with newer file`
+        );
+      }
+      latestByUuid.set(songUuid, { file, props, songUuid, driveModified });
+    }
+
+    if (latestByUuid.size === 0) {
+      console.log('[DriveSync] No chord charts found in Drive');
+      if (progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: 'No songs found in Drive',
+          current: 1,
+          total: 1,
+        });
+      }
+      return;
+    }
+
+    const downloads = [];
+    for (const entry of latestByUuid.values()) {
+      const { songUuid, file, props, driveModified } = entry;
+      const localSong = await this.organisationDb.getSong(songUuid);
+      const chordproRecord =
+        localSong && localSong.chordproFileId
+          ? await this.organisationDb.getChordPro(localSong.chordproFileId)
+          : null;
+
+      const lastSynced = localSong?.lastSyncedAt ? new Date(localSong.lastSyncedAt) : new Date(0);
+      const remoteHash = props.contentHash || null;
+      const localHash = localSong?.driveProperties?.contentHash || localSong?.contentHash || null;
+
+      let needsDownload = false;
+      if (!localSong) {
+        needsDownload = true;
+      } else if (!localSong.driveFileId || localSong.driveFileId !== file.id) {
+        needsDownload = true;
+      } else if (driveModified > lastSynced) {
+        if (!remoteHash || remoteHash !== localHash) {
+          needsDownload = true;
+        }
+      } else if (!chordproRecord) {
+        needsDownload = true;
+      }
+
+      if (needsDownload) {
+        downloads.push({ songUuid, file, props, localSong });
+      }
+    }
+
+    if (downloads.length === 0) {
+      console.log('[DriveSync] Local song library already up to date');
+      if (progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: 'Songs already up to date',
+          current: 1,
+          total: 1,
+        });
+      }
+      return;
+    }
+
+    console.log(`[DriveSync] Downloading ${downloads.length} songs from Drive...`);
+    let downloaded = 0;
+
+    if (progressCallback) {
+      progressCallback({
+        stage: 'pulling',
+        message: `Downloading ${downloads.length} songs...`,
+        current: 0,
+        total: downloads.length,
+      });
+    }
+
+    for (let i = 0; i < downloads.length; i += this.CONCURRENT_LIMIT) {
+      const batch = downloads.slice(i, i + this.CONCURRENT_LIMIT);
+      const results = await Promise.allSettled(batch.map(item => this.downloadSongFromDrive(item)));
+
+      const succeeded = results.filter(r => r.status === 'fulfilled').length;
+      downloaded += succeeded;
+      if (progressCallback && succeeded > 0) {
+        progressCallback({
+          stage: 'pulling',
+          message: `Downloaded ${downloaded}/${downloads.length} songs`,
+          current: downloaded,
+          total: downloads.length,
+        });
+      }
+
+      results
+        .filter(r => r.status === 'rejected')
+        .forEach(result => console.error('[DriveSync] Failed to download song:', result.reason));
+    }
+
+    console.log(`[DriveSync] ✅ Pulled ${downloaded} songs from Drive`);
+  }
+
+  async listDriveSongFiles(folderId) {
+    const files = [];
+    let pageToken = null;
+
+    do {
+      const query = `'${folderId}' in parents and trashed=false and mimeType='text/plain'`;
+      let url =
+        `/files?q=${encodeURIComponent(
+          query
+        )}&spaces=drive&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,appProperties,size)` +
+        '&pageSize=1000';
+      if (pageToken) {
+        url += `&pageToken=${pageToken}`;
+      }
+
+      const result = await driveRequest(url);
+      if (result.files) {
+        files.push(...result.files);
+      }
+      pageToken = result.nextPageToken || null;
+    } while (pageToken);
+
+    return files;
+  }
+
+  getDriveSongUuid(props, fallbackId) {
+    return props.songUuid || props.versionId || props.songId || fallbackId || null;
+  }
+
+  getTitleFromFilename(filename) {
+    if (!filename) return 'Untitled';
+    return filename.replace(/\.[^/.]+$/, '');
+  }
+
+  async downloadSongFromDrive({ songUuid, file, props, localSong }) {
+    const chordproContent = await DriveAPI.downloadChordProFile(file.id);
+    const chordproFileId = localSong?.chordproFileId || `chordpro-${crypto.randomUUID()}`;
+
+    const parsed = this.parser.parse(chordproContent);
+    const metadata = parsed.metadata || {};
+    const ccliNumber =
+      metadata.ccliSongNumber || metadata.ccli || props.ccliNumber || localSong?.ccliNumber || null;
+    const title =
+      metadata.title || props.title || localSong?.title || this.getTitleFromFilename(file.name);
+    const titleNormalized = normalizeTitle(title);
+    const deterministicId =
+      props.songId ||
+      localSong?.id ||
+      (ccliNumber ? `ccli-${ccliNumber}` : `title-${titleNormalized}`);
+    const variantLabel = props.variantLabel || localSong?.variantLabel || 'Original';
+    const contentHash = props.contentHash || hashText(chordproContent);
+
+    await this.organisationDb.saveChordPro({
+      id: chordproFileId,
+      content: chordproContent,
+      contentHash,
+      lastModified: new Date(file.modifiedTime || Date.now()).getTime(),
+    });
+
+    const songRecord = {
+      uuid: songUuid,
+      id: deterministicId,
+      variantOf: props.variantOf || localSong?.variantOf || null,
+      isDefault:
+        props.isDefault === 'true' ||
+        props.isDefault === true ||
+        localSong?.isDefault ||
+        !props.variantOf,
+      variantLabel,
+      chordproFileId,
+      ccliNumber,
+      title,
+      titleNormalized,
+      author: metadata.artist || metadata.author || localSong?.author || null,
+      copyright: metadata.copyright || localSong?.copyright || null,
+      key: metadata.key || localSong?.key || null,
+      tempo: metadata.tempo || localSong?.tempo || null,
+      time: metadata.time || localSong?.time || null,
+      importDate:
+        localSong?.importDate || props.importDate || file.createdTime || new Date().toISOString(),
+      importUser: localSong?.importUser || props.importUser || null,
+      importSource: 'drive',
+      sourceUrl: localSong?.sourceUrl || null,
+      modifiedDate: new Date(file.modifiedTime || file.createdTime || Date.now()).toISOString(),
+      driveFileId: file.id,
+      driveModifiedTime: file.modifiedTime,
+      lastSyncedAt: new Date().toISOString(),
+      driveProperties: {
+        songId: deterministicId,
+        songUuid,
+        contentHash,
+        ccliNumber: ccliNumber || '',
+        title,
+        titleNormalized,
+        variantLabel,
+        appVersion: props.appVersion || '1.0.0',
+      },
+      contentHash,
+    };
+
+    await this.organisationDb.saveSong(songRecord);
   }
 
   /**
@@ -542,12 +807,24 @@ export class DriveSyncManager {
     await this.buildDriveInventory();
 
     // Push setlists
-    if (progressCallback) progressCallback({ stage: 'pushing', message: 'Uploading setlists...' });
-    await this.pushSetlists();
+    if (progressCallback)
+      progressCallback({
+        stage: 'pushing',
+        message: 'Scanning setlists...',
+        current: 0,
+        total: 1,
+      });
+    await this.pushSetlists(progressCallback);
 
     // Push songs (chordpro files)
-    if (progressCallback) progressCallback({ stage: 'pushing', message: 'Uploading songs...' });
-    await this.pushSongs();
+    if (progressCallback)
+      progressCallback({
+        stage: 'pushing',
+        message: 'Scanning songs...',
+        current: 0,
+        total: 1,
+      });
+    await this.pushSongs(progressCallback);
 
     console.log('[DriveSync] Push complete');
   }
@@ -570,6 +847,14 @@ export class DriveSyncManager {
     }
 
     console.log(`[DriveSync] ${setlistsToSync.length} setlists need syncing`);
+    if (progressCallback) {
+      progressCallback({
+        stage: 'pushing',
+        message: `Uploading ${setlistsToSync.length} setlists...`,
+        current: 0,
+        total: Math.max(1, setlistsToSync.length),
+      });
+    }
 
     // Separate new setlists from updates (also check Drive existence)
     const newSetlists = [];
@@ -607,7 +892,7 @@ export class DriveSyncManager {
           const filename = generateSetlistFilename(
             setlist.date,
             setlist.type,
-            setlist.leader,
+            setlist.owner || setlist.leader,
             setlist.name
           );
 
@@ -746,295 +1031,269 @@ export class DriveSyncManager {
   }
 
   /**
-   * Push songs to Drive (flat structure with batch upload)
+   * Push songs (flattened variants) to Drive
    */
   async pushSongs(progressCallback = null) {
     console.log('[DriveSync] Pushing songs...');
 
-    // Get all songs
-    const songs = await this.songsDb.getAllSongs();
-    console.log(`[DriveSync] Found ${songs.length} songs to sync`);
+    const songs = await this.organisationDb.getAllSongs();
+    console.log(`[DriveSync] Found ${songs.length} local song variants`);
 
-    // Group songs that need syncing and separate new vs updates
-    const songsToSync = [];
-    const updatesToProcess = []; // Versions that need updating (not batch-able)
-    let totalVersions = 0;
+    const newSongs = [];
+    const updatesToProcess = [];
+    let totalVariants = 0;
 
     for (const song of songs) {
-      let needsSync = false;
-      const versionsToSync = [];
+      if (!song.chordproFileId) continue;
 
-      // Check each version
-      for (const version of song.versions) {
-        const chordproFile = await this.chordproDb.get(version.chordproFileId);
-        if (!chordproFile) continue;
-
-        if (await this.songVersionNeedsSync(song, version, chordproFile)) {
-          // Check if file actually exists in Drive
-          const existsInDrive =
-            version.driveChordproFileId && this.fileExistsInDrive(version.driveChordproFileId);
-
-          if (existsInDrive) {
-            // File exists in Drive, needs update (can't batch)
-            updatesToProcess.push({ song, version, chordproFile });
-            totalVersions++;
-          } else {
-            // New file or missing from Drive, can batch upload
-            // Clear stale Drive ID if file is missing
-            if (version.driveChordproFileId && !existsInDrive) {
-              console.log(`[DriveSync] Clearing stale Drive ID for ${song.id}/${version.id}`);
-              version.driveChordproFileId = null;
-              version.driveProperties = null;
-            }
-            versionsToSync.push({ version, chordproFile });
-            needsSync = true;
-            totalVersions++;
-          }
-        }
+      const chordproFile = await this.organisationDb.getChordPro(song.chordproFileId);
+      if (!chordproFile) {
+        console.warn(`[DriveSync] ChordPro file not found: ${song.chordproFileId}`);
+        continue;
       }
 
-      if (needsSync) {
-        songsToSync.push({ song, versionsToSync });
+      if (await this.songNeedsSync(song, chordproFile)) {
+        const existsInDrive = song.driveFileId && this.fileExistsInDrive(song.driveFileId);
+
+        if (existsInDrive) {
+          updatesToProcess.push({ song, chordproFile });
+        } else {
+          if (song.driveFileId && !existsInDrive) {
+            console.log(
+              `[DriveSync] Clearing stale Drive ID for ${song.id}/${this.getSongUuid(song)}`
+            );
+            song.driveFileId = null;
+            song.driveProperties = null;
+          }
+          newSongs.push({ song, chordproFile });
+        }
+        totalVariants++;
       }
     }
 
     console.log(
-      `[DriveSync] ${songsToSync.length} songs need upload, ${updatesToProcess.length} versions need updates`
+      `[DriveSync] ${newSongs.length} songs need upload, ${updatesToProcess.length} need updates`
     );
+    if (progressCallback) {
+      progressCallback({
+        stage: 'pushing',
+        message: `Uploading ${totalVariants} songs...`,
+        current: 0,
+        total: Math.max(1, totalVariants),
+      });
+    }
 
     let processed = 0;
     const songsFolderId = await this.getCachedSongsFolder();
-    const BATCH_SIZE = 25; // Process 25 songs at a time (each song has metadata + chordpro files)
+    const BATCH_SIZE = 25;
 
-    // Process new files in chunks (concurrent uploads within each chunk)
-    for (let i = 0; i < songsToSync.length; i += BATCH_SIZE) {
-      const batch = songsToSync.slice(i, i + BATCH_SIZE);
-
-      // Prepare all files for this batch (metadata + chordpro files)
+    for (let i = 0; i < newSongs.length; i += BATCH_SIZE) {
+      const batch = newSongs.slice(i, i + BATCH_SIZE);
       const files = [];
-      const fileTracking = []; // Track what each uploaded file corresponds to
+      const fileTracking = [];
 
-      for (const { song, versionsToSync } of batch) {
-        // Get title from first version
-        const firstVersion = versionsToSync[0];
-        const parsed = this.parser.parse(firstVersion.chordproFile.content);
-        const title = parsed.metadata.title || 'Untitled';
-        const ccliNumber = song.ccliNumber || '';
+      for (const { song, chordproFile } of batch) {
+        const { title, ccliNumber, variantLabel } = this.getSongFileMetadata(song, chordproFile);
+        const filename = generateChordProFilename(title, ccliNumber, variantLabel);
 
-        // Add all chordpro files for this song (each with complete metadata in appProperties)
-        for (const { version, chordproFile } of versionsToSync) {
-          const versionLabel = version.label || 'Original';
-          const filename = generateChordProFilename(title, ccliNumber, versionLabel);
-
-          files.push({
-            metadata: {
-              name: filename,
-              parents: [songsFolderId],
-              mimeType: 'text/plain',
-              appProperties: {
-                // File type
-                setalightType: 'chordpro',
-
-                // Song-level metadata
-                songId: song.id,
-                ccliNumber: ccliNumber,
-                title: title,
-                titleNormalized: song.titleNormalized,
-
-                // Version-level metadata
-                versionId: version.id,
-                versionLabel: versionLabel,
-                contentHash: chordproFile.contentHash,
-
-                // Timestamps
-                createdAt: song.createdAt,
-                updatedAt: song.updatedAt,
-
-                // App version
-                appVersion: '1.0.0',
-              },
+        files.push({
+          metadata: {
+            name: filename,
+            parents: [songsFolderId],
+            mimeType: 'text/plain',
+            appProperties: {
+              setalightType: 'chordpro',
+              organisationId: this.organisationId,
+              songId: song.id,
+              songUuid: this.getSongUuid(song),
+              ccliNumber: ccliNumber,
+              title: title,
+              titleNormalized: song.titleNormalized,
+              variantLabel: variantLabel,
+              isDefault: song.isDefault ? 'true' : 'false',
+              contentHash: chordproFile.contentHash,
+              importSource: song.importSource || '',
+              importDate: song.importDate || new Date().toISOString(),
+              modifiedDate: song.modifiedDate || new Date().toISOString(),
+              appVersion: '1.0.0',
             },
-            content: chordproFile.content,
-            contentType: 'text/plain; charset=utf-8',
-          });
-          fileTracking.push({ type: 'chordpro', song, version, chordproFile });
-        }
+          },
+          content: chordproFile.content,
+          contentType: 'text/plain; charset=utf-8',
+        });
+        fileTracking.push({ song, chordproFile, title, variantLabel });
       }
 
       if (files.length === 0) continue;
 
       try {
-        console.log(`[DriveSync] Uploading ${files.length} files (${batch.length} songs)...`);
+        console.log(`[DriveSync] Uploading ${files.length} files...`);
         const uploadedFiles = await batchUploadFiles(files);
-
-        // Update local records with Drive metadata
-        const updatedSongs = new Map();
+        const updatedSongs = [];
 
         for (let j = 0; j < fileTracking.length; j++) {
           const tracking = fileTracking[j];
           const driveFile = uploadedFiles[j];
-
           if (!driveFile || !driveFile.id) continue;
 
-          // All files are chordpro now (no separate metadata files)
-          tracking.version.driveChordproFileId = driveFile.id;
-          tracking.version.driveProperties = {
+          tracking.song.driveFileId = driveFile.id;
+          tracking.song.driveProperties = {
             songId: tracking.song.id,
-            versionId: tracking.version.id,
+            songUuid: this.getSongUuid(tracking.song),
             contentHash: tracking.chordproFile.contentHash,
             ccliNumber: tracking.song.ccliNumber || '',
-            title: this.parser.parse(tracking.chordproFile.content).metadata.title || 'Untitled',
+            title: tracking.title,
             titleNormalized: tracking.song.titleNormalized,
-            versionLabel: tracking.version.label || 'Original',
+            variantLabel: tracking.variantLabel,
             appVersion: '1.0.0',
           };
-          tracking.version.lastSyncedAt = new Date().toISOString();
-          updatedSongs.set(tracking.song.id, tracking.song);
+          tracking.song.lastSyncedAt = new Date().toISOString();
+          tracking.song.driveModifiedTime = tracking.song.lastSyncedAt;
+          tracking.song.contentHash = tracking.chordproFile.contentHash;
+          updatedSongs.push(tracking.song);
           processed++;
         }
 
-        // Batch save updated songs to database
-        if (updatedSongs.size > 0) {
-          await this.songsDb.saveSongsBatch(Array.from(updatedSongs.values()));
+        if (updatedSongs.length > 0) {
+          await this.organisationDb.saveSongsBatch(updatedSongs);
         }
 
-        console.log(`[DriveSync] ✅ Uploaded ${uploadedFiles.length} files`);
+        console.log(`[DriveSync] ✅ Uploaded ${updatedSongs.length} songs`);
       } catch (error) {
         console.error(`[DriveSync] Concurrent upload failed:`, error);
-        // Fallback to sequential uploads for this batch
-        for (const { song, versionsToSync } of batch) {
-          for (const { version, chordproFile } of versionsToSync) {
-            try {
-              await this.pushSongVersion(song, version, chordproFile);
-              processed++;
-            } catch (err) {
-              console.error(
-                `[DriveSync] Failed to upload song version ${song.id}/${version.id}:`,
-                err
-              );
-            }
+        for (const { song, chordproFile } of batch) {
+          try {
+            await this.pushSongVariant(song, chordproFile);
+            processed++;
+          } catch (err) {
+            console.error(
+              `[DriveSync] Failed to upload song ${song.id}/${this.getSongUuid(song)}:`,
+              err
+            );
           }
         }
       }
 
-      // Update progress
       if (progressCallback) {
         progressCallback({
           stage: 'pushing',
-          message: `Uploaded ${processed}/${totalVersions} song versions`,
+          message: `Uploaded ${processed}/${totalVariants} song variants`,
           current: processed,
-          total: totalVersions,
+          total: totalVariants,
         });
       }
     }
 
-    // Process updates in parallel (individual API calls required)
     if (updatesToProcess.length > 0) {
-      console.log(`[DriveSync] Updating ${updatesToProcess.length} existing song versions...`);
+      console.log(`[DriveSync] Updating ${updatesToProcess.length} existing song variants...`);
 
       for (let i = 0; i < updatesToProcess.length; i += this.CONCURRENT_LIMIT) {
         const batch = updatesToProcess.slice(i, i + this.CONCURRENT_LIMIT);
 
         const results = await Promise.allSettled(
-          batch.map(({ song, version, chordproFile }) =>
-            this.pushSongVersion(song, version, chordproFile)
-          )
+          batch.map(({ song, chordproFile }) => this.pushSongVariant(song, chordproFile))
         );
 
         const succeeded = results.filter(r => r.status === 'fulfilled').length;
         processed += succeeded;
 
-        // Update progress
         if (progressCallback) {
           progressCallback({
             stage: 'pushing',
-            message: `Uploaded ${processed}/${totalVersions} song versions`,
+            message: `Uploaded ${processed}/${totalVariants} song variants`,
             current: processed,
-            total: totalVersions,
+            total: totalVariants,
           });
         }
       }
     }
 
-    console.log(`[DriveSync] ✅ Pushed ${processed} song versions`);
+    console.log(`[DriveSync] ✅ Pushed ${processed} song variants`);
   }
 
   /**
-   * Push a specific song version to Drive
+   * Push a specific song variant to Drive
    */
-  async pushSongVersion(song, version, chordproFile) {
+  async pushSongVariant(song, chordproFile) {
+    const songUuid = this.getSongUuid(song);
     try {
       if (!chordproFile) {
-        console.warn(`[DriveSync] ChordPro file not found: ${version.chordproFileId}`);
+        console.warn(`[DriveSync] ChordPro file not found: ${song.chordproFileId}`);
         return;
       }
 
-      // Parse chordpro to get title
-      const parsed = this.parser.parse(chordproFile.content);
-      const title = parsed.metadata.title || 'Untitled';
-      const ccliNumber = song.ccliNumber || '';
-      const versionLabel = version.label || 'Original';
+      const { title, ccliNumber, variantLabel } = this.getSongFileMetadata(song, chordproFile);
 
-      if (!version.driveChordproFileId) {
-        // New version, upload it
-        console.log(`[DriveSync] Uploading song version: ${title} (${song.id}/${version.id})`);
+      if (!song.driveFileId) {
+        console.log(`[DriveSync] Uploading song: ${title} (${song.id}/${songUuid})`);
 
         const driveFile = await DriveAPI.uploadChordProFile(
           this.driveFolderId,
           song.id,
-          version.id,
+          songUuid,
           title,
           ccliNumber,
-          versionLabel,
+          variantLabel,
           chordproFile.content,
           {
             titleNormalized: song.titleNormalized,
             contentHash: chordproFile.contentHash,
-            createdAt: song.createdAt,
-            updatedAt: song.updatedAt,
+            createdAt: song.importDate || new Date().toISOString(),
+            updatedAt: song.modifiedDate || new Date().toISOString(),
           }
         );
 
-        // Update version with Drive metadata
-        version.driveChordproFileId = driveFile.id;
-        version.driveProperties = {
-          songId: song.id,
-          versionId: version.id,
-          contentHash: chordproFile.contentHash,
-          ccliNumber: ccliNumber,
-          title: title,
-          titleNormalized: song.titleNormalized,
-          versionLabel: versionLabel,
-          appVersion: '1.0.0',
-        };
-        version.lastSyncedAt = new Date().toISOString();
-
-        await this.songsDb.saveSong(song);
-
-        console.log(`[DriveSync] ✅ Uploaded song version: ${title}`);
+        song.driveFileId = driveFile.id;
       } else {
-        // Existing version, update it
-        console.log(`[DriveSync] Updating song version: ${title} (${song.id}/${version.id})`);
+        console.log(`[DriveSync] Updating song: ${title} (${song.id}/${songUuid})`);
 
-        await DriveAPI.updateChordProFile(version.driveChordproFileId, chordproFile.content, {
+        await DriveAPI.updateChordProFile(song.driveFileId, chordproFile.content, {
           contentHash: chordproFile.contentHash,
           ccliNumber: ccliNumber,
           title: title,
           titleNormalized: song.titleNormalized,
-          versionLabel: versionLabel,
-          updatedAt: song.updatedAt,
+          versionLabel: variantLabel,
+          updatedAt: song.modifiedDate || new Date().toISOString(),
         });
-
-        // Update sync metadata
-        version.lastSyncedAt = new Date().toISOString();
-        await this.songsDb.saveSong(song);
-
-        console.log(`[DriveSync] ✅ Updated song version: ${title}`);
       }
+
+      song.driveProperties = {
+        songId: song.id,
+        songUuid: songUuid,
+        contentHash: chordproFile.contentHash,
+        ccliNumber: ccliNumber,
+        title: title,
+        titleNormalized: song.titleNormalized,
+        variantLabel: variantLabel,
+        appVersion: '1.0.0',
+      };
+      song.lastSyncedAt = new Date().toISOString();
+      song.driveModifiedTime = song.lastSyncedAt;
+      song.contentHash = chordproFile.contentHash;
+
+      await this.organisationDb.saveSong(song);
+
+      console.log(`[DriveSync] ✅ Synced song: ${title}`);
     } catch (error) {
-      console.error(`[DriveSync] Failed to push song version ${song.id}/${version.id}:`, error);
-      throw error; // Re-throw for Promise.allSettled
+      console.error(`[DriveSync] Failed to push song ${song.id}/${songUuid}:`, error);
+      throw error;
     }
+  }
+
+  /**
+   * Derive title/C CLI/version label metadata for Drive files
+   */
+  getSongFileMetadata(song, chordproFile) {
+    const parsed = chordproFile ? this.parser.parse(chordproFile.content) : { metadata: {} };
+    const title = song.title || parsed.metadata?.title || 'Untitled';
+    const ccliNumber = song.ccliNumber || '';
+    const variantLabel =
+      song.variantLabel || (song.isDefault ? 'Original' : song.variantOf ? 'Variant' : 'Original');
+    return { title, ccliNumber, variantLabel };
+  }
+
+  getSongUuid(song) {
+    return song?.uuid || song?.id || '';
   }
 }
 

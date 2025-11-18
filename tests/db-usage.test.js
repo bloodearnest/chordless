@@ -5,7 +5,8 @@ const { describe, it } = window;
 suppressConsoleLogs();
 import { SetalightDB } from '../js/db.js';
 
-const uniqueName = () => (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2));
+const uniqueName = () =>
+  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
 
 const deleteDatabase = name =>
   new Promise(resolve => {
@@ -30,25 +31,27 @@ describe('SetalightDB usage aggregation', () => {
 
     const setlists = [
       {
-        id: 'set1',
+        id: crypto.randomUUID(),
         date: '2024-01-01',
         name: 'New Year',
-        leader: 'Leader A',
+        owner: 'Leader A',
         songs: [
-          { songId: 'song-1', modifications: { targetKey: 'C' } },
-          { songId: 'song-2', modifications: { targetKey: 'G' } },
+          { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'C', tempo: null, notes: '' },
+          { order: 1, songId: 'song-2', songUuid: 'uuid-2', key: 'G', tempo: null, notes: '' },
         ],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdDate: new Date().toISOString(),
+        modifiedDate: new Date().toISOString(),
       },
       {
-        id: 'set2',
+        id: crypto.randomUUID(),
         date: '2024-02-01',
         name: 'February',
-        leader: 'Leader B',
-        songs: [{ songId: 'song-1', modifications: { targetKey: 'D' } }],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        owner: 'Leader B',
+        songs: [
+          { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'D', tempo: null, notes: '' },
+        ],
+        createdDate: new Date().toISOString(),
+        modifiedDate: new Date().toISOString(),
       },
     ];
 

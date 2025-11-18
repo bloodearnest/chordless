@@ -59,7 +59,7 @@
     <script type="module" src="/js/theme-manager.js"></script>
     <script type="module">
       import { SetalightDB } from '/js/db.js';
-      import { getCurrentOrganisation } from '/js/workspace.js';
+      import { getCurrentOrganisation } from '/js/organisation.js';
 
       // Set window name for bookmarklet
       window.name = 'setalight';
@@ -150,7 +150,8 @@
 
             try {
               // Clear IndexedDB
-              const db = new SetalightDB(getCurrentOrganisation());
+              const { getCurrentDB } = await import('/js/db.js');
+              const db = await getCurrentDB();
               await db.init();
               await db.clearAll();
 

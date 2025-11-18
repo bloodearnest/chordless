@@ -1,10 +1,10 @@
 import { LitElement, html, css } from 'lit';
 import {
   getCurrentOrganisation,
-  setCurrentOrganisation,
+  switchOrganisation,
   listOrganisations,
-} from '../js/workspace.js';
-import { SetalightDB } from '../js/db.js';
+  createOrganisation,
+} from '../js/organisation.js';
 
 /**
  * SelectOrganisation Component
@@ -203,7 +203,7 @@ export class SelectOrganisation extends LitElement {
 
   constructor() {
     super();
-    this._currentOrganisation = getCurrentOrganisation();
+    this._currentOrganisation = null;
     this._organisations = [];
     this._loading = true;
     this._showCreateForm = false;
@@ -220,7 +220,8 @@ export class SelectOrganisation extends LitElement {
     this._loading = true;
     try {
       this._organisations = await listOrganisations();
-      this._currentOrganisation = getCurrentOrganisation();
+      const { name } = getCurrentOrganisation(); // Synchronous - reads from cache
+      this._currentOrganisation = name;
     } catch (error) {
       console.error('Failed to load organisations:', error);
     } finally {
@@ -228,18 +229,15 @@ export class SelectOrganisation extends LitElement {
     }
   }
 
-  async _handleSwitch(organisationName) {
-    if (organisationName === this._currentOrganisation) {
+  async _handleSwitch(org) {
+    if (org.name === this._currentOrganisation) {
       return;
     }
 
-    const confirmed = confirm(
-      `Switch to church "${organisationName}"?\n\nThis will reload the page.`
-    );
+    const confirmed = confirm(`Switch to church "${org.name}"?\n\nThis will reload the page.`);
 
     if (confirmed) {
-      setCurrentOrganisation(organisationName);
-      window.location.reload();
+      await switchOrganisation(org.id);
     }
   }
 
@@ -262,7 +260,7 @@ export class SelectOrganisation extends LitElement {
     }
 
     // Check if already exists
-    if (this._organisations.includes(name)) {
+    if (this._organisations.some(org => org.name === name)) {
       alert('A church with this name already exists');
       return;
     }
@@ -270,9 +268,8 @@ export class SelectOrganisation extends LitElement {
     this._creating = true;
 
     try {
-      // Create by initializing a new database
-      const db = new SetalightDB(name);
-      await db.init();
+      // Create organisation (already imported at top)
+      await createOrganisation(name);
 
       alert(`✅ Church "${name}" created!`);
 
@@ -309,11 +306,11 @@ export class SelectOrganisation extends LitElement {
           ${this._organisations.map(
             org => html`
               <div
-                class="organisation-item ${org === this._currentOrganisation ? 'current' : ''}"
+                class="organisation-item ${org.name === this._currentOrganisation ? 'current' : ''}"
                 @click=${() => this._handleSwitch(org)}
               >
-                <span class="organisation-name">${org}</span>
-                ${org === this._currentOrganisation
+                <span class="organisation-name">${org.name}</span>
+                ${org.name === this._currentOrganisation
                   ? html`<span class="organisation-badge">CURRENT</span>`
                   : html`<button
                       class="switch-button"

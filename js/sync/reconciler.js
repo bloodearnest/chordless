@@ -66,8 +66,8 @@ export function reconcileRecords(localRecords = [], remoteRecords = [], options 
       return;
     }
 
-    const localUpdated = normalizeDate(local.updatedAt);
-    const remoteUpdated = normalizeDate(remote.updatedAt);
+    const localUpdated = normalizeDate(local.modifiedDate || local.updatedAt);
+    const remoteUpdated = normalizeDate(remote.modifiedDate || remote.updatedAt);
 
     if (localUpdated > remoteUpdated) {
       plan.push(buildEntry('upload', entityType, local));
