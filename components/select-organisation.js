@@ -1,10 +1,10 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 import {
-  getCurrentOrganisation,
-  switchOrganisation,
-  listOrganisations,
   createOrganisation,
-} from '../js/organisation.js';
+  getCurrentOrganisation,
+  listOrganisations,
+  switchOrganisation,
+} from '../js/organisation.js'
 
 /**
  * SelectOrganisation Component
@@ -19,7 +19,7 @@ export class SelectOrganisation extends LitElement {
     _showCreateForm: { type: Boolean, state: true },
     _newOrganisationName: { type: String, state: true },
     _creating: { type: Boolean, state: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -198,99 +198,97 @@ export class SelectOrganisation extends LitElement {
       opacity: 0.7;
       margin: 0;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this._currentOrganisation = null;
-    this._organisations = [];
-    this._loading = true;
-    this._showCreateForm = false;
-    this._newOrganisationName = '';
-    this._creating = false;
+    super()
+    this._currentOrganisation = null
+    this._organisations = []
+    this._loading = true
+    this._showCreateForm = false
+    this._newOrganisationName = ''
+    this._creating = false
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    this._loadOrganisations();
+    super.connectedCallback()
+    this._loadOrganisations()
   }
 
   async _loadOrganisations() {
-    this._loading = true;
+    this._loading = true
     try {
-      this._organisations = await listOrganisations();
-      const { name } = getCurrentOrganisation(); // Synchronous - reads from cache
-      this._currentOrganisation = name;
+      this._organisations = await listOrganisations()
+      const { name } = getCurrentOrganisation() // Synchronous - reads from cache
+      this._currentOrganisation = name
     } catch (error) {
-      console.error('Failed to load organisations:', error);
+      console.error('Failed to load organisations:', error)
     } finally {
-      this._loading = false;
+      this._loading = false
     }
   }
 
   async _handleSwitch(org) {
     if (org.name === this._currentOrganisation) {
-      return;
+      return
     }
 
-    const confirmed = confirm(
-      `Switch to organisation "${org.name}"?\n\nThis will reload the page.`
-    );
+    const confirmed = confirm(`Switch to organisation "${org.name}"?\n\nThis will reload the page.`)
 
     if (confirmed) {
-      await switchOrganisation(org.id);
+      await switchOrganisation(org.id)
     }
   }
 
   _toggleCreateForm() {
-    this._showCreateForm = !this._showCreateForm;
-    this._newOrganisationName = '';
+    this._showCreateForm = !this._showCreateForm
+    this._newOrganisationName = ''
   }
 
   _handleNameInput(e) {
-    this._newOrganisationName = e.target.value;
+    this._newOrganisationName = e.target.value
   }
 
   async _handleCreate(e) {
-    e.preventDefault();
+    e.preventDefault()
 
-    const name = this._newOrganisationName.trim();
+    const name = this._newOrganisationName.trim()
     if (!name) {
-      alert('Please enter an organisation name');
-      return;
+      alert('Please enter an organisation name')
+      return
     }
 
     // Check if already exists
     if (this._organisations.some(org => org.name === name)) {
-      alert('An organisation with this name already exists');
-      return;
+      alert('An organisation with this name already exists')
+      return
     }
 
-    this._creating = true;
+    this._creating = true
 
     try {
       // Create organisation (already imported at top)
-      await createOrganisation(name);
+      await createOrganisation(name)
 
-      alert(`✅ Organisation "${name}" created!`);
+      alert(`✅ Organisation "${name}" created!`)
 
       // Reload organisations list
-      await this._loadOrganisations();
+      await this._loadOrganisations()
 
       // Hide form
-      this._showCreateForm = false;
-      this._newOrganisationName = '';
+      this._showCreateForm = false
+      this._newOrganisationName = ''
     } catch (error) {
-      console.error('Failed to create organisation:', error);
-      alert(`❌ Failed to create organisation: ${error.message}`);
+      console.error('Failed to create organisation:', error)
+      alert(`❌ Failed to create organisation: ${error.message}`)
     } finally {
-      this._creating = false;
+      this._creating = false
     }
   }
 
   render() {
     if (this._loading) {
-      return html`<div class="loading">Loading organisations...</div>`;
+      return html`<div class="loading">Loading organisations...</div>`
     }
 
     if (this._organisations.length === 0) {
@@ -298,7 +296,7 @@ export class SelectOrganisation extends LitElement {
         <div class="empty-state">
           <p>No organisations found. Create your first organisation to get started.</p>
         </div>
-      `;
+      `
     }
 
     return html`
@@ -311,24 +309,27 @@ export class SelectOrganisation extends LitElement {
                 @click=${() => this._handleSwitch(org)}
               >
                 <span class="organisation-name">${org.name}</span>
-                ${org.name === this._currentOrganisation
-                  ? html`<span class="organisation-badge">CURRENT</span>`
-                  : html`<button
+                ${
+                  org.name === this._currentOrganisation
+                    ? html`<span class="organisation-badge">CURRENT</span>`
+                    : html`<button
                       class="switch-button"
                       @click=${e => {
-                        e.stopPropagation();
-                        this._handleSwitch(org);
+                        e.stopPropagation()
+                        this._handleSwitch(org)
                       }}
                     >
                       Switch
-                    </button>`}
+                    </button>`
+                }
               </div>
             `
           )}
         </div>
 
-        ${this._showCreateForm
-          ? html`
+        ${
+          this._showCreateForm
+            ? html`
               <form class="create-form" @submit=${this._handleCreate}>
                 <input
                   type="text"
@@ -353,7 +354,7 @@ export class SelectOrganisation extends LitElement {
                 </div>
               </form>
             `
-          : html`
+            : html`
               <button class="create-button" @click=${this._toggleCreateForm}>
                 <svg
                   width="20"
@@ -368,10 +369,11 @@ export class SelectOrganisation extends LitElement {
                 </svg>
                 Create New Organisation
               </button>
-            `}
+            `
+        }
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('select-organisation', SelectOrganisation);
+customElements.define('select-organisation', SelectOrganisation)

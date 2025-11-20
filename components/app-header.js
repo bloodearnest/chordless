@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * AppHeader Component
@@ -36,7 +36,7 @@ export class AppHeader extends LitElement {
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
     expanded: { type: Boolean, reflect: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -267,112 +267,112 @@ export class AppHeader extends LitElement {
       border-color: rgba(255, 255, 255, 0.9);
       transform: scale(1.05);
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.heading = '';
-    this.showEditToggle = false;
-    this.showInfoButton = false;
-    this.showShareButton = false;
-    this.editMode = false;
-    this.disableAnimation = false;
-    this.expanded = false;
-    this._previousTitle = '';
-    this._animating = false;
-    this._displayTitle = ''; // The title actually shown in the UI
-    this._pendingTitle = null; // Title waiting to be shown after fade-out
+    super()
+    this.heading = ''
+    this.showEditToggle = false
+    this.showInfoButton = false
+    this.showShareButton = false
+    this.editMode = false
+    this.disableAnimation = false
+    this.expanded = false
+    this._previousTitle = ''
+    this._animating = false
+    this._displayTitle = '' // The title actually shown in the UI
+    this._pendingTitle = null // Title waiting to be shown after fade-out
   }
 
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     // Initialize display title
-    this._displayTitle = this.heading;
-    this._previousTitle = this.heading;
+    this._displayTitle = this.heading
+    this._previousTitle = this.heading
     console.log('[AppHeader] Connected with props:', {
       showEditToggle: this.showEditToggle,
       showInfoButton: this.showInfoButton,
       editMode: this.editMode,
-    });
+    })
   }
 
   updated(changedProperties) {
-    super.updated(changedProperties);
+    super.updated(changedProperties)
 
     // Cache DOM element references after each render
-    this._cachedTitleEl = this.shadowRoot?.querySelector('.title');
-    this._cachedCenterEl = this.shadowRoot?.querySelector('.header-center');
+    this._cachedTitleEl = this.shadowRoot?.querySelector('.title')
+    this._cachedCenterEl = this.shadowRoot?.querySelector('.header-center')
 
     // Handle title changes
     if (changedProperties.has('heading') && this.heading !== this._previousTitle) {
       if (this.disableAnimation) {
         // No animation - update immediately
-        this._displayTitle = this.heading;
-        this._previousTitle = this.heading;
-        this.requestUpdate();
+        this._displayTitle = this.heading
+        this._previousTitle = this.heading
+        this.requestUpdate()
       } else if (!this._animating) {
         // Animate the transition
-        this._animateTransition();
+        this._animateTransition()
       } else {
         // Animation in progress - queue this update
-        this._pendingTitle = this.heading;
+        this._pendingTitle = this.heading
       }
     }
   }
 
   async _animateTransition() {
-    if (this._animating) return;
-    this._animating = true;
+    if (this._animating) return
+    this._animating = true
 
     // Use cached references for initial fade-out
-    const titleEl = this._cachedTitleEl;
-    const centerEl = this._cachedCenterEl;
+    const titleEl = this._cachedTitleEl
+    const centerEl = this._cachedCenterEl
 
     // Fade out old content
-    titleEl?.classList.add('fade-out');
-    centerEl?.classList.add('fade-out');
+    titleEl?.classList.add('fade-out')
+    centerEl?.classList.add('fade-out')
 
     // Wait for fade-out to complete
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 300))
 
     // Update the displayed title
-    this._displayTitle = this.heading;
-    this._previousTitle = this.heading;
-    this.requestUpdate();
+    this._displayTitle = this.heading
+    this._previousTitle = this.heading
+    this.requestUpdate()
 
     // Wait for re-render
-    await this.updateComplete;
+    await this.updateComplete
 
     // Get fresh references after re-render
-    const newTitleEl = this.shadowRoot?.querySelector('.title');
-    const newCenterEl = this.shadowRoot?.querySelector('.header-center');
+    const newTitleEl = this.shadowRoot?.querySelector('.title')
+    const newCenterEl = this.shadowRoot?.querySelector('.header-center')
 
     // Fade in new content
     requestAnimationFrame(() => {
-      newTitleEl?.classList.remove('fade-out');
-      newCenterEl?.classList.remove('fade-out');
-    });
+      newTitleEl?.classList.remove('fade-out')
+      newCenterEl?.classList.remove('fade-out')
+    })
 
     // Wait for fade-in to complete
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise(resolve => setTimeout(resolve, 300))
 
-    this._animating = false;
+    this._animating = false
 
     // Handle any pending updates
     if (this._pendingTitle && this._pendingTitle !== this.heading) {
-      this._pendingTitle = null;
-      this._animateTransition();
+      this._pendingTitle = null
+      this._animateTransition()
     }
   }
 
   // Public method to update without animation
   setTitleInstant(newTitle) {
-    this.disableAnimation = true;
-    this.heading = newTitle;
+    this.disableAnimation = true
+    this.heading = newTitle
     // Re-enable after a tick
     setTimeout(() => {
-      this.disableAnimation = false;
-    }, 0);
+      this.disableAnimation = false
+    }, 0)
   }
 
   render() {
@@ -413,8 +413,9 @@ export class AppHeader extends LitElement {
         <div class="header-row-2">
           <slot name="controls"></slot>
 
-          ${this.showEditToggle
-            ? html`
+          ${
+            this.showEditToggle
+              ? html`
                 <button
                   class="icon-button edit-toggle ${this.editMode ? 'active' : ''}"
                   part="edit-toggle"
@@ -424,9 +425,11 @@ export class AppHeader extends LitElement {
                   ✎
                 </button>
               `
-            : ''}
-          ${this.showInfoButton
-            ? html`
+              : ''
+          }
+          ${
+            this.showInfoButton
+              ? html`
                 <button
                   class="icon-button info-button"
                   part="info-button"
@@ -436,9 +439,11 @@ export class AppHeader extends LitElement {
                   i
                 </button>
               `
-            : ''}
-          ${this.showShareButton
-            ? html`
+              : ''
+          }
+          ${
+            this.showShareButton
+              ? html`
                 <button
                   class="icon-button share-button"
                   part="share-button"
@@ -448,10 +453,11 @@ export class AppHeader extends LitElement {
                   ↗
                 </button>
               `
-            : ''}
+              : ''
+          }
         </div>
       </header>
-    `;
+    `
   }
 
   _handleNavMenuClick() {
@@ -460,7 +466,7 @@ export class AppHeader extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleEditToggle() {
@@ -469,7 +475,7 @@ export class AppHeader extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleInfoClick() {
@@ -478,7 +484,7 @@ export class AppHeader extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleShareClick() {
@@ -487,12 +493,12 @@ export class AppHeader extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleExpandToggle() {
-    this.expanded = !this.expanded;
-    console.log('[AppHeader] Expanded state:', this.expanded);
+    this.expanded = !this.expanded
+    console.log('[AppHeader] Expanded state:', this.expanded)
 
     // Emit custom event instead of direct DOM manipulation
     this.dispatchEvent(
@@ -501,9 +507,9 @@ export class AppHeader extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 }
 
 // Define the custom element
-customElements.define('app-header', AppHeader);
+customElements.define('app-header', AppHeader)

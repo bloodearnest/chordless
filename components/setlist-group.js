@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * SetlistGroup component
@@ -10,13 +10,13 @@ export class SetlistGroup extends LitElement {
     year: { type: String },
     setlists: { type: Array },
     expanded: { type: Boolean, reflect: true },
-  };
+  }
 
   constructor() {
-    super();
-    this.year = '';
-    this.setlists = [];
-    this.expanded = false;
+    super()
+    this.year = ''
+    this.setlists = []
+    this.expanded = false
   }
 
   static styles = css`
@@ -104,28 +104,28 @@ export class SetlistGroup extends LitElement {
       color: var(--text-secondary, #7f8c8d);
       white-space: nowrap;
     }
-  `;
+  `
 
   toggleExpand() {
-    this.expanded = !this.expanded;
+    this.expanded = !this.expanded
   }
 
   renderSetlistRow(setlist) {
-    const url = setlist.url || `/setlist/${setlist.id}`;
-    const name = setlist.displayName || setlist.name || '';
+    const url = setlist.url || `/setlist/${setlist.id}`
+    const name = setlist.displayName || setlist.name || ''
     const songCount =
       typeof setlist.songCount === 'number'
         ? setlist.songCount
         : setlist.songs
           ? setlist.songs.length
-          : 0;
+          : 0
 
     return html`
       <a class="setlist-button" href=${url}>
         <span class="setlist-name">${name}</span>
         <span class="setlist-song-count"> ${songCount} song${songCount === 1 ? '' : 's'} </span>
       </a>
-    `;
+    `
   }
 
   render() {
@@ -140,8 +140,8 @@ export class SetlistGroup extends LitElement {
         </button>
         <div class="year-list">${this.setlists.map(setlist => this.renderSetlistRow(setlist))}</div>
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('setlist-group', SetlistGroup);
+customElements.define('setlist-group', SetlistGroup)

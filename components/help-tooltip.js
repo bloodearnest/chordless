@@ -1,16 +1,16 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 export class HelpTooltip extends LitElement {
   static properties = {
     message: { type: String },
     _visible: { state: true },
-  };
+  }
 
   constructor() {
-    super();
-    this.message = '';
-    this._visible = false;
-    this._suppressNextClick = false;
+    super()
+    this.message = ''
+    this._visible = false
+    this._suppressNextClick = false
   }
 
   static styles = css`
@@ -85,7 +85,7 @@ export class HelpTooltip extends LitElement {
       pointer-events: auto;
       transform: translate(-50%, -0.1rem);
     }
-  `;
+  `
 
   render() {
     return html`
@@ -104,46 +104,46 @@ export class HelpTooltip extends LitElement {
           ${this.message}
         </span>
       </span>
-    `;
+    `
   }
 
   _handlePointerEnter(event) {
     if (event.pointerType === 'mouse' || event.pointerType === '') {
-      this._visible = true;
+      this._visible = true
     }
   }
 
   _handlePointerLeave(event) {
     if (event.pointerType === 'mouse' || event.pointerType === '') {
-      this._visible = false;
+      this._visible = false
     }
   }
 
   _handleFocus() {
-    this._visible = true;
+    this._visible = true
   }
 
   _handleBlur() {
-    this._visible = false;
+    this._visible = false
   }
 
   _handlePointerDown(event) {
     if (event.pointerType === 'touch' || event.pointerType === 'pen') {
-      event.preventDefault();
-      this._visible = !this._visible;
-      this._suppressNextClick = true;
+      event.preventDefault()
+      this._visible = !this._visible
+      this._suppressNextClick = true
     }
   }
 
   _handleClick(event) {
     if (this._suppressNextClick) {
-      event.preventDefault();
-      event.stopPropagation();
-      this._suppressNextClick = false;
-      return;
+      event.preventDefault()
+      event.stopPropagation()
+      this._suppressNextClick = false
+      return
     }
-    this._visible = false;
+    this._visible = false
   }
 }
 
-customElements.define('help-tooltip', HelpTooltip);
+customElements.define('help-tooltip', HelpTooltip)

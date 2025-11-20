@@ -75,7 +75,7 @@
         log('SW state: ' + registration.active?.state);
       }
 
-      async function registerSW() {
+      async function _registerSW() {
         log('Registering service worker...');
         try {
           const registration = await navigator.serviceWorker.register('/service-worker.js');
@@ -90,7 +90,7 @@
         }
       }
 
-      function testNav(url) {
+      function _testNav(url) {
         log('Testing navigation to: ' + url);
         window.location.href = url;
       }

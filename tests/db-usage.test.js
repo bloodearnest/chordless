@@ -1,33 +1,35 @@
-import { expect } from '@esm-bundle/chai';
-import { suppressConsoleLogs } from './test-helpers.js';
-const { describe, it } = window;
+import { expect } from '@esm-bundle/chai'
+import { suppressConsoleLogs } from './test-helpers.js'
 
-suppressConsoleLogs();
-import { SetalightDB } from '../js/db.js';
+const { describe, it } = window
+
+suppressConsoleLogs()
+
+import { SetalightDB } from '../js/db.js'
 
 const uniqueName = () =>
-  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2);
+  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
 
 const deleteDatabase = name =>
   new Promise(resolve => {
-    const request = indexedDB.deleteDatabase(name);
-    request.onsuccess = request.onerror = request.onblocked = () => resolve();
-  });
+    const request = indexedDB.deleteDatabase(name)
+    request.onsuccess = request.onerror = request.onblocked = () => resolve()
+  })
 
 describe('SetalightDB usage aggregation', () => {
-  let db;
+  let db
 
   afterEach(async () => {
     if (db?.dbName) {
-      await deleteDatabase(db.dbName);
-      db = null;
+      await deleteDatabase(db.dbName)
+      db = null
     }
-  });
+  })
 
   it('aggregates song appearances across setlists', async () => {
-    const orgName = `TEST-${uniqueName()}`;
-    db = new SetalightDB(orgName);
-    await db.init();
+    const orgName = `TEST-${uniqueName()}`
+    db = new SetalightDB(orgName)
+    await db.init()
 
     const setlists = [
       {
@@ -53,15 +55,15 @@ describe('SetalightDB usage aggregation', () => {
         createdDate: new Date().toISOString(),
         modifiedDate: new Date().toISOString(),
       },
-    ];
+    ]
 
     for (const setlist of setlists) {
-      await db.saveSetlist(setlist);
+      await db.saveSetlist(setlist)
     }
 
-    const usage = await db.getSongUsageFromSetlists('song-1');
-    expect(usage).to.have.lengthOf(2);
-    expect(usage[0].leader).to.equal('Leader B'); // sorted by date desc
-    expect(usage[1].leader).to.equal('Leader A');
-  });
-});
+    const usage = await db.getSongUsageFromSetlists('song-1')
+    expect(usage).to.have.lengthOf(2)
+    expect(usage[0].leader).to.equal('Leader B') // sorted by date desc
+    expect(usage[1].leader).to.equal('Leader A')
+  })
+})

@@ -1,6 +1,6 @@
-import { LitElement, html, css } from 'lit';
-import './app-modal.js';
-import './app-preferences.js';
+import { css, html, LitElement } from 'lit'
+import './app-modal.js'
+import './app-preferences.js'
 
 /**
  * NavMenu Component
@@ -31,7 +31,7 @@ export class NavMenu extends LitElement {
     songs: { type: Array, attribute: false },
     showOverviewLink: { type: Boolean, attribute: 'show-overview-link' },
     setlistTitle: { type: String, attribute: 'setlist-title' },
-  };
+  }
 
   static styles = css`
     :host {
@@ -130,17 +130,17 @@ export class NavMenu extends LitElement {
     .song-item {
       font-size: 1.3rem;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.showBackButton = false;
-    this.backLabel = 'Back';
-    this.popoverId = 'nav-menu-popover';
-    this.triggerButton = null;
-    this.songs = [];
-    this.showOverviewLink = false;
-    this.setlistTitle = 'Setlist';
+    super()
+    this.showBackButton = false
+    this.backLabel = 'Back'
+    this.popoverId = 'nav-menu-popover'
+    this.triggerButton = null
+    this.songs = []
+    this.showOverviewLink = false
+    this.setlistTitle = 'Setlist'
   }
 
   /**
@@ -148,81 +148,83 @@ export class NavMenu extends LitElement {
    * @returns {HTMLElement|null} The popover element
    */
   get popover() {
-    return this.shadowRoot?.querySelector(`#${this.popoverId}`);
+    return this.shadowRoot?.querySelector(`#${this.popoverId}`)
   }
 
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     // Set up positioning after the component is rendered
     this.updateComplete.then(() => {
       if (this.popover) {
         this.popover.addEventListener('toggle', e => {
           if (e.newState === 'open') {
             // Position the popover before it becomes visible
-            this._positionPopover();
+            this._positionPopover()
             // Add click-outside listener when open
             setTimeout(() => {
-              document.addEventListener('click', this._handleClickOutside);
-            }, 0);
+              document.addEventListener('click', this._handleClickOutside)
+            }, 0)
           } else {
             // Remove listener when closed
-            document.removeEventListener('click', this._handleClickOutside);
+            document.removeEventListener('click', this._handleClickOutside)
           }
-        });
+        })
       }
-    });
+    })
 
     // Bind the click outside handler
-    this._handleClickOutside = this._handleClickOutside.bind(this);
+    this._handleClickOutside = this._handleClickOutside.bind(this)
 
     // Listen for app-settings events
-    this.addEventListener('import-requested', this._handleImportRequested);
-    this.addEventListener('clear-database-requested', this._handleClearDatabaseRequested);
+    this.addEventListener('import-requested', this._handleImportRequested)
+    this.addEventListener('clear-database-requested', this._handleClearDatabaseRequested)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener('click', this._handleClickOutside);
+    super.disconnectedCallback()
+    document.removeEventListener('click', this._handleClickOutside)
   }
 
   _handleClickOutside(e) {
-    const popover = this.popover;
-    if (!popover) return;
+    const popover = this.popover
+    if (!popover) return
 
     // Close if clicked outside (browser handles auto-close)
-    const clickedInside = e.composedPath().includes(popover);
-    const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton);
+    const clickedInside = e.composedPath().includes(popover)
+    const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton)
 
     if (!clickedInside && !clickedTrigger) {
-      this.closePopover();
+      this.closePopover()
     }
   }
 
   // Set the trigger button element for positioning
   setTriggerButton(button) {
-    this.triggerButton = button;
+    this.triggerButton = button
   }
 
   // Position the popover relative to the trigger button
   _positionPopover() {
-    const popover = this.popover;
-    if (!popover || !this.triggerButton) return;
+    const popover = this.popover
+    if (!popover || !this.triggerButton) return
 
-    const buttonRect = this.triggerButton.getBoundingClientRect();
-    popover.style.top = `${buttonRect.bottom + 4}px`;
-    popover.style.left = `${buttonRect.left}px`;
+    const buttonRect = this.triggerButton.getBoundingClientRect()
+    popover.style.top = `${buttonRect.bottom + 4}px`
+    popover.style.left = `${buttonRect.left}px`
   }
 
   render() {
     return html`
       <div id="${this.popoverId}" class="nav-menu-popover" part="popover" popover="manual">
         <nav class="nav-menu" part="nav">
-          ${this.showOverviewLink || this.songs?.length > 0
-            ? html`
+          ${
+            this.showOverviewLink || this.songs?.length > 0
+              ? html`
                 <div class="setlist-section">
                   <div class="section-title">${this.setlistTitle}</div>
-                  ${this.showOverviewLink
-                    ? html`
+                  ${
+                    this.showOverviewLink
+                      ? html`
                         <button
                           class="nav-menu-item"
                           part="nav-item overview-item"
@@ -245,7 +247,8 @@ export class NavMenu extends LitElement {
                           <span>Overview</span>
                         </button>
                       `
-                    : ''}
+                      : ''
+                  }
                   ${this.songs?.map(
                     (song, index) => html`
                       <button
@@ -272,9 +275,11 @@ export class NavMenu extends LitElement {
                   )}
                 </div>
               `
-            : ''}
-          ${this.showBackButton
-            ? html`
+              : ''
+          }
+          ${
+            this.showBackButton
+              ? html`
                 <button
                   class="nav-menu-item"
                   part="nav-item back-button"
@@ -296,7 +301,8 @@ export class NavMenu extends LitElement {
                   <span>${this.backLabel}</span>
                 </button>
               `
-            : ''}
+              : ''
+          }
 
           <a href="/" class="nav-menu-item" part="nav-item">
             <svg
@@ -391,7 +397,7 @@ export class NavMenu extends LitElement {
         </div>
         <app-preferences></app-preferences>
       </app-modal>
-    `;
+    `
   }
 
   _handleBackClick() {
@@ -400,10 +406,10 @@ export class NavMenu extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
 
     // Close the popover after back is clicked
-    this.closePopover();
+    this.closePopover()
   }
 
   _handleOverviewClick() {
@@ -412,10 +418,10 @@ export class NavMenu extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
 
     // Close the popover after overview is clicked
-    this.closePopover();
+    this.closePopover()
   }
 
   _handleSongClick(index) {
@@ -425,43 +431,43 @@ export class NavMenu extends LitElement {
         composed: true,
         detail: { index },
       })
-    );
+    )
 
     // Close the popover after song is clicked
-    this.closePopover();
+    this.closePopover()
   }
 
   _handlePreferencesClick() {
-    this.closePopover();
+    this.closePopover()
     // Wait for next frame to ensure popover is closed before showing modal
     requestAnimationFrame(() => {
-      const modal = this.shadowRoot?.querySelector('#nav-preferences-modal');
+      const modal = this.shadowRoot?.querySelector('#nav-preferences-modal')
       if (modal) {
-        modal.show();
+        modal.show()
       }
-    });
+    })
   }
 
   async _handleClearDatabaseRequested() {
     const confirmed = confirm(
       '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
-    );
+    )
 
-    if (!confirmed) return;
+    if (!confirmed) return
 
     try {
-      const { getCurrentDB } = await import('../js/db.js');
-      const db = await getCurrentDB();
-      await db.clearAll();
+      const { getCurrentDB } = await import('../js/db.js')
+      const db = await getCurrentDB()
+      await db.clearAll()
 
-      localStorage.clear();
-      sessionStorage.clear();
+      localStorage.clear()
+      sessionStorage.clear()
 
-      alert('✅ Database cleared successfully!\n\nThe page will now reload.');
-      window.location.reload();
+      alert('✅ Database cleared successfully!\n\nThe page will now reload.')
+      window.location.reload()
     } catch (error) {
-      console.error('Failed to clear database:', error);
-      alert('❌ Failed to clear database: ' + error.message);
+      console.error('Failed to clear database:', error)
+      alert('❌ Failed to clear database: ' + error.message)
     }
   }
 
@@ -469,36 +475,36 @@ export class NavMenu extends LitElement {
     // If we're already on the preferences page, don't navigate
     // Let the event bubble to setlist-app which will handle the import
     if (window.location.pathname === '/preferences') {
-      return;
+      return
     }
 
     // Navigate to preferences page which handles the actual import
-    window.location.href = '/preferences';
+    window.location.href = '/preferences'
   }
 
   // Public API for controlling the popover
   showPopover() {
-    const popover = this.popover;
+    const popover = this.popover
     // Position before showing to avoid visual jump
-    this._positionPopover();
-    popover?.showPopover();
+    this._positionPopover()
+    popover?.showPopover()
   }
 
   closePopover() {
-    const popover = this.popover;
-    popover?.hidePopover();
+    const popover = this.popover
+    popover?.hidePopover()
   }
 
   togglePopover() {
-    const popover = this.popover;
-    popover?.togglePopover();
+    const popover = this.popover
+    popover?.togglePopover()
   }
 
   isOpen() {
-    const popover = this.popover;
-    return popover?.matches(':popover-open') || false;
+    const popover = this.popover
+    return popover?.matches(':popover-open') || false
   }
 }
 
 // Define the custom element
-customElements.define('nav-menu', NavMenu);
+customElements.define('nav-menu', NavMenu)

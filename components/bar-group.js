@@ -1,7 +1,7 @@
-import { LitElement, html, css } from 'lit';
-import { classMap } from 'lit/directives/class-map.js';
-import { isBarMarker } from '../js/utils/chord-utils.js';
-import './chord-display.js';
+import { css, html, LitElement } from 'lit'
+import { classMap } from 'lit/directives/class-map.js'
+import { isBarMarker } from '../js/utils/chord-utils.js'
+import './chord-display.js'
 
 export class BarGroup extends LitElement {
   static properties = {
@@ -10,7 +10,7 @@ export class BarGroup extends LitElement {
     displayKey: { type: String, attribute: 'display-key' },
     capo: { type: Number },
     capoKey: { type: String, attribute: 'capo-key' },
-  };
+  }
 
   static styles = css`
     .bar-group {
@@ -80,23 +80,23 @@ export class BarGroup extends LitElement {
       transform: translateY(-0.3em);
       margin-left: 0.05em;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.data = null;
-    this.displayAsNashville = false;
-    this.displayKey = '';
-    this.capo = 0;
-    this.capoKey = '';
+    super()
+    this.data = null
+    this.displayAsNashville = false
+    this.displayKey = ''
+    this.capo = 0
+    this.capoKey = ''
   }
 
   render() {
     if (!this.data || !this.data.measuresPerLine?.length) {
-      return html``;
+      return html``
     }
 
-    const maxColumns = Math.max(this.data.maxMeasures || 0, 1);
+    const maxColumns = Math.max(this.data.maxMeasures || 0, 1)
 
     return html`
       <div class="bar-group" style="grid-template-columns: repeat(${maxColumns}, auto);">
@@ -104,49 +104,53 @@ export class BarGroup extends LitElement {
           (measures, lineIndex) => html`
             <div class="chord-line bar-aligned" data-bar-line-index=${lineIndex}>
               ${Array.from({ length: maxColumns }).map((_, measureIndex) => {
-                const measure = measures[measureIndex] || null;
+                const measure = measures[measureIndex] || null
                 const measureClasses = classMap({
                   measure: true,
                   'first-measure': measureIndex === 0,
                   'last-measure': measureIndex === maxColumns - 1,
-                });
+                })
                 return html`
                   <span class=${measureClasses}>
-                    ${measure
-                      ? [
-                          (measure.chords || []).map(chord => this._renderChordOnlySegment(chord)),
-                          measure.bar ? this._renderBarMarker(measure.bar) : '',
-                        ]
-                      : ''}
+                    ${
+                      measure
+                        ? [
+                            (measure.chords || []).map(chord =>
+                              this._renderChordOnlySegment(chord)
+                            ),
+                            measure.bar ? this._renderBarMarker(measure.bar) : '',
+                          ]
+                        : ''
+                    }
                   </span>
-                `;
+                `
               })}
             </div>
           `
         )}
       </div>
-    `;
+    `
   }
 
   _renderChordOnlySegment(chordText) {
-    if (!chordText) return html``;
-    return html` <span class="chord-segment chord-only"> ${this._renderChord(chordText)} </span> `;
+    if (!chordText) return html``
+    return html` <span class="chord-segment chord-only"> ${this._renderChord(chordText)} </span> `
   }
 
   _renderBarMarker(barText) {
-    if (!barText) return html``;
+    if (!barText) return html``
     return html`
       <span class="chord-segment chord-only bar-marker">
         <span class="chord bar">${barText}</span>
       </span>
-    `;
+    `
   }
 
   _renderChord(chordText) {
     const classes = classMap({
       chord: true,
       bar: isBarMarker(chordText),
-    });
+    })
     return html`
       <span class=${classes}>
         <chord-display
@@ -157,8 +161,8 @@ export class BarGroup extends LitElement {
           .capoKey=${this.capoKey}
         ></chord-display>
       </span>
-    `;
+    `
   }
 }
 
-customElements.define('bar-group', BarGroup);
+customElements.define('bar-group', BarGroup)

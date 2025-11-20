@@ -1,4 +1,4 @@
-import { LitElement, html } from 'lit';
+import { html, LitElement } from 'lit'
 
 /**
  * SetlistOverview Component
@@ -10,17 +10,17 @@ export class SetlistOverview extends LitElement {
   static properties = {
     songs: { type: Array },
     editMode: { type: Boolean, attribute: 'edit-mode' },
-  };
+  }
 
   constructor() {
-    super();
-    this.songs = [];
-    this.editMode = false;
+    super()
+    this.songs = []
+    this.editMode = false
   }
 
   // Render into light DOM so existing CSS/selectors keep working
   createRenderRoot() {
-    return this;
+    return this
   }
 
   render() {
@@ -68,7 +68,7 @@ export class SetlistOverview extends LitElement {
           </button>
         </div>
       </div>
-    `;
+    `
   }
 
   _handleSongClick(index) {
@@ -78,7 +78,7 @@ export class SetlistOverview extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleSongDelete(index) {
@@ -88,7 +88,7 @@ export class SetlistOverview extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleAddSong() {
@@ -97,8 +97,8 @@ export class SetlistOverview extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 }
 
-customElements.define('setlist-overview', SetlistOverview);
+customElements.define('setlist-overview', SetlistOverview)

@@ -1,13 +1,13 @@
-import { LitElement, html, css, nothing } from 'lit';
-import { classMap } from 'lit/directives/class-map.js';
-import { isBarMarker } from '../js/utils/chord-utils.js';
+import { css, html, LitElement, nothing } from 'lit'
+import { classMap } from 'lit/directives/class-map.js'
+import { isBarMarker } from '../js/utils/chord-utils.js'
 import {
+  formatHiddenLyricsText,
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
-  formatHiddenLyricsText,
-} from '../js/utils/lyrics-normalizer.js';
-import './bar-group.js';
-import './chord-display.js';
+} from '../js/utils/lyrics-normalizer.js'
+import './bar-group.js'
+import './chord-display.js'
 
 /**
  * A custom element for rendering a section of a song with chords and lyrics.
@@ -43,7 +43,7 @@ export class SongSection extends LitElement {
     capo: { type: Number },
     /** @type {string} Target key after applying capo */
     capoKey: { type: String, attribute: 'capo-key' },
-  };
+  }
 
   static styles = css`
     .song-section-wrapper {
@@ -352,27 +352,27 @@ export class SongSection extends LitElement {
       transform: translateY(-0.3em);
       margin-left: 0.05em;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.songIndex = 0;
-    this.sectionIndex = 0;
-    this.editMode = false;
-    this.hideMode = 'none';
-    this.isCollapsed = false;
-    this.isHidden = false;
-    this.label = '';
-    this._lines = undefined; // Private storage for lines
-    this._contentBlocks = [];
-    this._hasAnyChords = false;
-    this._hasAnyLyrics = false;
-    this._onControlClick = this._onControlClick.bind(this);
-    this._onSummaryClick = this._onSummaryClick.bind(this);
-    this.displayAsNashville = false;
-    this.displayKey = '';
-    this.capo = 0;
-    this.capoKey = '';
+    super()
+    this.songIndex = 0
+    this.sectionIndex = 0
+    this.editMode = false
+    this.hideMode = 'none'
+    this.isCollapsed = false
+    this.isHidden = false
+    this.label = ''
+    this._lines = undefined // Private storage for lines
+    this._contentBlocks = []
+    this._hasAnyChords = false
+    this._hasAnyLyrics = false
+    this._onControlClick = this._onControlClick.bind(this)
+    this._onSummaryClick = this._onSummaryClick.bind(this)
+    this.displayAsNashville = false
+    this.displayKey = ''
+    this.capo = 0
+    this.capoKey = ''
   }
 
   /**
@@ -380,7 +380,7 @@ export class SongSection extends LitElement {
    * @returns {Array<{segments: Array<{chord: string, lyrics: string}>}>}
    */
   get lines() {
-    return this._lines;
+    return this._lines
   }
 
   /**
@@ -388,13 +388,13 @@ export class SongSection extends LitElement {
    * @param {Array<{segments: Array<{chord: string, lyrics: string}>}>} value
    */
   set lines(value) {
-    const oldValue = this._lines;
-    this._lines = value;
+    const oldValue = this._lines
+    this._lines = value
     if (value && value.length > 0) {
-      this._contentBlocks = this._buildContentBlocks(value);
-      this._analyzeContent(value);
+      this._contentBlocks = this._buildContentBlocks(value)
+      this._analyzeContent(value)
     }
-    this.requestUpdate('lines', oldValue);
+    this.requestUpdate('lines', oldValue)
   }
 
   /**
@@ -403,21 +403,21 @@ export class SongSection extends LitElement {
    * @private
    */
   _analyzeContent(lines) {
-    this._hasAnyChords = false;
-    this._hasAnyLyrics = false;
+    this._hasAnyChords = false
+    this._hasAnyLyrics = false
 
     for (const line of lines) {
-      const segments = line?.segments || [];
+      const segments = line?.segments || []
       for (const segment of segments) {
         if (segment.chord && segment.chord.trim()) {
-          this._hasAnyChords = true;
+          this._hasAnyChords = true
         }
         if (this._segmentHasLyrics(segment)) {
-          this._hasAnyLyrics = true;
+          this._hasAnyLyrics = true
         }
         // Early exit if we've found both
         if (this._hasAnyChords && this._hasAnyLyrics) {
-          return;
+          return
         }
       }
     }
@@ -430,30 +430,30 @@ export class SongSection extends LitElement {
   getRecommendedHideMode() {
     if (!this._hasAnyLyrics && this._hasAnyChords) {
       // Only chords, show chords only
-      return 'lyrics';
+      return 'lyrics'
     } else if (!this._hasAnyChords && this._hasAnyLyrics) {
       // Only lyrics, show lyrics only
-      return 'chords';
+      return 'chords'
     }
     // Has both or neither, show all
-    return 'none';
+    return 'none'
   }
 
   /** @inheritdoc */
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     if ((!this.label || !this.label.trim()) && this.dataset?.label) {
-      this.label = this.dataset.label;
+      this.label = this.dataset.label
     }
   }
 
   cloneNode(deep = true) {
-    const clone = super.cloneNode(deep);
+    const clone = super.cloneNode(deep)
     if (clone instanceof SongSection) {
-      clone.lines = this._cloneLines(this.lines);
-      clone.label = this.label;
+      clone.lines = this._cloneLines(this.lines)
+      clone.label = this.label
     }
-    return clone;
+    return clone
   }
 
   render() {
@@ -464,9 +464,9 @@ export class SongSection extends LitElement {
       'chords-hidden': this.hideMode === 'chords',
       'lyrics-hidden': this.hideMode === 'lyrics',
       'edit-mode-active': !!this.editMode,
-    };
-    const label = (this.label || '').trim();
-    const sectionLabel = label || `Section ${this.sectionIndex + 1}`;
+    }
+    const label = (this.label || '').trim()
+    const sectionLabel = label || `Section ${this.sectionIndex + 1}`
 
     return html` <div
       class=${classMap(classes)}
@@ -477,13 +477,13 @@ export class SongSection extends LitElement {
       data-section-index=${this.sectionIndex}
     >
       ${label ? this._renderLabeledSection(label) : this._renderPlainSection()}
-    </div>`;
+    </div>`
   }
 
   // willUpdate not needed - lines setter handles content block building
 
   _renderLabeledSection(label) {
-    const detailsOpen = this._shouldDetailsBeOpen();
+    const detailsOpen = this._shouldDetailsBeOpen()
     return html`
       <details
         class="song-section"
@@ -501,7 +501,7 @@ export class SongSection extends LitElement {
         </summary>
         <div class="section-content">${this._renderContent()}</div>
       </details>
-    `;
+    `
   }
 
   _renderPlainSection() {
@@ -509,22 +509,22 @@ export class SongSection extends LitElement {
       <div class="song-section">
         <div class="section-content">${this._renderContent()}</div>
       </div>
-    `;
+    `
   }
 
   _renderControls() {
-    const showAllActive = !this.isHidden && (!this.hideMode || this.hideMode === 'none');
-    const showLyricsActive = !this.isHidden && this.hideMode === 'chords';
-    const showChordsActive = !this.isHidden && this.hideMode === 'lyrics';
-    const showNoneActive = this.isHidden || this.hideMode === 'hide';
+    const showAllActive = !this.isHidden && (!this.hideMode || this.hideMode === 'none')
+    const showLyricsActive = !this.isHidden && this.hideMode === 'chords'
+    const showChordsActive = !this.isHidden && this.hideMode === 'lyrics'
+    const showNoneActive = this.isHidden || this.hideMode === 'hide'
 
     // Disable controls based on content
-    const canShowLyrics = this._hasAnyLyrics;
-    const canShowChords = this._hasAnyChords;
-    const canShowAll = canShowLyrics && canShowChords;
+    const canShowLyrics = this._hasAnyLyrics
+    const canShowChords = this._hasAnyChords
+    const canShowAll = canShowLyrics && canShowChords
 
     if (this.style) {
-      this.style.setProperty('--pill-option-count', 4);
+      this.style.setProperty('--pill-option-count', 4)
     }
     return html`
       <div class="section-controls" role="radiogroup" aria-label="Show content options">
@@ -536,12 +536,12 @@ export class SongSection extends LitElement {
           ${this._renderControlButton('show-none', 'None', showNoneActive)}
         </div>
       </div>
-    `;
+    `
   }
 
   _renderControlButton(action, label, active, disabled = false) {
-    const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`;
-    const ariaLabel = `Show ${label} in ${sectionLabel}`;
+    const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`
+    const ariaLabel = `Show ${label} in ${sectionLabel}`
     return html`
       <button
         class=${classMap({ active: !!active })}
@@ -555,16 +555,16 @@ export class SongSection extends LitElement {
       >
         ${label}
       </button>
-    `;
+    `
   }
 
   _renderCollapseToggle() {
-    const isCollapsed = this.hideMode === 'collapse' || this.isCollapsed;
-    const ariaLabel = isCollapsed ? 'Expand section' : 'Collapse section';
+    const isCollapsed = this.hideMode === 'collapse' || this.isCollapsed
+    const ariaLabel = isCollapsed ? 'Expand section' : 'Collapse section'
     const classes = classMap({
       'section-collapse-toggle': true,
       active: isCollapsed,
-    });
+    })
     return html`
       <button
         class=${classes}
@@ -575,18 +575,18 @@ export class SongSection extends LitElement {
       >
         <span class="collapse-icon" aria-hidden="true">▾</span>
       </button>
-    `;
+    `
   }
 
   _renderContent() {
     if (!this._contentBlocks || this._contentBlocks.length === 0) {
-      return nothing;
+      return nothing
     }
 
     return this._contentBlocks.map((block, index) => {
       if (block.type === 'bar-group') {
         if (this.hideMode === 'chords') {
-          return nothing;
+          return nothing
         }
         return html`<bar-group
           .data=${block.data}
@@ -594,69 +594,71 @@ export class SongSection extends LitElement {
           .displayKey=${this.displayKey}
           .capo=${this.capo}
           .capoKey=${this.capoKey}
-        ></bar-group>`;
+        ></bar-group>`
       }
-      return this._renderLine(block.line, index);
-    });
+      return this._renderLine(block.line, index)
+    })
   }
 
   _renderLine(line, index) {
-    const segments = line?.segments || [];
+    const segments = line?.segments || []
     if (segments.length === 0) {
-      return nothing;
+      return nothing
     }
 
-    const normalizedSegments = this._normalizeSegmentLyrics(segments);
+    const normalizedSegments = this._normalizeSegmentLyrics(segments)
 
     // Check if this line has ANY chords
-    const lineHasChords = normalizedSegments.some(seg => seg.chord && seg.chord.trim());
+    const lineHasChords = normalizedSegments.some(seg => seg.chord && seg.chord.trim())
 
-    let hasPreviousLyrics = false;
+    let hasPreviousLyrics = false
 
     return html`
       <div class="chord-line" data-line-index=${index}>
         ${normalizedSegments.map(segment => {
-          const joinWithPrev = !!segment.__joinWithPrev;
+          const joinWithPrev = !!segment.__joinWithPrev
           const rendered = this._renderSegment(
             segment,
             hasPreviousLyrics,
             joinWithPrev,
             lineHasChords
-          );
+          )
           if (this._segmentHasLyrics(segment)) {
-            hasPreviousLyrics = true;
+            hasPreviousLyrics = true
           }
-          return rendered;
+          return rendered
         })}
       </div>
-    `;
+    `
   }
 
   _renderSegment(segment, previousHadLyrics = false, joinWithPrev = false, lineHasChords = true) {
-    const hasLyrics = this._segmentHasLyrics(segment);
-    const chordText = segment.chord || '';
+    const hasLyrics = this._segmentHasLyrics(segment)
+    const chordText = segment.chord || ''
     const classes = classMap({
       'chord-segment': true,
       'chord-only': !hasLyrics,
-    });
+    })
 
     const lyricsText = hasLyrics
       ? this._formatLyricsText(segment.lyrics || '', previousHadLyrics, joinWithPrev)
-      : '';
+      : ''
 
     // If the line has no chords at all, don't render chord placeholders
-    const shouldRenderChordSpace = lineHasChords;
+    const shouldRenderChordSpace = lineHasChords
 
     return html`
       <span class=${classes}>
-        ${shouldRenderChordSpace
-          ? chordText
-            ? this._renderChord(chordText, segment.valid === false)
-            : html`<span class="chord chord-empty">&nbsp;</span>`
-          : nothing}
+        ${
+          shouldRenderChordSpace
+            ? chordText
+              ? this._renderChord(chordText, segment.valid === false)
+              : html`<span class="chord chord-empty">&nbsp;</span>`
+            : nothing
+        }
         ${hasLyrics ? html`<span class="lyrics">${lyricsText}</span>` : nothing}
       </span>
-    `;
+    `
   }
 
   _renderChord(chordText, isInvalid = false) {
@@ -664,7 +666,7 @@ export class SongSection extends LitElement {
       chord: true,
       bar: isBarMarker(chordText),
       invalid: !!isInvalid,
-    });
+    })
     return html`
       <span class=${classes}>
         <chord-display
@@ -676,45 +678,45 @@ export class SongSection extends LitElement {
           .capoKey=${this.capoKey}
         ></chord-display>
       </span>
-    `;
+    `
   }
 
   _onControlClick(event) {
-    event.stopPropagation();
-    event.preventDefault();
-    const action = event.currentTarget.dataset.action;
-    if (!action) return;
+    event.stopPropagation()
+    event.preventDefault()
+    const action = event.currentTarget.dataset.action
+    if (!action) return
     this.dispatchEvent(
       new CustomEvent('section-action', {
         detail: { songIndex: this.songIndex, sectionIndex: this.sectionIndex, action },
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _onSummaryClick(event) {
-    event.preventDefault();
+    event.preventDefault()
     this.dispatchEvent(
       new CustomEvent('section-toggle', {
         detail: { songIndex: this.songIndex, sectionIndex: this.sectionIndex },
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _shouldDetailsBeOpen() {
-    if (this.editMode) return true;
-    return !(this.isCollapsed || this.hideMode === 'collapse');
+    if (this.editMode) return true
+    return !(this.isCollapsed || this.hideMode === 'collapse')
   }
 
   getDetailsElement() {
-    return this._getWrapper()?.querySelector('details.song-section') || null;
+    return this._getWrapper()?.querySelector('details.song-section') || null
   }
 
   _getWrapper() {
-    return this.renderRoot?.querySelector('.song-section-wrapper') || null;
+    return this.renderRoot?.querySelector('.song-section-wrapper') || null
   }
 
   /**
@@ -725,28 +727,28 @@ export class SongSection extends LitElement {
    */
   _buildContentBlocks(lines) {
     if (!Array.isArray(lines) || lines.length === 0) {
-      return [];
+      return []
     }
 
-    const blocks = [];
-    let i = 0;
+    const blocks = []
+    let i = 0
 
     while (i < lines.length) {
-      const line = lines[i];
+      const line = lines[i]
       if (this._isBarLineLine(line)) {
-        const barLines = this._collectBarGroup(lines, i);
+        const barLines = this._collectBarGroup(lines, i)
         blocks.push({
           type: 'bar-group',
           data: this._buildBarGroupData(barLines),
-        });
-        i += barLines.length;
+        })
+        i += barLines.length
       } else {
-        blocks.push({ type: 'line', line });
-        i++;
+        blocks.push({ type: 'line', line })
+        i++
       }
     }
 
-    return blocks;
+    return blocks
   }
 
   /**
@@ -757,16 +759,16 @@ export class SongSection extends LitElement {
    * @private
    */
   _collectBarGroup(lines, startIndex) {
-    const group = [];
+    const group = []
     for (let i = startIndex; i < lines.length; i++) {
-      const candidate = lines[i];
+      const candidate = lines[i]
       if (this._isBarLineLine(candidate)) {
-        group.push(candidate);
+        group.push(candidate)
       } else {
-        break;
+        break
       }
     }
-    return group;
+    return group
   }
 
   /**
@@ -777,48 +779,48 @@ export class SongSection extends LitElement {
    */
   _buildBarGroupData(lines) {
     if (!lines.length) {
-      return { measuresPerLine: [], maxMeasures: 0 };
+      return { measuresPerLine: [], maxMeasures: 0 }
     }
 
     const measuresPerLine = lines.map(line => {
-      const items = [];
+      const items = []
       line.segments?.forEach(segment => {
         if (segment.chord) {
           items.push({
             chord: segment.chord,
             isBar: isBarMarker(segment.chord),
-          });
+          })
         }
-      });
+      })
 
-      const measures = [];
-      let currentMeasure = [];
+      const measures = []
+      let currentMeasure = []
 
       items.forEach(item => {
         if (item.isBar) {
           measures.push({
             chords: currentMeasure,
             bar: item.chord,
-          });
-          currentMeasure = [];
+          })
+          currentMeasure = []
         } else {
-          currentMeasure.push(item.chord);
+          currentMeasure.push(item.chord)
         }
-      });
+      })
 
       if (currentMeasure.length > 0 || measures.length === 0) {
         measures.push({
           chords: currentMeasure,
           bar: null,
-        });
+        })
       }
 
-      return measures;
-    });
+      return measures
+    })
 
     const maxMeasures =
-      measuresPerLine.reduce((max, measures) => Math.max(max, measures.length), 0) || 1;
-    return { measuresPerLine, maxMeasures };
+      measuresPerLine.reduce((max, measures) => Math.max(max, measures.length), 0) || 1
+    return { measuresPerLine, maxMeasures }
   }
 
   /**
@@ -828,16 +830,16 @@ export class SongSection extends LitElement {
    * @private
    */
   _isBarLineLine(line) {
-    if (!line?.segments || line.segments.length === 0) return false;
-    let hasBar = false;
+    if (!line?.segments || line.segments.length === 0) return false
+    let hasBar = false
     for (const segment of line.segments) {
-      const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0;
-      if (hasLyrics) return false;
+      const hasLyrics = segment.lyrics && segment.lyrics.trim().length > 0
+      if (hasLyrics) return false
       if (segment.chord && isBarMarker(segment.chord)) {
-        hasBar = true;
+        hasBar = true
       }
     }
-    return hasBar;
+    return hasBar
   }
 
   /**
@@ -848,11 +850,11 @@ export class SongSection extends LitElement {
    */
   _cloneLines(lines) {
     if (!Array.isArray(lines)) {
-      return [];
+      return []
     }
     return lines.map(line => ({
       segments: (line.segments || []).map(segment => ({ ...segment })),
-    }));
+    }))
   }
 
   /**
@@ -863,27 +865,27 @@ export class SongSection extends LitElement {
    */
   _formatLyricsText(text, previousHadLyrics = false, joinWithPrev = false) {
     if (!text) {
-      return '';
+      return ''
     }
     if (this.hideMode !== 'chords') {
-      return text;
+      return text
     }
-    return formatHiddenLyricsText(text, previousHadLyrics, joinWithPrev);
+    return formatHiddenLyricsText(text, previousHadLyrics, joinWithPrev)
   }
 
   _segmentHasLyrics(segment) {
-    return segmentHasVisibleLyrics(segment);
+    return segmentHasVisibleLyrics(segment)
   }
 
   _normalizeSegmentLyrics(segments) {
     if (!Array.isArray(segments) || segments.length === 0) {
-      return [];
+      return []
     }
     if (this.hideMode !== 'chords') {
-      return segments;
+      return segments
     }
-    return normalizeSegmentsForHiddenChords(segments);
+    return normalizeSegmentsForHiddenChords(segments)
   }
 }
 
-customElements.define('song-section', SongSection);
+customElements.define('song-section', SongSection)

@@ -1,7 +1,7 @@
-import { LitElement, html, css, nothing } from 'lit';
-import './song-section.js';
-import { getUseNashvilleNumbers } from '../js/preferences.js';
-import { transposeKeyName } from '../js/transpose.js';
+import { css, html, LitElement, nothing } from 'lit'
+import './song-section.js'
+import { getUseNashvilleNumbers } from '../js/preferences.js'
+import { transposeKeyName } from '../js/transpose.js'
 
 /**
  * Song Display Component
@@ -20,54 +20,54 @@ export class SongDisplay extends LitElement {
     useNashville: { type: Boolean, state: true },
     /** @type {number} Current capo value */
     capo: { type: Number },
-  };
+  }
 
   static styles = css`
     :host {
       display: block;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.parsed = null;
-    this.songIndex = 0;
-    this.useNashville = getUseNashvilleNumbers();
-    this.capo = 0;
+    super()
+    this.parsed = null
+    this.songIndex = 0
+    this.useNashville = getUseNashvilleNumbers()
+    this.capo = 0
     this._onNashvilleChange = event => {
-      this.useNashville = !!event.detail;
-      this.requestUpdate();
-    };
+      this.useNashville = !!event.detail
+      this.requestUpdate()
+    }
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    window.addEventListener('nashville-preference-changed', this._onNashvilleChange);
+    super.connectedCallback()
+    window.addEventListener('nashville-preference-changed', this._onNashvilleChange)
   }
 
   disconnectedCallback() {
-    window.removeEventListener('nashville-preference-changed', this._onNashvilleChange);
-    super.disconnectedCallback();
+    window.removeEventListener('nashville-preference-changed', this._onNashvilleChange)
+    super.disconnectedCallback()
   }
 
   render() {
     if (!this.parsed || !this.parsed.sections) {
-      return nothing;
+      return nothing
     }
 
     const sections = this.parsed.sections.map((section, index) =>
       this._renderSection(section, index)
-    );
+    )
 
-    return html`${sections}`;
+    return html`${sections}`
   }
 
   _renderSection(section, index) {
-    const displayKey = this.parsed?.metadata?.key || '';
+    const displayKey = this.parsed?.metadata?.key || ''
     const capoValue = Number.isFinite(this.capo)
       ? Math.min(Math.max(Math.round(this.capo), 0), 11)
-      : 0;
-    const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : '';
+      : 0
+    const capoKey = capoValue > 0 && displayKey ? transposeKeyName(displayKey, -capoValue) : ''
     return html`
       <song-section
         .lines=${section.lines}
@@ -83,8 +83,8 @@ export class SongDisplay extends LitElement {
         data-label=${section.label || ''}
       >
       </song-section>
-    `;
+    `
   }
 }
 
-customElements.define('song-display', SongDisplay);
+customElements.define('song-display', SongDisplay)

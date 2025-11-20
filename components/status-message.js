@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * StatusMessage component
@@ -11,13 +11,13 @@ export class StatusMessage extends LitElement {
     message: { type: String },
     detail: { type: String },
     state: { type: String, reflect: true },
-  };
+  }
 
   constructor() {
-    super();
-    this.message = '';
-    this.detail = '';
-    this.state = 'info';
+    super()
+    this.message = ''
+    this.detail = ''
+    this.state = 'info'
   }
 
   static styles = css`
@@ -96,16 +96,16 @@ export class StatusMessage extends LitElement {
         transform: rotate(360deg);
       }
     }
-  `;
+  `
 
   renderSpinner() {
-    if (this.state !== 'loading') return null;
-    return html`<div class="spinner" role="presentation" aria-hidden="true"></div>`;
+    if (this.state !== 'loading') return null
+    return html`<div class="spinner" role="presentation" aria-hidden="true"></div>`
   }
 
   render() {
-    const role = this.state === 'error' ? 'alert' : 'status';
-    const ariaLive = this.state === 'loading' ? 'polite' : 'off';
+    const role = this.state === 'error' ? 'alert' : 'status'
+    const ariaLive = this.state === 'loading' ? 'polite' : 'off'
 
     return html`
       <div class="status-card" role=${role} aria-live=${ariaLive}>
@@ -114,8 +114,8 @@ export class StatusMessage extends LitElement {
         ${this.detail ? html`<p class="detail">${this.detail}</p>` : null}
         <slot></slot>
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('status-message', StatusMessage);
+customElements.define('status-message', StatusMessage)

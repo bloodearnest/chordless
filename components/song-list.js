@@ -1,6 +1,6 @@
-import { LitElement, html, css } from 'lit';
-import './song-card.js';
-import './status-message.js';
+import { css, html, LitElement } from 'lit'
+import './song-card.js'
+import './status-message.js'
 
 /**
  * SongList component
@@ -15,15 +15,15 @@ export class SongList extends LitElement {
     emptyMessage: { type: String, attribute: 'empty-message' },
     emptyDetail: { type: String, attribute: 'empty-detail' },
     dense: { type: Boolean, reflect: true },
-  };
+  }
 
   constructor() {
-    super();
-    this.songs = [];
-    this.variant = 'library';
-    this.emptyMessage = 'No songs to display.';
-    this.emptyDetail = '';
-    this.dense = false;
+    super()
+    this.songs = []
+    this.variant = 'library'
+    this.emptyMessage = 'No songs to display.'
+    this.emptyDetail = ''
+    this.dense = false
   }
 
   static styles = css`
@@ -44,7 +44,7 @@ export class SongList extends LitElement {
     song-card {
       margin: 0;
     }
-  `;
+  `
 
   handleSongClick(song, index, originalEvent) {
     this.dispatchEvent(
@@ -53,19 +53,19 @@ export class SongList extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   renderEmptyState() {
     return html`
       <status-message state="empty" .message=${this.emptyMessage} .detail=${this.emptyDetail}>
       </status-message>
-    `;
+    `
   }
 
   render() {
     if (!this.songs || this.songs.length === 0) {
-      return this.renderEmptyState();
+      return this.renderEmptyState()
     }
 
     return html`
@@ -81,8 +81,8 @@ export class SongList extends LitElement {
           `
         )}
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('song-list', SongList);
+customElements.define('song-list', SongList)

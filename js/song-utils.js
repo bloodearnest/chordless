@@ -6,12 +6,12 @@
  * Each variant is a separate song document linked by variantOf field.
  */
 
-import { getCurrentDB, normalizeTitle } from './db.js';
-import { ChordProParser } from './parser.js';
+import { getCurrentDB, normalizeTitle } from './db.js'
+import { ChordProParser } from './parser.js'
 
-const parser = new ChordProParser();
-const parseCache = new Map();
-const MAX_CACHE_SIZE = 100;
+const parser = new ChordProParser()
+const parseCache = new Map()
+const MAX_CACHE_SIZE = 100
 
 /**
  * Get full song with parsed metadata from chordpro
@@ -22,22 +22,22 @@ const MAX_CACHE_SIZE = 100;
  */
 export async function getSongWithContent(songUuid, db = null) {
   if (!db) {
-    db = await getCurrentDB();
+    db = await getCurrentDB()
   }
 
-  const song = await db.getSong(songUuid);
+  const song = await db.getSong(songUuid)
   if (!song) {
-    throw new Error(`Song not found: ${songUuid}`);
+    throw new Error(`Song not found: ${songUuid}`)
   }
 
   // Get chordpro content
-  const chordpro = await db.getChordPro(song.chordproFileId);
+  const chordpro = await db.getChordPro(song.chordproFileId)
   if (!chordpro) {
-    throw new Error(`ChordPro content not found: ${song.chordproFileId}`);
+    throw new Error(`ChordPro content not found: ${song.chordproFileId}`)
   }
 
   // Parse chordpro (with caching)
-  const parsed = getCachedParsed(song.chordproFileId, chordpro.content);
+  const parsed = getCachedParsed(song.chordproFileId, chordpro.content)
 
   return {
     // Song identity
@@ -73,7 +73,7 @@ export async function getSongWithContent(songUuid, db = null) {
 
     // Parsed structure
     parsed: parsed,
-  };
+  }
 }
 
 /**
@@ -85,9 +85,9 @@ export async function getSongWithContent(songUuid, db = null) {
  */
 export async function getSongVariants(songId, db = null) {
   if (!db) {
-    db = await getCurrentDB();
+    db = await getCurrentDB()
   }
-  return await db.getSongVariants(songId);
+  return await db.getSongVariants(songId)
 }
 
 /**
@@ -99,9 +99,9 @@ export async function getSongVariants(songId, db = null) {
  */
 export async function getDefaultVariant(songId, db = null) {
   if (!db) {
-    db = await getCurrentDB();
+    db = await getCurrentDB()
   }
-  return await db.getDefaultSongVariant(songId);
+  return await db.getDefaultSongVariant(songId)
 }
 
 /**
@@ -113,17 +113,17 @@ export async function getDefaultVariant(songId, db = null) {
  */
 export async function getSongById(songId, db = null) {
   if (!db) {
-    db = await getCurrentDB();
+    db = await getCurrentDB()
   }
 
   // Get default variant for this song
-  const song = await db.getDefaultSongVariant(songId);
+  const song = await db.getDefaultSongVariant(songId)
   if (!song) {
-    throw new Error(`Song not found: ${songId}`);
+    throw new Error(`Song not found: ${songId}`)
   }
 
   // Return full song with content
-  return await getSongWithContent(song.uuid, db);
+  return await getSongWithContent(song.uuid, db)
 }
 
 /**
@@ -136,30 +136,30 @@ export async function getSongById(songId, db = null) {
  */
 export async function findExistingSong(ccliNumber, title, db = null) {
   if (!db) {
-    db = await getCurrentDB();
+    db = await getCurrentDB()
   }
 
   // Try CCLI first
   if (ccliNumber) {
-    const songs = await db.findSongByCCLI(ccliNumber);
+    const songs = await db.findSongByCCLI(ccliNumber)
     if (songs.length > 0) {
       // Return default variant if available
-      const defaultSong = songs.find(s => s.isDefault);
-      return defaultSong || songs[0];
+      const defaultSong = songs.find(s => s.isDefault)
+      return defaultSong || songs[0]
     }
   }
 
   // Try normalized title
   if (title) {
-    const titleNormalized = normalizeTitle(title);
-    const songs = await db.findSongByNormalizedTitle(titleNormalized);
+    const titleNormalized = normalizeTitle(title)
+    const songs = await db.findSongByNormalizedTitle(titleNormalized)
     if (songs.length > 0) {
-      const defaultSong = songs.find(s => s.isDefault);
-      return defaultSong || songs[0];
+      const defaultSong = songs.find(s => s.isDefault)
+      return defaultSong || songs[0]
     }
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -170,35 +170,35 @@ export async function findExistingSong(ccliNumber, title, db = null) {
  * @returns {Promise<Object>} Created song
  */
 export async function createSong(chordproContent, options = {}) {
-  const db = await getCurrentDB();
+  const db = await getCurrentDB()
 
   // Parse chordpro to extract metadata
-  const parsed = parser.parse(chordproContent);
-  const metadata = parsed.metadata;
+  const parsed = parser.parse(chordproContent)
+  const metadata = parsed.metadata
 
   // Generate deterministic ID
-  const ccliNumber = metadata.ccliSongNumber || metadata.ccli || options.ccliNumber;
-  const title = metadata.title || options.title || 'Untitled';
-  const titleNormalized = normalizeTitle(title);
+  const ccliNumber = metadata.ccliSongNumber || metadata.ccli || options.ccliNumber
+  const title = metadata.title || options.title || 'Untitled'
+  const titleNormalized = normalizeTitle(title)
 
-  let songId;
+  let songId
   if (ccliNumber) {
-    songId = `ccli-${ccliNumber}`;
+    songId = `ccli-${ccliNumber}`
   } else {
-    songId = `title-${titleNormalized}`;
+    songId = `title-${titleNormalized}`
   }
 
   // Check if song already exists
-  const existing = await findExistingSong(ccliNumber, title, db);
+  const existing = await findExistingSong(ccliNumber, title, db)
   if (existing && !options.forceNew) {
     throw new Error(
       `Song already exists: ${existing.title} (${existing.id}). Use forceNew option to create variant.`
-    );
+    )
   }
 
   // Create chordpro file
-  const chordproFileId = `chordpro-${crypto.randomUUID()}`;
-  const contentHash = hashText(chordproContent);
+  const chordproFileId = `chordpro-${crypto.randomUUID()}`
+  const contentHash = hashText(chordproContent)
 
   await db.saveChordPro({
     id: chordproFileId,
@@ -206,7 +206,7 @@ export async function createSong(chordproContent, options = {}) {
     contentHash: contentHash,
     createdDate: new Date().toISOString(),
     modifiedDate: new Date().toISOString(),
-  });
+  })
 
   // Create song
   const song = {
@@ -237,11 +237,11 @@ export async function createSong(chordproContent, options = {}) {
     driveModifiedTime: null,
     lastSyncedAt: null,
     contentHash: contentHash,
-  };
+  }
 
-  await db.saveSong(song);
+  await db.saveSong(song)
 
-  return song;
+  return song
 }
 
 /**
@@ -254,11 +254,11 @@ export async function createSong(chordproContent, options = {}) {
  * @returns {Promise<Object>} Created variant
  */
 export async function createVariant(sourceUuid, variantLabel, chordproContent, options = {}) {
-  const db = await getCurrentDB();
+  const db = await getCurrentDB()
 
-  const sourceSong = await db.getSong(sourceUuid);
+  const sourceSong = await db.getSong(sourceUuid)
   if (!sourceSong) {
-    throw new Error(`Source song not found: ${sourceUuid}`);
+    throw new Error(`Source song not found: ${sourceUuid}`)
   }
 
   return await createSong(chordproContent, {
@@ -268,7 +268,7 @@ export async function createVariant(sourceUuid, variantLabel, chordproContent, o
     ccliNumber: sourceSong.ccliNumber,
     title: sourceSong.title,
     forceNew: true,
-  });
+  })
 }
 
 /**
@@ -278,30 +278,30 @@ export async function createVariant(sourceUuid, variantLabel, chordproContent, o
  * @returns {Promise<void>}
  */
 export async function setDefaultVariant(songUuid) {
-  const db = await getCurrentDB();
+  const db = await getCurrentDB()
 
-  const song = await db.getSong(songUuid);
+  const song = await db.getSong(songUuid)
   if (!song) {
-    throw new Error(`Song not found: ${songUuid}`);
+    throw new Error(`Song not found: ${songUuid}`)
   }
 
   // Get all variants for this song
-  const variants = await db.getSongVariants(song.id);
+  const variants = await db.getSongVariants(song.id)
 
   // Unset all defaults
   for (const variant of variants) {
     if (variant.isDefault && variant.uuid !== songUuid) {
-      variant.isDefault = false;
-      variant.modifiedDate = new Date().toISOString();
-      await db.saveSong(variant);
+      variant.isDefault = false
+      variant.modifiedDate = new Date().toISOString()
+      await db.saveSong(variant)
     }
   }
 
   // Set this one as default
   if (!song.isDefault) {
-    song.isDefault = true;
-    song.modifiedDate = new Date().toISOString();
-    await db.saveSong(song);
+    song.isDefault = true
+    song.modifiedDate = new Date().toISOString()
+    await db.saveSong(song)
   }
 }
 
@@ -310,19 +310,19 @@ export async function setDefaultVariant(songUuid) {
  */
 function getCachedParsed(fileId, content) {
   if (parseCache.has(fileId)) {
-    return parseCache.get(fileId);
+    return parseCache.get(fileId)
   }
 
-  const parsed = parser.parse(content);
+  const parsed = parser.parse(content)
 
   // Limit cache size
   if (parseCache.size >= MAX_CACHE_SIZE) {
-    const firstKey = parseCache.keys().next().value;
-    parseCache.delete(firstKey);
+    const firstKey = parseCache.keys().next().value
+    parseCache.delete(firstKey)
   }
 
-  parseCache.set(fileId, parsed);
-  return parsed;
+  parseCache.set(fileId, parsed)
+  return parsed
 }
 
 /**
@@ -330,13 +330,13 @@ function getCachedParsed(fileId, content) {
  */
 export function hashText(text) {
   // Simple hash - could be upgraded to crypto.subtle.digest later
-  let hash = 0;
+  let hash = 0
   for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    const char = text.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash // Convert to 32bit integer
   }
-  return `hash-${Math.abs(hash).toString(16)}`;
+  return `hash-${Math.abs(hash).toString(16)}`
 }
 
 /**
@@ -347,10 +347,10 @@ export function hashText(text) {
  * @returns {Array<string>} Array of cleaned artist names
  */
 export function formatArtistNames(artistString) {
-  if (!artistString) return [];
+  if (!artistString) return []
 
   // Split by comma, semicolon, or pipe
-  const artists = artistString.split(/[,;|]/).map(a => a.trim());
+  const artists = artistString.split(/[,;|]/).map(a => a.trim())
 
   // Clean up each artist name by removing "Words by", "Music by", "Music:", etc.
   const cleanedArtists = artists
@@ -359,9 +359,9 @@ export function formatArtistNames(artistString) {
         .replace(/^Words\s+by\s+/i, '')
         .replace(/^Music\s+by\s+/i, '')
         .replace(/^Music:\s*/i, '')
-        .trim();
+        .trim()
     })
-    .filter(a => a.length > 0); // Remove empty strings
+    .filter(a => a.length > 0) // Remove empty strings
 
-  return cleanedArtists;
+  return cleanedArtists
 }

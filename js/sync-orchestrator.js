@@ -10,13 +10,13 @@
  * - UI components use this interface rather than calling DriveSyncManager directly
  */
 
-import { createSyncManager, isSyncAvailable } from './drive-sync.js';
+import { createSyncManager, isSyncAvailable } from './drive-sync.js'
 
 /**
  * Detect if we're running in a Service Worker context
  */
 function isServiceWorkerContext() {
-  return typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
+  return typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope
 }
 
 /**
@@ -24,8 +24,8 @@ function isServiceWorkerContext() {
  */
 class ProgressBroadcaster {
   constructor(callback = null) {
-    this.callback = callback;
-    this.isServiceWorker = isServiceWorkerContext();
+    this.callback = callback
+    this.isServiceWorker = isServiceWorkerContext()
   }
 
   /**
@@ -36,18 +36,18 @@ class ProgressBroadcaster {
   async send(progressData) {
     // Main thread: direct callback
     if (this.callback) {
-      this.callback(progressData);
+      this.callback(progressData)
     }
 
     // Service Worker: broadcast to all clients
     if (this.isServiceWorker && self.clients) {
-      const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      const clients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' })
       clients.forEach(client => {
         client.postMessage({
           type: 'SYNC_PROGRESS',
           data: progressData,
-        });
-      });
+        })
+      })
     }
   }
 }
@@ -57,17 +57,17 @@ class ProgressBroadcaster {
  */
 export class SyncOrchestrator {
   constructor(organisationName, organisationId) {
-    this.organisationName = organisationName;
-    this.organisationId = organisationId;
-    this.syncManager = null;
-    this.isServiceWorker = isServiceWorkerContext();
+    this.organisationName = organisationName
+    this.organisationId = organisationId
+    this.syncManager = null
+    this.isServiceWorker = isServiceWorkerContext()
   }
 
   /**
    * Initialize sync manager
    */
   async init() {
-    this.syncManager = await createSyncManager(this.organisationName, this.organisationId);
+    this.syncManager = await createSyncManager(this.organisationName, this.organisationId)
   }
 
   /**
@@ -76,43 +76,43 @@ export class SyncOrchestrator {
    */
   async sync(progressCallback = null) {
     if (!this.syncManager) {
-      await this.init();
+      await this.init()
     }
 
-    const broadcaster = new ProgressBroadcaster(progressCallback);
+    const broadcaster = new ProgressBroadcaster(progressCallback)
 
     try {
       await broadcaster.send({
         stage: 'starting',
         message: 'Starting sync...',
         timestamp: new Date().toISOString(),
-      });
+      })
 
       await this.syncManager.sync(progress => {
         broadcaster.send({
           ...progress,
           timestamp: new Date().toISOString(),
-        });
-      });
+        })
+      })
 
       await broadcaster.send({
         stage: 'complete',
         message: 'Sync complete!',
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      return { success: true };
+      return { success: true }
     } catch (error) {
-      console.error('[SyncOrchestrator] Sync failed:', error);
+      console.error('[SyncOrchestrator] Sync failed:', error)
 
       await broadcaster.send({
         stage: 'error',
         message: error.message,
         error: error.message,
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      throw error;
+      throw error
     }
   }
 
@@ -122,43 +122,43 @@ export class SyncOrchestrator {
    */
   async clearAndReupload(progressCallback = null) {
     if (!this.syncManager) {
-      await this.init();
+      await this.init()
     }
 
-    const broadcaster = new ProgressBroadcaster(progressCallback);
+    const broadcaster = new ProgressBroadcaster(progressCallback)
 
     try {
       await broadcaster.send({
         stage: 'starting',
         message: 'Starting clear and re-upload...',
         timestamp: new Date().toISOString(),
-      });
+      })
 
       await this.syncManager.clearAndReupload(progress => {
         broadcaster.send({
           ...progress,
           timestamp: new Date().toISOString(),
-        });
-      });
+        })
+      })
 
       await broadcaster.send({
         stage: 'complete',
         message: 'Clear and re-upload complete!',
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      return { success: true };
+      return { success: true }
     } catch (error) {
-      console.error('[SyncOrchestrator] Clear and re-upload failed:', error);
+      console.error('[SyncOrchestrator] Clear and re-upload failed:', error)
 
       await broadcaster.send({
         stage: 'error',
         message: error.message,
         error: error.message,
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      throw error;
+      throw error
     }
   }
 
@@ -168,43 +168,43 @@ export class SyncOrchestrator {
    */
   async push(progressCallback = null) {
     if (!this.syncManager) {
-      await this.init();
+      await this.init()
     }
 
-    const broadcaster = new ProgressBroadcaster(progressCallback);
+    const broadcaster = new ProgressBroadcaster(progressCallback)
 
     try {
       await broadcaster.send({
         stage: 'starting',
         message: 'Pushing to Drive...',
         timestamp: new Date().toISOString(),
-      });
+      })
 
       await this.syncManager.pushToDrive(progress => {
         broadcaster.send({
           ...progress,
           timestamp: new Date().toISOString(),
-        });
-      });
+        })
+      })
 
       await broadcaster.send({
         stage: 'complete',
         message: 'Push complete!',
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      return { success: true };
+      return { success: true }
     } catch (error) {
-      console.error('[SyncOrchestrator] Push failed:', error);
+      console.error('[SyncOrchestrator] Push failed:', error)
 
       await broadcaster.send({
         stage: 'error',
         message: error.message,
         error: error.message,
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      throw error;
+      throw error
     }
   }
 
@@ -214,43 +214,43 @@ export class SyncOrchestrator {
    */
   async pull(progressCallback = null) {
     if (!this.syncManager) {
-      await this.init();
+      await this.init()
     }
 
-    const broadcaster = new ProgressBroadcaster(progressCallback);
+    const broadcaster = new ProgressBroadcaster(progressCallback)
 
     try {
       await broadcaster.send({
         stage: 'starting',
         message: 'Pulling from Drive...',
         timestamp: new Date().toISOString(),
-      });
+      })
 
       await this.syncManager.pullFromDrive(progress => {
         broadcaster.send({
           ...progress,
           timestamp: new Date().toISOString(),
-        });
-      });
+        })
+      })
 
       await broadcaster.send({
         stage: 'complete',
         message: 'Pull complete!',
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      return { success: true };
+      return { success: true }
     } catch (error) {
-      console.error('[SyncOrchestrator] Pull failed:', error);
+      console.error('[SyncOrchestrator] Pull failed:', error)
 
       await broadcaster.send({
         stage: 'error',
         message: error.message,
         error: error.message,
         timestamp: new Date().toISOString(),
-      });
+      })
 
-      throw error;
+      throw error
     }
   }
 }
@@ -259,15 +259,15 @@ export class SyncOrchestrator {
  * Helper to create an orchestrator instance
  */
 export async function createSyncOrchestrator(organisationName, organisationId) {
-  const orchestrator = new SyncOrchestrator(organisationName, organisationId);
-  await orchestrator.init();
-  return orchestrator;
+  const orchestrator = new SyncOrchestrator(organisationName, organisationId)
+  await orchestrator.init()
+  return orchestrator
 }
 
 /**
  * Check if sync is available (user authenticated)
  */
-export { isSyncAvailable };
+export { isSyncAvailable }
 
 /**
  * Listen for sync messages from Service Worker (for main thread UI)
@@ -276,21 +276,23 @@ export { isSyncAvailable };
  */
 export function listenForSyncProgress(callback) {
   if (isServiceWorkerContext()) {
-    console.warn('[SyncOrchestrator] listenForSyncProgress called in SW context - ignoring');
-    return () => {};
+    console.warn('[SyncOrchestrator] listenForSyncProgress called in SW context - ignoring')
+    return () => {
+      // No-op: Service workers don't need cleanup
+    }
   }
 
   const handler = event => {
     if (event.data && event.data.type === 'SYNC_PROGRESS') {
-      callback(event.data.data);
+      callback(event.data.data)
     }
-  };
+  }
 
-  navigator.serviceWorker.addEventListener('message', handler);
+  navigator.serviceWorker.addEventListener('message', handler)
 
   return () => {
-    navigator.serviceWorker.removeEventListener('message', handler);
-  };
+    navigator.serviceWorker.removeEventListener('message', handler)
+  }
 }
 
 /**
@@ -299,18 +301,18 @@ export function listenForSyncProgress(callback) {
  */
 export async function requestBackgroundSync(organisationName, organisationId) {
   if (isServiceWorkerContext()) {
-    console.warn('[SyncOrchestrator] requestBackgroundSync called in SW context');
-    return;
+    console.warn('[SyncOrchestrator] requestBackgroundSync called in SW context')
+    return
   }
 
   if (!navigator.serviceWorker || !navigator.serviceWorker.ready) {
-    throw new Error('Service Worker not available');
+    throw new Error('Service Worker not available')
   }
 
   // For now, just sync on main thread
   // Later: register background sync and let SW handle it
-  const orchestrator = await createSyncOrchestrator(organisationName, organisationId);
-  return orchestrator.sync();
+  const orchestrator = await createSyncOrchestrator(organisationName, organisationId)
+  return orchestrator.sync()
 
   // Future implementation:
   // const registration = await navigator.serviceWorker.ready;

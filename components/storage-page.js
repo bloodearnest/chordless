@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
-import './drive-sync-panel.js';
-import './storage-summary.js';
-import './pad-set-manager.js';
-import './select-organisation.js';
+import { css, html, LitElement } from 'lit'
+import './drive-sync-panel.js'
+import './storage-summary.js'
+import './pad-set-manager.js'
+import './select-organisation.js'
 
 /**
  * StoragePage Component
@@ -17,7 +17,7 @@ export class StoragePage extends LitElement {
     isAuthenticated: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
-  };
+  }
 
   static styles = css`
     :host {
@@ -210,29 +210,29 @@ export class StoragePage extends LitElement {
       font-size: 0.85rem;
       opacity: 0.8;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.isAuthenticated = false;
-    this.authStatus = 'checking';
-    this.userInfo = null;
+    super()
+    this.isAuthenticated = false
+    this.authStatus = 'checking'
+    this.userInfo = null
   }
 
   async connectedCallback() {
-    super.connectedCallback();
-    await this.checkAuthStatus();
+    super.connectedCallback()
+    await this.checkAuthStatus()
   }
 
   async checkAuthStatus() {
     try {
-      const { isAuthenticated, getCurrentUserInfo } = await import('/js/google-auth.js');
-      this.isAuthenticated = await isAuthenticated();
-      this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null;
-      this.authStatus = 'ready';
+      const { isAuthenticated, getCurrentUserInfo } = await import('/js/google-auth.js')
+      this.isAuthenticated = await isAuthenticated()
+      this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
+      this.authStatus = 'ready'
     } catch (error) {
-      console.error('[StoragePage] Failed to check auth:', error);
-      this.authStatus = 'error';
+      console.error('[StoragePage] Failed to check auth:', error)
+      this.authStatus = 'error'
     }
   }
 
@@ -243,7 +243,7 @@ export class StoragePage extends LitElement {
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated)}
         ${this._renderPadSetSection()} ${this._renderImportSection()} ${this._renderDangerSection()}
       </div>
-    `;
+    `
   }
 
   _renderAuthSection() {
@@ -251,23 +251,26 @@ export class StoragePage extends LitElement {
       <div class="storage-section">
         <h3>🔐 Google Drive Authorization</h3>
 
-        ${this.authStatus === 'checking'
-          ? html`
+        ${
+          this.authStatus === 'checking'
+            ? html`
               <div class="auth-status pending">
                 <div class="spinner"></div>
                 <p>Checking authorization status...</p>
               </div>
             `
-          : this.isAuthenticated
-            ? html`
+            : this.isAuthenticated
+              ? html`
                 <div class="auth-status authenticated">
                   <h4>✓ Connected</h4>
 
-                  ${this.userInfo
-                    ? html`
+                  ${
+                    this.userInfo
+                      ? html`
                         <div class="user-card">
-                          ${this.userInfo.avatarDataUrl || this.userInfo.picture
-                            ? html`
+                          ${
+                            this.userInfo.avatarDataUrl || this.userInfo.picture
+                              ? html`
                                 <img
                                   class="user-avatar"
                                   src="${this.userInfo.avatarDataUrl || this.userInfo.picture}"
@@ -275,22 +278,26 @@ export class StoragePage extends LitElement {
                                   referrerpolicy="no-referrer"
                                 />
                               `
-                            : html`
+                              : html`
                                 <div class="user-avatar">
                                   ${(this.userInfo.name || this.userInfo.email || '?')
                                     .charAt(0)
                                     .toUpperCase()}
                                 </div>
-                              `}
+                              `
+                          }
                           <div class="user-details">
                             <span class="user-name">${this.userInfo.name || 'Signed in user'}</span>
-                            ${this.userInfo.email
-                              ? html`<span class="user-email">${this.userInfo.email}</span>`
-                              : ''}
+                            ${
+                              this.userInfo.email
+                                ? html`<span class="user-email">${this.userInfo.email}</span>`
+                                : ''
+                            }
                           </div>
                         </div>
                       `
-                    : ''}
+                      : ''
+                  }
                 </div>
 
                 <p>
@@ -310,7 +317,7 @@ export class StoragePage extends LitElement {
                   </button>
                 </div>
               `
-            : html`
+              : html`
                 <div class="auth-status pending">
                   <h4>Not Connected</h4>
                   <p>Connect with Google to enable cloud features.</p>
@@ -338,9 +345,10 @@ export class StoragePage extends LitElement {
                     📤 Import Auth Backup
                   </button>
                 </div>
-              `}
+              `
+        }
       </div>
-    `;
+    `
   }
 
   _renderLocalSummarySection() {
@@ -353,7 +361,7 @@ export class StoragePage extends LitElement {
         </p>
         <storage-summary></storage-summary>
       </div>
-    `;
+    `
   }
 
   _renderOrganisationSection() {
@@ -366,7 +374,7 @@ export class StoragePage extends LitElement {
         </p>
         <select-organisation></select-organisation>
       </div>
-    `;
+    `
   }
 
   _renderSyncSection(disabled = false) {
@@ -379,12 +387,14 @@ export class StoragePage extends LitElement {
         </p>
         <div class="sync-body">
           <drive-sync-panel ?disabled=${disabled}></drive-sync-panel>
-          ${disabled
-            ? html` <p class="sync-hint">Connect with Google above to enable syncing features.</p> `
-            : ''}
+          ${
+            disabled
+              ? html` <p class="sync-hint">Connect with Google above to enable syncing features.</p> `
+              : ''
+          }
         </div>
       </div>
-    `;
+    `
   }
 
   _renderPadSetSection() {
@@ -397,7 +407,7 @@ export class StoragePage extends LitElement {
         </p>
         <pad-set-manager></pad-set-manager>
       </div>
-    `;
+    `
   }
 
   _renderImportSection() {
@@ -412,7 +422,7 @@ export class StoragePage extends LitElement {
           Import Setlists from Filesystem
         </button>
       </div>
-    `;
+    `
   }
 
   _renderDangerSection() {
@@ -427,20 +437,20 @@ export class StoragePage extends LitElement {
           Clear Local Data
         </button>
       </div>
-    `;
+    `
   }
 
   async _authorize() {
-    this.authStatus = 'authorizing';
-    this.requestUpdate();
+    this.authStatus = 'authorizing'
+    this.requestUpdate()
 
     try {
-      const { authorizeWithGoogle, getCurrentUserInfo } = await import('/js/google-auth.js');
-      await authorizeWithGoogle();
-      this.userInfo = await getCurrentUserInfo();
+      const { authorizeWithGoogle, getCurrentUserInfo } = await import('/js/google-auth.js')
+      await authorizeWithGoogle()
+      this.userInfo = await getCurrentUserInfo()
 
-      this.isAuthenticated = true;
-      this.authStatus = 'ready';
+      this.isAuthenticated = true
+      this.authStatus = 'ready'
 
       this.dispatchEvent(
         new CustomEvent('show-message', {
@@ -448,10 +458,10 @@ export class StoragePage extends LitElement {
           composed: true,
           detail: { message: '✓ Authorization successful!', type: 'success' },
         })
-      );
+      )
     } catch (error) {
-      console.error('[StoragePage] Authorization failed:', error);
-      this.authStatus = 'ready';
+      console.error('[StoragePage] Authorization failed:', error)
+      this.authStatus = 'ready'
 
       this.dispatchEvent(
         new CustomEvent('show-message', {
@@ -459,7 +469,7 @@ export class StoragePage extends LitElement {
           composed: true,
           detail: { message: `✗ Authorization failed: ${error.message}`, type: 'error' },
         })
-      );
+      )
     }
   }
 
@@ -469,16 +479,16 @@ export class StoragePage extends LitElement {
         'Are you sure you want to logout and revoke Google Drive access?\n\nYou will need to re-authorize to use cloud features.'
       )
     ) {
-      return;
+      return
     }
 
     try {
-      const { logout } = await import('/js/google-auth.js');
-      await logout();
+      const { logout } = await import('/js/google-auth.js')
+      await logout()
 
-      this.isAuthenticated = false;
-      this.userInfo = null;
-      this.requestUpdate();
+      this.isAuthenticated = false
+      this.userInfo = null
+      this.requestUpdate()
 
       this.dispatchEvent(
         new CustomEvent('show-message', {
@@ -486,41 +496,41 @@ export class StoragePage extends LitElement {
           composed: true,
           detail: { message: '✓ Successfully logged out', type: 'success' },
         })
-      );
+      )
     } catch (error) {
-      console.error('[StoragePage] Logout failed:', error);
-      alert('Error logging out: ' + error.message);
+      console.error('[StoragePage] Logout failed:', error)
+      alert('Error logging out: ' + error.message)
     }
   }
 
   async _downloadBackup() {
     try {
-      const { downloadBlobBackup } = await import('/js/google-auth.js');
-      await downloadBlobBackup();
+      const { downloadBlobBackup } = await import('/js/google-auth.js')
+      await downloadBlobBackup()
     } catch (error) {
-      console.error('[StoragePage] Backup download failed:', error);
-      alert('Error downloading backup: ' + error.message);
+      console.error('[StoragePage] Backup download failed:', error)
+      alert('Error downloading backup: ' + error.message)
     }
   }
 
   _showImportBackup() {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'application/json,.json';
+    const input = document.createElement('input')
+    input.type = 'file'
+    input.accept = 'application/json,.json'
     input.onchange = async e => {
-      const file = e.target.files[0];
-      if (!file) return;
+      const file = e.target.files[0]
+      if (!file) return
 
       try {
-        const text = await file.text();
-        const backup = JSON.parse(text);
+        const text = await file.text()
+        const backup = JSON.parse(text)
 
-        const { importBlobBackup, getCurrentUserInfo } = await import('/js/google-auth.js');
-        await importBlobBackup(backup);
+        const { importBlobBackup, getCurrentUserInfo } = await import('/js/google-auth.js')
+        await importBlobBackup(backup)
 
-        this.isAuthenticated = true;
-        this.userInfo = await getCurrentUserInfo();
-        this.requestUpdate();
+        this.isAuthenticated = true
+        this.userInfo = await getCurrentUserInfo()
+        this.requestUpdate()
 
         this.dispatchEvent(
           new CustomEvent('show-message', {
@@ -528,65 +538,65 @@ export class StoragePage extends LitElement {
             composed: true,
             detail: { message: '✓ Auth backup imported successfully!', type: 'success' },
           })
-        );
+        )
       } catch (error) {
-        console.error('[StoragePage] Import backup failed:', error);
-        alert('Error importing backup: ' + error.message);
+        console.error('[StoragePage] Import backup failed:', error)
+        alert('Error importing backup: ' + error.message)
       }
-    };
-    input.click();
+    }
+    input.click()
   }
 
   async _testTokenRefresh() {
     try {
-      const { getAccessToken, getStoredBlob } = await import('/js/google-auth.js');
+      const { getAccessToken, getStoredBlob } = await import('/js/google-auth.js')
 
       // Check if Service Worker is active
       if (!navigator.serviceWorker.controller) {
-        alert('⚠️ Service Worker not active. Please refresh the page and try again.');
-        return;
+        alert('⚠️ Service Worker not active. Please refresh the page and try again.')
+        return
       }
 
-      const blobData = await getStoredBlob();
+      const blobData = await getStoredBlob()
       if (!blobData) {
-        alert('Not authenticated - authorize first');
-        return;
+        alert('Not authenticated - authorize first')
+        return
       }
 
-      const { blob, metadata } = blobData;
-      console.log('[Test] Current token expires at:', metadata.expires_at);
+      const { blob, metadata } = blobData
+      console.log('[Test] Current token expires at:', metadata.expires_at)
 
       // Force expiry by setting expires_at to the past
       const expiredMetadata = {
         ...metadata,
         expires_at: new Date(Date.now() - 60000).toISOString(),
-      };
+      }
 
       await new Promise((resolve, reject) => {
-        const messageChannel = new MessageChannel();
-        const messageId = crypto.randomUUID();
-        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000);
+        const messageChannel = new MessageChannel()
+        const messageId = crypto.randomUUID()
+        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
 
         messageChannel.port1.onmessage = event => {
-          clearTimeout(timeout);
+          clearTimeout(timeout)
           if (event.data.messageId === messageId) {
-            resolve(event.data);
+            resolve(event.data)
           }
-        };
+        }
 
         navigator.serviceWorker.controller.postMessage(
           { type: 'STORE_BLOB', data: { blob, metadata: expiredMetadata }, messageId },
           [messageChannel.port2]
-        );
-      });
+        )
+      })
 
-      console.log('[Test] Token expiry set to past, now calling getAccessToken()...');
-      await getAccessToken();
-      console.log('[Test] ✅ Token refresh successful!');
+      console.log('[Test] Token expiry set to past, now calling getAccessToken()...')
+      await getAccessToken()
+      console.log('[Test] ✅ Token refresh successful!')
 
-      const updatedBlob = await getStoredBlob();
-      const oldExpiry = new Date(metadata.expires_at);
-      const newExpiry = new Date(updatedBlob.metadata.expires_at);
+      const updatedBlob = await getStoredBlob()
+      const oldExpiry = new Date(metadata.expires_at)
+      const newExpiry = new Date(updatedBlob.metadata.expires_at)
 
       if (newExpiry > new Date()) {
         alert(
@@ -594,13 +604,13 @@ export class StoragePage extends LitElement {
             `Old expiry: ${oldExpiry.toLocaleTimeString()}\n` +
             `New expiry: ${newExpiry.toLocaleTimeString()}\n\n` +
             'Check console for details.'
-        );
+        )
       } else {
-        throw new Error('New token still expired!');
+        throw new Error('New token still expired!')
       }
     } catch (error) {
-      console.error('[Test] ❌ Token refresh failed:', error);
-      alert('❌ Token refresh test failed:\n\n' + error.message);
+      console.error('[Test] ❌ Token refresh failed:', error)
+      alert('❌ Token refresh test failed:\n\n' + error.message)
     }
   }
 
@@ -610,7 +620,7 @@ export class StoragePage extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleClearDatabase() {
@@ -619,8 +629,8 @@ export class StoragePage extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 }
 
-customElements.define('storage-page', StoragePage);
+customElements.define('storage-page', StoragePage)

@@ -1,5 +1,5 @@
-import { LitElement, html, css } from 'lit';
-import { getWeeksAgo } from '../js/utils/date-utils.js';
+import { css, html, LitElement } from 'lit'
+import { getWeeksAgo } from '../js/utils/date-utils.js'
 
 /**
  * SongInfo Component
@@ -18,7 +18,7 @@ export class SongInfo extends LitElement {
     song: { type: Object },
     appearances: { type: Array },
     loading: { type: Boolean },
-  };
+  }
 
   static styles = css`
     :host {
@@ -177,26 +177,26 @@ export class SongInfo extends LitElement {
       color: #7f8c8d;
       font-style: italic;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.song = null;
-    this.appearances = [];
-    this.loading = false;
+    super()
+    this.song = null
+    this.appearances = []
+    this.loading = false
   }
 
   render() {
     if (this.loading) {
-      return html`<div class="loading">Loading song information...</div>`;
+      return html`<div class="loading">Loading song information...</div>`
     }
 
     if (!this.song) {
-      return html`<div class="empty">No song data available.</div>`;
+      return html`<div class="empty">No song data available.</div>`
     }
 
-    const stats = this.calculateAppearanceStats();
-    const recentAppearances = this.getRecentAppearances();
+    const stats = this.calculateAppearanceStats()
+    const recentAppearances = this.getRecentAppearances()
 
     return html`
       <div class="song-info-container">
@@ -205,49 +205,58 @@ export class SongInfo extends LitElement {
         <div class="modal-columns-container">
           <!-- Left column: Metadata -->
           <div class="modal-left-column">
-            ${this.song.artist
-              ? html`
+            ${
+              this.song.artist
+                ? html`
                   <div class="modal-info-item">
                     <div class="modal-info-label">Artist</div>
                     <div class="modal-info-value">${this.song.artist}</div>
                   </div>
                 `
-              : ''}
-            ${this.song.metadata?.key
-              ? html`
+                : ''
+            }
+            ${
+              this.song.metadata?.key
+                ? html`
                   <div class="modal-info-item">
                     <div class="modal-info-label">Original Key / Tempo</div>
                     <div class="modal-info-value">
                       Key:
-                      ${this.song.metadata.key}${this.song.metadata.tempo
-                        ? ` • ${this.song.metadata.tempo} BPM`
-                        : ''}
+                      ${this.song.metadata.key}${
+                        this.song.metadata.tempo ? ` • ${this.song.metadata.tempo} BPM` : ''
+                      }
                     </div>
                   </div>
                 `
-              : ''}
-            ${this.song.metadata?.timeSignature
-              ? html`
+                : ''
+            }
+            ${
+              this.song.metadata?.timeSignature
+                ? html`
                   <div class="modal-info-item">
                     <div class="modal-info-label">Time Signature</div>
                     <div class="modal-info-value">${this.song.metadata.timeSignature}</div>
                   </div>
                 `
-              : ''}
-            ${stats.totalAppearances > 0
-              ? html`
+                : ''
+            }
+            ${
+              stats.totalAppearances > 0
+                ? html`
                   <div class="modal-info-item">
                     <div class="modal-info-label">Times Played (Total)</div>
                     <div class="modal-info-value">${stats.totalAppearances}</div>
                   </div>
                 `
-              : ''}
+                : ''
+            }
           </div>
 
           <!-- Right column: Recent appearances -->
           <div class="modal-right-column">
-            ${recentAppearances.length > 0
-              ? html`
+            ${
+              recentAppearances.length > 0
+                ? html`
                   <div class="modal-appearances-title">Recent Plays</div>
                   <div class="modal-appearances-list">
                     ${recentAppearances.map(
@@ -261,45 +270,47 @@ export class SongInfo extends LitElement {
                     )}
                   </div>
                 `
-              : ''}
+                : ''
+            }
           </div>
         </div>
 
         <!-- CCLI section -->
         ${this.renderCCLI()}
       </div>
-    `;
+    `
   }
 
   renderAppearanceMeta(appearance) {
-    const metaParts = [];
+    const metaParts = []
     if (appearance.leader) {
-      metaParts.push(appearance.leader);
+      metaParts.push(appearance.leader)
     }
-    const keyPlayed = appearance.playedInKey || this.song?.metadata?.key;
+    const keyPlayed = appearance.playedInKey || this.song?.metadata?.key
     if (keyPlayed) {
-      metaParts.push(`Key: ${keyPlayed}`);
+      metaParts.push(`Key: ${keyPlayed}`)
     }
 
     if (metaParts.length > 0) {
-      return html`<span class="appearance-meta">${metaParts.join(' • ')}</span>`;
+      return html`<span class="appearance-meta">${metaParts.join(' • ')}</span>`
     }
-    return '';
+    return ''
   }
 
   renderCCLI() {
     const ccliNumber =
-      this.song.metadata?.ccli || this.song.metadata?.ccliSongNumber || this.song.ccliNumber;
-    const ccliTrailer = this.song.metadata?.ccliTrailer;
+      this.song.metadata?.ccli || this.song.metadata?.ccliSongNumber || this.song.ccliNumber
+    const ccliTrailer = this.song.metadata?.ccliTrailer
 
     if (!ccliNumber && !ccliTrailer) {
-      return '';
+      return ''
     }
 
     return html`
       <div class="modal-ccli">
-        ${ccliNumber
-          ? html`
+        ${
+          ccliNumber
+            ? html`
               <div class="modal-info-item">
                 <div class="modal-info-label">CCLI Number</div>
                 <div class="modal-info-value">
@@ -320,10 +331,11 @@ export class SongInfo extends LitElement {
                 </div>
               </div>
             `
-          : ''}
+            : ''
+        }
         ${ccliTrailer ? html` <div class="ccli-trailer">${ccliTrailer}</div> ` : ''}
       </div>
-    `;
+    `
   }
 
   calculateAppearanceStats() {
@@ -332,35 +344,35 @@ export class SongInfo extends LitElement {
         totalAppearances: 0,
         last12MonthsAppearances: 0,
         lastPlayedDate: null,
-      };
+      }
     }
 
-    const totalAppearances = this.appearances.length;
+    const totalAppearances = this.appearances.length
 
     // Calculate date 12 months ago
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const twelveMonthsAgo = new Date()
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
 
     // Filter appearances in last 12 months
     const last12MonthsAppearances = this.appearances.filter(appearance => {
-      const appearanceDate = new Date(appearance.date);
-      return appearanceDate >= twelveMonthsAgo;
-    }).length;
+      const appearanceDate = new Date(appearance.date)
+      return appearanceDate >= twelveMonthsAgo
+    }).length
 
     // Find most recent appearance date
-    const sortedAppearances = [...this.appearances].sort((a, b) => b.date.localeCompare(a.date));
-    const lastPlayedDate = sortedAppearances[0].date;
+    const sortedAppearances = [...this.appearances].sort((a, b) => b.date.localeCompare(a.date))
+    const lastPlayedDate = sortedAppearances[0].date
 
     return {
       totalAppearances,
       last12MonthsAppearances,
       lastPlayedDate,
-    };
+    }
   }
 
   getRecentAppearances() {
     if (!this.appearances || this.appearances.length === 0) {
-      return [];
+      return []
     }
 
     // Sort by date (most recent first) and take the last 6 appearances
@@ -373,19 +385,19 @@ export class SongInfo extends LitElement {
         weeksAgo: getWeeksAgo(appearance.date),
         playedInKey: appearance.playedInKey,
         leader: appearance.leader,
-      }));
+      }))
   }
 
   formatDate(dateStr) {
     // Parse YYYY-MM-DD format and convert to readable format
-    const date = new Date(dateStr);
+    const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'long',
       day: 'numeric',
-    });
+    })
   }
 }
 
 // Define the custom element
-customElements.define('song-info', SongInfo);
+customElements.define('song-info', SongInfo)

@@ -1,16 +1,16 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 import {
-  getUseNashvilleNumbers,
-  setUseNashvilleNumbers,
-  getUseUnicodeAccidentals,
-  setUseUnicodeAccidentals,
-  getMusicianType,
-  setMusicianType,
   getCapoPreference,
+  getMusicianType,
+  getUseNashvilleNumbers,
+  getUseUnicodeAccidentals,
   setCapoPreference,
-} from '../js/preferences.js';
-import './theme-settings.js';
-import './media-player-settings.js';
+  setMusicianType,
+  setUseNashvilleNumbers,
+  setUseUnicodeAccidentals,
+} from '../js/preferences.js'
+import './theme-settings.js'
+import './media-player-settings.js'
 
 /**
  * AppPreferences Component
@@ -23,7 +23,7 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
-  };
+  }
 
   static styles = css`
     :host {
@@ -143,14 +143,14 @@ export class AppPreferences extends LitElement {
     a {
       text-decoration: none;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.useNashville = getUseNashvilleNumbers();
-    this.useUnicodeAccidentals = getUseUnicodeAccidentals();
-    this.musicianType = getMusicianType();
-    this.capoEnabled = getCapoPreference();
+    super()
+    this.useNashville = getUseNashvilleNumbers()
+    this.useUnicodeAccidentals = getUseUnicodeAccidentals()
+    this.musicianType = getMusicianType()
+    this.capoEnabled = getCapoPreference()
   }
 
   render() {
@@ -245,36 +245,36 @@ export class AppPreferences extends LitElement {
           <media-player-settings></media-player-settings>
         </div>
       </div>
-    `;
+    `
   }
 
   _isLyricsOnlySelection() {
-    return this.musicianType === 'singer' || this.musicianType === 'drummer';
+    return this.musicianType === 'singer' || this.musicianType === 'drummer'
   }
 
   _onMusicianTypeChange(event) {
-    const value = event.currentTarget.value;
-    this.musicianType = value;
-    setMusicianType(value);
+    const value = event.currentTarget.value
+    this.musicianType = value
+    setMusicianType(value)
   }
 
   _onNashvilleToggle(event) {
-    const value = event.currentTarget.checked;
-    this.useNashville = value;
-    setUseNashvilleNumbers(value);
+    const value = event.currentTarget.checked
+    this.useNashville = value
+    setUseNashvilleNumbers(value)
   }
 
   _onAccidentalToggle(event) {
-    const value = event.currentTarget.checked;
-    this.useUnicodeAccidentals = value;
-    setUseUnicodeAccidentals(value);
+    const value = event.currentTarget.checked
+    this.useUnicodeAccidentals = value
+    setUseUnicodeAccidentals(value)
   }
 
   _onCapoToggle(event) {
-    const value = event.currentTarget.checked;
-    this.capoEnabled = value;
-    setCapoPreference(value);
+    const value = event.currentTarget.checked
+    this.capoEnabled = value
+    setCapoPreference(value)
   }
 }
 
-customElements.define('app-preferences', AppPreferences);
+customElements.define('app-preferences', AppPreferences)

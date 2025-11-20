@@ -1,8 +1,8 @@
-import { LitElement, html, css } from 'lit';
-import './help-tooltip.js';
-import { getActivePadSet } from '../js/pad-set-service.js';
-import { MetronomeController } from '../js/metronome-controller.js';
-import { PadAudioController } from '../js/pad-audio-controller.js';
+import { css, html, LitElement } from 'lit'
+import './help-tooltip.js'
+import { MetronomeController } from '../js/metronome-controller.js'
+import { PadAudioController } from '../js/pad-audio-controller.js'
+import { getActivePadSet } from '../js/pad-set-service.js'
 
 /**
  * MediaPlayer Component
@@ -54,7 +54,7 @@ export class MediaPlayer extends LitElement {
     _padLoadFailed: { type: Boolean, state: true },
     _isPadLoading: { type: Boolean, state: true },
     _activePadSet: { type: Object, state: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -665,298 +665,298 @@ export class MediaPlayer extends LitElement {
     .close-button:active {
       background: rgba(255, 255, 255, 0.2);
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.currentKey = '';
-    this.bpm = 120;
-    this.tempoNote = '1/4'; // Default to quarter notes
-    this.timeSignature = '4/4';
+    super()
+    this.currentKey = ''
+    this.bpm = 120
+    this.tempoNote = '1/4' // Default to quarter notes
+    this.timeSignature = '4/4'
 
     // Load global settings from localStorage
-    const savedSettings = localStorage.getItem('setalight-media-settings');
-    let globalSettings = {};
+    const savedSettings = localStorage.getItem('setalight-media-settings')
+    let globalSettings = {}
     if (savedSettings) {
-      globalSettings = JSON.parse(savedSettings);
+      globalSettings = JSON.parse(savedSettings)
     }
 
     // Global feature toggles (from settings component)
-    this._padsEnabled = globalSettings.padsEnabled !== false; // Default true
-    this._metronomeGlobalEnabled = globalSettings.metronomeEnabled !== false; // Default true
-    this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true; // Default false
+    this._padsEnabled = globalSettings.padsEnabled !== false // Default true
+    this._metronomeGlobalEnabled = globalSettings.metronomeEnabled !== false // Default true
+    this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true // Default false
 
     // User toggle states (independent of which song is active)
     // Load saved toggle states from localStorage, default to true (on)
-    const savedPadsOn = localStorage.getItem('media-player-pads-on');
-    const savedClickOn = localStorage.getItem('media-player-click-on');
+    const savedPadsOn = localStorage.getItem('media-player-pads-on')
+    const savedClickOn = localStorage.getItem('media-player-click-on')
 
-    this._padsOn = savedPadsOn !== null ? JSON.parse(savedPadsOn) : true;
-    this._clickOn = savedClickOn !== null ? JSON.parse(savedClickOn) : true;
+    this._padsOn = savedPadsOn !== null ? JSON.parse(savedPadsOn) : true
+    this._clickOn = savedClickOn !== null ? JSON.parse(savedClickOn) : true
 
     // Active song state (what's currently loaded in the player)
-    this._activeSongId = null;
-    this._activeSongKey = null;
-    this._activeSongBpm = null;
-    this._activeSongTempoNote = null;
-    this._activeSongTimeSignature = null;
-    this._activeSongTitle = null;
-    this._activePadSet = getActivePadSet();
+    this._activeSongId = null
+    this._activeSongKey = null
+    this._activeSongBpm = null
+    this._activeSongTempoNote = null
+    this._activeSongTimeSignature = null
+    this._activeSongTitle = null
+    this._activePadSet = getActivePadSet()
 
     // UI state - load from localStorage, default to collapsed
-    const savedCollapsed = localStorage.getItem('media-player-collapsed');
-    this._collapsed = savedCollapsed !== null ? JSON.parse(savedCollapsed) : true;
-    this._showingSettings = false;
+    const savedCollapsed = localStorage.getItem('media-player-collapsed')
+    this._collapsed = savedCollapsed !== null ? JSON.parse(savedCollapsed) : true
+    this._showingSettings = false
 
     // Drag state
-    this._isDragging = false;
-    this._dragStartX = 0;
-    this._dragStartY = 0;
+    this._isDragging = false
+    this._dragStartX = 0
+    this._dragStartY = 0
 
     // Load saved position from localStorage immediately
-    const savedPosition = localStorage.getItem('media-player-position');
+    const savedPosition = localStorage.getItem('media-player-position')
     if (savedPosition) {
-      const { x, y } = JSON.parse(savedPosition);
-      this._dragOffsetX = x;
-      this._dragOffsetY = y;
+      const { x, y } = JSON.parse(savedPosition)
+      this._dragOffsetX = x
+      this._dragOffsetY = y
     } else {
-      this._dragOffsetX = 0;
-      this._dragOffsetY = 0;
+      this._dragOffsetX = 0
+      this._dragOffsetY = 0
     }
 
     // Load persistent volume settings from localStorage
-    const savedPadVolume = localStorage.getItem('setalight-pad-volume');
-    const savedClickVolume = localStorage.getItem('setalight-click-volume');
+    const savedPadVolume = localStorage.getItem('setalight-pad-volume')
+    const savedClickVolume = localStorage.getItem('setalight-click-volume')
 
     // Volume properties
-    this._padVolume = savedPadVolume !== null ? parseFloat(savedPadVolume) : 0.5; // 0-1 range
-    this._clickVolume = savedClickVolume !== null ? parseFloat(savedClickVolume) : 0.8; // 0-1 range
-    this._showingVolumeSlider = false;
-    this._activeVolumeControl = null; // 'pad' or 'click'
-    this._sliderX = 0;
-    this._sliderY = 0;
+    this._padVolume = savedPadVolume !== null ? parseFloat(savedPadVolume) : 0.5 // 0-1 range
+    this._clickVolume = savedClickVolume !== null ? parseFloat(savedClickVolume) : 0.8 // 0-1 range
+    this._showingVolumeSlider = false
+    this._activeVolumeControl = null // 'pad' or 'click'
+    this._sliderX = 0
+    this._sliderY = 0
 
     // Controllers (initialized in connectedCallback)
-    this._audioContext = null;
-    this._clickGain = null;
-    this._metronomeController = null;
-    this._padController = null;
+    this._audioContext = null
+    this._clickGain = null
+    this._metronomeController = null
+    this._padController = null
 
     // State mirrored from controllers
-    this._metronomeRunning = false;
-    this._padLoadFailed = false;
-    this._isPadLoading = false;
-    this._fadingIn = false;
-    this._fadingOut = false;
+    this._metronomeRunning = false
+    this._padLoadFailed = false
+    this._isPadLoading = false
+    this._fadingIn = false
+    this._fadingOut = false
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    this._initAudio();
-    this._boundHandleKeydown = this._handleKeydown.bind(this);
-    this._boundHandleSettingsChange = this._handleSettingsChange.bind(this);
-    this._boundHandleSongChange = this._handleSongChange.bind(this);
-    this._boundHandlePadSetChange = this._handlePadSetChange.bind(this);
-    document.addEventListener('keydown', this._boundHandleKeydown);
-    document.addEventListener('settings-change', this._boundHandleSettingsChange);
-    document.addEventListener('song-change', this._boundHandleSongChange);
-    window.addEventListener('pad-set-changed', this._boundHandlePadSetChange);
+    super.connectedCallback()
+    this._initAudio()
+    this._boundHandleKeydown = this._handleKeydown.bind(this)
+    this._boundHandleSettingsChange = this._handleSettingsChange.bind(this)
+    this._boundHandleSongChange = this._handleSongChange.bind(this)
+    this._boundHandlePadSetChange = this._handlePadSetChange.bind(this)
+    document.addEventListener('keydown', this._boundHandleKeydown)
+    document.addEventListener('settings-change', this._boundHandleSettingsChange)
+    document.addEventListener('song-change', this._boundHandleSongChange)
+    window.addEventListener('pad-set-changed', this._boundHandlePadSetChange)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
+    super.disconnectedCallback()
 
     // Cleanup controllers
     if (this._metronomeController) {
-      this._metronomeController.cleanup();
+      this._metronomeController.cleanup()
     }
     if (this._padController) {
-      this._padController.cleanup();
+      this._padController.cleanup()
     }
 
-    this._cleanup();
-    document.removeEventListener('keydown', this._boundHandleKeydown);
-    document.removeEventListener('settings-change', this._boundHandleSettingsChange);
-    document.removeEventListener('song-change', this._boundHandleSongChange);
-    window.removeEventListener('pad-set-changed', this._boundHandlePadSetChange);
+    this._cleanup()
+    document.removeEventListener('keydown', this._boundHandleKeydown)
+    document.removeEventListener('settings-change', this._boundHandleSettingsChange)
+    document.removeEventListener('song-change', this._boundHandleSongChange)
+    window.removeEventListener('pad-set-changed', this._boundHandlePadSetChange)
   }
 
   _handleSettingsChange(event) {
-    const settings = event.detail;
-    console.log('[MediaPlayer] Settings changed:', settings);
+    const settings = event.detail
+    console.log('[MediaPlayer] Settings changed:', settings)
 
-    this._padsEnabled = settings.padsEnabled !== false;
-    this._metronomeGlobalEnabled = settings.metronomeEnabled !== false;
-    this.stereoSplitEnabled = settings.stereoSplitEnabled === true;
+    this._padsEnabled = settings.padsEnabled !== false
+    this._metronomeGlobalEnabled = settings.metronomeEnabled !== false
+    this.stereoSplitEnabled = settings.stereoSplitEnabled === true
 
     // If only one feature is enabled, ensure it's always "on"
-    const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled;
+    const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled
     if (!bothEnabled) {
       if (this._padsEnabled) {
-        this._padsOn = true;
+        this._padsOn = true
       }
       if (this._metronomeGlobalEnabled) {
-        this._clickOn = true;
+        this._clickOn = true
       }
     }
 
     // Stop metronome if it was disabled globally
     if (!this._metronomeGlobalEnabled && this.metronomeEnabled) {
-      this._stopMetronome();
-      this.metronomeEnabled = false;
+      this._stopMetronome()
+      this.metronomeEnabled = false
     }
 
     // Update audio routing
-    this._updateAudioRouting();
+    this._updateAudioRouting()
 
-    this.requestUpdate();
+    this.requestUpdate()
   }
 
   _handleSongChange(event) {
-    const song = event.detail.song;
-    console.log('[MediaPlayer] Song changed:', song?.songId, song?.title);
+    const song = event.detail.song
+    console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
-    this._currentSongId = song?.songId || null;
-    this._currentSongTitle = song?.title || null;
+    this._currentSongId = song?.songId || null
+    this._currentSongTitle = song?.title || null
     if (song?.metadata?.key) {
-      this.currentKey = song.metadata.key;
+      this.currentKey = song.metadata.key
     } else {
-      this.currentKey = null;
+      this.currentKey = null
     }
     // Store current song's tempo/time signature metadata
     if (song?.metadata && 'tempo' in song.metadata) {
-      this._currentBpm = song.metadata.tempo ? Number(song.metadata.tempo) : null;
+      this._currentBpm = song.metadata.tempo ? Number(song.metadata.tempo) : null
     }
     if (song?.metadata && 'tempoNote' in song.metadata) {
-      this._currentTempoNote = song.metadata.tempoNote || '1/4';
+      this._currentTempoNote = song.metadata.tempoNote || '1/4'
     }
     if (song?.metadata && 'timeSignature' in song.metadata) {
-      this._currentTimeSignature = song.metadata.timeSignature || null;
+      this._currentTimeSignature = song.metadata.timeSignature || null
     }
 
     // If we're already playing this song and pads/click are active, refresh playback immediately
-    const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId;
+    const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId
     const padsPlaying =
-      this._padsOn && this._activeSongKey && this._padController && this._padController.isPlaying;
-    const clickRunning = this._clickOn && this._metronomeRunning;
+      this._padsOn && this._activeSongKey && this._padController && this._padController.isPlaying
+    const clickRunning = this._clickOn && this._metronomeRunning
 
     if (isActiveSong && (padsPlaying || clickRunning)) {
       console.log(
         '[MediaPlayer] Active song metadata changed – restarting playback for crossfade/update'
-      );
+      )
       this._startSong().catch(error => {
-        console.error('[MediaPlayer] Failed to restart song after metadata change:', error);
-      });
+        console.error('[MediaPlayer] Failed to restart song after metadata change:', error)
+      })
     }
   }
 
   _handlePadSetChange(event) {
-    const padSet = event?.detail?.padSet || getActivePadSet();
-    this._activePadSet = padSet;
-    this._padLoadFailed = false;
+    const padSet = event?.detail?.padSet || getActivePadSet()
+    this._activePadSet = padSet
+    this._padLoadFailed = false
 
     if (!this._padsOn) {
       this._updateAudioSource().catch(error => {
-        console.error('[MediaPlayer] Failed to update pad source after pad-set change:', error);
-      });
+        console.error('[MediaPlayer] Failed to update pad source after pad-set change:', error)
+      })
     }
   }
 
   updated(changedProperties) {
-    super.updated(changedProperties);
+    super.updated(changedProperties)
 
     // Handle key changes - just update the source, don't auto-switch
     if (changedProperties.has('currentKey') && this.currentKey && !this._padsOn) {
       // Update the source without playing (pre-load for quick start)
       this._updateAudioSource().catch(error => {
-        console.error('[MediaPlayer] Failed to preload pad source:', error);
-      });
+        console.error('[MediaPlayer] Failed to preload pad source:', error)
+      })
     }
 
     // Handle stereo split changes
     if (changedProperties.has('stereoSplitEnabled')) {
-      this._updateAudioRouting();
+      this._updateAudioRouting()
     }
   }
 
   _initAudio() {
     if (!this._audioContext) {
       // Initialize Web Audio API context
-      this._audioContext = new (window.AudioContext || window.webkitAudioContext)();
+      this._audioContext = new (window.AudioContext || window.webkitAudioContext)()
 
       // Create click gain node for metronome
-      this._clickGain = this._audioContext.createGain();
-      this._clickGain.gain.value = this._clickVolume;
+      this._clickGain = this._audioContext.createGain()
+      this._clickGain.gain.value = this._clickVolume
 
       // Initialize controllers
-      this._metronomeController = new MetronomeController(this._audioContext, this._clickGain);
-      this._padController = new PadAudioController(this._audioContext, { fadeDuration: 5000 });
+      this._metronomeController = new MetronomeController(this._audioContext, this._clickGain)
+      this._padController = new PadAudioController(this._audioContext, { fadeDuration: 5000 })
 
       // Set initial volumes
-      this._padController.setVolume(this._padVolume);
-      this._metronomeController.setVolume(this._clickVolume);
+      this._padController.setVolume(this._padVolume)
+      this._metronomeController.setVolume(this._clickVolume)
 
       // Set stereo mode
-      this._updateStereoMode();
+      this._updateStereoMode()
 
       // Load pad if we have a key
       if (this.currentKey) {
         this._padController.loadPad(this.currentKey, this._activePadSet).catch(error => {
-          console.error('[MediaPlayer] Failed to load pad during init:', error);
-        });
+          console.error('[MediaPlayer] Failed to load pad during init:', error)
+        })
       }
     }
   }
 
   _normalizeTempoNote(value) {
-    if (!value) return '1/4';
+    if (!value) return '1/4'
     if (typeof value === 'number') {
-      return `1/${value}`;
+      return `1/${value}`
     }
 
-    let candidate = `${value}`.trim();
-    const parenMatch = candidate.match(/\(([^)]+)\)/);
+    let candidate = `${value}`.trim()
+    const parenMatch = candidate.match(/\(([^)]+)\)/)
     if (parenMatch) {
-      candidate = parenMatch[1].trim();
+      candidate = parenMatch[1].trim()
     }
 
-    const fractionMatch = candidate.match(/(\d+)\s*\/\s*(\d+)/);
+    const fractionMatch = candidate.match(/(\d+)\s*\/\s*(\d+)/)
     if (fractionMatch) {
-      const numerator = Number(fractionMatch[1]);
-      const denominator = Number(fractionMatch[2]);
+      const numerator = Number(fractionMatch[1])
+      const denominator = Number(fractionMatch[2])
       if (numerator > 0 && denominator > 0) {
-        return `${numerator}/${denominator}`;
+        return `${numerator}/${denominator}`
       }
     }
 
-    const denomOnlyMatch = candidate.match(/^(\d+)$/);
+    const denomOnlyMatch = candidate.match(/^(\d+)$/)
     if (denomOnlyMatch) {
-      const denom = Number(denomOnlyMatch[1]);
+      const denom = Number(denomOnlyMatch[1])
       if (denom > 0) {
-        return `1/${denom}`;
+        return `1/${denom}`
       }
     }
 
-    return '1/4';
+    return '1/4'
   }
 
   async _updateAudioSource() {
-    if (!this.currentKey) return false;
+    if (!this.currentKey) return false
 
     // Ensure audio is initialized
-    this._initAudio();
+    this._initAudio()
 
     if (!this._padController) {
-      console.warn('[MediaPlayer] Cannot load pad: controller not initialized');
-      return false;
+      console.warn('[MediaPlayer] Cannot load pad: controller not initialized')
+      return false
     }
 
     // Load pad using controller
-    const loaded = await this._padController.loadPad(this.currentKey, this._activePadSet);
-    this._padLoadFailed = !loaded;
-    this._isPadLoading = this._padController.isLoading;
-    return loaded;
+    const loaded = await this._padController.loadPad(this.currentKey, this._activePadSet)
+    this._padLoadFailed = !loaded
+    this._isPadLoading = this._padController.isLoading
+    return loaded
   }
 
   _cleanup() {
@@ -967,142 +967,142 @@ export class MediaPlayer extends LitElement {
   _handleKeydown(event) {
     // Start song on spacebar
     if (event.code === 'Space' && !event.target.matches('input, textarea')) {
-      event.preventDefault();
-      this._startSong();
+      event.preventDefault()
+      this._startSong()
     }
     // Stop button on Escape - fade out and stop
     if (event.code === 'Escape') {
-      event.preventDefault();
-      this._stop();
+      event.preventDefault()
+      this._stop()
     }
   }
 
   async _stop() {
-    console.log('[MediaPlayer] Stop - stopping click and fading out pads');
+    console.log('[MediaPlayer] Stop - stopping click and fading out pads')
 
     // Check what's actually playing (panic button semantics: treat existing audio as playing)
-    const padsAvailable = !!this._padController;
-    const clickPlaying = this._metronomeRunning;
+    const padsAvailable = !!this._padController
+    const clickPlaying = this._metronomeRunning
 
     // Stop click immediately if playing (but don't change toggle state)
     // This also resets the beat counter so it starts fresh next time
     if (clickPlaying) {
-      this._stopMetronome();
+      this._stopMetronome()
     }
 
     // Fade out pads if we currently have audio wired up
     if (padsAvailable) {
-      await this._fadeOut();
+      await this._fadeOut()
     }
 
     // Clear active song properties so play button is no longer disabled
-    this._activeSongId = null;
-    this._activeSongKey = null;
-    this._activeSongBpm = null;
-    this._activeSongTempoNote = null;
-    this._activeSongTimeSignature = null;
-    this._activeSongTitle = null;
-    this._padLoadFailed = false;
+    this._activeSongId = null
+    this._activeSongKey = null
+    this._activeSongBpm = null
+    this._activeSongTempoNote = null
+    this._activeSongTimeSignature = null
+    this._activeSongTitle = null
+    this._padLoadFailed = false
 
     // Force UI update
-    this.requestUpdate();
+    this.requestUpdate()
   }
 
   _toggleMetronome() {
-    this.metronomeEnabled = !this.metronomeEnabled;
+    this.metronomeEnabled = !this.metronomeEnabled
 
     if (this.metronomeEnabled) {
-      this._startMetronome();
+      this._startMetronome()
     } else {
-      this._stopMetronome();
+      this._stopMetronome()
     }
   }
 
   _updateStereoMode() {
-    if (!this._padController) return;
+    if (!this._padController) return
 
     if (this.stereoSplitEnabled) {
-      this._padController.setStereoMode('left');
+      this._padController.setStereoMode('left')
     } else {
-      this._padController.setStereoMode('both');
+      this._padController.setStereoMode('both')
     }
 
     // Click routing - handled manually since it's simpler
-    this._updateClickRouting();
+    this._updateClickRouting()
   }
 
   _updateClickRouting() {
-    if (!this._audioContext || !this._clickGain) return;
+    if (!this._audioContext || !this._clickGain) return
 
-    this._clickGain.disconnect();
+    this._clickGain.disconnect()
 
     if (this.stereoSplitEnabled) {
       // Route click to right channel only
-      const splitter = this._audioContext.createChannelSplitter(2);
-      const merger = this._audioContext.createChannelMerger(2);
+      const splitter = this._audioContext.createChannelSplitter(2)
+      const merger = this._audioContext.createChannelMerger(2)
 
-      this._clickGain.connect(splitter);
-      splitter.connect(merger, 0, 1); // Left input to right output
-      merger.connect(this._audioContext.destination);
+      this._clickGain.connect(splitter)
+      splitter.connect(merger, 0, 1) // Left input to right output
+      merger.connect(this._audioContext.destination)
 
       // Store for cleanup
-      this._clickMerger = merger;
-      this._clickSplitter = splitter;
+      this._clickMerger = merger
+      this._clickSplitter = splitter
     } else {
       // Normal stereo routing
-      this._clickGain.connect(this._audioContext.destination);
-      this._clickMerger = null;
-      this._clickSplitter = null;
+      this._clickGain.connect(this._audioContext.destination)
+      this._clickMerger = null
+      this._clickSplitter = null
     }
   }
 
   _updateAudioRouting() {
     // Legacy method - redirect to new method
-    this._updateStereoMode();
+    this._updateStereoMode()
   }
 
   _startMetronome() {
-    const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm;
+    const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm
     const timeSignature =
-      this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature;
+      this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature
     const tempoNote = this._normalizeTempoNote(
       this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4'
-    );
+    )
 
     // Ensure audio is initialized
-    this._initAudio();
+    this._initAudio()
 
     if (!this._metronomeController) {
-      console.warn('[MediaPlayer] Cannot start metronome: controller not initialized');
-      return;
+      console.warn('[MediaPlayer] Cannot start metronome: controller not initialized')
+      return
     }
 
     // Start the metronome using controller
-    const started = this._metronomeController.start(bpmValue, timeSignature, tempoNote);
-    this._metronomeRunning = started;
-    this.requestUpdate();
+    const started = this._metronomeController.start(bpmValue, timeSignature, tempoNote)
+    this._metronomeRunning = started
+    this.requestUpdate()
   }
 
   _stopMetronome() {
     if (!this._metronomeController) {
-      return;
+      return
     }
 
-    this._metronomeController.stop();
-    this._metronomeRunning = false;
-    this.requestUpdate();
+    this._metronomeController.stop()
+    this._metronomeRunning = false
+    this.requestUpdate()
   }
 
   async _startSong() {
     if (!this.currentKey) {
-      console.warn('[MediaPlayer] No key set, cannot start song');
-      return;
+      console.warn('[MediaPlayer] No key set, cannot start song')
+      return
     }
 
     // Check if this song is already the active one
     if (this._isCurrentSongActive()) {
-      console.log('[MediaPlayer] Current song is already active, ignoring');
-      return;
+      console.log('[MediaPlayer] Current song is already active, ignoring')
+      return
     }
 
     console.log(
@@ -1110,22 +1110,22 @@ export class MediaPlayer extends LitElement {
       this.currentKey,
       this._currentBpm,
       this._currentTimeSignature
-    );
+    )
 
     // Store old active song values to check if we need to change
-    const oldActiveKey = this._activeSongKey;
-    const oldActiveBpm = this._activeSongBpm;
+    const oldActiveKey = this._activeSongKey
+    const oldActiveBpm = this._activeSongBpm
 
-    const needsKeyChange = oldActiveKey && oldActiveKey !== this.currentKey;
+    const needsKeyChange = oldActiveKey && oldActiveKey !== this.currentKey
     const needsTempoChange =
       oldActiveBpm &&
       (this._activeSongBpm !== this._currentBpm ||
         this._activeSongTempoNote !== this._currentTempoNote ||
-        this._activeSongTimeSignature !== this._currentTimeSignature);
+        this._activeSongTimeSignature !== this._currentTimeSignature)
 
     const wasPlayingPads =
-      this._padsOn && oldActiveKey && this._padController && this._padController.isPlaying;
-    const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning;
+      this._padsOn && oldActiveKey && this._padController && this._padController.isPlaying
+    const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning
 
     console.log('[MediaPlayer] _startSong state check:', {
       _padsOn: this._padsOn,
@@ -1136,176 +1136,176 @@ export class MediaPlayer extends LitElement {
       wasPlayingClick,
       oldActiveKey,
       needsKeyChange,
-    });
+    })
 
     // Reset pad failure state for the new active selection
-    this._padLoadFailed = false;
+    this._padLoadFailed = false
 
     // Set this as the active song BEFORE starting pads/click
     // This ensures the metronome has access to the tempo/time signature
-    this._activeSongId = this._currentSongId;
-    this._activeSongKey = this.currentKey;
-    this._activeSongBpm = this._currentBpm;
-    this._activeSongTempoNote = this._currentTempoNote;
-    this._activeSongTimeSignature = this._currentTimeSignature;
-    this._activeSongTitle = this._currentSongTitle;
+    this._activeSongId = this._currentSongId
+    this._activeSongKey = this.currentKey
+    this._activeSongBpm = this._currentBpm
+    this._activeSongTempoNote = this._currentTempoNote
+    this._activeSongTimeSignature = this._currentTimeSignature
+    this._activeSongTitle = this._currentSongTitle
 
     // Handle click immediately so metronome isn't blocked by pad loading
     if (needsTempoChange && this._clickOn && wasPlayingClick) {
-      console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm);
-      this._stopMetronome();
-      this._startMetronome();
+      console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm)
+      this._stopMetronome()
+      this._startMetronome()
     } else if (this._clickOn && !wasPlayingClick) {
-      console.log('[MediaPlayer] Starting click for first time');
-      this._startMetronome();
+      console.log('[MediaPlayer] Starting click for first time')
+      this._startMetronome()
     } else if (!this._clickOn && wasPlayingClick) {
-      console.log('[MediaPlayer] Click toggle off, stopping');
-      this._stopMetronome();
+      console.log('[MediaPlayer] Click toggle off, stopping')
+      this._stopMetronome()
     }
 
     // If we're currently fading out, cancel it and fade back in
     if (this._fadingOut) {
-      console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in');
+      console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in')
       if (this._fadeInterval) {
-        clearInterval(this._fadeInterval);
-        this._fadeInterval = null;
+        clearInterval(this._fadeInterval)
+        this._fadeInterval = null
       }
-      this._fadingOut = false;
+      this._fadingOut = false
 
       // Restart pads if they're toggled on
       if (this._padsOn) {
         // Fade in (controller will handle playback)
-        await this._fadeIn();
+        await this._fadeIn()
       }
 
       // Click will be started below in the normal flow if needed
     } else if (needsKeyChange && this._padsOn && wasPlayingPads) {
       // Handle pads: crossfade if key changed and pads toggle is on
-      console.log('[MediaPlayer] Crossfading pads from', oldActiveKey, 'to', this.currentKey);
-      await this._crossfadeToNewSong();
+      console.log('[MediaPlayer] Crossfading pads from', oldActiveKey, 'to', this.currentKey)
+      await this._crossfadeToNewSong()
     } else if (this._padsOn && !wasPlayingPads) {
       // Pads toggle is on but not playing yet, start them
-      console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn);
-      const hasSource = await this._updateAudioSource(); // Set the audio source before playing
+      console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn)
+      const hasSource = await this._updateAudioSource() // Set the audio source before playing
       if (hasSource) {
-        await this._fadeIn();
+        await this._fadeIn()
       }
     } else if (!this._padsOn && wasPlayingPads) {
       // Pads toggle was turned off while playing, fade out
-      console.log('[MediaPlayer] Pads toggle off, fading out');
-      await this._fadeOut();
+      console.log('[MediaPlayer] Pads toggle off, fading out')
+      await this._fadeOut()
     } else if (this._padsOn && wasPlayingPads && !needsKeyChange) {
       // Pads already playing in the same key - do nothing
-      console.log('[MediaPlayer] Pads already playing in same key, no action needed');
+      console.log('[MediaPlayer] Pads already playing in same key, no action needed')
     } else if (!this._padsOn) {
       // Pads toggle is off, just update the audio source (preload for later)
-      console.log('[MediaPlayer] Pads off, preloading audio source');
+      console.log('[MediaPlayer] Pads off, preloading audio source')
       this._updateAudioSource().catch(error => {
-        console.error('[MediaPlayer] Failed to preload pad source while pads off:', error);
-      });
+        console.error('[MediaPlayer] Failed to preload pad source while pads off:', error)
+      })
     }
 
     // Active song properties already set at the beginning of this method
   }
 
   _togglePads() {
-    this._padsOn = !this._padsOn;
-    console.log('[MediaPlayer] Pads toggle:', this._padsOn);
+    this._padsOn = !this._padsOn
+    console.log('[MediaPlayer] Pads toggle:', this._padsOn)
 
     // Save to localStorage
-    localStorage.setItem('media-player-pads-on', JSON.stringify(this._padsOn));
+    localStorage.setItem('media-player-pads-on', JSON.stringify(this._padsOn))
 
     // If a song is active, immediately start/stop pads
     if (this._activeSongKey) {
       if (this._padsOn) {
         // Turn pads on - fade in
-        this._fadeIn();
+        this._fadeIn()
       } else {
         // Turn pads off - fade out
-        this._fadeOut();
+        this._fadeOut()
       }
     }
     // Song is still "playing" - toggles just control outputs
   }
 
   _toggleClick() {
-    this._clickOn = !this._clickOn;
-    console.log('[MediaPlayer] Click toggle:', this._clickOn);
+    this._clickOn = !this._clickOn
+    console.log('[MediaPlayer] Click toggle:', this._clickOn)
 
     // Save to localStorage
-    localStorage.setItem('media-player-click-on', JSON.stringify(this._clickOn));
+    localStorage.setItem('media-player-click-on', JSON.stringify(this._clickOn))
 
     // If a song is active, immediately start/stop click
     if (this._activeSongBpm) {
       if (this._clickOn) {
         // Turn click on - start metronome
-        this._startMetronome();
+        this._startMetronome()
       } else {
         // Turn click off - stop metronome
-        this._stopMetronome();
+        this._stopMetronome()
       }
     }
   }
 
   _toggleCollapse() {
-    this._collapsed = !this._collapsed;
-    console.log('[MediaPlayer] Collapsed:', this._collapsed);
+    this._collapsed = !this._collapsed
+    console.log('[MediaPlayer] Collapsed:', this._collapsed)
 
     // Save to localStorage
-    localStorage.setItem('media-player-collapsed', JSON.stringify(this._collapsed));
+    localStorage.setItem('media-player-collapsed', JSON.stringify(this._collapsed))
   }
 
   _toggleSettings() {
-    this._showingSettings = !this._showingSettings;
-    console.log('[MediaPlayer] Settings:', this._showingSettings);
+    this._showingSettings = !this._showingSettings
+    console.log('[MediaPlayer] Settings:', this._showingSettings)
   }
 
   _startDrag(e) {
     // Don't start drag if clicking on a button
     if (e.target.closest('.title-bar-button')) {
-      return;
+      return
     }
 
-    this._isDragging = true;
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    this._isDragging = true
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
-    this._dragStartX = clientX - this._dragOffsetX;
-    this._dragStartY = clientY - this._dragOffsetY;
+    this._dragStartX = clientX - this._dragOffsetX
+    this._dragStartY = clientY - this._dragOffsetY
 
     // Prevent text selection during drag
-    e.preventDefault();
+    e.preventDefault()
 
     // Add global event listeners
-    const handleMove = moveEvent => this._handleDrag(moveEvent);
-    const handleEnd = () => this._endDrag(handleMove, handleEnd);
+    const handleMove = moveEvent => this._handleDrag(moveEvent)
+    const handleEnd = () => this._endDrag(handleMove, handleEnd)
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleEnd);
-    document.addEventListener('touchmove', handleMove);
-    document.addEventListener('touchend', handleEnd);
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleEnd)
+    document.addEventListener('touchmove', handleMove)
+    document.addEventListener('touchend', handleEnd)
   }
 
   _handleDrag(e) {
-    if (!this._isDragging) return;
+    if (!this._isDragging) return
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
-    this._dragOffsetX = clientX - this._dragStartX;
-    this._dragOffsetY = clientY - this._dragStartY;
+    this._dragOffsetX = clientX - this._dragStartX
+    this._dragOffsetY = clientY - this._dragStartY
 
-    this._applyPosition();
+    this._applyPosition()
   }
 
   _endDrag(handleMove, handleEnd) {
-    this._isDragging = false;
+    this._isDragging = false
 
     // Remove global event listeners
-    document.removeEventListener('mousemove', handleMove);
-    document.removeEventListener('mouseup', handleEnd);
-    document.removeEventListener('touchmove', handleMove);
-    document.removeEventListener('touchend', handleEnd);
+    document.removeEventListener('mousemove', handleMove)
+    document.removeEventListener('mouseup', handleEnd)
+    document.removeEventListener('touchmove', handleMove)
+    document.removeEventListener('touchend', handleEnd)
 
     // Save position to localStorage
     localStorage.setItem(
@@ -1314,13 +1314,13 @@ export class MediaPlayer extends LitElement {
         x: this._dragOffsetX,
         y: this._dragOffsetY,
       })
-    );
+    )
   }
 
   _applyPosition() {
     // Position is now applied directly in the template via style binding
     // Just trigger a re-render
-    this.requestUpdate();
+    this.requestUpdate()
   }
 
   _isCurrentSongActive() {
@@ -1329,206 +1329,206 @@ export class MediaPlayer extends LitElement {
       this._activeSongBpm === this.bpm &&
       this._activeSongTempoNote === this.tempoNote &&
       this._activeSongTimeSignature === this.timeSignature
-    );
+    )
   }
 
   async _crossfadeToNewSong() {
     if (!this._padController) {
-      console.warn('[MediaPlayer] Cannot crossfade: controller not initialized');
-      return;
+      console.warn('[MediaPlayer] Cannot crossfade: controller not initialized')
+      return
     }
 
-    console.log('[MediaPlayer] Crossfading to new song');
+    console.log('[MediaPlayer] Crossfading to new song')
 
-    await this._padController.crossfadeTo(this.currentKey, this._activePadSet);
-    this._padLoadFailed = this._padController.loadFailed;
-    this._padsOn = !this._padLoadFailed;
+    await this._padController.crossfadeTo(this.currentKey, this._activePadSet)
+    this._padLoadFailed = this._padController.loadFailed
+    this._padsOn = !this._padLoadFailed
   }
 
   async _togglePlay() {
     if (!this.currentKey) {
-      console.warn('[MediaPlayer] No key set, cannot play');
-      return;
+      console.warn('[MediaPlayer] No key set, cannot play')
+      return
     }
 
     // If currently fading, interrupt and switch direction
     if (this._fadingIn || this._fadingOut) {
-      console.log('[MediaPlayer] Interrupting current fade to switch direction');
-      const wasFadingIn = this._fadingIn;
-      const wasFadingOut = this._fadingOut;
+      console.log('[MediaPlayer] Interrupting current fade to switch direction')
+      const wasFadingIn = this._fadingIn
+      const wasFadingOut = this._fadingOut
 
       // Clear the current fade interval
       if (this._fadeInterval) {
-        clearInterval(this._fadeInterval);
-        this._fadeInterval = null;
+        clearInterval(this._fadeInterval)
+        this._fadeInterval = null
       }
       // Reset fading states
-      this._fadingIn = false;
-      this._fadingOut = false;
+      this._fadingIn = false
+      this._fadingOut = false
 
       // Do the opposite of what we were doing
       if (wasFadingOut) {
-        await this._fadeIn();
+        await this._fadeIn()
       } else if (wasFadingIn) {
-        await this._fadeOut();
+        await this._fadeOut()
       }
-      return;
+      return
     }
 
     if (this._padsOn) {
-      await this._fadeOut();
+      await this._fadeOut()
     } else {
-      await this._fadeIn();
+      await this._fadeIn()
     }
   }
 
   async _fadeIn() {
     if (!this._padController) {
-      console.error('[MediaPlayer] Cannot fade in: controller not initialized');
-      return;
+      console.error('[MediaPlayer] Cannot fade in: controller not initialized')
+      return
     }
 
-    this._fadingIn = true;
-    this._padsOn = true;
-    await this._padController.play();
-    this._fadingIn = false;
+    this._fadingIn = true
+    this._padsOn = true
+    await this._padController.play()
+    this._fadingIn = false
   }
 
   async _fadeOut() {
-    if (!this._padController) return;
+    if (!this._padController) return
 
-    this._fadingOut = true;
-    await this._padController.stop();
-    this._fadingOut = false;
+    this._fadingOut = true
+    await this._padController.stop()
+    this._fadingOut = false
   }
 
   async _crossfadeToNewKey() {
     if (!this._padController) {
-      console.warn('[MediaPlayer] Cannot crossfade: controller not initialized');
-      return;
+      console.warn('[MediaPlayer] Cannot crossfade: controller not initialized')
+      return
     }
 
-    this._fadingOut = true;
-    this._fadingIn = true;
+    this._fadingOut = true
+    this._fadingIn = true
 
-    await this._padController.crossfadeTo(this.currentKey, this._activePadSet);
-    this._padLoadFailed = this._padController.loadFailed;
+    await this._padController.crossfadeTo(this.currentKey, this._activePadSet)
+    this._padLoadFailed = this._padController.loadFailed
 
-    this._fadingOut = false;
-    this._fadingIn = false;
+    this._fadingOut = false
+    this._fadingIn = false
   }
 
   _getStatusText() {
-    if (this._fadingIn) return 'Fading in...';
-    if (this._fadingOut) return 'Fading out...';
-    if (this._padsOn) return 'Playing';
-    return 'Stopped';
+    if (this._fadingIn) return 'Fading in...'
+    if (this._fadingOut) return 'Fading out...'
+    if (this._padsOn) return 'Playing'
+    return 'Stopped'
   }
 
   _startVolumeControl(e, type) {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault()
+    e.stopPropagation()
 
     // Get initial touch/click position
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
     // Position slider near the touch point
-    this._sliderX = clientX;
-    this._sliderY = clientY;
-    this._activeVolumeControl = type;
-    this._showingVolumeSlider = true;
+    this._sliderX = clientX
+    this._sliderY = clientY
+    this._activeVolumeControl = type
+    this._showingVolumeSlider = true
 
     // Add move/end listeners
     const handleMove = moveEvent => {
-      this._handleVolumeMove(moveEvent);
-    };
+      this._handleVolumeMove(moveEvent)
+    }
 
     const handleEnd = () => {
-      this._showingVolumeSlider = false;
-      this._activeVolumeControl = null;
-      document.removeEventListener('mousemove', handleMove);
-      document.removeEventListener('mouseup', handleEnd);
-      document.removeEventListener('touchmove', handleMove);
-      document.removeEventListener('touchend', handleEnd);
-      this.requestUpdate();
-    };
+      this._showingVolumeSlider = false
+      this._activeVolumeControl = null
+      document.removeEventListener('mousemove', handleMove)
+      document.removeEventListener('mouseup', handleEnd)
+      document.removeEventListener('touchmove', handleMove)
+      document.removeEventListener('touchend', handleEnd)
+      this.requestUpdate()
+    }
 
-    document.addEventListener('mousemove', handleMove);
-    document.addEventListener('mouseup', handleEnd);
-    document.addEventListener('touchmove', handleMove);
-    document.addEventListener('touchend', handleEnd);
+    document.addEventListener('mousemove', handleMove)
+    document.addEventListener('mouseup', handleEnd)
+    document.addEventListener('touchmove', handleMove)
+    document.addEventListener('touchend', handleEnd)
   }
 
   _handleVolumeMove(e) {
-    if (!this._activeVolumeControl) return;
+    if (!this._activeVolumeControl) return
 
-    e.preventDefault();
+    e.preventDefault()
 
     // Get vertical position relative to initial touch
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY
 
     // Calculate delta from start (negative = up, positive = down)
-    const delta = this._sliderY - clientY;
+    const delta = this._sliderY - clientY
 
     // Convert to percentage change (200px = full range)
-    const change = delta / 200;
+    const change = delta / 200
 
     // Get current volume
-    const currentVolume = this._activeVolumeControl === 'pad' ? this._padVolume : this._clickVolume;
+    const currentVolume = this._activeVolumeControl === 'pad' ? this._padVolume : this._clickVolume
 
     // Calculate new volume
-    const newVolume = Math.max(0, Math.min(1, currentVolume + change));
+    const newVolume = Math.max(0, Math.min(1, currentVolume + change))
 
     // Update volume
     if (this._activeVolumeControl === 'pad') {
-      this._padVolume = newVolume;
+      this._padVolume = newVolume
       // Update pad controller volume
       if (this._padController) {
-        this._padController.setVolume(this._padVolume);
+        this._padController.setVolume(this._padVolume)
       }
       // Save to localStorage
-      localStorage.setItem('setalight-pad-volume', this._padVolume.toString());
+      localStorage.setItem('setalight-pad-volume', this._padVolume.toString())
     } else if (this._activeVolumeControl === 'click') {
-      this._clickVolume = newVolume;
+      this._clickVolume = newVolume
       // Update metronome controller volume
       if (this._metronomeController) {
-        this._metronomeController.setVolume(this._clickVolume);
+        this._metronomeController.setVolume(this._clickVolume)
       }
       // Save to localStorage
-      localStorage.setItem('setalight-click-volume', this._clickVolume.toString());
+      localStorage.setItem('setalight-click-volume', this._clickVolume.toString())
     }
 
     // Update slider Y position for next calculation
-    this._sliderY = clientY;
+    this._sliderY = clientY
 
-    this.requestUpdate();
+    this.requestUpdate()
   }
 
   render() {
-    const padsPlaying = this._padController && this._padController.isPlaying;
-    const clickPlaying = this._metronomeRunning;
-    const isPlaying = padsPlaying || clickPlaying;
-    const isDownloading = this._isPadLoading;
-    const statusText = isDownloading ? 'DOWNLOAD' : isPlaying ? 'PLAYING' : 'STOPPED';
-    const statusClass = isDownloading ? 'status-downloading' : '';
+    const padsPlaying = this._padController && this._padController.isPlaying
+    const clickPlaying = this._metronomeRunning
+    const isPlaying = padsPlaying || clickPlaying
+    const isDownloading = this._isPadLoading
+    const statusText = isDownloading ? 'DOWNLOAD' : isPlaying ? 'PLAYING' : 'STOPPED'
+    const statusClass = isDownloading ? 'status-downloading' : ''
 
     // Check if we're viewing a different song than what's playing
     // Compare song IDs instead of individual properties
     const viewingDifferentSong =
-      this._currentSongId && this._activeSongId && this._currentSongId !== this._activeSongId;
+      this._currentSongId && this._activeSongId && this._currentSongId !== this._activeSongId
 
     // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
-    const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong);
+    const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong)
 
-    const showPadError = this._padLoadFailed && !!this._activeSongKey;
+    const showPadError = this._padLoadFailed && !!this._activeSongKey
     const activeKeyDisplay = showPadError
       ? html`
           <help-tooltip message="Could not load pad sound for this key">
             ${this._activeSongKey}!
           </help-tooltip>
         `
-      : this._activeSongKey || '-';
+      : this._activeSongKey || '-'
 
     // If collapsed, show just the expand button (always bottom-left)
     if (this._collapsed) {
@@ -1536,13 +1536,14 @@ export class MediaPlayer extends LitElement {
         <button class="collapsed-button" @click=${this._toggleCollapse} title="Expand player">
           ▶
         </button>
-      `;
+      `
     }
 
     return html`
       <!-- Settings modal (outside container so it's not constrained) -->
-      ${this._showingSettings
-        ? html`
+      ${
+        this._showingSettings
+          ? html`
             <div class="settings-modal" @click=${this._toggleSettings}>
               <div class="settings-content" @click=${e => e.stopPropagation()}>
                 <div class="settings-header">
@@ -1557,27 +1558,28 @@ export class MediaPlayer extends LitElement {
                   .metronomeEnabled=${this._metronomeGlobalEnabled}
                   .stereoSplitEnabled=${this.stereoSplitEnabled}
                   @settings-change=${e => {
-                    console.log('[MediaPlayer] Settings changed from modal:', e.detail);
+                    console.log('[MediaPlayer] Settings changed from modal:', e.detail)
                     // Save to localStorage
-                    localStorage.setItem('mediaPlayerSettings', JSON.stringify(e.detail));
+                    localStorage.setItem('mediaPlayerSettings', JSON.stringify(e.detail))
                     // Update our local state
-                    this._padsEnabled = e.detail.padsEnabled !== false;
-                    this._metronomeGlobalEnabled = e.detail.metronomeEnabled !== false;
-                    this.stereoSplitEnabled = e.detail.stereoSplitEnabled === true;
+                    this._padsEnabled = e.detail.padsEnabled !== false
+                    this._metronomeGlobalEnabled = e.detail.metronomeEnabled !== false
+                    this.stereoSplitEnabled = e.detail.stereoSplitEnabled === true
                     // Dispatch to sync with global settings
                     window.dispatchEvent(
                       new CustomEvent('media-player-settings-changed', {
                         detail: e.detail,
                       })
-                    );
-                    this._updateAudioRouting();
-                    this.requestUpdate();
+                    )
+                    this._updateAudioRouting()
+                    this.requestUpdate()
                   }}
                 ></media-player-settings>
               </div>
             </div>
           `
-        : ''}
+          : ''
+      }
 
       <div
         class="player"
@@ -1600,8 +1602,9 @@ export class MediaPlayer extends LitElement {
         <!-- Container with grid layout -->
         <div class="container" part="container">
           <!-- Row 1, Column 1: LED display -->
-          ${this._padsEnabled || this._metronomeGlobalEnabled
-            ? html`
+          ${
+            this._padsEnabled || this._metronomeGlobalEnabled
+              ? html`
                 <div class="led-display-section">
                   <div class="led-display">
                     <!-- Row 1: Headers -->
@@ -1630,7 +1633,8 @@ export class MediaPlayer extends LitElement {
                   </div>
                 </div>
               `
-            : ''}
+              : ''
+          }
 
           <!-- Row 2, Column 1: Play/Stop buttons -->
           <div class="play-stop-section">
@@ -1658,23 +1662,27 @@ export class MediaPlayer extends LitElement {
           </div>
 
           <!-- Divider spanning both rows -->
-          ${this._padsEnabled || this._metronomeGlobalEnabled
-            ? html` <div class="divider"></div> `
-            : ''}
+          ${
+            this._padsEnabled || this._metronomeGlobalEnabled
+              ? html` <div class="divider"></div> `
+              : ''
+          }
 
           <!-- Row 1, Column 3: Volume knobs -->
-          ${this._padsEnabled || this._metronomeGlobalEnabled
-            ? html`
+          ${
+            this._padsEnabled || this._metronomeGlobalEnabled
+              ? html`
                 <div class="knobs-section">
                   <div class="knobs-row">
-                    ${this._padsEnabled
-                      ? html`
+                    ${
+                      this._padsEnabled
+                        ? html`
                           <div class="knob-column">
                             <div class="knob-label">Pads</div>
                             <div
-                              class="volume-knob ${this._activeVolumeControl === 'pad'
-                                ? 'dragging'
-                                : ''}"
+                              class="volume-knob ${
+                                this._activeVolumeControl === 'pad' ? 'dragging' : ''
+                              }"
                               @mousedown=${e => this._startVolumeControl(e, 'pad')}
                               @touchstart=${e => this._startVolumeControl(e, 'pad')}
                               title="Pad Volume"
@@ -1688,15 +1696,17 @@ export class MediaPlayer extends LitElement {
                             <div class="toggle-label">${this._padsOn ? 'On' : 'Off'}</div>
                           </div>
                         `
-                      : ''}
-                    ${this._metronomeGlobalEnabled
-                      ? html`
+                        : ''
+                    }
+                    ${
+                      this._metronomeGlobalEnabled
+                        ? html`
                           <div class="knob-column">
                             <div class="knob-label">Click</div>
                             <div
-                              class="volume-knob ${this._activeVolumeControl === 'click'
-                                ? 'dragging'
-                                : ''}"
+                              class="volume-knob ${
+                                this._activeVolumeControl === 'click' ? 'dragging' : ''
+                              }"
                               @mousedown=${e => this._startVolumeControl(e, 'click')}
                               @touchstart=${e => this._startVolumeControl(e, 'click')}
                               title="Click Volume"
@@ -1710,19 +1720,23 @@ export class MediaPlayer extends LitElement {
                             <div class="toggle-label">${this._clickOn ? 'On' : 'Off'}</div>
                           </div>
                         `
-                      : ''}
+                        : ''
+                    }
                   </div>
                 </div>
               `
-            : ''}
+              : ''
+          }
 
           <!-- Row 2, Column 3: LED toggle buttons -->
-          ${this._padsEnabled || this._metronomeGlobalEnabled
-            ? html`
+          ${
+            this._padsEnabled || this._metronomeGlobalEnabled
+              ? html`
                 <div class="toggles-section">
                   <div class="cassette-buttons">
-                    ${this._padsEnabled && this._metronomeGlobalEnabled
-                      ? html`
+                    ${
+                      this._padsEnabled && this._metronomeGlobalEnabled
+                        ? html`
                           <button
                             class="led-button middle ${this._padsOn ? 'active' : ''}"
                             @click=${this._togglePads}
@@ -1738,8 +1752,8 @@ export class MediaPlayer extends LitElement {
                             <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
                           </button>
                         `
-                      : this._padsEnabled
-                        ? html`
+                        : this._padsEnabled
+                          ? html`
                             <button
                               class="led-button ${this._padsOn ? 'active' : ''}"
                               @click=${this._togglePads}
@@ -1748,8 +1762,8 @@ export class MediaPlayer extends LitElement {
                               <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
                             </button>
                           `
-                        : this._metronomeGlobalEnabled
-                          ? html`
+                          : this._metronomeGlobalEnabled
+                            ? html`
                               <button
                                 class="led-button ${this._clickOn ? 'active' : ''}"
                                 @click=${this._toggleClick}
@@ -1758,18 +1772,20 @@ export class MediaPlayer extends LitElement {
                                 <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
                               </button>
                             `
-                          : ''}
+                            : ''
+                    }
                   </div>
                 </div>
               `
-            : ''}
+              : ''
+          }
         </div>
         <!-- End container -->
       </div>
       <!-- End player -->
-    `;
+    `
   }
 }
 
 // Define the custom element
-customElements.define('media-player', MediaPlayer);
+customElements.define('media-player', MediaPlayer)

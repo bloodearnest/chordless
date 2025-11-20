@@ -1,6 +1,6 @@
-import { LitElement, html, css } from 'lit';
-import { isSyncAvailable, createSyncOrchestrator } from '../js/sync-orchestrator.js';
-import { getCurrentOrganisation } from '../js/organisation.js';
+import { css, html, LitElement } from 'lit'
+import { getCurrentOrganisation } from '../js/organisation.js'
+import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
 
 /**
  * DriveSyncPanel Component
@@ -15,7 +15,7 @@ export class DriveSyncPanel extends LitElement {
     lastSyncTime: { type: String, attribute: false },
     syncError: { type: String, attribute: false },
     disabled: { type: Boolean, reflect: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -158,114 +158,114 @@ export class DriveSyncPanel extends LitElement {
       color: inherit;
       text-decoration: underline;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.syncAvailable = false;
-    this.syncing = false;
-    this.syncProgress = null;
-    this.lastSyncTime = null;
-    this.syncError = null;
-    this.disabled = false;
+    super()
+    this.syncAvailable = false
+    this.syncing = false
+    this.syncProgress = null
+    this.lastSyncTime = null
+    this.syncError = null
+    this.disabled = false
   }
 
   async connectedCallback() {
-    super.connectedCallback();
-    await this.checkSyncAvailability();
-    this.loadLastSyncTime();
+    super.connectedCallback()
+    await this.checkSyncAvailability()
+    this.loadLastSyncTime()
   }
 
   async checkSyncAvailability() {
-    this.syncAvailable = await isSyncAvailable();
+    this.syncAvailable = await isSyncAvailable()
   }
 
   loadLastSyncTime() {
-    const stored = localStorage.getItem('last-sync-time');
+    const stored = localStorage.getItem('last-sync-time')
     if (stored) {
-      this.lastSyncTime = stored;
+      this.lastSyncTime = stored
     }
   }
 
   async handleSync() {
-    if (this.syncing || !this.syncAvailable || this.disabled) return;
+    if (this.syncing || !this.syncAvailable || this.disabled) return
 
-    this.syncing = true;
-    this.syncError = null;
-    this.syncProgress = { stage: 'starting', message: 'Initializing...' };
+    this.syncing = true
+    this.syncError = null
+    this.syncProgress = { stage: 'starting', message: 'Initializing...' }
 
     try {
-      const { id, name } = getCurrentOrganisation();
+      const { id, name } = getCurrentOrganisation()
 
       // Use the SW-compatible orchestrator
-      const orchestrator = await createSyncOrchestrator(name, id);
+      const orchestrator = await createSyncOrchestrator(name, id)
 
       await orchestrator.sync(progress => {
-        this.syncProgress = progress;
-        this.requestUpdate();
-      });
+        this.syncProgress = progress
+        this.requestUpdate()
+      })
 
       // Success!
-      const now = new Date().toISOString();
-      this.lastSyncTime = now;
-      localStorage.setItem('last-sync-time', now);
+      const now = new Date().toISOString()
+      this.lastSyncTime = now
+      localStorage.setItem('last-sync-time', now)
 
       // Show success briefly
-      this.syncProgress = { stage: 'success', message: '✓ Sync complete!' };
+      this.syncProgress = { stage: 'success', message: '✓ Sync complete!' }
       setTimeout(() => {
-        this.syncing = false;
-        this.syncProgress = null;
-      }, 2000);
+        this.syncing = false
+        this.syncProgress = null
+      }, 2000)
     } catch (error) {
-      console.error('[DriveSyncPanel] Sync failed:', error);
-      this.syncError = error.message;
-      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` };
-      this.syncing = false;
+      console.error('[DriveSyncPanel] Sync failed:', error)
+      this.syncError = error.message
+      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
+      this.syncing = false
     }
   }
 
   async handleClearAndReupload() {
-    if (this.syncing || !this.syncAvailable || this.disabled) return;
+    if (this.syncing || !this.syncAvailable || this.disabled) return
 
     if (
       !confirm(
         '⚠️ This will DELETE all files in your Google Drive Setalight folder and re-upload everything with the new file structure.\n\nThis action cannot be undone!\n\nAre you sure?'
       )
     ) {
-      return;
+      return
     }
 
-    this.syncing = true;
-    this.syncError = null;
-    this.syncProgress = { stage: 'starting', message: 'Starting clear and re-upload...' };
+    this.syncing = true
+    this.syncError = null
+    this.syncProgress = { stage: 'starting', message: 'Starting clear and re-upload...' }
 
     try {
-      const { id, name } = getCurrentOrganisation();
+      const { id, name } = getCurrentOrganisation()
 
       // Use the SW-compatible orchestrator
-      const orchestrator = await createSyncOrchestrator(name, id);
+      const orchestrator = await createSyncOrchestrator(name, id)
 
       await orchestrator.clearAndReupload(progress => {
-        this.syncProgress = progress;
-        this.requestUpdate();
-      });
+        this.syncProgress = progress
+        this.requestUpdate()
+      })
 
       // Success!
-      const now = new Date().toISOString();
-      this.lastSyncTime = now;
-      localStorage.setItem('last-sync-time', now);
+      const now = new Date().toISOString()
+      this.lastSyncTime = now
+      localStorage.setItem('last-sync-time', now)
 
       // Show success briefly
-      this.syncProgress = { stage: 'success', message: '✓ Re-upload complete!' };
+      this.syncProgress = { stage: 'success', message: '✓ Re-upload complete!' }
       setTimeout(() => {
-        this.syncing = false;
-        this.syncProgress = null;
-      }, 2000);
+        this.syncing = false
+        this.syncProgress = null
+      }, 2000)
     } catch (error) {
-      console.error('[DriveSyncPanel] Clear and re-upload failed:', error);
-      this.syncError = error.message;
-      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` };
-      this.syncing = false;
+      console.error('[DriveSyncPanel] Clear and re-upload failed:', error)
+      this.syncError = error.message
+      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
+      this.syncing = false
     }
   }
 
@@ -280,7 +280,7 @@ export class DriveSyncPanel extends LitElement {
             </p>
           </div>
         </div>
-      `;
+      `
     }
 
     return html`
@@ -288,9 +288,9 @@ export class DriveSyncPanel extends LitElement {
         ${this.renderSyncStatus()}
 
         <button class="sync-button primary" ?disabled=${this.syncing} @click=${this.handleSync}>
-          ${this.syncing
-            ? html`<span class="spinner"></span> Syncing...`
-            : html`🔄 Sync with Drive`}
+          ${
+            this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
+          }
         </button>
 
         <button
@@ -302,13 +302,15 @@ export class DriveSyncPanel extends LitElement {
           🗑️ Clear & Re-upload (New File Structure)
         </button>
 
-        ${this.lastSyncTime
-          ? html`
+        ${
+          this.lastSyncTime
+            ? html`
               <div class="last-sync">Last synced: ${this.formatSyncTime(this.lastSyncTime)}</div>
             `
-          : ''}
+            : ''
+        }
       </div>
-    `;
+    `
   }
 
   renderSyncStatus() {
@@ -320,7 +322,7 @@ export class DriveSyncPanel extends LitElement {
             <span class="status-text">Ready to sync</span>
           </div>
         </div>
-      `;
+      `
     }
 
     if (this.syncError) {
@@ -332,13 +334,13 @@ export class DriveSyncPanel extends LitElement {
           </div>
           <div class="error-message">${this.syncError}</div>
         </div>
-      `;
+      `
     }
 
-    const { stage, message } = this.syncProgress;
-    const isError = stage === 'error';
-    const isSuccess = stage === 'complete' || stage === 'success';
-    const statusClass = isError ? 'error' : isSuccess ? 'success' : 'syncing';
+    const { stage, message } = this.syncProgress
+    const isError = stage === 'error'
+    const isSuccess = stage === 'complete' || stage === 'success'
+    const statusClass = isError ? 'error' : isSuccess ? 'success' : 'syncing'
 
     return html`
       <div class="sync-status ${statusClass}">
@@ -348,36 +350,36 @@ export class DriveSyncPanel extends LitElement {
         </div>
         ${!isError && !isSuccess ? this.renderProgressBar() : ''}
       </div>
-    `;
+    `
   }
 
   renderProgressBar() {
-    const { current, total } = this.syncProgress || {};
-    const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0;
-    const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null;
-    const width = percent !== null ? `${percent}%` : '50%';
+    const { current, total } = this.syncProgress || {}
+    const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0
+    const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null
+    const width = percent !== null ? `${percent}%` : '50%'
     return html`
       <div class="progress-bar">
         <div class="progress-fill" style="width: ${width}"></div>
       </div>
-    `;
+    `
   }
 
   formatSyncTime(isoString) {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now - date;
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+    const date = new Date(isoString)
+    const now = new Date()
+    const diffMs = now - date
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`;
-    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
-    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
+    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
 
-    return date.toLocaleDateString();
+    return date.toLocaleDateString()
   }
 }
 
-customElements.define('drive-sync-panel', DriveSyncPanel);
+customElements.define('drive-sync-panel', DriveSyncPanel)

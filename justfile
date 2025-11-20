@@ -12,17 +12,15 @@ test-unit:
     @echo "Running browser unit tests with Web Test Runner..."
     @npm run test:web
 
-# Lint/format JS files (basic syntax checks)
+# Lint/format JS files with Biome (fast!)
 lint:
-    @echo "Checking formatting..."
-    npx prettier --check .
-    @echo "Running ESLint..."
-    npx eslint components js tests service-worker.js auth-proxy/src
+    @echo "Running Biome check..."
+    npx @biomejs/biome check components js tests service-worker.js
 
-# Format project files with Prettier
+# Format project files with Biome
 format:
-    @echo "Formatting with Prettier..."
-    npx prettier --write .
+    @echo "Formatting with Biome..."
+    npx @biomejs/biome format --write components js tests service-worker.js
 
 # Copy vendored dependencies from node_modules to vendor/
 vendor:

@@ -1,5 +1,5 @@
-import { LitElement, html, css } from 'lit';
-import { listPadSets, getActivePadSet, selectPadSet } from '../js/pad-set-service.js';
+import { css, html, LitElement } from 'lit'
+import { getActivePadSet, listPadSets, selectPadSet } from '../js/pad-set-service.js'
 
 /**
  * MediaPlayerSettings Component
@@ -26,7 +26,7 @@ export class MediaPlayerSettings extends LitElement {
     selectedPadSetId: { type: String, state: true },
     padSetLoading: { type: Boolean, state: true },
     padSetError: { type: String, state: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -150,52 +150,52 @@ export class MediaPlayerSettings extends LitElement {
       margin-top: 0.4rem;
       opacity: 0.8;
     }
-  `;
+  `
 
   constructor() {
-    super();
+    super()
 
     // Load settings from localStorage
-    const savedSettings = localStorage.getItem('setalight-media-settings');
+    const savedSettings = localStorage.getItem('setalight-media-settings')
 
     if (savedSettings) {
-      const settings = JSON.parse(savedSettings);
-      this.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false; // Default true
-      this.padsEnabled = settings.padsEnabled !== false; // Default true
-      this.metronomeEnabled = settings.metronomeEnabled !== false; // Default true
-      this.stereoSplitEnabled = settings.stereoSplitEnabled === true; // Default false
+      const settings = JSON.parse(savedSettings)
+      this.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false // Default true
+      this.padsEnabled = settings.padsEnabled !== false // Default true
+      this.metronomeEnabled = settings.metronomeEnabled !== false // Default true
+      this.stereoSplitEnabled = settings.stereoSplitEnabled === true // Default false
     } else {
       // Defaults
-      this.mediaPlayerEnabled = true;
-      this.padsEnabled = true;
-      this.metronomeEnabled = true;
-      this.stereoSplitEnabled = false;
+      this.mediaPlayerEnabled = true
+      this.padsEnabled = true
+      this.metronomeEnabled = true
+      this.stereoSplitEnabled = false
     }
 
-    this.padSets = [];
-    this.selectedPadSetId = getActivePadSet().id;
-    this.padSetLoading = false;
-    this.padSetError = '';
+    this.padSets = []
+    this.selectedPadSetId = getActivePadSet().id
+    this.padSetLoading = false
+    this.padSetError = ''
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    this._loadPadSets();
-    this._boundPadSetListUpdated = () => this._loadPadSets(true);
+    super.connectedCallback()
+    this._loadPadSets()
+    this._boundPadSetListUpdated = () => this._loadPadSets(true)
     this._boundPadSetChanged = event => {
-      const padSet = event.detail?.padSet;
+      const padSet = event.detail?.padSet
       if (padSet) {
-        this.selectedPadSetId = padSet.id;
+        this.selectedPadSetId = padSet.id
       }
-    };
-    window.addEventListener('pad-set-list-updated', this._boundPadSetListUpdated);
-    window.addEventListener('pad-set-changed', this._boundPadSetChanged);
+    }
+    window.addEventListener('pad-set-list-updated', this._boundPadSetListUpdated)
+    window.addEventListener('pad-set-changed', this._boundPadSetChanged)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
-    window.removeEventListener('pad-set-list-updated', this._boundPadSetListUpdated);
-    window.removeEventListener('pad-set-changed', this._boundPadSetChanged);
+    super.disconnectedCallback()
+    window.removeEventListener('pad-set-list-updated', this._boundPadSetListUpdated)
+    window.removeEventListener('pad-set-changed', this._boundPadSetChanged)
   }
 
   _saveSettings() {
@@ -204,9 +204,9 @@ export class MediaPlayerSettings extends LitElement {
       padsEnabled: this.padsEnabled,
       metronomeEnabled: this.metronomeEnabled,
       stereoSplitEnabled: this.stereoSplitEnabled,
-    };
+    }
 
-    localStorage.setItem('setalight-media-settings', JSON.stringify(settings));
+    localStorage.setItem('setalight-media-settings', JSON.stringify(settings))
 
     // Dispatch event so media player can react
     this.dispatchEvent(
@@ -215,62 +215,62 @@ export class MediaPlayerSettings extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _toggleMediaPlayer() {
-    this.mediaPlayerEnabled = !this.mediaPlayerEnabled;
-    this._saveSettings();
+    this.mediaPlayerEnabled = !this.mediaPlayerEnabled
+    this._saveSettings()
   }
 
   _togglePads() {
-    this.padsEnabled = !this.padsEnabled;
-    this._saveSettings();
+    this.padsEnabled = !this.padsEnabled
+    this._saveSettings()
   }
 
   _toggleMetronome() {
-    this.metronomeEnabled = !this.metronomeEnabled;
-    this._saveSettings();
+    this.metronomeEnabled = !this.metronomeEnabled
+    this._saveSettings()
   }
 
   _toggleStereoSplit() {
-    this.stereoSplitEnabled = !this.stereoSplitEnabled;
-    this._saveSettings();
+    this.stereoSplitEnabled = !this.stereoSplitEnabled
+    this._saveSettings()
   }
 
   async _loadPadSets(force = false) {
-    this.padSetLoading = true;
-    this.padSetError = '';
+    this.padSetLoading = true
+    this.padSetError = ''
     try {
-      const sets = await listPadSets(force);
-      this.padSets = sets;
+      const sets = await listPadSets(force)
+      this.padSets = sets
       if (!sets.some(set => set.id === this.selectedPadSetId)) {
-        this.selectedPadSetId = getActivePadSet().id;
+        this.selectedPadSetId = getActivePadSet().id
       }
     } catch (error) {
-      console.error('[MediaPlayerSettings] Failed to load pad sets:', error);
-      this.padSetError = error.message || 'Unable to load pad sets.';
+      console.error('[MediaPlayerSettings] Failed to load pad sets:', error)
+      this.padSetError = error.message || 'Unable to load pad sets.'
     } finally {
-      this.padSetLoading = false;
+      this.padSetLoading = false
     }
   }
 
   async _handlePadSetChange(event) {
-    const newId = event.target.value;
-    const previousId = this.selectedPadSetId;
-    this.selectedPadSetId = newId;
-    this.padSetLoading = true;
-    this.padSetError = '';
+    const newId = event.target.value
+    const previousId = this.selectedPadSetId
+    this.selectedPadSetId = newId
+    this.padSetLoading = true
+    this.padSetError = ''
 
     try {
-      await selectPadSet(newId);
+      await selectPadSet(newId)
     } catch (error) {
-      console.error('[MediaPlayerSettings] Failed to switch pad set:', error);
-      this.padSetError = error.message || 'Unable to switch pad set.';
-      this.selectedPadSetId = previousId;
-      event.target.value = previousId;
+      console.error('[MediaPlayerSettings] Failed to switch pad set:', error)
+      this.padSetError = error.message || 'Unable to switch pad set.'
+      this.selectedPadSetId = previousId
+      event.target.value = previousId
     } finally {
-      this.padSetLoading = false;
+      this.padSetLoading = false
     }
   }
 
@@ -307,9 +307,9 @@ export class MediaPlayerSettings extends LitElement {
           </div>
 
           <div
-            class="setting-item indent ${!this.mediaPlayerEnabled || !this.padsEnabled
-              ? 'disabled'
-              : ''}"
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.padsEnabled ? 'disabled' : ''
+            }"
           >
             <div style="flex: 1;">
               <div class="setting-label">Pad Sound Set</div>
@@ -322,18 +322,22 @@ export class MediaPlayerSettings extends LitElement {
                 @change=${this._handlePadSetChange}
                 ?disabled=${this.padSetLoading || !this.mediaPlayerEnabled || !this.padsEnabled}
               >
-                ${this.padSets && this.padSets.length
-                  ? this.padSets.map(set => html` <option value=${set.id}>${set.name}</option> `)
-                  : html`<option value="builtin">Built-in Pads</option>`}
+                ${
+                  this.padSets && this.padSets.length
+                    ? this.padSets.map(set => html` <option value=${set.id}>${set.name}</option> `)
+                    : html`<option value="builtin">Built-in Pads</option>`
+                }
               </select>
-              ${this.padSetLoading
-                ? html`<div class="padset-message">Preparing pad set…</div>`
-                : ''}
-              ${this.padSetError
-                ? html`<div class="padset-message" style="color: #ffb3b3;">
+              ${
+                this.padSetLoading ? html`<div class="padset-message">Preparing pad set…</div>` : ''
+              }
+              ${
+                this.padSetError
+                  ? html`<div class="padset-message" style="color: #ffb3b3;">
                     ${this.padSetError}
                   </div>`
-                : ''}
+                  : ''
+              }
             </div>
           </div>
         </div>
@@ -353,9 +357,9 @@ export class MediaPlayerSettings extends LitElement {
 
           <!-- Stereo split (only when metronome enabled) -->
           <div
-            class="setting-item indent ${!this.mediaPlayerEnabled || !this.metronomeEnabled
-              ? 'disabled'
-              : ''}"
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.metronomeEnabled ? 'disabled' : ''
+            }"
           >
             <div>
               <div class="setting-label">Stereo Split (L/R)</div>
@@ -368,9 +372,9 @@ export class MediaPlayerSettings extends LitElement {
           </div>
         </div>
       </div>
-    `;
+    `
   }
 }
 
 // Define the custom element
-customElements.define('media-player-settings', MediaPlayerSettings);
+customElements.define('media-player-settings', MediaPlayerSettings)

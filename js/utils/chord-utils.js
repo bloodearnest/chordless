@@ -8,7 +8,7 @@
  * @returns {boolean} True if chord is a bar marker (|, ||, ||:, :||)
  */
 export function isBarMarker(chord) {
-  return chord === '|' || chord === '||' || chord === '||:' || chord === ':||';
+  return chord === '|' || chord === '||' || chord === '||:' || chord === ':||'
 }
 
 /**
@@ -19,26 +19,26 @@ export function isBarMarker(chord) {
  */
 export function convertAccidentalsToSymbols(text) {
   if (!text || typeof text !== 'string') {
-    return text;
+    return text
   }
 
-  let result = text;
+  let result = text
 
   // Replace accidentals immediately following note letters (e.g., Bb, C##)
   result = result.replace(/([A-G])([#b]+)/g, (_, note, accidentals) => {
-    const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭');
-    return `${note}${converted}`;
-  });
+    const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭')
+    return `${note}${converted}`
+  })
 
   // Replace accidentals following digits (e.g., 7b5, 9#11)
   result = result.replace(/(\d)([#b]+)/g, (_, digit, accidentals) => {
-    const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭');
-    return `${digit}${converted}`;
-  });
+    const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭')
+    return `${digit}${converted}`
+  })
 
   // Replace standalone accidentals before digits (e.g., #4, b7)
-  result = result.replace(/#(?=\d)/g, '♯');
-  result = result.replace(/b(?=\d)/g, '♭');
+  result = result.replace(/#(?=\d)/g, '♯')
+  result = result.replace(/b(?=\d)/g, '♭')
 
-  return result;
+  return result
 }

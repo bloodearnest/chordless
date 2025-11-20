@@ -1,5 +1,5 @@
-import { LitElement, html, css } from 'lit';
-import { themeManager } from '../js/theme-manager.js';
+import { css, html, LitElement } from 'lit'
+import { themeManager } from '../js/theme-manager.js'
 
 /**
  * ThemeSettings Component
@@ -13,7 +13,7 @@ export class ThemeSettings extends LitElement {
   static properties = {
     currentTheme: { type: String, state: true },
     fontScale: { type: Number, state: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -191,34 +191,34 @@ export class ThemeSettings extends LitElement {
       border-radius: 2px;
       font-size: 0.8rem;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.currentTheme = themeManager.getCurrentTheme();
-    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0;
+    super()
+    this.currentTheme = themeManager.getCurrentTheme()
+    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
 
     // Bind theme observer
-    this._themeObserver = this._handleThemeChange.bind(this);
+    this._themeObserver = this._handleThemeChange.bind(this)
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    themeManager.addObserver(this._themeObserver);
+    super.connectedCallback()
+    themeManager.addObserver(this._themeObserver)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
-    themeManager.removeObserver(this._themeObserver);
+    super.disconnectedCallback()
+    themeManager.removeObserver(this._themeObserver)
   }
 
   _handleThemeChange(theme) {
-    this.currentTheme = theme;
-    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0;
+    this.currentTheme = theme
+    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
   }
 
   _setTheme(theme) {
-    themeManager.setTheme(theme);
+    themeManager.setTheme(theme)
 
     // Dispatch event for parent components
     this.dispatchEvent(
@@ -227,40 +227,40 @@ export class ThemeSettings extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _handleFontScaleChange(e) {
-    const scale = parseFloat(e.target.value);
-    this.fontScale = scale;
-    themeManager.setFontScale(scale);
+    const scale = parseFloat(e.target.value)
+    this.fontScale = scale
+    themeManager.setFontScale(scale)
 
     // Save to localStorage
     try {
-      localStorage.setItem('font-scale', scale.toString());
+      localStorage.setItem('font-scale', scale.toString())
     } catch (err) {
-      console.warn('[ThemeSettings] Failed to save font scale:', err);
+      console.warn('[ThemeSettings] Failed to save font scale:', err)
     }
   }
 
   _setPresetScale(scale) {
-    this.fontScale = scale;
-    themeManager.setFontScale(scale);
+    this.fontScale = scale
+    themeManager.setFontScale(scale)
 
     try {
-      localStorage.setItem('font-scale', scale.toString());
+      localStorage.setItem('font-scale', scale.toString())
     } catch (err) {
-      console.warn('[ThemeSettings] Failed to save font scale:', err);
+      console.warn('[ThemeSettings] Failed to save font scale:', err)
     }
   }
 
   _detectSystemPreference() {
-    this._setTheme('system');
+    this._setTheme('system')
   }
 
   render() {
-    const systemPreference = themeManager.detectSystemPreference();
-    const usingSystemMode = this.currentTheme === 'system';
+    const systemPreference = themeManager.detectSystemPreference()
+    const usingSystemMode = this.currentTheme === 'system'
 
     return html`
       <div class="settings-group">
@@ -295,13 +295,15 @@ export class ThemeSettings extends LitElement {
             <span>Dark</span>
           </button>
         </div>
-        ${usingSystemMode
-          ? html`
+        ${
+          usingSystemMode
+            ? html`
               <div class="system-preference">
                 ✓ Following system preference (currently ${systemPreference})
               </div>
             `
-          : ''}
+            : ''
+        }
       </div>
 
       <div class="settings-group">
@@ -349,17 +351,19 @@ export class ThemeSettings extends LitElement {
           <span class="info-label">Font scale:</span>
           <span class="info-value">${Math.round(this.fontScale * 100)}%</span>
         </div>
-        ${!usingSystemMode
-          ? html`
+        ${
+          !usingSystemMode
+            ? html`
               <div class="info-row">
                 <span class="info-label">System prefers:</span>
                 <span class="info-value">${systemPreference}</span>
               </div>
             `
-          : ''}
+            : ''
+        }
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('theme-settings', ThemeSettings);
+customElements.define('theme-settings', ThemeSettings)

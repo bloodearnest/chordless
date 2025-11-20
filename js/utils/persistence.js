@@ -1,29 +1,29 @@
-let pendingPersistPromise = null;
+let pendingPersistPromise = null
 
 export function ensurePersistentStorage(reason = 'app data') {
   if (typeof navigator === 'undefined' || !navigator.storage?.persist) {
-    return Promise.resolve(false);
+    return Promise.resolve(false)
   }
 
   if (!pendingPersistPromise) {
     pendingPersistPromise = (async () => {
       try {
         if (await navigator.storage.persisted()) {
-          return true;
+          return true
         }
-        const granted = await navigator.storage.persist();
+        const granted = await navigator.storage.persist()
         if (!granted) {
-          console.warn(`[Storage] Persistent storage not granted (${reason})`);
+          console.warn(`[Storage] Persistent storage not granted (${reason})`)
         } else {
-          console.log(`[Storage] Persistent storage granted (${reason})`);
+          console.log(`[Storage] Persistent storage granted (${reason})`)
         }
-        return granted;
+        return granted
       } catch (error) {
-        console.warn('[Storage] Failed to request persistent storage:', error);
-        return false;
+        console.warn('[Storage] Failed to request persistent storage:', error)
+        return false
       }
-    })();
+    })()
   }
 
-  return pendingPersistPromise;
+  return pendingPersistPromise
 }

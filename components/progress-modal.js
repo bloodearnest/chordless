@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * ProgressModal component
@@ -12,14 +12,14 @@ export class ProgressModal extends LitElement {
     message: { type: String },
     progress: { type: Number },
     status: { type: String, reflect: true },
-  };
+  }
 
   constructor() {
-    super();
-    this.heading = 'Processing';
-    this.message = 'Working...';
-    this.progress = 0;
-    this.status = 'in-progress'; // in-progress | complete | error
+    super()
+    this.heading = 'Processing'
+    this.message = 'Working...'
+    this.progress = 0
+    this.status = 'in-progress' // in-progress | complete | error
   }
 
   static styles = css`
@@ -93,28 +93,28 @@ export class ProgressModal extends LitElement {
     :host([status='error']) .progress-fill {
       background: #e74c3c;
     }
-  `;
+  `
 
   /**
    * Update the status text and progress bar.
    * @param {{message?: string, current?: number, total?: number, value?: number}} payload
    */
   updateProgress(payload = {}) {
-    const { message, current, total, value } = payload;
+    const { message, current, total, value } = payload
 
     if (typeof message === 'string') {
-      this.message = message;
+      this.message = message
     }
 
-    let progressValue = this.progress;
+    let progressValue = this.progress
     if (typeof value === 'number') {
-      progressValue = value;
+      progressValue = value
     } else if (typeof current === 'number' && typeof total === 'number' && total > 0) {
-      progressValue = current / total;
+      progressValue = current / total
     }
 
-    this.progress = Math.max(0, Math.min(1, progressValue));
-    this.status = 'in-progress';
+    this.progress = Math.max(0, Math.min(1, progressValue))
+    this.status = 'in-progress'
   }
 
   /**
@@ -123,10 +123,10 @@ export class ProgressModal extends LitElement {
    */
   setComplete(message) {
     if (message) {
-      this.message = message;
+      this.message = message
     }
-    this.progress = 1;
-    this.status = 'complete';
+    this.progress = 1
+    this.status = 'complete'
   }
 
   /**
@@ -134,8 +134,8 @@ export class ProgressModal extends LitElement {
    * @param {string} message
    */
   setError(message) {
-    this.message = message;
-    this.status = 'error';
+    this.message = message
+    this.status = 'error'
   }
 
   /**
@@ -144,14 +144,14 @@ export class ProgressModal extends LitElement {
    */
   close(delayMs = 0) {
     if (delayMs > 0) {
-      setTimeout(() => this.remove(), delayMs);
+      setTimeout(() => this.remove(), delayMs)
     } else {
-      this.remove();
+      this.remove()
     }
   }
 
   get progressPercent() {
-    return Math.round(this.progress * 100);
+    return Math.round(this.progress * 100)
   }
 
   render() {
@@ -168,8 +168,8 @@ export class ProgressModal extends LitElement {
           <div class="progress-fill" style="width: ${this.progressPercent}%;"></div>
         </div>
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('progress-modal', ProgressModal);
+customElements.define('progress-modal', ProgressModal)

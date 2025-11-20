@@ -7,9 +7,9 @@
 
 export class ThemeManager {
   constructor() {
-    this.root = document.documentElement;
-    this._currentTheme = null;
-    this._observers = new Set();
+    this.root = document.documentElement
+    this._currentTheme = null
+    this._observers = new Set()
   }
 
   /**
@@ -101,7 +101,7 @@ export class ThemeManager {
       'active-bg': 'rgba(255, 255, 255, 0.15)',
       'focus-ring': '#4da6ff',
     },
-  };
+  }
 
   /**
    * Set a single CSS variable
@@ -109,7 +109,7 @@ export class ThemeManager {
    * @param {string} value - Variable value
    */
   setVariable(name, value) {
-    this.root.style.setProperty(`--${name}`, value);
+    this.root.style.setProperty(`--${name}`, value)
   }
 
   /**
@@ -118,7 +118,7 @@ export class ThemeManager {
    * @returns {string}
    */
   getVariable(name) {
-    return getComputedStyle(this.root).getPropertyValue(`--${name}`).trim();
+    return getComputedStyle(this.root).getPropertyValue(`--${name}`).trim()
   }
 
   /**
@@ -127,54 +127,54 @@ export class ThemeManager {
    */
   setTheme(themeName) {
     // Handle 'system' theme by detecting actual theme to apply
-    let actualTheme = themeName;
+    let actualTheme = themeName
     if (themeName === 'system') {
-      actualTheme = this.detectSystemPreference();
+      actualTheme = this.detectSystemPreference()
     }
 
-    const theme = ThemeManager.themes[actualTheme];
+    const theme = ThemeManager.themes[actualTheme]
     if (!theme) {
-      console.warn(`[ThemeManager] Unknown theme: ${actualTheme}`);
-      return;
+      console.warn(`[ThemeManager] Unknown theme: ${actualTheme}`)
+      return
     }
 
     console.log(
       `[ThemeManager] Applying theme: ${themeName}${themeName === 'system' ? ` (${actualTheme})` : ''}`
-    );
+    )
 
     // Apply all theme variables
     for (const [key, value] of Object.entries(theme)) {
-      this.setVariable(key, value);
+      this.setVariable(key, value)
     }
 
     // Store current theme preference (may be 'system')
-    this._currentTheme = themeName;
+    this._currentTheme = themeName
 
     // Save to localStorage
     try {
-      localStorage.setItem('theme', themeName);
+      localStorage.setItem('theme', themeName)
     } catch (e) {
-      console.warn('[ThemeManager] Failed to save theme preference:', e);
+      console.warn('[ThemeManager] Failed to save theme preference:', e)
     }
 
     // Notify observers
-    this._notifyObservers(themeName);
+    this._notifyObservers(themeName)
 
     // Dispatch custom event for components that need it
     window.dispatchEvent(
       new CustomEvent('theme-change', {
         detail: { theme: themeName, actualTheme },
       })
-    );
+    )
   }
 
   /**
    * Toggle between light and dark themes
    */
   toggleTheme() {
-    const current = this.getCurrentTheme();
-    const newTheme = current === 'light' ? 'dark' : 'light';
-    this.setTheme(newTheme);
+    const current = this.getCurrentTheme()
+    const newTheme = current === 'light' ? 'dark' : 'light'
+    this.setTheme(newTheme)
   }
 
   /**
@@ -182,7 +182,7 @@ export class ThemeManager {
    * @returns {string} - 'light', 'dark', or 'system'
    */
   getCurrentTheme() {
-    return this._currentTheme || localStorage.getItem('theme') || 'system';
+    return this._currentTheme || localStorage.getItem('theme') || 'system'
   }
 
   /**
@@ -191,9 +191,9 @@ export class ThemeManager {
    */
   detectSystemPreference() {
     if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      return 'dark';
+      return 'dark'
     }
-    return 'light';
+    return 'light'
   }
 
   /**
@@ -201,7 +201,7 @@ export class ThemeManager {
    * @param {number} scale - Font scale multiplier (e.g., 1.0, 1.2)
    */
   setFontScale(scale) {
-    this.setVariable('font-scale', scale);
+    this.setVariable('font-scale', scale)
   }
 
   /**
@@ -211,8 +211,8 @@ export class ThemeManager {
    */
   updateResponsiveFontScale(containerWidth, baseWidth = 1200) {
     // Calculate scale factor: min 0.65, max 1.2
-    const scale = Math.min(Math.max(containerWidth / baseWidth, 0.65), 1.2);
-    this.setFontScale(scale);
+    const scale = Math.min(Math.max(containerWidth / baseWidth, 0.65), 1.2)
+    this.setFontScale(scale)
   }
 
   /**
@@ -220,12 +220,12 @@ export class ThemeManager {
    * @param {string} fontFamily - Font family CSS value
    */
   setFontFamily(fontFamily) {
-    this.setVariable('font-family-base', fontFamily);
+    this.setVariable('font-family-base', fontFamily)
 
     try {
-      localStorage.setItem('font-family', fontFamily);
+      localStorage.setItem('font-family', fontFamily)
     } catch (e) {
-      console.warn('[ThemeManager] Failed to save font preference:', e);
+      console.warn('[ThemeManager] Failed to save font preference:', e)
     }
   }
 
@@ -234,39 +234,39 @@ export class ThemeManager {
    */
   loadPreferences() {
     // Load theme preference
-    let savedTheme = null;
+    let savedTheme = null
     try {
-      savedTheme = localStorage.getItem('theme');
+      savedTheme = localStorage.getItem('theme')
     } catch (e) {
-      console.warn('[ThemeManager] Failed to load theme preference:', e);
+      console.warn('[ThemeManager] Failed to load theme preference:', e)
     }
 
     // Use saved theme, or default to 'system'
-    const theme = savedTheme || 'system';
-    this.setTheme(theme);
+    const theme = savedTheme || 'system'
+    this.setTheme(theme)
 
     // Load font family preference
     try {
-      const savedFontFamily = localStorage.getItem('font-family');
+      const savedFontFamily = localStorage.getItem('font-family')
       if (savedFontFamily) {
-        this.setFontFamily(savedFontFamily);
+        this.setFontFamily(savedFontFamily)
       }
     } catch (e) {
-      console.warn('[ThemeManager] Failed to load font preference:', e);
+      console.warn('[ThemeManager] Failed to load font preference:', e)
     }
 
     // Load font scale preference
     try {
-      const savedFontScale = localStorage.getItem('font-scale');
+      const savedFontScale = localStorage.getItem('font-scale')
       if (savedFontScale) {
-        this.setFontScale(parseFloat(savedFontScale));
+        this.setFontScale(parseFloat(savedFontScale))
       }
     } catch (e) {
-      console.warn('[ThemeManager] Failed to load font scale preference:', e);
+      console.warn('[ThemeManager] Failed to load font scale preference:', e)
     }
 
     // Listen for system theme changes
-    this._setupSystemThemeListener();
+    this._setupSystemThemeListener()
   }
 
   /**
@@ -275,17 +275,17 @@ export class ThemeManager {
    */
   _setupSystemThemeListener() {
     if (window.matchMedia) {
-      const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
       darkModeQuery.addEventListener('change', e => {
         // Auto-switch if user preference is 'system'
-        const userPreference = localStorage.getItem('theme');
+        const userPreference = localStorage.getItem('theme')
         if (!userPreference || userPreference === 'system') {
-          const newTheme = e.matches ? 'dark' : 'light';
-          console.log(`[ThemeManager] System theme changed to ${newTheme}`);
-          this.setTheme('system');
+          const newTheme = e.matches ? 'dark' : 'light'
+          console.log(`[ThemeManager] System theme changed to ${newTheme}`)
+          this.setTheme('system')
         }
-      });
+      })
     }
   }
 
@@ -294,7 +294,7 @@ export class ThemeManager {
    * @param {Function} callback - Called with (themeName) when theme changes
    */
   addObserver(callback) {
-    this._observers.add(callback);
+    this._observers.add(callback)
   }
 
   /**
@@ -302,7 +302,7 @@ export class ThemeManager {
    * @param {Function} callback
    */
   removeObserver(callback) {
-    this._observers.delete(callback);
+    this._observers.delete(callback)
   }
 
   /**
@@ -312,11 +312,11 @@ export class ThemeManager {
   _notifyObservers(themeName) {
     this._observers.forEach(callback => {
       try {
-        callback(themeName);
+        callback(themeName)
       } catch (e) {
-        console.error('[ThemeManager] Observer error:', e);
+        console.error('[ThemeManager] Observer error:', e)
       }
-    });
+    })
   }
 
   /**
@@ -324,15 +324,15 @@ export class ThemeManager {
    * @returns {Object}
    */
   exportTheme() {
-    const theme = this.getCurrentTheme();
-    const config = ThemeManager.themes[theme];
+    const theme = this.getCurrentTheme()
+    const config = ThemeManager.themes[theme]
 
     return {
       name: theme,
       variables: config,
       fontScale: this.getVariable('font-scale'),
       fontFamily: this.getVariable('font-family-base'),
-    };
+    }
   }
 
   /**
@@ -343,25 +343,25 @@ export class ThemeManager {
     window.addEventListener('keydown', e => {
       // Ctrl+L for Light mode
       if (e.ctrlKey && e.key === 'l') {
-        e.preventDefault();
-        console.log('[ThemeManager] Keyboard shortcut: Switching to light mode');
-        this.setTheme('light');
+        e.preventDefault()
+        console.log('[ThemeManager] Keyboard shortcut: Switching to light mode')
+        this.setTheme('light')
       }
       // Ctrl+D for Dark mode
       else if (e.ctrlKey && e.key === 'd') {
-        e.preventDefault();
-        console.log('[ThemeManager] Keyboard shortcut: Switching to dark mode');
-        this.setTheme('dark');
+        e.preventDefault()
+        console.log('[ThemeManager] Keyboard shortcut: Switching to dark mode')
+        this.setTheme('dark')
       }
-    });
+    })
   }
 }
 
 // Singleton instance
-export const themeManager = new ThemeManager();
+export const themeManager = new ThemeManager()
 
 // Auto-load preferences on module load
-themeManager.loadPreferences();
+themeManager.loadPreferences()
 
 // Setup keyboard shortcuts for testing
-themeManager._setupKeyboardShortcuts();
+themeManager._setupKeyboardShortcuts()

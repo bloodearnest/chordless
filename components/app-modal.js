@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * AppModal Component
@@ -49,7 +49,7 @@ export class AppModal extends LitElement {
     confirmLabel: { type: String, attribute: 'confirm-label' },
     cancelLabel: { type: String, attribute: 'cancel-label' },
     hideCloseButton: { type: Boolean, attribute: 'hide-close-button' },
-  };
+  }
 
   static styles = css`
     :host {
@@ -212,34 +212,34 @@ export class AppModal extends LitElement {
     :host([hide-close-button]) .modal-close {
       display: none;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.open = false;
-    this.heading = '';
-    this.message = '';
-    this.type = 'custom';
-    this.size = 'medium';
-    this.confirmLabel = 'Confirm';
-    this.cancelLabel = 'Cancel';
-    this.hideCloseButton = false;
+    super()
+    this.open = false
+    this.heading = ''
+    this.message = ''
+    this.type = 'custom'
+    this.size = 'medium'
+    this.confirmLabel = 'Confirm'
+    this.cancelLabel = 'Cancel'
+    this.hideCloseButton = false
   }
 
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     // Listen for ESC key to close modal
     this._handleEscape = e => {
       if (e.key === 'Escape' && this.open) {
-        this.close();
+        this.close()
       }
-    };
-    document.addEventListener('keydown', this._handleEscape);
+    }
+    document.addEventListener('keydown', this._handleEscape)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
-    document.removeEventListener('keydown', this._handleEscape);
+    super.disconnectedCallback()
+    document.removeEventListener('keydown', this._handleEscape)
   }
 
   render() {
@@ -255,56 +255,60 @@ export class AppModal extends LitElement {
 
         ${this._renderActions()}
       </div>
-    `;
+    `
   }
 
   _renderHeader() {
     // Check if there's a slotted header content
-    const hasSlottedHeader = this.querySelector('[slot="header"]');
+    const hasSlottedHeader = this.querySelector('[slot="header"]')
 
     if (hasSlottedHeader) {
       return html`
         <div class="modal-header" part="header">
           <slot name="header"></slot>
-          ${!this.hideCloseButton
-            ? html`
+          ${
+            !this.hideCloseButton
+              ? html`
                 <button class="modal-close" part="close-button" @click=${this.close}>
                   &times;
                 </button>
               `
-            : ''}
+              : ''
+          }
         </div>
-      `;
+      `
     }
 
     if (this.heading || !this.hideCloseButton) {
       return html`
         <div class="modal-header" part="header">
           ${this.heading ? html`<h2 class="modal-title" part="title">${this.heading}</h2>` : ''}
-          ${!this.hideCloseButton
-            ? html`
+          ${
+            !this.hideCloseButton
+              ? html`
                 <button class="modal-close" part="close-button" @click=${this.close}>
                   &times;
                 </button>
               `
-            : ''}
+              : ''
+          }
         </div>
-      `;
+      `
     }
 
-    return '';
+    return ''
   }
 
   _renderActions() {
     // Check if there's a slotted actions content
-    const hasSlottedActions = this.querySelector('[slot="actions"]');
+    const hasSlottedActions = this.querySelector('[slot="actions"]')
 
     if (hasSlottedActions) {
       return html`
         <div class="modal-actions" part="actions">
           <slot name="actions"></slot>
         </div>
-      `;
+      `
     }
 
     if (this.type === 'confirm') {
@@ -325,16 +329,16 @@ export class AppModal extends LitElement {
             ${this.confirmLabel}
           </button>
         </div>
-      `;
+      `
     }
 
-    return '';
+    return ''
   }
 
   _handleOverlayClick(e) {
     // Only close if clicking directly on overlay, not on modal content
     if (e.target === e.currentTarget) {
-      this.close();
+      this.close()
     }
   }
 
@@ -344,8 +348,8 @@ export class AppModal extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
-    this.close();
+    )
+    this.close()
   }
 
   _handleCancel() {
@@ -354,29 +358,29 @@ export class AppModal extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
-    this.close();
+    )
+    this.close()
   }
 
   // Public API
   close() {
-    this.open = false;
+    this.open = false
     this.dispatchEvent(
       new CustomEvent('close', {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   show() {
-    this.open = true;
+    this.open = true
   }
 
   toggle() {
-    this.open = !this.open;
+    this.open = !this.open
   }
 }
 
 // Define the custom element
-customElements.define('app-modal', AppModal);
+customElements.define('app-modal', AppModal)

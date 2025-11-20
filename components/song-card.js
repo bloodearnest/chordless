@@ -1,6 +1,6 @@
-import { LitElement, html, css } from 'lit';
-import { getWeeksAgo } from '../js/utils/date-utils.js';
-import { formatArtistNames } from '../js/song-utils.js';
+import { css, html, LitElement } from 'lit'
+import { formatArtistNames } from '../js/song-utils.js'
+import { getWeeksAgo } from '../js/utils/date-utils.js'
 
 /**
  * SongCard Component
@@ -31,7 +31,7 @@ export class SongCard extends LitElement {
     song: { type: Object, attribute: false },
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'editmode' },
-  };
+  }
 
   static styles = css`
     :host {
@@ -236,13 +236,13 @@ export class SongCard extends LitElement {
     :host([variant='setlist']) .card-content {
       padding: 1.2rem 1.5rem;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.song = null;
-    this.variant = 'library';
-    this.editMode = false;
+    super()
+    this.song = null
+    this.variant = 'library'
+    this.editMode = false
   }
 
   render() {
@@ -251,7 +251,7 @@ export class SongCard extends LitElement {
         <div class="card" part="card">
           <div class="title empty" part="title">No song data</div>
         </div>
-      `;
+      `
     }
 
     return html`
@@ -260,11 +260,13 @@ export class SongCard extends LitElement {
           <div class="card-content">
             <div class="line1">
               <div class="title" part="title">${this.song.title}</div>
-              ${this.variant !== 'setlist' && this.song.artist
-                ? html`
+              ${
+                this.variant !== 'setlist' && this.song.artist
+                  ? html`
                     <div class="artist" part="artist">${this.formatArtist(this.song.artist)}</div>
                   `
-                : ''}
+                  : ''
+              }
             </div>
 
             <div class="line2">
@@ -304,80 +306,80 @@ export class SongCard extends LitElement {
           </div>
         </div>
       </div>
-    `;
+    `
   }
 
   renderMeta() {
-    const { metadata } = this.song;
-    if (!metadata) return '';
+    const { metadata } = this.song
+    if (!metadata) return ''
 
-    const items = [];
+    const items = []
 
     if (metadata.key) {
-      items.push(`Key: ${metadata.key}`);
+      items.push(`Key: ${metadata.key}`)
     }
 
     if (metadata.tempo) {
-      items.push(`BPM: ${metadata.tempo}`);
+      items.push(`BPM: ${metadata.tempo}`)
     }
 
     if (metadata.timeSignature) {
-      items.push(`Time: ${metadata.timeSignature}`);
+      items.push(`Time: ${metadata.timeSignature}`)
     }
 
-    return items.join('   ');
+    return items.join('   ')
   }
 
   formatArtist(artistString) {
-    const cleanedArtists = formatArtistNames(artistString);
+    const cleanedArtists = formatArtistNames(artistString)
 
-    if (cleanedArtists.length === 0) return '';
+    if (cleanedArtists.length === 0) return ''
 
     if (cleanedArtists.length > 2) {
-      return html`${cleanedArtists[0]} <i>et al</i>`;
+      return html`${cleanedArtists[0]} <i>et al</i>`
     }
 
-    return cleanedArtists.join(', ');
+    return cleanedArtists.join(', ')
   }
 
   renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt } = this.song;
+    const { lastUsageInfo, lastUsedAt } = this.song
 
     // Use new lastUsageInfo if available
     if (lastUsageInfo && lastUsageInfo.date) {
-      const weeksAgo = getWeeksAgo(lastUsageInfo.date);
-      const parts = [];
+      const weeksAgo = getWeeksAgo(lastUsageInfo.date)
+      const parts = []
 
       // Add leader if available
       if (lastUsageInfo.leader) {
-        parts.push(lastUsageInfo.leader);
+        parts.push(lastUsageInfo.leader)
       }
 
       // Add key if available
       if (lastUsageInfo.key) {
-        parts.push(`in ${lastUsageInfo.key}`);
+        parts.push(`in ${lastUsageInfo.key}`)
       }
 
       // Add time ago
-      parts.push(weeksAgo);
+      parts.push(weeksAgo)
 
-      return html`<div class="last-played" part="last-played">${parts.join(' • ')}</div>`;
+      return html`<div class="last-played" part="last-played">${parts.join(' • ')}</div>`
     }
 
     // Fallback to old lastUsedAt field
     if (lastUsedAt) {
-      const weeksAgo = getWeeksAgo(lastUsedAt);
-      return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`;
+      const weeksAgo = getWeeksAgo(lastUsedAt)
+      return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`
     }
 
-    return '';
+    return ''
   }
 
   // Click handler
   handleClick() {
     // In edit mode, don't fire click (avoid accidental navigation)
     if (this.editMode) {
-      return;
+      return
     }
 
     this.dispatchEvent(
@@ -386,38 +388,38 @@ export class SongCard extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   // Delete button handler
   handleDelete(e) {
-    e.stopPropagation(); // Prevent click from bubbling to card
+    e.stopPropagation() // Prevent click from bubbling to card
     this.dispatchEvent(
       new CustomEvent('song-delete', {
         detail: { song: this.song },
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     // Prevent context menu at host level for touch devices
     this.contextMenuHandler = e => {
-      e.preventDefault();
-      e.stopPropagation();
-    };
-    this.addEventListener('contextmenu', this.contextMenuHandler);
+      e.preventDefault()
+      e.stopPropagation()
+    }
+    this.addEventListener('contextmenu', this.contextMenuHandler)
   }
 
   disconnectedCallback() {
-    super.disconnectedCallback();
+    super.disconnectedCallback()
     if (this.contextMenuHandler) {
-      this.removeEventListener('contextmenu', this.contextMenuHandler);
+      this.removeEventListener('contextmenu', this.contextMenuHandler)
     }
   }
 }
 
 // Define the custom element
-customElements.define('song-card', SongCard);
+customElements.define('song-card', SongCard)

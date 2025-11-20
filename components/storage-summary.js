@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * storage-summary
@@ -11,7 +11,7 @@ export class StorageSummary extends LitElement {
     loading: { type: Boolean },
     error: { type: String },
     stats: { type: Object },
-  };
+  }
 
   static styles = css`
     :host {
@@ -76,30 +76,30 @@ export class StorageSummary extends LitElement {
       background: rgba(231, 76, 60, 0.2);
       border: 1px solid rgba(231, 76, 60, 0.4);
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.loading = true;
-    this.error = null;
-    this.stats = null;
-    this._isMounted = false;
+    super()
+    this.loading = true
+    this.error = null
+    this.stats = null
+    this._isMounted = false
   }
 
   connectedCallback() {
-    super.connectedCallback();
-    this._isMounted = true;
-    this._loadStats();
+    super.connectedCallback()
+    this._isMounted = true
+    this._loadStats()
   }
 
   disconnectedCallback() {
-    this._isMounted = false;
-    super.disconnectedCallback();
+    this._isMounted = false
+    super.disconnectedCallback()
   }
 
   render() {
     if (this.error) {
-      return html`<div class="error-card">${this.error}</div>`;
+      return html`<div class="error-card">${this.error}</div>`
     }
 
     if (this.loading || !this.stats) {
@@ -108,7 +108,7 @@ export class StorageSummary extends LitElement {
           <span class="stat-label">Loading…</span>
           <span class="stat-value">–</span>
         </div>
-      `;
+      `
     }
 
     return html`
@@ -124,7 +124,7 @@ export class StorageSummary extends LitElement {
         ])}
       </div>
       <p class="footnote">Includes data stored in this browser only.</p>
-    `;
+    `
   }
 
   _renderStat(label, value) {
@@ -133,7 +133,7 @@ export class StorageSummary extends LitElement {
         <span class="stat-label">${label}</span>
         <span class="stat-value">${value ?? '–'}</span>
       </div>
-    `;
+    `
   }
 
   _renderListStat(label, rows) {
@@ -151,25 +151,25 @@ export class StorageSummary extends LitElement {
           )}
         </div>
       </div>
-    `;
+    `
   }
 
   async _loadStats() {
     try {
-      const { getCurrentDB } = await import('../js/db.js');
-      const db = await getCurrentDB();
+      const { getCurrentDB } = await import('../js/db.js')
+      const db = await getCurrentDB()
 
-      const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()]);
+      const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()])
 
       const [dbBytesFromEstimate, cacheUsage] = await Promise.all([
         this._estimateIndexedDbUsage(),
         this._estimateCacheUsage(),
-      ]);
+      ])
 
       const approxDataBytes =
-        dbBytesFromEstimate ?? estimateRecordsSize(setlists) + estimateRecordsSize(songs);
+        dbBytesFromEstimate ?? estimateRecordsSize(setlists) + estimateRecordsSize(songs)
 
-      if (!this._isMounted) return;
+      if (!this._isMounted) return
 
       this.stats = {
         setlists: setlists.length,
@@ -177,119 +177,119 @@ export class StorageSummary extends LitElement {
         dbBytes: approxDataBytes,
         appCacheBytes: cacheUsage?.appBytes ?? null,
         mediaCacheBytes: cacheUsage?.mediaBytes ?? null,
-      };
-      this.loading = false;
+      }
+      this.loading = false
     } catch (error) {
-      console.error('[StorageSummary] Failed to load storage stats', error);
-      if (!this._isMounted) return;
-      this.error = 'Unable to read local storage details.';
-      this.loading = false;
+      console.error('[StorageSummary] Failed to load storage stats', error)
+      if (!this._isMounted) return
+      this.error = 'Unable to read local storage details.'
+      this.loading = false
     }
   }
 
   async _estimateIndexedDbUsage() {
     if (navigator.storage?.estimate) {
       try {
-        const estimate = await navigator.storage.estimate();
+        const estimate = await navigator.storage.estimate()
         if (estimate?.usageDetails?.indexedDB) {
-          return estimate.usageDetails.indexedDB;
+          return estimate.usageDetails.indexedDB
         }
       } catch (error) {
-        console.warn('[StorageSummary] StorageManager estimate failed', error);
+        console.warn('[StorageSummary] StorageManager estimate failed', error)
       }
     }
-    return null;
+    return null
   }
 
   async _estimateCacheUsage() {
     if (typeof caches === 'undefined') {
-      return null;
+      return null
     }
 
     try {
-      const cacheNames = await caches.keys();
-      let appBytes = 0;
-      let mediaBytes = 0;
+      const cacheNames = await caches.keys()
+      let appBytes = 0
+      let mediaBytes = 0
 
       for (const name of cacheNames) {
-        const cache = await caches.open(name);
-        const requests = await cache.keys();
+        const cache = await caches.open(name)
+        const requests = await cache.keys()
 
         for (const request of requests) {
-          const response = await cache.match(request);
-          if (!response) continue;
-          const buffer = await response.clone().arrayBuffer();
+          const response = await cache.match(request)
+          if (!response) continue
+          const buffer = await response.clone().arrayBuffer()
           if (isMediaRequest(request)) {
-            mediaBytes += buffer.byteLength;
+            mediaBytes += buffer.byteLength
           } else {
-            appBytes += buffer.byteLength;
+            appBytes += buffer.byteLength
           }
         }
       }
 
-      return { appBytes, mediaBytes };
+      return { appBytes, mediaBytes }
     } catch (error) {
-      console.warn('[StorageSummary] Failed to inspect caches', error);
-      return null;
+      console.warn('[StorageSummary] Failed to inspect caches', error)
+      return null
     }
   }
 
   _formatBytes(bytes) {
     if (bytes == null) {
-      return '–';
+      return '–'
     }
 
-    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-    let value = bytes;
-    let unitIndex = 0;
+    const units = ['B', 'KB', 'MB', 'GB', 'TB']
+    let value = bytes
+    let unitIndex = 0
 
     while (value >= 1024 && unitIndex < units.length - 1) {
-      value /= 1024;
-      unitIndex++;
+      value /= 1024
+      unitIndex++
     }
 
-    return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+    return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
   }
 
   _formatMegabytes(bytes) {
     if (bytes == null) {
-      return '–';
+      return '–'
     }
-    const mb = bytes / (1024 * 1024);
-    return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`;
+    const mb = bytes / (1024 * 1024)
+    return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
   }
 }
 
 function estimateRecordsSize(records) {
-  if (!records) return 0;
+  if (!records) return 0
   try {
-    const json = JSON.stringify(records);
-    return new Blob([json]).size;
+    const json = JSON.stringify(records)
+    return new Blob([json]).size
   } catch (error) {
-    console.warn('[StorageSummary] Failed to measure record size', error);
-    return 0;
+    console.warn('[StorageSummary] Failed to measure record size', error)
+    return 0
   }
 }
 
-const MEDIA_EXTENSIONS = new Set(['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac']);
+const MEDIA_EXTENSIONS = new Set(['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'])
 
 function isMediaRequest(request) {
   try {
-    const url = new URL(request.url);
-    const pathname = url.pathname || '';
-    const lastSegment = pathname.split('/').pop() || '';
-    const ext = lastSegment.includes('.') ? lastSegment.split('.').pop().toLowerCase() : '';
+    const url = new URL(request.url)
+    const pathname = url.pathname || ''
+    const lastSegment = pathname.split('/').pop() || ''
+    const ext = lastSegment.includes('.') ? lastSegment.split('.').pop().toLowerCase() : ''
 
     if (!ext) {
       // Treat extensionless requests as app assets (HTML routes, etc.)
-      return false;
+      return false
     }
 
-    return MEDIA_EXTENSIONS.has(ext);
+    return MEDIA_EXTENSIONS.has(ext)
   } catch (error) {
-    console.warn('[StorageSummary] Failed to classify cache entry', error);
-    return false;
+    console.warn('[StorageSummary] Failed to classify cache entry', error)
+    return false
   }
 }
 
-customElements.define('storage-summary', StorageSummary);
+customElements.define('storage-summary', StorageSummary)

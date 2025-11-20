@@ -1,4 +1,4 @@
-import { LitElement, html, css } from 'lit';
+import { css, html, LitElement } from 'lit'
 
 /**
  * KeySelector component
@@ -26,7 +26,7 @@ export class KeySelector extends LitElement {
     keys: { type: Array, attribute: false },
     originalKey: { type: String, attribute: 'original-key' },
     editMode: { type: Boolean, attribute: false },
-  };
+  }
 
   static styles = css`
     :host {
@@ -143,73 +143,73 @@ export class KeySelector extends LitElement {
       font-size: 1rem;
       color: rgba(255, 255, 255, 0.5);
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.label = 'Key';
-    this.value = '-';
-    this.keys = [];
-    this.originalKey = '';
-    this.editMode = false;
+    super()
+    this.label = 'Key'
+    this.value = '-'
+    this.keys = []
+    this.originalKey = ''
+    this.editMode = false
     // Generate unique ID for popover
-    this._popoverId = `key-popover-${Math.random().toString(36).substr(2, 9)}`;
+    this._popoverId = `key-popover-${Math.random().toString(36).substr(2, 9)}`
   }
 
   connectedCallback() {
-    super.connectedCallback();
+    super.connectedCallback()
     // Reflect edit-mode as attribute for CSS selectors
-    this._updateEditModeAttribute();
+    this._updateEditModeAttribute()
   }
 
   updated(changedProperties) {
-    super.updated(changedProperties);
+    super.updated(changedProperties)
 
     if (changedProperties.has('editMode')) {
-      this._updateEditModeAttribute();
+      this._updateEditModeAttribute()
     }
 
     // Setup popover positioning after render
     if (changedProperties.has('keys') || changedProperties.has('value')) {
-      this._setupPopoverPositioning();
+      this._setupPopoverPositioning()
     }
   }
 
   _updateEditModeAttribute() {
     if (this.editMode) {
-      this.setAttribute('edit-mode', '');
+      this.setAttribute('edit-mode', '')
     } else {
-      this.removeAttribute('edit-mode');
+      this.removeAttribute('edit-mode')
     }
   }
 
   _setupPopoverPositioning() {
-    const button = this.shadowRoot.querySelector('.key-selector');
-    const popover = this.shadowRoot.querySelector('.key-popover');
+    const button = this.shadowRoot.querySelector('.key-selector')
+    const popover = this.shadowRoot.querySelector('.key-popover')
 
     if (button && popover) {
       // Position popover when it opens
       const toggleHandler = e => {
         if (e.newState === 'open') {
-          const buttonRect = button.getBoundingClientRect();
-          popover.style.top = `${buttonRect.bottom + 4}px`;
-          popover.style.left = `${buttonRect.left}px`;
+          const buttonRect = button.getBoundingClientRect()
+          popover.style.top = `${buttonRect.bottom + 4}px`
+          popover.style.left = `${buttonRect.left}px`
         }
-      };
+      }
 
       // Remove old listener if exists
-      popover.removeEventListener('toggle', toggleHandler);
-      popover.addEventListener('toggle', toggleHandler);
+      popover.removeEventListener('toggle', toggleHandler)
+      popover.addEventListener('toggle', toggleHandler)
     }
   }
 
   _handleSelection(key) {
-    if (!key || key === this.value) return;
+    if (!key || key === this.value) return
 
     // Close the popover
-    const popover = this.shadowRoot.querySelector('.key-popover');
+    const popover = this.shadowRoot.querySelector('.key-popover')
     if (popover) {
-      popover.hidePopover();
+      popover.hidePopover()
     }
 
     // Dispatch event
@@ -219,21 +219,21 @@ export class KeySelector extends LitElement {
         bubbles: true,
         composed: true,
       })
-    );
+    )
   }
 
   _renderOptions() {
     if (!this.keys || this.keys.length === 0) {
-      return html``;
+      return html``
     }
 
-    const currentIndex = this.keys.indexOf(this.value);
+    const currentIndex = this.keys.indexOf(this.value)
     return this.keys.map((key, index) => {
-      const positionOffset = currentIndex === -1 ? 0 : currentIndex - index;
+      const positionOffset = currentIndex === -1 ? 0 : currentIndex - index
       const offsetText =
-        positionOffset === 0 ? '' : `${positionOffset > 0 ? '+' : '-'}${Math.abs(positionOffset)}`;
-      const keyText = key === this.originalKey ? `${key}*` : key;
-      const isSelected = key === this.value;
+        positionOffset === 0 ? '' : `${positionOffset > 0 ? '+' : '-'}${Math.abs(positionOffset)}`
+      const keyText = key === this.originalKey ? `${key}*` : key
+      const isSelected = key === this.value
 
       return html`
         <button
@@ -244,12 +244,12 @@ export class KeySelector extends LitElement {
           <span class="key-name">${keyText}</span>
           <span class="key-offset">${offsetText}</span>
         </button>
-      `;
-    });
+      `
+    })
   }
 
   render() {
-    const displayValue = this.value || '-';
+    const displayValue = this.value || '-'
     return html`
       <div class="key-display-wrapper">
         ${this.label ? html`<label class="meta-label">${this.label}:</label>` : ''}
@@ -260,8 +260,8 @@ export class KeySelector extends LitElement {
           <div class="key-options-list">${this._renderOptions()}</div>
         </div>
       </div>
-    `;
+    `
   }
 }
 
-customElements.define('key-selector', KeySelector);
+customElements.define('key-selector', KeySelector)

@@ -1,5 +1,5 @@
-import { LitElement, html, css } from 'lit';
-import * as GoogleAuth from '/js/google-auth.js';
+import { css, html, LitElement } from 'lit'
+import * as GoogleAuth from '/js/google-auth.js'
 
 /**
  * ShareSetlist Component
@@ -21,7 +21,7 @@ export class ShareSetlist extends LitElement {
     _shareLink: { type: String, state: true },
     _isSharing: { type: Boolean, state: true },
     _error: { type: String, state: true },
-  };
+  }
 
   static styles = css`
     :host {
@@ -138,20 +138,20 @@ export class ShareSetlist extends LitElement {
       color: #7f8c8d;
       font-size: 1.4rem;
     }
-  `;
+  `
 
   constructor() {
-    super();
-    this.setlist = null;
-    this._isAuthenticated = false;
-    this._shareLink = null;
-    this._isSharing = false;
-    this._error = null;
+    super()
+    this.setlist = null
+    this._isAuthenticated = false
+    this._shareLink = null
+    this._isSharing = false
+    this._error = null
   }
 
   async connectedCallback() {
-    super.connectedCallback();
-    this._isAuthenticated = await GoogleAuth.isAuthenticated();
+    super.connectedCallback()
+    this._isAuthenticated = await GoogleAuth.isAuthenticated()
   }
 
   render() {
@@ -165,8 +165,9 @@ export class ShareSetlist extends LitElement {
           </p>
 
           ${this._error ? html` <div class="error-message">${this._error}</div> ` : ''}
-          ${this._shareLink
-            ? html`
+          ${
+            this._shareLink
+              ? html`
                 <div class="success-message">
                   ✓ Share link created! This link will expire in 30 days.
                 </div>
@@ -178,22 +179,26 @@ export class ShareSetlist extends LitElement {
                   <button class="setlist-button" @click=${this._shareNative}>📱 Share</button>
                 </div>
               `
-            : html`
+              : html`
                 <button
                   class="setlist-button"
                   @click=${this._generateShareLink}
                   ?disabled=${this._isSharing}
                 >
-                  ${this._isSharing
-                    ? html`<span class="spinner"></span> Generating...`
-                    : 'Generate Share Link'}
+                  ${
+                    this._isSharing
+                      ? html`<span class="spinner"></span> Generating...`
+                      : 'Generate Share Link'
+                  }
                 </button>
-              `}
+              `
+          }
         </div>
 
         <!-- Google Drive sharing (future feature) -->
-        ${this._isAuthenticated
-          ? html`
+        ${
+          this._isAuthenticated
+            ? html`
               <div class="share-method">
                 <h3>☁️ Share via Google Drive (Coming Soon)</h3>
                 <p>
@@ -203,11 +208,13 @@ export class ShareSetlist extends LitElement {
                 <button class="setlist-button" disabled>Coming Soon</button>
               </div>
             `
-          : ''}
+            : ''
+        }
 
         <!-- Not authorized message -->
-        ${!this._isAuthenticated
-          ? html`
+        ${
+          !this._isAuthenticated
+            ? html`
               <div class="auth-section">
                 <h3>🔐 Cloud Features Not Enabled</h3>
                 <p style="color: #7f8c8d;">
@@ -226,34 +233,35 @@ export class ShareSetlist extends LitElement {
                 </p>
               </div>
             `
-          : ''}
+            : ''
+        }
       </div>
-    `;
+    `
   }
 
   async _generateShareLink() {
-    this._isSharing = true;
-    this._error = null;
+    this._isSharing = true
+    this._error = null
 
     try {
       const AUTH_PROXY_URL =
         window.location.hostname === 'localhost'
           ? 'http://localhost:8787'
-          : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+          : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
 
       const response = await fetch(`${AUTH_PROXY_URL}/api/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ setlist: this.setlist }),
-      });
+      })
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to create share link');
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to create share link')
       }
 
-      const { id } = await response.json();
-      this._shareLink = `${window.location.origin}/share/${id}`;
+      const { id } = await response.json()
+      this._shareLink = `${window.location.origin}/share/${id}`
 
       // Fire event
       this.dispatchEvent(
@@ -262,35 +270,35 @@ export class ShareSetlist extends LitElement {
           composed: true,
           detail: { shareLink: this._shareLink },
         })
-      );
+      )
     } catch (error) {
-      console.error('[Share] Error generating link:', error);
-      this._error = error.message;
+      console.error('[Share] Error generating link:', error)
+      this._error = error.message
     } finally {
-      this._isSharing = false;
+      this._isSharing = false
     }
   }
 
   async _copyLink() {
     try {
-      await navigator.clipboard.writeText(this._shareLink);
+      await navigator.clipboard.writeText(this._shareLink)
       // TODO: Show toast notification
-      alert('Link copied to clipboard!');
+      alert('Link copied to clipboard!')
     } catch (error) {
-      console.error('[Share] Error copying link:', error);
+      console.error('[Share] Error copying link:', error)
       // Fallback: select the text
-      const linkElement = this.shadowRoot.getElementById('share-link');
-      const range = document.createRange();
-      range.selectNode(linkElement);
-      window.getSelection().removeAllRanges();
-      window.getSelection().addRange(range);
+      const linkElement = this.shadowRoot.getElementById('share-link')
+      const range = document.createRange()
+      range.selectNode(linkElement)
+      window.getSelection().removeAllRanges()
+      window.getSelection().addRange(range)
     }
   }
 
   async _shareNative() {
     if (!navigator.share) {
-      this._copyLink();
-      return;
+      this._copyLink()
+      return
     }
 
     try {
@@ -298,12 +306,12 @@ export class ShareSetlist extends LitElement {
         title: `Setlist: ${this.setlist.name || this.setlist.date}`,
         text: 'Check out this setlist on Setalight',
         url: this._shareLink,
-      });
+      })
     } catch (error) {
       // User cancelled or error
-      console.log('[Share] Native share cancelled or failed:', error);
+      console.log('[Share] Native share cancelled or failed:', error)
     }
   }
 }
 
-customElements.define('share-setlist', ShareSetlist);
+customElements.define('share-setlist', ShareSetlist)
