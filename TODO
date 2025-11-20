@@ -1,3 +1,25 @@
+editing
+- local modifications storage
+  - should it be in indexed db for easier migrations?
+- song notes/stickies
+
+song edit UI
+- larger single popover for song settings
+    - key,
+    - capo (if enabled)
+    - bpm
+    - pads on/off for this song
+        - pad sound 
+    - click on/off for this song
+        - click pattern
+
+preferences
+  - custom section visibility defaults
+
+storage/sync
+- edit chordpro/variants
+- background syncing (periodic, and fallbacks)
+
 live mode
  - button on setlist
  - fullscreen
@@ -6,7 +28,6 @@ live mode
  - webrtc sync
 
 tests
- - more unit tests
  - component tests (using test page?)
 
 ccli import
@@ -24,32 +45,10 @@ player
  - click stuttering start
  - survive pageloads? -maybe migrate to SPA
 
-storage/sync
-- song db persistance
-- background syncing
-
 UI
 - device type fonts (mobile, tablet, desktop) - partially done.
 - autoscaling font
 - logo
 
-editing
-- change bpm
-- change click pattern
-- edit chordpro
-- song notes/stickies
-
-transpose
-- nashville numbers
-- capo
-
-settings
- - preferences
-   - vocalist/drummer?
-   - guitarist
-   - hide chorus?
-   - darkmode
-
 library
  - ccli report nag
-
