@@ -58,11 +58,11 @@ export class DriveSyncPanel extends LitElement {
       display: flex;
       align-items: center;
       gap: 0.75rem;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
     }
 
     .status-icon {
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
     }
 
     .status-text {
@@ -91,7 +91,7 @@ export class DriveSyncPanel extends LitElement {
       color: white;
       border: none;
       border-radius: 4px;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
@@ -119,14 +119,14 @@ export class DriveSyncPanel extends LitElement {
     }
 
     .last-sync {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
       text-align: center;
     }
 
     .error-message {
       color: #e74c3c;
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       margin-top: 0.5rem;
     }
 
@@ -151,7 +151,7 @@ export class DriveSyncPanel extends LitElement {
       background: rgba(243, 156, 18, 0.1);
       border: 1px solid rgba(243, 156, 18, 0.3);
       border-radius: 6px;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
     }
 
     .unavailable-notice a {

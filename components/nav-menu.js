@@ -80,7 +80,7 @@ export class NavMenu extends LitElement {
       color: var(--text-color, #2c3e50);
       background: transparent;
       border: none;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       font-family: inherit;
       cursor: pointer;
       transition: background-color 0.2s;
@@ -120,7 +120,7 @@ export class NavMenu extends LitElement {
 
     .section-title {
       padding: 0.5rem 1.5rem;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: var(--text-secondary, #7f8c8d);
       text-transform: uppercase;
@@ -128,7 +128,7 @@ export class NavMenu extends LitElement {
     }
 
     .song-item {
-      font-size: 1.3rem;
+      font-size: var(--font-ui);
     }
   `
 
@@ -393,7 +393,7 @@ export class NavMenu extends LitElement {
 
       <app-modal id="nav-preferences-modal" size="fullscreen">
         <div slot="header">
-          <h2 style="margin: 0; font-size: 1.8rem;">Preferences</h2>
+          <h2 style="margin: 0; font-size: var(--font-ui);">Preferences</h2>
         </div>
         <app-preferences></app-preferences>
       </app-modal>

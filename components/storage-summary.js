@@ -34,14 +34,14 @@ export class StorageSummary extends LitElement {
     }
 
     .stat-label {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       opacity: 0.75;
     }
 
     .stat-value {
-      font-size: 1.8rem;
+      font-size: var(--font-ui);
       font-weight: 700;
     }
 
@@ -55,18 +55,18 @@ export class StorageSummary extends LitElement {
     .stat-row {
       display: flex;
       justify-content: space-between;
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       font-weight: 600;
     }
 
     .stat-subtext {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
     }
 
     .footnote {
       margin-top: 0.75rem;
-      font-size: 0.75rem;
+      font-size: var(--font-ui-small);
       opacity: 0.65;
     }
 

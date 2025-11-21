@@ -100,7 +100,7 @@ export class SongCard extends LitElement {
     }
 
     .title {
-      font-size: 1.8rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: var(--text-color, #2c3e50);
       line-height: 1.3;
@@ -109,7 +109,7 @@ export class SongCard extends LitElement {
     }
 
     .artist {
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       color: var(--text-secondary, #7f8c8d);
       font-style: italic;
       text-align: right;
@@ -119,13 +119,13 @@ export class SongCard extends LitElement {
     }
 
     .meta {
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       color: var(--text-secondary, #7f8c8d);
       flex: 1;
     }
 
     .last-played {
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       color: var(--text-secondary, #7f8c8d);
       text-align: right;
       white-space: nowrap;
@@ -137,7 +137,7 @@ export class SongCard extends LitElement {
     }
 
     :host([variant='setlist']) .title {
-      font-size: 1.6rem;
+      font-size: var(--font-ui);
     }
 
     /* Empty state */
@@ -179,7 +179,7 @@ export class SongCard extends LitElement {
       border: 2px solid var(--color-danger, #e74c3c);
       border-radius: 6px;
       color: white;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       white-space: nowrap;

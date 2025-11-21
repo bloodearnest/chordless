@@ -119,7 +119,7 @@ export class AppModal extends LitElement {
     }
 
     .modal-title {
-      font-size: 2rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: var(--text-color, #2c3e50);
       margin: 0;
@@ -132,7 +132,7 @@ export class AppModal extends LitElement {
       right: 1rem;
       background: none;
       border: none;
-      font-size: 2.5rem;
+      font-size: var(--font-ui);
       line-height: 1;
       color: var(--text-secondary, #95a5a6);
       cursor: pointer;
@@ -158,7 +158,7 @@ export class AppModal extends LitElement {
     }
 
     .modal-message {
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       color: var(--text-color, #34495e);
       line-height: 1.6;
       margin: 0;
@@ -174,7 +174,7 @@ export class AppModal extends LitElement {
 
     .modal-btn {
       padding: 1rem 2rem;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       border-radius: 4px;
       border: none;
       cursor: pointer;

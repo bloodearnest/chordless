@@ -110,7 +110,7 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .section-title {
-      font-size: 1.6rem;
+      font-size: var(--font-lyrics);
       color: #7f8c8d;
       font-weight: bold;
       font-style: italic;
@@ -126,7 +126,7 @@ export class SongSection extends LitElement {
       border: none;
       background: none;
       color: #7f8c8d;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       line-height: 1;
       cursor: pointer;
       width: 1.75rem;
@@ -208,7 +208,7 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .section-controls .hide-label {
-      font-size: 1.1rem;
+      font-size: var(--font-ui-small);
       font-weight: 600;
       color: var(--text-secondary, #7f8c8d);
     }
@@ -230,15 +230,14 @@ export class SongSection extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1rem;
+      font-size: var(--font-ui-small);
       font-weight: 600;
       color: var(--text-secondary, #7f8c8d);
-      padding: 0.3rem 0rem;
+      padding: 0.3rem 0.1rem;
       cursor: pointer;
       transition:
         background-color 0.2s,
         color 0.2s;
-      min-width: 4.75rem;
     }
 
     .song-section-wrapper .hide-pill button + button {
@@ -272,7 +271,7 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .section-control-btn .control-label {
       font-weight: 600;
-      font-size: 0.8rem;
+      font-size: var(--font-ui-small);
     }
 
     .song-section-wrapper .section-content {
@@ -295,7 +294,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .chord-segment {
       display: inline-flex;
       flex-direction: column;
-      white-space: pre;
+      white-space: pre-wrap;
     }
 
     .song-section-wrapper .chord-segment.chord-only {
@@ -309,7 +308,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .chord {
       color: var(--chord-color, #2980b9);
       font-weight: bold;
-      font-size: 0.9em;
+      font-size: var(--font-chords);
       line-height: 1.1em;
       padding-right: 0.25em;
       font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
@@ -333,6 +332,7 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .lyrics {
+      font-size: var(--font-lyrics);
       line-height: 1.4em;
       padding: 0;
       margin: 0;
@@ -346,7 +346,7 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .chord sup.chord-extension {
       display: inline-block;
-      font-size: 0.75em;
+      font-size: calc(var(--font-chords) * 0.75);
       line-height: 1;
       vertical-align: baseline;
       transform: translateY(-0.3em);

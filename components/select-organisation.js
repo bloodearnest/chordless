@@ -61,7 +61,7 @@ export class SelectOrganisation extends LitElement {
     }
 
     .organisation-name {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 500;
     }
 
@@ -70,7 +70,7 @@ export class SelectOrganisation extends LitElement {
       background: #3498db;
       color: white;
       border-radius: 4px;
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       font-weight: 600;
     }
 
@@ -80,7 +80,7 @@ export class SelectOrganisation extends LitElement {
       color: white;
       border: none;
       border-radius: 4px;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
@@ -103,7 +103,7 @@ export class SelectOrganisation extends LitElement {
       border: none;
       color: white;
       border-radius: 4px;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       transition: all 0.2s;
       justify-content: center;
@@ -126,7 +126,7 @@ export class SelectOrganisation extends LitElement {
 
     .create-form input {
       padding: 0.75rem;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       background: rgba(0, 0, 0, 0.3);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 4px;
@@ -151,7 +151,7 @@ export class SelectOrganisation extends LitElement {
     .create-form-buttons button {
       flex: 1;
       padding: 0.75rem;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       border: none;
       border-radius: 4px;

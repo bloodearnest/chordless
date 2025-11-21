@@ -52,12 +52,12 @@ export class ProgressModal extends LitElement {
 
     h2 {
       margin: 0 0 1.5rem;
-      font-size: 2rem;
+      font-size: var(--font-ui);
       color: #2c3e50;
     }
 
     .message {
-      font-size: 1.5rem;
+      font-size: var(--font-ui);
       color: #2c3e50;
       margin: 0;
     }

@@ -45,20 +45,20 @@ export class AppPreferences extends LitElement {
     }
 
     h3 {
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       margin: 0 0 1rem 0;
       font-weight: 600;
     }
 
     h4 {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       margin: 1.5rem 0 1rem 0;
       font-weight: 600;
       color: #e74c3c;
     }
 
     p {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       margin: 0 0 1rem 0;
       opacity: 0.7;
       line-height: 1.4;
@@ -72,7 +72,7 @@ export class AppPreferences extends LitElement {
       color: white;
       border: none;
       border-radius: 4px;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
@@ -131,11 +131,11 @@ export class AppPreferences extends LitElement {
 
     .radio-option-label {
       font-weight: 600;
-      font-size: 1rem;
+      font-size: var(--font-ui);
     }
 
     .radio-option-description {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
       line-height: 1.3;
     }

@@ -91,7 +91,7 @@ export class MediaPlayer extends LitElement {
 
     .title-bar-content {
       flex: 1;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       font-weight: 500;
       opacity: 0.8;
       white-space: nowrap;
@@ -120,7 +120,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.2rem;
+      font-size: var(--font-icon);
       opacity: 0.7;
       transition:
         opacity 0.2s,
@@ -237,7 +237,7 @@ export class MediaPlayer extends LitElement {
     .led-display {
       display: grid;
       grid-template-columns: auto auto auto;
-      gap: 0.5rem 1rem;
+      gap: 0.1rem 0.5rem;
       background: #1a1a1a;
       border: 2px solid var(--player-text, white);
       border-radius: 4px;
@@ -246,7 +246,7 @@ export class MediaPlayer extends LitElement {
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
       width: 100%;
       box-sizing: border-box;
-      font-size: 0.75rem;
+      font-size: var(--font-icon);
       color: #00ff00;
       text-shadow:
         0 0 3px #00ff00,
@@ -304,7 +304,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.44rem;
+      font-size: var(--font-icon);
       line-height: 1;
       box-sizing: border-box;
       transition: all 0.2s;
@@ -350,7 +350,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.44rem;
+      font-size: var(--font-icon);
       line-height: 1;
       box-sizing: border-box;
       transition: all 0.2s;
@@ -381,7 +381,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 0.84rem;
+      font-size: var(--font-icon);
       font-weight: 600;
       line-height: 1;
       box-sizing: border-box;
@@ -408,7 +408,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2.4rem;
+      font-size: var(--font-ui);
       line-height: 1;
       padding-left: 1.8rem;
       padding-bottom: 0.12rem;
@@ -436,7 +436,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.44rem;
+      font-size: var(--font-icon);
       line-height: 1;
       box-sizing: border-box;
       transition: all 0.2s;
@@ -487,7 +487,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .volume-value {
-      font-size: 0.7rem;
+      font-size: var(--font-icon);
       font-weight: 600;
       color: var(--player-text, white);
       z-index: 1;
@@ -553,7 +553,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .button-info {
-      font-size: 0.7rem;
+      font-size: var(--font-icon);
       color: var(--player-text, white);
       opacity: 0.6;
       text-align: center;
@@ -569,7 +569,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .knob-label {
-      font-size: 0.95rem;
+      font-size: var(--font-icon);
       font-weight: 600;
       color: var(--player-text, white);
       opacity: 0.7;
@@ -578,7 +578,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .toggle-label {
-      font-size: 0.95rem;
+      font-size: var(--font-icon);
       font-weight: 600;
       color: var(--player-text, white);
       opacity: 0.7;
@@ -599,7 +599,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 2rem;
+      font-size: var(--font-ui);
       backdrop-filter: blur(4px);
       transition: background 0.2s;
       padding: 0;
@@ -642,7 +642,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .settings-title {
-      font-size: 1.5rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: var(--player-text, white);
     }
@@ -658,7 +658,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.2rem;
+      font-size: var(--font-icon);
       line-height: 1;
     }
 

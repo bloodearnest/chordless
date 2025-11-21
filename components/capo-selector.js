@@ -27,7 +27,7 @@ export class CapoSelector extends LitElement {
 
     .meta-label {
       opacity: 0.8;
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       color: var(--header-text, #fff);
       margin: 0;
     }
@@ -38,7 +38,7 @@ export class CapoSelector extends LitElement {
       border: 2px solid transparent;
       border-radius: 6px;
       padding: 0.2rem 0.4rem;
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       font-family: inherit;
       min-width: 0;
       text-align: center;
@@ -86,7 +86,7 @@ export class CapoSelector extends LitElement {
       border: none;
       background: transparent;
       color: var(--header-text, #fff);
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       padding: 0.5rem 0.75rem;
       text-align: left;
       display: flex;
@@ -107,7 +107,7 @@ export class CapoSelector extends LitElement {
     }
 
     .capo-option-hint {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       opacity: 0.7;
     }
   `

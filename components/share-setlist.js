@@ -54,13 +54,13 @@ export class ShareSetlist extends LitElement {
 
     .share-method h3 {
       margin-top: 0;
-      font-size: 1.6rem;
+      font-size: var(--font-ui);
       color: #2c3e50;
     }
 
     .share-method p {
       color: #7f8c8d;
-      font-size: 1.1rem;
+      font-size: var(--font-ui);
       margin-bottom: 1.5rem;
     }
 
@@ -74,7 +74,7 @@ export class ShareSetlist extends LitElement {
     .share-link {
       word-break: break-all;
       font-family: monospace;
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       color: #3498db;
       padding: 1rem;
       background: white;
@@ -136,7 +136,7 @@ export class ShareSetlist extends LitElement {
 
     .backup-section h3 {
       color: #7f8c8d;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
     }
   `
 
@@ -228,7 +228,7 @@ export class ShareSetlist extends LitElement {
                 >
                   Go to Authorization Page →
                 </a>
-                <p style="color: #95a5a6; font-size: 0.9rem; margin-top: 1rem;">
+                <p style="color: #95a5a6; font-size: var(--font-ui); margin-top: 1rem;">
                   Authorization is optional. Link sharing works without it.
                 </p>
               </div>

@@ -4,6 +4,25 @@
   box-sizing: border-box;
 }
 
+/* Reset heading styles */
+h1, h2, h3, h4, h5, h6 {
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+
+/* Reset other common elements */
+p, ul, ol, dl, blockquote, figure {
+  margin: 0;
+}
+
+button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
 html {
   overflow-x: hidden;
   width: 100%;
@@ -41,26 +60,15 @@ html {
   /* Typography */
   --font-family-base: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
-  /* Responsive font size multiplier for components */
-  /* This allows shadow DOM components to scale with viewport */
-  /* Default is for tablets (1.125 = 18/16) */
-  --font-scale: 1.125;
-}
+  /* Base font size - fluid scaling between mobile (14px) and desktop (24px) */
+  --font-base: clamp(16pt, 3vw, 24pt);
 
-/* Scale factor for phones - smaller */
-@media (max-width: 48rem) {
-  /* 768px */
-  :root {
-    --font-scale: 0.65; /* 10.4/16 - much smaller for mobile */
-  }
-}
-
-/* Scale factor for desktop */
-@media (min-width: 64rem) {
-  /* 1024px */
-  :root {
-    --font-scale: 1; /* 16/16 - standard desktop size */
-  }
+  /* Semantic font sizes for different content types */
+  --font-lyrics: var(--font-base);
+  --font-chords: calc(var(--font-base) * 0.9);
+  --font-ui: calc(var(--font-base) * 0.8);
+  --font-ui-small: calc(var(--font-base) * 0.7);
+  --font-icon: var(--font-ui); /* Icon/symbol text (buttons, etc.) */
 }
 
 body {
@@ -71,28 +79,7 @@ body {
   overflow: hidden;
   width: 100%;
   height: 100vh;
-
-  /* Responsive base font size */
-  /* Phone: 0.65rem (10.4px) - Very small for fitting lyrics */
-  /* Tablet: 1.125rem (18px) - Larger for performance/touch */
-  /* Desktop: 1rem (16px) - Standard for readability */
-  font-size: 0.65rem; /* Mobile default - smaller */
-}
-
-/* Tablet: larger for touch */
-@media (min-width: 48rem) and (max-width: 64rem) {
-  /* 768px - 1024px */
-  body {
-    font-size: 1.125rem;
-  }
-}
-
-/* Desktop: standard size */
-@media (min-width: 64rem) {
-  /* 1024px */
-  body {
-    font-size: 1rem;
-  }
+  font-size: var(--font-ui);
 }
 
 /* View Transitions */
@@ -149,7 +136,7 @@ body {
 }
 
 .home-content h2 {
-  font-size: 2rem;
+  font-size: var(--font-ui);
   margin-bottom: 2rem;
   color: var(--header-bg);
 }
@@ -208,7 +195,7 @@ body {
   border: 2px solid var(--header-text);
   color: var(--header-text);
   padding: 0.5rem 1rem;
-  font-size: 1.2rem;
+  font-size: var(--font-ui-small);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -251,7 +238,7 @@ body {
   background-color: var(--header-bg);
   color: var(--header-text);
   border: none;
-  font-size: 1.8rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -295,7 +282,7 @@ body {
   background-color: white;
   border: none;
   border-bottom: 1px solid #ecf0f1;
-  font-size: 1.3rem;
+  font-size: var(--font-ui);
   color: var(--text-color);
   cursor: pointer;
   transition: all 0.2s;
@@ -330,7 +317,7 @@ body {
   padding: 0.3rem 0.8rem;
   background-color: #ecf0f1;
   color: #7f8c8d;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   border-radius: 12px;
   transition: all 0.2s;
@@ -401,7 +388,7 @@ body {
   color: var(--header-text);
   border: none;
   padding: 1rem 1.5rem;
-  font-size: 1.4rem;
+  font-size: var(--font-ui);
   font-family: inherit;
   font-weight: normal;
   cursor: pointer;
@@ -459,7 +446,7 @@ header {
   border: 2px solid var(--header-text);
   color: var(--header-text);
   padding: 0.5rem 1rem;
-  font-size: 1.2rem;
+  font-size: var(--font-ui-small);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -501,7 +488,7 @@ header {
 }
 
 .song-title-compact {
-  font-size: 1.4rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -513,7 +500,7 @@ header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   white-space: nowrap;
 }
 
@@ -525,7 +512,7 @@ header {
 
 .meta-label {
   opacity: 0.8;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
 }
 
 /* Mobile header expansion - show all controls when header is expanded */
@@ -542,16 +529,16 @@ header {
     gap: 0.15rem !important;
     flex-shrink: 0 !important;
     min-width: 0 !important;
-    font-size: 0.9rem !important;
+    font-size: var(--font-ui-small) !important;
   }
 
   body.header-expanded .meta-label {
-    font-size: 0.9rem !important;
+    font-size: var(--font-ui-small) !important;
   }
 
   body.header-expanded .key-selector {
     min-width: 2.2rem !important;
-    font-size: 1rem !important;
+    font-size: var(--font-ui) !important;
     padding: 0.2rem 0.35rem !important;
     min-height: auto !important;
     border-width: 1px !important;
@@ -561,7 +548,7 @@ header {
     flex-shrink: 1 !important;
     min-width: 0 !important;
     max-width: 6rem !important;
-    font-size: 0.9rem !important;
+    font-size: var(--font-ui-small) !important;
     white-space: nowrap !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
@@ -572,7 +559,7 @@ header {
   body.header-expanded .font-size-btn {
     width: 1.8rem !important;
     height: 1.8rem !important;
-    font-size: 0.9rem !important;
+    font-size: var(--font-ui-small) !important;
     border-width: 1px !important;
     padding: 0.2rem !important;
     flex-shrink: 0 !important;
@@ -670,7 +657,7 @@ body.edit-mode .edit-mode-control.fade-in {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   font-weight: bold;
   transition: all 0.2s;
 }
@@ -723,7 +710,7 @@ body.edit-mode .edit-mode-control.fade-in {
   color: var(--header-text);
   border: 2px solid transparent;
   padding: 0.25rem 0.3rem;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   border-radius: 4px;
   cursor: default;
   transition: all 0.25s ease-in-out;
@@ -784,7 +771,7 @@ body.edit-mode .key-selector:focus {
   color: var(--header-text);
   border: none;
   padding: 0.5rem 1rem;
-  font-size: 1.5rem;
+  font-size: var(--font-ui);
   font-family: inherit;
   font-weight: normal;
   cursor: pointer;
@@ -811,7 +798,7 @@ body.edit-mode .key-selector:focus {
 
 .key-option-item .key-offset {
   flex: 0 0 auto;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   color: rgba(255, 255, 255, 0.5);
   margin-left: 1rem;
 }
@@ -832,7 +819,7 @@ body.edit-mode .key-selector:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   font-weight: bold;
   transition:
     opacity 0.25s ease-in-out,
@@ -863,7 +850,7 @@ body.edit-mode .key-selector:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.5rem;
+  font-size: var(--font-ui);
   font-weight: bold;
   transition:
     opacity 0.25s ease-in-out,
@@ -887,7 +874,7 @@ body.edit-mode .key-selector:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   font-weight: bold;
   transition: all 0.2s;
 }
@@ -921,7 +908,7 @@ body.edit-mode .key-selector:focus {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   font-weight: bold;
   transition: all 0.2s;
 }
@@ -953,16 +940,9 @@ body.edit-mode .key-selector:focus {
 
 .song-container {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--font-lyrics);
   height: 100%;
   width: 100%;
-}
-
-/* Larger font on tablet/desktop */
-@media (min-width: 48rem) {
-  .song-container {
-    font-size: 1.6rem;
-  }
 }
 
 .song {
@@ -970,7 +950,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-title {
-  font-size: 2rem;
+  font-size: var(--font-ui);
   margin-bottom: 1.5rem;
   color: var(--header-bg);
 }
@@ -981,20 +961,20 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .song-title {
-  font-size: 2rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   color: var(--header-bg);
   margin-bottom: 0.5rem;
 }
 
 .song-content .song-artist {
-  font-size: 1rem;
+  font-size: var(--font-ui);
   color: #7f8c8d;
   margin-bottom: 0.5rem;
 }
 
 .song-content .song-meta {
-  font-size: 0.9rem;
+  font-size: var(--font-ui-small);
   color: #95a5a6;
   display: flex;
   gap: 1.5rem;
@@ -1002,7 +982,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-content .song-ccli {
-  font-size: 0.85rem;
+  font-size: var(--font-ui-small);
   color: #bdc3c7;
   margin-top: 0.5rem;
 }
@@ -1053,7 +1033,7 @@ body.edit-mode .key-selector:focus {
 .song-content .chord {
   color: var(--chord-color);
   font-weight: bold;
-  font-size: 0.9em;
+  font-size: var(--font-chords);
   min-height: 1.1em;
   line-height: 1.1em;
   padding-right: 0.25em;
@@ -1323,7 +1303,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .choice-button-icon {
-  font-size: 2rem;
+  font-size: var(--font-ui);
   flex-shrink: 0;
 }
 
@@ -1332,14 +1312,14 @@ body.edit-mode .key-selector:focus {
 }
 
 .choice-button-title {
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   font-weight: 600;
   color: var(--text-color);
   margin-bottom: 0.25rem;
 }
 
 .choice-button-subtitle {
-  font-size: 1rem;
+  font-size: var(--font-ui);
   color: #7f8c8d;
 }
 
@@ -1348,7 +1328,7 @@ body.edit-mode .key-selector:focus {
   width: 100%;
   padding: 0.5rem 0.75rem;
   margin-top: 0.5rem;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   border: 2px solid #ecf0f1;
   border-radius: 6px;
   background-color: #f8f9fa;
@@ -1378,7 +1358,7 @@ body.edit-mode .key-selector:focus {
   right: 1.5rem;
   background: none;
   border: none;
-  font-size: 2rem;
+  font-size: var(--font-ui);
   cursor: pointer;
   color: var(--text-color);
   opacity: 0.6;
@@ -1394,7 +1374,7 @@ body.edit-mode .key-selector:focus {
 .modal-content h2 {
   margin-top: 0;
   color: var(--header-bg);
-  font-size: 2rem;
+  font-size: var(--font-ui);
 }
 
 .modal-info-grid {
@@ -1409,7 +1389,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .modal-info-label {
-  font-size: 1rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   color: #7f8c8d;
   text-transform: uppercase;
@@ -1429,7 +1409,7 @@ body.edit-mode .key-selector:focus {
   justify-content: center;
   width: 1.4rem;
   height: 1.4rem;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   color: #95a5a6;
   cursor: pointer;
   border-radius: 50%;
@@ -1452,7 +1432,7 @@ body.edit-mode .key-selector:focus {
   color: var(--header-text);
   padding: 0.75rem 1rem;
   border-radius: 8px;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   font-weight: normal;
   text-transform: none;
   white-space: normal;
@@ -1489,7 +1469,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .modal-info-value {
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   color: var(--text-color);
 }
 
@@ -1504,7 +1484,7 @@ body.edit-mode .key-selector:focus {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 6px;
-  font-size: 1.1rem;
+  font-size: var(--font-ui-small);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -1556,7 +1536,7 @@ body.edit-mode .key-selector:focus {
   margin-bottom: 0.5rem;
   color: var(--text-color);
   font-weight: 600;
-  font-size: 1rem;
+  font-size: var(--font-ui);
 }
 
 .form-field input[type='date'],
@@ -1567,7 +1547,7 @@ body.edit-mode .key-selector:focus {
   padding: 0.75rem;
   border: 2px solid var(--border-light, #e0e0e0);
   border-radius: 6px;
-  font-size: 1rem;
+  font-size: var(--font-ui);
   font-family: inherit;
   background-color: var(--bg-tertiary, white);
   color: var(--text-color);
@@ -1623,7 +1603,7 @@ body.edit-mode .key-selector:focus {
   padding: 1.2rem 2rem;
   background-color: transparent;
   border: none;
-  font-size: 1.4rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   color: #7f8c8d;
   cursor: pointer;
@@ -1700,7 +1680,7 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-card-title {
-  font-size: 1.5rem;
+  font-size: var(--font-ui);
   font-weight: 600;
   color: var(--text-color);
   overflow: hidden;
@@ -1711,14 +1691,14 @@ body.edit-mode .key-selector:focus {
 }
 
 .song-card-last-played {
-  font-size: 1rem;
+  font-size: var(--font-ui);
   color: #95a5a6;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .song-card-meta {
-  font-size: 1.1rem;
+  font-size: var(--font-ui-small);
   color: #7f8c8d;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1752,7 +1732,7 @@ body.edit-mode .key-selector:focus {
 .song-search-input {
   width: 100%;
   padding: 1rem 1.5rem;
-  font-size: 1.3rem;
+  font-size: var(--font-ui-small);
   border: 2px solid var(--border-light, #ecf0f1);
   border-radius: 8px;
   background-color: var(--bg-secondary, white);
@@ -1795,7 +1775,7 @@ body.edit-mode .key-selector:focus {
 
   .controls button {
     padding: 1rem 2rem;
-    font-size: 1.5rem;
+    font-size: var(--font-ui);
   }
 
   .modal-content {

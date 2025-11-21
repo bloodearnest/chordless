@@ -53,11 +53,11 @@ export class PadSetManager extends LitElement {
 
     .padset-name {
       font-weight: 600;
-      font-size: 1rem;
+      font-size: var(--font-ui);
     }
 
     .padset-meta {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
     }
 
@@ -69,7 +69,7 @@ export class PadSetManager extends LitElement {
     }
 
     label {
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       font-weight: 500;
     }
 
@@ -79,7 +79,7 @@ export class PadSetManager extends LitElement {
       padding: 0.6rem 0.75rem;
       border-radius: 4px;
       border: none;
-      font-size: 1rem;
+      font-size: var(--font-ui);
     }
 
     input[type='file'] {
@@ -117,7 +117,7 @@ export class PadSetManager extends LitElement {
     }
 
     .status-message {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       padding: 0.4rem 0.5rem;
       border-radius: 4px;
     }
@@ -133,13 +133,13 @@ export class PadSetManager extends LitElement {
     }
 
     .empty-state {
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       opacity: 0.75;
       margin-bottom: 0.5rem;
     }
 
     .padset-message {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.85;
     }
   `

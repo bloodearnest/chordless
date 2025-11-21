@@ -38,7 +38,7 @@ export class SetlistInfo extends LitElement {
     h2 {
       margin-top: 0;
       color: var(--header-bg);
-      font-size: 2rem;
+      font-size: var(--font-ui);
     }
 
     .modal-info-grid {
@@ -53,14 +53,14 @@ export class SetlistInfo extends LitElement {
     }
 
     .modal-info-label {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: #7f8c8d;
       text-transform: uppercase;
     }
 
     .modal-info-value {
-      font-size: 1.3rem;
+      font-size: var(--font-ui);
       color: var(--text-color);
     }
 

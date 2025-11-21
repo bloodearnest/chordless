@@ -11,7 +11,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'setalight-v254'
+const CACHE_NAME = 'setalight-v266'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const ASSETS = [
   '/',
@@ -482,6 +482,14 @@ self.addEventListener('fetch', event => {
   }
 
   // Everything else - pass through
+  // Silently fail for missing manifest (optional PWA file)
+  if (url.pathname.endsWith('manifest.webmanifest')) {
+    event.respondWith(
+      fetch(event.request).catch(() => new Response('', { status: 404 }))
+    )
+    return
+  }
+
   event.respondWith(fetch(event.request))
 })
 

@@ -40,7 +40,7 @@ export class SongInfo extends LitElement {
     }
 
     .song-title {
-      font-size: 2.4rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       color: var(--color-text, #2c3e50);
       margin: 0 0 2rem 0;
@@ -72,7 +72,7 @@ export class SongInfo extends LitElement {
     }
 
     .modal-info-label {
-      font-size: 1.1rem;
+      font-size: var(--font-ui);
       color: #95a5a6;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -80,13 +80,13 @@ export class SongInfo extends LitElement {
     }
 
     .modal-info-value {
-      font-size: 1.6rem;
+      font-size: var(--font-ui-small);
       color: var(--color-text, #2c3e50);
       font-weight: 500;
     }
 
     .modal-appearances-title {
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       color: #95a5a6;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -111,18 +111,18 @@ export class SongInfo extends LitElement {
     }
 
     .appearance-date {
-      font-size: 1.1rem;
+      font-size: var(--font-ui);
       color: var(--color-text, #2c3e50);
       font-weight: 500;
     }
 
     .appearance-relative {
-      font-size: 0.9rem;
+      font-size: var(--font-ui-small);
       color: #7f8c8d;
     }
 
     .appearance-meta {
-      font-size: 1.2rem;
+      font-size: var(--font-ui);
       color: #95a5a6;
       margin-top: 0.3rem;
     }
@@ -139,7 +139,7 @@ export class SongInfo extends LitElement {
       gap: 0.5rem;
       color: var(--button-bg, #3498db);
       text-decoration: none;
-      font-size: 1.4rem;
+      font-size: var(--font-ui-small);
       transition: color 0.2s;
     }
 
@@ -159,7 +159,7 @@ export class SongInfo extends LitElement {
       padding: 1rem;
       background-color: #f8f9fa;
       border-radius: 6px;
-      font-size: 1.2rem;
+      font-size: var(--font-ui);
       color: #7f8c8d;
       white-space: pre-line;
       line-height: 1.6;

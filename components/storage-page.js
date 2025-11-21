@@ -48,19 +48,19 @@ export class StoragePage extends LitElement {
     }
 
     h3 {
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       margin: 0 0 1rem 0;
       font-weight: 600;
     }
 
     h4 {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       margin: 1.5rem 0 1rem 0;
       font-weight: 600;
     }
 
     p {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       margin: 0 0 1rem 0;
       opacity: 0.7;
       line-height: 1.4;
@@ -84,7 +84,7 @@ export class StoragePage extends LitElement {
 
     .auth-status h4 {
       margin: 0 0 0.5rem 0;
-      font-size: 1.1rem;
+      font-size: var(--font-ui);
     }
 
     .auth-status p {
@@ -116,7 +116,7 @@ export class StoragePage extends LitElement {
       color: white;
       border: none;
       border-radius: 4px;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
@@ -144,7 +144,7 @@ export class StoragePage extends LitElement {
     }
 
     .sync-hint {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.8;
     }
 
@@ -202,12 +202,12 @@ export class StoragePage extends LitElement {
     }
 
     .user-name {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 600;
     }
 
     .user-email {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.8;
     }
   `
@@ -332,7 +332,7 @@ export class StoragePage extends LitElement {
                   <li>📱 Access from any device with a browser</li>
                 </ul>
 
-                <p style="opacity: 0.6; font-size: 0.8rem;">
+                <p style="opacity: 0.6; font-size: var(--font-ui-small);">
                   <strong>Note:</strong> Authorization happens locally on your device. Your
                   credentials are encrypted and never stored on our servers.
                 </p>

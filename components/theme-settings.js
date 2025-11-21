@@ -30,14 +30,14 @@ export class ThemeSettings extends LitElement {
 
     .settings-label {
       display: block;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       margin-bottom: 0.5rem;
       opacity: 0.9;
     }
 
     .settings-description {
-      font-size: 0.8rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
       margin-bottom: 0.75rem;
       line-height: 1.4;
@@ -57,7 +57,7 @@ export class ThemeSettings extends LitElement {
       border-radius: 6px;
       background: rgba(255, 255, 255, 0.05);
       color: white;
-      font-size: 0.95rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       transition: all 0.2s;
@@ -84,7 +84,7 @@ export class ThemeSettings extends LitElement {
     }
 
     .theme-icon {
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
     }
 
     .font-scale-controls {
@@ -128,7 +128,7 @@ export class ThemeSettings extends LitElement {
       min-width: 60px;
       text-align: center;
       font-weight: 600;
-      font-size: 0.9rem;
+      font-size: var(--font-ui);
       padding: 0.25rem 0.5rem;
       background: rgba(255, 255, 255, 0.1);
       border-radius: 4px;
@@ -147,7 +147,7 @@ export class ThemeSettings extends LitElement {
       border-radius: 4px;
       background: rgba(255, 255, 255, 0.05);
       color: white;
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       cursor: pointer;
       transition: all 0.2s;
     }
@@ -162,7 +162,7 @@ export class ThemeSettings extends LitElement {
       padding: 0.75rem;
       background: rgba(255, 255, 255, 0.05);
       border-radius: 4px;
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
     }
 
     .info-row {
@@ -189,7 +189,7 @@ export class ThemeSettings extends LitElement {
       background: rgba(52, 152, 219, 0.1);
       border-left: 3px solid var(--color-primary, #3498db);
       border-radius: 2px;
-      font-size: 0.8rem;
+      font-size: var(--font-ui-small);
     }
   `
 

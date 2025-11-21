@@ -112,7 +112,7 @@ export class AppHeader extends LitElement {
     }
 
     .title {
-      font-size: calc(1.4rem * var(--font-scale, 1));
+      font-size: var(--font-ui);
       font-weight: 600;
       white-space: nowrap;
       overflow: hidden;
@@ -142,7 +142,8 @@ export class AppHeader extends LitElement {
       align-items: center;
       gap: 0.5rem;
       transition: opacity 0.3s ease-in-out;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
+      flex-shrink: 0;
     }
 
     /* Force visibility of slotted controls when expanded on mobile */
@@ -204,7 +205,7 @@ export class AppHeader extends LitElement {
       :host([expanded]) .icon-button {
         width: 1.8rem;
         height: 1.8rem;
-        font-size: 0.9rem;
+        font-size: var(--font-ui);
         flex-shrink: 0;
         border-width: 1px;
       }
@@ -224,6 +225,8 @@ export class AppHeader extends LitElement {
         display: flex;
         justify-content: flex-end;
         flex: 1;
+        flex-wrap: nowrap;
+        white-space: nowrap;
       }
     }
 
@@ -231,16 +234,16 @@ export class AppHeader extends LitElement {
       background: none;
       border: 2px solid var(--header-text, white);
       color: var(--header-text, white);
-      width: calc(2.5rem * var(--font-scale, 1));
-      height: calc(2.5rem * var(--font-scale, 1));
-      min-width: calc(2.5rem * var(--font-scale, 1));
-      min-height: calc(2.5rem * var(--font-scale, 1));
+      width: 2.5rem;
+      height: 2.5rem;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      font-size: calc(1.3rem * var(--font-scale, 1));
+      font-size: var(--font-icon);
       font-weight: bold;
       transition: all 0.2s;
       flex-shrink: 0;

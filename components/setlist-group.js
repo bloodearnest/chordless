@@ -37,7 +37,7 @@ export class SetlistGroup extends LitElement {
       background-color: var(--header-bg, #2c3e50);
       color: var(--header-text, #ecf0f1);
       border: none;
-      font-size: 1.8rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
       text-align: left;
@@ -79,7 +79,7 @@ export class SetlistGroup extends LitElement {
       background-color: var(--bg-secondary, white);
       border: none;
       border-bottom: 1px solid var(--border-light, #ecf0f1);
-      font-size: 1.3rem;
+      font-size: var(--font-ui);
       color: var(--text-color, #2c3e50);
       text-decoration: none;
       min-height: 70px;
@@ -100,7 +100,7 @@ export class SetlistGroup extends LitElement {
     }
 
     .setlist-song-count {
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       color: var(--text-secondary, #7f8c8d);
       white-space: nowrap;
     }

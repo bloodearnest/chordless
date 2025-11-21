@@ -59,7 +59,7 @@ export class BarGroup extends LitElement {
     .chord {
       color: var(--chord-color, #2980b9);
       font-weight: bold;
-      font-size: 0.9em;
+      font-size: var(--font-chords);
       line-height: 1.1em;
       padding-right: 0.25em;
       font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
@@ -74,7 +74,7 @@ export class BarGroup extends LitElement {
 
     .chord sup.chord-extension {
       display: inline-block;
-      font-size: 0.75em;
+      font-size: calc(var(--font-chords) * 0.75);
       line-height: 1;
       vertical-align: baseline;
       transform: translateY(-0.3em);

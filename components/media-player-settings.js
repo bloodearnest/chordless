@@ -42,7 +42,7 @@ export class MediaPlayerSettings extends LitElement {
 
     h2 {
       margin: 0 0 1rem 0;
-      font-size: 1.2rem;
+      font-size: var(--font-ui-small);
       font-weight: 600;
       color: var(--settings-text, white);
     }
@@ -80,12 +80,12 @@ export class MediaPlayerSettings extends LitElement {
     }
 
     .setting-label {
-      font-size: 1rem;
+      font-size: var(--font-ui);
       font-weight: 500;
     }
 
     .setting-description {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       opacity: 0.7;
       margin-top: 0.25rem;
     }
@@ -134,7 +134,7 @@ export class MediaPlayerSettings extends LitElement {
       padding: 0.5rem 0.65rem;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.3);
-      font-size: 1rem;
+      font-size: var(--font-ui);
       background: rgba(0, 0, 0, 0.35);
       color: #f5f5f5;
       appearance: none;
@@ -146,7 +146,7 @@ export class MediaPlayerSettings extends LitElement {
     }
 
     .padset-message {
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       margin-top: 0.4rem;
       opacity: 0.8;
     }

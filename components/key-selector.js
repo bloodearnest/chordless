@@ -41,7 +41,7 @@ export class KeySelector extends LitElement {
 
     .meta-label {
       opacity: 0.8;
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       color: var(--header-text, #fff);
       margin: 0;
     }
@@ -52,7 +52,7 @@ export class KeySelector extends LitElement {
       border: 2px solid transparent;
       border-radius: 6px;
       padding: 0.2rem 0.45rem;
-      font-size: 1.3rem;
+      font-size: var(--font-ui-small);
       cursor: default;
       transition: all 0.2s;
       font-family: inherit;
@@ -113,7 +113,7 @@ export class KeySelector extends LitElement {
       border: none;
       border-radius: 6px;
       padding: 0.75rem 1rem;
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       cursor: pointer;
       transition: background-color 0.2s;
       display: flex;
@@ -140,7 +140,7 @@ export class KeySelector extends LitElement {
 
     .key-option-item .key-offset {
       flex: 0 0 auto;
-      font-size: 1rem;
+      font-size: var(--font-ui);
       color: rgba(255, 255, 255, 0.5);
     }
   `

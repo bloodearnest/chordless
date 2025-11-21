@@ -64,13 +64,13 @@ export class StatusMessage extends LitElement {
     }
 
     .message {
-      font-size: 1.6rem;
+      font-size: var(--font-ui);
       font-weight: 600;
       margin: 0 0 0.6rem;
     }
 
     .detail {
-      font-size: 1.4rem;
+      font-size: var(--font-ui);
       color: rgba(44, 62, 80, 0.85);
       margin: 0;
     }

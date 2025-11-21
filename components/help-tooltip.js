@@ -25,7 +25,7 @@ export class HelpTooltip extends LitElement {
         -apple-system,
         sans-serif
       );
-      font-size: 0.85rem;
+      font-size: var(--font-ui-small);
       color: inherit;
     }
 
@@ -57,7 +57,7 @@ export class HelpTooltip extends LitElement {
       color: white;
       padding: 0.35rem 0.5rem;
       border-radius: 4px;
-      font-size: 0.7rem;
+      font-size: calc(var(--font-ui-small) * 0.85);
       line-height: 1.3;
       white-space: nowrap;
       box-shadow: 0 4px 10px rgba(0, 0, 0, 0.35);
