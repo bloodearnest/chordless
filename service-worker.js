@@ -11,7 +11,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'setalight-v266'
+const CACHE_NAME = 'setalight-v268'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const ASSETS = [
   '/',

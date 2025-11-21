@@ -173,7 +173,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .section-controls {
       display: flex;
       flex-direction: row;
-      gap: 0.6rem;
+      gap: 0.2rem;
       align-items: center;
       margin-left: auto;
       opacity: 0;
@@ -214,8 +214,7 @@ export class SongSection extends LitElement {
     }
 
     .song-section-wrapper .hide-pill {
-      display: grid;
-      grid-template-columns: repeat(var(--pill-option-count, 4), minmax(4rem, 1fr));
+      display: flex;
       border: 1.5px solid var(--border-color, #7f8c8d);
       border-radius: 0.5rem;
       overflow: hidden;
@@ -224,20 +223,36 @@ export class SongSection extends LitElement {
       backdrop-filter: blur(4px);
     }
 
+    /* Equal widths on larger screens */
+    @media (min-width: 48rem) {
+      .song-section-wrapper .hide-pill {
+        display: grid;
+        grid-template-columns: repeat(var(--pill-option-count, 4), minmax(4rem, 1fr));
+      }
+    }
+
     .song-section-wrapper .hide-pill button {
       border: none;
       background: var(--bg-secondary, rgba(255, 255, 255, 0.95));
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: var(--font-ui-small);
+      font-size: calc(var(--font-ui-small) * 0.8);
       font-weight: 600;
+      text-transform: uppercase;
       color: var(--text-secondary, #7f8c8d);
       padding: 0.3rem 0.1rem;
       cursor: pointer;
       transition:
         background-color 0.2s,
         color 0.2s;
+    }
+
+    /* Minimal padding on larger screens with grid layout */
+    @media (min-width: 48rem) {
+      .song-section-wrapper .hide-pill button {
+        padding: 0.3rem 0.1rem;
+      }
     }
 
     .song-section-wrapper .hide-pill button + button {
