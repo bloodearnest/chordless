@@ -160,12 +160,38 @@ export class ThemeManager {
     // Notify observers
     this._notifyObservers(themeName)
 
+    // Update favicon to match theme
+    this._updateFavicon(actualTheme)
+
     // Dispatch custom event for components that need it
     window.dispatchEvent(
       new CustomEvent('theme-change', {
         detail: { theme: themeName, actualTheme },
       })
     )
+  }
+
+  /**
+   * Update favicon to match the current theme
+   * @private
+   * @param {string} theme - 'light' or 'dark'
+   */
+  _updateFavicon(theme) {
+    // Find existing favicon link or create one
+    let faviconLink = document.querySelector('link[rel="icon"]')
+
+    if (!faviconLink) {
+      faviconLink = document.createElement('link')
+      faviconLink.rel = 'icon'
+      faviconLink.type = 'image/svg+xml'
+      document.head.appendChild(faviconLink)
+    }
+
+    // Update href based on theme
+    const faviconPath = theme === 'dark' ? '/icons/favicon-dark.svg' : '/icons/favicon-light.svg'
+
+    // Add cache-busting parameter to force browser to reload
+    faviconLink.href = `${faviconPath}?t=${Date.now()}`
   }
 
   /**

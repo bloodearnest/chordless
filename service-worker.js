@@ -11,8 +11,12 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'setalight-v269'
+const CACHE_NAME = 'setalight-v280'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
+const RUNTIME_CACHE_NAME = 'setalight-runtime-v1'
+
+// Only cache critical files needed for offline app shell
+// Other assets (icons, images, fonts) are cached at runtime on first request
 const ASSETS = [
   '/',
   '/css/style.css',
@@ -24,6 +28,7 @@ const ASSETS = [
   '/js/theme-manager.js',
   '/components/media-player.js',
   '/components/media-player-settings.js',
+  '/manifest.webmanifest',
 ]
 
 // External CDN resources to cache for offline support
@@ -81,7 +86,11 @@ self.addEventListener('activate', event => {
     caches.keys().then(cacheNames => {
       return Promise.all(
         cacheNames.map(cacheName => {
-          if (cacheName !== CACHE_NAME && cacheName !== PAD_CACHE_NAME) {
+          if (
+            cacheName !== CACHE_NAME &&
+            cacheName !== PAD_CACHE_NAME &&
+            cacheName !== RUNTIME_CACHE_NAME
+          ) {
             return caches.delete(cacheName)
           }
         })
@@ -481,12 +490,33 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  // Static assets (icons, images, fonts) - cache on first request (stale-while-revalidate)
+  if (url.pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$/)) {
+    event.respondWith(
+      caches.open(RUNTIME_CACHE_NAME).then(cache => {
+        return cache.match(event.request).then(cached => {
+          const fetchPromise = fetch(event.request)
+            .then(response => {
+              // Cache the new version for next time
+              if (response.ok) {
+                cache.put(event.request, response.clone())
+              }
+              return response
+            })
+            .catch(() => cached) // Fallback to cached if fetch fails
+
+          // Return cached immediately if available, otherwise wait for fetch
+          return cached || fetchPromise
+        })
+      })
+    )
+    return
+  }
+
   // Everything else - pass through
   // Silently fail for missing manifest (optional PWA file)
   if (url.pathname.endsWith('manifest.webmanifest')) {
-    event.respondWith(
-      fetch(event.request).catch(() => new Response('', { status: 404 }))
-    )
+    event.respondWith(fetch(event.request).catch(() => new Response('', { status: 404 })))
     return
   }
 
