@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import './icon.js'
 
 /**
  * AppHeader Component
@@ -143,7 +144,9 @@ export class AppHeader extends LitElement {
       gap: 0.5rem;
       transition: opacity 0.3s ease-in-out;
       flex-wrap: nowrap;
-      flex-shrink: 0;
+      flex-shrink: 1;
+      min-width: 0;
+      overflow: hidden;
     }
 
     /* Force visibility of slotted controls when expanded on mobile */
@@ -195,9 +198,10 @@ export class AppHeader extends LitElement {
         display: flex;
         width: 100%;
         justify-content: flex-end;
+        align-items: center;
         gap: 0.2rem;
         flex-wrap: nowrap;
-        overflow-x: auto;
+        overflow-x: visible;
         -webkit-overflow-scrolling: touch;
       }
 
@@ -425,7 +429,7 @@ export class AppHeader extends LitElement {
                   @click=${this._handleEditToggle}
                   aria-label="Toggle edit mode"
                 >
-                  ✎
+                  <app-icon name="edit"></app-icon>
                 </button>
               `
               : ''
@@ -439,7 +443,7 @@ export class AppHeader extends LitElement {
                   @click=${this._handleInfoClick}
                   aria-label="Information"
                 >
-                  i
+                  <app-icon name="info"></app-icon>
                 </button>
               `
               : ''

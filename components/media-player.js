@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.js'
+import './icon.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
 import { getActivePadSet } from '../js/pad-set-service.js'
@@ -1534,7 +1535,7 @@ export class MediaPlayer extends LitElement {
     if (this._collapsed) {
       return html`
         <button class="collapsed-button" @click=${this._toggleCollapse} title="Expand player">
-          ▶
+          <app-icon name="play" size="32"></app-icon>
         </button>
       `
     }
@@ -1591,10 +1592,10 @@ export class MediaPlayer extends LitElement {
           <div class="title-bar-content">${this._activeSongTitle || 'Media Player'}</div>
           <div class="title-bar-buttons">
             <button class="title-bar-button" @click=${this._toggleSettings} title="Settings">
-              ⚙
+              <app-icon name="settings"></app-icon>
             </button>
             <button class="title-bar-button" @click=${this._toggleCollapse} title="Minimize">
-              ▼
+              <app-icon name="chevron-down"></app-icon>
             </button>
           </div>
         </div>
@@ -1647,7 +1648,7 @@ export class MediaPlayer extends LitElement {
                 title="Start song (Space)"
                 ?disabled=${!this.currentKey || this._isCurrentSongActive()}
               >
-                ▶
+                <app-icon name="play" size="32"></app-icon>
               </button>
               <button
                 class="stop-button"
@@ -1656,7 +1657,7 @@ export class MediaPlayer extends LitElement {
                 aria-label="Stop (Escape)"
                 title="Stop - Press Escape"
               >
-                ⏹
+                <app-icon name="stop" size="32"></app-icon>
               </button>
             </div>
           </div>

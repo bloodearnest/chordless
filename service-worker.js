@@ -11,7 +11,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'setalight-v280'
+const CACHE_NAME = 'setalight-v283'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const RUNTIME_CACHE_NAME = 'setalight-runtime-v1'
 
@@ -26,8 +26,10 @@ const ASSETS = [
   '/js/import.js',
   '/js/transpose.js',
   '/js/theme-manager.js',
+  '/js/icons.js',
   '/components/media-player.js',
   '/components/media-player-settings.js',
+  '/components/icon.js',
   '/manifest.webmanifest',
 ]
 
