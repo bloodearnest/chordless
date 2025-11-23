@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Icon Library Test</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js",
+          "lit/": "https://cdn.jsdelivr.net/npm/lit@3.1.0/",
+          "lit-element": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js",
+          "lit-element/": "https://cdn.jsdelivr.net/npm/lit-element@4.0.4/",
+          "lit-html": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js",
+          "lit-html/": "https://cdn.jsdelivr.net/npm/lit-html@3.1.0/",
+          "@lit/reactive-element": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js",
+          "@lit/reactive-element/": "https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/"
+        }
+      }
+    </script>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        padding: 2rem;
+        background: #f5f5f5;
+      }
+
+      h1 {
+        margin-bottom: 2rem;
+        color: #2c3e50;
+      }
+
+      .icon-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+      }
+
+      .icon-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
+      }
+
+      .icon-item:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      }
+
+      .icon-name {
+        font-size: 0.875rem;
+        color: #666;
+        text-align: center;
+        word-break: break-word;
+      }
+
+      .icon-sizes {
+        display: flex;
+        gap: 0.5rem;
+        align-items: center;
+      }
+
+      .size-label {
+        font-size: 0.75rem;
+        color: #999;
+        margin-top: 0.5rem;
+      }
+
+      app-icon {
+        color: #2c3e50;
+      }
+
+      .dark-mode {
+        background: #2c3e50;
+        color: #ecf0f1;
+      }
+
+      .dark-mode .icon-item {
+        background: #34495e;
+      }
+
+      .dark-mode app-icon {
+        color: white;
+      }
+
+      .dark-mode .icon-name {
+        color: #bdc3c7;
+      }
+
+      .dark-mode .size-label {
+        color: #95a5a6;
+      }
+
+      .theme-toggle {
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        padding: 0.5rem 1rem;
+        background: #3498db;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.875rem;
+      }
+
+      .theme-toggle:hover {
+        background: #2980b9;
+      }
+
+      .section {
+        margin-bottom: 3rem;
+      }
+
+      .section-title {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        color: inherit;
+        opacity: 0.8;
+      }
+    </style>
+  </head>
+  <body>
+    <button class="theme-toggle" onclick="toggleTheme()">Toggle Dark Mode</button>
+
+    <h1>Icon Library</h1>
+
+    <div id="icon-container"></div>
+
+    <script type="module">
+      import './components/icon.js'
+      import { icons } from './js/icons.js'
+
+      const container = document.getElementById('icon-container')
+
+      // Group icons by category
+      const categories = {
+        'Media Controls': ['play', 'pause', 'stop', 'skip-next', 'skip-previous'],
+        'UI Controls': ['settings', 'edit', 'info', 'close', 'menu'],
+        'Navigation': ['chevron-left', 'chevron-right', 'chevron-up', 'chevron-down'],
+        'Actions': ['add', 'remove', 'check', 'delete'],
+        'Content': ['search', 'share'],
+      }
+
+      // Render each category
+      for (const [category, iconNames] of Object.entries(categories)) {
+        const section = document.createElement('div')
+        section.className = 'section'
+
+        const title = document.createElement('h2')
+        title.className = 'section-title'
+        title.textContent = category
+        section.appendChild(title)
+
+        const grid = document.createElement('div')
+        grid.className = 'icon-grid'
+
+        iconNames.forEach(iconName => {
+          const item = document.createElement('div')
+          item.className = 'icon-item'
+
+          // Show different sizes
+          const sizes = document.createElement('div')
+          sizes.className = 'icon-sizes'
+
+          ;[16, 24, 32].forEach(size => {
+            const icon = document.createElement('app-icon')
+            icon.setAttribute('name', iconName)
+            icon.setAttribute('size', size)
+            sizes.appendChild(icon)
+          })
+
+          const name = document.createElement('div')
+          name.className = 'icon-name'
+          name.textContent = iconName
+
+          const label = document.createElement('div')
+          label.className = 'size-label'
+          label.textContent = '16 / 24 / 32'
+
+          item.appendChild(sizes)
+          item.appendChild(name)
+          item.appendChild(label)
+          grid.appendChild(item)
+        })
+
+        section.appendChild(grid)
+        container.appendChild(section)
+      }
+
+      // Theme toggle
+      window.toggleTheme = () => {
+        document.body.classList.toggle('dark-mode')
+      }
+    </script>
+  </body>
+</html>

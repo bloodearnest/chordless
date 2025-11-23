@@ -1,5 +1,5 @@
-import { unsafeSVG } from 'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/unsafe-svg.js'
-import { css, html, LitElement, unsafeCSS } from 'https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js'
+import { css, html, LitElement } from 'lit'
+import { unsafeSVG } from 'lit-html/directives/unsafe-svg.js'
 import { icons } from '/js/icons.js'
 
 /**
