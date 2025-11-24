@@ -224,7 +224,9 @@ export async function createSong(chordproContent, options = {}) {
     author: metadata.artist || metadata.author || null,
     copyright: metadata.copyright || null,
     key: metadata.key || null,
+    originalKey: metadata.key || null, // Preserve imported key for reset
     tempo: metadata.tempo || null,
+    originalTempo: metadata.tempo || null, // Preserve imported tempo for reset
     time: metadata.time || null,
 
     importDate: new Date().toISOString(),

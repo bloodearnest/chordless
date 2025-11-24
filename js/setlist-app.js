@@ -807,6 +807,12 @@ class PageApp {
         return
       }
 
+      // Update key if it has changed
+      if (this.currentLibraryKey && this.currentLibraryKey !== song.key) {
+        song.key = this.currentLibraryKey
+        console.log(`Updated song key to: ${this.currentLibraryKey}`)
+      }
+
       // Update the timestamp
       song.modifiedDate = new Date().toISOString()
 
@@ -849,8 +855,9 @@ class PageApp {
     // Get available keys rotated around the selected key
     const keys = getAvailableKeys(selectedKey)
 
-    // Get original key from current song
-    const originalKey = this.currentLibraryParsedSong?.metadata?.key
+    // Get original imported key from current song
+    const originalKey =
+      this.currentLibrarySong?.originalKey || this.currentLibraryParsedSong?.metadata?.key
 
     // Update component properties
     keySelector.value = selectedKey
@@ -1031,26 +1038,31 @@ class PageApp {
   }
 
   async resetLibrarySong() {
-    if (!this.currentLibraryParsedSong) return
+    if (!this.currentLibraryParsedSong || !this.currentLibrarySong) return
 
-    // Reset key to original
-    this.currentLibraryKey = this.currentLibraryParsedSong.metadata.key
+    // Reset key to original imported key
+    const originalKey =
+      this.currentLibrarySong.originalKey || this.currentLibraryParsedSong.metadata.key
+    this.currentLibraryKey = originalKey
 
     // Reset font size to default
     this.currentLibraryFontSize = CONFIG.DEFAULT_FONT_SIZE
 
     // Re-render with original key
-    await this.reRenderLibrarySong(this.currentLibraryKey)
+    await this.reRenderLibrarySong(originalKey)
 
     // Update key selector
-    if (this.currentLibraryKey) {
-      this.updateLibraryKeySelector(this.currentLibraryKey)
+    if (originalKey) {
+      this.updateLibraryKeySelector(originalKey)
     }
 
     // Apply font size
     this.applyLibraryFontSize()
 
-    console.log('Library song reset to defaults')
+    // Save the reset key back to the database
+    await this.saveLibrarySongToDatabase()
+
+    console.log('Library song reset to original imported key:', originalKey)
   }
 
   extractYear(dateStr) {
@@ -1335,9 +1347,15 @@ class PageApp {
         // Parse the chordpro
         const parsed = this.parser.parse(sourceText)
 
-        // Capture original key before any transposition so we can always return to it
+        // Capture original key from ChordPro file (for transposition reference)
         const originalKey = parsed.metadata.key || null
-        const targetKey = songEntry.key
+
+        // Determine target key: use setlist override, or fall back to canonical song's current key
+        let targetKey = songEntry.key
+        if (targetKey === null || targetKey === undefined) {
+          // No override in setlist, use the canonical song's current key from database
+          targetKey = canonicalSong?.key || null
+        }
 
         // Apply transposition if requested and we have a reference key
         if (targetKey && originalKey && targetKey !== originalKey) {
@@ -1348,10 +1366,16 @@ class PageApp {
           parsed.metadata.key = targetKey
         }
 
-        // Apply BPM override
-        const bpmOverride = songEntry.tempo
-        if (bpmOverride) {
-          parsed.metadata.tempo = bpmOverride
+        // Determine target tempo: use setlist override, or fall back to canonical song's current tempo
+        let targetTempo = songEntry.tempo
+        if (targetTempo === null || targetTempo === undefined) {
+          // No override in setlist, use the canonical song's current tempo from database
+          targetTempo = canonicalSong?.tempo || null
+        }
+
+        // Apply tempo override
+        if (targetTempo) {
+          parsed.metadata.tempo = targetTempo
         }
 
         // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
@@ -3895,23 +3919,22 @@ class PageApp {
         return
       }
 
-      // Create new song entry
+      // Create new song entry using new schema
+      // key: null means use the canonical song's current key
+      // tempo: null means use the canonical song's current tempo
       const newSongEntry = {
         order: setlist.songs.length,
         songId: song.id,
+        key: null, // Will use song's current key from database
+        tempo: null, // Will use song's current tempo from database
+        notes: '',
         chordproEdits: null,
-        modifications: {
-          targetKey: null,
-          bpmOverride: null,
-          fontSize: 1.6,
-          sectionStates: {},
-        },
       }
 
-      // Preload pads for the song's default key in the background
-      const songDefaultKey = song?.metadata?.key || song?.parsed?.metadata?.key || null
-      if (songDefaultKey) {
-        preloadPadKey(songDefaultKey)
+      // Preload pads for the song's current key in the background
+      const songCurrentKey = song?.key || song?.metadata?.key || song?.parsed?.metadata?.key || null
+      if (songCurrentKey) {
+        preloadPadKey(songCurrentKey)
       }
 
       // Add to setlist
@@ -3921,7 +3944,7 @@ class PageApp {
       // Save to database
       await this.db.saveSetlist(setlist)
 
-      console.log('Added song to setlist:', song.title)
+      console.log('Added song to setlist:', song.title, 'with current key:', songCurrentKey)
 
       // Close modal
       const modal = document.getElementById('add-song-modal')
