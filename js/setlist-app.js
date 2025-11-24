@@ -803,79 +803,64 @@ class PageApp {
     }
 
     try {
-      // Get the updated song from database (in case it was modified)
-      // currentLibrarySongId is the UUID
-      const song = await this.db.getSong(this.currentLibrarySongId)
-
-      if (!song) {
-        console.error('Song not found in database')
-        return
-      }
+      // Use LibrarySong model for persistence
+      const { createLibrarySongModel } = await import('./song-model-factory.js')
+      const model = createLibrarySongModel(this.currentLibrarySong, this.db, this.db.organisationId)
 
       // Update key if it has changed
-      if (this.currentLibraryKey && this.currentLibraryKey !== song.key) {
-        song.key = this.currentLibraryKey
-        console.log(`Updated song key to: ${this.currentLibraryKey}`)
+      if (this.currentLibraryKey && this.currentLibraryKey !== model.getKey()) {
+        model.setKey(this.currentLibraryKey)
+        console.log(`[LibrarySong Model] Updated song key to: ${this.currentLibraryKey}`)
       }
 
-      // Update the timestamp
-      song.modifiedDate = new Date().toISOString()
+      // Collect and save section defaults
+      const sectionDefaults = this._collectLibrarySectionDefaults()
+      if (sectionDefaults && Object.keys(sectionDefaults).length > 0) {
+        for (const [index, state] of Object.entries(sectionDefaults)) {
+          model.setSectionState(Number(index), state)
+        }
+      }
 
-      // Save back to per-org database
-      await this.db.saveSong(song)
+      // Save capo if set
+      if (
+        this._capoEnabled &&
+        this.currentLibraryCapo !== undefined &&
+        this.currentLibraryCapo !== 0
+      ) {
+        model.setCapo(this.currentLibraryCapo)
+      }
 
-      console.log('Saved song to database:', song.title)
+      // Save all changes via model
+      await model.save()
+      console.log('[LibrarySong Model] Saved all changes via model')
 
-      // Save song user prefs (capo and section visibility)
-      await this.saveLibrarySongUserPrefs()
+      // Update in-memory song key if changed
+      if (this.currentLibraryKey && this.currentLibraryKey !== this.currentLibrarySong.key) {
+        this.currentLibrarySong.key = this.currentLibraryKey
+      }
 
-      // Refresh the library song view with updated data
-      const { getSongWithContent } = await import('./song-utils.js')
-      const fullSong = await getSongWithContent(song.uuid, this.db)
-      this.currentLibrarySong = fullSong
-      await this.viewLibrarySong(fullSong)
+      // Don't reload the view - just update edit mode state on sections
+      // This preserves the section visibility that was just saved
+      const contentElement = document.getElementById('library-song-content')
+      if (contentElement) {
+        const songDisplay = contentElement.querySelector('song-display')
+        if (songDisplay && songDisplay.shadowRoot) {
+          const sections = songDisplay.shadowRoot.querySelectorAll('song-section')
+          sections.forEach(section => {
+            section.editMode = false
+          })
+        }
+      }
     } catch (error) {
       console.error('Error saving library song:', error)
     }
   }
 
+  // NOTE: This function is now replaced by LibrarySong model in saveLibrarySongToDatabase()
+  // Keeping stub for backwards compatibility if needed
   async saveLibrarySongUserPrefs() {
-    if (!this.currentLibrarySong) return
-
-    try {
-      const { saveSongUserPrefs } = await import('./song-user-prefs.js')
-
-      // Collect section defaults from the library view
-      const sectionDefaults = this._collectLibrarySectionDefaults()
-
-      // Collect capo (if capo is enabled and set)
-      const capo =
-        this._capoEnabled && this.currentLibraryCapo !== undefined
-          ? this.currentLibraryCapo
-          : undefined
-
-      // Only save if we have something to save
-      if (sectionDefaults && Object.keys(sectionDefaults).length > 0) {
-        saveSongUserPrefs(this.currentLibrarySong.id, this.db.organisationId, {
-          sectionDefaults,
-        })
-        console.log('[Library] Saved section defaults to song user prefs')
-      }
-
-      if (capo !== undefined && capo !== 0) {
-        saveSongUserPrefs(this.currentLibrarySong.id, this.db.organisationId, {
-          capo,
-        })
-        console.log('[Library] Saved capo to song user prefs:', capo)
-      }
-
-      // Invalidate cache for this song so new prefs are loaded
-      if (this._songUserPrefsCache && this.currentLibrarySong.id) {
-        delete this._songUserPrefsCache[this.currentLibrarySong.id]
-      }
-    } catch (error) {
-      console.error('[Library] Error saving song user prefs:', error)
-    }
+    // No-op: Now handled by LibrarySong model
+    console.log('[DEPRECATED] saveLibrarySongUserPrefs called - now handled by LibrarySong model')
   }
 
   _collectLibrarySectionDefaults() {
@@ -1602,7 +1587,7 @@ class PageApp {
         }
 
         // Create song object for runtime
-        songs.push({
+        const runtimeSong = {
           title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
           parsed: parsed,
           songIndex: songEntry.order,
@@ -1620,7 +1605,12 @@ class PageApp {
           songId: songEntry.songId,
           sourceText: sourceText,
           hasLocalEdits: songEntry.chordproEdits !== null,
-        })
+          // Store references needed for model creation
+          _setlistEntry: songEntry,
+          _canonicalSong: canonicalSong,
+        }
+
+        songs.push(runtimeSong)
       }
 
       console.log('Parsed songs:', songs.length)
@@ -2498,6 +2488,31 @@ class PageApp {
     localStorage.setItem(stateKey, JSON.stringify(stateToSave))
   }
 
+  /**
+   * Save section states for a specific song using SongModel
+   */
+  async _saveSectionStateViaModel(songIndex) {
+    const song = this.songs[songIndex]
+    if (!song) return
+
+    const { createSetlistSongModel, syncSectionStates } = await import('./song-model-factory.js')
+    const model = createSetlistSongModel(
+      song,
+      song._setlistEntry,
+      song._canonicalSong,
+      this.currentSetlistId,
+      this.db,
+      this.db.organisationId
+    )
+
+    // Sync all section states for this song
+    const sectionStatesForSong = this.sectionState[songIndex] || {}
+    syncSectionStates(model, sectionStatesForSong)
+
+    await model.save()
+    console.log('[SongModel] Saved section states via model for song:', songIndex)
+  }
+
   _getSectionDefaultsConfig() {
     let stored = null
     try {
@@ -2680,7 +2695,7 @@ class PageApp {
     return label.trim().toLowerCase()
   }
 
-  setSectionHideMode(songIndex, sectionIndex, mode) {
+  async setSectionHideMode(songIndex, sectionIndex, mode) {
     const component = this._getSongSectionComponent(songIndex, sectionIndex)
     const state = this._ensureSectionOverride(songIndex, sectionIndex, component)
 
@@ -2715,7 +2730,7 @@ class PageApp {
           state.hideMode = 'none'
         }
       }
-      this.saveState()
+      await this._saveSectionStateViaModel(songIndex)
       this.updateSectionDOM(songIndex, sectionIndex)
       return
     }
@@ -2732,11 +2747,11 @@ class PageApp {
     } else {
       state.hideMode = state.hideMode === mappedMode ? 'none' : mappedMode
     }
-    this.saveState()
+    await this._saveSectionStateViaModel(songIndex)
     this.updateSectionDOM(songIndex, sectionIndex)
   }
 
-  animateSectionToggle(songIndex, sectionIndex, details) {
+  async animateSectionToggle(songIndex, sectionIndex, details) {
     const state = this._ensureSectionOverride(songIndex, sectionIndex)
     const content = details.querySelector('.section-content')
     const wrapper = details.closest('.song-section-wrapper') || details
@@ -2752,7 +2767,7 @@ class PageApp {
       // Opening: update state first
       state.isCollapsed = false
       state.hideMode = 'none'
-      this.saveState()
+      await this._saveSectionStateViaModel(songIndex)
 
       // Update wrapper classes
       wrapper.classList.remove('section-collapsed')
@@ -2795,10 +2810,10 @@ class PageApp {
         content.style.height = endHeight + 'px'
 
         // After animation completes, update state
-        setTimeout(() => {
+        setTimeout(async () => {
           state.isCollapsed = true
           state.hideMode = 'collapse'
-          this.saveState()
+          await this._saveSectionStateViaModel(songIndex)
 
           // Update wrapper classes (adds section-collapsed)
           wrapper.classList.add('section-collapsed')
@@ -3093,7 +3108,7 @@ class PageApp {
     this.updateCapoSelector(currentCapo, currentSong?.currentKey || null)
   }
 
-  handleCapoChange(newValue) {
+  async handleCapoChange(newValue) {
     if (!this._capoEnabled || this.currentSongIndex < 0) return
     const normalized = this._normalizeCapoValue(newValue)
     const song = this.songs[this.currentSongIndex]
@@ -3101,8 +3116,20 @@ class PageApp {
 
     song.currentCapo = normalized
 
-    // Save capo to localStorage
-    this.saveState()
+    // Use SongModel to persist the change
+    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const model = createSetlistSongModel(
+      song,
+      song._setlistEntry,
+      song._canonicalSong,
+      this.currentSetlistId,
+      this.db,
+      this.db.organisationId
+    )
+    model.setCapo(normalized)
+    await model.save()
+
+    console.log('[SongModel] Saved capo change via model:', normalized)
 
     this.updateCapoSelector(normalized, song.currentKey)
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
@@ -3113,8 +3140,26 @@ class PageApp {
 
     console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`)
 
-    // Update key in setlist (use new schema property)
-    this.currentSetlist.songs[this.currentSongIndex].key = newKey
+    const song = this.songs[this.currentSongIndex]
+    if (!song) return
+
+    // Update key in runtime song object
+    song.currentKey = newKey
+
+    // Use SongModel to persist the change
+    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const model = createSetlistSongModel(
+      song,
+      song._setlistEntry,
+      song._canonicalSong,
+      this.currentSetlistId,
+      this.db,
+      this.db.organisationId
+    )
+    model.setKey(newKey)
+    await model.save()
+
+    console.log('[SongModel] Saved key change via model:', newKey)
 
     // Re-render the song with transposition
     await this.reRenderSong(this.currentSongIndex)
