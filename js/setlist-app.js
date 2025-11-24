@@ -637,9 +637,16 @@ class PageApp {
     songContent.appendChild(songDisplay)
     contentElement.appendChild(songContent)
 
-    // Initialize song sections (must happen after DOM is attached)
+    // Wait for song-display to complete its initial render
+    await customElements.whenDefined('song-display')
+    await songDisplay.updateComplete
+
+    // Initialize song sections (must happen after song-display renders its shadow DOM)
     await customElements.whenDefined('song-section')
     this._initializeSongSections(contentElement)
+
+    // Setup section controls for library
+    this.setupLibrarySectionControls()
 
     // Setup key selector for library
     this.setupLibraryKeySelector(parsed)
@@ -764,10 +771,8 @@ class PageApp {
           keySelector.editMode = false
         }
 
+        // Save and refresh view (viewLibrarySong will re-initialize sections)
         this.saveLibrarySongToDatabase()
-
-        // Update all section components
-        this._initializeSongSections()
       }
     })
 
@@ -821,6 +826,9 @@ class PageApp {
 
       console.log('Saved song to database:', song.title)
 
+      // Save song user prefs (capo and section visibility)
+      await this.saveLibrarySongUserPrefs()
+
       // Refresh the library song view with updated data
       const { getSongWithContent } = await import('./song-utils.js')
       const fullSong = await getSongWithContent(song.uuid, this.db)
@@ -829,6 +837,80 @@ class PageApp {
     } catch (error) {
       console.error('Error saving library song:', error)
     }
+  }
+
+  async saveLibrarySongUserPrefs() {
+    if (!this.currentLibrarySong) return
+
+    try {
+      const { saveSongUserPrefs } = await import('./song-user-prefs.js')
+
+      // Collect section defaults from the library view
+      const sectionDefaults = this._collectLibrarySectionDefaults()
+
+      // Collect capo (if capo is enabled and set)
+      const capo =
+        this._capoEnabled && this.currentLibraryCapo !== undefined
+          ? this.currentLibraryCapo
+          : undefined
+
+      // Only save if we have something to save
+      if (sectionDefaults && Object.keys(sectionDefaults).length > 0) {
+        saveSongUserPrefs(this.currentLibrarySong.id, this.db.organisationId, {
+          sectionDefaults,
+        })
+        console.log('[Library] Saved section defaults to song user prefs')
+      }
+
+      if (capo !== undefined && capo !== 0) {
+        saveSongUserPrefs(this.currentLibrarySong.id, this.db.organisationId, {
+          capo,
+        })
+        console.log('[Library] Saved capo to song user prefs:', capo)
+      }
+
+      // Invalidate cache for this song so new prefs are loaded
+      if (this._songUserPrefsCache && this.currentLibrarySong.id) {
+        delete this._songUserPrefsCache[this.currentLibrarySong.id]
+      }
+    } catch (error) {
+      console.error('[Library] Error saving song user prefs:', error)
+    }
+  }
+
+  _collectLibrarySectionDefaults() {
+    const contentElement = document.getElementById('library-song-content')
+    if (!contentElement) return {}
+
+    const sectionDefaults = {}
+
+    // Find all song-section elements in library view
+    const sections = []
+    const songDisplay = contentElement.querySelector('song-display')
+    if (songDisplay && songDisplay.shadowRoot) {
+      sections.push(...songDisplay.shadowRoot.querySelectorAll('song-section'))
+    }
+
+    sections.forEach(section => {
+      const sectionIndex = Number(section.getAttribute('section-index'))
+      if (Number.isNaN(sectionIndex)) return
+
+      // Only save if not in default state
+      const hideMode = section.hideMode || 'none'
+      const isCollapsed = section.isCollapsed || false
+      const isHidden = section.isHidden || false
+
+      // Check if different from defaults
+      if (hideMode !== 'none' || isCollapsed !== false || isHidden !== false) {
+        sectionDefaults[sectionIndex.toString()] = {
+          hideMode,
+          isCollapsed,
+          isHidden,
+        }
+      }
+    })
+
+    return sectionDefaults
   }
 
   setupLibraryKeySelector(parsed) {
@@ -1013,6 +1095,118 @@ class PageApp {
     const songContent = contentElement.querySelector('.song-content')
     if (songContent) {
       songContent.style.fontSize = `${this.currentLibraryFontSize}rem`
+    }
+  }
+
+  setupLibrarySectionControls() {
+    const container = document.getElementById('library-song-content')
+    if (!container) return
+
+    // Set up section action handler (hide mode buttons)
+    if (!this._librarySectionActionHandler) {
+      this._librarySectionActionHandler = event => {
+        const { sectionIndex, action } = event.detail || {}
+        if (typeof sectionIndex !== 'number' || !action) {
+          return
+        }
+        // Library view treats the song as songIndex = 0
+        this.setLibrarySectionHideMode(sectionIndex, action)
+      }
+      container.addEventListener('section-action', this._librarySectionActionHandler)
+    }
+
+    // Set up section toggle handler (collapse/expand)
+    if (!this._librarySectionToggleHandler) {
+      this._librarySectionToggleHandler = event => {
+        const { sectionIndex } = event.detail || {}
+        if (typeof sectionIndex !== 'number') {
+          return
+        }
+        // Library view treats the song as songIndex = 0
+        const songDisplay = container.querySelector('song-display')
+        if (songDisplay && songDisplay.shadowRoot) {
+          const component = songDisplay.shadowRoot.querySelector(
+            `song-section[section-index="${sectionIndex}"]`
+          )
+          const details = component?.getDetailsElement()
+          if (details) {
+            this.animateLibrarySectionToggle(sectionIndex, details)
+          }
+        }
+      }
+      container.addEventListener('section-toggle', this._librarySectionToggleHandler)
+    }
+  }
+
+  setLibrarySectionHideMode(sectionIndex, mode) {
+    const container = document.getElementById('library-song-content')
+    if (!container) return
+
+    const songDisplay = container.querySelector('song-display')
+    if (!songDisplay || !songDisplay.shadowRoot) return
+
+    const component = songDisplay.shadowRoot.querySelector(
+      `song-section[section-index="${sectionIndex}"]`
+    )
+    if (!component) return
+
+    // Apply the mode change directly to the component
+    if (mode === 'collapse') {
+      const details = component.getDetailsElement()
+      if (details) {
+        this.animateLibrarySectionToggle(sectionIndex, details)
+      }
+      return
+    }
+
+    const explicitShowMap = {
+      'show-all': 'none',
+      'show-lyrics': 'chords',
+      'show-chords': 'lyrics',
+      'show-none': 'hide',
+    }
+    const mappedMode = explicitShowMap[mode] || mode
+    const isExplicit = Boolean(explicitShowMap[mode])
+
+    if (mappedMode === 'hide') {
+      if (isExplicit) {
+        component.isHidden = true
+        component.hideMode = 'hide'
+        component.isCollapsed = false
+      } else {
+        component.isHidden = !component.isHidden
+        if (component.isHidden) {
+          component.hideMode = 'hide'
+          component.isCollapsed = false
+        }
+      }
+    } else {
+      component.isHidden = false
+      component.hideMode = mappedMode
+    }
+  }
+
+  animateLibrarySectionToggle(sectionIndex, detailsElement) {
+    const isOpen = detailsElement.open
+    const container = document.getElementById('library-song-content')
+    if (!container) return
+
+    const songDisplay = container.querySelector('song-display')
+    if (!songDisplay || !songDisplay.shadowRoot) return
+
+    const component = songDisplay.shadowRoot.querySelector(
+      `song-section[section-index="${sectionIndex}"]`
+    )
+    if (!component) return
+
+    if (isOpen) {
+      // Closing
+      component.isCollapsed = true
+      detailsElement.open = false
+    } else {
+      // Opening
+      component.isCollapsed = false
+      detailsElement.open = true
     }
   }
 
@@ -1350,10 +1544,10 @@ class PageApp {
         // Capture original key from ChordPro file (for transposition reference)
         const originalKey = parsed.metadata.key || null
 
-        // Determine target key: use setlist override, or fall back to canonical song's current key
+        // Get target key from setlist (explicit snapshot)
+        // Fallback to canonical song's key for backwards compatibility with old setlists
         let targetKey = songEntry.key
         if (targetKey === null || targetKey === undefined) {
-          // No override in setlist, use the canonical song's current key from database
           targetKey = canonicalSong?.key || null
         }
 
@@ -1366,10 +1560,10 @@ class PageApp {
           parsed.metadata.key = targetKey
         }
 
-        // Determine target tempo: use setlist override, or fall back to canonical song's current tempo
+        // Get target tempo from setlist (explicit snapshot)
+        // Fallback to canonical song's tempo for backwards compatibility with old setlists
         let targetTempo = songEntry.tempo
         if (targetTempo === null || targetTempo === undefined) {
-          // No override in setlist, use the canonical song's current tempo from database
           targetTempo = canonicalSong?.tempo || null
         }
 
@@ -2244,6 +2438,47 @@ class PageApp {
     } else {
       this.sectionState = {}
     }
+
+    // Apply capo defaults from song user prefs (for songs without explicit setlist override)
+    this._applyCapoDefaults()
+  }
+
+  async _applyCapoDefaults() {
+    if (!this._capoEnabled) return
+
+    const { getSongUserPrefs } = await import('./song-user-prefs.js')
+
+    this.songs.forEach((song, index) => {
+      // Skip if capo already set by setlist state (highest priority)
+      if (song.currentCapo !== undefined && song.currentCapo !== 0) {
+        return
+      }
+
+      // Get song user prefs
+      const songUserPrefs = getSongUserPrefs(song.songId, this.db.organisationId)
+      if (!songUserPrefs || songUserPrefs.capo === undefined) {
+        return
+      }
+
+      // Only apply song prefs capo if using canonical key
+      const setlistSongEntry = this.currentSetlist?.songs?.[index]
+      if (!setlistSongEntry) return
+
+      // Get canonical song to compare keys
+      const canonicalSong = this.songs[index]
+      if (!canonicalSong) return
+
+      // Check if setlist key matches what the user's prefs are based on
+      // We need to compare against the canonical song's current key
+      // The song user prefs capo is based on the canonical key at the time they set it
+      if (setlistSongEntry.key === song.currentKey) {
+        // Key hasn't been changed from canonical, apply user's preferred capo
+        song.currentCapo = this._normalizeCapoValue(songUserPrefs.capo)
+        console.log(
+          `[Capo] Applied song user pref capo=${songUserPrefs.capo} for song ${song.title}`
+        )
+      }
+    })
   }
 
   saveState() {
@@ -2289,21 +2524,69 @@ class PageApp {
   }
 
   _resolveSectionState(songIndex, sectionIndex, sectionElement = null) {
+    // Priority 1: Setlist state override (explicit per-setlist override)
     const overridesForSong = this.sectionState[songIndex] || {}
     const override = overridesForSong[sectionIndex] || null
-    const defaults = {
+
+    // Priority 2: Song user prefs (user's defaults for this song)
+    const songUserPrefsDefaults = this._getSongUserPrefsSectionDefaults(songIndex, sectionIndex)
+
+    // Priority 3: Global section defaults & app defaults
+    const appDefaults = {
       hideMode: this._resolveDefaultHideMode(sectionElement, songIndex, sectionIndex),
       isCollapsed: false,
       isHidden: false,
     }
-    if (!override) {
-      return defaults
+
+    // Merge priorities
+    if (!override && !songUserPrefsDefaults) {
+      return appDefaults
     }
+
     return {
-      hideMode: override.hideMode ?? defaults.hideMode,
-      isCollapsed: override.isCollapsed ?? defaults.isCollapsed,
-      isHidden: override.isHidden ?? defaults.isHidden,
+      hideMode: override?.hideMode ?? songUserPrefsDefaults?.hideMode ?? appDefaults.hideMode,
+      isCollapsed:
+        override?.isCollapsed ?? songUserPrefsDefaults?.isCollapsed ?? appDefaults.isCollapsed,
+      isHidden: override?.isHidden ?? songUserPrefsDefaults?.isHidden ?? appDefaults.isHidden,
     }
+  }
+
+  _getSongUserPrefsSectionDefaults(songIndex, sectionIndex) {
+    // Get song user prefs for this song
+    // Handle both setlist view (this.songs[index]) and library view (this.currentLibrarySong)
+    let song = this.songs?.[songIndex]
+    if (!song && songIndex === 0 && this.currentLibrarySong) {
+      // We're in library view
+      song = this.currentLibrarySong
+    }
+    if (!song) return null
+
+    // Get songId (library songs use .id, setlist songs use .songId)
+    const songId = song.songId || song.id
+    if (!songId) return null
+
+    // Check if we have cached prefs
+    if (!this._songUserPrefsCache) {
+      this._songUserPrefsCache = {}
+    }
+
+    // Load prefs if not cached
+    if (!(songId in this._songUserPrefsCache)) {
+      try {
+        // Synchronous access for performance
+        const key = `setalight-song-prefs-${this.db.organisationId}`
+        const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
+        this._songUserPrefsCache[songId] = allPrefs[songId] || null
+      } catch (error) {
+        console.error('[SongUserPrefs] Error loading prefs:', error)
+        this._songUserPrefsCache[songId] = null
+      }
+    }
+
+    const prefs = this._songUserPrefsCache[songId]
+    if (!prefs || !prefs.sectionDefaults) return null
+
+    return prefs.sectionDefaults[sectionIndex.toString()] || null
   }
 
   _ensureSectionOverride(songIndex, sectionIndex, sectionElement = null) {
@@ -3919,20 +4202,21 @@ class PageApp {
         return
       }
 
-      // Create new song entry using new schema
-      // key: null means use the canonical song's current key
-      // tempo: null means use the canonical song's current tempo
+      // Create new song entry using new schema with explicit snapshot
+      // Key and tempo are explicitly set from canonical song (snapshot in time)
+      const songCurrentKey = song?.key || song?.metadata?.key || song?.parsed?.metadata?.key || null
+      const songCurrentTempo = song?.tempo || song?.metadata?.tempo || null
+
       const newSongEntry = {
         order: setlist.songs.length,
         songId: song.id,
-        key: null, // Will use song's current key from database
-        tempo: null, // Will use song's current tempo from database
+        key: songCurrentKey, // Explicit snapshot of canonical key
+        tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
         notes: '',
         chordproEdits: null,
       }
 
       // Preload pads for the song's current key in the background
-      const songCurrentKey = song?.key || song?.metadata?.key || song?.parsed?.metadata?.key || null
       if (songCurrentKey) {
         preloadPadKey(songCurrentKey)
       }
