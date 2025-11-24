@@ -1383,11 +1383,6 @@ class PageApp {
           tempoNote = canonicalSong.metadata.tempoNote
         }
 
-        const capoValue = this._normalizeCapoValue(songEntry.capo)
-        if (typeof songEntry.capo !== 'number') {
-          songEntry.capo = capoValue
-        }
-
         // Create song object for runtime
         songs.push({
           title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
@@ -1403,7 +1398,7 @@ class PageApp {
           currentKey: parsed.metadata.key,
           currentBPM: currentBPM,
           currentFontSize: CONFIG.DEFAULT_FONT_SIZE, // fontSize is now in setlist_local, not modifications
-          currentCapo: capoValue,
+          currentCapo: 0, // Capo is loaded from localStorage in loadState()
           songId: songEntry.songId,
           sourceText: sourceText,
           hasLocalEdits: songEntry.chordproEdits !== null,
@@ -1473,6 +1468,7 @@ class PageApp {
         if (hashValue === 'overview') {
           // Overview is already visible by default
           this._lastVisibleSection = 'overview'
+          this.currentSongIndex = -1
           this.updateHeader(null, true) // true = instant, no animation
           this.exitEditMode()
           this.dispatchSongChange(null)
@@ -1482,6 +1478,7 @@ class PageApp {
           const index = parseInt(hashValue.split('-')[1])
           // Song is already visible from pre-render setup above
           this._lastVisibleSection = `song-${index}`
+          this.currentSongIndex = index
           this.updateHeader(this.songs[index], true) // true = instant, no animation
           this.applyFontSize(index)
           this.exitEditMode()
@@ -1496,6 +1493,7 @@ class PageApp {
         // Default to overview (already visible)
         console.log('No hash, showing overview')
         this._lastVisibleSection = 'overview'
+        this.currentSongIndex = -1
         this.updateHeader(null, true) // true = instant, no animation
         this.exitEditMode()
         this.dispatchSongChange(null)
@@ -1526,9 +1524,6 @@ class PageApp {
         // Set up key selector
         this.setupKeySelector()
         this.setupCapoSelector()
-
-        // Set up font size controls
-        this.setupFontSizeControls()
 
         // Set up reset button
         this.setupResetButton()
@@ -2202,7 +2197,22 @@ class PageApp {
     const savedState = localStorage.getItem(stateKey)
     if (savedState) {
       try {
-        this.sectionState = JSON.parse(savedState)
+        const parsed = JSON.parse(savedState)
+        // Extract capo data if it exists
+        if (parsed.capo) {
+          // Load capo values into runtime songs
+          if (this._capoEnabled) {
+            Object.keys(parsed.capo).forEach(songIndex => {
+              const index = parseInt(songIndex)
+              if (this.songs[index]) {
+                this.songs[index].currentCapo = this._normalizeCapoValue(parsed.capo[songIndex])
+              }
+            })
+          }
+          // Remove capo from sectionState since it's handled separately
+          delete parsed.capo
+        }
+        this.sectionState = parsed
       } catch (e) {
         console.error('Failed to parse saved state:', e)
         this.sectionState = {}
@@ -2214,7 +2224,19 @@ class PageApp {
 
   saveState() {
     const stateKey = `setalight-state-${this.currentSetlistId}`
-    localStorage.setItem(stateKey, JSON.stringify(this.sectionState))
+    const stateToSave = { ...this.sectionState }
+
+    // Save capo values if capo is enabled
+    if (this._capoEnabled) {
+      stateToSave.capo = {}
+      this.songs.forEach((song, index) => {
+        if (song.currentCapo !== undefined && song.currentCapo !== 0) {
+          stateToSave.capo[index] = song.currentCapo
+        }
+      })
+    }
+
+    localStorage.setItem(stateKey, JSON.stringify(stateToSave))
   }
 
   _getSectionDefaultsConfig() {
@@ -2772,9 +2794,8 @@ class PageApp {
 
     song.currentCapo = normalized
 
-    if (this.currentSetlist?.songs?.[this.currentSongIndex]) {
-      this.currentSetlist.songs[this.currentSongIndex].capo = normalized
-    }
+    // Save capo to localStorage
+    this.saveState()
 
     this.updateCapoSelector(normalized, song.currentKey)
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
@@ -2801,35 +2822,6 @@ class PageApp {
 
     // Ensure the pad for this key is cached for upcoming playback
     preloadPadKey(newKey)
-  }
-
-  setupFontSizeControls() {
-    const decreaseBtn = document.getElementById('font-size-decrease')
-    const increaseBtn = document.getElementById('font-size-increase')
-
-    if (!decreaseBtn || !increaseBtn) return
-
-    decreaseBtn.addEventListener('click', () => {
-      if (this.currentSongIndex >= 0) {
-        const song = this.songs[this.currentSongIndex]
-        song.currentFontSize = Math.max(
-          CONFIG.MIN_FONT_SIZE,
-          song.currentFontSize - CONFIG.FONT_SIZE_STEP
-        )
-        this.applyFontSize(this.currentSongIndex)
-      }
-    })
-
-    increaseBtn.addEventListener('click', () => {
-      if (this.currentSongIndex >= 0) {
-        const song = this.songs[this.currentSongIndex]
-        song.currentFontSize = Math.min(
-          CONFIG.MAX_FONT_SIZE,
-          song.currentFontSize + CONFIG.FONT_SIZE_STEP
-        )
-        this.applyFontSize(this.currentSongIndex)
-      }
-    })
   }
 
   async _animateSlottedContent(updateCallback) {
@@ -2902,9 +2894,6 @@ class PageApp {
 
     if (this._capoEnabled) {
       song.currentCapo = 0
-      if (this.currentSetlist?.songs?.[this.currentSongIndex]) {
-        this.currentSetlist.songs[this.currentSongIndex].capo = 0
-      }
       this.updateCapoSelector(0, song.currentKey)
       this._updateSongDisplayCapo(this.currentSongIndex, 0)
     }

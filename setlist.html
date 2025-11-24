@@ -40,14 +40,6 @@
             >
               ↺
             </button>
-            <div class="font-size-controls edit-mode-control">
-              <button class="font-size-btn" id="font-size-decrease" aria-label="Decrease font size">
-                A−
-              </button>
-              <button class="font-size-btn" id="font-size-increase" aria-label="Increase font size">
-                A+
-              </button>
-            </div>
             <!-- Key display/selector component -->
             <key-selector id="key-selector" label="Key"></key-selector>
             <capo-selector id="capo-selector" label="Capo" style="display: none"></capo-selector>
@@ -75,7 +67,7 @@
         id="reset-confirm-modal"
         type="confirm"
         heading="Reset Song?"
-        message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+        message="This will reset the key, capo, and all section states back to defaults. This cannot be undone."
         confirm-label="Reset"
         cancel-label="Cancel"
       >
