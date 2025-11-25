@@ -33,7 +33,7 @@
 
     <script type="module">
       import { OrganisationDB } from './js/organisation-db.js';
-      import { SetalightDB } from './js/db.js';
+      import { ChordlessDB } from './js/db.js';
 
       const output = document.getElementById('output');
 
@@ -74,13 +74,13 @@
           logObject('Retrieved organisation', retrieved);
           log('✓ Organisation retrieved successfully', 'success');
 
-          log('\\n=== Testing SetalightDB ===');
+          log('\\n=== Testing ChordlessDB ===');
 
           // Test 4: Create organisation-specific database
-          log(`4. Creating SetalightDB for organisation ${testOrg.id}...`);
-          const db = new SetalightDB(testOrg.id);
+          log(`4. Creating ChordlessDB for organisation ${testOrg.id}...`);
+          const db = new ChordlessDB(testOrg.id);
           await db.init();
-          log('✓ SetalightDB initialized', 'success');
+          log('✓ ChordlessDB initialized', 'success');
 
           // Test 5: Verify all object stores exist
           log('5. Verifying object stores...');

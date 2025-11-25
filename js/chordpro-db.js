@@ -4,7 +4,7 @@
  * Stores raw chordpro file content only.
  * All metadata lives in SongsDB.
  *
- * Database: SetalightDB-songs (global, shared with SongsDB)
+ * Database: ChordlessDB-songs (global, shared with SongsDB)
  * Object Store: chordpro
  *
  * ChordPro records contain:
@@ -14,7 +14,7 @@
  * - Sync metadata (for future Drive sync)
  */
 
-const DB_NAME = 'SetalightDB-songs'
+const DB_NAME = 'songs'
 const DB_VERSION = 2
 
 export class ChordProDB {

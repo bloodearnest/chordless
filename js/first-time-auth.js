@@ -8,7 +8,7 @@
 import { getCurrentUserInfo } from './google-auth.js'
 import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.js'
 
-const FIRST_AUTH_KEY = 'setalight-first-auth-done'
+const FIRST_AUTH_KEY = 'first-auth-done'
 
 /**
  * Check if this is the first time user has authenticated

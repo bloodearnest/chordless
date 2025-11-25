@@ -6,7 +6,7 @@ import { ensurePersistentStorage } from './utils/persistence.js'
  * Stores song metadata (NOT chordpro content) that is shared across all organisations.
  * ChordPro content is stored separately in ChordProDB.
  *
- * Database: SetalightDB-songs (global, not organisation-specific)
+ * Database: ChordlessDB-songs (global, not organisation-specific)
  * Object Stores:
  * - songs: Song metadata with versions array
  * - chordpro: Raw chordpro content (managed by ChordProDB)
@@ -24,7 +24,7 @@ import { ensurePersistentStorage } from './utils/persistence.js'
  * - Sync metadata: lastModified, Drive sync state (for future)
  */
 
-const DB_NAME = 'SetalightDB-songs'
+const DB_NAME = 'songs'
 const DB_VERSION = 2
 
 export class SongsDB {

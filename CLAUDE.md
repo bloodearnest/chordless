@@ -1,4 +1,4 @@
-# Project: setalight
+# Project: chordless
 
 ## Overview
 

@@ -1,6 +1,6 @@
-# Setalight Development Guide
+# Chordless Development Guide
 
-Setalight is designed to run exactly the same locally as it does in production: an HTTPS-only, service-worker-driven webapp served by Caddy with HTTP/2/3 enabled. Follow this guide to get your machine ready and to keep certificates in sync.
+Chordless is designed to run exactly the same locally as it does in production: an HTTPS-only, service-worker-driven webapp served by Caddy with HTTP/2/3 enabled. Follow this guide to get your machine ready and to keep certificates in sync.
 
 ## Prerequisites
 
@@ -19,8 +19,8 @@ just setup-dev-https
 What this does:
 
 1. Generates `certs/dev.crt` and `certs/dev.key` if they do not already exist.
-2. Copies the certificate into `/usr/local/share/ca-certificates/setalight-dev.crt` and runs `update-ca-certificates` (you will be prompted for sudo).
-3. If `certutil` is available, adds/removes the `setalight-dev` CA entry inside Chrome/Chromium’s NSS database at `~/.pki/nssdb`.
+2. Copies the certificate into `/usr/local/share/ca-certificates/chordless-dev.crt` and runs `update-ca-certificates` (you will be prompted for sudo).
+3. If `certutil` is available, adds/removes the `chordless-dev` CA entry inside Chrome/Chromium’s NSS database at `~/.pki/nssdb`.
 4. Reminds you to restart browsers so they pick up the refreshed trust store.
 
 To undo the setup (e.g., before rotating the certs or leaving the project), run:

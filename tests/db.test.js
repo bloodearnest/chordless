@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { createSetlist, SetalightDB } from '../js/db.js'
+import { ChordlessDB, createSetlist } from '../js/db.js'
 
 const uniqueName = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
@@ -16,7 +16,7 @@ const deleteDatabase = name =>
     request.onsuccess = request.onerror = request.onblocked = () => resolve()
   })
 
-describe('SetalightDB', () => {
+describe('ChordlessDB', () => {
   let db
 
   afterEach(async () => {
@@ -28,7 +28,7 @@ describe('SetalightDB', () => {
 
   it('saves and retrieves setlist', async () => {
     const orgName = `TEST-${uniqueName()}`
-    db = new SetalightDB(orgName)
+    db = new ChordlessDB(orgName)
     await db.init()
 
     const setlist = createSetlist({

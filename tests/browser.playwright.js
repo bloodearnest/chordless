@@ -109,7 +109,7 @@ test.describe('Application Pages', () => {
 
     // Check for main heading
     const heading = await page.locator('h1').textContent()
-    expect(heading).toBe('Setalight')
+    expect(heading).toBe('Chordless')
 
     console.log('✓ Home page loaded successfully')
   })
@@ -120,7 +120,7 @@ test.describe('Application Pages', () => {
 
     // Check we got the right page
     const title = await page.title()
-    expect(title).toBe('Setlist - Setalight')
+    expect(title).toBe('Setlist - Chordless')
 
     // Wait for the setlist view structure
     await page.waitForSelector('#song-view', { timeout: 5000 })

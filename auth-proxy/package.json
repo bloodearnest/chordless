@@ -1,7 +1,7 @@
 {
-  "name": "setalight-auth-proxy",
+  "name": "chordless-auth-proxy",
   "version": "1.0.0",
-  "description": "Stateless OAuth proxy for Setalight Google Drive integration",
+  "description": "Stateless OAuth proxy for Chordless Google Drive integration",
   "type": "module",
   "main": "src/index.js",
   "scripts": {

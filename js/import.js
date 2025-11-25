@@ -1,6 +1,6 @@
 // Import tool for migrating filesystem data to IndexedDB
 
-import { determineSetlistType, SetalightDB } from './db.js'
+import { ChordlessDB, determineSetlistType } from './db.js'
 import { getCurrentUserInfo } from './google-auth.js'
 import {
   createOrganisation,
@@ -38,7 +38,7 @@ export class SetlistImporter {
     console.log(`[Import] Set current organisation to: ${org.name} (${org.id})`)
 
     // Initialize the organisation's database
-    this.db = new SetalightDB(org.id)
+    this.db = new ChordlessDB(org.id)
     await this.db.init()
 
     console.log(`[Import] Using organisation: ${org.name}, database: ${this.db.dbName}`)

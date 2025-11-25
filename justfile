@@ -1,4 +1,4 @@
-# Setalight development commands
+# Chordless development commands
 
 # Default recipe - show available commands
 default:

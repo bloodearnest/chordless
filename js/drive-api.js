@@ -1,10 +1,10 @@
 /**
  * Google Drive API Helper
  *
- * Handles all interactions with Google Drive API for Setalight.
+ * Handles all interactions with Google Drive API for Chordless.
  *
  * Folder Structure:
- * - Setalight/ (root)
+ * - Chordless/ (root)
  *   - [Organisation Name]/
  *     - songs/
  *       - [song-id]/
@@ -18,7 +18,7 @@ import * as GoogleAuth from './google-auth.js'
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3'
 
-const ROOT_FOLDER_NAME = 'Setalight'
+const ROOT_FOLDER_NAME = 'Chordless'
 const PADS_FOLDER_NAME = 'pads'
 const PADSET_CATEGORY = 'padset'
 const PADSET_FILE_CATEGORY = 'padsetFile'
@@ -368,39 +368,39 @@ export async function downloadFileBinary(fileId) {
  */
 
 /**
- * Find or create the root "Setalight" folder
+ * Find or create the root "Chordless" folder
  */
 export async function findOrCreateRootFolder() {
-  console.log('[DriveAPI] Finding/creating root Setalight folder...')
+  console.log('[DriveAPI] Finding/creating root Chordless folder...')
 
-  // Search for existing Setalight folder
+  // Search for existing Chordless folder
   const query = `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
   )
 
   if (result.files && result.files.length > 0) {
-    console.log('[DriveAPI] Found existing Setalight folder:', result.files[0].id)
+    console.log('[DriveAPI] Found existing Chordless folder:', result.files[0].id)
     return result.files[0].id
   }
 
   // Create new root folder
-  console.log('[DriveAPI] Creating new Setalight folder...')
+  console.log('[DriveAPI] Creating new Chordless folder...')
   const folder = await driveRequest('/files', {
     method: 'POST',
     body: JSON.stringify({
       name: ROOT_FOLDER_NAME,
       mimeType: 'application/vnd.google-apps.folder',
-      description: 'Setalight - Worship Setlist Management',
+      description: 'Chordless - Worship Setlist Management',
     }),
   })
 
-  console.log('[DriveAPI] Created Setalight folder:', folder.id)
+  console.log('[DriveAPI] Created Chordless folder:', folder.id)
   return folder.id
 }
 
 /**
- * Find or create an organisation folder under Setalight/
+ * Find or create an organisation folder under Chordless/
  */
 export async function findOrCreateOrganisationFolder(organisationName, organisationId) {
   console.log(`[DriveAPI] Finding/creating organisation folder: ${organisationName}`)
@@ -430,7 +430,7 @@ export async function findOrCreateOrganisationFolder(organisationName, organisat
       mimeType: 'application/vnd.google-apps.folder',
       parents: [rootFolderId],
       appProperties: {
-        setalightType: 'organisation',
+        resourceType: 'organisation',
         organisationId: organisationId,
         createdAt: new Date().toISOString(),
         appVersion: APP_VERSION,
@@ -620,7 +620,7 @@ export async function findOrCreateSongFolder(parentId, songId, folderName, prope
       mimeType: 'application/vnd.google-apps.folder',
       parents: [parentId],
       appProperties: {
-        setalightType: 'songFolder',
+        type: 'songFolder',
         songId: songId,
         ccliNumber: properties.ccliNumber || '',
         title: properties.title || '',
@@ -697,7 +697,7 @@ export async function uploadChordProFile(
     parents: [songsFolderId], // Directly in songs/ folder
     appProperties: {
       // File type
-      setalightType: 'chordpro',
+      type: 'chordpro',
 
       // Song-level metadata
       songId: songId,
@@ -834,7 +834,7 @@ export async function uploadSetlist(organisationFolderId, setlistId, setlistData
     name: fileName,
     parents: [setlistsFolderId],
     appProperties: {
-      setalightType: 'setlist',
+      resourceType: 'setlist',
       setlistId: setlistId,
       organisationId: organisationId,
       date: setlistData.date || '',
@@ -909,22 +909,22 @@ export async function listSetlists(organisationFolderId) {
  */
 
 /**
- * List all Setalight organisation folders
+ * List all Chordless organisation folders
  */
 export async function listOrganisations() {
-  console.log('[DriveAPI] Listing all Setalight organisations...')
+  console.log('[DriveAPI] Listing all Chordless organisations...')
 
   const rootFolderId = await findOrCreateRootFolder()
 
-  // Find all folders in Setalight root with setalightType=organisation
+  // Find all folders in Chordless root with type=organisation
   const query = `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,createdTime)`
   )
 
-  // Filter to only Setalight organisation folders
+  // Filter to only Chordless organisation folders
   const organisations = (result.files || []).filter(
-    folder => folder.appProperties?.setalightType === 'organisation'
+    folder => folder.appProperties?.type === 'organisation'
   )
 
   console.log(`[DriveAPI] Found ${organisations.length} organisations`)

@@ -3,13 +3,13 @@
 //
 // Hybrid approach:
 // - Org metadata (id, name, owner, etc.) stored in OrganisationDB (IndexedDB)
-// - Current org ID stored in localStorage: setalight-current-organisation-id
-// - Current org NAME cached in localStorage: setalight-current-organisation-name (for sync access)
+// - Current org ID stored in localStorage: current-organisation-id
+// - Current org NAME cached in localStorage: current-organisation-name (for sync access)
 
 import { OrganisationDB } from './organisation-db.js'
 
-const ORGANISATION_ID_KEY = 'setalight-current-organisation-id'
-const ORGANISATION_NAME_KEY = 'setalight-current-organisation-name'
+const ORGANISATION_ID_KEY = 'current-organisation-id'
+const ORGANISATION_NAME_KEY = 'current-organisation-name'
 const DEFAULT_ORGANISATION_NAME = 'Personal'
 
 let orgDB = null

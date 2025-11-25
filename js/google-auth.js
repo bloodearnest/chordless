@@ -36,7 +36,7 @@ const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email p
 const AUTH_PROXY_URL =
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:8787'
-    : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+    : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
 
 /**
  * Parse JWT and extract payload
@@ -432,7 +432,7 @@ export async function downloadBlobBackup() {
 
   const a = document.createElement('a')
   a.href = url
-  a.download = `setalight-auth-backup-${new Date().toISOString().split('T')[0]}.json`
+  a.download = `chordless-auth-backup-${new Date().toISOString().split('T')[0]}.json`
   a.click()
 
   URL.revokeObjectURL(url)

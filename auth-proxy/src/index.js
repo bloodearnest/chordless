@@ -1,5 +1,5 @@
 /**
- * Setalight Auth Proxy - Cloudflare Worker
+ * Chordless Auth Proxy - Cloudflare Worker
  *
  * Stateless OAuth proxy for Google Drive integration.
  * - Exchanges auth codes for tokens, encrypts refresh tokens as JWE blobs

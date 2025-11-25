@@ -1,10 +1,10 @@
 import { ensurePersistentStorage } from './utils/persistence.js'
 
-// IndexedDB wrapper for Setalight
+// IndexedDB wrapper for database operations
 // Manages organisation-specific data: songs, chordpro content, setlists, and local state
 //
 // NOTE: This now stores ALL organisation data in one database per organisation.
-// Organisation metadata is stored separately in SetalightDB-organisations.
+// Organisation metadata is stored separately in the 'organisations' database.
 
 const DB_VERSION = 5
 
@@ -37,7 +37,7 @@ function cloneForStorage(value, path = '') {
 
   if (type === 'object') {
     if (typeof value.then === 'function' && typeof value.catch === 'function') {
-      console.warn(`[SetalightDB] Dropping Promise at ${path || '<root>'} before storage`)
+      console.warn(`[ChordlessDB] Dropping Promise at ${path || '<root>'} before storage`)
       return null
     }
 
@@ -45,7 +45,7 @@ function cloneForStorage(value, path = '') {
     for (const [key, val] of Object.entries(value)) {
       if (typeof val === 'function' || typeof val === 'symbol') {
         console.warn(
-          `[SetalightDB] Dropping non-serializable property ${path ? `${path}.` : ''}${key}`
+          `[ChordlessDB] Dropping non-serializable property ${path ? `${path}.` : ''}${key}`
         )
         continue
       }
@@ -65,10 +65,10 @@ function cloneForStorage(value, path = '') {
   return value
 }
 
-export class SetalightDB {
+export class ChordlessDB {
   constructor(organisationId) {
     if (!organisationId) {
-      throw new Error('organisationId is required for SetalightDB')
+      throw new Error('organisationId is required for ChordlessDB')
     }
 
     // Database name is just the organisation ID
@@ -96,12 +96,12 @@ export class SetalightDB {
         const db = event.target.result
         const oldVersion = event.oldVersion
 
-        console.log(`[SetalightDB] Upgrading ${this.dbName} from v${oldVersion} to v${DB_VERSION}`)
+        console.log(`[ChordlessDB] Upgrading ${this.dbName} from v${oldVersion} to v${DB_VERSION}`)
 
         // Create Songs store (moved from global SongsDB)
         // Now uses uuid as keyPath instead of id
         if (!db.objectStoreNames.contains('songs')) {
-          console.log('[SetalightDB] Creating songs store')
+          console.log('[ChordlessDB] Creating songs store')
           const songStore = db.createObjectStore('songs', { keyPath: 'uuid' })
           songStore.createIndex('id', 'id', { unique: false })
           songStore.createIndex('ccliNumber', 'ccliNumber', { unique: false })
@@ -112,14 +112,14 @@ export class SetalightDB {
 
         // Create ChordPro store (moved from global ChordProDB)
         if (!db.objectStoreNames.contains('chordpro')) {
-          console.log('[SetalightDB] Creating chordpro store')
+          console.log('[ChordlessDB] Creating chordpro store')
           const chordproStore = db.createObjectStore('chordpro', { keyPath: 'id' })
           chordproStore.createIndex('contentHash', 'contentHash', { unique: false })
         }
 
         // Create/Update Setlists store
         if (!db.objectStoreNames.contains('setlists')) {
-          console.log('[SetalightDB] Creating setlists store')
+          console.log('[ChordlessDB] Creating setlists store')
           const setlistStore = db.createObjectStore('setlists', { keyPath: 'id' })
           setlistStore.createIndex('date', 'date', { unique: false })
           setlistStore.createIndex('type', 'type', { unique: false })
@@ -129,20 +129,20 @@ export class SetalightDB {
           const transaction = event.target.transaction
           const setlistStore = transaction.objectStore('setlists')
           if (!setlistStore.indexNames.contains('owner')) {
-            console.log('[SetalightDB] Adding owner index to setlists')
+            console.log('[ChordlessDB] Adding owner index to setlists')
             setlistStore.createIndex('owner', 'owner', { unique: false })
           }
         }
 
         // Create setlist_local store (new in v5)
         if (!db.objectStoreNames.contains('setlist_local')) {
-          console.log('[SetalightDB] Creating setlist_local store')
+          console.log('[ChordlessDB] Creating setlist_local store')
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
         // Clean up old stores
         if (db.objectStoreNames.contains('song_usage')) {
-          console.log('[SetalightDB] Removing song_usage store')
+          console.log('[ChordlessDB] Removing song_usage store')
           db.deleteObjectStore('song_usage')
         }
       }
@@ -619,7 +619,7 @@ export function formatTempo(bpm, tempoNote = '1/4') {
 export async function getCurrentDB() {
   const { ensureCurrentOrganisation } = await import('./organisation.js')
   const { id } = await ensureCurrentOrganisation()
-  const db = new SetalightDB(id)
+  const db = new ChordlessDB(id)
   await db.init()
   return db
 }

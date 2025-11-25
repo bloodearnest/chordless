@@ -676,7 +676,7 @@ export class MediaPlayer extends LitElement {
     this.timeSignature = '4/4'
 
     // Load global settings from localStorage
-    const savedSettings = localStorage.getItem('setalight-media-settings')
+    const savedSettings = localStorage.getItem('media-settings')
     let globalSettings = {}
     if (savedSettings) {
       globalSettings = JSON.parse(savedSettings)
@@ -726,8 +726,8 @@ export class MediaPlayer extends LitElement {
     }
 
     // Load persistent volume settings from localStorage
-    const savedPadVolume = localStorage.getItem('setalight-pad-volume')
-    const savedClickVolume = localStorage.getItem('setalight-click-volume')
+    const savedPadVolume = localStorage.getItem('pad-volume')
+    const savedClickVolume = localStorage.getItem('click-volume')
 
     // Volume properties
     this._padVolume = savedPadVolume !== null ? parseFloat(savedPadVolume) : 0.5 // 0-1 range
@@ -1489,7 +1489,7 @@ export class MediaPlayer extends LitElement {
         this._padController.setVolume(this._padVolume)
       }
       // Save to localStorage
-      localStorage.setItem('setalight-pad-volume', this._padVolume.toString())
+      localStorage.setItem('pad-volume', this._padVolume.toString())
     } else if (this._activeVolumeControl === 'click') {
       this._clickVolume = newVolume
       // Update metronome controller volume
@@ -1497,7 +1497,7 @@ export class MediaPlayer extends LitElement {
         this._metronomeController.setVolume(this._clickVolume)
       }
       // Save to localStorage
-      localStorage.setItem('setalight-click-volume', this._clickVolume.toString())
+      localStorage.setItem('click-volume', this._clickVolume.toString())
     }
 
     // Update slider Y position for next calculation

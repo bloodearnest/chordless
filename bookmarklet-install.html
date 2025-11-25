@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Install Setalight CCLI Bookmarklet" />
+    <meta name="description" content="Install Chordless CCLI Bookmarklet" />
     <meta name="view-transition" content="same-origin" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <title>Bookmarklet - Setalight</title>
+    <title>Bookmarklet - Chordless</title>
     <link rel="stylesheet" href="/css/style.css" />
     <style>
       .bookmarklet-link {
@@ -99,7 +99,7 @@
           <div class="settings-content">
             <h2>CCLI SongSelect Importer</h2>
             <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 2rem">
-              Import songs from SongSelect directly into your Setalight library with one click using
+              Import songs from SongSelect directly into your Chordless library with one click using
               this bookmarklet.
             </p>
 
@@ -111,7 +111,7 @@
                 <strong>Drag this button to your bookmarks bar:</strong>
               </p>
               <p>
-                <a href="" id="bookmarkletLink" class="bookmarklet-link">📝 Import to Setalight</a>
+                <a href="" id="bookmarkletLink" class="bookmarklet-link">📝 Import to Chordless</a>
               </p>
 
               <h4
@@ -129,7 +129,7 @@
               </p>
               <ol style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
                 <li>Create a new bookmark (Ctrl+D or Cmd+D)</li>
-                <li>Name it "Import to Setalight"</li>
+                <li>Name it "Import to Chordless"</li>
                 <li>Copy the code below and paste it as the URL</li>
               </ol>
               <textarea id="bookmarkletCode" readonly></textarea>
@@ -198,7 +198,7 @@
                 <li>Navigate to a song on SongSelect</li>
                 <li>Click the bookmarklet in your bookmarks bar</li>
                 <li>The bookmarklet fetches the ChordPro file from SongSelect</li>
-                <li>Opens Setalight (or reuses existing tab) and imports the song</li>
+                <li>Opens Chordless (or reuses existing tab) and imports the song</li>
                 <li>Song is saved to your IndexedDB library</li>
               </ol>
             </div>
@@ -224,10 +224,10 @@
 
     <script>
       // Set window name so bookmarklet can find and reuse this tab
-      window.name = 'setalight';
+      window.name = 'chordless';
 
       // The bookmarklet code
-      const bookmarkletCode = `javascript:(async function(){const SETALIGHT_URL='http://localhost:8000';if(!window.location.href.includes('songselect.ccli.com')){alert('Please navigate to a SongSelect song page first.');return;}const urlMatch=window.location.href.match(/\\/songs\\/(\\d+)/);if(!urlMatch){alert('❌ Could not extract song number from URL');return;}const songNumber=urlMatch[1];const title=document.querySelector('h1')?.textContent.trim();let key='C';const keyMatch=document.body.textContent.match(/Key:\\s*([A-G][b#]?)/i);if(keyMatch)key=keyMatch[1];try{const apiUrl=\`https://songselect.ccli.com/api/GetSongChordPro?songNumber=\${songNumber}&key=\${key}&style=Number&columns=1\`;const response=await fetch(apiUrl,{headers:{'accept':'*/*','client-locale':'en-GB'},credentials:'include'});if(!response.ok)throw new Error(\`API failed: \${response.status}\`);const data=await response.json();const chordproText=data.payload;if(!chordproText||chordproText.trim().length===0)throw new Error('Empty ChordPro file. Do you have access?');const metadata={ccliNumber:songNumber,title:title,key:key};let tab=window.open('','setalight');if(!tab||tab.closed){tab=window.open(\`\${SETALIGHT_URL}/import-song\`,'setalight');}else{tab.location.href=\`\${SETALIGHT_URL}/import-song\`;}if(!tab){alert('⚠️ Popup blocked. Please allow popups.');return;}const timeout=setTimeout(()=>alert('⚠️ Timeout waiting for Setalight'),10000);const handler=(event)=>{if(event.origin!==SETALIGHT_URL)return;if(event.data&&event.data.type==='SETALIGHT_READY'){clearTimeout(timeout);window.removeEventListener('message',handler);tab.postMessage({type:'SETALIGHT_IMPORT',data:{chordproText:chordproText,metadata:metadata,source:'songselect'}},SETALIGHT_URL);}};window.addEventListener('message',handler);}catch(error){alert('❌ Import failed: '+error.message);}})();`;
+      const bookmarkletCode = `javascript:(async function(){const CHORDLESS_URL='http://localhost:8000';if(!window.location.href.includes('songselect.ccli.com')){alert('Please navigate to a SongSelect song page first.');return;}const urlMatch=window.location.href.match(/\\/songs\\/(\\d+)/);if(!urlMatch){alert('❌ Could not extract song number from URL');return;}const songNumber=urlMatch[1];const title=document.querySelector('h1')?.textContent.trim();let key='C';const keyMatch=document.body.textContent.match(/Key:\\s*([A-G][b#]?)/i);if(keyMatch)key=keyMatch[1];try{const apiUrl=\`https://songselect.ccli.com/api/GetSongChordPro?songNumber=\${songNumber}&key=\${key}&style=Number&columns=1\`;const response=await fetch(apiUrl,{headers:{'accept':'*/*','client-locale':'en-GB'},credentials:'include'});if(!response.ok)throw new Error(\`API failed: \${response.status}\`);const data=await response.json();const chordproText=data.payload;if(!chordproText||chordproText.trim().length===0)throw new Error('Empty ChordPro file. Do you have access?');const metadata={ccliNumber:songNumber,title:title,key:key};let tab=window.open('','chordless');if(!tab||tab.closed){tab=window.open(\`\${CHORDLESS_URL}/import-song\`,'chordless');}else{tab.location.href=\`\${CHORDLESS_URL}/import-song\`;}if(!tab){alert('⚠️ Popup blocked. Please allow popups.');return;}const timeout=setTimeout(()=>alert('⚠️ Timeout waiting for Chordless'),10000);const handler=(event)=>{if(event.origin!==CHORDLESS_URL)return;if(event.data&&event.data.type==='CHORDLESS_READY'){clearTimeout(timeout);window.removeEventListener('message',handler);tab.postMessage({type:'CHORDLESS_IMPORT',data:{chordproText:chordproText,metadata:metadata,source:'songselect'}},CHORDLESS_URL);}};window.addEventListener('message',handler);}catch(error){alert('❌ Import failed: '+error.message);}})();`;
 
       // Set the href and textarea
       document.getElementById('bookmarkletLink').href = bookmarkletCode;

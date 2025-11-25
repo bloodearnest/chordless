@@ -1,5 +1,5 @@
-const NASHVILLE_PREF_KEY = 'setalight-use-nashville'
-const ACCIDENTAL_PREF_KEY = 'setalight-use-unicode-accidentals'
+const NASHVILLE_PREF_KEY = 'use-nashville'
+const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
 const MUSICIAN_TYPE_KEY = 'musician_type'
 const SECTION_DEFAULTS_KEY = 'section_defaults'
 const ENABLE_CAPO_KEY = 'enable_capo'

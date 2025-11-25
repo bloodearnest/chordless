@@ -1,4 +1,4 @@
-# Setalight Auth Proxy
+# Chordless Auth Proxy
 
 Stateless OAuth proxy for Google Drive integration, deployed as a Cloudflare Worker.
 

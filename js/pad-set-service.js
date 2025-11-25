@@ -16,8 +16,8 @@ const BUILT_IN_PAD_SET = Object.freeze({
   modifiedTime: null,
 })
 
-const PAD_SET_SELECTION_KEY = 'setalight-padset-selection'
-const PAD_SET_CACHE_STATE_KEY = 'setalight-padset-cache-state'
+const PAD_SET_SELECTION_KEY = 'padset-selection'
+const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
 const PAD_SET_METADATA_CACHE = new Map()

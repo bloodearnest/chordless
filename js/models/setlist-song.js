@@ -258,7 +258,7 @@ export class SetlistSong extends SongModel {
   // ==================== Helpers ====================
 
   _loadSetlistState() {
-    const key = `setalight-state-${this._setlistId}`
+    const key = `state-${this._setlistId}`
     try {
       const state = localStorage.getItem(key)
       if (state) {
@@ -274,7 +274,7 @@ export class SetlistSong extends SongModel {
   }
 
   _saveSetlistState(state) {
-    const key = `setalight-state-${this._setlistId}`
+    const key = `state-${this._setlistId}`
     try {
       localStorage.setItem(key, JSON.stringify(state))
     } catch (error) {

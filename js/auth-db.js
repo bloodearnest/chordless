@@ -7,7 +7,7 @@
  * - Track operation status and retry logic
  */
 
-const DB_NAME = 'setalight-auth'
+const DB_NAME = 'auth'
 const DB_VERSION = 1
 
 const STORES = {

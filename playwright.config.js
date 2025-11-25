@@ -2,7 +2,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 /**
- * Playwright configuration for Setalight browser tests
+ * Playwright configuration for Chordless browser tests
  * @see https://playwright.dev/docs/test-configuration
  */
 export default defineConfig({

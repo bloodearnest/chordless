@@ -7,7 +7,7 @@ cd "$REPO_ROOT"
 CERT_DIR="$REPO_ROOT/certs"
 CERT_PATH="$CERT_DIR/dev.crt"
 KEY_PATH="$CERT_DIR/dev.key"
-CERT_NAME="setalight-dev"
+CERT_NAME="chordless-dev"
 SYSTEM_CERT="/usr/local/share/ca-certificates/${CERT_NAME}.crt"
 NSS_DB="${HOME}/.pki/nssdb"
 

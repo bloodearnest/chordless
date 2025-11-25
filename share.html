@@ -11,7 +11,7 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <title>Import Shared Setlist - Setalight</title>
+    <title>Import Shared Setlist - Chordless</title>
     <link rel="stylesheet" href="/css/style.css" />
     <style>
       .share-container {
@@ -98,13 +98,13 @@
     </div>
 
     <script type="module">
-      import { SetalightDB } from '/js/db.js';
+      import { ChordlessDB } from '/js/db.js';
 
       // Auto-detect auth proxy URL
       const AUTH_PROXY_URL =
         window.location.hostname === 'localhost'
           ? 'http://localhost:8787'
-          : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
 
       // Extract share ID from URL
       const pathParts = window.location.pathname.split('/');

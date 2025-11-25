@@ -4,7 +4,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-CERT_NAME="setalight-dev"
+CERT_NAME="chordless-dev"
 SYSTEM_CERT="/usr/local/share/ca-certificates/${CERT_NAME}.crt"
 CERT_PATH="$REPO_ROOT/certs/dev.crt"
 KEY_PATH="$REPO_ROOT/certs/dev.key"

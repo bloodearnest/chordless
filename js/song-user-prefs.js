@@ -5,7 +5,7 @@
  * These are personal defaults for capo and section visibility.
  *
  * Storage: localStorage per organisation
- * Key format: 'setalight-song-prefs-${orgId}'
+ * Key format: 'song-prefs-${orgId}'
  *
  * Structure:
  * {
@@ -29,7 +29,7 @@ export function getSongUserPrefs(songId, orgId) {
   if (!songId || !orgId) return null
 
   try {
-    const key = `setalight-song-prefs-${orgId}`
+    const key = `song-prefs-${orgId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     return allPrefs[songId] || null
   } catch (error) {
@@ -51,7 +51,7 @@ export function saveSongUserPrefs(songId, orgId, prefs) {
   }
 
   try {
-    const key = `setalight-song-prefs-${orgId}`
+    const key = `song-prefs-${orgId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
 
     // Merge with existing prefs
@@ -76,7 +76,7 @@ export function clearSongUserPrefs(songId, orgId) {
   if (!songId || !orgId) return
 
   try {
-    const key = `setalight-song-prefs-${orgId}`
+    const key = `song-prefs-${orgId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     delete allPrefs[songId]
     localStorage.setItem(key, JSON.stringify(allPrefs))
@@ -95,7 +95,7 @@ export function getAllSongUserPrefs(orgId) {
   if (!orgId) return {}
 
   try {
-    const key = `setalight-song-prefs-${orgId}`
+    const key = `song-prefs-${orgId}`
     return JSON.parse(localStorage.getItem(key) || '{}')
   } catch (error) {
     console.error('[SongUserPrefs] Error loading all preferences:', error)
@@ -111,7 +111,7 @@ export function clearAllSongUserPrefs(orgId) {
   if (!orgId) return
 
   try {
-    const key = `setalight-song-prefs-${orgId}`
+    const key = `song-prefs-${orgId}`
     localStorage.removeItem(key)
     console.log('[SongUserPrefs] Cleared all preferences for org:', orgId)
   } catch (error) {

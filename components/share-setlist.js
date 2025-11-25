@@ -161,7 +161,7 @@ export class ShareSetlist extends LitElement {
           <h3>📤 Share via Link</h3>
           <p>
             Generate a shareable link that expires in 30 days. Anyone with the link can import this
-            setlist into their Setalight library.
+            setlist into their Chordless library.
           </p>
 
           ${this._error ? html` <div class="error-message">${this._error}</div> ` : ''}
@@ -219,7 +219,7 @@ export class ShareSetlist extends LitElement {
                 <h3>🔐 Cloud Features Not Enabled</h3>
                 <p style="color: #7f8c8d;">
                   To enable Google Drive storage and real-time sync features, you need to authorize
-                  Setalight to access your Google Drive.
+                  Chordless to access your Google Drive.
                 </p>
                 <a
                   href="/authorize"
@@ -247,7 +247,7 @@ export class ShareSetlist extends LitElement {
       const AUTH_PROXY_URL =
         window.location.hostname === 'localhost'
           ? 'http://localhost:8787'
-          : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
 
       const response = await fetch(`${AUTH_PROXY_URL}/api/share`, {
         method: 'POST',
@@ -304,7 +304,7 @@ export class ShareSetlist extends LitElement {
     try {
       await navigator.share({
         title: `Setlist: ${this.setlist.name || this.setlist.date}`,
-        text: 'Check out this setlist on Setalight',
+        text: 'Check out this setlist on Chordless',
         url: this._shareLink,
       })
     } catch (error) {

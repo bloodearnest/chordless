@@ -1,4 +1,4 @@
-// Service Worker for Setalight
+// Service Worker for offline-first operation
 import * as AuthDB from '/js/auth-db.js'
 
 // Handles routing and generates pages for offline-first operation
@@ -11,9 +11,9 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'setalight-v283'
+const CACHE_NAME = 'cache-v1'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
-const RUNTIME_CACHE_NAME = 'setalight-runtime-v1'
+const RUNTIME_CACHE_NAME = 'runtime-v1'
 
 // Only cache critical files needed for offline app shell
 // Other assets (icons, images, fonts) are cached at runtime on first request
@@ -260,7 +260,7 @@ async function processOperation(operation) {
   const AUTH_PROXY_URL =
     self.location.hostname === 'localhost'
       ? 'http://localhost:8787'
-      : 'https://setalight-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+      : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
 
   if (operation.type === 'invite') {
     // Call /session/invite

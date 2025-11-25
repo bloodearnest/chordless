@@ -1,11 +1,11 @@
-// CCLI to Setalight Bookmarklet
+// CCLI to Chordless Bookmarklet
 // This is the readable version. The minified version goes in the bookmarklet.
 
 ;(async function () {
   'use strict'
 
   // Configuration
-  const SETALIGHT_URL = 'http://localhost:8000'
+  const CHORDLESS_URL = 'http://localhost:8000'
 
   // Check if we're on a SongSelect page
   if (!window.location.href.includes('songselect.ccli.com')) {
@@ -84,51 +84,51 @@
     return chordproText
   }
 
-  // Send to Setalight via window and postMessage
-  async function sendToSetalight(chordproText, metadata) {
-    // Try to reuse existing Setalight window or open new one
-    let setalightWindow = window.open('', 'setalight')
+  // Send to Chordless via window and postMessage
+  async function sendToChordless(chordproText, metadata) {
+    // Try to reuse existing Chordless window or open new one
+    let chordlessWindow = window.open('', 'chordless')
 
     // If no window exists or it's closed, open new one
-    if (!setalightWindow || setalightWindow.closed) {
-      setalightWindow = window.open(`${SETALIGHT_URL}/import-song`, 'setalight')
+    if (!chordlessWindow || chordlessWindow.closed) {
+      chordlessWindow = window.open(`${CHORDLESS_URL}/import-song`, 'chordless')
     } else {
       // Reuse existing window - navigate to import page
-      setalightWindow.location.href = `${SETALIGHT_URL}/import-song`
+      chordlessWindow.location.href = `${CHORDLESS_URL}/import-song`
     }
 
-    if (!setalightWindow) {
-      throw new Error('Could not open Setalight window. Please check popup blockers.')
+    if (!chordlessWindow) {
+      throw new Error('Could not open Chordless window. Please check popup blockers.')
     }
 
     // Wait for the window to signal it's ready
     return new Promise((resolve, reject) => {
       const timeout = setTimeout(() => {
-        reject(new Error('Timeout waiting for Setalight window'))
+        reject(new Error('Timeout waiting for Chordless window'))
       }, 10000)
 
       const messageHandler = event => {
         // Verify origin
-        if (event.origin !== SETALIGHT_URL) {
+        if (event.origin !== CHORDLESS_URL) {
           return
         }
 
-        if (event.data && event.data.type === 'SETALIGHT_READY') {
-          console.log('[Bookmarklet] Setalight window is ready')
+        if (event.data && event.data.type === 'CHORDLESS_READY') {
+          console.log('[Bookmarklet] Chordless window is ready')
           clearTimeout(timeout)
           window.removeEventListener('message', messageHandler)
 
           // Send the song data
-          setalightWindow.postMessage(
+          chordlessWindow.postMessage(
             {
-              type: 'SETALIGHT_IMPORT',
+              type: 'CHORDLESS_IMPORT',
               data: {
                 chordproText: chordproText,
                 metadata: metadata,
                 source: 'songselect',
               },
             },
-            SETALIGHT_URL
+            CHORDLESS_URL
           )
 
           resolve()
@@ -148,16 +148,16 @@
       return
     }
 
-    alert('🎵 Starting import to Setalight...')
+    alert('🎵 Starting import to Chordless...')
 
     console.log('Metadata:', metadata)
 
     const chordproText = await downloadChordPro(metadata.ccliNumber)
     console.log('Downloaded ChordPro:', chordproText.substring(0, 100))
 
-    await sendToSetalight(chordproText, metadata)
+    await sendToChordless(chordproText, metadata)
 
-    alert('✅ Song imported to Setalight successfully!')
+    alert('✅ Song imported to Chordless successfully!')
   } catch (error) {
     console.error('Import failed:', error)
     alert('❌ Import failed: ' + error.message)

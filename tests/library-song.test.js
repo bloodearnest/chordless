@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { SetalightDB } from '../js/db.js'
+import { ChordlessDB } from '../js/db.js'
 import { LibrarySong } from '../js/models/library-song.js'
 import { ChordProParser } from '../js/parser.js'
 import { suppressConsoleLogs } from './test-helpers.js'
@@ -17,7 +17,7 @@ const deleteDatabase = name =>
   })
 
 const clearLocalStorage = orgId => {
-  localStorage.removeItem(`setalight-song-prefs-${orgId}`)
+  localStorage.removeItem(`song-prefs-${orgId}`)
 }
 
 const sampleChordPro = `{title: Amazing Grace}
@@ -42,7 +42,7 @@ describe('LibrarySong', () => {
 
   beforeEach(async () => {
     orgId = `test-org-${uniqueName()}`
-    db = new SetalightDB(orgId)
+    db = new ChordlessDB(orgId)
     await db.init()
     parser = new ChordProParser()
     clearLocalStorage(orgId)
@@ -301,14 +301,14 @@ describe('LibrarySong', () => {
       song.setCapo(2)
       await song.save()
 
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       const prefs = JSON.parse(localStorage.getItem(key))
       expect(prefs['ccli-12345'].capo).to.equal(2)
     })
 
     it('loads capo from song-user-prefs', async () => {
       // Save capo preference
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -391,7 +391,7 @@ describe('LibrarySong', () => {
       song.setSectionState(1, { hideMode: 'none', isCollapsed: true, isHidden: false })
       await song.save()
 
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       const prefs = JSON.parse(localStorage.getItem(key))
       expect(prefs['ccli-12345'].sectionDefaults['0'].hideMode).to.equal('chords')
       expect(prefs['ccli-12345'].sectionDefaults['1'].isCollapsed).to.equal(true)
@@ -399,7 +399,7 @@ describe('LibrarySong', () => {
 
     it('loads section state from song-user-prefs', async () => {
       // Save section preferences
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       localStorage.setItem(
         key,
         JSON.stringify({

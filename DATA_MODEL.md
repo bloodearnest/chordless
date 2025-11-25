@@ -1,6 +1,6 @@
 # DATA MODEL
 
-The Chordial data model is somewhat complex, primarily for one reason: Chordial
+The Chordless data model is somewhat complex, primarily for one reason: Chordless
 cannot store the song data, as that is copyrighted. The users must store it, on
 their devices or on their own google drive.
 
@@ -120,7 +120,7 @@ Properties:
 
 Organisations use a hybrid storage approach for optimal performance:
 
-**Metadata Storage (SetalightDB-organisations):**
+**Metadata Storage (organisations):**
 
 - Global IndexedDB database storing metadata for all organisations
 - Contains: id, name, timestamps
@@ -134,8 +134,8 @@ Organisations use a hybrid storage approach for optimal performance:
 
 **localStorage Caching:**
 
-- Current organisation ID: `setalight-current-organisation-id`
-- Current organisation name: `setalight-current-organisation-name`
+- Current organisation ID: `current-organisation-id`
+- Current organisation name: `current-organisation-name`
 - Allows synchronous access to org name for UI rendering without async DB calls
 
 ### Default "Personal" Organisation

@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { createSetlist, SetalightDB } from '../js/db.js'
+import { ChordlessDB, createSetlist } from '../js/db.js'
 import { SetlistSong } from '../js/models/setlist-song.js'
 import { ChordProParser } from '../js/parser.js'
 import { suppressConsoleLogs } from './test-helpers.js'
@@ -17,8 +17,8 @@ const deleteDatabase = name =>
   })
 
 const clearLocalStorage = (orgId, setlistId) => {
-  localStorage.removeItem(`setalight-song-prefs-${orgId}`)
-  localStorage.removeItem(`setalight-state-${setlistId}`)
+  localStorage.removeItem(`song-prefs-${orgId}`)
+  localStorage.removeItem(`state-${setlistId}`)
 }
 
 const sampleChordPro = `{title: Amazing Grace}
@@ -41,7 +41,7 @@ describe('SetlistSong', () => {
 
   beforeEach(async () => {
     orgId = `test-org-${uniqueName()}`
-    db = new SetalightDB(orgId)
+    db = new ChordlessDB(orgId)
     await db.init()
     parser = new ChordProParser()
 
@@ -206,7 +206,7 @@ describe('SetlistSong', () => {
 
     it('loads capo from song-user-prefs when keys match', () => {
       // Set song-user-prefs
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -223,7 +223,7 @@ describe('SetlistSong', () => {
       setlist.songs[0].key = 'A'
 
       // Set song-user-prefs with capo
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -237,7 +237,7 @@ describe('SetlistSong', () => {
 
     it('setlist localStorage overrides song-user-prefs', () => {
       // Set song-user-prefs
-      const prefsKey = `setalight-song-prefs-${orgId}`
+      const prefsKey = `song-prefs-${orgId}`
       localStorage.setItem(
         prefsKey,
         JSON.stringify({
@@ -246,7 +246,7 @@ describe('SetlistSong', () => {
       )
 
       // Set setlist state
-      const stateKey = `setalight-state-${setlist.id}`
+      const stateKey = `state-${setlist.id}`
       localStorage.setItem(
         stateKey,
         JSON.stringify({
@@ -272,7 +272,7 @@ describe('SetlistSong', () => {
       song.setCapo(4)
       await song.save()
 
-      const stateKey = `setalight-state-${setlist.id}`
+      const stateKey = `state-${setlist.id}`
       const state = JSON.parse(localStorage.getItem(stateKey))
       expect(state.capoValues['0']).to.equal(4)
     })
@@ -288,7 +288,7 @@ describe('SetlistSong', () => {
     })
 
     it('loads section state from song-user-prefs', () => {
-      const key = `setalight-song-prefs-${orgId}`
+      const key = `song-prefs-${orgId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -307,7 +307,7 @@ describe('SetlistSong', () => {
 
     it('setlist localStorage overrides song-user-prefs', () => {
       // Set song-user-prefs
-      const prefsKey = `setalight-song-prefs-${orgId}`
+      const prefsKey = `song-prefs-${orgId}`
       localStorage.setItem(
         prefsKey,
         JSON.stringify({
@@ -320,7 +320,7 @@ describe('SetlistSong', () => {
       )
 
       // Set setlist state
-      const stateKey = `setalight-state-${setlist.id}`
+      const stateKey = `state-${setlist.id}`
       localStorage.setItem(
         stateKey,
         JSON.stringify({
@@ -353,7 +353,7 @@ describe('SetlistSong', () => {
       song.setSectionState(1, { hideMode: 'lyrics', isCollapsed: true, isHidden: false })
       await song.save()
 
-      const stateKey = `setalight-state-${setlist.id}`
+      const stateKey = `state-${setlist.id}`
       const state = JSON.parse(localStorage.getItem(stateKey))
       expect(state.sectionState['0']['0'].hideMode).to.equal('chords')
       expect(state.sectionState['0']['1'].hideMode).to.equal('lyrics')

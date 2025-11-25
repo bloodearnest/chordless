@@ -1,4 +1,4 @@
-// Import Song Handler for Setalight
+// Import Song Handler for Chordless
 // Handles bookmarklet imports with user choice UI
 
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
@@ -20,8 +20,8 @@ import { createSong, findExistingSong } from './song-utils.js'
       return
     }
 
-    // Check if it's a Setalight import message
-    if (event.data && event.data.type === 'SETALIGHT_IMPORT') {
+    // Check if it's a Chordless import message
+    if (event.data && event.data.type === 'CHORDLESS_IMPORT') {
       console.log('[Import] Received import message from:', event.origin)
       processImport(event.data.data)
     }
@@ -34,7 +34,7 @@ import { createSong, findExistingSong } from './song-utils.js'
       try {
         window.opener.postMessage(
           {
-            type: 'SETALIGHT_READY',
+            type: 'CHORDLESS_READY',
           },
           'https://songselect.ccli.com'
         )

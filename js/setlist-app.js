@@ -1,4 +1,4 @@
-// Page-based application logic for Setalight
+// Page-based application logic for Chordless
 // Works with service worker routing and Navigation API
 
 import { formatTempo, getCurrentDB } from './db.js'
@@ -1433,7 +1433,7 @@ class PageApp {
   }
 
   loadState() {
-    const stateKey = `setalight-state-${this.currentSetlistId}`
+    const stateKey = `state-${this.currentSetlistId}`
     const savedState = localStorage.getItem(stateKey)
     if (savedState) {
       try {
@@ -1504,7 +1504,7 @@ class PageApp {
   }
 
   saveState() {
-    const stateKey = `setalight-state-${this.currentSetlistId}`
+    const stateKey = `state-${this.currentSetlistId}`
     const stateToSave = { ...this.sectionState }
 
     // Save capo values if capo is enabled
@@ -1616,7 +1616,7 @@ class PageApp {
     if (!(songId in this._songUserPrefsCache)) {
       try {
         // Synchronous access for performance
-        const key = `setalight-song-prefs-${this.db.organisationId}`
+        const key = `song-prefs-${this.db.organisationId}`
         const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
         this._songUserPrefsCache[songId] = allPrefs[songId] || null
       } catch (error) {

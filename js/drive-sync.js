@@ -11,10 +11,10 @@
  *
  * ⚠️ NOTE ⚠️
  * Pull-side logic still needs to be brought in line with the new flattened song variant
- * model, but the push path now targets the per-organisation SetalightDB schema.
+ * model, but the push path now targets the per-organisation ChordlessDB schema.
  */
 
-import { getCurrentDB, normalizeTitle, SetalightDB } from './db.js'
+import { ChordlessDB, getCurrentDB, normalizeTitle } from './db.js'
 import * as DriveAPI from './drive-api.js'
 import {
   batchDeleteFiles,
@@ -57,7 +57,7 @@ export class DriveSyncManager {
       // Ensure we keep the actual organisation ID from the DB (in case caller passed null)
       this.organisationId = this.organisationDb.organisationId
     } else {
-      this.organisationDb = new SetalightDB(this.organisationId)
+      this.organisationDb = new ChordlessDB(this.organisationId)
       await this.organisationDb.init()
     }
 
@@ -575,7 +575,7 @@ export class DriveSyncManager {
     const latestByUuid = new Map()
     for (const file of driveFiles) {
       const props = file.appProperties || {}
-      if (props.setalightType && props.setalightType !== 'chordpro') continue
+      if (props.type && props.type !== 'chordpro') continue
       const songUuid = this.getDriveSongUuid(props, file.id)
       if (!songUuid) {
         console.warn(`[DriveSync] Skipping chord chart with no song UUID: ${file.name}`)
@@ -1097,7 +1097,7 @@ export class DriveSyncManager {
             parents: [songsFolderId],
             mimeType: 'text/plain',
             appProperties: {
-              setalightType: 'chordpro',
+              type: 'chordpro',
               organisationId: this.organisationId,
               songId: song.id,
               songUuid: this.getSongUuid(song),

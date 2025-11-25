@@ -156,7 +156,7 @@ export class MediaPlayerSettings extends LitElement {
     super()
 
     // Load settings from localStorage
-    const savedSettings = localStorage.getItem('setalight-media-settings')
+    const savedSettings = localStorage.getItem('media-settings')
 
     if (savedSettings) {
       const settings = JSON.parse(savedSettings)
@@ -206,7 +206,7 @@ export class MediaPlayerSettings extends LitElement {
       stereoSplitEnabled: this.stereoSplitEnabled,
     }
 
-    localStorage.setItem('setalight-media-settings', JSON.stringify(settings))
+    localStorage.setItem('media-settings', JSON.stringify(settings))
 
     // Dispatch event so media player can react
     this.dispatchEvent(

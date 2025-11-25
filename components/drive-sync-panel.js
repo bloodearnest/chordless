@@ -229,7 +229,7 @@ export class DriveSyncPanel extends LitElement {
 
     if (
       !confirm(
-        '⚠️ This will DELETE all files in your Google Drive Setalight folder and re-upload everything with the new file structure.\n\nThis action cannot be undone!\n\nAre you sure?'
+        '⚠️ This will DELETE all files in your Google Drive Chordless folder and re-upload everything with the new file structure.\n\nThis action cannot be undone!\n\nAre you sure?'
       )
     ) {
       return

@@ -383,7 +383,7 @@ export class StoragePage extends LitElement {
         <h3>🔄 Google Drive Sync</h3>
         <p>
           Sync your setlists and songs with Google Drive. Your data will be stored in the
-          "Setalight" folder.
+          "Chordless" folder.
         </p>
         <div class="sync-body">
           <drive-sync-panel ?disabled=${disabled}></drive-sync-panel>

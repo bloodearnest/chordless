@@ -6,13 +6,13 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <meta name="description" content="Preferences for Setalight" />
+    <meta name="description" content="Preferences for Chordless" />
     <meta name="view-transition" content="same-origin" />
     <meta name="theme-color" content="#2c3e50" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
-    <title>Preferences - Setalight</title>
+    <title>Preferences - Chordless</title>
     <link rel="stylesheet" href="/css/style.css" />
     <script type="importmap">
       {
@@ -62,11 +62,11 @@
 
     <script type="module" src="/js/theme-manager.js"></script>
     <script type="module">
-      import { SetalightDB } from '/js/db.js';
+      import { ChordlessDB } from '/js/db.js';
       import { getCurrentOrganisation } from '/js/organisation.js';
 
       // Set window name for bookmarklet
-      window.name = 'setalight';
+      window.name = 'chordless';
 
       // Initialize nav menu button - wait for custom element to be defined
       customElements.whenDefined('nav-menu').then(() => {

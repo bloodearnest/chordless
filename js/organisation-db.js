@@ -1,6 +1,6 @@
 // Organisation metadata database
 // Stores metadata about organisations (workspaces) in a separate global database
-// Each organisation then has its own SetalightDB with songs, setlists, etc.
+// Each organisation then has its own ChordlessDB with songs, setlists, etc.
 
 import { ensurePersistentStorage } from './utils/persistence.js'
 
@@ -17,7 +17,7 @@ import { ensurePersistentStorage } from './utils/persistence.js'
  * - Timestamps: createdDate, modifiedDate
  */
 
-const DB_NAME = 'SetalightDB-organisations'
+const DB_NAME = 'organisations'
 const DB_VERSION = 1
 
 export class OrganisationDB {

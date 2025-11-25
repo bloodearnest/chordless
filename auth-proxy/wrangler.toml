@@ -1,4 +1,4 @@
-name = "setalight-auth-proxy"
+name = "chordless-auth-proxy"
 main = "src/index.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
