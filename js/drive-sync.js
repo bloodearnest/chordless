@@ -1233,6 +1233,12 @@ export class DriveSyncManager {
           {
             titleNormalized: song.titleNormalized,
             contentHash: chordproFile.contentHash,
+            variantOf: song.variantOf,
+            isDefault: song.isDefault,
+            importDate: song.importDate,
+            importUser: song.importUser,
+            importSource: song.importSource,
+            sourceUrl: song.sourceUrl,
             createdAt: song.importDate || new Date().toISOString(),
             updatedAt: song.modifiedDate || new Date().toISOString(),
           }
@@ -1248,6 +1254,12 @@ export class DriveSyncManager {
           title: title,
           titleNormalized: song.titleNormalized,
           versionLabel: variantLabel,
+          variantOf: song.variantOf,
+          isDefault: song.isDefault,
+          importDate: song.importDate,
+          importUser: song.importUser,
+          importSource: song.importSource,
+          sourceUrl: song.sourceUrl,
           updatedAt: song.modifiedDate || new Date().toISOString(),
         })
       }

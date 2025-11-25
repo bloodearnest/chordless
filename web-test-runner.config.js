@@ -5,6 +5,8 @@ export default {
     'tests/chord-utils.test.js',
     'tests/db.test.js',
     'tests/db-usage.test.js',
+    'tests/drive-api-sync.test.js',
+    'tests/drive-sync-conflicts.test.js',
     'tests/library-song.test.js',
     'tests/lyrics-normalizer.test.js',
     'tests/metronome-controller.test.js',

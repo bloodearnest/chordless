@@ -710,6 +710,16 @@ export async function uploadChordProFile(
       versionLabel: versionLabel,
       contentHash: metadata.contentHash || '',
 
+      // Variant relationships
+      variantOf: metadata.variantOf || '',
+      isDefault: metadata.isDefault ? 'true' : 'false',
+
+      // Import metadata
+      importDate: metadata.importDate || '',
+      importUser: metadata.importUser || '',
+      importSource: metadata.importSource || '',
+      sourceUrl: metadata.sourceUrl || '',
+
       // Timestamps
       createdAt: metadata.createdAt || new Date().toISOString(),
       updatedAt: metadata.updatedAt || new Date().toISOString(),
@@ -755,6 +765,17 @@ export async function updateChordProFile(fileId, content, metadata = {}) {
     if (metadata.titleNormalized) appPropsUpdate.titleNormalized = metadata.titleNormalized
     if (metadata.versionLabel) appPropsUpdate.versionLabel = metadata.versionLabel
     if (metadata.updatedAt) appPropsUpdate.updatedAt = metadata.updatedAt
+
+    // Variant relationships
+    if (metadata.variantOf !== undefined) appPropsUpdate.variantOf = metadata.variantOf || ''
+    if (metadata.isDefault !== undefined)
+      appPropsUpdate.isDefault = metadata.isDefault ? 'true' : 'false'
+
+    // Import metadata
+    if (metadata.importDate) appPropsUpdate.importDate = metadata.importDate
+    if (metadata.importUser) appPropsUpdate.importUser = metadata.importUser
+    if (metadata.importSource) appPropsUpdate.importSource = metadata.importSource
+    if (metadata.sourceUrl) appPropsUpdate.sourceUrl = metadata.sourceUrl
 
     await driveRequest(`/files/${fileId}`, {
       method: 'PATCH',
