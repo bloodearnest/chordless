@@ -431,6 +431,26 @@ header {
   overflow: visible;
 }
 
+header h1 {
+  font-size: var(--font-ui);
+  font-weight: 600;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+
+.header-with-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.header-logo {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}
+
 /* Larger padding and gap on tablet/desktop */
 @media (min-width: 48rem) {
   header {

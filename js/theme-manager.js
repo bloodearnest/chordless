@@ -72,7 +72,7 @@ export class ThemeManager {
       'text-muted': '#566573',
 
       // Header colors
-      'header-bg': '#242830',
+      'header-bg': '#2c3e50',
       'header-text': '#ecf0f1',
 
       // Button colors

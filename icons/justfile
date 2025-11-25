@@ -1,26 +1,20 @@
-# Generate light mode SVG favicon from base (swaps colors for light mode)
-# Light mode: text=#2c3e50, background=#ecf0f1
-generate-svg-light:
-    sed 's/fill:#2c3e50/fill:#ecf0f1/g; s/fill:#3498db/fill:#2980b9/g' favicon-base.svg | npx svgo --input - --output favicon-light.svg
+# Generate both light and dark SVG favicons from transparent base
+# Both have transparent backgrounds, only difference is symbol color:
+# Light mode: #2980b9 (darker blue for visibility on light backgrounds)
+# Dark mode: #3498db (brighter blue for visibility on dark backgrounds)
+generate-svg:
+    ./generate-favicons.sh
 
-# Generate dark mode SVG favicon from base (minimizes with svgo)
-# Dark mode: text=#3498db, background=#2c3e50
-generate-svg-dark:
-    npx svgo --input favicon-base.svg --output favicon-dark.svg
-
-# Generate both light and dark SVG favicons
-generate-svg: generate-svg-light generate-svg-dark
-
-# Generate the apple-touch-icon (iOS PWA) from dark mode base
+# Generate the apple-touch-icon (iOS PWA) from base with dark background
 # Uses ImageMagick convert since favicon-base.svg uses paths (no embedded fonts)
 # -background sets the background color, -density renders at high DPI for crisp output
 generate-apple-icon:
-    convert -density 300 -background none favicon-base.svg -resize 192x192 apple-touch-icon.png
+    convert -density 300 -background "#2c3e50" favicon-base.svg -resize 192x192 apple-touch-icon.png
 
-# Generate 512x512 icon for PWA manifest
+# Generate 512x512 icon for PWA manifest with dark background
 # Higher density for larger size to avoid blurriness
 generate-icon-512:
-    convert -density 600 -background none favicon-base.svg -resize 512x512 icon-512.png
+    convert -density 600 -background "#2c3e50" favicon-base.svg -resize 512x512 icon-512.png
 
 # Generate all PWA icons
 generate-pwa-icons: generate-apple-icon generate-icon-512

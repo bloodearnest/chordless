@@ -34,6 +34,7 @@ export class AppHeader extends LitElement {
     showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
     showInfoButton: { type: Boolean, attribute: 'show-info-button' },
     showShareButton: { type: Boolean, attribute: 'show-share-button' },
+    showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
     expanded: { type: Boolean, reflect: true },
@@ -119,10 +120,19 @@ export class AppHeader extends LitElement {
       overflow: hidden;
       text-overflow: ellipsis;
       transition: opacity 0.3s ease-in-out;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
     }
 
     .title.fade-out {
       opacity: 0;
+    }
+
+    .logo {
+      width: 32px;
+      height: 32px;
+      flex-shrink: 0;
     }
 
     .header-center {
@@ -282,6 +292,7 @@ export class AppHeader extends LitElement {
     this.showEditToggle = false
     this.showInfoButton = false
     this.showShareButton = false
+    this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
     this.expanded = false
@@ -406,7 +417,10 @@ export class AppHeader extends LitElement {
               <line x1="3" y1="18" x2="21" y2="18"></line>
             </svg>
           </button>
-          <div class="title" part="title">${this._displayTitle}</div>
+          <div class="title" part="title">
+            ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}
+            ${this._displayTitle}
+          </div>
           <button
             class="icon-button expand-toggle ${this.expanded ? 'active' : ''}"
             @click=${this._handleExpandToggle}
