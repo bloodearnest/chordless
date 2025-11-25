@@ -14,12 +14,12 @@ NSS_DB="${HOME}/.pki/nssdb"
 if [[ -f "$CERT_PATH" && -f "$KEY_PATH" ]]; then
   echo "Certificate already exists at $CERT_PATH - skipping generation."
 else
-  echo "Generating self-signed certificate for https://localhost:8443..."
+  echo "Generating self-signed certificate for https://localhost:8443 and https://chordless.dev:8443..."
   mkdir -p "$CERT_DIR"
   openssl req -x509 -nodes -newkey rsa:4096 -sha256 -days 365 \
     -keyout "$KEY_PATH" -out "$CERT_PATH" \
     -subj "/CN=localhost" \
-    -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+    -addext "subjectAltName=DNS:localhost,DNS:chordless.dev,IP:127.0.0.1"
   echo "✓ Generated $CERT_PATH and $KEY_PATH"
 fi
 
