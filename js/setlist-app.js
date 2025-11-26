@@ -1011,7 +1011,7 @@ class PageApp {
 
   async updateHeader(song, instant = false) {
     const appHeader = document.getElementById('app-header')
-    const metaEl = document.getElementById('song-meta-header')
+    const musicalMetadata = document.getElementById('musical-metadata')
     const keySelector = document.getElementById('key-selector')
     const capoSelector = document.getElementById('capo-selector')
     const resetButton = document.getElementById('reset-button')
@@ -1043,7 +1043,7 @@ class PageApp {
       appHeader.setTitleInstant(newTitle)
       this._updateHeaderContent(
         song,
-        metaEl,
+        musicalMetadata,
         keySelector,
         capoSelector,
         resetButton,
@@ -1056,7 +1056,7 @@ class PageApp {
       await this._animateSlottedContent(async () => {
         this._updateHeaderContent(
           song,
-          metaEl,
+          musicalMetadata,
           keySelector,
           capoSelector,
           resetButton,
@@ -1066,7 +1066,14 @@ class PageApp {
     }
   }
 
-  _updateHeaderContent(song, metaEl, keySelector, capoSelector, resetButton, fontSizeControls) {
+  _updateHeaderContent(
+    song,
+    musicalMetadata,
+    keySelector,
+    capoSelector,
+    resetButton,
+    fontSizeControls
+  ) {
     if (song) {
       // Update key selector
       if (song.currentKey) {
@@ -1080,62 +1087,35 @@ class PageApp {
 
       if (capoSelector) {
         if (this._capoEnabled) {
-          capoSelector.style.display = ''
           this.updateCapoSelector(song.currentCapo ?? 0, song.currentKey)
-        } else {
-          capoSelector.style.display = 'none'
         }
       }
 
-      // Update BPM
-      metaEl.textContent = ''
-      if (song.currentBPM) {
-        const metaItem = document.createElement('span')
-        metaItem.className = 'meta-item'
-
-        const label = document.createElement('span')
-        label.className = 'meta-label'
-        label.textContent = 'BPM:'
-        metaItem.appendChild(label)
-
-        const formattedTempo = formatTempo(song.currentBPM, song.metadata?.tempoNote)
-        metaItem.appendChild(document.createTextNode(' ' + formattedTempo))
-        metaEl.appendChild(metaItem)
+      // Update musical metadata display
+      if (musicalMetadata) {
+        musicalMetadata.keyValue = song.currentKey || ''
+        musicalMetadata.capoValue = song.currentCapo ?? 0
+        musicalMetadata.bpm = song.currentBPM || null
+        musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
+        musicalMetadata.style.display = ''
       }
-
-      // Show song-specific controls
-      if (keySelector) keySelector.style.display = ''
-      if (capoSelector && this._capoEnabled) capoSelector.style.display = ''
-      if (resetButton) resetButton.style.display = 'block'
-      if (fontSizeControls) fontSizeControls.style.display = 'flex'
 
       // Store current song for info button handler
       this._currentSongForInfo = song
     } else {
-      // Overview - clear key
+      // Overview - hide musical metadata
+      if (musicalMetadata) {
+        musicalMetadata.style.display = 'none'
+      }
+
+      // Clear key selector
       if (keySelector) {
         keySelector.value = '-'
         keySelector.keys = []
       }
       if (capoSelector) {
-        capoSelector.style.display = 'none'
         capoSelector.referenceKey = ''
       }
-
-      // Show setlist type in metadata
-      metaEl.textContent = ''
-      if (this.currentSetlist && this.currentSetlist.type) {
-        const typeSpan = document.createElement('span')
-        typeSpan.className = 'meta-item'
-        typeSpan.textContent = this.currentSetlist.type
-        metaEl.appendChild(typeSpan)
-      }
-
-      // Hide song-specific controls on overview
-      if (keySelector) keySelector.style.display = 'none'
-      if (capoSelector) capoSelector.style.display = 'none'
-      if (resetButton) resetButton.style.display = 'none'
-      if (fontSizeControls) fontSizeControls.style.display = 'none'
 
       // Store that we're on overview for info button handler
       this._currentSongForInfo = null
@@ -1898,6 +1878,12 @@ class PageApp {
         document.body.setAttribute('data-edit-mode', '')
         appHeader.editMode = true
 
+        // Update musical metadata to edit mode (makes it clickable)
+        const musicalMetadata = document.getElementById('musical-metadata')
+        if (musicalMetadata) {
+          musicalMetadata.editMode = true
+        }
+
         // Update key selector edit mode
         const keySelector = document.getElementById('key-selector')
         if (keySelector) {
@@ -1935,6 +1921,12 @@ class PageApp {
         document.body.classList.remove('edit-mode')
         document.body.removeAttribute('data-edit-mode')
         appHeader.editMode = false
+
+        // Update musical metadata to normal mode (not clickable)
+        const musicalMetadata = document.getElementById('musical-metadata')
+        if (musicalMetadata) {
+          musicalMetadata.editMode = false
+        }
 
         // Update key selector edit mode
         const keySelector = document.getElementById('key-selector')
@@ -2028,6 +2020,19 @@ class PageApp {
         document.documentElement.style.setProperty('--header-expanded', '0')
       }
     })
+
+    // Setup song settings popover
+    const musicalMetadata = document.getElementById('musical-metadata')
+    const songSettingsPopover = document.getElementById('song-settings-popover')
+    if (musicalMetadata && songSettingsPopover) {
+      // Set the trigger button for positioning
+      songSettingsPopover.setTriggerButton(musicalMetadata)
+
+      // Listen to musical metadata clicks (only works in edit mode)
+      musicalMetadata.addEventListener('settings-click', () => {
+        songSettingsPopover.togglePopover()
+      })
+    }
   }
 
   setupSectionControls() {
@@ -2119,7 +2124,8 @@ class PageApp {
       return
     }
 
-    capoSelector.style.display = 'none'
+    // Capo is enabled, make sure it's visible
+    capoSelector.style.display = ''
     capoSelector.editMode = document.body.classList.contains('edit-mode')
 
     if (!this._capoChangeHandler) {
@@ -2160,6 +2166,12 @@ class PageApp {
 
     this.updateCapoSelector(normalized, song.currentKey)
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
+
+    // Update the musical metadata display with the new capo value
+    const musicalMetadata = document.getElementById('musical-metadata')
+    if (musicalMetadata) {
+      musicalMetadata.capoValue = normalized
+    }
   }
 
   async handleKeyChange(newKey) {
@@ -2193,6 +2205,12 @@ class PageApp {
 
     // Update the key selector with the new key
     this.updateKeySelector(newKey)
+
+    // Update the musical metadata display with the new key
+    const musicalMetadata = document.getElementById('musical-metadata')
+    if (musicalMetadata) {
+      musicalMetadata.keyValue = newKey
+    }
 
     // Notify media player so it refreshes tempo/time/key data
     if (this.songs[this.currentSongIndex]) {
@@ -2244,26 +2262,49 @@ class PageApp {
     const resetButton = document.getElementById('reset-button')
     const resetModal = document.getElementById('reset-confirm-modal')
 
-    if (!resetButton || !resetModal) return
+    console.log('[setupResetButton] resetButton:', resetButton)
+    console.log('[setupResetButton] resetModal:', resetModal)
+
+    if (!resetButton || !resetModal) {
+      console.warn(
+        '[setupResetButton] Missing elements - button:',
+        !!resetButton,
+        'modal:',
+        !!resetModal
+      )
+      return
+    }
 
     // Show confirmation modal when reset button is clicked
     resetButton.addEventListener('click', () => {
+      console.log('[setupResetButton] Reset button clicked, showing modal')
       resetModal.show()
     })
 
     // Listen for confirm event
     resetModal.addEventListener('confirm', () => {
+      console.log('[setupResetButton] Confirm event received, calling resetCurrentSong')
       this.resetCurrentSong()
     })
   }
 
-  resetCurrentSong() {
-    if (this.currentSongIndex < 0 || this.currentSongIndex >= this.songs.length) return
+  async resetCurrentSong() {
+    console.log('[resetCurrentSong] Called - currentSongIndex:', this.currentSongIndex)
+    if (this.currentSongIndex < 0 || this.currentSongIndex >= this.songs.length) {
+      console.warn('[resetCurrentSong] Invalid song index, returning')
+      return
+    }
 
     const song = this.songs[this.currentSongIndex]
+    console.log('[resetCurrentSong] Resetting song:', song.title)
+    console.log(
+      '[resetCurrentSong] Current key:',
+      song.currentKey,
+      'Original key:',
+      song.originalKey
+    )
 
-    // Reset key to original
-    song.currentKey = song.metadata.key
+    const originalKey = song.originalKey
 
     // Reset BPM to original
     song.currentBPM = song.metadata.tempo
@@ -2271,10 +2312,10 @@ class PageApp {
     // Reset font size to default
     song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE
 
-    if (this._capoEnabled) {
-      song.currentCapo = 0
-      this.updateCapoSelector(0, song.currentKey)
-      this._updateSongDisplayCapo(this.currentSongIndex, 0)
+    // Reset capo to 0 (using handleCapoChange to update all displays)
+    if (this._capoEnabled && song.currentCapo !== 0) {
+      console.log('[resetCurrentSong] Resetting capo from', song.currentCapo, 'to 0')
+      await this.handleCapoChange(0)
     }
 
     // Reset all section states for this song
@@ -2282,20 +2323,38 @@ class PageApp {
       delete this.sectionState[this.currentSongIndex]
     }
 
-    // Save state
-    this.saveState()
-
-    // Update UI
-    this.updateHeader(song)
-    this.applyFontSize(this.currentSongIndex)
-
-    // Update key selector
-    if (song.currentKey) {
-      this.updateKeySelector(song.currentKey)
-    }
-
     // Reapply section states (all back to default)
     this.applySectionState()
+
+    // Apply font size
+    this.applyFontSize(this.currentSongIndex)
+
+    // Reset key last - this will handle re-rendering and updating all displays
+    console.log(
+      '[resetCurrentSong] Checking key reset - originalKey:',
+      originalKey,
+      'currentKey:',
+      song.currentKey,
+      'different?:',
+      song.currentKey !== originalKey
+    )
+    if (originalKey && song.currentKey !== originalKey) {
+      console.log('[resetCurrentSong] Calling handleKeyChange to reset key to:', originalKey)
+      await this.handleKeyChange(originalKey)
+    } else if (originalKey) {
+      console.log('[resetCurrentSong] Key already correct, just updating displays')
+      // Key is already correct, just update displays
+      const musicalMetadata = document.getElementById('musical-metadata')
+      if (musicalMetadata) {
+        musicalMetadata.keyValue = originalKey
+        musicalMetadata.bpm = song.currentBPM || null
+      }
+    } else {
+      console.warn('[resetCurrentSong] No original key found in metadata!')
+    }
+
+    // Save state
+    this.saveState()
   }
 
   setupOverviewDragDrop() {

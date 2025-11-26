@@ -20,41 +20,39 @@ export class SongSettingsPopover extends LitElement {
     }
 
     .settings-popover {
-      border: none;
+      background-color: var(--header-bg, #2c3e50);
+      border: 2px solid rgba(255, 255, 255, 0.3);
       border-radius: 8px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
       padding: 1rem;
-      background: var(--bg-secondary, white);
-      min-width: 300px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      margin: 0;
+      z-index: 1000;
+      min-width: 250px;
       max-width: 90vw;
       max-height: 80vh;
-      margin: 0;
+      overflow-y: auto;
       position: fixed;
       inset: unset;
-      overflow-y: auto;
       /* Start positioned off-screen to prevent flash */
       top: -9999px;
       left: -9999px;
     }
 
     .settings-popover::backdrop {
-      background-color: transparent;
+      background-color: rgba(0, 0, 0, 0.3);
     }
 
     .settings-content {
       display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-
-    .settings-row {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
+      flex-direction: row;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      color: var(--header-text, #fff);
     }
 
     ::slotted(*) {
-      width: 100%;
+      flex-shrink: 0;
     }
   `
 
@@ -152,7 +150,7 @@ export class SongSettingsPopover extends LitElement {
     return html`
       <div id="${this.popoverId}" class="settings-popover" popover="manual">
         <div class="settings-content" id="settings-content-container">
-          <!-- Controls will be moved here via JavaScript when popover opens -->
+          <slot></slot>
         </div>
       </div>
     `

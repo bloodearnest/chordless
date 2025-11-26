@@ -535,69 +535,7 @@ header h1 {
   font-size: var(--font-ui-small);
 }
 
-/* Mobile header expansion - show all controls when header is expanded */
-@media (max-width: 47.99rem) {
-  /* Show normal controls when header is expanded (not in edit mode) */
-  body.header-expanded:not(.edit-mode) .key-display-wrapper,
-  body.header-expanded:not(.edit-mode) .song-meta-compact {
-    display: flex !important;
-    opacity: 1 !important;
-  }
-
-  /* Make controls more compact when expanded */
-  body.header-expanded .key-display-wrapper {
-    gap: 0.15rem !important;
-    flex-shrink: 0 !important;
-    min-width: 0 !important;
-    font-size: var(--font-ui-small) !important;
-  }
-
-  body.header-expanded .meta-label {
-    font-size: var(--font-ui-small) !important;
-  }
-
-  body.header-expanded .key-selector {
-    min-width: 2.2rem !important;
-    font-size: var(--font-ui) !important;
-    padding: 0.2rem 0.35rem !important;
-    min-height: auto !important;
-    border-width: 1px !important;
-  }
-
-  body.header-expanded .song-meta-compact {
-    flex-shrink: 1 !important;
-    min-width: 0 !important;
-    max-width: 6rem !important;
-    font-size: var(--font-ui-small) !important;
-    white-space: nowrap !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-  }
-
-  /* Make edit mode buttons match the size of edit/info buttons */
-  body.header-expanded .reset-button,
-  body.header-expanded .font-size-btn {
-    width: 1.8rem !important;
-    height: 1.8rem !important;
-    font-size: var(--font-ui-small) !important;
-    border-width: 1px !important;
-    padding: 0.2rem !important;
-    flex-shrink: 0 !important;
-  }
-
-  /* Ensure the header-controls-slot doesn't wrap */
-  body.header-expanded .header-controls-slot {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    gap: 0.2rem !important;
-  }
-
-  /* Show edit controls when header is expanded AND in edit mode */
-  body.header-expanded.edit-mode .edit-mode-control {
-    display: flex !important;
-    opacity: 1 !important;
-  }
-}
+/* Removed mobile header expansion - now using popover for settings */
 
 /* Edit mode control visibility system */
 /* Controls visible in normal mode, hidden in edit mode */
@@ -703,18 +641,6 @@ body.edit-mode .edit-mode-control.fade-in {
     display: none !important;
   }
 
-  /* When expanded on regular header (for songs.html, etc) */
-  body.header-expanded header .header-center {
-    display: flex !important;
-    flex-basis: 100%;
-    order: 3;
-    width: 100%;
-  }
-
-  body.header-expanded header .header-right .edit-mode-toggle,
-  body.header-expanded header .header-right .info-button {
-    display: flex !important;
-  }
 }
 
 /* Tablet/desktop: hide expand toggle, always show controls */

@@ -33,17 +33,37 @@
       <div id="song-view" class="view">
         <app-header id="app-header" heading="Loading..." show-edit-toggle show-info-button>
           <div slot="controls" class="header-controls-slot">
-            <button
-              class="reset-button edit-mode-control"
-              id="reset-button"
-              aria-label="Reset song"
-            >
-              ↺
-            </button>
-            <!-- Key display/selector component -->
-            <key-selector id="key-selector" label="Key"></key-selector>
-            <capo-selector id="capo-selector" label="Capo" style="display: none"></capo-selector>
-            <div class="song-meta-compact" id="song-meta-header"></div>
+            <!-- Musical metadata display / settings trigger -->
+            <musical-metadata-display
+              id="musical-metadata"
+              key-value=""
+              capo-value="0"
+              bpm=""
+              time-signature=""
+            ></musical-metadata-display>
+
+            <!-- Song settings popover (contains key, capo, reset, BPM controls) -->
+            <song-settings-popover id="song-settings-popover">
+              <!-- Key selector -->
+              <key-selector id="key-selector" label="Key"></key-selector>
+
+              <!-- Capo selector -->
+              <capo-selector id="capo-selector" label="Capo"></capo-selector>
+
+              <!-- Reset button -->
+              <button
+                class="reset-button"
+                id="reset-button"
+                aria-label="Reset song"
+              >
+                ↺
+              </button>
+
+              <!-- BPM placeholder -->
+              <div class="bpm-placeholder" style="opacity: 0.6; font-size: var(--font-ui-small); color: var(--header-text);">
+                (BPM editor coming soon)
+              </div>
+            </song-settings-popover>
           </div>
         </app-header>
 
@@ -160,6 +180,8 @@
     <script type="module" src="/components/song-section.js"></script>
     <script type="module" src="/components/song-info.js"></script>
     <script type="module" src="/components/setlist-info.js"></script>
+    <script type="module" src="/components/musical-metadata-display.js"></script>
+    <script type="module" src="/components/song-settings-popover.js"></script>
     <script type="module" src="/components/key-selector.js"></script>
     <script type="module" src="/components/capo-selector.js"></script>
     <script type="module" src="/components/app-header.js"></script>
