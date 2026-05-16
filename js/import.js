@@ -160,35 +160,64 @@ export class SetlistImporter {
       for (const dirName of setlistDirs) {
         console.log(`[Import] Checking directory: ${dirName}`)
 
-        // Directory names should be in YYYY-MM-DD format
-        const dateMatch = dirName.match(/^\d{4}-\d{2}-\d{2}$/)
+        // Directory names should start with YYYY-MM-DD, optionally followed by a name
+        const dateMatch = dirName.match(/^(\d{4}-\d{2}-\d{2})/)
         if (!dateMatch) {
           console.log(`[Import] Skipping ${dirName} - doesn't match date format`)
           continue
         }
 
         // Fetch files in this setlist directory
-        const files = await this._fetchDirectoryListing(`sets/${dirName}`)
-        console.log(`[Import] Files in ${dirName}:`, files)
+        const entries = await this._fetchDirectoryListing(`sets/${dirName}`)
+        console.log(`[Import] Entries in ${dirName}:`, entries)
 
-        const chordproFiles = files.filter(
-          f =>
-            f.endsWith('.cho') ||
-            f.endsWith('.chordpro') ||
-            f.endsWith('.txt') ||
-            f.includes('chordpro')
-        )
-        console.log(`[Import] ChordPro files in ${dirName}:`, chordproFiles)
+        const isChordpro = f =>
+          f.endsWith('.cho') ||
+          f.endsWith('.chordpro') ||
+          f.endsWith('.txt') ||
+          f.includes('chordpro')
 
-        setlists.push({
-          id: dirName,
-          date: dirName,
-          path: `sets/${dirName}/`,
-          songs: chordproFiles.map(f => ({
-            filename: f,
-            path: `sets/${dirName}/${f}`,
-          })),
-        })
+        const chordproFiles = entries.filter(isChordpro)
+        const subdirCandidates = entries.filter(e => !e.includes('.'))
+
+        if (subdirCandidates.length > 0) {
+          for (const subDir of subdirCandidates) {
+            let subEntries
+            try {
+              subEntries = await this._fetchDirectoryListing(`sets/${dirName}/${subDir}`)
+            } catch {
+              console.log(`[Import] Skipping ${dirName}/${subDir} - not a readable directory`)
+              continue
+            }
+            const subChordpro = subEntries.filter(isChordpro)
+            if (subChordpro.length === 0) continue
+            console.log(`[Import] Subdir ${dirName}/${subDir}: ${subChordpro.length} chordpro files`)
+            setlists.push({
+              id: `${dirName}/${subDir}`,
+              date: dateMatch[1],
+              path: `sets/${dirName}/${subDir}/`,
+              parentDirName: dirName,
+              subDirName: subDir,
+              songs: subChordpro.map(f => ({
+                filename: f,
+                path: `sets/${dirName}/${subDir}/${f}`,
+              })),
+            })
+          }
+        } else {
+          console.log(`[Import] ChordPro files in ${dirName}:`, chordproFiles)
+          setlists.push({
+            id: dirName,
+            date: dateMatch[1],
+            path: `sets/${dirName}/`,
+            parentDirName: dirName,
+            subDirName: null,
+            songs: chordproFiles.map(f => ({
+              filename: f,
+              path: `sets/${dirName}/${f}`,
+            })),
+          })
+        }
       }
 
       // Sort by date, most recent first
@@ -333,8 +362,10 @@ export class SetlistImporter {
     // Sort songs by order
     songs.sort((a, b) => a.order - b.order)
 
-    // Extract name from setlist ID
-    const name = this.extractSetlistName(setlistData.id)
+    // Build name from parent dir name and optional subdir name
+    const parentName = this.extractSetlistName(setlistData.parentDirName)
+    const subName = setlistData.subDirName ? this.humanizeName(setlistData.subDirName) : null
+    const name = [parentName, subName].filter(Boolean).join(' - ') || null
 
     // Create setlist object with new schema
     const setlist = {
@@ -398,18 +429,18 @@ export class SetlistImporter {
     return result
   }
 
+  humanizeName(str) {
+    return str.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+  }
+
   /**
-   * Extract optional name from directory name
+   * Extract optional name from a YYYY-MM-DD[-name] directory name.
    * e.g. "2025-10-12-morning-service" -> "Morning Service"
    */
   extractSetlistName(dirName) {
     const parts = dirName.split('-')
     if (parts.length > 3) {
-      // Has event name
-      return parts
-        .slice(3)
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(' ')
+      return this.humanizeName(parts.slice(3).join('-'))
     }
     return null
   }
