@@ -33,10 +33,10 @@
 const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
 
-const AUTH_PROXY_URL =
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8787'
-    : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+// Auth routes are proxied through Caddy at same origin (see Caddyfile /oauth/* /session/* routes).
+// TODO: when deploying to production, set this to the deployed Cloudflare Worker URL
+// and add the production hostname check: window.location.hostname === 'chordless.dev'
+const AUTH_PROXY_URL = ''
 
 /**
  * Parse JWT and extract payload
@@ -161,6 +161,9 @@ export async function authorizeWithGoogle() {
       client_id: GOOGLE_CLIENT_ID,
       scope: GOOGLE_SCOPES + ' openid email profile',
       ux_mode: 'popup',
+      // Force the consent screen every time so Drive scope is always explicitly granted.
+      // Without this, Google reuses cached consent and may issue a token without Drive scope.
+      prompt: 'consent',
       callback: async response => {
         try {
           if (response.error) {
@@ -172,7 +175,7 @@ export async function authorizeWithGoogle() {
           const blobResponse = await fetch(`${AUTH_PROXY_URL}/oauth/callback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code: response.code }),
+            body: JSON.stringify({ code: response.code, redirect_uri: window.location.origin }),
           })
 
           if (!blobResponse.ok) {

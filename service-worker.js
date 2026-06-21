@@ -492,33 +492,36 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Static assets (icons, images, fonts) - cache on first request (stale-while-revalidate)
+  // Static assets (icons, images, fonts) - network first, cache as fallback only
+  // Store without query string so cache-busted URLs (e.g. ?t=...) can find the entry
   if (url.pathname.match(/\.(svg|png|jpg|jpeg|gif|webp|ico|woff|woff2|ttf|eot)$/)) {
     event.respondWith(
-      caches.open(RUNTIME_CACHE_NAME).then(cache => {
-        return cache.match(event.request).then(cached => {
-          const fetchPromise = fetch(event.request)
-            .then(response => {
-              // Cache the new version for next time
-              if (response.ok) {
-                cache.put(event.request, response.clone())
-              }
-              return response
+      fetch(event.request)
+        .then(response => {
+          if (response.ok) {
+            caches.open(RUNTIME_CACHE_NAME).then(cache => {
+              cache.put(new Request(url.origin + url.pathname), response.clone())
             })
-            .catch(() => cached) // Fallback to cached if fetch fails
-
-          // Return cached immediately if available, otherwise wait for fetch
-          return cached || fetchPromise
+          }
+          return response
         })
-      })
+        .catch(() =>
+          caches
+            .open(RUNTIME_CACHE_NAME)
+            .then(cache => cache.match(event.request, { ignoreSearch: true }))
+            .then(cached => cached || new Response('', { status: 404 }))
+        )
     )
     return
   }
 
-  // Everything else - pass through
-  // Silently fail for missing manifest (optional PWA file)
+  // Manifest - network first, fall back to install cache
   if (url.pathname.endsWith('manifest.webmanifest')) {
-    event.respondWith(fetch(event.request).catch(() => new Response('', { status: 404 })))
+    event.respondWith(
+      fetch(event.request).catch(() =>
+        caches.match(event.request).then(cached => cached || new Response('', { status: 404 }))
+      )
+    )
     return
   }
 

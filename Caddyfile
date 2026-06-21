@@ -11,12 +11,19 @@
 }
 
 # HTTPS server
-https://localhost:8443, https://127.0.0.1:8443 {
+https://localhost:8443, https://127.0.0.1:8443, https://casey.tail030f3.ts.net:8443 {
     root * .
     encode zstd gzip
-    file_server browse
     tls certs/dev.crt certs/dev.key
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
     }
+    # Proxy auth routes to local wrangler dev server
+    handle /oauth/* {
+        reverse_proxy http://localhost:8787
+    }
+    handle /session/* {
+        reverse_proxy http://localhost:8787
+    }
+    file_server browse
 }

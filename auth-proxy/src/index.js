@@ -92,17 +92,24 @@ export default {
  */
 async function handleOAuthCallback(request, env) {
   const body = await request.json();
-  const { code } = body;
+  const { code, redirect_uri } = body;
 
   if (!code) {
     return jsonResponse({ error: 'Missing code' }, 400);
+  }
+
+  // Use the redirect_uri supplied by the client (its own origin), falling back to the
+  // env var. The client passes its origin so this works from localhost, Tailscale, etc.
+  const redirectUri = redirect_uri || env.GOOGLE_REDIRECT_URI;
+  if (!redirectUri) {
+    return jsonResponse({ error: 'Missing redirect_uri' }, 400);
   }
 
   // Exchange code for tokens
   const oauth2Client = new OAuth2Client({
     clientId: env.GOOGLE_CLIENT_ID,
     clientSecret: env.GOOGLE_CLIENT_SECRET,
-    redirectUri: env.GOOGLE_REDIRECT_URI,
+    redirectUri,
   });
 
   const { tokens } = await oauth2Client.getToken(code);
@@ -123,6 +130,18 @@ async function handleOAuthCallback(request, env) {
   if (!refresh_token) {
     return jsonResponse(
       { error: 'No refresh token received. User may need to revoke and re-authorize.' },
+      400
+    );
+  }
+
+  // Validate that Drive scope was granted
+  const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+  if (!scope || !scope.includes(REQUIRED_SCOPE)) {
+    return jsonResponse(
+      {
+        error: 'Drive access not granted. Please re-authorize and ensure you grant access to Google Drive files.',
+        granted_scopes: scope || '',
+      },
       400
     );
   }
