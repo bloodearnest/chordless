@@ -3,10 +3,16 @@
     auto_https off
 }
 
-# HTTP server
+# HTTP server (also used by Tailscale Funnel)
 :8080 {
     root * .
     encode zstd gzip
+    handle /oauth/* {
+        reverse_proxy http://localhost:8787
+    }
+    handle /session/* {
+        reverse_proxy http://localhost:8787
+    }
     file_server browse
 }
 

@@ -11,7 +11,7 @@ const DEV_MODE =
   self.location.hostname.startsWith('10.') ||
   self.location.hostname.endsWith('.local')
 
-const CACHE_NAME = 'cache-v1'
+const CACHE_NAME = 'cache-v2'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const RUNTIME_CACHE_NAME = 'runtime-v1'
 
@@ -257,10 +257,7 @@ async function processOperation(operation) {
     throw new Error('No ID token available - user needs to refresh session')
   }
 
-  const AUTH_PROXY_URL =
-    self.location.hostname === 'localhost'
-      ? 'http://localhost:8787'
-      : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+  const AUTH_PROXY_URL = self.location.hostname === 'localhost' ? 'http://localhost:8787' : ''
 
   if (operation.type === 'invite') {
     // Call /session/invite
@@ -395,40 +392,19 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Static assets - behavior depends on dev mode
+  // JS/CSS: always network-first, bypassing HTTP cache, fallback to SW cache for offline
   if (url.pathname.match(/\.(css|js)$/)) {
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      event.respondWith(
-        fetch(event.request, { cache: 'no-cache' })
-          .then(response => {
-            // Clone the response and cache it as backup
-            const responseToCache = response.clone()
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache)
-            })
-            return response
-          })
-          .catch(() => {
-            // If network fails, serve stale from cache
-            return caches.match(event.request)
-          })
-      )
-    } else {
-      // Production mode: Cache first, update in background
-      event.respondWith(
-        caches.match(event.request).then(cached => {
-          const fetchPromise = fetch(event.request).then(response => {
-            const responseToCache = response.clone()
-            caches.open(CACHE_NAME).then(cache => {
-              cache.put(event.request, responseToCache)
-            })
-            return response
-          })
-          return cached || fetchPromise
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then(response => {
+          if (response.ok) {
+            const clone = response.clone()
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone))
+          }
+          return response
         })
-      )
-    }
+        .catch(() => caches.match(event.request))
+    )
     return
   }
 
@@ -499,8 +475,9 @@ self.addEventListener('fetch', event => {
       fetch(event.request)
         .then(response => {
           if (response.ok) {
+            const clone = response.clone()
             caches.open(RUNTIME_CACHE_NAME).then(cache => {
-              cache.put(new Request(url.origin + url.pathname), response.clone())
+              cache.put(new Request(url.origin + url.pathname), clone)
             })
           }
           return response

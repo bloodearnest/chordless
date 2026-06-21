@@ -176,6 +176,12 @@ export class DriveSyncPanel extends LitElement {
     this.loadLastSyncTime()
   }
 
+  updated(changedProperties) {
+    if (changedProperties.has('disabled') && !this.disabled) {
+      this.checkSyncAvailability()
+    }
+  }
+
   async checkSyncAvailability() {
     this.syncAvailable = await isSyncAvailable()
   }
