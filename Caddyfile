@@ -3,6 +3,14 @@
     auto_https off
 }
 
+# HTTP server
+:8080 {
+    root * .
+    encode zstd gzip
+    file_server browse
+}
+
+# HTTPS server
 https://localhost:8443, https://127.0.0.1:8443 {
     root * .
     encode zstd gzip

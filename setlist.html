@@ -44,25 +44,8 @@
 
             <!-- Song settings popover (contains key, capo, reset, BPM controls) -->
             <song-settings-popover id="song-settings-popover">
-              <!-- Key selector -->
-              <key-selector id="key-selector" label="Key"></key-selector>
-
-              <!-- Capo selector -->
-              <capo-selector id="capo-selector" label="Capo"></capo-selector>
-
-              <!-- Reset button -->
-              <button
-                class="reset-button"
-                id="reset-button"
-                aria-label="Reset song"
-              >
-                ↺
-              </button>
-
-              <!-- BPM placeholder -->
-              <div class="bpm-placeholder" style="opacity: 0.6; font-size: var(--font-ui-small); color: var(--header-text);">
-                (BPM editor coming soon)
-              </div>
+              <key-selector id="key-selector" slot="key-selector"></key-selector>
+              <capo-selector id="capo-selector" slot="capo-selector"></capo-selector>
             </song-settings-popover>
           </div>
         </app-header>

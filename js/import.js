@@ -191,7 +191,9 @@ export class SetlistImporter {
             }
             const subChordpro = subEntries.filter(isChordpro)
             if (subChordpro.length === 0) continue
-            console.log(`[Import] Subdir ${dirName}/${subDir}: ${subChordpro.length} chordpro files`)
+            console.log(
+              `[Import] Subdir ${dirName}/${subDir}: ${subChordpro.length} chordpro files`
+            )
             setlists.push({
               id: `${dirName}/${subDir}`,
               date: dateMatch[1],
@@ -430,7 +432,10 @@ export class SetlistImporter {
   }
 
   humanizeName(str) {
-    return str.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    return str
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')
   }
 
   /**

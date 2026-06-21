@@ -16,13 +16,11 @@ export class CapoSelector extends LitElement {
 
   static styles = css`
     :host {
-      display: inline-flex;
+      display: contents;
     }
 
     .capo-wrapper {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
+      display: contents;
     }
 
     .meta-label {
@@ -30,6 +28,7 @@ export class CapoSelector extends LitElement {
       font-size: var(--font-ui-small);
       color: var(--header-text, #fff);
       margin: 0;
+      padding-left: 0.5rem;
     }
 
     .capo-button {
@@ -37,15 +36,19 @@ export class CapoSelector extends LitElement {
       color: var(--header-text, #fff);
       border: 2px solid transparent;
       border-radius: 6px;
-      padding: 0.2rem 0.4rem;
-      font-size: var(--font-ui-small);
+      padding: 0.4rem 0.6rem;
+      font-size: var(--font-ui);
       font-family: inherit;
-      min-width: 0;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
       text-align: center;
       cursor: default;
       pointer-events: none;
       transition: all 0.2s;
       white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     :host([edit-mode]) .capo-button {
@@ -53,16 +56,6 @@ export class CapoSelector extends LitElement {
       border-color: rgba(255, 255, 255, 0.3);
       cursor: pointer;
       pointer-events: auto;
-    }
-
-    :host([edit-mode]) .capo-button:hover {
-      background-color: rgba(255, 255, 255, 0.3);
-      border-color: rgba(255, 255, 255, 0.5);
-    }
-
-    :host([edit-mode]) .capo-button:focus {
-      outline: none;
-      border-color: var(--header-text, #fff);
     }
 
     .capo-popover {

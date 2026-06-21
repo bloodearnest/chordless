@@ -3,15 +3,15 @@ import { css, html, LitElement } from 'lit'
 /**
  * SongSettingsPopover Component
  *
- * A dropdown popover containing song editing controls.
- * Uses slots to contain the existing key-selector, capo-selector,
- * font-size controls, and reset button.
- *
- * Similar pattern to nav-menu - dropdown menu style, not a modal.
+ * A dropdown popover containing song editing controls (key, capo, BPM, reset).
+ * All controls are rendered directly in this component to ensure proper grid alignment.
  */
 export class SongSettingsPopover extends LitElement {
   static properties = {
     popoverId: { type: String, attribute: 'popover-id' },
+    bpmValue: { type: Number, attribute: 'bpm-value' },
+    bpmMin: { type: Number, attribute: 'bpm-min' },
+    bpmMax: { type: Number, attribute: 'bpm-max' },
   }
 
   static styles = css`
@@ -33,7 +33,6 @@ export class SongSettingsPopover extends LitElement {
       overflow-y: auto;
       position: fixed;
       inset: unset;
-      /* Start positioned off-screen to prevent flash */
       top: -9999px;
       left: -9999px;
     }
@@ -43,16 +42,71 @@ export class SongSettingsPopover extends LitElement {
     }
 
     .settings-content {
-      display: flex;
-      flex-direction: row;
+      display: grid;
+      grid-template-columns: auto auto auto auto;
+      column-gap: 0.25rem;
+      row-gap: 0.75rem;
       align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
       color: var(--header-text, #fff);
     }
 
-    ::slotted(*) {
-      flex-shrink: 0;
+    .meta-label {
+      opacity: 0.8;
+      font-size: var(--font-ui-small);
+      color: var(--header-text, #fff);
+      margin: 0;
+      white-space: nowrap;
+    }
+
+    .control-button {
+      background-color: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: var(--header-text, #fff);
+      border-radius: 6px;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      padding: 0.4rem 0.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: var(--font-ui);
+      font-weight: normal;
+      font-family: inherit;
+      text-align: center;
+    }
+
+    .control-button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .bpm-value {
+      color: var(--header-text, #fff);
+      font-size: var(--font-ui);
+      min-width: 3ch;
+      text-align: center;
+      font-family: inherit;
+    }
+
+    .reset-button {
+      grid-column: 1 / 5;
+      margin-top: 0.5rem;
+      background-color: rgba(255, 255, 255, 0.2);
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: var(--header-text, #fff);
+      border-radius: 6px;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      padding: 0.4rem 0.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: var(--font-ui);
+      font-weight: normal;
+      font-family: inherit;
+      text-align: center;
     }
   `
 
@@ -60,6 +114,9 @@ export class SongSettingsPopover extends LitElement {
     super()
     this.popoverId = 'song-settings-popover'
     this.triggerButton = null
+    this.bpmValue = 120
+    this.bpmMin = 40
+    this.bpmMax = 240
   }
 
   get popover() {
@@ -68,26 +125,20 @@ export class SongSettingsPopover extends LitElement {
 
   connectedCallback() {
     super.connectedCallback()
-    // Set up positioning after the component is rendered
     this.updateComplete.then(() => {
       if (this.popover) {
         this.popover.addEventListener('toggle', e => {
           if (e.newState === 'open') {
-            // Position the popover before it becomes visible
             this._positionPopover()
-            // Add click-outside listener when open
             setTimeout(() => {
               document.addEventListener('click', this._handleClickOutside)
             }, 0)
           } else {
-            // Remove listener when closed
             document.removeEventListener('click', this._handleClickOutside)
           }
         })
       }
     })
-
-    // Bind the click outside handler
     this._handleClickOutside = this._handleClickOutside.bind(this)
   }
 
@@ -99,26 +150,27 @@ export class SongSettingsPopover extends LitElement {
   _handleClickOutside(e) {
     const popover = this.popover
     if (!popover) return
-
-    // Close if clicked outside
     const clickedInside = e.composedPath().includes(popover)
     const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton)
 
-    if (!clickedInside && !clickedTrigger) {
+    // Check if clicked inside key-selector or capo-selector (including their popovers)
+    const keySelector = document.getElementById('key-selector')
+    const capoSelector = document.getElementById('capo-selector')
+    const clickedKeySelector = keySelector && e.composedPath().includes(keySelector)
+    const clickedCapoSelector = capoSelector && e.composedPath().includes(capoSelector)
+
+    if (!clickedInside && !clickedTrigger && !clickedKeySelector && !clickedCapoSelector) {
       this.closePopover()
     }
   }
 
-  // Set the trigger button element for positioning
   setTriggerButton(button) {
     this.triggerButton = button
   }
 
-  // Position the popover relative to the trigger button
   _positionPopover() {
     const popover = this.popover
     if (!popover || !this.triggerButton) return
-
     const buttonRect = this.triggerButton.getBoundingClientRect()
     popover.style.top = `${buttonRect.bottom + 4}px`
     popover.style.left = `${buttonRect.left}px`
@@ -126,7 +178,6 @@ export class SongSettingsPopover extends LitElement {
 
   showPopover() {
     const popover = this.popover
-    // Position before showing to avoid visual jump
     this._positionPopover()
     popover?.showPopover()
   }
@@ -146,11 +197,73 @@ export class SongSettingsPopover extends LitElement {
     return popover?.matches(':popover-open') || false
   }
 
+  _handleBPMDecrement() {
+    const newValue = Math.max(this.bpmMin, this.bpmValue - 1)
+    if (newValue !== this.bpmValue) {
+      this.dispatchEvent(
+        new CustomEvent('bpm-change', {
+          detail: { value: newValue },
+          bubbles: true,
+          composed: true,
+        })
+      )
+    }
+  }
+
+  _handleBPMIncrement() {
+    const newValue = Math.min(this.bpmMax, this.bpmValue + 1)
+    if (newValue !== this.bpmValue) {
+      this.dispatchEvent(
+        new CustomEvent('bpm-change', {
+          detail: { value: newValue },
+          bubbles: true,
+          composed: true,
+        })
+      )
+    }
+  }
+
+  _handleReset() {
+    this.dispatchEvent(new CustomEvent('reset-click', { bubbles: true, composed: true }))
+  }
+
   render() {
+    const canDecrementBPM = this.bpmValue > this.bpmMin
+    const canIncrementBPM = this.bpmValue < this.bpmMax
+
     return html`
       <div id="${this.popoverId}" class="settings-popover" popover="manual">
-        <div class="settings-content" id="settings-content-container">
-          <slot></slot>
+        <div class="settings-content">
+          <!-- Row 1: Key selector and Capo selector -->
+          <slot name="key-selector"></slot>
+          <slot name="capo-selector"></slot>
+
+          <!-- Row 2: BPM controls -->
+          <label class="meta-label">BPM:</label>
+          <button
+            class="control-button"
+            @click=${this._handleBPMDecrement}
+            ?disabled=${!canDecrementBPM}
+            aria-label="Decrease BPM"
+            type="button"
+          >
+            −
+          </button>
+          <span class="bpm-value">${this.bpmValue || '—'}</span>
+          <button
+            class="control-button"
+            @click=${this._handleBPMIncrement}
+            ?disabled=${!canIncrementBPM}
+            aria-label="Increase BPM"
+            type="button"
+          >
+            +
+          </button>
+
+          <!-- Row 3: Reset -->
+          <button class="reset-button" @click=${this._handleReset} aria-label="Reset song" type="button">
+            Reset
+          </button>
         </div>
       </div>
     `

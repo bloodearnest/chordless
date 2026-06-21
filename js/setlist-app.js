@@ -764,9 +764,7 @@ class PageApp {
         // Set up key selector
         this.setupKeySelector()
         this.setupCapoSelector()
-
-        // Set up reset button
-        this.setupResetButton()
+        this.setupBPMEditor()
 
         // Set up Intersection Observer to auto-detect current song
         this.setupSectionObserver()
@@ -1014,7 +1012,6 @@ class PageApp {
     const musicalMetadata = document.getElementById('musical-metadata')
     const keySelector = document.getElementById('key-selector')
     const capoSelector = document.getElementById('capo-selector')
-    const resetButton = document.getElementById('reset-button')
     const fontSizeControls = document.querySelector('.font-size-controls')
 
     // Determine new title
@@ -1041,14 +1038,7 @@ class PageApp {
     if (instant) {
       // Instant update - no animation
       appHeader.setTitleInstant(newTitle)
-      this._updateHeaderContent(
-        song,
-        musicalMetadata,
-        keySelector,
-        capoSelector,
-        resetButton,
-        fontSizeControls
-      )
+      this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, fontSizeControls)
     } else {
       // Animated update - fade out old, swap content, fade in new
       appHeader.heading = newTitle
@@ -1059,21 +1049,13 @@ class PageApp {
           musicalMetadata,
           keySelector,
           capoSelector,
-          resetButton,
           fontSizeControls
         )
       })
     }
   }
 
-  _updateHeaderContent(
-    song,
-    musicalMetadata,
-    keySelector,
-    capoSelector,
-    resetButton,
-    fontSizeControls
-  ) {
+  _updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, fontSizeControls) {
     if (song) {
       // Update key selector
       if (song.currentKey) {
@@ -1090,6 +1072,12 @@ class PageApp {
           this.updateCapoSelector(song.currentCapo ?? 0, song.currentKey)
         }
       }
+
+      // Update BPM editor
+      this.updateBPMEditor(song.currentBPM || 120)
+
+      // Update song settings popover
+      this.updateSongSettingsPopover()
 
       // Update musical metadata display
       if (musicalMetadata) {
@@ -1857,6 +1845,9 @@ class PageApp {
   }
 
   setupEditMode() {
+    if (this._editModeSetup) return
+    this._editModeSetup = true
+
     const appHeader = document.getElementById('app-header')
     if (!appHeader) return
 
@@ -1973,6 +1964,9 @@ class PageApp {
   }
 
   setupAppHeaderEvents() {
+    if (this._appHeaderEventsSetup) return
+    this._appHeaderEventsSetup = true
+
     const appHeader = document.getElementById('app-header')
     if (!appHeader) return
 
@@ -2031,6 +2025,22 @@ class PageApp {
       // Listen to musical metadata clicks (only works in edit mode)
       musicalMetadata.addEventListener('settings-click', () => {
         songSettingsPopover.togglePopover()
+      })
+
+      songSettingsPopover.addEventListener('bpm-change', async e => {
+        const newValue = e.detail?.value
+        await this.handleBPMChange(newValue)
+      })
+
+      songSettingsPopover.addEventListener('reset-click', async () => {
+        // Show confirmation modal
+        const modal = document.getElementById('reset-confirm-modal')
+        if (modal) {
+          const confirmed = await modal.show()
+          if (confirmed) {
+            await this.resetCurrentSong()
+          }
+        }
       })
     }
   }
@@ -2100,11 +2110,13 @@ class PageApp {
     const keySelector = document.getElementById('key-selector')
     if (!keySelector) return
 
-    // Listen for key-change events
-    keySelector.addEventListener('key-change', async e => {
-      const newKey = e.detail.value
-      await this.handleKeyChange(newKey)
-    })
+    if (!this._keyChangeHandler) {
+      this._keyChangeHandler = async e => {
+        const newKey = e.detail.value
+        await this.handleKeyChange(newKey)
+      }
+      keySelector.addEventListener('key-change', this._keyChangeHandler)
+    }
 
     // Initialize with current song's key
     if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
@@ -2120,13 +2132,8 @@ class PageApp {
     if (!capoSelector) return
 
     if (!this._capoEnabled) {
-      capoSelector.style.display = 'none'
       return
     }
-
-    // Capo is enabled, make sure it's visible
-    capoSelector.style.display = ''
-    capoSelector.editMode = document.body.classList.contains('edit-mode')
 
     if (!this._capoChangeHandler) {
       this._capoChangeHandler = event => {
@@ -2139,6 +2146,85 @@ class PageApp {
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     const currentCapo = currentSong?.currentCapo || 0
     this.updateCapoSelector(currentCapo, currentSong?.currentKey || null)
+  }
+
+  setupBPMEditor() {
+    const bpmEditor = document.getElementById('bpm-editor')
+    if (!bpmEditor) return
+
+    bpmEditor.editMode = document.body.classList.contains('edit-mode')
+
+    if (!this._bpmChangeHandler) {
+      this._bpmChangeHandler = event => {
+        const newValue = event.detail?.value
+        this.handleBPMChange(newValue)
+      }
+      bpmEditor.addEventListener('bpm-change', this._bpmChangeHandler)
+    }
+
+    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
+    const currentBPM = currentSong?.currentBPM || 120
+    this.updateBPMEditor(currentBPM)
+  }
+
+  updateBPMEditor(bpm) {
+    const bpmEditor = document.getElementById('bpm-editor')
+    if (bpmEditor) {
+      bpmEditor.value = bpm || 120
+    }
+  }
+
+  updateSongSettingsPopover() {
+    const songSettingsPopover = document.getElementById('song-settings-popover')
+    if (!songSettingsPopover) return
+
+    const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
+    if (!song) return
+
+    // Update BPM value
+    songSettingsPopover.bpmValue = song.currentBPM || 120
+  }
+
+  async handleBPMChange(newValue) {
+    if (this.currentSongIndex < 0) return
+    const song = this.songs[this.currentSongIndex]
+    if (!song || song.currentBPM === newValue) return
+
+    console.log(`BPM changed to: ${newValue} for song ${this.currentSongIndex}`)
+
+    song.currentBPM = newValue
+
+    // Use SongModel to persist the change
+    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const model = createSetlistSongModel(
+      song,
+      song._setlistEntry,
+      song._canonicalSong,
+      this.currentSetlistId,
+      this.db,
+      this.db.organisationId
+    )
+    model.setTempo(newValue)
+    await model.save()
+
+    console.log('[SongModel] Saved BPM change via model:', newValue)
+
+    // Update the BPM editor display
+    this.updateBPMEditor(newValue)
+
+    // Update the musical metadata display with the new BPM
+    const musicalMetadata = document.getElementById('musical-metadata')
+    if (musicalMetadata) {
+      musicalMetadata.bpm = newValue
+    }
+
+    // Update the song settings popover
+    this.updateSongSettingsPopover()
+
+    // Notify media player so it refreshes tempo data
+    if (this.songs[this.currentSongIndex]) {
+      this.dispatchSongChange(this.songs[this.currentSongIndex])
+    }
   }
 
   async handleCapoChange(newValue) {
@@ -2172,6 +2258,9 @@ class PageApp {
     if (musicalMetadata) {
       musicalMetadata.capoValue = normalized
     }
+
+    // Update the song settings popover
+    this.updateSongSettingsPopover()
   }
 
   async handleKeyChange(newKey) {
@@ -2211,6 +2300,9 @@ class PageApp {
     if (musicalMetadata) {
       musicalMetadata.keyValue = newKey
     }
+
+    // Update the song settings popover
+    this.updateSongSettingsPopover()
 
     // Notify media player so it refreshes tempo/time/key data
     if (this.songs[this.currentSongIndex]) {
@@ -2256,36 +2348,6 @@ class PageApp {
         songContainer.style.fontSize = `${song.currentFontSize}rem`
       }
     }
-  }
-
-  setupResetButton() {
-    const resetButton = document.getElementById('reset-button')
-    const resetModal = document.getElementById('reset-confirm-modal')
-
-    console.log('[setupResetButton] resetButton:', resetButton)
-    console.log('[setupResetButton] resetModal:', resetModal)
-
-    if (!resetButton || !resetModal) {
-      console.warn(
-        '[setupResetButton] Missing elements - button:',
-        !!resetButton,
-        'modal:',
-        !!resetModal
-      )
-      return
-    }
-
-    // Show confirmation modal when reset button is clicked
-    resetButton.addEventListener('click', () => {
-      console.log('[setupResetButton] Reset button clicked, showing modal')
-      resetModal.show()
-    })
-
-    // Listen for confirm event
-    resetModal.addEventListener('confirm', () => {
-      console.log('[setupResetButton] Confirm event received, calling resetCurrentSong')
-      this.resetCurrentSong()
-    })
   }
 
   async resetCurrentSong() {
@@ -3443,10 +3505,8 @@ class PageApp {
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     if (capoSelector) {
       if (this._capoEnabled && currentSong) {
-        capoSelector.style.display = ''
         this.updateCapoSelector(currentSong.currentCapo ?? 0, currentSong.currentKey)
       } else {
-        capoSelector.style.display = 'none'
         capoSelector.referenceKey = ''
       }
     }

@@ -30,13 +30,11 @@ export class KeySelector extends LitElement {
 
   static styles = css`
     :host {
-      display: inline-flex;
+      display: contents;
     }
 
     .key-display-wrapper {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.25rem;
+      display: contents;
     }
 
     .meta-label {
@@ -51,16 +49,19 @@ export class KeySelector extends LitElement {
       color: var(--header-text, #fff);
       border: 2px solid transparent;
       border-radius: 6px;
-      padding: 0.2rem 0.45rem;
-      font-size: var(--font-ui-small);
+      padding: 0.4rem 0.6rem;
+      font-size: var(--font-ui);
       cursor: default;
       transition: all 0.2s;
       font-family: inherit;
       text-align: center;
       pointer-events: none;
       white-space: nowrap;
-      min-width: 0;
-      width: auto;
+      min-width: 2.5rem;
+      min-height: 2.5rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     /* In edit mode, make it look and behave like a button */
@@ -69,17 +70,6 @@ export class KeySelector extends LitElement {
       border-color: rgba(255, 255, 255, 0.3);
       cursor: pointer;
       pointer-events: auto;
-    }
-
-    :host([edit-mode]) .key-selector:hover {
-      background-color: rgba(255, 255, 255, 0.3);
-      border-color: rgba(255, 255, 255, 0.5);
-    }
-
-    :host([edit-mode]) .key-selector:focus {
-      outline: none;
-      background-color: rgba(255, 255, 255, 0.3);
-      border-color: var(--header-text, #fff);
     }
 
     /* Popover container */
