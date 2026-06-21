@@ -133,14 +133,13 @@ import { createSong, findExistingSong } from './song-utils.js'
     if (setlists.length > 0) {
       // Sort by date descending
       setlists.sort((a, b) => b.date.localeCompare(a.date))
-      const recentSetlists = setlists.slice(0, 3)
 
       const select = document.getElementById('recent-setlist-select')
       const recentButton = document.getElementById('choice-recent-setlist')
 
       // Populate dropdown
       select.innerHTML = ''
-      recentSetlists.forEach(setlist => {
+      setlists.forEach(setlist => {
         const option = document.createElement('option')
         option.value = setlist.id
         const formattedDate = formatDate(setlist.date)
