@@ -37,6 +37,7 @@ export class SetlistOverview extends LitElement {
                 .editMode=${this.editMode}
                 @song-click=${() => this._handleSongClick(index)}
                 @song-delete=${() => this._handleSongDelete(index)}
+                @song-key-change=${e => this._handleSongKeyChange(index, e.detail.key)}
               ></song-card>
             `
           )}
@@ -85,6 +86,16 @@ export class SetlistOverview extends LitElement {
     this.dispatchEvent(
       new CustomEvent('overview-song-delete', {
         detail: { index },
+        bubbles: true,
+        composed: true,
+      })
+    )
+  }
+
+  _handleSongKeyChange(index, key) {
+    this.dispatchEvent(
+      new CustomEvent('overview-song-key-change', {
+        detail: { index, key },
         bubbles: true,
         composed: true,
       })

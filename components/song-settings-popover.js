@@ -172,8 +172,10 @@ export class SongSettingsPopover extends LitElement {
     const popover = this.popover
     if (!popover || !this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
+    const popoverWidth = popover.offsetWidth
+    const left = Math.min(buttonRect.left, window.innerWidth - popoverWidth - 8)
     popover.style.top = `${buttonRect.bottom + 4}px`
-    popover.style.left = `${buttonRect.left}px`
+    popover.style.left = `${Math.max(8, left)}px`
   }
 
   showPopover() {

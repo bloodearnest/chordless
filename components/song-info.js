@@ -42,7 +42,7 @@ export class SongInfo extends LitElement {
     .song-title {
       font-size: var(--font-ui);
       font-weight: 600;
-      color: var(--color-text, #2c3e50);
+      color: var(--text-color, #2c3e50);
       margin: 0 0 2rem 0;
     }
 
@@ -73,7 +73,7 @@ export class SongInfo extends LitElement {
 
     .modal-info-label {
       font-size: var(--font-ui);
-      color: #95a5a6;
+      color: var(--text-secondary, #95a5a6);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
@@ -81,13 +81,13 @@ export class SongInfo extends LitElement {
 
     .modal-info-value {
       font-size: var(--font-ui-small);
-      color: var(--color-text, #2c3e50);
+      color: var(--text-color, #2c3e50);
       font-weight: 500;
     }
 
     .modal-appearances-title {
       font-size: var(--font-ui);
-      color: #95a5a6;
+      color: var(--text-secondary, #95a5a6);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
@@ -105,32 +105,32 @@ export class SongInfo extends LitElement {
       flex-direction: column;
       gap: 0.25rem;
       padding: 0.75rem;
-      background-color: #f8f9fa;
+      background-color: var(--bg-secondary, #f8f9fa);
       border-radius: 6px;
-      border-left: 3px solid var(--button-bg, #3498db);
+      border-left: 3px solid var(--color-primary, #3498db);
     }
 
     .appearance-date {
       font-size: var(--font-ui);
-      color: var(--color-text, #2c3e50);
+      color: var(--text-color, #2c3e50);
       font-weight: 500;
     }
 
     .appearance-relative {
       font-size: var(--font-ui-small);
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
     }
 
     .appearance-meta {
       font-size: var(--font-ui);
-      color: #95a5a6;
+      color: var(--text-secondary, #95a5a6);
       margin-top: 0.3rem;
     }
 
     .modal-ccli {
       margin-top: 2rem;
       padding-top: 2rem;
-      border-top: 1px solid #ecf0f1;
+      border-top: 1px solid var(--border-color, #ecf0f1);
     }
 
     .ccli-link {
@@ -157,10 +157,10 @@ export class SongInfo extends LitElement {
     .ccli-trailer {
       margin-top: 1.5rem;
       padding: 1rem;
-      background-color: #f8f9fa;
+      background-color: var(--bg-secondary, #f8f9fa);
       border-radius: 6px;
       font-size: var(--font-ui);
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
       white-space: pre-line;
       line-height: 1.6;
     }
@@ -168,13 +168,13 @@ export class SongInfo extends LitElement {
     .loading {
       text-align: center;
       padding: 2rem;
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
     }
 
     .empty {
       text-align: center;
       padding: 2rem;
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
       font-style: italic;
     }
   `

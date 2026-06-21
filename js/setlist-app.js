@@ -76,6 +76,13 @@ class PageApp {
       this.openAddSongModal()
     }
 
+    this._onOverviewSongKeyChange = event => {
+      const { index, key } = event.detail ?? {}
+      if (typeof index === 'number' && key) {
+        this.changeSongKeyInSetlist(index, key)
+      }
+    }
+
     this.init()
   }
 
@@ -788,6 +795,10 @@ class PageApp {
         this._onOverviewSongDelete
       )
       this._overviewComponent.removeEventListener('overview-add-song', this._onOverviewAddSong)
+      this._overviewComponent.removeEventListener(
+        'overview-song-key-change',
+        this._onOverviewSongKeyChange
+      )
     }
 
     this._overviewComponent = component
@@ -796,6 +807,7 @@ class PageApp {
       component.addEventListener('overview-song-click', this._onOverviewSongClick)
       component.addEventListener('overview-song-delete', this._onOverviewSongDelete)
       component.addEventListener('overview-add-song', this._onOverviewAddSong)
+      component.addEventListener('overview-song-key-change', this._onOverviewSongKeyChange)
     }
   }
 
@@ -3449,6 +3461,17 @@ class PageApp {
     }
 
     modal.addEventListener('confirm', handleConfirm, { once: true })
+  }
+
+  async changeSongKeyInSetlist(index, newKey) {
+    const setlist = this.currentSetlist
+    if (!setlist?.songs?.[index]) return
+
+    setlist.songs[index].key = newKey
+    setlist.modifiedDate = new Date().toISOString()
+    await this.db.saveSetlist(setlist)
+
+    await this.renderSetlist(setlist.id)
   }
 
   async deleteSongFromSetlist(index) {

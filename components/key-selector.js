@@ -178,11 +178,17 @@ export class KeySelector extends LitElement {
     const popover = this.shadowRoot.querySelector('.key-popover')
 
     if (button && popover) {
-      // Position popover when it opens
+      // Position popover when it opens, flipping upward if near bottom of screen
       const toggleHandler = e => {
         if (e.newState === 'open') {
           const buttonRect = button.getBoundingClientRect()
-          popover.style.top = `${buttonRect.bottom + 4}px`
+          const popoverHeight = popover.offsetHeight
+          const spaceBelow = window.innerHeight - buttonRect.bottom
+          if (spaceBelow < popoverHeight + 8) {
+            popover.style.top = `${buttonRect.top - popoverHeight - 4}px`
+          } else {
+            popover.style.top = `${buttonRect.bottom + 4}px`
+          }
           popover.style.left = `${buttonRect.left}px`
         }
       }

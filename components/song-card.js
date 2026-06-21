@@ -1,6 +1,10 @@
 import { css, html, LitElement } from 'lit'
 import { formatArtistNames } from '../js/song-utils.js'
 import { getWeeksAgo } from '../js/utils/date-utils.js'
+import './key-selector.js'
+
+const MAJOR_KEYS = ['Ab', 'A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G']
+const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm']
 
 /**
  * SongCard Component
@@ -171,8 +175,7 @@ export class SongCard extends LitElement {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.5rem;
-      padding: 0.8rem 1.5rem;
+      padding: 0.8rem;
       margin: 0 1rem;
       height: auto;
       background: var(--color-danger, #e74c3c);
@@ -207,7 +210,6 @@ export class SongCard extends LitElement {
       justify-content: center;
       width: 50px;
       background: var(--bg-tertiary, #f8f9fa);
-      border-left: 1px solid var(--bg-tertiary, #f8f9fa);
       cursor: grab;
       color: var(--text-secondary, #95a5a6);
       font-size: 24px;
@@ -230,6 +232,21 @@ export class SongCard extends LitElement {
 
     /* Hide drag handle in library variant */
     :host([variant='library']) .drag-handle {
+      display: none;
+    }
+
+    .key-edit-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 0.5rem;
+      align-self: stretch;
+      /* Override key-selector colors to use theme text instead of header-text */
+      --header-text: var(--text-color, #1a1a1a);
+      --header-bg: var(--bg-tertiary, #ecf0f1);
+    }
+
+    :host([variant='library']) .key-edit-wrapper {
       display: none;
     }
 
@@ -300,8 +317,8 @@ export class SongCard extends LitElement {
                 <line x1="10" y1="11" x2="10" y2="17"></line>
                 <line x1="14" y1="11" x2="14" y2="17"></line>
               </svg>
-              <span>Remove</span>
             </button>
+            ${this.renderKeyEdit()}
             <div class="drag-handle" part="drag-handle">☰</div>
           </div>
         </div>
@@ -373,6 +390,35 @@ export class SongCard extends LitElement {
     }
 
     return ''
+  }
+
+  renderKeyEdit() {
+    const currentKey = this.song?.currentKey
+    const isMinor = currentKey?.endsWith('m')
+    const keys = isMinor ? MINOR_KEYS : MAJOR_KEYS
+    return html`
+      <div class="key-edit-wrapper" @click=${e => e.stopPropagation()}>
+        <key-selector
+          label="Key"
+          .value=${currentKey ?? '-'}
+          .keys=${keys}
+          .originalKey=${this.song?.originalKey ?? ''}
+          .editMode=${true}
+          @key-change=${this.handleKeyEditChange}
+        ></key-selector>
+      </div>
+    `
+  }
+
+  handleKeyEditChange(e) {
+    e.stopPropagation()
+    this.dispatchEvent(
+      new CustomEvent('song-key-change', {
+        detail: { key: e.detail.value },
+        bubbles: true,
+        composed: true,
+      })
+    )
   }
 
   // Click handler
