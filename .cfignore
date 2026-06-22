@@ -1,0 +1,5 @@
+auth-proxy/
+tests/
+test-results/
+certs/
+node_modules/

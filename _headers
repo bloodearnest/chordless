@@ -1,0 +1,21 @@
+# Service worker must always be fetched fresh so browsers detect updates
+/service-worker.js
+  Cache-Control: no-store
+
+# App files: allow ETag/304 validation but don't serve stale from browser cache
+/*.js
+  Cache-Control: no-cache
+
+/*.css
+  Cache-Control: no-cache
+
+# Vendored dependencies are content-addressed — safe to cache indefinitely
+/vendor/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Audio and icons: cache for a day
+/pads/*
+  Cache-Control: public, max-age=86400
+
+/icons/*
+  Cache-Control: public, max-age=86400

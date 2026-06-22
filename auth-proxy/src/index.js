@@ -11,67 +11,85 @@
 import * as jose from 'jose';
 import { OAuth2Client } from 'google-auth-library';
 
-/**
- * CORS headers for browser requests
- */
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // TODO: Restrict to your domain in production
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
-};
+const ALLOWED_ORIGINS = [
+  'https://chordless.app',
+  'https://chordless.dev',
+  'https://localhost:8443',
+  'https://127.0.0.1:8443',
+  'http://localhost:8080',
+];
+
+function corsHeaders(request) {
+  const origin = request.headers.get('Origin') || '';
+  // Allow Tailscale .ts.net domains for local development
+  const allowed = ALLOWED_ORIGINS.includes(origin) || origin.endsWith('.ts.net');
+  return {
+    'Access-Control-Allow-Origin': allowed ? origin : 'https://chordless.app',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Max-Age': '86400',
+  };
+}
 
 /**
  * Router - handles incoming requests
  */
 export default {
   async fetch(request, env, _ctx) {
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS });
-    }
-
-    const url = new URL(request.url);
-    const path = url.pathname;
-
-    try {
-      // OAuth endpoints
-      if (path === '/oauth/callback' && request.method === 'POST') {
-        return await handleOAuthCallback(request, env);
-      }
-
-      // Token refresh endpoint
-      if (path === '/session/refresh' && request.method === 'POST') {
-        return await handleTokenRefresh(request, env);
-      }
-
-      // Session endpoints (require encrypted blob) - for future Drive collaboration features
-      if (path === '/session/invite' && request.method === 'POST') {
-        return await handleSessionInvite(request, env);
-      }
-
-      if (path === '/session/revoke' && request.method === 'POST') {
-        return await handleSessionRevoke(request, env);
-      }
-
-      // Setlist storage endpoints
-      if (path === '/api/share' && request.method === 'POST') {
-        return await handleShareSetlist(request, env);
-      }
-
-      if (path.startsWith('/api/share/') && request.method === 'GET') {
-        const id = path.split('/')[3];
-        return await handleGetSetlist(id, env);
-      }
-
-      // 404
-      return jsonResponse({ error: 'Not found' }, 404);
-    } catch (error) {
-      console.error('Worker error:', error);
-      return jsonResponse({ error: 'Internal server error', message: error.message }, 500);
-    }
+    const response = await route(request, env);
+    // Add CORS headers to every response centrally
+    const headers = new Headers(response.headers);
+    for (const [k, v] of Object.entries(corsHeaders(request))) headers.set(k, v);
+    return new Response(response.body, { status: response.status, headers });
   },
 };
+
+async function route(request, env) {
+  // Handle CORS preflight
+  if (request.method === 'OPTIONS') {
+    return new Response(null, { status: 204 });
+  }
+
+  const url = new URL(request.url);
+  const path = url.pathname;
+
+  try {
+    // OAuth endpoints
+    if (path === '/oauth/callback' && request.method === 'POST') {
+      return await handleOAuthCallback(request, env);
+    }
+
+    // Token refresh endpoint
+    if (path === '/session/refresh' && request.method === 'POST') {
+      return await handleTokenRefresh(request, env);
+    }
+
+    // Session endpoints (require encrypted blob) - for future Drive collaboration features
+    if (path === '/session/invite' && request.method === 'POST') {
+      return await handleSessionInvite(request, env);
+    }
+
+    if (path === '/session/revoke' && request.method === 'POST') {
+      return await handleSessionRevoke(request, env);
+    }
+
+    // Setlist storage endpoints
+    if (path === '/api/share' && request.method === 'POST') {
+      return await handleShareSetlist(request, env);
+    }
+
+    if (path.startsWith('/api/share/') && request.method === 'GET') {
+      const id = path.split('/')[3];
+      return await handleGetSetlist(id, env);
+    }
+
+    // 404
+    return jsonResponse({ error: 'Not found' }, 404);
+  } catch (error) {
+    console.error('Worker error:', error);
+    return jsonResponse({ error: 'Internal server error', message: error.message }, 500);
+  }
+}
 
 /**
  * POST /oauth/callback
@@ -518,9 +536,6 @@ function generateShortId() {
 function jsonResponse(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      ...CORS_HEADERS,
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 }

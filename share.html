@@ -100,12 +100,6 @@
     <script type="module">
       import { ChordlessDB } from '/js/db.js';
 
-      // Auto-detect auth proxy URL
-      const AUTH_PROXY_URL =
-        window.location.hostname === 'localhost'
-          ? 'http://localhost:8787'
-          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
-
       // Extract share ID from URL
       const pathParts = window.location.pathname.split('/');
       const shareId = pathParts[pathParts.length - 1];
@@ -121,7 +115,7 @@
 
         try {
           // Fetch setlist from auth proxy
-          const response = await fetch(`${AUTH_PROXY_URL}/api/share/${shareId}`);
+          const response = await fetch(`/api/share/${shareId}`);
 
           if (!response.ok) {
             if (response.status === 404) {

@@ -1,0 +1,9 @@
+# Standalone pages with their own HTML
+/share/*        /share.html              200
+/import-song    /import-song.html        200
+/bookmarklet    /bookmarklet-install.html 200
+/authorize      /authorize.html          200
+/songs          /songs.html              200
+
+# SPA shell handles all other routes
+/*              /index.html              200
