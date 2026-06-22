@@ -1,22 +1,16 @@
 // Service Worker for offline-first operation
 import * as AuthDB from '/js/auth-db.js'
 
-// Handles routing and generates pages for offline-first operation
+// Caching strategy: network-first with ETag validation for all app files.
+// Uses cache: 'no-cache' so the browser sends conditional requests (If-None-Match / 304),
+// avoiding full re-downloads when files haven't changed, while still always checking for updates.
+// SW cache is the offline fallback — used only when the network is unreachable.
 
-// Auto-detect development mode based on hostname
-const DEV_MODE =
-  self.location.hostname === 'localhost' ||
-  self.location.hostname === '127.0.0.1' ||
-  self.location.hostname.startsWith('192.168.') ||
-  self.location.hostname.startsWith('10.') ||
-  self.location.hostname.endsWith('.local')
-
-const CACHE_NAME = 'cache-v2'
+const CACHE_NAME = 'cache-v3'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const RUNTIME_CACHE_NAME = 'runtime-v1'
 
-// Only cache critical files needed for offline app shell
-// Other assets (icons, images, fonts) are cached at runtime on first request
+// Critical files to precache for offline app shell
 const ASSETS = [
   '/',
   '/css/style.css',
@@ -33,52 +27,9 @@ const ASSETS = [
   '/manifest.webmanifest',
 ]
 
-// External CDN resources to cache for offline support
-const CDN_ASSETS = [
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js',
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/class-map.js',
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/style-map.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/custom-element.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/property.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/state.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/event-options.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-all.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-async.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-elements.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-nodes.js',
-  'https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/is-server.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive-helpers.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/async-directive.js',
-]
-
 // Install service worker and cache assets
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Cache local assets
-      const localCache = cache.addAll(ASSETS)
-
-      // Cache CDN assets (non-blocking, fail silently)
-      const cdnCache = Promise.allSettled(
-        CDN_ASSETS.map(url =>
-          fetch(url, { mode: 'cors' })
-            .then(response => {
-              if (response.ok) {
-                return cache.put(url, response)
-              }
-            })
-            .catch(err => console.log('[SW] Failed to cache CDN asset:', url, err))
-        )
-      )
-
-      return Promise.all([localCache, cdnCache])
-    })
-  )
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)))
   self.skipWaiting()
 })
 
@@ -346,35 +297,7 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Handle CDN requests (Lit.js from jsdelivr)
-  if (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.includes('/npm/lit')) {
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        // Return cached version if available, otherwise fetch and cache
-        if (cached) {
-          return cached
-        }
-        return fetch(event.request, { mode: 'cors' })
-          .then(response => {
-            if (response.ok) {
-              const responseToCache = response.clone()
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, responseToCache)
-              })
-            }
-            return response
-          })
-          .catch(() => {
-            console.log('[SW] Failed to fetch CDN asset:', url.href)
-            // Return a fallback or throw to let the browser handle it
-            return new Response('CDN asset not available', { status: 503 })
-          })
-      })
-    )
-    return
-  }
-
-  // Only handle same-origin requests after CDN check
+  // Only handle same-origin requests
   if (url.origin !== location.origin) {
     return
   }
@@ -392,10 +315,10 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // JS/CSS: always network-first, bypassing HTTP cache, fallback to SW cache for offline
+  // JS/CSS: network-first with ETag validation, SW cache as offline fallback
   if (url.pathname.match(/\.(css|js)$/)) {
     event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
+      fetch(event.request, { cache: 'no-cache' })
         .then(response => {
           if (response.ok) {
             const clone = response.clone()
@@ -505,231 +428,39 @@ self.addEventListener('fetch', event => {
   event.respondWith(fetch(event.request))
 })
 
+// Network-first HTML fetch: validates via ETag (304 if unchanged), SW cache as offline fallback.
+async function serveHtmlNetworkFirst(htmlPath) {
+  try {
+    const response = await fetch(htmlPath, { cache: 'no-cache' })
+    if (response.ok) {
+      const clone = response.clone()
+      caches.open(CACHE_NAME).then(cache => cache.put(htmlPath, clone))
+    }
+    return response
+  } catch {
+    return (await caches.match(htmlPath)) ?? new Response('Offline', { status: 503 })
+  }
+}
+
 async function handleRoute(url) {
   const path = url.pathname
 
-  console.log('[SW] handleRoute:', path)
-
   // Test files - pass through to network
   if (path.includes('-test.html') || path.includes('test-')) {
-    console.log('[SW] Test file - passing through')
     return fetch(url)
   }
 
-  // Home page: /
-  if (path === '/' || path === '/index.html') {
-    console.log('[SW] Serving index.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/index.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/index.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/index.html')
-        })
-    } else {
-      return fetch('/index.html')
-    }
-  }
+  if (path === '/' || path === '/index.html') return serveHtmlNetworkFirst('/index.html')
+  if (path.startsWith('/setlist/')) return serveHtmlNetworkFirst('/setlist.html')
+  if (path.startsWith('/songs')) return serveHtmlNetworkFirst('/songs.html')
+  if (path.startsWith('/preferences')) return serveHtmlNetworkFirst('/preferences.html')
+  if (path.startsWith('/storage')) return serveHtmlNetworkFirst('/storage.html')
+  if (path.startsWith('/share/')) return serveHtmlNetworkFirst('/share.html')
+  if (path.startsWith('/import-song')) return serveHtmlNetworkFirst('/import-song.html')
+  if (path.startsWith('/bookmarklet')) return serveHtmlNetworkFirst('/bookmarklet-install.html')
+  if (path.startsWith('/authorize')) return serveHtmlNetworkFirst('/authorize.html')
+  if (path.startsWith('/components-test')) return serveHtmlNetworkFirst('/components-test.html')
 
-  // Songs library page: /songs or /songs/
-  if (path === '/songs' || path === '/songs/' || path === '/songs.html') {
-    console.log('[SW] Serving songs.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/songs.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/songs.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/songs.html')
-        })
-    } else {
-      return fetch('/songs.html')
-    }
-  }
-
-  // Preferences page: /preferences
-  if (path === '/preferences' || path === '/preferences/' || path === '/preferences.html') {
-    console.log('[SW] Serving preferences.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/preferences.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/preferences.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/preferences.html')
-        })
-    } else {
-      return fetch('/preferences.html')
-    }
-  }
-
-  // Bookmarklet page: /bookmarklet
-  if (path === '/bookmarklet' || path === '/bookmarklet/' || path === '/bookmarklet-install.html') {
-    console.log('[SW] Serving bookmarklet-install.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/bookmarklet-install.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/bookmarklet-install.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/bookmarklet-install.html')
-        })
-    } else {
-      return fetch('/bookmarklet-install.html')
-    }
-  }
-
-  // Import song page: /import-song
-  if (path === '/import-song' || path === '/import-song/' || path === '/import-song.html') {
-    console.log('[SW] Serving import-song.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/import-song.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/import-song.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/import-song.html')
-        })
-    } else {
-      return fetch('/import-song.html')
-    }
-  }
-
-  // Components test page: /components-test
-  if (
-    path === '/components-test' ||
-    path === '/components-test/' ||
-    path === '/components-test.html'
-  ) {
-    console.log('[SW] Serving components-test.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/components-test.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/components-test.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/components-test.html')
-        })
-    } else {
-      return fetch('/components-test.html')
-    }
-  }
-
-  // Setlist page: /setlist/{uuid} (ignore hash)
-  const setlistMatch = path.match(/^\/setlist\/([^/]+)$/)
-  if (setlistMatch) {
-    console.log('[SW] Serving setlist.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/setlist.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/setlist.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/setlist.html')
-        })
-    } else {
-      return fetch('/setlist.html')
-    }
-  }
-
-  // Share page: /share/{id}
-  const shareMatch = path.match(/^\/share\/([a-zA-Z0-9]+)$/)
-  if (shareMatch) {
-    console.log('[SW] Serving share.html')
-    if (DEV_MODE) {
-      return fetch('/share.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/share.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/share.html')
-        })
-    } else {
-      return fetch('/share.html')
-    }
-  }
-
-  // Authorize page: /authorize (redirects to storage)
-  if (path === '/authorize' || path === '/authorize/' || path === '/authorize.html') {
-    console.log('[SW] Serving authorize.html (redirect page)')
-    if (DEV_MODE) {
-      return fetch('/authorize.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/authorize.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/authorize.html')
-        })
-    } else {
-      return fetch('/authorize.html')
-    }
-  }
-
-  // Storage page: /storage
-  if (path === '/storage' || path === '/storage/' || path === '/storage.html') {
-    console.log('[SW] Serving storage.html')
-    if (DEV_MODE) {
-      return fetch('/storage.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/storage.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/storage.html')
-        })
-    } else {
-      return fetch('/storage.html')
-    }
-  }
-
-  // 404
-  console.log('[SW] 404 - not found')
+  console.log('[SW] 404 - not found:', path)
   return new Response('Not Found', { status: 404 })
 }
