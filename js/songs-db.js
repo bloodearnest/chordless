@@ -16,12 +16,12 @@ import { ensurePersistentStorage } from './utils/persistence.js'
  * - Versions: array of version references (each points to a chordpro file)
  * - Usage tracking: appearances, lastUsedAt
  * - Import metadata: source, sourceUrl, createdAt
- * - Sync metadata: Drive file IDs, sync status (for future)
+ * - Sync metadata: Drive file IDs, sync status
  *
  * ChordPro records contain:
  * - content: Raw chordpro text
  * - contentHash: For deduplication
- * - Sync metadata: lastModified, Drive sync state (for future)
+ * - Sync metadata: lastModified, Drive sync state
  */
 
 const DB_NAME = 'songs'

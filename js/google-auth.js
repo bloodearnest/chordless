@@ -217,10 +217,9 @@ export async function authorizeWithGoogle() {
 /**
  * Get current ID token (for API calls to auth proxy)
  *
- * NOTE: This is infrastructure for future Drive API operations (invite/revoke).
- * Currently not used by any UI features.
+ * NOTE: Used by Drive collaboration operations (invite/revoke via auth proxy).
  *
- * TODO: When implementing Drive API features, consider refactoring this function.
+ * NOTE: Consider refactoring this function if FedCM browser warnings become an issue.
  * The current implementation uses google.accounts.id.prompt() which triggers
  * FedCM and may cause browser warnings. Alternative approaches:
  * - Store ID token from initial OAuth flow and check expiration

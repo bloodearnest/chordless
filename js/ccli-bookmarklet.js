@@ -4,8 +4,10 @@
 ;(async function () {
   'use strict'
 
-  // Configuration
-  const CHORDLESS_URL = 'http://localhost:8000'
+  // NOTE: This is the readable source. The install page (bookmarklet-install.html)
+  // injects window.location.origin at generation time so the bookmarklet always
+  // points back to whichever host it was installed from.
+  const CHORDLESS_URL = 'http://localhost:8443'
 
   // Check if we're on a SongSelect page
   if (!window.location.href.includes('songselect.ccli.com')) {
