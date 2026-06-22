@@ -450,16 +450,18 @@ async function handleRoute(url) {
     return fetch(url)
   }
 
-  if (path === '/' || path === '/index.html') return serveHtmlNetworkFirst('/index.html')
-  if (path.startsWith('/setlist/')) return serveHtmlNetworkFirst('/setlist.html')
-  if (path.startsWith('/songs')) return serveHtmlNetworkFirst('/songs.html')
-  if (path.startsWith('/preferences')) return serveHtmlNetworkFirst('/preferences.html')
-  if (path.startsWith('/storage')) return serveHtmlNetworkFirst('/storage.html')
-  if (path.startsWith('/share/')) return serveHtmlNetworkFirst('/share.html')
-  if (path.startsWith('/import-song')) return serveHtmlNetworkFirst('/import-song.html')
-  if (path.startsWith('/bookmarklet')) return serveHtmlNetworkFirst('/bookmarklet-install.html')
-  if (path.startsWith('/authorize')) return serveHtmlNetworkFirst('/authorize.html')
-  if (path.startsWith('/components-test')) return serveHtmlNetworkFirst('/components-test.html')
+  // Fetch clean paths (no .html extension) — Cloudflare Pages 308-redirects *.html to
+  // clean URLs, which breaks SW navigation responses. Caddy serves clean paths via try_files.
+  if (path === '/' || path === '/index.html') return serveHtmlNetworkFirst('/')
+  if (path.startsWith('/setlist/')) return serveHtmlNetworkFirst(path)
+  if (path.startsWith('/songs')) return serveHtmlNetworkFirst('/songs')
+  if (path.startsWith('/preferences')) return serveHtmlNetworkFirst('/preferences')
+  if (path.startsWith('/storage')) return serveHtmlNetworkFirst('/storage')
+  if (path.startsWith('/share/')) return serveHtmlNetworkFirst(path)
+  if (path.startsWith('/import-song')) return serveHtmlNetworkFirst('/import-song')
+  if (path.startsWith('/bookmarklet')) return serveHtmlNetworkFirst('/bookmarklet')
+  if (path.startsWith('/authorize')) return serveHtmlNetworkFirst('/authorize')
+  if (path.startsWith('/components-test')) return serveHtmlNetworkFirst('/components-test')
 
   console.log('[SW] 404 - not found:', path)
   return new Response('Not Found', { status: 404 })

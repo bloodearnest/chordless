@@ -16,7 +16,9 @@
     handle /api/* {
         reverse_proxy http://localhost:8787
     }
-    file_server browse
+    file_server browse {
+        try_files {path} {path}.html
+    }
 }
 
 # HTTPS server (localhost, chordless.dev, Tailscale)
@@ -37,5 +39,7 @@ https://localhost:8443, https://127.0.0.1:8443, https://casey.tail030f3.ts.net:8
     handle /api/* {
         reverse_proxy http://localhost:8787
     }
-    file_server browse
+    file_server browse {
+        try_files {path} {path}.html
+    }
 }
