@@ -244,7 +244,12 @@ export class ShareSetlist extends LitElement {
     this._error = null
 
     try {
-      const response = await fetch('/api/share', {
+      const AUTH_PROXY_URL =
+        window.location.hostname === 'localhost'
+          ? 'http://localhost:8787'
+          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+
+      const response = await fetch(`${AUTH_PROXY_URL}/api/share`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ setlist: this.setlist }),
