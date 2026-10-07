@@ -341,11 +341,6 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Always pass through auth-proxy requests (different port)
-  if (url.port === '8787' || url.hostname.includes('workers.dev')) {
-    return
-  }
-
   // Handle CDN requests (Lit.js from jsdelivr)
   if (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.includes('/npm/lit')) {
     event.respondWith(
