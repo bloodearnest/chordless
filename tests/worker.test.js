@@ -5,8 +5,9 @@
  *
  * Uses wrangler's unstable_dev to start a real worker process.
  */
-import { before, after, test } from 'node:test'
+
 import assert from 'node:assert/strict'
+import { after, before, test } from 'node:test'
 import { unstable_dev } from 'wrangler'
 
 let worker
@@ -26,7 +27,10 @@ after(async () => {
 test('serves root as HTML', async () => {
   const resp = await worker.fetch('/')
   assert.equal(resp.status, 200)
-  assert.ok(resp.headers.get('content-type')?.includes('text/html'), 'content-type should be text/html')
+  assert.ok(
+    resp.headers.get('content-type')?.includes('text/html'),
+    'content-type should be text/html'
+  )
 })
 
 test('serves static CSS', async () => {
@@ -55,7 +59,11 @@ test('worker API: /oauth/callback route exists', async () => {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({}),
   })
-  assert.notEqual(resp.status, 404, '/oauth/callback should be handled by the worker, not fall through to assets')
+  assert.notEqual(
+    resp.status,
+    404,
+    '/oauth/callback should be handled by the worker, not fall through to assets'
+  )
   assert.equal(resp.status, 400, `expected 400 for missing fields, got ${resp.status}`)
 })
 
@@ -76,7 +84,7 @@ test('worker source is not served as JavaScript', async () => {
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `worker source should not be served — got content-type: ${ct} (check .assetsignore)`,
+    `worker source should not be served — got content-type: ${ct} (check .assetsignore)`
   )
 })
 
@@ -86,7 +94,7 @@ test('CORS preflight returns correct headers', async () => {
   assert.ok(resp.headers.get('access-control-allow-origin'), 'missing Access-Control-Allow-Origin')
   assert.ok(
     resp.headers.get('access-control-allow-methods')?.includes('POST'),
-    'POST should be in allowed methods',
+    'POST should be in allowed methods'
   )
 })
 
@@ -97,7 +105,7 @@ test('sets/ personal data not served as raw files', async () => {
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `sets/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`,
+    `sets/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`
   )
 })
 
@@ -106,6 +114,6 @@ test('notes/ personal data not served as raw files', async () => {
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `notes/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`,
+    `notes/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`
   )
 })
