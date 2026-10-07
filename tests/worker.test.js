@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
+import * as jose from 'jose'
 import { unstable_dev } from 'wrangler'
 
 let worker
@@ -107,6 +108,30 @@ test('sets/ personal data not served as raw files', async () => {
     ct.includes('text/html'),
     `sets/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`
   )
+})
+
+test('JWE blob round-trips: encrypt then decrypt returns original data', async () => {
+  // Mirrors encryptBlob/decryptBlob in worker/src/index.js exactly.
+  // Catches jose API breakage (e.g. CompactEncrypt constructor, header shape, decrypt return type).
+  const keyData = globalThis.crypto.getRandomValues(new Uint8Array(32))
+  const secret = await globalThis.crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  )
+
+  const data = { userId: 'test@example.com', refreshToken: 'rt_abc123', kid: 'default' }
+
+  const jwe = await new jose.CompactEncrypt(new TextEncoder().encode(JSON.stringify(data)))
+    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', kid: data.kid })
+    .encrypt(secret)
+
+  const { plaintext } = await jose.compactDecrypt(jwe, secret)
+  const decrypted = JSON.parse(new TextDecoder().decode(plaintext))
+
+  assert.deepEqual(decrypted, data)
 })
 
 test('notes/ personal data not served as raw files', async () => {
