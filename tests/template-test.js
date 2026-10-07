@@ -93,68 +93,22 @@ async function runTests() {
     assertEquals(clonedCount.textContent, '5 songs', 'Can set song count text content')
   }
 
-  // ===== Test setlist.html templates =====
+  // ===== Test setlist.html structure =====
   console.log('\n=== Testing setlist.html ===')
 
   const setlistDoc = await loadHTMLContent('/setlist.html')
 
-  // Test key option template exists
-  const keyOptionTemplate = setlistDoc.getElementById('key-option-template')
-  assert(keyOptionTemplate !== null, 'key-option-template exists')
-  assert(keyOptionTemplate.tagName === 'TEMPLATE', 'key-option-template is a <template> element')
-
-  // Test template content
-  if (keyOptionTemplate) {
-    const content = keyOptionTemplate.content
-    assert(content !== null, 'Template has content property')
-
-    // Test structure
-    const keyOption = content.querySelector('.key-option-item')
-    assert(keyOption !== null, 'Template contains .key-option-item')
-    assert(keyOption.tagName === 'BUTTON', 'key-option-item is a button')
-
-    const keyName = content.querySelector('.key-name')
-    assert(keyName !== null, 'Template contains .key-name')
-
-    const keyOffset = content.querySelector('.key-offset')
-    assert(keyOffset !== null, 'Template contains .key-offset')
-
-    // Test cloning
-    const clone = content.cloneNode(true)
-    assert(clone !== null, 'Template can be cloned')
-
-    const clonedOption = clone.querySelector('.key-option-item')
-    assert(clonedOption !== null, 'Cloned content contains .key-option-item')
-
-    // Test populating cloned content
-    const clonedName = clone.querySelector('.key-name')
-    clonedName.textContent = 'G*'
-    assertEquals(clonedName.textContent, 'G*', 'Can set key name text content')
-
-    const clonedOffset = clone.querySelector('.key-offset')
-    clonedOffset.textContent = '+2'
-    assertEquals(clonedOffset.textContent, '+2', 'Can set key offset text content')
-
-    // Test that cloning doesn't affect original
-    const originalName = content.querySelector('.key-name')
-    assert(originalName.textContent === '', 'Original template unchanged after cloning')
-  }
-
-  // Test required HTML elements exist in setlist.html
+  // key-selector, musical-metadata-display etc. are now Lit components —
+  // their internals live in shadow DOM and can't be tested via DOMParser.
+  // Test only the static scaffold elements that remain in the HTML source.
   const mainContent = setlistDoc.getElementById('main-content')
   assert(mainContent !== null, 'main-content element exists')
 
-  const songTitleHeader = setlistDoc.getElementById('song-title-header')
-  assert(songTitleHeader !== null, 'song-title-header element exists')
+  const songView = setlistDoc.getElementById('song-view')
+  assert(songView !== null, 'song-view element exists')
 
-  const keyValueDisplay = setlistDoc.getElementById('key-value-display')
-  assert(keyValueDisplay !== null, 'key-value-display element exists')
-
-  const keySelectorButton = setlistDoc.getElementById('key-selector-button')
-  assert(keySelectorButton !== null, 'key-selector-button element exists')
-
-  const keyOptionsList = setlistDoc.getElementById('key-options-list')
-  assert(keyOptionsList !== null, 'key-options-list element exists')
+  const appHeader = setlistDoc.getElementById('app-header')
+  assert(appHeader !== null, 'app-header element exists')
 
   // ===== Test index.html structure =====
   console.log('\n=== Testing index.html structure ===')
