@@ -10,6 +10,7 @@ kv_namespaces = [
 [assets]
 directory = "."
 not_found_handling = "single-page-application"
+binding = "ASSETS"
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)

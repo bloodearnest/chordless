@@ -26,6 +26,9 @@ format:
 vendor:
     node scripts/vendor-deps.mjs
 
+test-node:
+    npm run test:node
+
 serve:
     npm run dev
 

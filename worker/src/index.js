@@ -64,8 +64,8 @@ export default {
         return await handleGetSetlist(id, env);
       }
 
-      // 404
-      return jsonResponse({ error: 'Not found' }, 404);
+      // Not an API route — delegate to static assets (SPA fallback handles unknown paths)
+      return env.ASSETS.fetch(request);
     } catch (error) {
       console.error('Worker error:', error);
       return jsonResponse({ error: 'Internal server error', message: error.message }, 500);
