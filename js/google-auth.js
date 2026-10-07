@@ -161,6 +161,7 @@ export async function authorizeWithGoogle() {
       client_id: GOOGLE_CLIENT_ID,
       scope: GOOGLE_SCOPES + ' openid email profile',
       ux_mode: 'popup',
+      access_type: 'offline',
       // Force the consent screen every time so Drive scope is always explicitly granted.
       // Without this, Google reuses cached consent and may issue a token without Drive scope.
       prompt: 'consent',
