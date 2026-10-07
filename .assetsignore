@@ -1,5 +1,5 @@
 # Worker code — not static assets
-/auth-proxy/
+/worker/
 
 # Sensitive / should never be served
 /certs/

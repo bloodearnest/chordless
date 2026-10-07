@@ -1,5 +1,5 @@
 name = "chordless-auth-proxy"
-main = "auth-proxy/src/index.js"
+main = "worker/src/index.js"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
 
