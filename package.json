@@ -13,12 +13,12 @@
     "test:browser:headed": "playwright test --headed"
   },
   "dependencies": {
-    "@lit/reactive-element": "2.0.4",
+    "@lit/reactive-element": "^2.1.2",
     "google-auth-library": "^11.2.0",
     "jose": "^6.2.12",
-    "lit": "3.1.0",
-    "lit-element": "4.0.4",
-    "lit-html": "3.1.0"
+    "lit": "^3.3.3",
+    "lit-element": "^4.2.2",
+    "lit-html": "^3.3.3"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

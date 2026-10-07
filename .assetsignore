@@ -8,6 +8,11 @@
 /sets/
 /notes/
 
+# Worker-only npm packages vendored by scripts/vendor-deps.mjs
+# (jose and google-auth-library are used by the CF Worker, not the browser)
+/vendor/jose/
+/vendor/google-auth-library/
+
 # Dev artefacts
 /node_modules/
 /test-results/
