@@ -102,9 +102,9 @@
 
       // Auto-detect auth proxy URL
       const AUTH_PROXY_URL =
-        window.location.hostname === 'localhost'
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:8787'
-          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev';
+          : 'https://chordless.app';
 
       // Extract share ID from URL
       const pathParts = window.location.pathname.split('/');

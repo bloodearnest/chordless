@@ -34,9 +34,10 @@ const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.goo
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
 
 // Auth routes are proxied through Caddy at same origin (see Caddyfile /oauth/* /session/* routes).
-// TODO: when deploying to production, set this to the deployed Cloudflare Worker URL
-// and add the production hostname check: window.location.hostname === 'chordless.dev'
-const AUTH_PROXY_URL = ''
+const AUTH_PROXY_URL =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:8787'
+    : 'https://chordless.app'
 
 /**
  * Parse JWT and extract payload

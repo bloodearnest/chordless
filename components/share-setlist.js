@@ -245,9 +245,9 @@ export class ShareSetlist extends LitElement {
 
     try {
       const AUTH_PROXY_URL =
-        window.location.hostname === 'localhost'
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
           ? 'http://localhost:8787'
-          : 'https://chordless-auth-proxy.YOUR-SUBDOMAIN.workers.dev'
+          : 'https://chordless.app'
 
       const response = await fetch(`${AUTH_PROXY_URL}/api/share`, {
         method: 'POST',
