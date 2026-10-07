@@ -1,15 +1,7 @@
 // Service Worker for offline-first operation
 import * as AuthDB from '/js/auth-db.js'
 
-// Handles routing and generates pages for offline-first operation
-
-// Auto-detect development mode based on hostname
-const DEV_MODE =
-  self.location.hostname === 'localhost' ||
-  self.location.hostname === '127.0.0.1' ||
-  self.location.hostname.startsWith('192.168.') ||
-  self.location.hostname.startsWith('10.') ||
-  self.location.hostname.endsWith('.local')
+// Handles routing and offline caching
 
 const CACHE_NAME = 'cache-v2'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
@@ -503,228 +495,55 @@ self.addEventListener('fetch', event => {
 async function handleRoute(url) {
   const path = url.pathname
 
-  console.log('[SW] handleRoute:', path)
-
   // Test files - pass through to network
   if (path.includes('-test.html') || path.includes('test-')) {
-    console.log('[SW] Test file - passing through')
     return fetch(url)
   }
 
-  // Home page: /
-  if (path === '/' || path === '/index.html') {
-    console.log('[SW] Serving index.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/index.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/index.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/index.html')
-        })
-    } else {
-      return fetch('/index.html')
-    }
+  // Map clean URL paths to their HTML files.
+  // Fetch '/' not '/index.html' — wrangler redirects /index.html to /.
+  // All other .html files are served directly without redirect.
+  const HTML_FILES = {
+    '/': '/',
+    '/index.html': '/',
+    '/songs': '/songs.html',
+    '/songs/': '/songs.html',
+    '/songs.html': '/songs.html',
+    '/preferences': '/preferences.html',
+    '/preferences/': '/preferences.html',
+    '/preferences.html': '/preferences.html',
+    '/storage': '/storage.html',
+    '/storage/': '/storage.html',
+    '/storage.html': '/storage.html',
+    '/authorize': '/authorize.html',
+    '/authorize/': '/authorize.html',
+    '/authorize.html': '/authorize.html',
+    '/import-song': '/import-song.html',
+    '/import-song/': '/import-song.html',
+    '/import-song.html': '/import-song.html',
+    '/bookmarklet': '/bookmarklet-install.html',
+    '/bookmarklet/': '/bookmarklet-install.html',
+    '/bookmarklet-install.html': '/bookmarklet-install.html',
+    '/components-test': '/components-test.html',
+    '/components-test/': '/components-test.html',
+    '/components-test.html': '/components-test.html',
   }
 
-  // Songs library page: /songs or /songs/
-  if (path === '/songs' || path === '/songs/' || path === '/songs.html') {
-    console.log('[SW] Serving songs.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/songs.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/songs.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/songs.html')
-        })
-    } else {
-      return fetch('/songs.html')
-    }
+  let htmlFile = HTML_FILES[path]
+  if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist.html'
+  if (!htmlFile && /^\/share\/[a-zA-Z0-9]+$/.test(path)) htmlFile = '/share.html'
+
+  if (!htmlFile) {
+    return new Response('Not Found', { status: 404 })
   }
 
-  // Preferences page: /preferences
-  if (path === '/preferences' || path === '/preferences/' || path === '/preferences.html') {
-    console.log('[SW] Serving preferences.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/preferences.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/preferences.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/preferences.html')
-        })
-    } else {
-      return fetch('/preferences.html')
+  try {
+    const response = await fetch(htmlFile)
+    if (response.ok) {
+      caches.open(CACHE_NAME).then(cache => cache.put(htmlFile, response.clone()))
     }
+    return response
+  } catch {
+    return (await caches.match(htmlFile)) ?? new Response('Offline', { status: 503 })
   }
-
-  // Bookmarklet page: /bookmarklet
-  if (path === '/bookmarklet' || path === '/bookmarklet/' || path === '/bookmarklet-install.html') {
-    console.log('[SW] Serving bookmarklet-install.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/bookmarklet-install.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/bookmarklet-install.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/bookmarklet-install.html')
-        })
-    } else {
-      return fetch('/bookmarklet-install.html')
-    }
-  }
-
-  // Import song page: /import-song
-  if (path === '/import-song' || path === '/import-song/' || path === '/import-song.html') {
-    console.log('[SW] Serving import-song.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/import-song.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/import-song.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/import-song.html')
-        })
-    } else {
-      return fetch('/import-song.html')
-    }
-  }
-
-  // Components test page: /components-test
-  if (
-    path === '/components-test' ||
-    path === '/components-test/' ||
-    path === '/components-test.html'
-  ) {
-    console.log('[SW] Serving components-test.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/components-test.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/components-test.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/components-test.html')
-        })
-    } else {
-      return fetch('/components-test.html')
-    }
-  }
-
-  // Setlist page: /setlist/{uuid} (ignore hash)
-  const setlistMatch = path.match(/^\/setlist\/([^/]+)$/)
-  if (setlistMatch) {
-    console.log('[SW] Serving setlist.html')
-    if (DEV_MODE) {
-      // Dev mode: Always fetch fresh, fallback to cache on failure
-      return fetch('/setlist.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/setlist.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/setlist.html')
-        })
-    } else {
-      return fetch('/setlist.html')
-    }
-  }
-
-  // Share page: /share/{id}
-  const shareMatch = path.match(/^\/share\/([a-zA-Z0-9]+)$/)
-  if (shareMatch) {
-    console.log('[SW] Serving share.html')
-    if (DEV_MODE) {
-      return fetch('/share.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/share.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/share.html')
-        })
-    } else {
-      return fetch('/share.html')
-    }
-  }
-
-  // Authorize page: /authorize (redirects to storage)
-  if (path === '/authorize' || path === '/authorize/' || path === '/authorize.html') {
-    console.log('[SW] Serving authorize.html (redirect page)')
-    if (DEV_MODE) {
-      return fetch('/authorize.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/authorize.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/authorize.html')
-        })
-    } else {
-      return fetch('/authorize.html')
-    }
-  }
-
-  // Storage page: /storage
-  if (path === '/storage' || path === '/storage/' || path === '/storage.html') {
-    console.log('[SW] Serving storage.html')
-    if (DEV_MODE) {
-      return fetch('/storage.html', { cache: 'no-cache' })
-        .then(response => {
-          const responseToCache = response.clone()
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put('/storage.html', responseToCache)
-          })
-          return response
-        })
-        .catch(() => {
-          return caches.match('/storage.html')
-        })
-    } else {
-      return fetch('/storage.html')
-    }
-  }
-
-  // 404
-  console.log('[SW] 404 - not found')
-  return new Response('Not Found', { status: 404 })
 }
