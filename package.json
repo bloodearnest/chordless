@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@lit/reactive-element": "2.0.4",
-    "google-auth-library": "^9.15.0",
+    "google-auth-library": "^11.2.0",
     "jose": "^6.2.12",
     "lit": "3.1.0",
     "lit-element": "4.0.4",
