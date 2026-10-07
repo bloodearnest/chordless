@@ -1,24 +1,14 @@
 // Playwright test runner for browser-based tests
 import { expect, test } from '@playwright/test'
 
-const BASE_URL = 'http://localhost:8000'
-
 test.describe('Template Tests', () => {
   test('should run all template tests successfully', async ({ page }) => {
-    // Listen for console errors
     page.on('console', msg => {
-      if (msg.type() === 'error') {
-        console.error('Browser console error:', msg.text())
-      }
+      if (msg.type() === 'error') console.error('Browser console error:', msg.text())
     })
+    page.on('pageerror', error => console.error('Page error:', error))
 
-    // Listen for page errors
-    page.on('pageerror', error => {
-      console.error('Page error:', error)
-    })
-
-    // Navigate to template test page
-    await page.goto(`${BASE_URL}/tests/template-test.html`)
+    await page.goto('/tests/template-test.html')
 
     // Wait for tests to complete by checking for summary div to change from "loading"
     await page.waitForSelector('#test-summary:not(.loading)', { timeout: 10000 })
@@ -45,7 +35,7 @@ test.describe('Template Tests', () => {
 test.describe('Service Worker Tests', () => {
   test('should have service worker registered and active', async ({ page }) => {
     // Navigate to SW test page
-    await page.goto(`${BASE_URL}/tests/test-sw.html`)
+    await page.goto('/tests/test-sw.html')
 
     // Wait for status check to complete
     await page.waitForSelector('#status .status', { timeout: 5000 })
@@ -98,7 +88,7 @@ test.describe('Service Worker Tests', () => {
 test.describe('Application Pages', () => {
   test('home page should load', async ({ page }) => {
     // Just navigate to the home page directly
-    await page.goto(`${BASE_URL}/`)
+    await page.goto('/')
 
     // Wait for the content to load
     await page.waitForSelector('#home-view', { timeout: 5000 })
@@ -116,7 +106,7 @@ test.describe('Application Pages', () => {
 
   test('setlist page HTML structure', async ({ page }) => {
     // Test the setlist.html file directly (not the routed URL)
-    await page.goto(`${BASE_URL}/setlist.html`)
+    await page.goto('/setlist.html')
 
     // Check we got the right page
     const title = await page.title()
