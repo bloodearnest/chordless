@@ -4,7 +4,7 @@
 ;(async function () {
   'use strict'
 
-  // NOTE: This is the readable source. The install page (bookmarklet-install.html)
+  // NOTE: This is the readable source. The install page (bookmarklet.html)
   // injects window.location.origin at generation time so the bookmarklet always
   // points back to whichever host it was installed from.
   const CHORDLESS_URL = 'http://localhost:8443'

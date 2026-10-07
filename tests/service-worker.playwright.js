@@ -24,6 +24,24 @@ test('direct navigation to SPA route serves app shell', async ({ page }) => {
   await expect(page).toHaveTitle(/Chordless/)
 })
 
+test('SW routes non-root pages to correct HTML', async ({ page }) => {
+  // Prime the SW by loading the app first
+  await page.goto('/')
+  await waitForSW(page)
+
+  // Navigate to a non-root route through the SW and verify the correct page loads.
+  // This would have caught the .html redirect bug: fetching /storage.html redirected
+  // to /storage, and browser navigations use redirect:manual so the SW response failed.
+  await page.goto('/storage')
+  await expect(page).toHaveTitle('Storage - Chordless')
+
+  await page.goto('/songs')
+  await expect(page).toHaveTitle('Song Library - Chordless')
+
+  await page.goto('/setlist/test-uuid')
+  await expect(page).toHaveTitle('Setlist - Chordless')
+})
+
 test('page reloads successfully while offline', async ({ page, context }) => {
   // Load the page so the SW installs and populates the cache
   await page.goto('/')

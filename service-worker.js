@@ -495,43 +495,44 @@ self.addEventListener('fetch', event => {
 async function handleRoute(url) {
   const path = url.pathname
 
-  // Test files - pass through to network
-  if (path.includes('-test.html') || path.includes('test-')) {
+  // Test HTML files - pass through to network (e.g. /tests/template-test.html)
+  if (path.endsWith('.html') && path.includes('test')) {
     return fetch(url)
   }
 
-  // Map clean URL paths to their HTML files.
-  // Fetch '/' not '/index.html' — wrangler redirects /index.html to /.
-  // All other .html files are served directly without redirect.
+  // Map all URL variants to the clean URL to fetch.
+  // Wrangler strips .html extensions, so fetching /storage.html redirects to /storage.
+  // Browser navigations have redirect: 'manual', so a redirected SW response causes an error.
+  // Always fetch the clean URL — wrangler serves the right .html file without redirecting.
   const HTML_FILES = {
     '/': '/',
     '/index.html': '/',
-    '/songs': '/songs.html',
-    '/songs/': '/songs.html',
-    '/songs.html': '/songs.html',
-    '/preferences': '/preferences.html',
-    '/preferences/': '/preferences.html',
-    '/preferences.html': '/preferences.html',
-    '/storage': '/storage.html',
-    '/storage/': '/storage.html',
-    '/storage.html': '/storage.html',
-    '/authorize': '/authorize.html',
-    '/authorize/': '/authorize.html',
-    '/authorize.html': '/authorize.html',
-    '/import-song': '/import-song.html',
-    '/import-song/': '/import-song.html',
-    '/import-song.html': '/import-song.html',
-    '/bookmarklet': '/bookmarklet-install.html',
-    '/bookmarklet/': '/bookmarklet-install.html',
-    '/bookmarklet-install.html': '/bookmarklet-install.html',
-    '/components-test': '/components-test.html',
-    '/components-test/': '/components-test.html',
-    '/components-test.html': '/components-test.html',
+    '/songs': '/songs',
+    '/songs/': '/songs',
+    '/songs.html': '/songs',
+    '/preferences': '/preferences',
+    '/preferences/': '/preferences',
+    '/preferences.html': '/preferences',
+    '/storage': '/storage',
+    '/storage/': '/storage',
+    '/storage.html': '/storage',
+    '/authorize': '/authorize',
+    '/authorize/': '/authorize',
+    '/authorize.html': '/authorize',
+    '/import-song': '/import-song',
+    '/import-song/': '/import-song',
+    '/import-song.html': '/import-song',
+    '/bookmarklet': '/bookmarklet',
+    '/bookmarklet/': '/bookmarklet',
+    '/bookmarklet.html': '/bookmarklet',
+    '/components-test': '/components-test',
+    '/components-test/': '/components-test',
+    '/components-test.html': '/components-test',
   }
 
   let htmlFile = HTML_FILES[path]
-  if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist.html'
-  if (!htmlFile && /^\/share\/[a-zA-Z0-9]+$/.test(path)) htmlFile = '/share.html'
+  if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist'
+  if (!htmlFile && /^\/share\/[a-zA-Z0-9]+$/.test(path)) htmlFile = '/share'
 
   if (!htmlFile) {
     return new Response('Not Found', { status: 404 })
