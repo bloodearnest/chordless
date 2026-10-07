@@ -11,3 +11,4 @@
 # Dev artefacts
 /node_modules/
 /test-results/
+/.wrangler/

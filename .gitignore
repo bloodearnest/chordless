@@ -7,6 +7,10 @@
 node_modules/
 certs/
 
+# Wrangler
+.wrangler/
+.dev.vars
+
 # Playwright
 /test-results/
 /playwright-report/

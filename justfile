@@ -27,7 +27,13 @@ vendor:
     node scripts/vendor-deps.mjs
 
 serve:
-    cd auth-proxy && npm run dev
+    npm run dev
+
+deploy:
+    npm run deploy
+
+secrets:
+    bash push-secrets.sh
 
 # Expose local server via Tailscale Funnel (HTTPS -> http://localhost:8787)
 funnel:
