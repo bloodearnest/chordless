@@ -1,0 +1,13 @@
+# Worker code — not static assets
+/auth-proxy/
+
+# Sensitive / should never be served
+/certs/
+
+# Personal data
+/sets/
+/notes/
+
+# Dev artefacts
+/node_modules/
+/test-results/

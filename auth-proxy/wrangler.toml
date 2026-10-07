@@ -8,10 +8,12 @@ kv_namespaces = [
   { binding = "SETLISTS", id = "f18f2488c23c4bc4b35fe2bd7c2963af", preview_id = "019dd2bdee1542f79acb9fcf7facf2c2" }
 ]
 
-# Environment variables (set via `wrangler secret put --env=""`)
-# Required secrets:
+[assets]
+directory = ".."
+not_found_handling = "single-page-application"
+
+# Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
 # - GOOGLE_CLIENT_ID: Google OAuth client ID
 # - GOOGLE_CLIENT_SECRET: Google OAuth client secret
-# - GOOGLE_REDIRECT_URI: OAuth callback URL (e.g., https://your-worker.workers.dev/oauth/callback)
 

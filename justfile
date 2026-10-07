@@ -27,13 +27,13 @@ vendor:
     node scripts/vendor-deps.mjs
 
 serve:
-    caddy run --config Caddyfile --watch
+    cd auth-proxy && npm run dev
 
-setup-dev-https:
-    @bash scripts/setup-dev-https.sh
-
-remove-dev-https:
-    @bash scripts/remove-dev-https.sh
+# Expose local server via Tailscale Funnel (HTTPS -> http://localhost:8787)
+funnel:
+    @tailscale funnel status 2>/dev/null | grep -q "8787" \
+        && tailscale funnel status \
+        || tailscale funnel 8787
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:
@@ -65,8 +65,8 @@ test-browser-manual:
     @echo "Opening browser tests..."
     @echo "Browser tests will open in your default browser"
     @echo "Check the browser console for test results"
-    xdg-open http://localhost:8000/tests/template-test.html
+    xdg-open http://localhost:8787/tests/template-test.html
     @sleep 1
-    xdg-open http://localhost:8000/tests/test-sw.html
+    xdg-open http://localhost:8787/tests/test-sw.html
     @echo "✓ Browser tests opened"
-    @echo "Note: Make sure the dev server is running (just run)"
+    @echo "Note: Make sure the dev server is running (just serve)"
