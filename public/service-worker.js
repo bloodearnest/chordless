@@ -366,6 +366,12 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  // Dev-only component playgrounds (public/dev/) - leave entirely to the browser.
+  // Not part of the app: never cached, and not served in production.
+  if (url.pathname === '/dev' || url.pathname.startsWith('/dev/')) {
+    return
+  }
+
   // API requests - pass through to network
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(fetch(event.request))
@@ -495,11 +501,6 @@ self.addEventListener('fetch', event => {
 async function handleRoute(url) {
   const path = url.pathname
 
-  // Test HTML files - pass through to network (e.g. /tests/template-test.html)
-  if (path.endsWith('.html') && path.includes('test')) {
-    return fetch(url)
-  }
-
   // Map all URL variants to the clean URL to fetch.
   // Wrangler strips .html extensions, so fetching /storage.html redirects to /storage.
   // Browser navigations have redirect: 'manual', so a redirected SW response causes an error.
@@ -525,9 +526,6 @@ async function handleRoute(url) {
     '/bookmarklet': '/bookmarklet',
     '/bookmarklet/': '/bookmarklet',
     '/bookmarklet.html': '/bookmarklet',
-    '/components-test': '/components-test',
-    '/components-test/': '/components-test',
-    '/components-test.html': '/components-test',
   }
 
   let htmlFile = HTML_FILES[path]

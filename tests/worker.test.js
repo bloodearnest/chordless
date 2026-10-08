@@ -155,3 +155,26 @@ test('worker-only packages are not vendored into public/', async () => {
     assert.ok(ct.includes('text/html'), `${path} should not be served — got content-type: ${ct}`)
   }
 })
+
+test('dev pages are not served without DEV_PAGES (production)', async () => {
+  for (const path of ['/dev', '/dev/', '/dev/index.html', '/dev/components.html']) {
+    const resp = await worker.fetch(path, { redirect: 'manual' })
+    assert.equal(resp.status, 404, `${path} should be 404 in production, got ${resp.status}`)
+  }
+})
+
+test('dev pages are served in the dev environment (npm run dev)', async () => {
+  const devWorker = await unstable_dev('worker/src/index.js', {
+    config: 'wrangler.toml',
+    env: 'dev',
+    logLevel: 'error',
+    experimental: { disableExperimentalWarning: true },
+  })
+  try {
+    const resp = await devWorker.fetch('/dev/components')
+    assert.equal(resp.status, 200)
+    assert.match(await resp.text(), /<title>Components Test - Chordless<\/title>/)
+  } finally {
+    await devWorker.stop()
+  }
+})

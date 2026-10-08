@@ -46,3 +46,16 @@ Notes:
 - The first visit registers the service worker; the page reloads automatically once it is active.
 - Use DevTools Console and filter for `[SW]` to inspect service-worker logs.
 - The importer and Google auth flows rely on HTTPS. Do not fall back to Python/Node static servers; they are unsupported.
+
+## Dev pages (component playgrounds)
+
+`public/dev/` holds pages for developing components visually, in isolation. With `just serve`
+running, open http://localhost:8787/dev/ for the list.
+
+- They are only served locally: `npm run dev` uses the `[env.dev]` environment in
+  `wrangler.toml`, which sets `DEV_PAGES`. The worker returns 404 for `/dev/*` without it, so
+  they never reach production. Put other local-only settings in `[env.dev]` too.
+- When adding a page, link it from `public/dev/index.html` and use absolute paths
+  (`/js/...`, `/components/...`, `/css/style.css`).
+- `tests/dev-pages.playwright.js` loads every page and fails on JS errors, failed requests or
+  unregistered custom elements, so a broken playground shows up in `just test-browser-headless`.

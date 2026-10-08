@@ -64,6 +64,15 @@ export default {
         return await handleGetSetlist(id, env);
       }
 
+      // Dev-only component playgrounds (public/dev/). DEV_PAGES is set only in [env.dev]
+      // in wrangler.toml (`npm run dev`). Routed here first via run_worker_first.
+      if (path === '/dev' || path.startsWith('/dev/')) {
+        if (!env.DEV_PAGES) {
+          return new Response('Not Found', { status: 404 });
+        }
+        return env.ASSETS.fetch(request);
+      }
+
       // Not an API route — delegate to static assets (SPA fallback handles unknown paths)
       return env.ASSETS.fetch(request);
     } catch (error) {

@@ -11,8 +11,24 @@ kv_namespaces = [
 directory = "public"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
+# Paths the worker handles before static assets. API routes must be listed:
+# otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.
+# /dev is listed so the worker can hide the dev-only pages in production.
+run_worker_first = ["/oauth/*", "/session/*", "/api/*", "/dev", "/dev/*"]
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
 # - GOOGLE_CLIENT_ID: Google OAuth client ID
 # - GOOGLE_CLIENT_SECRET: Google OAuth client secret
+
+# Local development settings: `npm run dev` runs `wrangler dev --env dev`.
+# Environments don't inherit vars or kv_namespaces, so the KV binding is repeated here.
+# Secrets still come from .dev.vars.
+[env.dev]
+kv_namespaces = [
+  { binding = "SETLISTS", id = "f18f2488c23c4bc4b35fe2bd7c2963af", preview_id = "019dd2bdee1542f79acb9fcf7facf2c2" }
+]
+
+[env.dev.vars]
+# Serve the component playgrounds in public/dev/ (404 in production)
+DEV_PAGES = "true"
