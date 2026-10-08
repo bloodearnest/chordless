@@ -226,7 +226,7 @@ export class StoragePage extends LitElement {
 
   async checkAuthStatus() {
     try {
-      const { isAuthenticated, getCurrentUserInfo } = await import('/js/google-auth.js')
+      const { isAuthenticated, getCurrentUserInfo } = await import('../js/google-auth.js')
       this.isAuthenticated = await isAuthenticated()
       this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
       this.authStatus = 'ready'
@@ -445,7 +445,7 @@ export class StoragePage extends LitElement {
     this.requestUpdate()
 
     try {
-      const { authorizeWithGoogle, getCurrentUserInfo } = await import('/js/google-auth.js')
+      const { authorizeWithGoogle, getCurrentUserInfo } = await import('../js/google-auth.js')
       await authorizeWithGoogle()
       this.userInfo = await getCurrentUserInfo()
 
@@ -483,7 +483,7 @@ export class StoragePage extends LitElement {
     }
 
     try {
-      const { logout } = await import('/js/google-auth.js')
+      const { logout } = await import('../js/google-auth.js')
       await logout()
 
       this.isAuthenticated = false
@@ -505,7 +505,7 @@ export class StoragePage extends LitElement {
 
   async _downloadBackup() {
     try {
-      const { downloadBlobBackup } = await import('/js/google-auth.js')
+      const { downloadBlobBackup } = await import('../js/google-auth.js')
       await downloadBlobBackup()
     } catch (error) {
       console.error('[StoragePage] Backup download failed:', error)
@@ -525,7 +525,7 @@ export class StoragePage extends LitElement {
         const text = await file.text()
         const backup = JSON.parse(text)
 
-        const { importBlobBackup, getCurrentUserInfo } = await import('/js/google-auth.js')
+        const { importBlobBackup, getCurrentUserInfo } = await import('../js/google-auth.js')
         await importBlobBackup(backup)
 
         this.isAuthenticated = true
@@ -549,7 +549,7 @@ export class StoragePage extends LitElement {
 
   async _testTokenRefresh() {
     try {
-      const { getAccessToken, getStoredBlob } = await import('/js/google-auth.js')
+      const { getAccessToken, getStoredBlob } = await import('../js/google-auth.js')
 
       // Check if Service Worker is active
       if (!navigator.serviceWorker.controller) {

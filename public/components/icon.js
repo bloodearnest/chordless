@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { unsafeSVG } from 'lit-html/directives/unsafe-svg.js'
-import { icons } from '/js/icons.js'
+import { icons } from '../js/icons.js'
 
 /**
  * Icon Component

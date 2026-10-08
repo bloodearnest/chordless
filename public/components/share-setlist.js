@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import * as GoogleAuth from '/js/google-auth.js'
+import * as GoogleAuth from '../js/google-auth.js'
 
 /**
  * ShareSetlist Component

@@ -72,7 +72,7 @@ async function seedSong(page, { setlistId = null } = {}) {
       uuid: 'info-test-song',
       id: 'title-info-test-song',
       title: 'Info Test Song',
-      titleNormalized: 'info test song',
+      titleNormalized: 'infotestsong',
       isDefault: true,
       chordproFileId: 'chordpro-info-test',
       modifiedDate: new Date().toISOString(),
@@ -242,5 +242,87 @@ test.describe('Song info', () => {
       return (await getCurrentDB()).getSetlist('cancel-test-setlist')
     })
     expect(saved.owner).toBe('Ann')
+  })
+})
+
+test.describe('Song import', () => {
+  /** Open the import page and hand it a song, as the bookmarklet would */
+  async function importSong(page, title) {
+    await page.goto('/import-song')
+    await page.waitForFunction(() => customElements.get('song-import'))
+    await page.locator('song-import').evaluate(
+      (element, title) =>
+        element.receive({
+          chordproText: `{title: ${title}}\n{key: D}\n\n[D]Hello [G]world`,
+          metadata: { title },
+          source: 'songselect',
+        }),
+      title
+    )
+  }
+
+  /** Call a method of the app's database, e.g. fromDB(page, 'getSong', uuid) */
+  function fromDB(page, method, arg) {
+    return page.evaluate(
+      async ({ method, arg }) => {
+        const { getCurrentDB } = await import('/js/db.js')
+        return (await getCurrentDB())[method](arg)
+      },
+      { method, arg }
+    )
+  }
+
+  test('saves a new song to the library only', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await importSong(page, 'Imported Song')
+
+    await expect(page.getByRole('heading', { name: /Imported Song/ })).toBeVisible()
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await page.locator('song-import .library-only').click()
+    await page.waitForURL(/\/songs#/)
+
+    const uuid = new URL(page.url()).hash.slice(1)
+    const song = await fromDB(page, 'getSong', uuid)
+    expect(song.title).toBe('Imported Song')
+  })
+
+  test('adds a new song to a new setlist', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await importSong(page, 'Imported Song')
+
+    await page.locator('song-import .new-setlist').click()
+    const modal = page.locator('song-import app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await modal.locator('#name').fill('Import Test')
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await modal.locator('button[type="submit"]').click()
+    await page.waitForURL(/\/setlist\//)
+
+    const setlistId = new URL(page.url()).pathname.split('/').pop()
+    const setlist = await fromDB(page, 'getSetlist', setlistId)
+    expect(setlist.name).toBe('Import Test')
+    expect(setlist.songs.map(s => s.songId)).toEqual(['title-importedsong'])
+  })
+
+  test('adds a song already in the library to an existing setlist', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'import-test-setlist' })
+    await importSong(page, 'Info Test Song')
+
+    const songImport = page.locator('song-import')
+    await expect(songImport).toContainText('already exists in your library')
+    await songImport.locator('.use-existing').click()
+    await expect(songImport.locator('select')).toHaveValue('import-test-setlist')
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await songImport.locator('.add').click()
+    await page.waitForURL(/\/setlist\/import-test-setlist/)
+
+    const setlist = await fromDB(page, 'getSetlist', 'import-test-setlist')
+    expect(setlist.songs.map(s => s.songUuid)).toEqual([undefined, 'info-test-song'])
   })
 })
