@@ -494,6 +494,19 @@ export class ChordlessDB {
     return migratedCount
   }
 
+  // Clear setlists, songs and charts, keeping per-setlist device state
+  // (setlist_local). Used to reset from Drive.
+  async clearSyncedData() {
+    const tx = this.db.transaction(['setlists', 'songs', 'chordpro'], 'readwrite')
+    for (const name of ['setlists', 'songs', 'chordpro']) {
+      tx.objectStore(name).clear()
+    }
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve()
+      tx.onerror = () => reject(tx.error)
+    })
+  }
+
   // Clear all data (for re-import)
   async clearAll() {
     const tx = this.db.transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite')

@@ -117,6 +117,39 @@ export class SyncOrchestrator {
   }
 
   /**
+   * Replace this device's local data with what's in Drive (see
+   * DriveSyncManager.resetLocalFromDrive). Throws UnsyncedChangesError, changing
+   * nothing, if local records have changes that aren't in Drive.
+   * @param {Function} progressCallback - Optional callback for main thread
+   */
+  async resetLocalFromDrive(progressCallback = null) {
+    if (!this.syncManager) {
+      await this.init()
+    }
+
+    const broadcaster = new ProgressBroadcaster(progressCallback)
+
+    try {
+      await this.syncManager.resetLocalFromDrive(progress => {
+        broadcaster.send({
+          ...progress,
+          timestamp: new Date().toISOString(),
+        })
+      })
+      return { success: true }
+    } catch (error) {
+      console.error('[SyncOrchestrator] Reset from Drive failed:', error)
+      await broadcaster.send({
+        stage: 'error',
+        message: error.message,
+        error: error.message,
+        timestamp: new Date().toISOString(),
+      })
+      throw error
+    }
+  }
+
+  /**
    * Push local changes to Drive
    * @param {Function} progressCallback - Optional callback for main thread
    */

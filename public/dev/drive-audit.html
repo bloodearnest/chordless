@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Drive Audit - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 70rem;
+        margin: 0 auto;
+      }
+      h2 {
+        margin-block: 1.5rem 0.5rem;
+        font-weight: 600;
+      }
+      .problem {
+        color: #c0392b;
+      }
+      .ok {
+        color: #27ae60;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      td,
+      th {
+        border: 1px solid #ccc;
+        padding: 0.2rem 0.4rem;
+        text-align: left;
+      }
+      pre {
+        white-space: pre-wrap;
+        font-size: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Drive audit</h1>
+      <p>
+        Read-only check of the setlist files in your Drive <code>Chordless</code> folder: duplicates,
+        files whose contents don't match their <code>setlistId</code>, and setlists sharing a date.
+        Nothing is written to Drive or the local database.
+      </p>
+      <button id="run">Run audit</button>
+      <button id="copy" disabled>Copy report JSON</button>
+      <div id="status"></div>
+      <div id="output"></div>
+      <section id="cleanup" hidden>
+        <h2>Cleanup</h2>
+        <p>
+          Organisation to keep: <select id="keep-org"></select>
+        </p>
+        <div id="cleanup-plan"></div>
+        <p>
+          <label
+            ><input type="checkbox" id="cleanup-confirm" /> I've checked this list. Move these to the
+            Google Drive trash (recoverable for 30 days).</label
+          >
+        </p>
+        <button id="cleanup-run" disabled>Move to trash</button>
+        <div id="cleanup-status"></div>
+      </section>
+    </main>
+
+    <script type="module">
+      import { downloadSetlist, driveRequest } from '/js/drive-api.js'
+
+      const FOLDER = 'application/vnd.google-apps.folder'
+      const status = document.getElementById('status')
+      const output = document.getElementById('output')
+      let report = null
+
+      const esc = s =>
+        String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+      async function listAll(query, fields) {
+        const files = []
+        let pageToken = null
+        do {
+          let url = `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=1000&fields=nextPageToken,files(${fields})`
+          if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
+          const result = await driveRequest(url)
+          files.push(...(result.files || []))
+          pageToken = result.nextPageToken || null
+        } while (pageToken)
+        return files
+      }
+
+      const children = (parentId, extra = '') =>
+        listAll(
+          `'${parentId}' in parents and trashed=false${extra}`,
+          'id,name,mimeType,createdTime,modifiedTime,appProperties'
+        )
+
+      async function auditOrg(org) {
+        const subfolders = await children(org.id, ` and mimeType='${FOLDER}'`)
+        const setlistsFolders = subfolders.filter(f => f.name === 'setlists')
+        const driveFiles = []
+        for (const folder of setlistsFolders) {
+          driveFiles.push(...(await children(folder.id)).filter(f => f.mimeType !== FOLDER))
+        }
+
+        const files = []
+        const CONCURRENCY = 10
+        for (let i = 0; i < driveFiles.length; i += CONCURRENCY) {
+          status.textContent = `${org.name}: downloading ${i + 1}–${Math.min(i + CONCURRENCY, driveFiles.length)} of ${driveFiles.length}`
+          await Promise.all(driveFiles.slice(i, i + CONCURRENCY).map(async file => {
+            let content = null
+            let error = null
+            try {
+              content = await downloadSetlist(file.id)
+            } catch (e) {
+              error = e.message
+            }
+            files.push({
+              fileId: file.id,
+              name: file.name,
+              createdTime: file.createdTime,
+              modifiedTime: file.modifiedTime,
+              setlistId: file.appProperties?.setlistId ?? null,
+              contentId: content?.id ?? null,
+              date: content?.date ?? null,
+              setlistName: content?.name ?? null,
+              songCount: content?.songs?.length ?? null,
+              error,
+            })
+          }))
+        }
+
+        const groupBy = key => {
+          const map = new Map()
+          for (const f of files) {
+            const k = key(f)
+            if (k == null) continue
+            if (!map.has(k)) map.set(k, [])
+            map.get(k).push(f)
+          }
+          return [...map.entries()].filter(([, group]) => group.length > 1)
+        }
+
+        return {
+          org: org.name,
+          orgFolderId: org.id,
+          setlistsFolderCount: setlistsFolders.length,
+          fileCount: files.length,
+          files: files.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')),
+          duplicateSetlistIds: groupBy(f => f.setlistId),
+          duplicateContentIds: groupBy(f => f.contentId),
+          mismatched: files.filter(f => f.setlistId && f.contentId && f.setlistId !== f.contentId),
+          missingSetlistId: files.filter(f => !f.setlistId),
+          sameDate: groupBy(f => (f.date ? `${f.date}|${f.setlistName ?? ''}` : null)),
+          downloadErrors: files.filter(f => f.error),
+        }
+      }
+
+      function renderGroup(title, groups) {
+        if (!groups.length) return `<p class="ok">✓ No ${esc(title)}</p>`
+        return `<p class="problem">✗ ${groups.length} ${esc(title)}</p><ul>${groups
+          .map(
+            ([key, group]) =>
+              `<li><code>${esc(key)}</code>: ${group.map(f => `${esc(f.name)} (created ${esc(f.createdTime)})`).join('; ')}</li>`
+          )
+          .join('')}</ul>`
+      }
+
+      function renderList(title, files) {
+        if (!files.length) return `<p class="ok">✓ No ${esc(title)}</p>`
+        return `<p class="problem">✗ ${files.length} ${esc(title)}</p><ul>${files
+          .map(f => `<li>${esc(f.name)}: setlistId ${esc(f.setlistId)}, contents ${esc(f.contentId)} ${esc(f.error ?? '')}</li>`)
+          .join('')}</ul>`
+      }
+
+      function render(orgs) {
+        output.innerHTML = orgs
+          .map(
+            o => `
+          <h2>${esc(o.org)}: ${o.fileCount} setlist files</h2>
+          ${o.setlistsFolderCount === 1 ? '' : `<p class="problem">✗ ${o.setlistsFolderCount} setlists folders</p>`}
+          ${renderGroup('setlistIds used by more than one file', o.duplicateSetlistIds)}
+          ${renderGroup('setlists stored in more than one file (by contents id)', o.duplicateContentIds)}
+          ${renderList('files whose contents are a different setlist than their setlistId', o.mismatched)}
+          ${renderList('files without a setlistId', o.missingSetlistId)}
+          ${renderList('download errors', o.downloadErrors)}
+          ${renderGroup('date + name shared by more than one file', o.sameDate)}
+          <details><summary>All files</summary><table>
+            <tr><th>date</th><th>name</th><th>songs</th><th>file</th><th>created</th><th>modified</th><th>setlistId</th><th>contents id</th></tr>
+            ${o.files
+              .map(
+                f => `<tr><td>${esc(f.date)}</td><td>${esc(f.setlistName)}</td><td>${esc(f.songCount)}</td><td>${esc(f.name)}</td>
+                <td>${esc(f.createdTime)}</td><td>${esc(f.modifiedTime)}</td><td>${esc(f.setlistId)}</td><td>${esc(f.contentId)}</td></tr>`
+              )
+              .join('')}
+          </table></details>`
+          )
+          .join('')
+      }
+
+      // ---------- cleanup ----------
+
+      const cleanup = document.getElementById('cleanup')
+      const keepSelect = document.getElementById('keep-org')
+      const confirmBox = document.getElementById('cleanup-confirm')
+      const runButton = document.getElementById('cleanup-run')
+      const cleanupStatus = document.getElementById('cleanup-status')
+      let plan = null
+
+      function planCleanup(orgs, keepName) {
+        const keep = orgs.find(o => o.org === keepName)
+        const others = orgs.filter(o => o !== keep)
+        const otherIds = new Set(others.flatMap(o => o.files.map(f => f.setlistId)).filter(Boolean))
+        const files = keep.files.flatMap(f => {
+          const reasons = []
+          if (otherIds.has(f.setlistId)) reasons.push('copy of a setlist from another organisation')
+          if (f.songCount === 0) reasons.push('empty setlist')
+          return reasons.length ? [{ ...f, reason: reasons.join(', ') }] : []
+        })
+        return {
+          keep,
+          files,
+          folders: others.map(o => ({ id: o.orgFolderId, name: o.org, fileCount: o.fileCount })),
+          remaining: keep.fileCount - files.length,
+        }
+      }
+
+      function renderPlan() {
+        plan = planCleanup(report.orgs, keepSelect.value)
+        confirmBox.checked = false
+        runButton.disabled = true
+        document.getElementById('cleanup-plan').innerHTML = `
+          <p><strong>${plan.files.length}</strong> setlist files in ${esc(plan.keep.org)} and
+            <strong>${plan.folders.length}</strong> organisation folder(s) will go to the trash.
+            ${esc(plan.keep.org)} will have <strong>${plan.remaining}</strong> setlist files left.</p>
+          ${plan.folders.map(f => `<p>Folder <code>${esc(f.name)}</code> (${f.fileCount} setlist files, plus its songs)</p>`).join('')}
+          <details><summary>Files</summary><table>
+            <tr><th>date</th><th>file</th><th>created</th><th>songs</th><th>reason</th></tr>
+            ${plan.files
+              .map(f => `<tr><td>${esc(f.date)}</td><td>${esc(f.name)}</td><td>${esc(f.createdTime)}</td><td>${esc(f.songCount)}</td><td>${esc(f.reason)}</td></tr>`)
+              .join('')}
+          </table></details>`
+      }
+
+      keepSelect.addEventListener('change', renderPlan)
+      confirmBox.addEventListener('change', () => {
+        runButton.disabled = !confirmBox.checked
+      })
+
+      runButton.addEventListener('click', async () => {
+        runButton.disabled = true
+        confirmBox.disabled = true
+        const targets = [
+          ...plan.files.map(f => ({ id: f.fileId, label: f.name })),
+          ...plan.folders.map(f => ({ id: f.id, label: `folder ${f.name}` })),
+        ]
+        const failed = []
+        let done = 0
+        for (let i = 0; i < targets.length; i += 10) {
+          await Promise.all(
+            targets.slice(i, i + 10).map(async t => {
+              try {
+                await driveRequest(`/files/${t.id}`, {
+                  method: 'PATCH',
+                  body: JSON.stringify({ trashed: true }),
+                })
+              } catch (e) {
+                failed.push(`${t.label}: ${e.message}`)
+              }
+              done++
+              cleanupStatus.textContent = `Moved ${done} of ${targets.length} to trash...`
+            })
+          )
+        }
+        cleanupStatus.innerHTML = failed.length
+          ? `<p class="problem">✗ ${failed.length} failed:</p><pre>${esc(failed.join('\n'))}</pre>`
+          : `<p class="ok">✓ Moved ${targets.length} items to the trash. Run the audit again to check.</p>`
+      })
+
+      function showCleanup() {
+        keepSelect.innerHTML = report.orgs
+          .map(o => `<option>${esc(o.org)}</option>`)
+          .join('')
+        // Default to the organisation with the most setlist files
+        keepSelect.value = [...report.orgs].sort((a, b) => b.fileCount - a.fileCount)[0]?.org
+        confirmBox.disabled = false
+        cleanupStatus.textContent = ''
+        cleanup.hidden = false
+        renderPlan()
+      }
+
+      document.getElementById('run').addEventListener('click', async () => {
+        output.innerHTML = ''
+        cleanup.hidden = true
+        status.textContent = 'Finding Chordless folder...'
+        try {
+          const roots = await listAll(`name='Chordless' and mimeType='${FOLDER}' and trashed=false`, 'id,name')
+          if (roots.length !== 1) status.textContent = `Warning: found ${roots.length} Chordless folders. `
+          const orgs = []
+          for (const root of roots) {
+            for (const org of await children(root.id, ` and mimeType='${FOLDER}'`)) {
+              if (org.name === 'pads') continue
+              orgs.push(await auditOrg(org))
+            }
+          }
+          report = { generatedAt: new Date().toISOString(), chordlessFolders: roots.length, orgs }
+          render(orgs)
+          showCleanup()
+          status.textContent += 'Done.'
+          document.getElementById('copy').disabled = false
+        } catch (error) {
+          status.textContent = `Failed: ${error.message}`
+        }
+      })
+
+      document.getElementById('copy').addEventListener('click', async () => {
+        await navigator.clipboard.writeText(JSON.stringify(report, null, 2))
+        status.textContent = 'Report copied to clipboard.'
+      })
+    </script>
+  </body>
+</html>

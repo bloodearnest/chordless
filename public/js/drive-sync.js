@@ -28,6 +28,21 @@ import { ChordProParser } from './parser.js'
 import { hashText } from './song-utils.js'
 
 /**
+ * Thrown by resetLocalFromDrive when local records have changes not in Drive.
+ */
+export class UnsyncedChangesError extends Error {
+  constructor(unsynced) {
+    const shown = unsynced.slice(0, 5).map(u => `${u.type} ${u.label || u.id}`)
+    const more = unsynced.length > 5 ? ` and ${unsynced.length - 5} more` : ''
+    super(
+      `${unsynced.length} local change(s) aren't in Drive yet, so nothing was reset: ${shown.join(', ')}${more}`
+    )
+    this.name = 'UnsyncedChangesError'
+    this.unsynced = unsynced
+  }
+}
+
+/**
  * Sync Manager for a specific organisation
  */
 export class DriveSyncManager {
@@ -209,6 +224,18 @@ export class DriveSyncManager {
       return true
     }
 
+    return this.setlistHasLocalChanges(setlist)
+  }
+
+  /**
+   * Whether a setlist has local changes that aren't in Drive: never uploaded,
+   * or edited since its last sync. Ignores whether its Drive file still exists.
+   */
+  setlistHasLocalChanges(setlist) {
+    if (!setlist.driveFileId) {
+      return true
+    }
+
     // Check timestamp first (fast path). Comparing dates is far cheaper than
     // re-hashing the entire setlist payload, so we bail out quickly when the
     // local record hasn't changed since the last sync.
@@ -248,6 +275,18 @@ export class DriveSyncManager {
       return true
     }
 
+    return this.songHasLocalChanges(song, chordproFile)
+  }
+
+  /**
+   * Whether a song has local changes that aren't in Drive: never uploaded, or
+   * its chart edited since its last sync. Ignores whether its Drive file exists.
+   */
+  songHasLocalChanges(song, chordproFile) {
+    if (!song.driveFileId) {
+      return true
+    }
+
     // Check timestamp first (fast path). Comparing dates is cheaper than
     // re-hashing large chordpro payloads, so we short-circuit when nothing changed.
     const lastSynced = song.lastSyncedAt ? new Date(song.lastSyncedAt) : new Date(0)
@@ -266,6 +305,62 @@ export class DriveSyncManager {
     }
 
     return true // Content changed, needs sync
+  }
+
+  /**
+   * Replace this device's setlists, songs and charts with what's in Drive.
+   *
+   * Unlike a normal sync, local records whose Drive file is gone are dropped
+   * rather than re-uploaded, so files removed from Drive stay removed. To avoid
+   * losing work it changes nothing if Drive can't be listed, or if any local
+   * record has changes that aren't in Drive (throws UnsyncedChangesError).
+   * Per-setlist device preferences (setlist_local) are kept.
+   */
+  async resetLocalFromDrive(progressCallback = null) {
+    try {
+      progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
+      await this.buildDriveInventory()
+      if (!this._driveFileIds) {
+        throw new Error("Couldn't list your Drive files, so nothing was changed. Try again.")
+      }
+
+      progressCallback?.({ stage: 'scanning', message: 'Checking for unsynced changes...' })
+      const unsynced = await this.findUnsyncedChanges()
+      if (unsynced.length > 0) {
+        throw new UnsyncedChangesError(unsynced)
+      }
+
+      progressCallback?.({ stage: 'clearing', message: 'Clearing local copy...' })
+      await this.organisationDb.clearSyncedData()
+
+      await this.pullFromDrive(progressCallback)
+      progressCallback?.({ stage: 'complete', message: 'Reset complete' })
+    } finally {
+      this._folderCache.clear()
+      this._driveFileIds = null
+    }
+  }
+
+  /**
+   * Local setlists and songs with changes that aren't in Drive.
+   * @returns {Promise<Array<{type: string, id: string, label: string}>>}
+   */
+  async findUnsyncedChanges() {
+    const unsynced = []
+    for (const setlist of await this.organisationDb.getAllSetlists()) {
+      if (this.setlistHasLocalChanges(setlist)) {
+        const label = [setlist.date, setlist.name].filter(Boolean).join(' ')
+        unsynced.push({ type: 'setlist', id: setlist.id, label })
+      }
+    }
+    for (const song of await this.organisationDb.getAllSongs()) {
+      if (!song.chordproFileId) continue
+      const chordproFile = await this.organisationDb.getChordPro(song.chordproFileId)
+      if (chordproFile && this.songHasLocalChanges(song, chordproFile)) {
+        unsynced.push({ type: 'song', id: this.getSongUuid(song), label: song.title || '' })
+      }
+    }
+    return unsynced
   }
 
   /**

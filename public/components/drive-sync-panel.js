@@ -193,6 +193,46 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
+  async handleReset() {
+    if (this.syncing || !this.syncAvailable || this.disabled) return
+
+    if (
+      !confirm(
+        "Replace this device's setlists and songs with the copy in Google Drive?\n\n" +
+          "Anything removed from Drive is removed here too. If this device has changes that aren't in Drive yet, nothing is changed."
+      )
+    ) {
+      return
+    }
+
+    this.syncing = true
+    this.syncError = null
+    this.syncProgress = { stage: 'starting', message: 'Starting reset...' }
+
+    try {
+      const { id, name } = getCurrentOrganisation()
+      const orchestrator = await createSyncOrchestrator(name, id)
+
+      await orchestrator.resetLocalFromDrive(progress => {
+        this.syncProgress = progress
+        this.requestUpdate()
+      })
+
+      const now = new Date().toISOString()
+      this.lastSyncTime = now
+      localStorage.setItem('last-sync-time', now)
+
+      // Local data changed underneath every page, so reload to show it
+      this.syncProgress = { stage: 'success', message: '✓ Reset complete, reloading...' }
+      setTimeout(() => window.location.reload(), 1000)
+    } catch (error) {
+      console.error('[DriveSyncPanel] Reset from Drive failed:', error)
+      this.syncError = error.message
+      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
+      this.syncing = false
+    }
+  }
+
   async handleSync() {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
@@ -252,6 +292,10 @@ export class DriveSyncPanel extends LitElement {
           ${
             this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
           }
+        </button>
+
+        <button class="sync-button" ?disabled=${this.syncing} @click=${this.handleReset}>
+          ⤓ Reset from Google Drive
         </button>
 
         ${
