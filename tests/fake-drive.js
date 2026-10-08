@@ -15,6 +15,9 @@
  *   returned when `fields` requests it.
  * - modifiedTime comes from the server clock (Date.now() + clockOffsetMs), not
  *   the client's, and changes on content updates.
+ * - md5Checksum is derived from the content (a stand-in hash, not real MD5: code
+ *   only compares checksums), changes only when content does, and folders have
+ *   none.
  * - Metadata-only PATCHes don't change modifiedTime. ASSUMPTION: verify against
  *   real Drive in the integration tests.
  *
@@ -89,7 +92,12 @@ export class FakeDrive {
   /** Simulate an edit made elsewhere (another device, or the Drive UI) */
   editContent(fileId, content) {
     const file = this._get(fileId)
+    this._setContent(file, content)
+  }
+
+  _setContent(file, content) {
     file.content = content
+    file.md5Checksum = fakeChecksum(content)
     file.modifiedTime = this.now()
     file.version++
   }
@@ -166,9 +174,7 @@ export class FakeDrive {
         this._unsupported(`uploadType=${params.get('uploadType')}`)
       const file = this._getOr404(uploadMatch[1])
       if (file instanceof Response) return file
-      file.content = body
-      file.modifiedTime = this.now()
-      file.version++
+      this._setContent(file, body)
       return json(this._project(file, params.get('fields')))
     }
 
@@ -206,6 +212,7 @@ export class FakeDrive {
       modifiedTime: now,
       version: 1,
       content,
+      md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : fakeChecksum(content),
     }
     this.files.set(file.id, file)
     return json(this._project(file, params.get('fields')))
@@ -363,6 +370,15 @@ function parseMultipart(contentType, body) {
   if (parts.length !== 2)
     throw new FakeDriveError(`Expected 2 multipart parts, got ${parts.length}`)
   return { metadata: JSON.parse(parts[0].body), content: parts[1].body }
+}
+
+/** Deterministic content hash standing in for Drive's md5Checksum */
+function fakeChecksum(content) {
+  let hash = 0x811c9dc5
+  for (let i = 0; i < content.length; i++) {
+    hash = Math.imul(hash ^ content.charCodeAt(i), 0x01000193)
+  }
+  return `fake-md5-${(hash >>> 0).toString(16)}-${content.length}`
 }
 
 function json(data, status = 200) {

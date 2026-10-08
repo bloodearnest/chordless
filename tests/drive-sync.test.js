@@ -219,11 +219,10 @@ describe('Drive sync (against FakeDrive)', () => {
       expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Tablet edit on top')
     })
 
-    it('KNOWN BUG: device clock ahead of Drive -> overwrites a remote edit', async () => {
-      // lastSyncedAt uses the device clock but is compared with Drive's server
-      // modifiedTime (drive-sync.js pullSetlists). If the device clock is ahead,
-      // a remote edit made within the skew window looks older than the last
-      // sync, so the pull skips it and the push then overwrites it.
+    it('detects a remote edit when the device clock is ahead of Drive', async () => {
+      // Regression: lastSyncedAt (device clock) used to be compared with Drive's
+      // modifiedTime (server clock), so with the device ahead, a remote edit
+      // looked older than the last sync and was silently overwritten.
       drive.clockOffsetMs = -5 * 60 * 1000 // server 5 min behind = devices 5 min ahead
       const phone = await makeDevice('phone')
       const tablet = await makeDevice('tablet')
@@ -236,19 +235,15 @@ describe('Drive sync (against FakeDrive)', () => {
       await editSetlist(tablet, setlist.id, { name: 'Tablet renamed' })
       await syncDevice(tablet)
 
+      // Detected as a conflict, resolved like any other (Drive wins)
       const onDrive = driveSetlist(setlist.id)
-      expect(onDrive.name).to.equal('Tablet renamed')
-      // The phone's edit is gone from Drive and from the tablet, with no warning.
-      // Correct behaviour would detect the conflict instead.
-      expect(onDrive.leader).to.equal('Ann')
-      expect((await tablet.db.getSetlist(setlist.id)).leader).to.equal('Ann')
+      expect(onDrive.leader).to.equal('Phone changed leader')
+      expect((await tablet.db.getSetlist(setlist.id)).leader).to.equal('Phone changed leader')
     })
 
-    it('KNOWN BUG: device clock behind Drive -> discards its own new edit', async () => {
-      // After an upload, Drive's modifiedTime (server clock) is later than the
-      // device's lastSyncedAt, so the device's own upload looks like a remote
-      // change. Any edit made within the skew window is then treated as a
-      // conflict and replaced by the version the device itself uploaded.
+    it('keeps a local edit when the device clock is behind Drive', async () => {
+      // Regression: the device's own upload looked like a newer remote change,
+      // so an edit made within the skew window was replaced by the old version.
       drive.clockOffsetMs = 5 * 60 * 1000 // server 5 min ahead = devices 5 min behind
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Original' })
@@ -257,9 +252,93 @@ describe('Drive sync (against FakeDrive)', () => {
       await editSetlist(phone, setlist.id, { name: 'Edited' })
       await syncDevice(phone)
 
-      // Correct behaviour: 'Edited' locally and on Drive
+      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Edited')
+      expect(driveSetlist(setlist.id).name).to.equal('Edited')
+    })
+  })
+
+  describe('change detection by content', () => {
+    it('uploads an edit even if modifiedDate was not updated', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Original' })
+      await syncDevice(phone)
+
+      const stored = await phone.db.getSetlist(setlist.id)
+      await phone.db.saveSetlist({ ...stored, name: 'Edited, same modifiedDate' })
+      await syncDevice(phone)
+
+      expect(driveSetlist(setlist.id).name).to.equal('Edited, same modifiedDate')
+    })
+
+    it('does not download when only Drive metadata changed', async () => {
+      // Drive's md5Checksum only changes with content, so e.g. an appProperties
+      // update (or anything else that moves modifiedTime) isn't a remote change.
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Original' })
+      await syncDevice(phone)
+      const [file] = driveSetlistFiles()
+      drive.files.get(file.id).modifiedTime = new Date(Date.now() + 60_000).toISOString()
+      drive.files.get(file.id).appProperties.note = 'changed elsewhere'
+      drive.requests = []
+
+      await syncDevice(phone)
+
+      expect(drive.requests.filter(r => r.params.get('alt') === 'media')).to.deep.equal([])
       expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Original')
-      expect(driveSetlist(setlist.id).name).to.equal('Original')
+    })
+
+    it('does not upload an edit that was undone', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Original' })
+      await syncDevice(phone)
+      await editSetlist(phone, setlist.id, { name: 'Changed' })
+      await editSetlist(phone, setlist.id, { name: 'Original' })
+      drive.requests = []
+
+      await syncDevice(phone)
+
+      expect(drive.requests.filter(r => r.method !== 'GET').map(r => r.path)).to.deep.equal([])
+    })
+
+    it('keeps device sync state out of the copy in Drive', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Clean' })
+      await syncDevice(phone)
+      await editSetlist(phone, setlist.id, { name: 'Clean edit' })
+      await syncDevice(phone)
+
+      const onDrive = driveSetlist(setlist.id)
+      for (const field of [
+        'driveFileId',
+        'driveModifiedTime',
+        'lastSyncedAt',
+        'syncedContentHash',
+      ]) {
+        expect(onDrive, field).not.to.have.property(field)
+      }
+    })
+
+    it('syncs setlists recorded before content hashes', async () => {
+      // Records synced by the previous version have no syncedContentHash or
+      // driveChecksum, and a driveModifiedTime taken from the device clock.
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Old record' })
+      await syncDevice(phone)
+      const stored = await phone.db.getSetlist(setlist.id)
+      delete stored.syncedContentHash
+      delete stored.driveChecksum
+      stored.driveModifiedTime = new Date().toISOString()
+      stored._lastSyncHash = 'hash-from-old-version'
+      await phone.db.saveSetlist(stored)
+      drive.requests = []
+
+      await syncDevice(phone)
+      expect(drive.requests.filter(r => r.method !== 'GET').map(r => r.path)).to.deep.equal([])
+      expect((await phone.db.getSetlist(setlist.id)).syncedContentHash).to.be.a('string')
+
+      await editSetlist(phone, setlist.id, { name: 'Old record, edited' })
+      await syncDevice(phone)
+      expect(driveSetlist(setlist.id).name).to.equal('Old record, edited')
     })
   })
 
@@ -574,6 +653,32 @@ describe('Drive sync (against FakeDrive)', () => {
         const song = await phone.db.getSong(uuid)
         expect(drive.files.get(song.driveFileId).content).to.equal(await songContent(phone, uuid))
       }
+    })
+
+    it('uploads a chart edit even if its stored contentHash is stale', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: 'v1' })
+      await syncDevice(phone)
+
+      const song = await phone.db.getSong('song-1')
+      const chart = await phone.db.getChordPro(song.chordproFileId)
+      await phone.db.saveChordPro({ ...chart, content: 'v2 without new hash' })
+      await syncDevice(phone)
+
+      const [file] = drive.listFiles(f => f.appProperties.type === 'chordpro')
+      expect(file.content).to.equal('v2 without new hash')
+    })
+
+    it('pulls a chart edited in Drive even if its appProperties are stale', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: 'v1' })
+      await syncDevice(phone)
+
+      const [file] = drive.listFiles(f => f.appProperties.type === 'chordpro')
+      drive.editContent(file.id, 'edited in Drive')
+      await syncDevice(phone)
+
+      expect(await songContent(phone, 'song-1')).to.equal('edited in Drive')
     })
 
     it('keeps the Drive version when a chart is edited on two devices', async () => {

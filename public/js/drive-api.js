@@ -24,6 +24,10 @@ const PADSET_CATEGORY = 'padset'
 const PADSET_FILE_CATEGORY = 'padsetFile'
 const APP_VERSION = '1.0.0'
 
+// Fields returned by uploads and updates. Sync records md5Checksum (computed by
+// Drive from the stored content) to detect later remote changes.
+const WRITE_FIELDS = 'id,name,mimeType,modifiedTime,md5Checksum'
+
 // Where Drive access tokens come from. Tests replace this to run without the
 // service worker auth flow (see tests/fake-drive.js).
 let getAccessToken = () => GoogleAuth.getAccessToken()
@@ -228,14 +232,17 @@ export async function batchUploadFiles(files) {
           file.content +
           closeDelimiter
 
-        const response = await fetch(`${UPLOAD_API_BASE}/files?uploadType=multipart`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': `multipart/related; boundary=${boundary}`,
-          },
-          body: body,
-        })
+        const response = await fetch(
+          `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': `multipart/related; boundary=${boundary}`,
+            },
+            body: body,
+          }
+        )
 
         if (!response.ok) {
           const error = await response
@@ -297,14 +304,17 @@ async function uploadFile(metadata, content, contentType = 'text/plain') {
     type: `multipart/related; boundary=${boundary}`,
   })
 
-  const response = await fetch(`${UPLOAD_API_BASE}/files?uploadType=multipart`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': `multipart/related; boundary=${boundary}`,
-    },
-    body,
-  })
+  const response = await fetch(
+    `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    }
+  )
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
@@ -320,14 +330,17 @@ async function uploadFile(metadata, content, contentType = 'text/plain') {
 async function updateFileContent(fileId, content, contentType = 'text/plain') {
   const token = await getAccessToken()
 
-  const response = await fetch(`${UPLOAD_API_BASE}/files/${fileId}?uploadType=media`, {
-    method: 'PATCH',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': contentType,
-    },
-    body: content,
-  })
+  const response = await fetch(
+    `${UPLOAD_API_BASE}/files/${fileId}?uploadType=media&fields=${WRITE_FIELDS}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': contentType,
+      },
+      body: content,
+    }
+  )
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
@@ -753,13 +766,15 @@ export async function downloadChordProFile(fileId) {
 }
 
 /**
- * Update an existing chordpro file (content and metadata)
+ * Update an existing chordpro file (content and metadata).
+ * Returns the file resource (with modifiedTime) after the last write.
  */
 export async function updateChordProFile(fileId, content, metadata = {}) {
   console.log(`[DriveAPI] Updating chordpro: ${fileId}`)
 
   // Update content
-  await updateFileContent(fileId, content, 'text/plain')
+  // Return the last write's file resource, so callers get the final modifiedTime
+  let file = await updateFileContent(fileId, content, 'text/plain')
 
   // Update appProperties with complete metadata (if provided)
   if (Object.keys(metadata).length > 0) {
@@ -786,7 +801,7 @@ export async function updateChordProFile(fileId, content, metadata = {}) {
     if (metadata.importSource) appPropsUpdate.importSource = metadata.importSource
     if (metadata.sourceUrl) appPropsUpdate.sourceUrl = metadata.sourceUrl
 
-    await driveRequest(`/files/${fileId}`, {
+    file = await driveRequest(`/files/${fileId}?fields=${WRITE_FIELDS}`, {
       method: 'PATCH',
       body: JSON.stringify({
         appProperties: appPropsUpdate,
@@ -795,6 +810,7 @@ export async function updateChordProFile(fileId, content, metadata = {}) {
   }
 
   console.log(`[DriveAPI] Updated chordpro file: ${fileId}`)
+  return file
 }
 
 /**
@@ -897,8 +913,9 @@ export async function downloadSetlist(fileId) {
 export async function updateSetlist(fileId, setlistData) {
   console.log(`[DriveAPI] Updating setlist: ${fileId}`)
   const content = JSON.stringify(setlistData, null, 2)
-  await updateFileContent(fileId, content, 'application/json')
+  const file = await updateFileContent(fileId, content, 'application/json')
   console.log(`[DriveAPI] Updated setlist: ${fileId}`)
+  return file
 }
 
 /**
@@ -934,7 +951,7 @@ export async function listSetlists(organisationFolderId) {
   do {
     let url =
       `/files?q=${encodeURIComponent(query)}&spaces=drive` +
-      '&fields=nextPageToken,files(id,name,appProperties,modifiedTime)' +
+      '&fields=nextPageToken,files(id,name,appProperties,modifiedTime,md5Checksum)' +
       '&orderBy=modifiedTime desc&pageSize=1000'
     if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
 

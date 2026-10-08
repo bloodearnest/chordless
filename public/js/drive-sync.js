@@ -27,6 +27,48 @@ import {
 import { ChordProParser } from './parser.js'
 import { hashText } from './song-utils.js'
 
+// Fields describing a setlist's sync state on this device rather than its
+// content. Excluded from content hashes and from the copy uploaded to Drive.
+// (_lastSyncHash is the pre-content-hash field, kept only for old records.)
+const SETLIST_SYNC_FIELDS = [
+  'driveFileId',
+  'driveModifiedTime',
+  'driveChecksum',
+  'lastSyncedAt',
+  'syncedContentHash',
+  '_lastSyncHash',
+]
+
+/** A setlist without this device's sync state: what gets stored in Drive */
+export function setlistContent(setlist) {
+  const content = { ...setlist }
+  for (const field of SETLIST_SYNC_FIELDS) delete content[field]
+  return content
+}
+
+/** JSON with object keys sorted, so equal content always hashes the same */
+function stableStringify(value) {
+  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .filter(key => value[key] !== undefined)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+    return `{${entries.join(',')}}`
+  }
+  return JSON.stringify(value)
+}
+
+/**
+ * Hash of a setlist's content, ignoring sync state and key order. modifiedDate
+ * is left out too: it records when it was saved, so a save that changes nothing
+ * (or an edit that's undone) doesn't count as a change.
+ */
+export function setlistContentHash(setlist) {
+  const { modifiedDate: _modifiedDate, ...content } = setlistContent(setlist)
+  return hashText(stableStringify(content))
+}
+
 /**
  * Thrown by resetLocalFromDrive when local records have changes not in Drive.
  */
@@ -235,25 +277,13 @@ export class DriveSyncManager {
     if (!setlist.driveFileId) {
       return true
     }
-
-    // Check timestamp first (fast path). Comparing dates is far cheaper than
-    // re-hashing the entire setlist payload, so we bail out quickly when the
-    // local record hasn't changed since the last sync.
-    const localModified = new Date(setlist.modifiedDate)
+    if (setlist.syncedContentHash) {
+      return setlistContentHash(setlist) !== setlist.syncedContentHash
+    }
+    // Synced before content hashes were recorded: fall back to timestamps,
+    // both from this device's clock
     const lastSynced = setlist.lastSyncedAt ? new Date(setlist.lastSyncedAt) : new Date(0)
-
-    if (localModified <= lastSynced) {
-      return false // Not modified since last sync
-    }
-
-    // Content might have changed - compare hash (only now, since hashing is more expensive)
-    const currentHash = hashText(JSON.stringify(setlist))
-    if (setlist._lastSyncHash && setlist._lastSyncHash === currentHash) {
-      // Content hasn't actually changed, just timestamp
-      return false
-    }
-
-    return true // Content changed, needs sync
+    return new Date(setlist.modifiedDate) > lastSynced
   }
 
   /**
@@ -286,25 +316,20 @@ export class DriveSyncManager {
     if (!song.driveFileId) {
       return true
     }
+    if (song.syncedContentHash) {
+      // Hash the chart itself rather than trusting a stored contentHash
+      return hashText(chordproFile.content) !== song.syncedContentHash
+    }
 
-    // Check timestamp first (fast path). Comparing dates is cheaper than
-    // re-hashing large chordpro payloads, so we short-circuit when nothing changed.
+    // Synced before content hashes were recorded: fall back to the old check
     const lastSynced = song.lastSyncedAt ? new Date(song.lastSyncedAt) : new Date(0)
     const localModified = chordproFile.lastModified
       ? new Date(chordproFile.lastModified)
       : new Date(song.modifiedDate || 0)
-
     if (localModified <= lastSynced) {
-      return false // Not modified since last sync
-    }
-
-    // Check content hash (only if timestamps disagree to avoid unnecessary hashing)
-    if (song.driveProperties?.contentHash === chordproFile.contentHash) {
-      // Content hash matches, no changes
       return false
     }
-
-    return true // Content changed, needs sync
+    return song.driveProperties?.contentHash !== chordproFile.contentHash
   }
 
   /**
@@ -397,7 +422,6 @@ export class DriveSyncManager {
     for (const driveFile of driveSetlists) {
       try {
         const setlistId = driveFile.appProperties?.setlistId || driveFile.name.replace('.json', '')
-        const driveModifiedTime = new Date(driveFile.modifiedTime)
 
         // Check if we have this setlist locally
         const localSetlist = await this.organisationDb.getSetlist(setlistId)
@@ -407,23 +431,10 @@ export class DriveSyncManager {
           console.log(`[DriveSync] Downloading new setlist: ${setlistId}`)
           downloadQueue.push({ driveFile, setlistId })
         } else if (localSetlist.driveFileId === driveFile.id) {
-          // Existing setlist, check if Drive version is newer
-          const localModified = new Date(localSetlist.modifiedDate)
-          const lastSynced = localSetlist.lastSyncedAt
-            ? new Date(localSetlist.lastSyncedAt)
-            : new Date(0)
-
-          if (driveModifiedTime > lastSynced) {
-            console.log(`[DriveSync] Drive version newer for: ${setlistId}`)
-
-            // Check if we also have local changes
-            if (localModified > lastSynced) {
-              console.warn(`[DriveSync] ⚠️ Conflict detected for setlist: ${setlistId}`)
-              // For now, prefer Drive version
-              // TODO: Implement proper conflict resolution
-            }
-
-            downloadQueue.push({ driveFile, setlistId })
+          // Drive's content changed since our last sync if its md5Checksum (computed
+          // by Drive) differs from the one we recorded. No clocks involved.
+          if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
+            downloadQueue.push({ driveFile, setlistId, localSetlist })
           }
         }
       } catch (error) {
@@ -458,14 +469,34 @@ export class DriveSyncManager {
       const batch = downloadQueue.slice(i, i + this.CONCURRENT_LIMIT)
 
       const results = await Promise.allSettled(
-        batch.map(async ({ driveFile, setlistId }) => {
-          const setlistData = await DriveAPI.downloadSetlist(driveFile.id)
-          setlistData.id = setlistData.id || setlistId
-          setlistData.driveFileId = driveFile.id
-          setlistData.driveModifiedTime = driveFile.modifiedTime
-          setlistData.lastSyncedAt = new Date().toISOString()
-          setlistData._lastSyncHash = hashText(JSON.stringify(setlistData))
-          return setlistData
+        batch.map(async ({ driveFile, setlistId, localSetlist }) => {
+          const remote = await DriveAPI.downloadSetlist(driveFile.id)
+          const remoteHash = setlistContentHash(remote)
+
+          if (localSetlist?.syncedContentHash === remoteHash) {
+            // Same content as we last synced, e.g. a record from before checksums
+            // were recorded. Not a remote change: keep local edits, record checksum.
+            return {
+              ...localSetlist,
+              driveModifiedTime: driveFile.modifiedTime,
+              driveChecksum: driveFile.md5Checksum,
+            }
+          }
+          if (localSetlist && this.setlistHasLocalChanges(localSetlist)) {
+            // Changed both here and in Drive. For now Drive wins.
+            // TODO: Implement proper conflict resolution
+            console.warn(`[DriveSync] ⚠️ Conflict for setlist ${setlistId}, keeping Drive version`)
+          }
+
+          return {
+            ...setlistContent(remote),
+            id: remote.id || setlistId,
+            driveFileId: driveFile.id,
+            driveModifiedTime: driveFile.modifiedTime,
+            driveChecksum: driveFile.md5Checksum,
+            lastSyncedAt: new Date().toISOString(),
+            syncedContentHash: remoteHash,
+          }
         })
       )
 
@@ -555,26 +586,22 @@ export class DriveSyncManager {
 
     const downloads = []
     for (const entry of latestByUuid.values()) {
-      const { songUuid, file, props, driveModified } = entry
+      const { songUuid, file, props } = entry
       const localSong = await this.organisationDb.getSong(songUuid)
       const chordproRecord =
         localSong && localSong.chordproFileId
           ? await this.organisationDb.getChordPro(localSong.chordproFileId)
           : null
 
-      const lastSynced = localSong?.lastSyncedAt ? new Date(localSong.lastSyncedAt) : new Date(0)
-      const remoteHash = props.contentHash || null
-      const localHash = localSong?.driveProperties?.contentHash || localSong?.contentHash || null
-
       let needsDownload = false
       if (!localSong) {
         needsDownload = true
       } else if (!localSong.driveFileId || localSong.driveFileId !== file.id) {
         needsDownload = true
-      } else if (driveModified > lastSynced) {
-        if (!remoteHash || remoteHash !== localHash) {
-          needsDownload = true
-        }
+      } else if (file.md5Checksum !== localSong.driveChecksum) {
+        // Drive's content changed since our last sync: its md5Checksum (computed
+        // by Drive) differs from the one we recorded
+        needsDownload = true
       } else if (!chordproRecord) {
         needsDownload = true
       }
@@ -641,7 +668,7 @@ export class DriveSyncManager {
       let url =
         `/files?q=${encodeURIComponent(
           query
-        )}&spaces=drive&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,appProperties,size)` +
+        )}&spaces=drive&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,appProperties,size)` +
         '&pageSize=1000'
       if (pageToken) {
         url += `&pageToken=${pageToken}`
@@ -668,6 +695,26 @@ export class DriveSyncManager {
 
   async downloadSongFromDrive({ songUuid, file, props, localSong }) {
     const chordproContent = await DriveAPI.downloadChordProFile(file.id)
+    const remoteHash = hashText(chordproContent)
+
+    if (localSong?.driveFileId === file.id && localSong.syncedContentHash === remoteHash) {
+      // Same chart as we last synced, e.g. a record from before checksums were
+      // recorded. Not a remote change: keep local edits, record the checksum.
+      await this.organisationDb.saveSong({
+        ...localSong,
+        driveModifiedTime: file.modifiedTime,
+        driveChecksum: file.md5Checksum,
+      })
+      return
+    }
+    if (localSong?.chordproFileId) {
+      const localChart = await this.organisationDb.getChordPro(localSong.chordproFileId)
+      if (localChart && this.songHasLocalChanges(localSong, localChart)) {
+        // Changed both here and in Drive. For now Drive wins.
+        console.warn(`[DriveSync] ⚠️ Conflict for song ${songUuid}, keeping Drive version`)
+      }
+    }
+
     const chordproFileId = localSong?.chordproFileId || `chordpro-${crypto.randomUUID()}`
 
     const parsed = this.parser.parse(chordproContent)
@@ -682,7 +729,7 @@ export class DriveSyncManager {
       localSong?.id ||
       (ccliNumber ? `ccli-${ccliNumber}` : `title-${titleNormalized}`)
     const variantLabel = props.variantLabel || localSong?.variantLabel || 'Original'
-    const contentHash = props.contentHash || hashText(chordproContent)
+    const contentHash = remoteHash
 
     await this.organisationDb.saveChordPro({
       id: chordproFileId,
@@ -718,7 +765,9 @@ export class DriveSyncManager {
       modifiedDate: new Date(file.modifiedTime || file.createdTime || Date.now()).toISOString(),
       driveFileId: file.id,
       driveModifiedTime: file.modifiedTime,
+      driveChecksum: file.md5Checksum,
       lastSyncedAt: new Date().toISOString(),
+      syncedContentHash: remoteHash,
       driveProperties: {
         songId: deterministicId,
         songUuid,
@@ -810,6 +859,7 @@ export class DriveSyncManager {
           console.log(`[DriveSync] Clearing stale Drive ID for setlist ${setlist.id}`)
           setlist.driveFileId = null
           setlist.driveModifiedTime = null
+          setlist.driveChecksum = null
         }
         newSetlists.push(setlist)
       }
@@ -847,7 +897,7 @@ export class DriveSyncManager {
                 appVersion: '1.0.0',
               },
             },
-            content: JSON.stringify(setlist, null, 2),
+            content: JSON.stringify(setlistContent(setlist), null, 2),
             contentType: 'application/json',
           }
         })
@@ -864,9 +914,10 @@ export class DriveSyncManager {
 
             if (driveFile && driveFile.id) {
               setlist.driveFileId = driveFile.id
-              setlist.driveModifiedTime = driveFile.modifiedTime || new Date().toISOString()
+              setlist.driveModifiedTime = driveFile.modifiedTime ?? null
+              setlist.driveChecksum = driveFile.md5Checksum ?? null
               setlist.lastSyncedAt = new Date().toISOString()
-              setlist._lastSyncHash = hashText(JSON.stringify(setlist))
+              setlist.syncedContentHash = setlistContentHash(setlist)
               updatedSetlists.push(setlist)
               processed++
             }
@@ -940,14 +991,16 @@ export class DriveSyncManager {
         const driveFile = await DriveAPI.uploadSetlist(
           this.driveFolderId,
           setlist.id,
-          setlist,
+          setlistContent(setlist),
           this.organisationId
         )
 
         // Update local record with Drive metadata
         setlist.driveFileId = driveFile.id
-        setlist.driveModifiedTime = driveFile.modifiedTime || new Date().toISOString()
+        setlist.driveModifiedTime = driveFile.modifiedTime ?? null
+        setlist.driveChecksum = driveFile.md5Checksum ?? null
         setlist.lastSyncedAt = new Date().toISOString()
+        setlist.syncedContentHash = setlistContentHash(setlist)
         await this.organisationDb.saveSetlist(setlist)
 
         console.log(`[DriveSync] ✅ Uploaded setlist: ${setlist.id}`)
@@ -955,11 +1008,13 @@ export class DriveSyncManager {
         // Existing setlist, update it
         console.log(`[DriveSync] Updating setlist: ${setlist.id}`)
 
-        await DriveAPI.updateSetlist(setlist.driveFileId, setlist)
+        const driveFile = await DriveAPI.updateSetlist(setlist.driveFileId, setlistContent(setlist))
 
         // Update sync metadata
-        setlist.driveModifiedTime = new Date().toISOString()
+        setlist.driveModifiedTime = driveFile?.modifiedTime ?? null
+        setlist.driveChecksum = driveFile?.md5Checksum ?? null
         setlist.lastSyncedAt = new Date().toISOString()
+        setlist.syncedContentHash = setlistContentHash(setlist)
         await this.organisationDb.saveSetlist(setlist)
 
         console.log(`[DriveSync] ✅ Updated setlist: ${setlist.id}`)
@@ -1004,6 +1059,7 @@ export class DriveSyncManager {
             )
             song.driveFileId = null
             song.driveProperties = null
+            song.driveChecksum = null
           }
           newSongs.push({ song, chordproFile })
         }
@@ -1051,7 +1107,7 @@ export class DriveSyncManager {
               titleNormalized: song.titleNormalized,
               variantLabel: variantLabel,
               isDefault: song.isDefault ? 'true' : 'false',
-              contentHash: chordproFile.contentHash,
+              contentHash: hashText(chordproFile.content),
               importSource: song.importSource || '',
               importDate: song.importDate || new Date().toISOString(),
               modifiedDate: song.modifiedDate || new Date().toISOString(),
@@ -1080,7 +1136,7 @@ export class DriveSyncManager {
           tracking.song.driveProperties = {
             songId: tracking.song.id,
             songUuid: this.getSongUuid(tracking.song),
-            contentHash: tracking.chordproFile.contentHash,
+            contentHash: hashText(tracking.chordproFile.content),
             ccliNumber: tracking.song.ccliNumber || '',
             title: tracking.title,
             titleNormalized: tracking.song.titleNormalized,
@@ -1088,7 +1144,9 @@ export class DriveSyncManager {
             appVersion: '1.0.0',
           }
           tracking.song.lastSyncedAt = new Date().toISOString()
-          tracking.song.driveModifiedTime = tracking.song.lastSyncedAt
+          tracking.song.driveModifiedTime = driveFile.modifiedTime ?? null
+          tracking.song.driveChecksum = driveFile.md5Checksum ?? null
+          tracking.song.syncedContentHash = hashText(tracking.chordproFile.content)
           tracking.song.contentHash = tracking.chordproFile.contentHash
           updatedSongs.push(tracking.song)
           processed++
@@ -1163,11 +1221,13 @@ export class DriveSyncManager {
       }
 
       const { title, ccliNumber, variantLabel } = this.getSongFileMetadata(song, chordproFile)
+      const contentHash = hashText(chordproFile.content)
+      let driveFile
 
       if (!song.driveFileId) {
         console.log(`[DriveSync] Uploading song: ${title} (${song.id}/${songUuid})`)
 
-        const driveFile = await DriveAPI.uploadChordProFile(
+        driveFile = await DriveAPI.uploadChordProFile(
           this.driveFolderId,
           song.id,
           songUuid,
@@ -1177,7 +1237,7 @@ export class DriveSyncManager {
           chordproFile.content,
           {
             titleNormalized: song.titleNormalized,
-            contentHash: chordproFile.contentHash,
+            contentHash,
             variantOf: song.variantOf,
             isDefault: song.isDefault,
             importDate: song.importDate,
@@ -1193,8 +1253,8 @@ export class DriveSyncManager {
       } else {
         console.log(`[DriveSync] Updating song: ${title} (${song.id}/${songUuid})`)
 
-        await DriveAPI.updateChordProFile(song.driveFileId, chordproFile.content, {
-          contentHash: chordproFile.contentHash,
+        driveFile = await DriveAPI.updateChordProFile(song.driveFileId, chordproFile.content, {
+          contentHash,
           ccliNumber: ccliNumber,
           title: title,
           titleNormalized: song.titleNormalized,
@@ -1212,7 +1272,7 @@ export class DriveSyncManager {
       song.driveProperties = {
         songId: song.id,
         songUuid: songUuid,
-        contentHash: chordproFile.contentHash,
+        contentHash,
         ccliNumber: ccliNumber,
         title: title,
         titleNormalized: song.titleNormalized,
@@ -1220,7 +1280,9 @@ export class DriveSyncManager {
         appVersion: '1.0.0',
       }
       song.lastSyncedAt = new Date().toISOString()
-      song.driveModifiedTime = song.lastSyncedAt
+      song.driveModifiedTime = driveFile?.modifiedTime ?? null
+      song.driveChecksum = driveFile?.md5Checksum ?? null
+      song.syncedContentHash = contentHash
       song.contentHash = chordproFile.contentHash
 
       await this.organisationDb.saveSong(song)
