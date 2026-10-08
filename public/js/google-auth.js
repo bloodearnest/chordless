@@ -33,11 +33,9 @@
 const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
 
-// Auth routes are proxied through Caddy at same origin (see Caddyfile /oauth/* /session/* routes).
-const AUTH_PROXY_URL =
-  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8787'
-    : 'https://chordless.app'
+// The worker serves the auth routes (/oauth/*, /session/*) on the same origin as
+// the app: wrangler dev locally, Tailscale serve/funnel, and production.
+const AUTH_PROXY_URL = ''
 
 /**
  * Parse JWT and extract payload

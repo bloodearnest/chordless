@@ -38,11 +38,12 @@ deploy:
 secrets:
     bash push-secrets.sh
 
-# Expose local server via Tailscale Funnel (HTTPS -> http://localhost:8787)
+# Keep the same URL: browser data (IndexedDB, sign-in) is tied to that origin.
+# Expose local server via Tailscale Funnel on https://<machine>.<tailnet>.ts.net (port 443)
 funnel:
     @tailscale funnel status 2>/dev/null | grep -q "8787" \
         && tailscale funnel status \
-        || tailscale funnel 8787
+        || sudo tailscale funnel --bg 8787
 
 # Run browser tests with Playwright (headless)
 test-browser-headless:
