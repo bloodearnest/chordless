@@ -7,6 +7,8 @@ export default {
     'tests/db-usage.test.js',
     'tests/drive-api-sync.test.js',
     'tests/drive-sync-conflicts.test.js',
+    'tests/drive-sync.test.js',
+    'tests/fake-drive.test.js',
     'tests/library-song.test.js',
     'tests/lyrics-normalizer.test.js',
     'tests/metronome-controller.test.js',

@@ -31,10 +31,15 @@ import { hashText } from './song-utils.js'
  * Sync Manager for a specific organisation
  */
 export class DriveSyncManager {
-  constructor(organisationName, organisationId) {
+  /**
+   * @param {object} [options]
+   * @param {ChordlessDB} [options.db] - Database to sync. Defaults to the current
+   *   organisation's database. Tests pass one per simulated device.
+   */
+  constructor(organisationName, organisationId, { db = null } = {}) {
     this.organisationName = organisationName
     this.organisationId = organisationId
-    this.organisationDb = null
+    this.organisationDb = db
     this.driveFolderId = null
     this.parser = new ChordProParser()
 
@@ -50,7 +55,9 @@ export class DriveSyncManager {
     console.log(`[DriveSync] Initializing sync for: ${this.organisationName}`)
 
     // Initialize database
-    if (typeof window !== 'undefined') {
+    if (this.organisationDb) {
+      this.organisationId ??= this.organisationDb.organisationId
+    } else if (typeof window !== 'undefined') {
       // In main thread we can reuse the same DB instance the UI uses
       this.organisationDb = await getCurrentDB()
       // Ensure we keep the actual organisation ID from the DB (in case caller passed null)

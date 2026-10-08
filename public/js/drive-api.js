@@ -24,6 +24,14 @@ const PADSET_CATEGORY = 'padset'
 const PADSET_FILE_CATEGORY = 'padsetFile'
 const APP_VERSION = '1.0.0'
 
+// Where Drive access tokens come from. Tests replace this to run without the
+// service worker auth flow (see tests/fake-drive.js).
+let getAccessToken = () => GoogleAuth.getAccessToken()
+
+export function setAccessTokenProvider(provider) {
+  getAccessToken = provider || (() => GoogleAuth.getAccessToken())
+}
+
 /**
  * Helper functions for human-readable filenames
  */
@@ -112,7 +120,7 @@ export function generateSetlistFilename(date, type, leader, name) {
  * Make an authenticated request to Google Drive API
  */
 export async function driveRequest(endpoint, options = {}) {
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
 
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -144,7 +152,7 @@ export async function driveRequest(endpoint, options = {}) {
 export async function batchDeleteFiles(fileIds) {
   if (fileIds.length === 0) return
 
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
   const boundary = '===============7330845974216740156=='
 
   // Build batch request body
@@ -203,7 +211,7 @@ export async function batchUploadFiles(files) {
     // Upload all files in this chunk concurrently
     const uploadPromises = chunk.map(async file => {
       try {
-        const token = await GoogleAuth.getAccessToken()
+        const token = await getAccessToken()
         const boundary = '-------314159265358979323846'
         const delimiter = `\r\n--${boundary}\r\n`
         const closeDelimiter = `\r\n--${boundary}--`
@@ -258,7 +266,7 @@ export async function batchUploadFiles(files) {
  * Upload file content to Drive
  */
 async function uploadFile(metadata, content, contentType = 'text/plain') {
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
   const boundary = '-------314159265358979323846'
   const encoder = new TextEncoder()
 
@@ -309,7 +317,7 @@ async function uploadFile(metadata, content, contentType = 'text/plain') {
  * Update existing file content
  */
 async function updateFileContent(fileId, content, contentType = 'text/plain') {
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
 
   const response = await fetch(`${UPLOAD_API_BASE}/files/${fileId}?uploadType=media`, {
     method: 'PATCH',
@@ -332,7 +340,7 @@ async function updateFileContent(fileId, content, contentType = 'text/plain') {
  * Download file content
  */
 async function downloadFile(fileId) {
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
 
   const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
     headers: {
@@ -348,7 +356,7 @@ async function downloadFile(fileId) {
 }
 
 export async function downloadFileBinary(fileId) {
-  const token = await GoogleAuth.getAccessToken()
+  const token = await getAccessToken()
 
   const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
     headers: {
@@ -957,7 +965,7 @@ export async function listOrganisations() {
  */
 export async function checkDriveAccess() {
   try {
-    await GoogleAuth.getAccessToken()
+    await getAccessToken()
     // Try a simple API call to verify access
     await driveRequest('/about?fields=user')
     return true
