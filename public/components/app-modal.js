@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import './icon.js'
 
 /**
  * AppModal Component
@@ -132,43 +133,53 @@ export class AppModal extends LitElement {
     /* Extra header buttons (slot="header-actions"), just left of the close button */
     .header-actions {
       position: absolute;
-      top: 1rem;
-      right: 5rem;
+      top: 1.5rem;
+      right: 4.75rem;
       display: flex;
-      gap: 0.5rem;
+      gap: 0.75rem;
     }
 
     :host([has-header-actions]) .modal-title {
       padding-right: 8rem;
     }
 
-    .modal-close {
+    /* Circled icon buttons, matching the page header's (close, and any buttons
+       slotted into header-actions such as an edit pencil) */
+    .modal-close,
+    ::slotted(button[slot='header-actions']) {
       position: absolute;
-      top: 1rem;
-      right: 1rem;
+      top: 1.5rem;
+      right: 1.5rem;
       background: none;
-      border: none;
-      font-size: var(--font-ui);
-      line-height: 1;
-      color: var(--text-secondary, #95a5a6);
-      cursor: pointer;
-      padding: 0.5rem;
-      width: 3.5rem;
-      height: 3.5rem;
+      border: 2px solid currentColor;
+      color: var(--text-secondary, #7f8c8d);
+      width: 2.5rem;
+      height: 2.5rem;
+      padding: 0;
+      border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 4px;
+      cursor: pointer;
+      font-size: var(--font-icon, 1.25rem);
       transition: all 0.2s;
     }
 
-    .modal-close:hover {
-      background-color: var(--bg-tertiary, #ecf0f1);
+    ::slotted(button[slot='header-actions']) {
+      position: static;
+    }
+
+    .modal-close:hover,
+    ::slotted(button[slot='header-actions']:hover) {
       color: var(--text-color, #2c3e50);
+      background-color: var(--bg-tertiary, #ecf0f1);
+      transform: scale(1.05);
     }
 
     /* No heading: no header bar, the close button sits in the content's corner */
     .modal-close.floating {
+      top: 1rem;
+      right: 1rem;
       z-index: 1;
     }
 
@@ -296,8 +307,8 @@ export class AppModal extends LitElement {
         aria-label="Close"
         @click=${this.close}
       >
-        &times;
-      </button>
+                  <app-icon name="close"></app-icon>
+                </button>
     `
   }
 
@@ -312,8 +323,8 @@ export class AppModal extends LitElement {
           ${
             !this.hideCloseButton
               ? html`
-                <button class="modal-close" part="close-button" @click=${this.close}>
-                  &times;
+                <button class="modal-close" part="close-button" aria-label="Close" @click=${this.close}>
+                  <app-icon name="close"></app-icon>
                 </button>
               `
               : ''
@@ -332,8 +343,8 @@ export class AppModal extends LitElement {
           ${
             !this.hideCloseButton
               ? html`
-                <button class="modal-close" part="close-button" @click=${this.close}>
-                  &times;
+                <button class="modal-close" part="close-button" aria-label="Close" @click=${this.close}>
+                  <app-icon name="close"></app-icon>
                 </button>
               `
               : ''

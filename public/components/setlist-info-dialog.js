@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit'
+import { html, LitElement } from 'lit'
 import './app-modal.js'
 import './icon.js'
 import './setlist-details-form.js'
@@ -27,27 +27,6 @@ export class SetlistInfoDialog extends LitElement {
     _setlist: { state: true },
     _editing: { state: true },
   }
-
-  static styles = css`
-    .edit-button {
-      background: none;
-      border: none;
-      color: var(--text-secondary, #95a5a6);
-      cursor: pointer;
-      width: 3.5rem;
-      height: 3.5rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-    }
-
-    .edit-button:hover {
-      background-color: var(--bg-tertiary, #ecf0f1);
-      color: var(--text-color, #2c3e50);
-    }
-  `
 
   constructor() {
     super()
