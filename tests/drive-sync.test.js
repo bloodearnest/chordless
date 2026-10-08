@@ -251,10 +251,10 @@ describe('Drive sync (against FakeDrive)', () => {
   })
 
   describe('errors partway through a sync', () => {
-    it('KNOWN BUG: one failed upload in a batch mismatches Drive file IDs', async () => {
-      // batchUploadFiles drops failed uploads from its results, but pushSetlists
-      // pairs results with setlists by index, so later setlists get the wrong
-      // driveFileId. The next edit then overwrites a different setlist's file.
+    it('keeps Drive file IDs matched when one upload in a batch fails', async () => {
+      // Regression: batchUploadFiles used to drop failed uploads from its
+      // results, shifting later setlists onto the wrong driveFileId so a later
+      // edit overwrote a different setlist's file.
       const phone = await makeDevice('phone')
       await addSetlist(phone, { id: 'setlist-a', name: 'A' })
       await addSetlist(phone, { id: 'setlist-b', name: 'B' })
@@ -264,16 +264,19 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       const fileFor = async id => drive.files.get((await phone.db.getSetlist(id)).driveFileId)
-      // A's upload failed, so it was given B's file, and B was given C's
-      expect((await fileFor('setlist-a')).appProperties.setlistId).to.equal('setlist-b')
-      expect((await fileFor('setlist-b')).appProperties.setlistId).to.equal('setlist-c')
+      expect((await phone.db.getSetlist('setlist-a')).driveFileId).to.equal(undefined)
+      expect((await fileFor('setlist-b')).appProperties.setlistId).to.equal('setlist-b')
+      expect((await fileFor('setlist-c')).appProperties.setlistId).to.equal('setlist-c')
 
-      // Editing A now overwrites setlist B's file in Drive
+      // The failed one is uploaded next sync, and editing it only touches its own file
+      await syncDevice(phone)
+      expect((await fileFor('setlist-a')).appProperties.setlistId).to.equal('setlist-a')
       await editSetlist(phone, 'setlist-a', { name: 'A edited' })
       await syncDevice(phone)
-      const bFile = drive.listFiles(f => f.appProperties.setlistId === 'setlist-b')[0]
-      expect(JSON.parse(bFile.content).id).to.equal('setlist-a')
-      expect(JSON.parse(bFile.content).name).to.equal('A edited')
+
+      expect(driveSetlist('setlist-a').name).to.equal('A edited')
+      expect(driveSetlist('setlist-b').name).to.equal('B')
+      expect(driveSetlist('setlist-c').name).to.equal('C')
     })
 
     it('KNOWN BUG: a failed Drive inventory re-uploads every setlist as a duplicate', async () => {
@@ -413,6 +416,21 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(tablet)
 
       expect(await songContent(tablet, 'song-1')).to.equal('{title: Amazing}\n[A]Grace')
+    })
+
+    it('keeps Drive file IDs matched when one song upload in a batch fails', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, { uuid: 'song-a', title: 'Alpha', content: 'alpha chart' })
+      await addSong(phone, { uuid: 'song-b', title: 'Beta', content: 'beta chart' })
+      drive.failRequests({ method: 'POST', path: /^\/upload\/drive\/v3\/files/, status: 500 })
+
+      await syncDevice(phone)
+      await syncDevice(phone)
+
+      for (const uuid of ['song-a', 'song-b']) {
+        const song = await phone.db.getSong(uuid)
+        expect(drive.files.get(song.driveFileId).content).to.equal(await songContent(phone, uuid))
+      }
     })
 
     it('keeps the Drive version when a chart is edited on two devices', async () => {

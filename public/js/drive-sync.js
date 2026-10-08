@@ -792,7 +792,7 @@ export class DriveSyncManager {
             await this.organisationDb.saveSetlistsBatch(updatedSetlists)
           }
 
-          console.log(`[DriveSync] ✅ Uploaded ${uploadedFiles.length} setlists`)
+          console.log(`[DriveSync] ✅ Uploaded ${updatedSetlists.length}/${batch.length} setlists`)
         } catch (error) {
           console.error(`[DriveSync] Concurrent upload failed:`, error)
           // Fallback to sequential uploads for this batch

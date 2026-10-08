@@ -192,7 +192,9 @@ export async function batchDeleteFiles(fileIds) {
  * So we use high-concurrency individual uploads instead (much faster than sequential).
  *
  * @param {Array} files - Array of { metadata, content, contentType }
- * @returns {Promise<Array>} - Array of uploaded file responses
+ * @returns {Promise<Array>} - One entry per input file, in the same order: the
+ *   uploaded file response, or null if that upload failed. Callers pair results
+ *   with their inputs by index, so failures must keep their slot.
  */
 export async function batchUploadFiles(files) {
   if (files.length === 0) return []
@@ -249,16 +251,15 @@ export async function batchUploadFiles(files) {
       }
     })
 
-    // Wait for all uploads in this chunk to complete
-    const chunkResults = await Promise.all(uploadPromises)
+    // Wait for all uploads in this chunk to complete. Keep nulls (failed uploads)
+    // so results stay aligned with files.
+    results.push(...(await Promise.all(uploadPromises)))
 
-    // Filter out nulls (failed uploads) and add to results
-    results.push(...chunkResults.filter(r => r !== null))
-
-    console.log(`[DriveAPI] Progress: ${results.length}/${files.length} files uploaded`)
+    console.log(`[DriveAPI] Progress: ${results.length}/${files.length} files processed`)
   }
 
-  console.log(`[DriveAPI] Completed: ${results.length}/${files.length} files uploaded successfully`)
+  const succeeded = results.filter(r => r !== null).length
+  console.log(`[DriveAPI] Completed: ${succeeded}/${files.length} files uploaded successfully`)
   return results
 }
 
