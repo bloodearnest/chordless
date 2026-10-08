@@ -140,33 +140,18 @@ export class DriveSyncManager {
   async buildDriveInventory() {
     console.log('[DriveSync] Building Drive file inventory...')
 
-    const fileIds = new Set()
-
     try {
-      // List all files recursively in the organisation folder
-      const query = `'${this.driveFolderId}' in parents and trashed=false`
-      const result = await driveRequest(
-        `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,mimeType)&pageSize=1000`
-      )
-
-      if (result.files) {
-        for (const file of result.files) {
-          fileIds.add(file.id)
-
-          // If it's a folder, recursively list its contents
-          if (file.mimeType === 'application/vnd.google-apps.folder') {
-            await this._addFolderContentsToInventory(file.id, fileIds)
-          }
-        }
-      }
-
+      const fileIds = new Set()
+      await this._addFolderContentsToInventory(this.driveFolderId, fileIds)
+      this._driveFileIds = fileIds
       console.log(`[DriveSync] Drive inventory: ${fileIds.size} files found`)
     } catch (error) {
-      console.error('[DriveSync] Failed to build Drive inventory:', error)
-      // Don't fail the sync, just skip the inventory check
+      // Without a complete inventory we can't tell which files are missing, so
+      // skip the check (fileExistsInDrive assumes they exist). An incomplete set
+      // would make every unlisted file look deleted and get re-uploaded.
+      console.error('[DriveSync] Failed to build Drive inventory, skipping check:', error)
+      this._driveFileIds = null
     }
-
-    this._driveFileIds = fileIds
   }
 
   /**
@@ -174,12 +159,16 @@ export class DriveSyncManager {
    */
   async _addFolderContentsToInventory(folderId, fileIds) {
     const query = `'${folderId}' in parents and trashed=false`
-    const result = await driveRequest(
-      `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,mimeType)&pageSize=1000`
-    )
+    let pageToken = null
 
-    if (result.files) {
-      for (const file of result.files) {
+    do {
+      let url =
+        `/files?q=${encodeURIComponent(query)}&spaces=drive` +
+        '&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000'
+      if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
+
+      const result = await driveRequest(url)
+      for (const file of result.files || []) {
         fileIds.add(file.id)
 
         // Recursively process subfolders
@@ -187,7 +176,8 @@ export class DriveSyncManager {
           await this._addFolderContentsToInventory(file.id, fileIds)
         }
       }
-    }
+      pageToken = result.nextPageToken || null
+    } while (pageToken)
   }
 
   /**

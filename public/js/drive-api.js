@@ -927,11 +927,23 @@ export async function listSetlists(organisationFolderId) {
   const setlistsFolderId = await getSetlistsFolder(organisationFolderId)
 
   const query = `'${setlistsFolderId}' in parents and trashed=false and name contains '.json'`
-  const result = await driveRequest(
-    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)&orderBy=modifiedTime desc`
-  )
+  const files = []
+  let pageToken = null
 
-  return result.files || []
+  // Drive returns at most one page (default 100) per request, so follow nextPageToken
+  do {
+    let url =
+      `/files?q=${encodeURIComponent(query)}&spaces=drive` +
+      '&fields=nextPageToken,files(id,name,appProperties,modifiedTime)' +
+      '&orderBy=modifiedTime desc&pageSize=1000'
+    if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
+
+    const result = await driveRequest(url)
+    files.push(...(result.files || []))
+    pageToken = result.nextPageToken || null
+  } while (pageToken)
+
+  return files
 }
 
 /**

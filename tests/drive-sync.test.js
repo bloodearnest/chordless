@@ -114,6 +114,19 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(onTablet.name).to.equal('Harvest')
     })
 
+    it('downloads every setlist when the listing spans several pages', async () => {
+      drive.maxPageSize = 2
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const setlists = [await addSetlist(phone), await addSetlist(phone), await addSetlist(phone)]
+      await syncDevice(phone)
+
+      await syncDevice(tablet)
+
+      const onTablet = await tablet.db.getAllSetlists()
+      expect(onTablet.map(s => s.id).sort()).to.deep.equal(setlists.map(s => s.id).sort())
+    })
+
     it('propagates an edit from one device to another', async () => {
       const phone = await makeDevice('phone')
       const tablet = await makeDevice('tablet')
@@ -279,20 +292,33 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(driveSetlist('setlist-c').name).to.equal('C')
     })
 
-    it('KNOWN BUG: a failed Drive inventory re-uploads every setlist as a duplicate', async () => {
-      // buildDriveInventory swallows errors but still installs its (empty) file
-      // set, so every synced setlist looks "missing from Drive" and is uploaded
-      // again as a new file.
+    it("doesn't duplicate setlists when the Drive inventory fails", async () => {
+      // Regression: buildDriveInventory used to swallow errors but keep its
+      // (empty) file set, so every synced setlist looked "missing from Drive"
+      // and was uploaded again as a new file.
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone)
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Edited' })
-      drive.failRequests({ method: 'GET', path: /fields=files\(id,name,mimeType\)&pageSize=1000/ })
+      drive.failRequests({ method: 'GET', path: /files\(id,name,mimeType\)&pageSize/ })
 
       await syncDevice(phone)
 
-      const files = drive.listFiles(f => f.appProperties.setlistId === setlist.id)
-      expect(files).to.have.length(2)
+      expect(driveSetlist(setlist.id).name).to.equal('Edited')
+    })
+
+    it("doesn't duplicate setlists when the inventory spans several pages", async () => {
+      // Regression: the inventory only read the first page of each folder, so
+      // files on later pages looked missing and were re-uploaded.
+      drive.maxPageSize = 2
+      const phone = await makeDevice('phone')
+      const setlists = [await addSetlist(phone), await addSetlist(phone), await addSetlist(phone)]
+      await syncDevice(phone)
+      for (const { id } of setlists) await editSetlist(phone, id, { name: `Edited ${id}` })
+
+      await syncDevice(phone)
+
+      for (const { id } of setlists) expect(driveSetlist(id).name).to.equal(`Edited ${id}`)
     })
 
     it('reports success when a setlist update fails, and retries next sync', async () => {

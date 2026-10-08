@@ -11,6 +11,8 @@
  * - Responses only include requested `fields`. Without `fields`, file resources
  *   are Drive's defaults (kind, id, name, mimeType), so e.g. a create response
  *   has no modifiedTime, as with the real API.
+ * - Lists are paginated (default 100, max maxPageSize); nextPageToken is only
+ *   returned when `fields` requests it.
  * - modifiedTime comes from the server clock (Date.now() + clockOffsetMs), not
  *   the client's, and changes on content updates.
  * - Metadata-only PATCHes don't change modifiedTime. ASSUMPTION: verify against
@@ -36,6 +38,8 @@ export class FakeDrive {
     this.requests = []
     /** Server clock skew relative to the test's (client's) clock, in ms */
     this.clockOffsetMs = 0
+    /** Largest page a list request returns (real Drive: 1000) */
+    this.maxPageSize = 1000
     this._nextId = 1
     this._failures = []
     /** FakeDriveErrors raised while handling requests. The app may swallow
@@ -237,14 +241,21 @@ export class FakeDrive {
     } else if (orderBy) {
       this._unsupported(`orderBy=${orderBy}`)
     }
-    if (params.get('pageToken')) this._unsupported('pageToken')
+
+    // Pagination: Drive's default pageSize is 100, capped at 1000 (maxPageSize,
+    // lowerable in tests). nextPageToken is only returned when fields asks for it.
+    const pageSize = Math.min(Number(params.get('pageSize')) || 100, this.maxPageSize)
+    const start = Number(params.get('pageToken') || 0)
+    const page = files.slice(start, start + pageSize)
+    const more = start + pageSize < files.length
 
     const fieldsParam = params.get('fields')
     const fileFields = fieldsParam?.match(/files\(([^)]*)\)/)?.[1]
-    return json({
-      kind: 'drive#fileList',
-      files: files.map(f => this._project(f, fileFields)),
-    })
+    const result = { kind: 'drive#fileList', files: page.map(f => this._project(f, fileFields)) }
+    if (more && (!fieldsParam || /\bnextPageToken\b/.test(fieldsParam))) {
+      result.nextPageToken = String(start + pageSize)
+    }
+    return json(result)
   }
 
   _project(file, fields) {
