@@ -248,7 +248,7 @@ export function setupResetButton(resetButton, confirmModal, onConfirm) {
   if (!resetButton || !confirmModal) return
 
   resetButton.onclick = () => {
-    confirmModal.open()
+    confirmModal.show()
   }
 
   // Remove old listener if exists

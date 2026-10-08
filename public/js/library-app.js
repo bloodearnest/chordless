@@ -520,7 +520,7 @@ export class LibraryApp {
     })
 
     // Listen for info button click
-    appHeader.addEventListener('info-button-click', () => {
+    appHeader.addEventListener('info-click', () => {
       if (this.currentLibraryParsedSong && this.currentLibrarySong) {
         this.showLibrarySongInfo(this.currentLibraryParsedSong, this.currentLibrarySong)
       }
@@ -717,7 +717,7 @@ export class LibraryApp {
     modalBody.appendChild(songInfo)
 
     // Show the modal
-    modal.open()
+    modal.show()
   }
 
   // ==================== Font Size Controls ====================
@@ -904,14 +904,12 @@ export class LibraryApp {
     const newResetButton = resetButton.cloneNode(true)
     resetButton.parentNode.replaceChild(newResetButton, resetButton)
 
-    // Show confirmation modal when reset button is clicked
-    newResetButton.addEventListener('click', () => {
-      resetModal.open()
-    })
-
-    // Listen for confirm event
-    resetModal.addEventListener('confirm', () => {
-      this.resetLibrarySong()
+    // Confirm, then reset. (Waiting on ask() rather than adding a 'confirm'
+    // listener here, which piled up one more listener per song opened.)
+    newResetButton.addEventListener('click', async () => {
+      if (await resetModal.ask()) {
+        this.resetLibrarySong()
+      }
     })
   }
 

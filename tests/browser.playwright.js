@@ -48,3 +48,44 @@ test.describe('Loading', () => {
     await expect(input).toBeHidden()
   })
 })
+
+test.describe('Song library', () => {
+  test('info button opens the song info modal', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+
+    // Let the app set up its organisation and database (the first visit reloads
+    // once the service worker takes control), then add a song to it
+    await page.goto('/songs')
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+    await page.waitForLoadState('load')
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      const db = await getCurrentDB()
+      const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
+      await db.saveChordPro({
+        id: 'chordpro-info-test',
+        content,
+        contentHash: 'test',
+        lastModified: Date.now(),
+      })
+      await db.saveSong({
+        uuid: 'info-test-song',
+        id: 'title-info-test-song',
+        title: 'Info Test Song',
+        titleNormalized: 'info test song',
+        isDefault: true,
+        chordproFileId: 'chordpro-info-test',
+        modifiedDate: new Date().toISOString(),
+      })
+    })
+
+    await page.goto('/songs#info-test-song')
+    await page.reload()
+    await page.locator('#library-app-header .info-button').click()
+
+    await expect(page.locator('#library-song-info-modal')).toHaveAttribute('open', '')
+    await expect(page.locator('#library-modal-body song-info')).toBeAttached()
+    expect(errors).toEqual([])
+  })
+})

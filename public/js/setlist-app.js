@@ -2048,7 +2048,7 @@ class PageApp {
         // Show confirmation modal
         const modal = document.getElementById('reset-confirm-modal')
         if (modal) {
-          const confirmed = await modal.show()
+          const confirmed = await modal.ask()
           if (confirmed) {
             await this.resetCurrentSong()
           }

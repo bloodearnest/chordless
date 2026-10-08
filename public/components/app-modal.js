@@ -377,6 +377,28 @@ export class AppModal extends LitElement {
     this.open = true
   }
 
+  /**
+   * Show the modal and wait for an answer (type='confirm').
+   * @returns {Promise<boolean>} true if confirmed, false if cancelled or closed
+   */
+  ask() {
+    return new Promise(resolve => {
+      let confirmed = false
+      const onConfirm = () => {
+        confirmed = true
+      }
+      // Confirm and cancel both close the modal, so close settles every outcome
+      const onClose = () => {
+        this.removeEventListener('confirm', onConfirm)
+        this.removeEventListener('close', onClose)
+        resolve(confirmed)
+      }
+      this.addEventListener('confirm', onConfirm)
+      this.addEventListener('close', onClose)
+      this.show()
+    })
+  }
+
   toggle() {
     this.open = !this.open
   }
