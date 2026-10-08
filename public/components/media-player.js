@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.js'
 import './icon.js'
+import { loadMediaSettings } from '../js/media-settings.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
 import { getActivePadSet } from '../js/pad-set-service.js'
@@ -676,17 +677,11 @@ export class MediaPlayer extends LitElement {
     this.tempoNote = '1/4' // Default to quarter notes
     this.timeSignature = '4/4'
 
-    // Load global settings from localStorage
-    const savedSettings = localStorage.getItem('media-settings')
-    let globalSettings = {}
-    if (savedSettings) {
-      globalSettings = JSON.parse(savedSettings)
-    }
-
     // Global feature toggles (from settings component)
-    this._padsEnabled = globalSettings.padsEnabled !== false // Default true
-    this._metronomeGlobalEnabled = globalSettings.metronomeEnabled !== false // Default true
-    this.stereoSplitEnabled = globalSettings.stereoSplitEnabled === true // Default false
+    const globalSettings = loadMediaSettings()
+    this._padsEnabled = globalSettings.padsEnabled
+    this._metronomeGlobalEnabled = globalSettings.metronomeEnabled
+    this.stereoSplitEnabled = globalSettings.stereoSplitEnabled
 
     // User toggle states (independent of which song is active)
     // Load saved toggle states from localStorage, default to true (on)
@@ -754,6 +749,7 @@ export class MediaPlayer extends LitElement {
 
   connectedCallback() {
     super.connectedCallback()
+    this._showIfEnabled(loadMediaSettings())
     this._initAudio()
     this._boundHandleKeydown = this._handleKeydown.bind(this)
     this._boundHandleSettingsChange = this._handleSettingsChange.bind(this)
@@ -783,9 +779,15 @@ export class MediaPlayer extends LitElement {
     window.removeEventListener('pad-set-changed', this._boundHandlePadSetChange)
   }
 
+  /** The whole player is hidden while it's turned off in the settings */
+  _showIfEnabled(settings) {
+    this.style.display = settings.mediaPlayerEnabled === false ? 'none' : ''
+  }
+
   _handleSettingsChange(event) {
     const settings = event.detail
     console.log('[MediaPlayer] Settings changed:', settings)
+    this._showIfEnabled(settings)
 
     this._padsEnabled = settings.padsEnabled !== false
     this._metronomeGlobalEnabled = settings.metronomeEnabled !== false
@@ -1559,23 +1561,6 @@ export class MediaPlayer extends LitElement {
                   .padsEnabled=${this._padsEnabled}
                   .metronomeEnabled=${this._metronomeGlobalEnabled}
                   .stereoSplitEnabled=${this.stereoSplitEnabled}
-                  @settings-change=${e => {
-                    console.log('[MediaPlayer] Settings changed from modal:', e.detail)
-                    // Save to localStorage
-                    localStorage.setItem('mediaPlayerSettings', JSON.stringify(e.detail))
-                    // Update our local state
-                    this._padsEnabled = e.detail.padsEnabled !== false
-                    this._metronomeGlobalEnabled = e.detail.metronomeEnabled !== false
-                    this.stereoSplitEnabled = e.detail.stereoSplitEnabled === true
-                    // Dispatch to sync with global settings
-                    window.dispatchEvent(
-                      new CustomEvent('media-player-settings-changed', {
-                        detail: e.detail,
-                      })
-                    )
-                    this._updateAudioRouting()
-                    this.requestUpdate()
-                  }}
                 ></media-player-settings>
               </div>
             </div>

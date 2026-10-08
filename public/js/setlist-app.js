@@ -109,8 +109,6 @@ class PageApp {
       await this.renderHome()
     } else if (route.type === 'setlist') {
       await this.renderSetlist(route.setlistId)
-    } else if (route.type === 'settings') {
-      await this.renderSettings()
     } else if (route.type === 'storage') {
       await this.renderStorage()
     }
@@ -173,11 +171,6 @@ class PageApp {
   async renderHome() {
     // Just render the setlist list
     await this.renderSetlistsTab()
-  }
-
-  async renderSettings() {
-    // Setup the import button on the settings page
-    this.setupImportButton()
   }
 
   async renderStorage() {
@@ -290,18 +283,6 @@ class PageApp {
     })
 
     return element
-  }
-
-  setupImportButton() {
-    const appSettings = document.getElementById('app-settings')
-    if (!appSettings) return
-
-    if (this.settingsImportHandler) {
-      appSettings.removeEventListener('import-requested', this.settingsImportHandler)
-    }
-
-    this.settingsImportHandler = () => this.runImport()
-    appSettings.addEventListener('import-requested', this.settingsImportHandler)
   }
 
   setupStorageImportButton() {

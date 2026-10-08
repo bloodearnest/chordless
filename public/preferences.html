@@ -62,41 +62,8 @@
 
     <script type="module" src="/js/theme-manager.js"></script>
     <script type="module">
-      import { ChordlessDB } from '/js/db.js';
-      import { getCurrentOrganisation } from '/js/organisation.js';
-
       // Set window name for bookmarklet
       window.name = 'chordless';
-
-      // Initialize media player settings - wait for custom element to be defined
-      customElements.whenDefined('media-player-settings').then(() => {
-        const settingsComponent = document.getElementById('media-player-settings');
-
-        if (settingsComponent) {
-          // Load saved settings from localStorage
-          const savedSettings = localStorage.getItem('mediaPlayerSettings');
-          if (savedSettings) {
-            const settings = JSON.parse(savedSettings);
-            settingsComponent.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false;
-            settingsComponent.padsEnabled = settings.padsEnabled !== false;
-            settingsComponent.metronomeEnabled = settings.metronomeEnabled !== false;
-            settingsComponent.stereoSplitEnabled = settings.stereoSplitEnabled === true;
-          }
-
-          // Listen for settings changes and save to localStorage
-          settingsComponent.addEventListener('settings-change', event => {
-            console.log('[Preferences] Media player settings changed:', event.detail);
-            localStorage.setItem('mediaPlayerSettings', JSON.stringify(event.detail));
-
-            // Dispatch custom event that media player can listen to
-            window.dispatchEvent(
-              new CustomEvent('media-player-settings-changed', {
-                detail: event.detail,
-              })
-            );
-          });
-        }
-      });
 
       // Register service worker
       if ('serviceWorker' in navigator) {
@@ -123,50 +90,9 @@
             console.error('Service Worker registration failed:', error);
           });
       }
-
-      // Handle app-preferences component events
-      customElements.whenDefined('app-preferences').then(() => {
-        const appPreferences = document.getElementById('app-preferences');
-
-        if (appPreferences) {
-          // Handle clear database request
-          appPreferences.addEventListener('clear-database-requested', async () => {
-            const confirmed = confirm(
-              '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
-            );
-
-            if (!confirmed) return;
-
-            try {
-              // Clear IndexedDB
-              const { getCurrentDB } = await import('/js/db.js');
-              const db = await getCurrentDB();
-              await db.init();
-              await db.clearAll();
-
-              // Clear localStorage
-              localStorage.clear();
-
-              // Clear sessionStorage
-              sessionStorage.clear();
-
-              alert('✅ Database cleared successfully!\n\nThe page will now reload.');
-
-              // Reload the page
-              window.location.reload();
-            } catch (error) {
-              console.error('Failed to clear database:', error);
-              alert('❌ Failed to clear database: ' + error.message);
-            }
-          });
-
-          // Handle import request - handled by setlist-app.js
-        }
-      });
     </script>
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>
-    <script type="module" src="/components/media-player-settings.js"></script>
     <script type="module" src="/components/app-preferences.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
   </body>

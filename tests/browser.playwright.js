@@ -380,3 +380,24 @@ test.describe('Navigation menu', () => {
     })
   }
 })
+
+test.describe('Media player settings', () => {
+  test('turning the media player off in preferences hides it on setlists', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'player-test-setlist' })
+
+    await page.goto('/setlist/player-test-setlist')
+    await expect(page.locator('media-player')).toBeVisible()
+
+    await page.goto('/preferences')
+    const masterToggle = page.locator('media-player-settings .master-toggle')
+    await masterToggle.click()
+    await expect(masterToggle).not.toHaveClass(/active/)
+
+    await page.goto('/setlist/player-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+    await expect(page.locator('media-player')).toBeHidden()
+    expect(errors).toEqual([])
+  })
+})

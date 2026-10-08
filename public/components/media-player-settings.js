@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.js'
 import { getActivePadSet, listPadSets, selectPadSet } from '../js/pad-set-service.js'
 
 /**
@@ -155,22 +156,7 @@ export class MediaPlayerSettings extends LitElement {
   constructor() {
     super()
 
-    // Load settings from localStorage
-    const savedSettings = localStorage.getItem('media-settings')
-
-    if (savedSettings) {
-      const settings = JSON.parse(savedSettings)
-      this.mediaPlayerEnabled = settings.mediaPlayerEnabled !== false // Default true
-      this.padsEnabled = settings.padsEnabled !== false // Default true
-      this.metronomeEnabled = settings.metronomeEnabled !== false // Default true
-      this.stereoSplitEnabled = settings.stereoSplitEnabled === true // Default false
-    } else {
-      // Defaults
-      this.mediaPlayerEnabled = true
-      this.padsEnabled = true
-      this.metronomeEnabled = true
-      this.stereoSplitEnabled = false
-    }
+    Object.assign(this, loadMediaSettings())
 
     this.padSets = []
     this.selectedPadSetId = getActivePadSet().id
@@ -206,7 +192,7 @@ export class MediaPlayerSettings extends LitElement {
       stereoSplitEnabled: this.stereoSplitEnabled,
     }
 
-    localStorage.setItem('media-settings', JSON.stringify(settings))
+    saveMediaSettings(settings)
 
     // Dispatch event so media player can react
     this.dispatchEvent(

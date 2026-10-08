@@ -40,6 +40,8 @@ export class NavMenu extends LitElement {
     songs: { type: Array, attribute: false },
     showOverviewLink: { type: Boolean, attribute: 'show-overview-link' },
     setlistTitle: { type: String, attribute: 'setlist-title' },
+    // Preferences are only rendered once first opened: they load pad sets from Drive
+    _preferencesOpened: { state: true },
   }
 
   static styles = css`
@@ -190,10 +192,6 @@ export class NavMenu extends LitElement {
     this._root = this.getRootNode()
     this._root.addEventListener('click', this._onRootClick)
     this._root.addEventListener('nav-menu-click', this._onNavMenuClick)
-
-    // Listen for app-settings events
-    this.addEventListener('import-requested', this._handleImportRequested)
-    this.addEventListener('clear-database-requested', this._handleClearDatabaseRequested)
   }
 
   disconnectedCallback() {
@@ -420,11 +418,8 @@ export class NavMenu extends LitElement {
         </nav>
       </div>
 
-      <app-modal id="nav-preferences-modal" size="fullscreen">
-        <div slot="header">
-          <h2 style="margin: 0; font-size: var(--font-ui);">Preferences</h2>
-        </div>
-        <app-preferences></app-preferences>
+      <app-modal id="nav-preferences-modal" size="fullscreen" heading="Preferences">
+        ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
       </app-modal>
     `
   }
@@ -468,6 +463,7 @@ export class NavMenu extends LitElement {
 
   _handlePreferencesClick() {
     this.closePopover()
+    this._preferencesOpened = true
     // Wait for next frame to ensure popover is closed before showing modal
     requestAnimationFrame(() => {
       const modal = this.shadowRoot?.querySelector('#nav-preferences-modal')
@@ -475,40 +471,6 @@ export class NavMenu extends LitElement {
         modal.show()
       }
     })
-  }
-
-  async _handleClearDatabaseRequested() {
-    const confirmed = confirm(
-      '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
-    )
-
-    if (!confirmed) return
-
-    try {
-      const { getCurrentDB } = await import('../js/db.js')
-      const db = await getCurrentDB()
-      await db.clearAll()
-
-      localStorage.clear()
-      sessionStorage.clear()
-
-      alert('✅ Database cleared successfully!\n\nThe page will now reload.')
-      window.location.reload()
-    } catch (error) {
-      console.error('Failed to clear database:', error)
-      alert('❌ Failed to clear database: ' + error.message)
-    }
-  }
-
-  async _handleImportRequested() {
-    // If we're already on the preferences page, don't navigate
-    // Let the event bubble to setlist-app which will handle the import
-    if (window.location.pathname === '/preferences') {
-      return
-    }
-
-    // Navigate to preferences page which handles the actual import
-    window.location.href = '/preferences'
   }
 
   // Public API for controlling the popover

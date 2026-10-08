@@ -50,6 +50,15 @@ describe('nav-menu', () => {
     expect(menu.isOpen()).to.equal(false)
   })
 
+  it('renders the preferences only once they are opened', async () => {
+    const menu = await setUp('<nav-menu></nav-menu>')
+    expect(menu.shadowRoot.querySelector('app-preferences')).to.equal(null)
+
+    menu.shadowRoot.querySelector('.nav-menu-item:not(a)').click()
+    await menu.updateComplete
+    expect(menu.shadowRoot.querySelector('app-preferences')).to.not.equal(null)
+  })
+
   it("opens from an app-header's menu button, positioned under it", async () => {
     const menu = await setUp(`
       <app-header title="Test"></app-header>
