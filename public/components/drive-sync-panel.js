@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { nameOrganisationBeforeSync } from '../js/first-time-auth.js'
 import { getCurrentOrganisation } from '../js/organisation.js'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
 
@@ -210,6 +211,7 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting reset...' }
 
     try {
+      await nameOrganisationBeforeSync()
       const { id, name } = getCurrentOrganisation()
       const orchestrator = await createSyncOrchestrator(name, id)
 
@@ -241,6 +243,7 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Initializing...' }
 
     try {
+      await nameOrganisationBeforeSync()
       const { id, name } = getCurrentOrganisation()
 
       // Use the SW-compatible orchestrator

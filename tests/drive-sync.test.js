@@ -507,6 +507,22 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(driveSetlist(setlist.id).name).to.equal('Harvest edited')
     })
 
+    it('joins an existing folder with the new name if nothing was synced yet', async () => {
+      // e.g. a new browser syncs while still "Personal", then is renamed to the
+      // Google account's name, which another device already syncs with
+      const tablet = await makeDevice('tablet', { orgName: 'Simon Davy' })
+      const theirs = await addSetlist(tablet, { name: 'From tablet' })
+      await syncDevice(tablet)
+      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      await syncDevice(phone) // linked to an empty "Personal" folder
+
+      await renameOrganisation(phone, 'Simon Davy')
+      await syncDevice(phone)
+
+      expect((await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
+      expect(phone.folderLink.value).to.equal(drive.findByPath(['Chordless', 'Simon Davy']).id)
+    })
+
     it('stops before changing anything if records belong to another folder', async () => {
       // A device from before folders were linked: sync found the folder by name,
       // so renaming its organisation pointed it at a different folder, and

@@ -86,6 +86,32 @@ export async function handleFirstTimeAuth() {
 }
 
 /**
+ * Rename the organisation from the pre-sign-in default "Personal" to the Google
+ * account's name, if it still has that name. Called before syncing: the Drive
+ * folder is found by name on first sync, so syncing as "Personal" and being
+ * renamed later would leave this device on a different folder from the others.
+ * Unlike handleFirstTimeAuth it doesn't reload the page.
+ *
+ * @returns {Promise<boolean>} True if the organisation was renamed
+ */
+export async function nameOrganisationBeforeSync() {
+  const { id, name } = getCurrentOrganisation()
+  if (!id || name !== 'Personal') {
+    return false
+  }
+
+  const userInfo = await getCurrentUserInfo()
+  if (!userInfo?.name) {
+    return false
+  }
+
+  console.log(`[FirstAuth] Renaming "Personal" to "${userInfo.name}" before syncing`)
+  await renameOrganisation(id, userInfo.name)
+  markFirstAuthComplete()
+  return true
+}
+
+/**
  * Check and handle first-time auth on app startup
  * Call this from your main app initialization
  */

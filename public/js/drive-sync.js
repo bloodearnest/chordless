@@ -199,7 +199,7 @@ export class DriveSyncManager {
       }
       this.driveFolderId = folder.id
       if (folder.name !== this.organisationName) {
-        await this.renameDriveFolder(folder)
+        await this.followRename(folder)
       }
       return false
     }
@@ -214,20 +214,41 @@ export class DriveSyncManager {
   }
 
   /**
-   * Keep the Drive folder's name in step with the organisation's, unless another
-   * organisation folder already has that name.
+   * The organisation was renamed since it was linked to `folder`. If another
+   * organisation folder already has the new name (e.g. another device created
+   * it) and this device has nothing synced yet, join that folder. Otherwise
+   * rename the linked folder to match, unless that name is taken.
    */
-  async renameDriveFolder(folder) {
+  async followRename(folder) {
     const existing = await DriveAPI.findOrganisationFolderByName(this.organisationName)
+
     if (existing && existing.id !== folder.id) {
+      if (!(await this.hasSyncedRecords())) {
+        console.log(
+          `[DriveSync] Joining existing Drive folder "${this.organisationName}" instead of "${folder.name}"`
+        )
+        this.driveFolderId = existing.id
+        await this.folderLink.set(existing.id)
+        return
+      }
       console.warn(
         `[DriveSync] Not renaming Drive folder "${folder.name}" to "${this.organisationName}": ` +
           'another folder already has that name. Syncing continues with the linked folder.'
       )
       return
     }
+
     console.log(`[DriveSync] Renaming Drive folder "${folder.name}" to "${this.organisationName}"`)
     await DriveAPI.renameFile(folder.id, this.organisationName)
+  }
+
+  /** Whether any local setlist or song has been synced to Drive */
+  async hasSyncedRecords() {
+    const records = [
+      ...(await this.organisationDb.getAllSetlists()),
+      ...(await this.organisationDb.getAllSongs()),
+    ]
+    return records.some(record => record.driveFileId)
   }
 
   /**
