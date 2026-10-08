@@ -4,9 +4,9 @@ export default {
   files: [
     'tests/chord-utils.test.js',
     'tests/date-utils.test.js',
+    'tests/drive-metadata.test.js',
     'tests/db.test.js',
     'tests/db-usage.test.js',
-    'tests/drive-api-sync.test.js',
     'tests/drive-sync-conflicts.test.js',
     'tests/app-modal.test.js',
     'tests/drive-sync.test.js',

@@ -16,14 +16,13 @@
 
 import { ChordlessDB, getCurrentDB, normalizeTitle } from './db.js'
 import * as DriveAPI from './drive-api.js'
+import { batchUploadFiles, driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.js'
 import {
-  batchUploadFiles,
-  driveRequest,
-  generateChordProFilename,
-  generateSetlistFilename,
-  getSetlistsFolder,
-  getSongsFolder,
-} from './drive-api.js'
+  forUpdate,
+  setlistFileMetadata,
+  songFileDetails,
+  songFileMetadata,
+} from './drive-metadata.js'
 import { OrganisationDB } from './organisation-db.js'
 import { ChordProParser } from './parser.js'
 import { hashText } from './song-utils.js'
@@ -45,6 +44,11 @@ export function setlistContent(setlist) {
   const content = { ...setlist }
   for (const field of SETLIST_SYNC_FIELDS) delete content[field]
   return content
+}
+
+/** A setlist's file content in Drive */
+function setlistJson(setlist) {
+  return JSON.stringify(setlistContent(setlist), null, 2)
 }
 
 /** JSON with object keys sorted, so equal content always hashes the same */
@@ -1024,29 +1028,11 @@ export class DriveSyncManager {
         const batch = newSetlists.slice(i, i + BATCH_SIZE)
 
         // Prepare files for batch upload
-        const files = batch.map(setlist => {
-          const filename = generateSetlistFilename(
-            setlist.date,
-            setlist.type,
-            setlist.owner,
-            setlist.name
-          )
-
-          return {
-            metadata: {
-              name: filename,
-              parents: [setlistsFolderId],
-              mimeType: 'application/json',
-              appProperties: {
-                organisationId: this.organisationId,
-                setlistId: setlist.id,
-                appVersion: '1.0.0',
-              },
-            },
-            content: JSON.stringify(setlistContent(setlist), null, 2),
-            contentType: 'application/json',
-          }
-        })
+        const files = batch.map(setlist => ({
+          metadata: { ...this.setlistMetadata(setlist), parents: [setlistsFolderId] },
+          content: setlistJson(setlist),
+          contentType: 'application/json',
+        }))
 
         try {
           console.log(`[DriveSync] Uploading ${files.length} new setlists...`)
@@ -1134,11 +1120,10 @@ export class DriveSyncManager {
         // New setlist, upload it
         console.log(`[DriveSync] Uploading new setlist: ${setlist.id}`)
 
-        const driveFile = await DriveAPI.uploadSetlist(
-          this.driveFolderId,
-          setlist.id,
-          setlistContent(setlist),
-          this.organisationId
+        const driveFile = await DriveAPI.createFile(
+          { ...this.setlistMetadata(setlist), parents: [await this.getCachedSetlistsFolder()] },
+          setlistJson(setlist),
+          'application/json'
         )
 
         // Update local record with Drive metadata
@@ -1154,7 +1139,13 @@ export class DriveSyncManager {
         // Existing setlist, update it
         console.log(`[DriveSync] Updating setlist: ${setlist.id}`)
 
-        const driveFile = await DriveAPI.updateSetlist(setlist.driveFileId, setlistContent(setlist))
+        // Metadata too, so the file name follows e.g. a changed date or leader
+        const driveFile = await DriveAPI.updateFile(
+          setlist.driveFileId,
+          forUpdate(this.setlistMetadata(setlist), 'setlist'),
+          setlistJson(setlist),
+          'application/json'
+        )
 
         // Update sync metadata
         setlist.driveModifiedTime = driveFile?.modifiedTime ?? null
@@ -1235,35 +1226,12 @@ export class DriveSyncManager {
       const fileTracking = []
 
       for (const { song, chordproFile } of batch) {
-        const { title, ccliNumber, variantLabel } = this.getSongFileMetadata(song, chordproFile)
-        const filename = generateChordProFilename(title, ccliNumber, variantLabel)
-
         files.push({
-          metadata: {
-            name: filename,
-            parents: [songsFolderId],
-            mimeType: 'text/plain',
-            appProperties: {
-              type: 'chordpro',
-              organisationId: this.organisationId,
-              songId: song.id,
-              songUuid: this.getSongUuid(song),
-              ccliNumber: ccliNumber,
-              title: title,
-              titleNormalized: song.titleNormalized,
-              variantLabel: variantLabel,
-              isDefault: song.isDefault ? 'true' : 'false',
-              contentHash: hashText(chordproFile.content),
-              importSource: song.importSource || '',
-              importDate: song.importDate || new Date().toISOString(),
-              modifiedDate: song.modifiedDate || new Date().toISOString(),
-              appVersion: '1.0.0',
-            },
-          },
+          metadata: { ...this.songMetadata(song, chordproFile), parents: [songsFolderId] },
           content: chordproFile.content,
           contentType: 'text/plain; charset=utf-8',
         })
-        fileTracking.push({ song, chordproFile, title, variantLabel })
+        fileTracking.push({ song, chordproFile })
       }
 
       if (files.length === 0) continue
@@ -1279,16 +1247,10 @@ export class DriveSyncManager {
           if (!driveFile || !driveFile.id) continue
 
           tracking.song.driveFileId = driveFile.id
-          tracking.song.driveProperties = {
-            songId: tracking.song.id,
-            songUuid: this.getSongUuid(tracking.song),
-            contentHash: hashText(tracking.chordproFile.content),
-            ccliNumber: tracking.song.ccliNumber || '',
-            title: tracking.title,
-            titleNormalized: tracking.song.titleNormalized,
-            variantLabel: tracking.variantLabel,
-            appVersion: '1.0.0',
-          }
+          tracking.song.driveProperties = this.songDriveProperties(
+            tracking.song,
+            tracking.chordproFile
+          )
           tracking.song.lastSyncedAt = new Date().toISOString()
           tracking.song.driveModifiedTime = driveFile.modifiedTime ?? null
           tracking.song.driveChecksum = driveFile.md5Checksum ?? null
@@ -1366,65 +1328,30 @@ export class DriveSyncManager {
         return
       }
 
-      const { title, ccliNumber, variantLabel } = this.getSongFileMetadata(song, chordproFile)
+      const { title } = songFileDetails(song, chordproFile)
       const contentHash = hashText(chordproFile.content)
+      const metadata = this.songMetadata(song, chordproFile)
       let driveFile
 
       if (!song.driveFileId) {
         console.log(`[DriveSync] Uploading song: ${title} (${song.id}/${songUuid})`)
-
-        driveFile = await DriveAPI.uploadChordProFile(
-          this.driveFolderId,
-          song.id,
-          songUuid,
-          title,
-          ccliNumber,
-          variantLabel,
+        driveFile = await DriveAPI.createFile(
+          { ...metadata, parents: [await this.getCachedSongsFolder()] },
           chordproFile.content,
-          {
-            titleNormalized: song.titleNormalized,
-            contentHash,
-            variantOf: song.variantOf,
-            isDefault: song.isDefault,
-            importDate: song.importDate,
-            importUser: song.importUser,
-            importSource: song.importSource,
-            sourceUrl: song.sourceUrl,
-            createdAt: song.importDate || new Date().toISOString(),
-            updatedAt: song.modifiedDate || new Date().toISOString(),
-          }
+          'text/plain; charset=utf-8'
         )
-
         song.driveFileId = driveFile.id
       } else {
         console.log(`[DriveSync] Updating song: ${title} (${song.id}/${songUuid})`)
-
-        driveFile = await DriveAPI.updateChordProFile(song.driveFileId, chordproFile.content, {
-          contentHash,
-          ccliNumber: ccliNumber,
-          title: title,
-          titleNormalized: song.titleNormalized,
-          versionLabel: variantLabel,
-          variantOf: song.variantOf,
-          isDefault: song.isDefault,
-          importDate: song.importDate,
-          importUser: song.importUser,
-          importSource: song.importSource,
-          sourceUrl: song.sourceUrl,
-          updatedAt: song.modifiedDate || new Date().toISOString(),
-        })
+        driveFile = await DriveAPI.updateFile(
+          song.driveFileId,
+          forUpdate(metadata, 'song'),
+          chordproFile.content,
+          'text/plain; charset=utf-8'
+        )
       }
 
-      song.driveProperties = {
-        songId: song.id,
-        songUuid: songUuid,
-        contentHash,
-        ccliNumber: ccliNumber,
-        title: title,
-        titleNormalized: song.titleNormalized,
-        variantLabel: variantLabel,
-        appVersion: '1.0.0',
-      }
+      song.driveProperties = this.songDriveProperties(song, chordproFile)
       song.lastSyncedAt = new Date().toISOString()
       song.driveModifiedTime = driveFile?.modifiedTime ?? null
       song.driveChecksum = driveFile?.md5Checksum ?? null
@@ -1440,16 +1367,28 @@ export class DriveSyncManager {
     }
   }
 
-  /**
-   * Derive title/C CLI/version label metadata for Drive files
-   */
-  getSongFileMetadata(song, chordproFile) {
-    const parsed = chordproFile ? this.parser.parse(chordproFile.content) : { metadata: {} }
-    const title = song.title || parsed.metadata?.title || 'Untitled'
-    const ccliNumber = song.ccliNumber || ''
-    const variantLabel =
-      song.variantLabel || (song.isDefault ? 'Original' : song.variantOf ? 'Variant' : 'Original')
-    return { title, ccliNumber, variantLabel }
+  /** Drive file metadata for a setlist (see drive-metadata.js) */
+  setlistMetadata(setlist) {
+    return setlistFileMetadata(setlist, { organisationId: this.organisationId })
+  }
+
+  /** Drive file metadata for a song variant's chart (see drive-metadata.js) */
+  songMetadata(song, chordproFile) {
+    return songFileMetadata(song, chordproFile, { organisationId: this.organisationId })
+  }
+
+  /** What this device records about a song's synced file */
+  songDriveProperties(song, chordproFile) {
+    const { title, ccliNumber, variantLabel } = songFileDetails(song, chordproFile)
+    return {
+      songId: song.id,
+      songUuid: this.getSongUuid(song),
+      contentHash: hashText(chordproFile.content),
+      ccliNumber,
+      title,
+      titleNormalized: song.titleNormalized,
+      variantLabel,
+    }
   }
 
   getSongUuid(song) {

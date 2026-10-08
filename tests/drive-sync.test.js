@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai'
 import { ChordlessDB, createSetlist } from '../public/js/db.js'
+import { setlistFileMetadata, songFileMetadata } from '../public/js/drive-metadata.js'
 import { DriveSyncManager } from '../public/js/drive-sync.js'
 import { hashText } from '../public/js/song-utils.js'
 import { installFakeDrive } from './fake-drive.js'
@@ -200,6 +201,59 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       expect(driveSetlist(setlist.id).name).to.equal('Resurrected')
+    })
+  })
+
+  describe('Drive file metadata', () => {
+    const fileFor = id => drive.listFiles(f => f.appProperties.setlistId === id)[0]
+
+    it('creates and updates setlist files with the metadata from drive-metadata.js', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Harvest', owner: 'Ann' })
+      await syncDevice(phone)
+      const expected = () => setlistFileMetadata(setlist, { organisationId: ORG_ID }).appProperties
+
+      expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
+
+      await editSetlist(phone, setlist.id, { name: 'Harvest Festival' })
+      await syncDevice(phone)
+      expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
+    })
+
+    it("renames a setlist's file when its date or leader changes", async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, {
+        date: '2026-10-11',
+        owner: '',
+        type: 'Church Service',
+      })
+      await syncDevice(phone)
+      expect(fileFor(setlist.id).name).to.equal('2026-10-11-church-service.json')
+
+      await editSetlist(phone, setlist.id, { date: '2026-10-18', owner: 'Ann' })
+      await syncDevice(phone)
+
+      expect(fileFor(setlist.id).name).to.equal('2026-10-18-ann-church-service.json')
+    })
+
+    it('removes retired appProperties from older files when updating them', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Old file' })
+      await syncDevice(phone)
+      Object.assign(fileFor(setlist.id).appProperties, {
+        resourceType: 'setlist',
+        leader: '',
+        date: '2020-01-01',
+      })
+
+      await editSetlist(phone, setlist.id, { name: 'Old file, edited' })
+      await syncDevice(phone)
+
+      expect(Object.keys(fileFor(setlist.id).appProperties).sort()).to.deep.equal([
+        'appVersion',
+        'organisationId',
+        'setlistId',
+      ])
     })
   })
 
@@ -798,6 +852,28 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       expect(await songContent(phone, 'song-1')).to.equal('edited in Drive')
+    })
+
+    it('creates and updates song files with the metadata from drive-metadata.js', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: '{title: Amazing}' })
+      await syncDevice(phone)
+      const file = () => drive.listFiles(f => f.appProperties.type === 'chordpro')[0]
+      const expected = async () => {
+        const song = await phone.db.getSong('song-1')
+        const chart = await phone.db.getChordPro(song.chordproFileId)
+        return songFileMetadata(song, chart, { organisationId: ORG_ID }).appProperties
+      }
+      expect(file().appProperties).to.deep.equal(await expected())
+
+      // A variant change only shows in appProperties, so updates must send them
+      const song = await phone.db.getSong('song-1')
+      await phone.db.saveSong({ ...song, isDefault: false, variantOf: 'song-0' })
+      await editSongContent(phone, 'song-1', '{title: Amazing}\n[G]edited')
+      await syncDevice(phone)
+
+      expect(file().appProperties.isDefault).to.equal('false')
+      expect(file().appProperties).to.deep.equal(await expected())
     })
 
     it('keeps the Drive version when a chart is edited on two devices', async () => {

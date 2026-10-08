@@ -170,11 +170,20 @@ export class FakeDrive {
       return this._create(metadata, content, params)
     }
     if (uploadMatch && method === 'PATCH') {
-      if (params.get('uploadType') !== 'media')
-        this._unsupported(`uploadType=${params.get('uploadType')}`)
+      const uploadType = params.get('uploadType')
+      if (uploadType !== 'media' && uploadType !== 'multipart') {
+        this._unsupported(`uploadType=${uploadType}`)
+      }
       const file = this._getOr404(uploadMatch[1])
       if (file instanceof Response) return file
-      this._setContent(file, body)
+      if (uploadType === 'multipart') {
+        const { metadata, content } = parseMultipart(request.headers.get('Content-Type'), body)
+        if ('parents' in metadata) this._unsupported('changing parents in an update')
+        this._applyMetadata(file, metadata)
+        this._setContent(file, content)
+      } else {
+        this._setContent(file, body)
+      }
       return json(this._project(file, params.get('fields')))
     }
 

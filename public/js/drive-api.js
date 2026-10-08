@@ -7,12 +7,15 @@
  * - Chordless/ (root)
  *   - [Organisation Name]/
  *     - songs/
- *       - [song-id]/
- *         - [version-id].chordpro
+ *       - [title-ccli].txt (one chord chart per song variant)
  *     - setlists/
- *       - [setlist-id].json
+ *       - [date-leader-type-name].json
+ *   - pads/
+ *
+ * Song and setlist file names and appProperties come from drive-metadata.js.
  */
 
+import { APP_VERSION } from './drive-metadata.js'
 import * as GoogleAuth from './google-auth.js'
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
@@ -22,7 +25,6 @@ const ROOT_FOLDER_NAME = 'Chordless'
 const PADS_FOLDER_NAME = 'pads'
 const PADSET_CATEGORY = 'padset'
 const PADSET_FILE_CATEGORY = 'padsetFile'
-const APP_VERSION = '1.0.0'
 
 // Fields returned by uploads and updates. Sync records md5Checksum (computed by
 // Drive from the stored content) to detect later remote changes.
@@ -34,86 +36,6 @@ let getAccessToken = () => GoogleAuth.getAccessToken()
 
 export function setAccessTokenProvider(provider) {
   getAccessToken = provider || (() => GoogleAuth.getAccessToken())
-}
-
-/**
- * Helper functions for human-readable filenames
- */
-
-/**
- * Generate human-readable song folder name
- * Format: title-ccli (e.g., "amazing-grace-4779")
- */
-export function generateSongFolderName(title, ccliNumber) {
-  const normalizedTitle = title
-    .toLowerCase()
-    .replace(/[^\w\s-]/g, '') // Remove special chars
-    .replace(/\s+/g, '-') // Spaces to dashes
-    .replace(/--+/g, '-') // Multiple dashes to single
-    .trim()
-
-  if (ccliNumber) {
-    return `${normalizedTitle}-${ccliNumber}`
-  }
-  return normalizedTitle
-}
-
-/**
- * Generate human-readable chordpro filename
- * Format: title-ccli.txt (e.g., "amazing-grace-4779.txt")
- */
-export function generateChordProFilename(title, ccliNumber, _versionLabel) {
-  const baseName = generateSongFolderName(title, ccliNumber)
-  return `${baseName}.txt`
-}
-
-/**
- * Generate metadata filename for a song
- * Format: title-ccli.metadata.json (e.g., "amazing-grace-4779.metadata.json")
- */
-export function generateMetadataFilename(title, ccliNumber) {
-  const baseName = generateSongFolderName(title, ccliNumber)
-  return `${baseName}.metadata.json`
-}
-
-/**
- * Generate human-readable setlist filename
- * Format: date-leader-type[-name].json (e.g., "2025-11-10-john-smith-sunday-morning-service.json")
- */
-export function generateSetlistFilename(date, type, leader, name) {
-  const parts = [date]
-
-  // Add leader name
-  if (leader) {
-    const normalizedLeader = leader
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .trim()
-    if (normalizedLeader) parts.push(normalizedLeader)
-  }
-
-  // Add type (Sunday, Midweek, Special, etc.)
-  if (type) {
-    const normalizedType = type
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .trim()
-    if (normalizedType) parts.push(normalizedType)
-  }
-
-  // Add event name
-  if (name) {
-    const normalizedName = name
-      .toLowerCase()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .trim()
-    if (normalizedName) parts.push(normalizedName)
-  }
-
-  return parts.join('-') + '.json'
 }
 
 /**
@@ -295,9 +217,10 @@ export async function batchUploadFiles(files) {
 }
 
 /**
- * Upload file content to Drive
+ * Create a file in Drive: metadata (name, parents, mimeType, appProperties) and
+ * content in one multipart request. Returns the file resource (WRITE_FIELDS).
  */
-async function uploadFile(metadata, content, contentType = 'text/plain') {
+export async function createFile(metadata, content, contentType = 'text/plain') {
   const token = await getAccessToken()
   const boundary = '-------314159265358979323846'
   const encoder = new TextEncoder()
@@ -349,20 +272,29 @@ async function uploadFile(metadata, content, contentType = 'text/plain') {
 }
 
 /**
- * Update existing file content
+ * Update a file's content and metadata (name, appProperties) in one multipart
+ * request. appProperties are merged; a null value removes that key. Returns the
+ * file resource (WRITE_FIELDS).
  */
-async function updateFileContent(fileId, content, contentType = 'text/plain') {
+export async function updateFile(fileId, metadata, content, contentType = 'text/plain') {
   const token = await getAccessToken()
+  const boundary = '-------314159265358979323846'
+  const body =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+    JSON.stringify(metadata) +
+    `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n` +
+    content +
+    `\r\n--${boundary}--`
 
   const response = await fetch(
-    `${UPLOAD_API_BASE}/files/${fileId}?uploadType=media&fields=${WRITE_FIELDS}`,
+    `${UPLOAD_API_BASE}/files/${fileId}?uploadType=multipart&fields=${WRITE_FIELDS}`,
     {
       method: 'PATCH',
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': contentType,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
       },
-      body: content,
+      body,
     }
   )
 
@@ -602,7 +534,7 @@ export async function uploadPadFile(folderId, key, blob) {
     },
   }
 
-  return uploadFile(metadata, blob, 'audio/mpeg')
+  return createFile(metadata, blob, 'audio/mpeg')
 }
 
 /**
@@ -640,62 +572,6 @@ async function findSubfolder(parentId, name) {
 }
 
 /**
- * Find or create a song folder with appProperties
- * Returns { folderId, isNew }
- */
-export async function findOrCreateSongFolder(parentId, songId, folderName, properties = {}) {
-  console.log(`[DriveAPI] Finding/creating song folder: ${folderName} (${songId})`)
-
-  // First, try to find by appProperties.songId (most reliable)
-  const queryByProps = `'${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false and properties has { key='songId' and value='${songId}' }`
-  const resultByProps = await driveRequest(
-    `/files?q=${encodeURIComponent(queryByProps)}&spaces=drive&fields=files(id,name,appProperties)`
-  )
-
-  if (resultByProps.files && resultByProps.files.length > 0) {
-    console.log(`[DriveAPI] Found existing song folder by songId: ${resultByProps.files[0].id}`)
-    return {
-      folderId: resultByProps.files[0].id,
-      isNew: false,
-    }
-  }
-
-  // Fall back to finding by folder name
-  const folderId = await findSubfolder(parentId, folderName)
-  if (folderId) {
-    console.log(`[DriveAPI] Found existing song folder by name: ${folderId}`)
-    return {
-      folderId: folderId,
-      isNew: false,
-    }
-  }
-
-  // Not found, create new folder with appProperties
-  console.log(`[DriveAPI] Creating new song folder: ${folderName}`)
-  const folder = await driveRequest('/files', {
-    method: 'POST',
-    body: JSON.stringify({
-      name: folderName,
-      mimeType: 'application/vnd.google-apps.folder',
-      parents: [parentId],
-      appProperties: {
-        type: 'songFolder',
-        songId: songId,
-        ccliNumber: properties.ccliNumber || '',
-        title: properties.title || '',
-        appVersion: APP_VERSION,
-      },
-    }),
-  })
-
-  console.log(`[DriveAPI] Created song folder: ${folder.id}`)
-  return {
-    folderId: folder.id,
-    isNew: true,
-  }
-}
-
-/**
  * Get or create songs folder within organisation
  */
 export async function getSongsFolder(orgFolderId) {
@@ -718,81 +594,9 @@ export async function getSetlistsFolder(orgFolderId) {
 }
 
 /**
- * Song Operations
+ * Song and setlist files. Their metadata comes from drive-metadata.js; sync
+ * creates and updates them with createFile/updateFile.
  */
-
-/**
- * Upload a chordpro file to Drive (flat structure)
- * Each file contains complete metadata in appProperties (self-contained)
- *
- * @param {string} organisationFolderId - Parent organisation folder ID
- * @param {string} songId - Internal song ID (for appProperties)
- * @param {string} versionId - Internal version ID (for appProperties)
- * @param {string} title - Song title (for filename)
- * @param {string} ccliNumber - CCLI number (for filename)
- * @param {string} versionLabel - Version label stored in appProperties (e.g., "Original")
- * @param {string} content - ChordPro file content
- * @param {object} metadata - Complete metadata object
- */
-export async function uploadChordProFile(
-  organisationFolderId,
-  songId,
-  versionId,
-  title,
-  ccliNumber,
-  versionLabel,
-  content,
-  metadata = {}
-) {
-  console.log(`[DriveAPI] Uploading chordpro: ${title} (${songId}/${versionId})`)
-
-  const songsFolderId = await getSongsFolder(organisationFolderId)
-
-  // Generate human-readable filename (flat structure, no folder)
-  const fileName = generateChordProFilename(title, ccliNumber, versionLabel)
-
-  const fileMetadata = {
-    name: fileName,
-    parents: [songsFolderId], // Directly in songs/ folder
-    appProperties: {
-      // File type
-      type: 'chordpro',
-
-      // Song-level metadata
-      songId: songId,
-      ccliNumber: ccliNumber || '',
-      title: title,
-      titleNormalized: metadata.titleNormalized || '',
-
-      // Version-level metadata
-      versionId: versionId,
-      versionLabel: versionLabel,
-      contentHash: metadata.contentHash || '',
-
-      // Variant relationships
-      variantOf: metadata.variantOf || '',
-      isDefault: metadata.isDefault ? 'true' : 'false',
-
-      // Import metadata
-      importDate: metadata.importDate || '',
-      importUser: metadata.importUser || '',
-      importSource: metadata.importSource || '',
-      sourceUrl: metadata.sourceUrl || '',
-
-      // Timestamps
-      createdAt: metadata.createdAt || new Date().toISOString(),
-      updatedAt: metadata.updatedAt || new Date().toISOString(),
-
-      // App version
-      appVersion: APP_VERSION,
-    },
-  }
-
-  const file = await uploadFile(fileMetadata, content, 'text/plain')
-
-  console.log(`[DriveAPI] Uploaded chordpro file: ${file.id} (${fileName})`)
-  return file
-}
 
 /**
  * Download a chordpro file from Drive
@@ -803,175 +607,12 @@ export async function downloadChordProFile(fileId) {
 }
 
 /**
- * Update an existing chordpro file (content and metadata).
- * Returns the file resource (with modifiedTime) after the last write.
- */
-export async function updateChordProFile(fileId, content, metadata = {}) {
-  console.log(`[DriveAPI] Updating chordpro: ${fileId}`)
-
-  // Update content
-  // Return the last write's file resource, so callers get the final modifiedTime
-  let file = await updateFileContent(fileId, content, 'text/plain')
-
-  // Update appProperties with complete metadata (if provided)
-  if (Object.keys(metadata).length > 0) {
-    const appPropsUpdate = {
-      appVersion: APP_VERSION,
-    }
-
-    // Add all provided metadata fields
-    if (metadata.contentHash) appPropsUpdate.contentHash = metadata.contentHash
-    if (metadata.ccliNumber !== undefined) appPropsUpdate.ccliNumber = metadata.ccliNumber
-    if (metadata.title) appPropsUpdate.title = metadata.title
-    if (metadata.titleNormalized) appPropsUpdate.titleNormalized = metadata.titleNormalized
-    if (metadata.versionLabel) appPropsUpdate.versionLabel = metadata.versionLabel
-    if (metadata.updatedAt) appPropsUpdate.updatedAt = metadata.updatedAt
-
-    // Variant relationships
-    if (metadata.variantOf !== undefined) appPropsUpdate.variantOf = metadata.variantOf || ''
-    if (metadata.isDefault !== undefined)
-      appPropsUpdate.isDefault = metadata.isDefault ? 'true' : 'false'
-
-    // Import metadata
-    if (metadata.importDate) appPropsUpdate.importDate = metadata.importDate
-    if (metadata.importUser) appPropsUpdate.importUser = metadata.importUser
-    if (metadata.importSource) appPropsUpdate.importSource = metadata.importSource
-    if (metadata.sourceUrl) appPropsUpdate.sourceUrl = metadata.sourceUrl
-
-    file = await driveRequest(`/files/${fileId}?fields=${WRITE_FIELDS}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        appProperties: appPropsUpdate,
-      }),
-    })
-  }
-
-  console.log(`[DriveAPI] Updated chordpro file: ${fileId}`)
-  return file
-}
-
-/**
- * Find chordpro file by songId and versionId (searches by appProperties)
- */
-export async function findChordProFile(
-  organisationFolderId,
-  songId,
-  versionId,
-  title = null,
-  ccliNumber = null
-) {
-  const songsFolderId = await getSongsFolder(organisationFolderId)
-
-  // If we have title/ccli, try to find the folder by name first
-  if (title) {
-    const folderName = generateSongFolderName(title, ccliNumber)
-    const songFolderId = await findSubfolder(songsFolderId, folderName)
-
-    if (songFolderId) {
-      // Search for file by appProperties within this folder
-      const query = `'${songFolderId}' in parents and trashed=false and properties has { key='songId' and value='${songId}' } and properties has { key='versionId' and value='${versionId}' }`
-      const result = await driveRequest(
-        `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
-      )
-
-      if (result.files && result.files.length > 0) {
-        return result.files[0]
-      }
-    }
-  }
-
-  // Fallback: search by appProperties across all songs folders
-  const query = `'${songsFolderId}' in parents and trashed=false and properties has { key='songId' and value='${songId}' } and properties has { key='versionId' and value='${versionId}' }`
-  const result = await driveRequest(
-    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
-  )
-
-  if (result.files && result.files.length > 0) {
-    return result.files[0]
-  }
-
-  return null
-}
-
-/**
- * Setlist Operations
- */
-
-/**
- * Upload a setlist to Drive
- */
-export async function uploadSetlist(organisationFolderId, setlistId, setlistData, organisationId) {
-  console.log(`[DriveAPI] Uploading setlist: ${setlistId}`)
-
-  const setlistsFolderId = await getSetlistsFolder(organisationFolderId)
-
-  // Generate human-readable filename
-  const fileName = generateSetlistFilename(
-    setlistData.date || setlistId,
-    setlistData.type || '',
-    setlistData.owner || '',
-    setlistData.name || ''
-  )
-
-  const fileMetadata = {
-    name: fileName,
-    parents: [setlistsFolderId],
-    appProperties: {
-      resourceType: 'setlist',
-      setlistId: setlistId,
-      organisationId: organisationId,
-      date: setlistData.date || '',
-      type: setlistData.type || '',
-      leader: setlistData.leader || '',
-      name: setlistData.name || '',
-      appVersion: APP_VERSION,
-    },
-  }
-
-  const content = JSON.stringify(setlistData, null, 2)
-  const file = await uploadFile(fileMetadata, content, 'application/json')
-
-  console.log(`[DriveAPI] Uploaded setlist: ${file.id} (${fileName})`)
-  return file
-}
-
-/**
  * Download a setlist from Drive
  */
 export async function downloadSetlist(fileId) {
   console.log(`[DriveAPI] Downloading setlist: ${fileId}`)
   const content = await downloadFile(fileId)
   return JSON.parse(content)
-}
-
-/**
- * Update an existing setlist
- */
-export async function updateSetlist(fileId, setlistData) {
-  console.log(`[DriveAPI] Updating setlist: ${fileId}`)
-  const content = JSON.stringify(setlistData, null, 2)
-  const file = await updateFileContent(fileId, content, 'application/json')
-  console.log(`[DriveAPI] Updated setlist: ${fileId}`)
-  return file
-}
-
-/**
- * Find setlist file by setlistId (searches by appProperties)
- */
-export async function findSetlist(organisationFolderId, setlistId) {
-  const setlistsFolderId = await getSetlistsFolder(organisationFolderId)
-
-  // Search by appProperties
-  const query = `'${setlistsFolderId}' in parents and trashed=false and properties has { key='setlistId' and value='${setlistId}' }`
-  const result = await driveRequest(
-    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
-  )
-
-  if (result.files && result.files.length > 0) {
-    return result.files[0]
-  }
-
-  return null
 }
 
 /**
