@@ -38,7 +38,7 @@ import './icon.js'
  * @csspart actions - The actions button container
  * @csspart close-button - The × close button
  * @slot header-actions - Extra buttons in the header, left of the close button
- *   (needs a heading). Set the has-header-actions attribute to leave room for them.
+ *   (needs a heading).
  * @csspart header-actions - Container for the header-actions slot
  * @csspart confirm-button - The confirm button
  * @csspart cancel-button - The cancel button
@@ -116,31 +116,28 @@ export class AppModal extends LitElement {
       height: 95vh;
     }
 
+    /* Themed like the page header: title and buttons in one centred row */
     .modal-header {
-      position: relative;
-      padding: 2rem 2rem 1rem 2rem;
-      border-bottom: 1px solid var(--border-light, #ecf0f1);
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 1.5rem 1rem 2rem;
+      background-color: var(--header-bg, #2c3e50);
+      color: var(--header-text, white);
     }
 
     .modal-title {
+      flex: 1;
       font-size: var(--font-ui);
       font-weight: 600;
-      color: var(--text-color, #2c3e50);
+      color: inherit;
       margin: 0;
-      padding-right: 3rem;
     }
 
     /* Extra header buttons (slot="header-actions"), just left of the close button */
     .header-actions {
-      position: absolute;
-      top: 1.5rem;
-      right: 4.75rem;
       display: flex;
       gap: 0.75rem;
-    }
-
-    :host([has-header-actions]) .modal-title {
-      padding-right: 8rem;
     }
 
     /* Circled icon buttons, matching the page header's (close, and any buttons
@@ -165,14 +162,24 @@ export class AppModal extends LitElement {
       transition: all 0.2s;
     }
 
-    ::slotted(button[slot='header-actions']) {
-      position: static;
-    }
-
-    .modal-close:hover,
-    ::slotted(button[slot='header-actions']:hover) {
+    .modal-close:hover {
       color: var(--text-color, #2c3e50);
       background-color: var(--bg-tertiary, #ecf0f1);
+      transform: scale(1.05);
+    }
+
+    /* On the header band, buttons sit in the row and use the header's colours */
+    .modal-header .modal-close,
+    ::slotted(button[slot='header-actions']) {
+      position: static;
+      flex-shrink: 0;
+      color: var(--header-text, white);
+    }
+
+    .modal-header .modal-close:hover,
+    ::slotted(button[slot='header-actions']:hover) {
+      color: var(--header-text, white);
+      background-color: rgba(255, 255, 255, 0.2);
       transform: scale(1.05);
     }
 

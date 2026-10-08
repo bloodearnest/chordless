@@ -82,7 +82,6 @@ export class SetlistInfoDialog extends LitElement {
       <app-modal
         size="fullscreen"
         heading=${this._editing ? `Edit: ${heading}` : heading}
-        ?has-header-actions=${!this._editing}
         @close=${() => {
           this._editing = false
         }}
