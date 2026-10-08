@@ -1820,19 +1820,6 @@ class PageApp {
       }
     })
 
-    // Listen to nav menu clicks - toggle the popover
-    appHeader.addEventListener('nav-menu-click', () => {
-      const navMenu = document.getElementById('nav-menu')
-      if (navMenu) {
-        // Get the nav button from the app-header component
-        const navButton = appHeader.shadowRoot?.querySelector('.nav-menu-button')
-        if (navButton) {
-          navMenu.setTriggerButton(navButton)
-        }
-        navMenu.togglePopover()
-      }
-    })
-
     // Listen for header-expand-toggle event
     appHeader.addEventListener('header-expand-toggle', e => {
       const { expanded } = e.detail

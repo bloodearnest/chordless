@@ -348,3 +348,35 @@ test.describe('Song import', () => {
     expect(song.id).toBe('title-info-test-song')
   })
 })
+
+test.describe('Navigation menu', () => {
+  for (const path of [
+    '/',
+    '/songs',
+    '/setlist/menu-test-setlist',
+    '/preferences',
+    '/storage',
+    '/bookmarklet',
+  ]) {
+    test(`opens and closes on ${path}`, async ({ page }) => {
+      const errors = []
+      page.on('pageerror', error => errors.push(error.message))
+      await seedSong(page, { setlistId: 'menu-test-setlist' })
+      await page.goto(path)
+
+      // Either the page's own menu button or the app-header's
+      const button = page.locator('#nav-menu-button, app-header .nav-menu-button').first()
+      const menu = page.locator('nav-menu .nav-menu-popover')
+      // Pages wire up once their scripts have run, so retry the first click
+      await expect(async () => {
+        await button.click()
+        await expect(menu).toBeVisible({ timeout: 500 })
+      }).toPass()
+      await expect(menu.getByText('Song Library')).toBeVisible()
+
+      await button.click()
+      await expect(menu).toBeHidden()
+      expect(errors).toEqual([])
+    })
+  }
+})

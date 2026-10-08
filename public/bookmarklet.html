@@ -93,7 +93,7 @@
         </header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu"></nav-menu>
+        <nav-menu id="nav-menu" for="nav-menu-button"></nav-menu>
 
         <main class="home-content">
           <div class="settings-content">
@@ -241,25 +241,6 @@
         alert('✅ Copied to clipboard! Now paste this as the URL when creating a bookmark.');
       }
 
-      // Initialize nav menu button - wait for custom element to be defined
-      customElements.whenDefined('nav-menu').then(() => {
-        const navMenuButton = document.getElementById('nav-menu-button');
-        const navMenu = document.getElementById('nav-menu');
-
-        if (navMenuButton && navMenu) {
-          // Set the trigger button for positioning
-          navMenu.setTriggerButton(navMenuButton);
-
-          navMenuButton.addEventListener('click', () => {
-            navMenu.togglePopover();
-          });
-
-          // Handle back button click from nav-menu component
-          navMenu.addEventListener('back-click', () => {
-            window.history.back();
-          });
-        }
-      });
     </script>
     <!-- Import the nav-menu component -->
     <script type="module" src="/components/nav-menu.js"></script>

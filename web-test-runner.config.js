@@ -15,6 +15,7 @@ export default {
     'tests/library-song.test.js',
     'tests/lyrics-normalizer.test.js',
     'tests/metronome-controller.test.js',
+    'tests/nav-menu.test.js',
     'tests/pad-audio-controller.test.js',
     'tests/people.test.js',
     'tests/setlist-details-form.test.js',

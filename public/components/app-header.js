@@ -18,7 +18,7 @@ import './icon.js'
  * Events:
  * @fires edit-mode-toggle - When edit toggle button is clicked
  * @fires info-click - When info button is clicked
- * @fires nav-menu-click - When nav menu button is clicked
+ * @fires nav-menu-click - When nav menu button is clicked (detail: {trigger: the button})
  * @fires header-expand-toggle - When header expand toggle is clicked (detail: {expanded: boolean})
  *
  * CSS Parts:
@@ -481,11 +481,12 @@ export class AppHeader extends LitElement {
     `
   }
 
-  _handleNavMenuClick() {
+  _handleNavMenuClick(event) {
     this.dispatchEvent(
       new CustomEvent('nav-menu-click', {
         bubbles: true,
         composed: true,
+        detail: { trigger: event.currentTarget },
       })
     )
   }

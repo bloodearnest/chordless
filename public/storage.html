@@ -51,7 +51,7 @@
         </header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu"></nav-menu>
+        <nav-menu id="nav-menu" for="nav-menu-button"></nav-menu>
 
         <main class="home-content">
           <storage-page id="storage-page"></storage-page>
@@ -65,21 +65,6 @@
     <script type="module">
       // Set window name for bookmarklet
       window.name = 'chordless';
-
-      // Initialize nav menu button - wait for custom element to be defined
-      customElements.whenDefined('nav-menu').then(() => {
-        const navMenuButton = document.getElementById('nav-menu-button');
-        const navMenu = document.getElementById('nav-menu');
-
-        if (navMenuButton && navMenu) {
-          // Set the trigger button for positioning
-          navMenu.setTriggerButton(navMenuButton);
-
-          navMenuButton.addEventListener('click', () => {
-            navMenu.togglePopover();
-          });
-        }
-      });
 
       // Register service worker
       if ('serviceWorker' in navigator) {

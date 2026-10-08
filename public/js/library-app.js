@@ -459,24 +459,11 @@ export class LibraryApp {
 
   setupLibraryHeaderEvents() {
     const appHeader = document.getElementById('library-app-header')
-    const navMenu = document.getElementById('nav-menu')
     if (!appHeader) return
 
     // Only set up listeners once
     if (this._libraryHeaderEventsSetup) return
     this._libraryHeaderEventsSetup = true
-
-    // Listen for nav-menu-click event
-    appHeader.addEventListener('nav-menu-click', () => {
-      if (navMenu) {
-        // Get the nav button from the app-header component's shadow root
-        const navButton = appHeader.shadowRoot?.querySelector('.nav-menu-button')
-        if (navButton) {
-          navMenu.setTriggerButton(navButton)
-        }
-        navMenu.togglePopover()
-      }
-    })
 
     // Listen for edit-mode-toggle event
     appHeader.addEventListener('edit-mode-toggle', () => {

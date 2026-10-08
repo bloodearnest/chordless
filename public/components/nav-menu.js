@@ -9,7 +9,15 @@ import './app-preferences.js'
  * Contains links to main sections (Setlists, Songs, Preferences, Bookmarklet)
  * and optionally a back button.
  *
+ * It opens from its trigger: the button named by its `for` attribute (a button
+ * id, as with <label for>), or the menu button of an <app-header>, which fires
+ * nav-menu-click.
+ *
+ *   <button id="nav-menu-button">…</button>
+ *   <nav-menu for="nav-menu-button"></nav-menu>
+ *
  * Properties:
+ * @property {String} for - id of the button that opens the menu
  * @property {Boolean} showBackButton - Whether to show the back button
  * @property {String} backLabel - Label for the back button (default: "Back")
  * @property {String} popoverId - ID for the popover element (default: "nav-menu-popover")
@@ -25,6 +33,7 @@ import './app-preferences.js'
  */
 export class NavMenu extends LitElement {
   static properties = {
+    triggerId: { type: String, attribute: 'for' },
     showBackButton: { type: Boolean, attribute: 'show-back-button' },
     backLabel: { type: String, attribute: 'back-label' },
     popoverId: { type: String, attribute: 'popover-id' },
@@ -175,6 +184,13 @@ export class NavMenu extends LitElement {
     // Bind the click outside handler
     this._handleClickOutside = this._handleClickOutside.bind(this)
 
+    // Open from the trigger button, or from an app-header's menu button
+    this._onRootClick = this._onRootClick.bind(this)
+    this._onNavMenuClick = this._onNavMenuClick.bind(this)
+    this._root = this.getRootNode()
+    this._root.addEventListener('click', this._onRootClick)
+    this._root.addEventListener('nav-menu-click', this._onNavMenuClick)
+
     // Listen for app-settings events
     this.addEventListener('import-requested', this._handleImportRequested)
     this.addEventListener('clear-database-requested', this._handleClearDatabaseRequested)
@@ -183,6 +199,24 @@ export class NavMenu extends LitElement {
   disconnectedCallback() {
     super.disconnectedCallback()
     document.removeEventListener('click', this._handleClickOutside)
+    this._root?.removeEventListener('click', this._onRootClick)
+    this._root?.removeEventListener('nav-menu-click', this._onNavMenuClick)
+  }
+
+  _onRootClick(e) {
+    if (!this.triggerId) return
+    const trigger = e.composedPath().find(el => el.id === this.triggerId)
+    if (trigger) this.toggle(trigger)
+  }
+
+  _onNavMenuClick(e) {
+    this.toggle(e.detail?.trigger || e.target)
+  }
+
+  /** Open or close the menu, positioned under the trigger button */
+  toggle(trigger) {
+    this.triggerButton = trigger
+    this.togglePopover()
   }
 
   _handleClickOutside(e) {
@@ -196,11 +230,6 @@ export class NavMenu extends LitElement {
     if (!clickedInside && !clickedTrigger) {
       this.closePopover()
     }
-  }
-
-  // Set the trigger button element for positioning
-  setTriggerButton(button) {
-    this.triggerButton = button
   }
 
   // Position the popover relative to the trigger button
