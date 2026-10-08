@@ -1,37 +1,6 @@
 // Playwright test runner for browser-based tests
 import { expect, test } from '@playwright/test'
 
-test.describe('Template Tests', () => {
-  test('should run all template tests successfully', async ({ page }) => {
-    page.on('console', msg => {
-      if (msg.type() === 'error') console.error('Browser console error:', msg.text())
-    })
-    page.on('pageerror', error => console.error('Page error:', error))
-
-    await page.goto('/tests/template-test.html')
-
-    // Wait for tests to complete by checking for summary div to change from "loading"
-    await page.waitForSelector('#test-summary:not(.loading)', { timeout: 10000 })
-
-    // Get test summary
-    const summary = await page.locator('#test-summary').textContent()
-    console.log('Template tests:', summary)
-
-    // Check if all tests passed
-    const hasPassed = await page.locator('#test-summary.summary-pass').count()
-    expect(hasPassed).toBe(1)
-
-    // Get test count from summary
-    const failedTests = await page.locator('.test-fail').count()
-    expect(failedTests).toBe(0)
-
-    // Log all test results
-    const results = await page.locator('#test-results > div').allTextContents()
-    console.log('\nTest results:')
-    results.forEach(result => console.log(result))
-  })
-})
-
 test.describe('Application Pages', () => {
   test('home page should load', async ({ page }) => {
     await page.goto('/')

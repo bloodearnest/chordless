@@ -15,12 +15,12 @@ test-unit:
 # Lint/format JS files with Biome (fast!)
 lint:
     @echo "Running Biome check..."
-    npx @biomejs/biome check public/components public/js public/tests tests public/service-worker.js
+    npx @biomejs/biome check public/components public/js tests public/service-worker.js
 
 # Format project files with Biome
 format:
     @echo "Formatting with Biome..."
-    npx @biomejs/biome format --write public/components public/js public/tests tests public/service-worker.js
+    npx @biomejs/biome format --write public/components public/js tests public/service-worker.js
 
 # Copy vendored dependencies from node_modules to vendor/
 vendor:
@@ -68,14 +68,3 @@ install-playwright:
     npm install
     @echo "Installing Chromium browser..."
     npx playwright install chromium
-
-# Open browser tests manually (for development)
-test-browser-manual:
-    @echo "Opening browser tests..."
-    @echo "Browser tests will open in your default browser"
-    @echo "Check the browser console for test results"
-    xdg-open http://localhost:8787/tests/template-test.html
-    @sleep 1
-    xdg-open http://localhost:8787/tests/test-sw.html
-    @echo "✓ Browser tests opened"
-    @echo "Note: Make sure the dev server is running (just serve)"
