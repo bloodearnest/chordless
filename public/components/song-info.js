@@ -4,7 +4,8 @@ import { getWeeksAgo } from '../js/utils/date-utils.js'
 /**
  * SongInfo Component
  *
- * Displays detailed information about a song including metadata and usage history
+ * Displays detailed information about a song including metadata and usage history.
+ * It doesn't show the title: song-info-dialog shows that as its heading.
  *
  * Properties:
  * @property {Object} song - Song data object
@@ -37,13 +38,6 @@ export class SongInfo extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 2rem;
-    }
-
-    .song-title {
-      font-size: var(--font-ui);
-      font-weight: 600;
-      color: var(--text-color, #2c3e50);
-      margin: 0 0 2rem 0;
     }
 
     .modal-columns-container {
@@ -200,8 +194,6 @@ export class SongInfo extends LitElement {
 
     return html`
       <div class="song-info-container">
-        <h2 class="song-title">${this.song.title}</h2>
-
         <div class="modal-columns-container">
           <!-- Left column: Metadata -->
           <div class="modal-left-column">

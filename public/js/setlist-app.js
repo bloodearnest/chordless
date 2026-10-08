@@ -288,78 +288,6 @@ class PageApp {
     return element
   }
 
-  calculateAppearanceStats(song) {
-    if (!song.appearances || song.appearances.length === 0) {
-      return {
-        totalAppearances: 0,
-        last12MonthsAppearances: 0,
-        lastPlayedDate: null,
-      }
-    }
-
-    const totalAppearances = song.appearances.length
-
-    // Calculate date 12 months ago
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-
-    // Filter appearances in last 12 months
-    const last12MonthsAppearances = song.appearances.filter(appearance => {
-      const appearanceDate = new Date(appearance.date)
-      return appearanceDate >= twelveMonthsAgo
-    }).length
-
-    // Find most recent appearance date
-    const sortedAppearances = [...song.appearances].sort((a, b) => b.date.localeCompare(a.date))
-    const lastPlayedDate = sortedAppearances[0].date
-
-    return {
-      totalAppearances,
-      last12MonthsAppearances,
-      lastPlayedDate,
-    }
-  }
-
-  getWeeksAgo(dateStr) {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diffTime = now - date
-    const diffWeeks = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7))
-
-    if (diffWeeks === 0) {
-      return 'This week'
-    } else if (diffWeeks === 1) {
-      return '1 week ago'
-    } else {
-      return `${diffWeeks} weeks ago`
-    }
-  }
-
-  getRecentAppearances(song) {
-    if (!song.appearances || song.appearances.length === 0) {
-      return []
-    }
-
-    // Calculate date 12 months ago
-    const twelveMonthsAgo = new Date()
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12)
-
-    // Filter and sort appearances in last 12 months (most recent first)
-    return song.appearances
-      .filter(appearance => {
-        const appearanceDate = new Date(appearance.date)
-        return appearanceDate >= twelveMonthsAgo
-      })
-      .sort((a, b) => b.date.localeCompare(a.date))
-      .map(appearance => ({
-        date: appearance.date,
-        formattedDate: this.formatDate(appearance.date),
-        weeksAgo: this.getWeeksAgo(appearance.date),
-        playedInKey: appearance.playedInKey,
-        leader: appearance.owner,
-      }))
-  }
-
   setupImportButton() {
     const appSettings = document.getElementById('app-settings')
     if (!appSettings) return
@@ -1135,60 +1063,10 @@ class PageApp {
   }
 
   async showSongInfo(song) {
-    const modal = document.getElementById('song-info-modal')
-    const modalBody = document.getElementById('modal-body')
-
-    // Clear previous content
-    modalBody.textContent = ''
-
-    modal.show()
-
-    // Create or get song-info component
-    let songInfoEl = modalBody.querySelector('song-info')
-    if (!songInfoEl) {
-      songInfoEl = document.createElement('song-info')
-      modalBody.appendChild(songInfoEl)
-    }
-
-    // Show loading state
-    songInfoEl.loading = true
-
-    // Load full song data from database to get metadata/variants
-    let fullSong = null
-    try {
-      const { getSongById } = await import('./song-utils.js')
-      fullSong = await getSongById(song.songId, this.db)
-    } catch (error) {
-      console.error('Could not load full song data for:', song.songId, error)
-    }
-
-    if (!fullSong) {
-      songInfoEl.loading = false
-      songInfoEl.song = null
-      return
-    }
-
-    // Load song usage data to get appearances
-    const songUsage = await this.db.getSongUsageFromSetlists(song.songId)
-    const appearances = songUsage.map(entry => ({
-      setlistId: entry.setlistId,
-      date: entry.setlistDate,
-      playedInKey: entry.playedInKey,
-      leader: entry.owner,
-      setlistName: entry.setlistName,
-    }))
-
-    // Merge the display song data with the full database song data
-    const songData = {
-      ...fullSong,
-      title: song.title,
-      metadata: song.metadata,
-    }
-
-    // Update component
-    songInfoEl.loading = false
-    songInfoEl.song = songData
-    songInfoEl.appearances = appearances
+    const dialog = document.getElementById('song-info-dialog')
+    if (!dialog) return
+    dialog.db = this.db
+    await dialog.show(song.songId, { title: song.title })
   }
 
   async showSetlistInfo() {

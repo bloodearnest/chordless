@@ -141,7 +141,7 @@ export class LibraryApp {
             const lastUsage = usage[0]
             fullSong.lastUsageInfo = {
               date: lastUsage.setlistDate,
-              leader: lastUsage.owner,
+              leader: lastUsage.leader,
               key: lastUsage.playedInKey,
             }
           }
@@ -703,21 +703,10 @@ export class LibraryApp {
   // ==================== Song Info Modal ====================
 
   async showLibrarySongInfo(parsed, song) {
-    const modal = document.getElementById('library-song-info-modal')
-    const modalBody = document.getElementById('library-modal-body')
-
-    if (!modal || !modalBody) return
-
-    // Create song-info component
-    const songInfo = document.createElement('song-info')
-    songInfo.song = song
-    songInfo.parsed = parsed
-
-    modalBody.innerHTML = ''
-    modalBody.appendChild(songInfo)
-
-    // Show the modal
-    modal.show()
+    const dialog = document.getElementById('library-song-info-dialog')
+    if (!dialog) return
+    dialog.db = this.db
+    await dialog.show(song.id, { title: parsed.metadata.title })
   }
 
   // ==================== Font Size Controls ====================

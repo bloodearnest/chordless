@@ -151,6 +151,15 @@ export class AppModal extends LitElement {
       color: var(--text-color, #2c3e50);
     }
 
+    /* No heading: no header bar, the close button sits in the content's corner */
+    .modal-close.floating {
+      z-index: 1;
+    }
+
+    .modal-content.headerless .modal-body {
+      padding-top: 4.5rem;
+    }
+
     .modal-body {
       padding: 2rem;
       flex: 1;
@@ -245,8 +254,8 @@ export class AppModal extends LitElement {
   render() {
     return html`
       <div class="modal-overlay" part="overlay" @click=${this._handleOverlayClick}></div>
-      <div class="modal-content" part="content">
-        ${this._renderHeader()}
+      <div class="modal-content ${this._hasHeader() ? '' : 'headerless'}" part="content">
+        ${this._hasHeader() ? this._renderHeader() : this._renderFloatingClose()}
 
         <div class="modal-body" part="body">
           ${this.message ? html`<p class="modal-message">${this.message}</p>` : ''}
@@ -255,6 +264,24 @@ export class AppModal extends LitElement {
 
         ${this._renderActions()}
       </div>
+    `
+  }
+
+  _hasHeader() {
+    return Boolean(this.heading || this.querySelector('[slot="header"]'))
+  }
+
+  _renderFloatingClose() {
+    if (this.hideCloseButton) return ''
+    return html`
+      <button
+        class="modal-close floating"
+        part="close-button"
+        aria-label="Close"
+        @click=${this.close}
+      >
+        &times;
+      </button>
     `
   }
 
@@ -279,7 +306,7 @@ export class AppModal extends LitElement {
       `
     }
 
-    if (this.heading || !this.hideCloseButton) {
+    if (this.heading) {
       return html`
         <div class="modal-header" part="header">
           ${this.heading ? html`<h2 class="modal-title" part="title">${this.heading}</h2>` : ''}

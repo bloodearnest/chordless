@@ -127,10 +127,8 @@
         </main>
       </div>
 
-      <!-- Song info modal -->
-      <app-modal id="library-song-info-modal" size="fullscreen">
-        <div id="library-modal-body"></div>
-      </app-modal>
+      <!-- Song info dialog -->
+      <song-info-dialog id="library-song-info-dialog"></song-info-dialog>
 
       <!-- Reset confirmation modal -->
       <app-modal
@@ -180,7 +178,7 @@
 
     <!-- Import the components -->
     <script type="module" src="/components/song-card.js"></script>
-    <script type="module" src="/components/song-info.js"></script>
+    <script type="module" src="/components/song-info-dialog.js"></script>
     <script type="module" src="/components/key-selector.js"></script>
     <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>

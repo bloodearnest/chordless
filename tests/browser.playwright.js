@@ -49,43 +49,78 @@ test.describe('Loading', () => {
   })
 })
 
-test.describe('Song library', () => {
-  test('info button opens the song info modal', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
-
-    // Let the app set up its organisation and database (the first visit reloads
-    // once the service worker takes control), then add a song to it
-    await page.goto('/songs')
-    await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-    await page.waitForLoadState('load')
-    await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
-      const db = await getCurrentDB()
-      const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
-      await db.saveChordPro({
-        id: 'chordpro-info-test',
-        content,
-        contentHash: 'test',
-        lastModified: Date.now(),
-      })
-      await db.saveSong({
-        uuid: 'info-test-song',
-        id: 'title-info-test-song',
-        title: 'Info Test Song',
-        titleNormalized: 'info test song',
-        isDefault: true,
-        chordproFileId: 'chordpro-info-test',
+/** Open the app once so it sets up its organisation and database (the first
+ * visit reloads when the service worker takes control), then add a test song,
+ * and optionally a setlist containing it. */
+async function seedSong(page, { setlistId = null } = {}) {
+  await page.goto('/songs')
+  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+  await page.waitForLoadState('load')
+  await page.evaluate(async setlistId => {
+    const { getCurrentDB } = await import('/js/db.js')
+    const db = await getCurrentDB()
+    const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
+    await db.saveChordPro({
+      id: 'chordpro-info-test',
+      content,
+      contentHash: 'test',
+      lastModified: Date.now(),
+    })
+    await db.saveSong({
+      uuid: 'info-test-song',
+      id: 'title-info-test-song',
+      title: 'Info Test Song',
+      titleNormalized: 'info test song',
+      isDefault: true,
+      chordproFileId: 'chordpro-info-test',
+      modifiedDate: new Date().toISOString(),
+    })
+    if (setlistId) {
+      await db.saveSetlist({
+        id: setlistId,
+        date: '2026-10-11',
+        time: '10:30',
+        type: 'Church Service',
+        name: '',
+        owner: 'Ann',
+        songs: [{ songId: 'title-info-test-song', key: 'A' }],
+        createdDate: new Date().toISOString(),
         modifiedDate: new Date().toISOString(),
       })
-    })
+    }
+  }, setlistId)
+}
+
+test.describe('Song info', () => {
+  test('info button on the songs page opens the song info dialog', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
 
     await page.goto('/songs#info-test-song')
     await page.reload()
     await page.locator('#library-app-header .info-button').click()
 
-    await expect(page.locator('#library-song-info-modal')).toHaveAttribute('open', '')
-    await expect(page.locator('#library-modal-body song-info')).toBeAttached()
+    const modal = page.locator('#library-song-info-dialog app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await expect(modal).toHaveAttribute('heading', 'Info Test Song')
+    await expect(page.locator('#library-song-info-dialog song-info')).toContainText('Key')
+    expect(errors).toEqual([])
+  })
+
+  test('info button on a setlist song opens the song info dialog', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'info-test-setlist' })
+
+    await page.goto('/setlist/info-test-setlist#song-0')
+    await page.locator('#app-header .info-button').click()
+
+    const modal = page.locator('#song-info-dialog app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await expect(modal).toHaveAttribute('heading', 'Info Test Song')
+    // Played in this setlist, so it appears in the history
+    await expect(page.locator('#song-info-dialog song-info')).toContainText('Ann')
     expect(errors).toEqual([])
   })
 })

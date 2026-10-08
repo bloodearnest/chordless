@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Song Info - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+
+    <!-- Import map for Lit -->
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "/vendor/lit/index.js",
+          "lit/": "/vendor/lit/",
+          "@lit/reactive-element": "/vendor/@lit/reactive-element/reactive-element.js",
+          "@lit/reactive-element/": "/vendor/@lit/reactive-element/",
+          "lit-element/lit-element.js": "/vendor/lit-element/lit-element.js",
+          "lit-html": "/vendor/lit-html/lit-html.js",
+          "lit-html/": "/vendor/lit-html/"
+        }
+      }
+    </script>
+
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 40rem;
+        margin: 0 auto;
+      }
+      .buttons {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+        margin-block: 1.5rem;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Song info dialog</h1>
+      <p>
+        <code>&lt;song-info-dialog&gt;</code> in its different states, with sample data. The
+        <code>no-heading</code> button shows a plain <code>app-modal</code> without a heading, to
+        check where its close button sits.
+      </p>
+      <div class="buttons">
+        <button data-state="full">Full details + history</button>
+        <button data-state="long">Long title, no history</button>
+        <button data-state="minimal">Minimal metadata</button>
+        <button data-state="loading">Loading</button>
+        <button data-state="missing">Song not found</button>
+        <button data-state="no-heading">app-modal without heading</button>
+      </div>
+
+      <song-info-dialog id="dialog"></song-info-dialog>
+      <app-modal id="plain-modal" size="medium">
+        <p>An <code>app-modal</code> with no heading: no header bar, close button in the corner.</p>
+      </app-modal>
+    </main>
+
+    <script type="module">
+      import '/components/song-info-dialog.js'
+      import '/components/app-modal.js'
+
+      const weeksAgo = weeks => new Date(Date.now() - weeks * 7 * 86400000).toISOString().slice(0, 10)
+
+      const states = {
+        full: {
+          song: {
+            title: 'How Great Thou Art',
+            artist: 'Stuart K. Hine',
+            ccliNumber: '14181',
+            metadata: { key: 'A', tempo: 72, timeSignature: '3/4' },
+          },
+          appearances: [
+            { date: weeksAgo(2), playedInKey: 'G', leader: 'Ann', setlistName: '' },
+            { date: weeksAgo(9), playedInKey: 'A', leader: 'Ben', setlistName: 'Harvest' },
+            { date: weeksAgo(30), playedInKey: 'A', leader: 'Ann', setlistName: '' },
+          ],
+        },
+        long: {
+          song: {
+            title:
+              'O Come All Ye Faithful (Adeste Fideles) – Extended Arrangement With Descant And Final Verse',
+            metadata: { key: 'G' },
+          },
+          appearances: [],
+        },
+        minimal: { song: { title: 'Untitled Song', metadata: {} }, appearances: [] },
+        loading: { song: { title: 'Loading Song' }, loading: true },
+        missing: { song: null },
+      }
+
+      const dialog = document.getElementById('dialog')
+      for (const button of document.querySelectorAll('[data-state]')) {
+        button.addEventListener('click', () => {
+          const state = button.dataset.state
+          if (state === 'no-heading') {
+            document.getElementById('plain-modal').show()
+          } else {
+            dialog.showData(states[state])
+          }
+        })
+      }
+    </script>
+  </body>
+</html>

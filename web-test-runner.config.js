@@ -3,6 +3,7 @@ import { playwrightLauncher } from '@web/test-runner-playwright';
 export default {
   files: [
     'tests/chord-utils.test.js',
+    'tests/date-utils.test.js',
     'tests/db.test.js',
     'tests/db-usage.test.js',
     'tests/drive-api-sync.test.js',
