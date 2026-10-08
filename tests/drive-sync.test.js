@@ -43,9 +43,15 @@ describe('Drive sync (against FakeDrive)', () => {
   async function makeDevice(name, { orgName = ORG_NAME, folderLink = memoryFolderLink() } = {}) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
-    const sync = new DriveSyncManager(orgName, ORG_ID, { db, folderLink })
+    const memberCache = {
+      value: null,
+      async set(members) {
+        this.value = members
+      },
+    }
+    const sync = new DriveSyncManager(orgName, ORG_ID, { db, folderLink, memberCache })
     await sync.init()
-    const device = { name, db, sync, folderLink }
+    const device = { name, db, sync, folderLink, memberCache }
     devices.push(device)
     return device
   }
@@ -55,6 +61,7 @@ describe('Drive sync (against FakeDrive)', () => {
     device.sync = new DriveSyncManager(newName, ORG_ID, {
       db: device.db,
       folderLink: device.folderLink,
+      memberCache: device.memberCache,
     })
     await device.sync.init()
   }
@@ -618,6 +625,42 @@ describe('Drive sync (against FakeDrive)', () => {
 
       expect(error?.message).to.match(/in the Drive trash/)
       expect(orgFolders()).to.deep.equal([])
+    })
+  })
+
+  describe('organisation members', () => {
+    it("caches the people the organisation's folder is shared with", async () => {
+      const phone = await makeDevice('phone')
+      const folder = drive.findByPath(['Chordless', ORG_NAME])
+      drive.addPermission(folder.id, {
+        emailAddress: 'simon@example.com',
+        displayName: 'Simon Davy',
+        role: 'owner',
+      })
+      drive.addPermission(folder.id, {
+        emailAddress: 'ann@example.com',
+        displayName: 'Ann Smith',
+        role: 'writer',
+      })
+      drive.addPermission(folder.id, { type: 'anyone', role: 'reader' })
+
+      await syncDevice(phone)
+
+      expect(phone.memberCache.value).to.deep.equal([
+        { email: 'simon@example.com', name: 'Simon Davy', role: 'owner' },
+        { email: 'ann@example.com', name: 'Ann Smith', role: 'writer' },
+      ])
+    })
+
+    it('still syncs if the members cannot be fetched', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Synced anyway' })
+      drive.failRequests({ method: 'GET', path: /\/permissions/ })
+
+      await syncDevice(phone)
+
+      expect(driveSetlist(setlist.id).name).to.equal('Synced anyway')
+      expect(phone.memberCache.value).to.equal(null)
     })
   })
 

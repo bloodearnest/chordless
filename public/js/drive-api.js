@@ -87,6 +87,20 @@ export async function getFile(fileId, fields = 'id,name,parents,trashed') {
 }
 
 /**
+ * People a file or folder is shared with: [{ email, name, role }] for each user
+ * permission (role is owner, organizer, fileOrganizer, writer, commenter or
+ * reader). Group, domain and "anyone" permissions are skipped.
+ */
+export async function listFolderPermissions(folderId) {
+  const result = await driveRequest(
+    `/files/${folderId}/permissions?fields=permissions(id,type,role,emailAddress,displayName,deleted)`
+  )
+  return (result.permissions || [])
+    .filter(p => p.type === 'user' && p.emailAddress && !p.deleted)
+    .map(p => ({ email: p.emailAddress, name: p.displayName || p.emailAddress, role: p.role }))
+}
+
+/**
  * Rename a file or folder
  */
 export async function renameFile(fileId, name) {

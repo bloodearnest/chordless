@@ -711,7 +711,7 @@ export function determineSetlistType(dateString, name) {
 /**
  * Create a new setlist object with defaults
  */
-export function createSetlist({ date, time, type, name, owner } = {}) {
+export function createSetlist({ date, time, type, name, owner, ownerId } = {}) {
   const setlistDate = date || getNextSunday()
   const dateString = typeof setlistDate === 'string' ? setlistDate : toLocalDateString(setlistDate)
 
@@ -722,6 +722,8 @@ export function createSetlist({ date, time, type, name, owner } = {}) {
     type: type || determineSetlistType(dateString, name),
     name: name || '',
     owner: owner || '',
+    // Leader's Google account email (empty for a leader known only by name)
+    ownerId: ownerId || '',
     songs: [],
     createdDate: new Date().toISOString(),
     modifiedDate: new Date().toISOString(),

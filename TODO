@@ -40,6 +40,14 @@ ccli import
 sharing
 - temporary sharing
 - email media team
+- invite people to an organisation: a dialog to share the org's Drive folder with an
+  email address, as read (musicians) or write (leaders) access. The leader dropdown
+  already lists the folder's members (cached at sync).
+- shared users' devices can't find the org folder yet: the app only has the drive.file
+  scope, which only covers files the app created for that user. Needs the Google Picker
+  (user picks the folder once) or a wider scope. See SHARING.md and the worker's
+  /session/invite endpoint.
+- restrict editing others' setlists, using the setlist's ownerId (leader's Google email)
 
 player
  - click stuttering start

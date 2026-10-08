@@ -89,6 +89,12 @@ export class FakeDrive {
     return found
   }
 
+  /** Share a file or folder: { emailAddress, displayName, role, type = 'user' } */
+  addPermission(fileId, permission) {
+    const file = this._get(fileId)
+    file.permissions.push({ id: `perm-${this._nextId++}`, type: 'user', ...permission })
+  }
+
   /** Simulate an edit made elsewhere (another device, or the Drive UI) */
   editContent(fileId, content) {
     const file = this._get(fileId)
@@ -132,10 +138,23 @@ export class FakeDrive {
     this.requests.push({ method, path, params, body })
 
     const fileMatch = path.match(/^\/drive\/v3\/files\/([^/]+)$/)
+    const permissionsMatch = path.match(/^\/drive\/v3\/files\/([^/]+)\/permissions$/)
     const uploadMatch = path.match(/^\/upload\/drive\/v3\/files\/([^/]+)$/)
 
     if (path === '/drive/v3/about' && method === 'GET') {
       return json({ user: { displayName: 'Fake User', emailAddress: 'fake@example.com' } })
+    }
+    if (permissionsMatch && method === 'GET') {
+      const file = this._getOr404(permissionsMatch[1])
+      if (file instanceof Response) return file
+      const fields = params
+        .get('fields')
+        ?.match(/permissions\(([^)]*)\)/)?.[1]
+        ?.split(',')
+      const permissions = file.permissions.map(p =>
+        fields ? Object.fromEntries(fields.filter(f => f in p).map(f => [f, p[f]])) : p
+      )
+      return json({ kind: 'drive#permissionList', permissions })
     }
     if (path === '/drive/v3/files' && method === 'GET') {
       return this._list(params)
@@ -220,6 +239,7 @@ export class FakeDrive {
       createdTime: now,
       modifiedTime: now,
       version: 1,
+      permissions: [],
       content,
       md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : fakeChecksum(content),
     }

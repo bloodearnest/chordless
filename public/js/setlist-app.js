@@ -4,6 +4,7 @@
 import { formatTempo, getCurrentDB } from './db.js'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
+import { claimSetlistsOnce, getOrganisationPeople } from './people.js'
 import { getAvailableKeys, transposeSong } from './transpose.js'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
 import { isTypingInField } from './utils/keyboard.js'
@@ -194,6 +195,8 @@ class PageApp {
         state: 'loading',
       })
 
+      // One-off: record leader ids on setlists from before they existed
+      await claimSetlistsOnce(this.db, this.db.organisationId)
       const setlists = await this.db.getAllSetlists()
 
       if (setlists.length === 0) {
@@ -1007,6 +1010,7 @@ class PageApp {
       this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.detail.changes)
       dialog.addEventListener('details-save', this._setlistDetailsSaveHandler)
     }
+    dialog.people = (await getOrganisationPeople()).people
     await dialog.show(this.currentSetlist)
   }
 

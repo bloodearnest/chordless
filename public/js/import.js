@@ -1,13 +1,13 @@
 // Import tool for migrating filesystem data to IndexedDB
 
 import { ChordlessDB, determineSetlistType } from './db.js'
-import { getCurrentUserInfo } from './google-auth.js'
 import {
   createOrganisation,
   getOrganisationByName,
   setCurrentOrganisation,
 } from './organisation.js'
 import { ChordProParser } from './parser.js'
+import { getCurrentPerson } from './people.js'
 import { createSong, findExistingSong, hashText } from './song-utils.js'
 import { parseHtml } from './utils/html-parser.js'
 
@@ -125,12 +125,9 @@ export class SetlistImporter {
   async importFromServer(progressCallback = null) {
     console.log('[Import] Starting import from server')
 
-    // Get current user info for leader field
-    const userInfo = await getCurrentUserInfo()
-    const defaultLeader = userInfo?.name || userInfo?.email || 'Simon Davy'
-
-    console.log(`[Import] Using default leader: ${defaultLeader}`)
-    this.defaultLeader = defaultLeader
+    // Imported setlists are led by whoever is importing (no leader if not signed in)
+    this.defaultLeader = await getCurrentPerson()
+    console.log(`[Import] Using default leader: ${this.defaultLeader?.name || '(none)'}`)
 
     // Clear existing data (without deleting the database)
     // This works even when multiple tabs are open
@@ -376,7 +373,8 @@ export class SetlistImporter {
       time: '10:30', // Default time
       type: determineSetlistType(setlistData.date, name),
       name: name || '',
-      owner: this.defaultLeader || '', // Renamed from leader
+      owner: this.defaultLeader?.name || '', // Renamed from leader
+      ownerId: this.defaultLeader?.id || '',
       songs: songs,
       createdDate: new Date().toISOString(), // Renamed from createdAt
       modifiedDate: new Date().toISOString(), // Renamed from updatedAt

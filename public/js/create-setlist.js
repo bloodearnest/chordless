@@ -1,5 +1,6 @@
 // Create Setlist Modal Handler
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
+import { getOrganisationPeople } from './people.js'
 import { toLocalDateString } from './utils/date-utils.js'
 
 let db = null
@@ -25,15 +26,18 @@ export async function initCreateSetlistModal() {
     return
   }
 
-  // Open with defaults: next Sunday, a Sunday morning service
-  createButton.addEventListener('click', () => {
+  // Open with defaults: next Sunday, a Sunday morning service, led by you
+  createButton.addEventListener('click', async () => {
+    const { people, me } = await getOrganisationPeople()
     const date = toLocalDateString(getNextSunday())
+    form.people = people
     form.setlist = {
       date,
       time: '10:30',
       type: determineSetlistType(date, ''),
       name: '',
-      owner: '',
+      owner: me?.name || '',
+      ownerId: me?.id || '',
     }
     modal.show()
   })

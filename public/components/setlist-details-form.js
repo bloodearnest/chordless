@@ -4,6 +4,40 @@ import { determineSetlistType } from '../js/db.js'
 
 export const SETLIST_TYPES = ['Church Service', 'Prayer Meeting', 'Event', 'Other']
 
+const NO_LEADER = ''
+const OTHER_LEADER = 'other'
+
+/**
+ * The leader choices for a setlist: the organisation's people, plus its current
+ * leader if they aren't one of them.
+ *
+ * A leader recorded by name only (before leaders had ids) is matched to a
+ * person with that name, so saving the form adds their id.
+ *
+ * @param {object} setlist - with owner (name) and ownerId (email)
+ * @param {Array<{id: string, name: string}>} people
+ * @returns {{options: Array<{value: string, person: {id: string, name: string}}>, selected: string}}
+ */
+export function leaderChoices(setlist = {}, people = []) {
+  const options = people.map(person => ({ value: `id:${person.id}`, person }))
+  const owner = setlist.owner?.trim() || ''
+  const ownerId = setlist.ownerId || ''
+  const same = (a, b) => a.toLowerCase() === b.toLowerCase()
+
+  if (!owner && !ownerId) return { options, selected: NO_LEADER }
+
+  const match = ownerId
+    ? options.find(o => same(o.person.id, ownerId))
+    : options.find(o => same(o.person.name, owner))
+  if (match) return { options, selected: match.value }
+
+  // Not one of the people: keep them as a choice rather than lose them
+  const extra = ownerId
+    ? { value: `id:${ownerId}`, person: { id: ownerId, name: owner || ownerId } }
+    : { value: `name:${owner}`, person: { id: '', name: owner } }
+  return { options: [...options, extra], selected: extra.value }
+}
+
 /**
  * SetlistDetailsForm Component
  *
@@ -11,14 +45,16 @@ export const SETLIST_TYPES = ['Church Service', 'Prayer Meeting', 'Event', 'Othe
  * both to create a setlist and to edit one, so the two can't drift apart.
  *
  * Properties:
- * @property {Object} setlist - Initial values ({date, time, type, name, owner})
+ * @property {Object} setlist - Initial values ({date, time, type, name, owner, ownerId})
+ * @property {Array} people - Who can be chosen as leader: [{id, name}] (see people.js)
  * @property {string} submitLabel - Label for the submit button
  * @property {boolean} autoType - Guess the type from the date and name as they
  *   change (for new setlists)
  *
  * Events:
- * @fires save - detail: {date, time, type, name, owner}. The leader is stored
- *   as `owner`, trimmed.
+ * @fires save - detail: {date, time, type, name, owner, ownerId}. The leader's
+ *   name is `owner` and their id (Google account email) is `ownerId`, which is
+ *   empty for a leader typed in with "Other…".
  * @fires cancel - Cancel was pressed
  */
 export class SetlistDetailsForm extends LitElement {
@@ -26,6 +62,8 @@ export class SetlistDetailsForm extends LitElement {
     setlist: { attribute: false },
     submitLabel: { type: String, attribute: 'submit-label' },
     autoType: { type: Boolean, attribute: 'auto-type' },
+    people: { attribute: false },
+    _otherLeader: { state: true },
   }
 
   static styles = css`
@@ -66,6 +104,10 @@ export class SetlistDetailsForm extends LitElement {
       border-color: var(--button-bg);
     }
 
+    .other-leader {
+      margin-top: 0.5rem;
+    }
+
     input::placeholder {
       color: var(--text-secondary, #95a5a6);
     }
@@ -103,6 +145,9 @@ export class SetlistDetailsForm extends LitElement {
     this.setlist = {}
     this.submitLabel = 'Save'
     this.autoType = false
+    this.people = []
+    this._otherLeader = false
+    this._leaders = leaderChoices()
   }
 
   _guessType() {
@@ -114,14 +159,34 @@ export class SetlistDetailsForm extends LitElement {
     }
   }
 
-  /** Put the fields back to the `setlist` values, discarding anything typed */
-  reset() {
-    this.requestUpdate()
+  willUpdate(changed) {
+    if (changed.has('setlist') || changed.has('people')) {
+      this._leaders = leaderChoices(this.setlist, this.people)
+      this._otherLeader = false
+    }
   }
 
-  updated() {
-    // Set after render: a .value binding on <select> runs before its options exist
-    this.renderRoot.getElementById('type').value = this.setlist?.type || SETLIST_TYPES[0]
+  updated(changed) {
+    // Set selects after render (a .value binding runs before their options
+    // exist), and only for a new setlist, so the user's choices aren't undone
+    if (changed.has('setlist') || changed.has('people')) {
+      this.renderRoot.getElementById('type').value = this.setlist?.type || SETLIST_TYPES[0]
+      this.renderRoot.getElementById('leader').value = this._leaders.selected
+    }
+  }
+
+  _leaderChanged(event) {
+    this._otherLeader = event.target.value === OTHER_LEADER
+  }
+
+  /** The chosen leader as { owner, ownerId } */
+  _leader(data) {
+    const value = data.get('leader')
+    if (value === OTHER_LEADER) {
+      return { owner: data.get('leaderOther')?.trim() || '', ownerId: '' }
+    }
+    const person = this._leaders.options.find(o => o.value === value)?.person
+    return { owner: person?.name || '', ownerId: person?.id || '' }
   }
 
   _submit(event) {
@@ -136,7 +201,7 @@ export class SetlistDetailsForm extends LitElement {
           time: data.get('time'),
           type: data.get('type'),
           name: data.get('name')?.trim() || '',
-          owner: data.get('leader')?.trim() || '',
+          ...this._leader(data),
         },
       })
     )
@@ -186,13 +251,28 @@ export class SetlistDetailsForm extends LitElement {
         </div>
         <div class="form-field">
           <label for="leader">Leader (optional)</label>
-          <input
-            type="text"
-            id="leader"
-            name="leader"
-            .value=${live(s.owner || '')}
-            placeholder="e.g. John Smith"
-          />
+          <select id="leader" name="leader" @change=${this._leaderChanged}>
+            <option value="">No leader</option>
+            ${this._leaders.options.map(
+              o => html`<option value=${o.value}>${o.person.name}</option>`
+            )}
+            <option value=${OTHER_LEADER}>Other…</option>
+          </select>
+          ${
+            this._otherLeader
+              ? html`
+                <input
+                  type="text"
+                  id="leader-other"
+                  name="leaderOther"
+                  class="other-leader"
+                  aria-label="Leader's name"
+                  placeholder="Leader's name"
+                  required
+                />
+              `
+              : ''
+          }
         </div>
         <div class="actions">
           <button type="button" class="cancel" @click=${this._cancel}>Cancel</button>

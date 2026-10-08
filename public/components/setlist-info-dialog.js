@@ -24,12 +24,15 @@ import './setlist-info.js'
  */
 export class SetlistInfoDialog extends LitElement {
   static properties = {
+    /** Who can be chosen as leader when editing: [{id, name}] (see people.js) */
+    people: { attribute: false },
     _setlist: { state: true },
     _editing: { state: true },
   }
 
   constructor() {
     super()
+    this.people = []
     this._setlist = null
     this._editing = false
   }
@@ -105,6 +108,7 @@ export class SetlistInfoDialog extends LitElement {
             ? html`
               <setlist-details-form
                 .setlist=${this._setlist}
+                .people=${this.people}
                 submit-label="Save"
                 @save=${this._save}
                 @cancel=${this._cancel}

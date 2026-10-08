@@ -135,6 +135,21 @@ function organisationFolderLink(organisationId) {
 }
 
 /**
+ * Where the organisation's members (people its Drive folder is shared with) are
+ * cached for offline use: its record in the organisations database, as
+ * `members`. Tests pass their own { set }.
+ */
+function organisationMemberCache(organisationId) {
+  return {
+    async set(members) {
+      const db = new OrganisationDB()
+      await db.init()
+      await db.updateOrganisation(organisationId, { members })
+    },
+  }
+}
+
+/**
  * Sync Manager for a specific organisation
  */
 export class DriveSyncManager {
@@ -145,12 +160,19 @@ export class DriveSyncManager {
    * @param {{get: Function, set: Function}} [options.folderLink] - Where the link
    *   to the organisation's Drive folder is stored. Defaults to its record in the
    *   organisations database.
+   * @param {{set: Function}} [options.memberCache] - Where the folder's members
+   *   are cached. Defaults to the organisation's record.
    */
-  constructor(organisationName, organisationId, { db = null, folderLink = null } = {}) {
+  constructor(
+    organisationName,
+    organisationId,
+    { db = null, folderLink = null, memberCache = null } = {}
+  ) {
     this.organisationName = organisationName
     this.organisationId = organisationId
     this.organisationDb = db
     this.folderLink = folderLink
+    this.memberCache = memberCache
     this.driveFolderId = null
     this.parser = new ChordProParser()
 
@@ -179,6 +201,7 @@ export class DriveSyncManager {
     }
 
     this.folderLink ??= organisationFolderLink(this.organisationId)
+    this.memberCache ??= organisationMemberCache(this.organisationId)
     const isNew = await this.resolveDriveFolder()
     console.log(`[DriveSync] Organisation folder ID: ${this.driveFolderId}`)
     return isNew
@@ -283,6 +306,9 @@ export class DriveSyncManager {
     if (progressCallback) progressCallback({ stage: 'starting', message: 'Starting sync...' })
 
     try {
+      // Who the organisation's folder is shared with, for choosing leaders
+      await this.refreshMembers()
+
       // Before changing anything, check local records belong to this folder
       if (progressCallback)
         progressCallback({ stage: 'scanning', message: 'Checking Drive files...' })
@@ -360,6 +386,22 @@ export class DriveSyncManager {
       }
       pageToken = result.nextPageToken || null
     } while (pageToken)
+  }
+
+  /**
+   * Fetch and cache the people the organisation's Drive folder is shared with.
+   * Not essential to syncing, so failures are only logged.
+   * @returns {Promise<Array<{email: string, name: string, role: string}>|null>}
+   */
+  async refreshMembers() {
+    try {
+      const members = await DriveAPI.listFolderPermissions(this.driveFolderId)
+      await this.memberCache.set(members)
+      return members
+    } catch (error) {
+      console.warn('[DriveSync] Could not refresh organisation members:', error)
+      return null
+    }
   }
 
   /**

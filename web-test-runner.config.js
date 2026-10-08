@@ -16,6 +16,7 @@ export default {
     'tests/lyrics-normalizer.test.js',
     'tests/metronome-controller.test.js',
     'tests/pad-audio-controller.test.js',
+    'tests/people.test.js',
     'tests/setlist-details-form.test.js',
     'tests/setlist-song.test.js',
     'tests/sync-reconciler.test.js',

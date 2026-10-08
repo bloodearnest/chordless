@@ -101,6 +101,8 @@ test.describe('Song info', () => {
 
     await page.goto('/songs#info-test-song')
     await page.reload()
+    // The header shows the song once it has loaded; info refers to it from then on
+    await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
     await page.locator('#library-app-header .info-button').click()
 
     const modal = page.locator('#library-song-info-dialog app-modal')
@@ -156,7 +158,8 @@ test.describe('Song info', () => {
     await page.locator('#create-setlist-button').click()
     const form = page.locator('#create-setlist-form')
     await form.locator('#name').fill('Leader Test')
-    await form.locator('#leader').fill('  Ann  ')
+    await form.locator('#leader').selectOption('other')
+    await form.locator('#leader-other').fill('  Ann  ')
     await form.locator('button[type="submit"]').click()
     await page.waitForURL(/\/setlist\//)
     // The redirect from the home page logs an aborted view transition and a null
@@ -184,11 +187,12 @@ test.describe('Song info', () => {
     const dialog = page.locator('#setlist-info-dialog')
     await dialog.locator('.edit-button').click()
     const form = dialog.locator('setlist-details-form')
-    await expect(form.locator('#leader')).toHaveValue('Ann')
+    // The setlist's current leader is selected
+    await expect(form.locator('#leader option:checked')).toHaveText('Ann')
     // Type with real key presses: page shortcuts (space starts the song, arrows
     // change song) must leave text fields alone
-    const leader = form.locator('#leader')
-    await leader.fill('')
+    await form.locator('#leader').selectOption('other')
+    const leader = form.locator('#leader-other')
     await leader.pressSequentially('Ben Smith')
     await leader.press('ArrowLeft')
     await leader.press('ArrowLeft')
@@ -211,7 +215,12 @@ test.describe('Song info', () => {
       const { getCurrentDB } = await import('/js/db.js')
       return (await getCurrentDB()).getSetlist('edit-test-setlist')
     })
-    expect(saved).toMatchObject({ owner: 'Ben Smi-th', date: '2026-10-18', name: 'Harvest' })
+    expect(saved).toMatchObject({
+      owner: 'Ben Smi-th',
+      ownerId: '',
+      date: '2026-10-18',
+      name: 'Harvest',
+    })
     expect(errors).toEqual([])
   })
 
@@ -223,7 +232,8 @@ test.describe('Song info', () => {
     await page.locator('#app-header .info-button').click()
     const dialog = page.locator('#setlist-info-dialog')
     await dialog.locator('.edit-button').click()
-    await dialog.locator('setlist-details-form #leader').fill('Not saved')
+    await dialog.locator('setlist-details-form #leader').selectOption('other')
+    await dialog.locator('setlist-details-form #leader-other').fill('Not saved')
     await dialog.locator('setlist-details-form .cancel').click()
 
     await expect(dialog.locator('setlist-info')).toContainText('Ann')

@@ -2,6 +2,7 @@
 // Handles bookmarklet imports with user choice UI
 
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
+import { getOrganisationPeople } from './people.js'
 import { createSong, findExistingSong } from './song-utils.js'
 import { formatSetlistDate, toLocalDateString } from './utils/date-utils.js'
 
@@ -229,19 +230,22 @@ import { formatSetlistDate, toLocalDateString } from './utils/date-utils.js'
     }
   }
 
-  function openCreateSetlistModal() {
+  async function openCreateSetlistModal() {
     const modal = document.getElementById('create-setlist-modal')
     const form = document.getElementById('create-setlist-form')
     const close = () => modal.classList.remove('active')
 
-    // Open with defaults: next Sunday, a Sunday morning service
+    // Open with defaults: next Sunday, a Sunday morning service, led by you
+    const { people, me } = await getOrganisationPeople()
     const date = toLocalDateString(getNextSunday())
+    form.people = people
     form.setlist = {
       date,
       time: '10:30',
       type: determineSetlistType(date, ''),
       name: '',
-      owner: '',
+      owner: me?.name || '',
+      ownerId: me?.id || '',
     }
     modal.classList.add('active')
 
