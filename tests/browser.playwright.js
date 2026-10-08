@@ -24,3 +24,27 @@ test.describe('Application Pages', () => {
     expect(await page.locator('#song-view').count()).toBe(1)
   })
 })
+
+test.describe('Loading', () => {
+  test('modal content is hidden until app-modal is defined', async ({ page }) => {
+    // Hold app-modal.js until we've checked, so the element stays undefined
+    let releaseModal
+    const modalHeld = new Promise(resolve => {
+      releaseModal = resolve
+    })
+    await page.route(/\/components\/app-modal\.js$/, async route => {
+      await modalHeld
+      await route.continue()
+    })
+
+    await page.goto('/', { waitUntil: 'commit' })
+    const input = page.locator('#create-setlist-modal input').first()
+    await input.waitFor({ state: 'attached' })
+    expect(await page.evaluate(() => customElements.get('app-modal'))).toBeUndefined()
+    await expect(input).toBeHidden()
+
+    releaseModal()
+    await page.waitForFunction(() => customElements.get('app-modal'))
+    await expect(input).toBeHidden()
+  })
+})

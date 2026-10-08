@@ -28,6 +28,17 @@ html {
   width: 100%;
 }
 
+/* Custom elements whose module hasn't loaded yet render their light DOM as raw
+   HTML. Hide them until defined to avoid a flash of unstyled content. */
+:not(:defined) {
+  visibility: hidden;
+}
+
+/* Modals start closed, so take their content out of the layout entirely. */
+app-modal:not(:defined) {
+  display: none;
+}
+
 :root {
   /* Theme colors - set by theme-manager.js */
   /* Light mode defaults (will be overridden by theme manager) */
