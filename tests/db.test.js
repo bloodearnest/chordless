@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { ChordlessDB, createSetlist } from '../js/db.js'
+import { ChordlessDB, createSetlist } from '../public/js/db.js'
 
 const uniqueName = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)

@@ -15,12 +15,12 @@ test-unit:
 # Lint/format JS files with Biome (fast!)
 lint:
     @echo "Running Biome check..."
-    npx @biomejs/biome check components js tests service-worker.js
+    npx @biomejs/biome check public/components public/js public/tests tests public/service-worker.js
 
 # Format project files with Biome
 format:
     @echo "Formatting with Biome..."
-    npx @biomejs/biome format --write components js tests service-worker.js
+    npx @biomejs/biome format --write public/components public/js public/tests tests public/service-worker.js
 
 # Copy vendored dependencies from node_modules to vendor/
 vendor:

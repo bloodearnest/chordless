@@ -10,11 +10,18 @@ const EXCLUDE_PATTERNS = [
   /\/testing\//,
 ];
 
+// Used only by the Cloudflare Worker (bundled by wrangler from node_modules),
+// never by the browser, so they must not be copied into public/.
+const WORKER_ONLY = new Set(['jose', 'google-auth-library']);
+
+const VENDOR_DIR = 'public/vendor';
+
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
-rmSync('vendor', { recursive: true, force: true });
+rmSync(VENDOR_DIR, { recursive: true, force: true });
 for (const dep of Object.keys(pkg.dependencies || {})) {
+  if (WORKER_ONLY.has(dep)) continue;
   const src = join('node_modules', dep);
-  const dest = join('vendor', dep);
+  const dest = join(VENDOR_DIR, dep);
   mkdirSync(dirname(dest), { recursive: true });
   copyFiltered(src, dest);
 }

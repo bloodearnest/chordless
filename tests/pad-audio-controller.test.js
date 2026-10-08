@@ -83,7 +83,7 @@ describe('PadAudioController', () => {
 
   before(async () => {
     window.Audio = MockAudio
-    ;({ PadAudioController } = await import('../js/pad-audio-controller.js'))
+    ;({ PadAudioController } = await import('../public/js/pad-audio-controller.js'))
 
     PadAudioController.prototype._resolvePadUrl = async function (key) {
       return key ? `https://example.com/pads/${key}.mp3` : null

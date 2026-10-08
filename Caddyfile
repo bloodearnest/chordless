@@ -5,7 +5,7 @@
 
 # HTTP server (also used by Tailscale Funnel)
 :8080 {
-    root * .
+    root * public
     encode zstd gzip
     handle /oauth/* {
         reverse_proxy http://localhost:8787
@@ -18,7 +18,7 @@
 
 # HTTPS server
 https://localhost:8443, https://127.0.0.1:8443, https://casey.tail030f3.ts.net:8443 {
-    root * .
+    root * public
     encode zstd gzip
     tls certs/dev.crt certs/dev.key
     header {

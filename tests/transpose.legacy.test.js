@@ -16,7 +16,7 @@ import {
   transposeChordBySemitones,
   transposeKeyName,
   transposeNote,
-} from '../js/transpose.js'
+} from '../public/js/transpose.js'
 
 function assert(condition, message) {
   expect(condition, message).to.be.true

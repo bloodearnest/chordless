@@ -97,6 +97,7 @@
 		"includes": [
 			"**",
 			"!node_modules/**",
+			"!public/vendor/**",
 			"!test-results/**",
 			"!tests/fixtures/**"
 		]
@@ -121,13 +122,13 @@
 		}
 	},
 	"overrides": [
-		{ "includes": ["components/**/*.js"], "linter": { "rules": {} } },
+		{ "includes": ["public/components/**/*.js"], "linter": { "rules": {} } },
 		{
 			"includes": [
-				"*.js",
-				"components/**/*.js",
-				"js/**/*.js",
-				"service-worker.js"
+				"public/*.js",
+				"public/components/**/*.js",
+				"public/js/**/*.js",
+				"public/service-worker.js"
 			],
 			"javascript": {
 				"globals": [
@@ -269,7 +270,7 @@
 			}
 		},
 		{
-			"includes": ["service-worker.js"],
+			"includes": ["public/service-worker.js"],
 			"javascript": {
 				"globals": [
 					"WorkerGlobalScope",
@@ -448,7 +449,7 @@
 			}
 		},
 		{
-			"includes": ["tests/template-test.js", "tests/test-sw.js"],
+			"includes": ["public/tests/template-test.js"],
 			"javascript": {
 				"globals": [
 					"onanimationend",

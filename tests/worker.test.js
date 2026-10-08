@@ -79,13 +79,12 @@ test('worker API: /session/refresh route exists', async () => {
 })
 
 test('worker source is not served as JavaScript', async () => {
-  // If .assetsignore is working: ASSETS excludes the file, SPA fallback returns index.html (text/html)
-  // If .assetsignore is broken: source code is served as application/javascript — leaks server logic
+  // Only public/ is served; anything outside it falls through to the SPA fallback (text/html)
   const resp = await worker.fetch('/worker/src/index.js')
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `worker source should not be served — got content-type: ${ct} (check .assetsignore)`
+    `worker source should not be served — got content-type: ${ct} (check [assets] directory)`
   )
 })
 
@@ -100,13 +99,11 @@ test('CORS preflight returns correct headers', async () => {
 })
 
 test('sets/ personal data not served as raw files', async () => {
-  // If .assetsignore is working: ASSETS excludes the dir, SPA fallback returns index.html
-  // If .assetsignore is broken: setlist JSON files are publicly readable
   const resp = await worker.fetch('/sets/test.json')
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `sets/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`
+    `sets/ should not be served as assets — got content-type: ${ct} (check [assets] directory)`
   )
 })
 
@@ -139,6 +136,22 @@ test('notes/ personal data not served as raw files', async () => {
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
-    `notes/ should not be served as assets — got content-type: ${ct} (check .assetsignore)`
+    `notes/ should not be served as assets — got content-type: ${ct} (check [assets] directory)`
   )
+})
+
+test('repo root files are not served', async () => {
+  for (const path of ['/wrangler.toml', '/package.json', '/CLAUDE.md']) {
+    const resp = await worker.fetch(path)
+    const ct = resp.headers.get('content-type') ?? ''
+    assert.ok(ct.includes('text/html'), `${path} should not be served — got content-type: ${ct}`)
+  }
+})
+
+test('worker-only packages are not vendored into public/', async () => {
+  for (const path of ['/vendor/jose/package.json', '/vendor/google-auth-library/package.json']) {
+    const resp = await worker.fetch(path)
+    const ct = resp.headers.get('content-type') ?? ''
+    assert.ok(ct.includes('text/html'), `${path} should not be served — got content-type: ${ct}`)
+  }
 })

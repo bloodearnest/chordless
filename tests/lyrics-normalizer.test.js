@@ -10,7 +10,7 @@ import {
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
   splitChordDisplaySegments,
-} from '../js/utils/lyrics-normalizer.js'
+} from '../public/js/utils/lyrics-normalizer.js'
 
 describe('lyrics-normalizer utilities', () => {
   it('detects visible lyrics and normalizes glue markers', () => {

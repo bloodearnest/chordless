@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { reconcileSetlists, reconcileSongs } from '../js/sync/reconciler.js'
+import { reconcileSetlists, reconcileSongs } from '../public/js/sync/reconciler.js'
 
 const now = (offset = 0) => new Date(Date.now() + offset).toISOString()
 
