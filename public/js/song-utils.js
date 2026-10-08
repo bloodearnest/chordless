@@ -221,13 +221,7 @@ export async function createSong(chordproContent, options = {}) {
     ccliNumber: ccliNumber || null,
     title: title,
     titleNormalized: titleNormalized,
-    author: metadata.artist || metadata.author || null,
-    copyright: metadata.copyright || null,
-    key: metadata.key || null,
-    originalKey: metadata.key || null, // Preserve imported key for reset
-    tempo: metadata.tempo || null,
-    originalTempo: metadata.tempo || null, // Preserve imported tempo for reset
-    time: metadata.time || null,
+    ...chartFields(metadata),
 
     importDate: new Date().toISOString(),
     importUser: options.importUser || 'default-user',
@@ -244,6 +238,62 @@ export async function createSong(chordproContent, options = {}) {
   await db.saveSong(song)
 
   return song
+}
+
+/** The song fields that come from its chart's metadata */
+function chartFields(metadata) {
+  return {
+    author: metadata.artist || metadata.author || null,
+    copyright: metadata.copyright || null,
+    key: metadata.key || null,
+    originalKey: metadata.key || null, // Preserve imported key for reset
+    tempo: metadata.tempo || null,
+    originalTempo: metadata.tempo || null, // Preserve imported tempo for reset
+    time: metadata.time || null,
+  }
+}
+
+/**
+ * Replace a song's chart with new content, e.g. a fresh import of the same
+ * song. The song keeps its identity (uuid, id, title, variant and Drive
+ * fields); the fields that come from the chart are updated. Sync sees the
+ * changed chart and uploads it.
+ *
+ * @param {string} songUuid - UUID of the song to overwrite
+ * @param {string} chordproContent - The new ChordPro content
+ * @param {Object} db - Optional database instance (uses getCurrentDB if not provided)
+ * @returns {Promise<Object>} The updated song
+ */
+export async function overwriteSong(songUuid, chordproContent, db = null) {
+  if (!db) {
+    db = await getCurrentDB()
+  }
+
+  const song = await db.getSong(songUuid)
+  if (!song) {
+    throw new Error(`Song not found: ${songUuid}`)
+  }
+  const chordpro = await db.getChordPro(song.chordproFileId)
+  const now = new Date().toISOString()
+  const contentHash = hashText(chordproContent)
+
+  await db.saveChordPro({
+    ...chordpro,
+    id: song.chordproFileId,
+    content: chordproContent,
+    contentHash,
+    modifiedDate: now,
+  })
+  parseCache.delete(song.chordproFileId)
+
+  const updated = {
+    ...song,
+    ...chartFields(parser.parse(chordproContent).metadata),
+    contentHash,
+    modifiedDate: now,
+  }
+  await db.saveSong(updated)
+  return updated
 }
 
 /**

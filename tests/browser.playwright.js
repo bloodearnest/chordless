@@ -324,5 +324,27 @@ test.describe('Song import', () => {
 
     const setlist = await fromDB(page, 'getSetlist', 'import-test-setlist')
     expect(setlist.songs.map(s => s.songUuid)).toEqual([undefined, 'info-test-song'])
+    const chart = await fromDB(page, 'getChordPro', 'chordpro-info-test')
+    expect(chart.content).toContain('[G]Amazing [C]grace')
+  })
+
+  test('updates a song already in the library with the imported one', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await importSong(page, 'Info Test Song')
+
+    const songImport = page.locator('song-import')
+    await expect(songImport).toContainText('already exists in your library')
+    await songImport.locator('.update').click()
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await songImport.locator('.library-only').click()
+    await page.waitForURL(/\/songs#info-test-song/)
+
+    const chart = await fromDB(page, 'getChordPro', 'chordpro-info-test')
+    expect(chart.content).toContain('[D]Hello [G]world')
+    const song = await fromDB(page, 'getSong', 'info-test-song')
+    expect(song.key).toBe('D')
+    expect(song.id).toBe('title-info-test-song')
   })
 })

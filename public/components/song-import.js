@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.js'
 import { getOrganisationPeople } from '../js/people.js'
-import { createSong, findExistingSong } from '../js/song-utils.js'
+import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.js'
 import './app-modal.js'
 import './setlist-details-form.js'
@@ -272,6 +272,7 @@ export class SongImport extends LitElement {
         }))
       this._isDuplicate = Boolean(existing)
       this._duplicateChoice = null
+      this._chordproText = chordproText
 
       const setlists = await this._db.getAllSetlists()
       this._setlists = setlists.sort((a, b) => b.date.localeCompare(a.date))
@@ -400,17 +401,31 @@ export class SongImport extends LitElement {
     `
   }
 
-  _renderDuplicate() {
-    const choose = choice => () => {
-      this._duplicateChoice = choice
+  /** Keep the library's copy of a song we already have */
+  _useExisting() {
+    this._duplicateChoice = 'use-existing'
+  }
+
+  /** Replace the library's copy of the song with the imported one */
+  async _update() {
+    try {
+      this._song = await overwriteSong(this._song.uuid, this._chordproText, this._db)
+      console.log('[Import] Updated existing song:', this._song.title)
+      this._duplicateChoice = 'update'
+    } catch (error) {
+      console.error('[Import] Failed to update song:', error)
+      this._showError(`Failed to update song: ${error.message}`)
     }
+  }
+
+  _renderDuplicate() {
     return html`
       <div class="duplicate">
         <strong>⚠️ This song already exists in your library</strong>
         <p>Do you want to update the song with the new version, or use the existing one?</p>
         <div class="duplicate-actions">
-          <button class="update" @click=${choose('update')}>Update Song</button>
-          <button class="use-existing" @click=${choose('use-existing')}>Use Existing</button>
+          <button class="update" @click=${this._update}>Update Song</button>
+          <button class="use-existing" @click=${this._useExisting}>Use Existing</button>
         </div>
       </div>
     `
