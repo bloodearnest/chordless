@@ -117,52 +117,6 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Clear Drive and re-upload everything
-   * @param {Function} progressCallback - Optional callback for main thread
-   */
-  async clearAndReupload(progressCallback = null) {
-    if (!this.syncManager) {
-      await this.init()
-    }
-
-    const broadcaster = new ProgressBroadcaster(progressCallback)
-
-    try {
-      await broadcaster.send({
-        stage: 'starting',
-        message: 'Starting clear and re-upload...',
-        timestamp: new Date().toISOString(),
-      })
-
-      await this.syncManager.clearAndReupload(progress => {
-        broadcaster.send({
-          ...progress,
-          timestamp: new Date().toISOString(),
-        })
-      })
-
-      await broadcaster.send({
-        stage: 'complete',
-        message: 'Clear and re-upload complete!',
-        timestamp: new Date().toISOString(),
-      })
-
-      return { success: true }
-    } catch (error) {
-      console.error('[SyncOrchestrator] Clear and re-upload failed:', error)
-
-      await broadcaster.send({
-        stage: 'error',
-        message: error.message,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      })
-
-      throw error
-    }
-  }
-
-  /**
    * Push local changes to Drive
    * @param {Function} progressCallback - Optional callback for main thread
    */

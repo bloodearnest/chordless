@@ -230,51 +230,6 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
-  async handleClearAndReupload() {
-    if (this.syncing || !this.syncAvailable || this.disabled) return
-
-    if (
-      !confirm(
-        '⚠️ This will DELETE all files in your Google Drive Chordless folder and re-upload everything with the new file structure.\n\nThis action cannot be undone!\n\nAre you sure?'
-      )
-    ) {
-      return
-    }
-
-    this.syncing = true
-    this.syncError = null
-    this.syncProgress = { stage: 'starting', message: 'Starting clear and re-upload...' }
-
-    try {
-      const { id, name } = getCurrentOrganisation()
-
-      // Use the SW-compatible orchestrator
-      const orchestrator = await createSyncOrchestrator(name, id)
-
-      await orchestrator.clearAndReupload(progress => {
-        this.syncProgress = progress
-        this.requestUpdate()
-      })
-
-      // Success!
-      const now = new Date().toISOString()
-      this.lastSyncTime = now
-      localStorage.setItem('last-sync-time', now)
-
-      // Show success briefly
-      this.syncProgress = { stage: 'success', message: '✓ Re-upload complete!' }
-      setTimeout(() => {
-        this.syncing = false
-        this.syncProgress = null
-      }, 2000)
-    } catch (error) {
-      console.error('[DriveSyncPanel] Clear and re-upload failed:', error)
-      this.syncError = error.message
-      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
-      this.syncing = false
-    }
-  }
-
   render() {
     if (!this.syncAvailable || this.disabled) {
       return html`
@@ -297,15 +252,6 @@ export class DriveSyncPanel extends LitElement {
           ${
             this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
           }
-        </button>
-
-        <button
-          class="sync-button"
-          ?disabled=${this.syncing}
-          @click=${this.handleClearAndReupload}
-          style="background: rgba(231, 76, 60, 0.2);"
-        >
-          🗑️ Clear & Re-upload (New File Structure)
         </button>
 
         ${
