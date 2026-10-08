@@ -27,15 +27,35 @@ describe('Drive sync (against FakeDrive)', () => {
   let drive
   let devices
 
+  /** In-memory stand-in for the organisation's stored Drive folder link */
+  const memoryFolderLink = () => ({
+    value: null,
+    async get() {
+      return this.value
+    },
+    async set(value) {
+      this.value = value
+    },
+  })
+
   /** A simulated device: its own local database, syncing the shared org */
-  async function makeDevice(name) {
+  async function makeDevice(name, { orgName = ORG_NAME, folderLink = memoryFolderLink() } = {}) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
-    const sync = new DriveSyncManager(ORG_NAME, ORG_ID, { db })
+    const sync = new DriveSyncManager(orgName, ORG_ID, { db, folderLink })
     await sync.init()
-    const device = { name, db, sync }
+    const device = { name, db, sync, folderLink }
     devices.push(device)
     return device
+  }
+
+  /** Rename the device's organisation: sync from then on uses the new name */
+  async function renameOrganisation(device, newName) {
+    device.sync = new DriveSyncManager(newName, ORG_ID, {
+      db: device.db,
+      folderLink: device.folderLink,
+    })
+    await device.sync.init()
   }
 
   async function addSetlist(device, fields = {}) {
@@ -445,6 +465,89 @@ describe('Drive sync (against FakeDrive)', () => {
 
       expect(error?.message).to.match(/Drive API error/)
       expect(drive.requests.filter(r => r.path.startsWith('/upload/'))).to.deep.equal([])
+    })
+  })
+
+  describe('organisations', () => {
+    const orgFolders = () =>
+      [...drive.files.values()].filter(
+        f => f.parents.includes(drive.findByPath(['Chordless']).id) && !f.trashed
+      )
+
+    it('keeps syncing the same Drive folder after a rename, and renames it', async () => {
+      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const setlist = await addSetlist(phone, { name: 'Harvest' })
+      await syncDevice(phone)
+      const folderId = drive.findByPath(['Chordless', 'Personal']).id
+
+      await renameOrganisation(phone, 'Simon Davy')
+      await editSetlist(phone, setlist.id, { name: 'Harvest edited' })
+      await syncDevice(phone)
+
+      expect(orgFolders().map(f => f.name)).to.deep.equal(['Simon Davy'])
+      expect(drive.findByPath(['Chordless', 'Simon Davy']).id).to.equal(folderId)
+      expect(driveSetlist(setlist.id).name).to.equal('Harvest edited')
+    })
+
+    it('keeps the linked folder, without renaming it, if the new name is taken', async () => {
+      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const setlist = await addSetlist(phone, { name: 'Harvest' })
+      await syncDevice(phone)
+      await makeDevice('tablet', { orgName: 'Simon Davy' }) // creates that folder
+
+      await renameOrganisation(phone, 'Simon Davy')
+      await editSetlist(phone, setlist.id, { name: 'Harvest edited' })
+      await syncDevice(phone)
+
+      expect(
+        orgFolders()
+          .map(f => f.name)
+          .sort()
+      ).to.deep.equal(['Personal', 'Simon Davy'])
+      expect(driveSetlist(setlist.id).name).to.equal('Harvest edited')
+    })
+
+    it('stops before changing anything if records belong to another folder', async () => {
+      // A device from before folders were linked: sync found the folder by name,
+      // so renaming its organisation pointed it at a different folder, and
+      // everything looked "missing" and was uploaded again (6 October 2026).
+      const noLink = { get: async () => null, set: async () => {} }
+      const phone = await makeDevice('phone', { orgName: 'Personal', folderLink: noLink })
+      await addSetlist(phone, { name: 'Mine' })
+      await syncDevice(phone)
+      const tablet = await makeDevice('tablet', { orgName: 'Simon Davy' })
+      await addSetlist(tablet, { name: 'Theirs' })
+      await syncDevice(tablet)
+      drive.requests = []
+
+      await renameOrganisation(phone, 'Simon Davy')
+      let error
+      try {
+        await phone.sync.sync()
+      } catch (e) {
+        error = e
+      }
+
+      expect(error?.name).to.equal('OrganisationFolderMismatchError')
+      expect(drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+      expect((await phone.db.getAllSetlists()).map(s => s.name)).to.deep.equal(['Mine'])
+    })
+
+    it('stops instead of creating a new folder if the linked one is in the trash', async () => {
+      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      await addSetlist(phone)
+      await syncDevice(phone)
+      drive.files.get(drive.findByPath(['Chordless', 'Personal']).id).trashed = true
+
+      let error
+      try {
+        await renameOrganisation(phone, 'Personal')
+      } catch (e) {
+        error = e
+      }
+
+      expect(error?.message).to.match(/in the Drive trash/)
+      expect(orgFolders()).to.deep.equal([])
     })
   })
 

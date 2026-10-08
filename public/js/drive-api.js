@@ -139,7 +139,9 @@ export async function driveRequest(endpoint, options = {}) {
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
-    throw new Error(`Drive API error: ${error.error?.message || response.statusText}`)
+    const err = new Error(`Drive API error: ${error.error?.message || response.statusText}`)
+    err.status = response.status
+    throw err
   }
 
   // Handle responses with no content (like DELETE operations)
@@ -148,6 +150,28 @@ export async function driveRequest(endpoint, options = {}) {
   }
 
   return response.json()
+}
+
+/**
+ * Get a file's metadata, or null if it doesn't exist (404)
+ */
+export async function getFile(fileId, fields = 'id,name,parents,trashed') {
+  try {
+    return await driveRequest(`/files/${fileId}?fields=${fields}`)
+  } catch (error) {
+    if (error.status === 404) return null
+    throw error
+  }
+}
+
+/**
+ * Rename a file or folder
+ */
+export async function renameFile(fileId, name) {
+  return driveRequest(`/files/${fileId}?fields=id,name`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
+  })
 }
 
 /**
@@ -392,6 +416,19 @@ export async function downloadFileBinary(fileId) {
 /**
  * Find or create the root "Chordless" folder
  */
+/**
+ * Find the organisation folder with this name under the root Chordless folder,
+ * without creating anything. Returns the folder or null.
+ */
+export async function findOrganisationFolderByName(organisationName) {
+  const rootFolderId = await findOrCreateRootFolder()
+  const query = `name='${organisationName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  const result = await driveRequest(
+    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
+  )
+  return result.files?.[0] ?? null
+}
+
 export async function findOrCreateRootFolder() {
   console.log('[DriveAPI] Finding/creating root Chordless folder...')
 

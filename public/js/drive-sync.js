@@ -24,6 +24,7 @@ import {
   getSetlistsFolder,
   getSongsFolder,
 } from './drive-api.js'
+import { OrganisationDB } from './organisation-db.js'
 import { ChordProParser } from './parser.js'
 import { hashText } from './song-utils.js'
 
@@ -85,6 +86,51 @@ export class UnsyncedChangesError extends Error {
 }
 
 /**
+ * Thrown when local records belong to a different Drive folder than the one this
+ * organisation now syncs with (e.g. it was renamed before folders were linked).
+ * Syncing would re-upload them all as duplicates, so sync stops instead.
+ */
+export class OrganisationFolderMismatchError extends Error {
+  constructor(count, folderName) {
+    super(
+      `${count} setlist(s)/song(s) on this device are stored in a different Google Drive ` +
+        `folder than "${folderName}", the one this organisation now syncs with. ` +
+        `Nothing was synced, to avoid uploading them again as duplicates.`
+    )
+    this.name = 'OrganisationFolderMismatchError'
+    this.count = count
+  }
+}
+
+/**
+ * Where an organisation's link to its Drive folder is stored: its record in the
+ * organisations database. Tests pass their own { get, set }.
+ */
+function organisationFolderLink(organisationId) {
+  let db = null
+  const getDb = async () => {
+    if (!db) {
+      db = new OrganisationDB()
+      await db.init()
+    }
+    return db
+  }
+  return {
+    async get() {
+      const org = await (await getDb()).getOrganisation(organisationId)
+      return org?.driveFolderId ?? null
+    },
+    async set(driveFolderId) {
+      try {
+        await (await getDb()).updateOrganisation(organisationId, { driveFolderId })
+      } catch (error) {
+        console.warn('[DriveSync] Could not record Drive folder link:', error)
+      }
+    },
+  }
+}
+
+/**
  * Sync Manager for a specific organisation
  */
 export class DriveSyncManager {
@@ -92,11 +138,15 @@ export class DriveSyncManager {
    * @param {object} [options]
    * @param {ChordlessDB} [options.db] - Database to sync. Defaults to the current
    *   organisation's database. Tests pass one per simulated device.
+   * @param {{get: Function, set: Function}} [options.folderLink] - Where the link
+   *   to the organisation's Drive folder is stored. Defaults to its record in the
+   *   organisations database.
    */
-  constructor(organisationName, organisationId, { db = null } = {}) {
+  constructor(organisationName, organisationId, { db = null, folderLink = null } = {}) {
     this.organisationName = organisationName
     this.organisationId = organisationId
     this.organisationDb = db
+    this.folderLink = folderLink
     this.driveFolderId = null
     this.parser = new ChordProParser()
 
@@ -124,16 +174,60 @@ export class DriveSyncManager {
       await this.organisationDb.init()
     }
 
-    // Find or create organisation folder in Drive
+    this.folderLink ??= organisationFolderLink(this.organisationId)
+    const isNew = await this.resolveDriveFolder()
+    console.log(`[DriveSync] Organisation folder ID: ${this.driveFolderId}`)
+    return isNew
+  }
+
+  /**
+   * Find this organisation's Drive folder. Once linked (stored after the first
+   * sync) it's used by ID, so renaming the organisation can't point sync at a
+   * different folder. The first sync finds or creates it by name and links it.
+   * @returns {Promise<boolean>} whether the folder was newly created
+   */
+  async resolveDriveFolder() {
+    const linkedId = await this.folderLink.get()
+
+    if (linkedId) {
+      const folder = await DriveAPI.getFile(linkedId, 'id,name,trashed')
+      if (!folder || folder.trashed) {
+        throw new Error(
+          `This organisation's Google Drive folder ${folder ? `"${folder.name}" is in the Drive trash` : 'no longer exists'}. ` +
+            'Restore it from the Drive trash, or reset this organisation, before syncing.'
+        )
+      }
+      this.driveFolderId = folder.id
+      if (folder.name !== this.organisationName) {
+        await this.renameDriveFolder(folder)
+      }
+      return false
+    }
+
     const result = await DriveAPI.findOrCreateOrganisationFolder(
       this.organisationName,
       this.organisationId
     )
     this.driveFolderId = result.folderId
-
-    console.log(`[DriveSync] Organisation folder ID: ${this.driveFolderId}`)
-
+    await this.folderLink.set(result.folderId)
     return result.isNew
+  }
+
+  /**
+   * Keep the Drive folder's name in step with the organisation's, unless another
+   * organisation folder already has that name.
+   */
+  async renameDriveFolder(folder) {
+    const existing = await DriveAPI.findOrganisationFolderByName(this.organisationName)
+    if (existing && existing.id !== folder.id) {
+      console.warn(
+        `[DriveSync] Not renaming Drive folder "${folder.name}" to "${this.organisationName}": ` +
+          'another folder already has that name. Syncing continues with the linked folder.'
+      )
+      return
+    }
+    console.log(`[DriveSync] Renaming Drive folder "${folder.name}" to "${this.organisationName}"`)
+    await DriveAPI.renameFile(folder.id, this.organisationName)
   }
 
   /**
@@ -164,6 +258,12 @@ export class DriveSyncManager {
     if (progressCallback) progressCallback({ stage: 'starting', message: 'Starting sync...' })
 
     try {
+      // Before changing anything, check local records belong to this folder
+      if (progressCallback)
+        progressCallback({ stage: 'scanning', message: 'Checking Drive files...' })
+      await this.buildDriveInventory()
+      await this.assertRecordsInThisFolder()
+
       // First, pull changes from Drive
       if (progressCallback)
         progressCallback({ stage: 'pulling', message: 'Downloading from Drive...' })
@@ -235,6 +335,31 @@ export class DriveSyncManager {
       }
       pageToken = result.nextPageToken || null
     } while (pageToken)
+  }
+
+  /**
+   * Throw OrganisationFolderMismatchError if local records point to Drive files
+   * that exist outside this organisation's folder. Sync treats records missing
+   * from the folder as deleted and re-uploads them; for files that actually live
+   * in another folder that would duplicate them, so stop instead. Needs the
+   * inventory; skipped if it couldn't be built.
+   */
+  async assertRecordsInThisFolder() {
+    if (!this._driveFileIds) return
+
+    const missing = [
+      ...(await this.organisationDb.getAllSetlists()),
+      ...(await this.organisationDb.getAllSongs()),
+    ].filter(record => record.driveFileId && !this.fileExistsInDrive(record.driveFileId))
+
+    let elsewhere = 0
+    for (const record of missing) {
+      const file = await DriveAPI.getFile(record.driveFileId, 'id,trashed')
+      if (file && !file.trashed) elsewhere++
+    }
+    if (elsewhere > 0) {
+      throw new OrganisationFolderMismatchError(elsewhere, this.organisationName)
+    }
   }
 
   /**
