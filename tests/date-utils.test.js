@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { getWeeksAgo } from '../public/js/utils/date-utils.js'
+import { formatSetlistDate, getWeeksAgo, setlistTitle } from '../public/js/utils/date-utils.js'
 
 const { describe, it } = window
 
@@ -28,5 +28,48 @@ describe('getWeeksAgo', () => {
     expect(getWeeksAgo('2026-10-09', lateEvening)).to.equal('tomorrow')
     const earlyMorning = new Date(2026, 9, 8, 0, 1)
     expect(getWeeksAgo('2026-10-07', earlyMorning)).to.equal('yesterday')
+  })
+})
+
+describe('formatSetlistDate', () => {
+  const now = new Date(2026, 9, 8)
+
+  it('formats long dates in the given locale', () => {
+    expect(formatSetlistDate('2026-10-18', 'long', { locale: 'en-GB', now })).to.equal(
+      'Sunday, 18 October 2026'
+    )
+    expect(formatSetlistDate('2026-10-18', 'long', { locale: 'en-US', now })).to.equal(
+      'Sunday, October 18, 2026'
+    )
+  })
+
+  it('formats short dates, adding the year only when it is not this year', () => {
+    expect(formatSetlistDate('2026-10-18', 'short', { locale: 'en-GB', now })).to.equal(
+      'Sun 18 Oct'
+    )
+    expect(formatSetlistDate('2025-10-12', 'short', { locale: 'en-GB', now })).to.equal(
+      'Sun, 12 Oct 2025'
+    )
+  })
+
+  it('reads YYYY-MM-DD as a local date', () => {
+    // As UTC this would be Saturday evening in timezones behind UTC
+    expect(formatSetlistDate('2026-10-18', 'short', { locale: 'en-GB', now })).to.match(/^Sun/)
+  })
+
+  it('returns anything unparseable unchanged', () => {
+    expect(formatSetlistDate('not a date', 'long', { locale: 'en-GB', now })).to.equal('not a date')
+  })
+})
+
+describe('setlistTitle', () => {
+  const now = new Date(2026, 9, 8)
+  const options = { locale: 'en-GB', now }
+
+  it('is the date, plus the name if there is one', () => {
+    expect(setlistTitle({ date: '2026-10-18' }, 'short', options)).to.equal('Sun 18 Oct')
+    expect(setlistTitle({ date: '2026-10-18', name: 'Harvest' }, 'long', options)).to.equal(
+      'Sunday, 18 October 2026 - Harvest'
+    )
   })
 })

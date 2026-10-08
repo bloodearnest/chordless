@@ -9,6 +9,21 @@
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Import Song - Chordless</title>
     <link rel="stylesheet" href="/css/style.css" />
+
+    <!-- Import map for Lit -->
+    <script type="importmap">
+      {
+        "imports": {
+          "lit": "/vendor/lit/index.js",
+          "lit/": "/vendor/lit/",
+          "@lit/reactive-element": "/vendor/@lit/reactive-element/reactive-element.js",
+          "@lit/reactive-element/": "/vendor/@lit/reactive-element/",
+          "lit-element/lit-element.js": "/vendor/lit-element/lit-element.js",
+          "lit-html": "/vendor/lit-html/lit-html.js",
+          "lit-html/": "/vendor/lit-html/"
+        }
+      }
+    </script>
   </head>
   <body>
     <div class="app-container">
@@ -110,49 +125,11 @@
           <div class="modal-content">
             <button class="modal-close" id="create-modal-close">&times;</button>
             <h2>Create New Setlist</h2>
-            <form id="create-setlist-form">
-              <div class="form-field">
-                <label for="setlist-date">Date</label>
-                <input type="date" id="setlist-date" name="date" required />
-              </div>
-              <div class="form-field">
-                <label for="setlist-time">Time</label>
-                <input type="time" id="setlist-time" name="time" value="10:30" required />
-              </div>
-              <div class="form-field">
-                <label for="setlist-type">Type</label>
-                <select id="setlist-type" name="type" required>
-                  <option value="Church Service">Church Service</option>
-                  <option value="Prayer Meeting">Prayer Meeting</option>
-                  <option value="Event">Event</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-              <div class="form-field">
-                <label for="setlist-name">Name (optional)</label>
-                <input
-                  type="text"
-                  id="setlist-name"
-                  name="name"
-                  placeholder="e.g. Youth Service, Christmas Special"
-                />
-              </div>
-              <div class="form-field">
-                <label for="setlist-leader">Leader (optional)</label>
-                <input
-                  type="text"
-                  id="setlist-leader"
-                  name="leader"
-                  placeholder="e.g. John Smith"
-                />
-              </div>
-              <div class="modal-actions">
-                <button type="button" class="modal-btn modal-btn-cancel" id="create-cancel">
-                  Cancel
-                </button>
-                <button type="submit" class="modal-btn modal-btn-primary">Create & Add Song</button>
-              </div>
-            </form>
+            <setlist-details-form
+              id="create-setlist-form"
+              submit-label="Create & Add Song"
+              auto-type
+            ></setlist-details-form>
           </div>
         </div>
       </div>
@@ -162,6 +139,7 @@
       // Set window name so bookmarklet can find and reuse this tab
       window.name = 'chordless';
     </script>
+    <script type="module" src="/components/setlist-details-form.js"></script>
     <script type="module" src="/js/import-song-handler.js"></script>
   </body>
 </html>

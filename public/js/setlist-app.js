@@ -5,6 +5,8 @@ import { formatTempo, getCurrentDB } from './db.js'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
 import { getAvailableKeys, transposeSong } from './transpose.js'
+import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
+import { isTypingInField } from './utils/keyboard.js'
 import '../components/status-message.js'
 import '../components/song-list.js'
 import '../components/progress-modal.js'
@@ -231,8 +233,7 @@ class PageApp {
       for (const year of years) {
         const formattedSetlists = groupedByYear[year].map(setlist => {
           const songCount = Array.isArray(setlist.songs) ? setlist.songs.length : 0
-          const baseName = this.formatSetlistName(setlist.date)
-          const displayName = setlist.name ? `${baseName} - ${setlist.name}` : baseName
+          const displayName = setlistTitle(setlist, 'short')
           return {
             id: setlist.id,
             url: `/setlist/${setlist.id}`,
@@ -352,61 +353,6 @@ class PageApp {
     } catch (error) {
       console.error('Import failed:', error)
       progressModal.setError(`Import failed: ${error.message}`)
-    }
-  }
-
-  formatSetlistName(dateStr) {
-    const parts = dateStr.split('-')
-
-    if (parts.length < 3) {
-      return dateStr
-    }
-
-    const year = parts[0]
-    const month = parts[1]
-    const day = parts[2]
-
-    const eventParts = parts.slice(3)
-    const eventName =
-      eventParts.length > 0 ? this.capitalizeWords(eventParts.join(' ').replace(/_/g, ' ')) : null
-
-    try {
-      const date = new Date(`${year}-${month}-${day}T00:00:00`)
-      if (isNaN(date.getTime())) {
-        return dateStr
-      }
-
-      const dayNum = date.getDate()
-      const monthName = date.toLocaleDateString('en-US', { month: 'long' })
-      const dayName = date.toLocaleDateString('en-US', { weekday: 'long' })
-      const ordinalSuffix = this.getOrdinalSuffix(dayNum)
-
-      const formattedDate = `${dayNum}${ordinalSuffix} ${monthName} (${dayName})`
-
-      return eventName ? `${formattedDate} - ${eventName}` : formattedDate
-    } catch {
-      return dateStr
-    }
-  }
-
-  capitalizeWords(str) {
-    return str
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-      .join(' ')
-  }
-
-  getOrdinalSuffix(day) {
-    if (day > 3 && day < 21) return 'th'
-    switch (day % 10) {
-      case 1:
-        return 'st'
-      case 2:
-        return 'nd'
-      case 3:
-        return 'rd'
-      default:
-        return 'th'
     }
   }
 
@@ -775,23 +721,6 @@ class PageApp {
     history.replaceState({ view: 'overview' }, '', newUrl)
   }
 
-  formatDate(dateStr) {
-    try {
-      const date = new Date(dateStr + 'T00:00:00')
-      if (isNaN(date.getTime())) {
-        return dateStr
-      }
-      return date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      })
-    } catch {
-      return dateStr
-    }
-  }
-
   renderFullSetlist(setlist, songs) {
     const fragment = document.createDocumentFragment()
 
@@ -965,10 +894,7 @@ class PageApp {
       newTitle = song.title
     } else {
       if (this.currentSetlist) {
-        const formattedDate = this.formatSetlistName(this.currentSetlist.date)
-        newTitle = this.currentSetlist.name
-          ? `${formattedDate} - ${this.currentSetlist.name}`
-          : formattedDate
+        newTitle = setlistTitle(this.currentSetlist, 'short')
       } else {
         newTitle = 'Setlist'
       }
@@ -1077,7 +1003,34 @@ class PageApp {
   async showSetlistInfo() {
     const dialog = document.getElementById('setlist-info-dialog')
     if (!dialog || !this.currentSetlist) return
+    if (!this._setlistDetailsSaveHandler) {
+      this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.detail.changes)
+      dialog.addEventListener('details-save', this._setlistDetailsSaveHandler)
+    }
     await dialog.show(this.currentSetlist)
+  }
+
+  /**
+   * Save edited setlist details (date, time, type, name, leader) from the info
+   * dialog. On failure the dialog stays in edit mode with what was typed.
+   */
+  async saveSetlistDetails(changes) {
+    const dialog = document.getElementById('setlist-info-dialog')
+    const setlist = this.currentSetlist
+    const previous = { ...setlist }
+    try {
+      Object.assign(setlist, changes, { modifiedDate: new Date().toISOString() })
+      await this.db.saveSetlist(setlist)
+    } catch (error) {
+      Object.assign(setlist, previous)
+      console.error('[SetlistInfo] Failed to save setlist details:', error)
+      alert(`Couldn't save the setlist details: ${error.message}`)
+      return
+    }
+
+    const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
+    this.updateHeader(song, true)
+    await dialog?.show(setlist)
   }
 
   scrollToSection(sectionId, newIndex, instant = false) {
@@ -2935,6 +2888,9 @@ class PageApp {
     if (route.type === 'home') return
 
     document.addEventListener('keydown', e => {
+      // Leave keys alone while typing in a field (e.g. the setlist details form)
+      if (isTypingInField(e)) return
+
       // Handle Escape key to exit edit mode
       if (e.key === 'Escape') {
         const isEditMode = document.body.classList.contains('edit-mode')
@@ -3070,9 +3026,7 @@ class PageApp {
           if (this.currentSetlist.name) {
             navMenu.setlistTitle = this.currentSetlist.name
           } else {
-            let datePart = this.formatSetlistName(this.currentSetlist.date)
-            // Remove the day name in parentheses (e.g., "(Sunday)")
-            datePart = datePart.replace(/\s*\([^)]+\)/, '')
+            const datePart = formatSetlistDate(this.currentSetlist.date, 'short')
             const typePart = this.currentSetlist.type ? ` - ${this.currentSetlist.type}` : ''
             navMenu.setlistTitle = datePart + typePart
           }

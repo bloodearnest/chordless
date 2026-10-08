@@ -62,6 +62,7 @@
       <div class="buttons">
         <button data-setlist="full">Named, all details</button>
         <button data-setlist="minimal">Unnamed, no leader, no songs</button>
+        <button id="edit-setlist">Editing details</button>
       </div>
       <h2>app-modal</h2>
       <div class="buttons">
@@ -126,6 +127,14 @@
       for (const button of document.querySelectorAll('[data-setlist]')) {
         button.addEventListener('click', () => setlistDialog.show(setlists[button.dataset.setlist]))
       }
+      document
+        .getElementById('edit-setlist')
+        .addEventListener('click', () => setlistDialog.edit(setlists.full))
+      // Stand in for the setlist page: apply the changes and show the result
+      setlistDialog.addEventListener('details-save', event => {
+        Object.assign(setlists.full, event.detail.changes, { modifiedDate: new Date().toISOString() })
+        setlistDialog.show(setlists.full)
+      })
 
       const dialog = document.getElementById('dialog')
       for (const button of document.querySelectorAll('[data-state]')) {

@@ -78,44 +78,11 @@
 
       <!-- Create Setlist Modal -->
       <app-modal id="create-setlist-modal" heading="Create New Setlist">
-        <form id="create-setlist-form">
-          <div class="form-field">
-            <label for="setlist-date">Date</label>
-            <input type="date" id="setlist-date" name="date" required />
-          </div>
-          <div class="form-field">
-            <label for="setlist-time">Time</label>
-            <input type="time" id="setlist-time" name="time" value="10:30" required />
-          </div>
-          <div class="form-field">
-            <label for="setlist-type">Type</label>
-            <select id="setlist-type" name="type" required>
-              <option value="Church Service">Church Service</option>
-              <option value="Prayer Meeting">Prayer Meeting</option>
-              <option value="Event">Event</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-          <div class="form-field">
-            <label for="setlist-name">Name (optional)</label>
-            <input
-              type="text"
-              id="setlist-name"
-              name="name"
-              placeholder="e.g. Youth Service, Christmas Special"
-            />
-          </div>
-          <div class="form-field">
-            <label for="setlist-leader">Leader (optional)</label>
-            <input type="text" id="setlist-leader" name="leader" placeholder="e.g. John Smith" />
-          </div>
-          <div slot="actions" class="modal-actions">
-            <button type="button" class="modal-btn modal-btn-cancel" id="create-cancel">
-              Cancel
-            </button>
-            <button type="submit" class="modal-btn modal-btn-primary">Create Setlist</button>
-          </div>
-        </form>
+        <setlist-details-form
+          id="create-setlist-form"
+          submit-label="Create Setlist"
+          auto-type
+        ></setlist-details-form>
       </app-modal>
     </div>
 
@@ -166,6 +133,7 @@
     <!-- Import the components -->
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-modal.js"></script>
+    <script type="module" src="/components/setlist-details-form.js"></script>
     <script type="module" src="js/create-setlist.js"></script>
     <script type="module" src="js/setlist-app.js"></script>
   </body>

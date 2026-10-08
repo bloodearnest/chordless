@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { getWeeksAgo } from '../js/utils/date-utils.js'
+import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.js'
 
 /**
  * SongInfo Component
@@ -381,13 +381,7 @@ export class SongInfo extends LitElement {
   }
 
   formatDate(dateStr) {
-    // Parse YYYY-MM-DD format and convert to readable format
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
+    return formatSetlistDate(dateStr, 'long')
   }
 }
 

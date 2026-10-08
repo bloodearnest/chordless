@@ -1,11 +1,10 @@
 import { css, html, LitElement } from 'lit'
-import { parseLocalDate } from '../js/utils/date-utils.js'
 
 /**
  * SetlistInfo Component
  *
  * Displays detailed information about a setlist. It doesn't show the date and
- * name: setlist-info-dialog shows those as its heading (see setlistTitle).
+ * name: setlist-info-dialog shows those as its heading (setlistTitle in date-utils).
  *
  * Properties:
  * @property {Object} setlist - Setlist data object
@@ -91,7 +90,7 @@ export class SetlistInfo extends LitElement {
       return html`<div class="empty">No setlist information available.</div>`
     }
 
-    // The date and name are the dialog's heading (setlistTitle), so not repeated here
+    // The date and name are the dialog's heading, so not repeated here
     const songCount = this.setlist.songs ? this.setlist.songs.length : 0
     const leader = this.leader || this.setlist.owner?.trim()
 
@@ -133,21 +132,6 @@ export class SetlistInfo extends LitElement {
     const date = new Date(isoString)
     return date.toLocaleString()
   }
-}
-
-/** Format a setlist's YYYY-MM-DD date for display, as a local date */
-export function formatSetlistDate(dateStr) {
-  return parseLocalDate(dateStr).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
-}
-
-/** A setlist's display title: its date, plus its name if it has one */
-export function setlistTitle(setlist) {
-  const date = formatSetlistDate(setlist.date)
-  return setlist.name ? `${date} - ${setlist.name}` : date
 }
 
 // Define the custom element

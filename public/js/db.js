@@ -1,3 +1,4 @@
+import { parseLocalDate, toLocalDateString } from './utils/date-utils.js'
 import { ensurePersistentStorage } from './utils/persistence.js'
 
 // IndexedDB wrapper for database operations
@@ -685,7 +686,7 @@ export function getNextSunday() {
  * Determine setlist type based on date and name
  */
 export function determineSetlistType(dateString, name) {
-  const date = new Date(dateString)
+  const date = parseLocalDate(dateString)
   const dayOfWeek = date.getDay()
 
   // If there's a name, default to Event
@@ -712,8 +713,7 @@ export function determineSetlistType(dateString, name) {
  */
 export function createSetlist({ date, time, type, name, owner } = {}) {
   const setlistDate = date || getNextSunday()
-  const dateString =
-    typeof setlistDate === 'string' ? setlistDate : setlistDate.toISOString().split('T')[0]
+  const dateString = typeof setlistDate === 'string' ? setlistDate : toLocalDateString(setlistDate)
 
   return {
     id: crypto.randomUUID(),

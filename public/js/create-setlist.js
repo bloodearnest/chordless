@@ -1,5 +1,6 @@
 // Create Setlist Modal Handler
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
+import { toLocalDateString } from './utils/date-utils.js'
 
 let db = null
 
@@ -17,79 +18,34 @@ export async function initCreateSetlistModal() {
 
   const modal = document.getElementById('create-setlist-modal')
   const createButton = document.getElementById('create-setlist-button')
-  const cancelButton = document.getElementById('create-cancel')
   const form = document.getElementById('create-setlist-form')
-  const dateInput = document.getElementById('setlist-date')
-  const typeSelect = document.getElementById('setlist-type')
-  const nameInput = document.getElementById('setlist-name')
 
   if (!modal || !createButton || !form) {
     console.error('Create setlist modal elements not found')
     return
   }
 
-  // Show modal and initialize form
+  // Open with defaults: next Sunday, a Sunday morning service
   createButton.addEventListener('click', () => {
-    // Set default date to next Sunday
-    const nextSunday = getNextSunday()
-    const dateString = nextSunday.toISOString().split('T')[0]
-    dateInput.value = dateString
-
-    // Set default type to Church Service
-    typeSelect.value = 'Church Service'
-
-    // Clear optional fields
-    nameInput.value = ''
-    document.getElementById('setlist-leader').value = ''
-
+    const date = toLocalDateString(getNextSunday())
+    form.setlist = {
+      date,
+      time: '10:30',
+      type: determineSetlistType(date, ''),
+      name: '',
+      owner: '',
+    }
     modal.show()
   })
 
-  // Close modal handler
-  cancelButton.addEventListener('click', () => {
-    modal.close()
-  })
+  form.addEventListener('cancel', () => modal.close())
 
-  // Auto-detect type when date or name changes
-  const updateType = () => {
-    const date = dateInput.value
-    const name = nameInput.value
-    if (date) {
-      const detectedType = determineSetlistType(date, name)
-      typeSelect.value = detectedType
-    }
-  }
-
-  dateInput.addEventListener('change', updateType)
-  nameInput.addEventListener('input', updateType)
-
-  // Handle form submission
-  form.addEventListener('submit', async e => {
-    e.preventDefault()
-
-    const formData = new FormData(form)
-    const setlistData = {
-      date: formData.get('date'),
-      time: formData.get('time'),
-      type: formData.get('type'),
-      name: formData.get('name'),
-      // The form calls it leader; setlists store the leader as owner
-      owner: formData.get('leader')?.trim() || '',
-    }
-
+  form.addEventListener('save', async event => {
     try {
-      // Create the setlist
-      const newSetlist = createSetlist(setlistData)
-
-      // Save to database
+      const newSetlist = createSetlist(event.detail)
       await db.saveSetlist(newSetlist)
-
       console.log('Setlist created:', newSetlist)
-
-      // Close modal
       modal.close()
-
-      // Redirect to the new setlist
       window.location.href = `/setlist/${newSetlist.id}`
     } catch (error) {
       console.error('Failed to create setlist:', error)

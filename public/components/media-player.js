@@ -4,6 +4,7 @@ import './icon.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
 import { getActivePadSet } from '../js/pad-set-service.js'
+import { isTypingInField } from '../js/utils/keyboard.js'
 
 /**
  * MediaPlayer Component
@@ -967,7 +968,7 @@ export class MediaPlayer extends LitElement {
 
   _handleKeydown(event) {
     // Start song on spacebar
-    if (event.code === 'Space' && !event.target.matches('input, textarea')) {
+    if (event.code === 'Space' && !isTypingInField(event)) {
       event.preventDefault()
       this._startSong()
     }

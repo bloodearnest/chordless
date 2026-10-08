@@ -36,6 +36,9 @@ import { css, html, LitElement } from 'lit'
  * @csspart body - The body content section
  * @csspart actions - The actions button container
  * @csspart close-button - The × close button
+ * @slot header-actions - Extra buttons in the header, left of the close button
+ *   (needs a heading). Set the has-header-actions attribute to leave room for them.
+ * @csspart header-actions - Container for the header-actions slot
  * @csspart confirm-button - The confirm button
  * @csspart cancel-button - The cancel button
  */
@@ -124,6 +127,19 @@ export class AppModal extends LitElement {
       color: var(--text-color, #2c3e50);
       margin: 0;
       padding-right: 3rem;
+    }
+
+    /* Extra header buttons (slot="header-actions"), just left of the close button */
+    .header-actions {
+      position: absolute;
+      top: 1rem;
+      right: 5rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    :host([has-header-actions]) .modal-title {
+      padding-right: 8rem;
     }
 
     .modal-close {
@@ -310,6 +326,9 @@ export class AppModal extends LitElement {
       return html`
         <div class="modal-header" part="header">
           ${this.heading ? html`<h2 class="modal-title" part="title">${this.heading}</h2>` : ''}
+          <div class="header-actions" part="header-actions">
+            <slot name="header-actions"></slot>
+          </div>
           ${
             !this.hideCloseButton
               ? html`

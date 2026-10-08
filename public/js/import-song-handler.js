@@ -3,6 +3,7 @@
 
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
 import { createSong, findExistingSong } from './song-utils.js'
+import { formatSetlistDate, toLocalDateString } from './utils/date-utils.js'
 
 ;(async function () {
   'use strict'
@@ -231,65 +232,40 @@ import { createSong, findExistingSong } from './song-utils.js'
   function openCreateSetlistModal() {
     const modal = document.getElementById('create-setlist-modal')
     const form = document.getElementById('create-setlist-form')
+    const close = () => modal.classList.remove('active')
 
-    // Set default date to next Sunday
-    const nextSunday = getNextSunday()
-    document.getElementById('setlist-date').valueAsDate = nextSunday
-
-    // Set default type based on date
-    const defaultType = determineSetlistType(nextSunday.toISOString().split('T')[0], '')
-    document.getElementById('setlist-type').value = defaultType
-
-    // Clear other fields
-    document.getElementById('setlist-time').value = '10:30'
-    document.getElementById('setlist-name').value = ''
-    document.getElementById('setlist-leader').value = ''
-
+    // Open with defaults: next Sunday, a Sunday morning service
+    const date = toLocalDateString(getNextSunday())
+    form.setlist = {
+      date,
+      time: '10:30',
+      type: determineSetlistType(date, ''),
+      name: '',
+      owner: '',
+    }
     modal.classList.add('active')
 
-    // Handle form submission
-    form.onsubmit = async e => {
-      e.preventDefault()
-
-      const formData = new FormData(form)
-      const date = formData.get('date')
-      const time = formData.get('time')
-      const type = formData.get('type')
-      const name = formData.get('name')
-      const leader = formData.get('leader')
-
-      // Create setlist
-      const setlist = createSetlist({ date, time, type, name, leader })
-
-      try {
-        // Save setlist to database
-        await db.saveSetlist(setlist)
-        console.log('[Import] Created new setlist:', setlist.id)
-
-        // Close modal
-        modal.classList.remove('active')
-
-        // Add song to this new setlist
-        await saveSongAndAddToSetlist(setlist.id)
-      } catch (error) {
-        console.error('[Import] Error creating setlist:', error)
-        alert(`Failed to create setlist: ${error.message}`)
-      }
+    // Custom events have no on* properties; add the listeners once
+    if (!form.dataset.listening) {
+      form.dataset.listening = 'true'
+      form.addEventListener('save', async event => {
+        const setlist = createSetlist(event.detail)
+        try {
+          await db.saveSetlist(setlist)
+          console.log('[Import] Created new setlist:', setlist.id)
+          close()
+          // Add song to this new setlist
+          await saveSongAndAddToSetlist(setlist.id)
+        } catch (error) {
+          console.error('[Import] Error creating setlist:', error)
+          alert(`Failed to create setlist: ${error.message}`)
+        }
+      })
+      form.addEventListener('cancel', close)
     }
-
-    // Handle close buttons
-    document.getElementById('create-modal-close').onclick = () => {
-      modal.classList.remove('active')
-    }
-
-    document.getElementById('create-cancel').onclick = () => {
-      modal.classList.remove('active')
-    }
-
+    document.getElementById('create-modal-close').onclick = close
     modal.onclick = e => {
-      if (e.target === modal) {
-        modal.classList.remove('active')
-      }
+      if (e.target === modal) close()
     }
   }
 
@@ -301,13 +277,7 @@ import { createSong, findExistingSong } from './song-utils.js'
   }
 
   function formatDate(dateString) {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+    return formatSetlistDate(dateString, 'short')
   }
 
   // Run on page load

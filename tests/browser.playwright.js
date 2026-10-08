@@ -38,7 +38,7 @@ test.describe('Loading', () => {
     })
 
     await page.goto('/', { waitUntil: 'commit' })
-    const input = page.locator('#create-setlist-modal input').first()
+    const input = page.locator('#create-setlist-modal setlist-details-form')
     await input.waitFor({ state: 'attached' })
     expect(await page.evaluate(() => customElements.get('app-modal'))).toBeUndefined()
     await expect(input).toBeHidden()
@@ -55,7 +55,9 @@ test.describe('Loading', () => {
 async function seedSong(page, { setlistId = null } = {}) {
   await page.goto('/songs')
   await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-  await page.waitForLoadState('load')
+  // The app reloads itself when the service worker first takes control, which
+  // can land mid-seed. A page loaded under the worker doesn't, so reload first.
+  await page.reload()
   await page.evaluate(async setlistId => {
     const { getCurrentDB } = await import('/js/db.js')
     const db = await getCurrentDB()
@@ -114,6 +116,8 @@ test.describe('Song info', () => {
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist#song-0')
+    // The header shows the song once it has loaded; info refers to it from then on
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
     await page.locator('#app-header .info-button').click()
 
     const modal = page.locator('#song-info-dialog app-modal')
@@ -130,11 +134,12 @@ test.describe('Song info', () => {
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
     await page.locator('#app-header .info-button').click()
 
     const modal = page.locator('#setlist-info-dialog app-modal')
     await expect(modal).toHaveAttribute('open', '')
-    await expect(modal).toHaveAttribute('heading', 'October 11, 2026')
+    await expect(modal).toHaveAttribute('heading', 'Sunday, 11 October 2026')
     const info = page.locator('#setlist-info-dialog setlist-info')
     await expect(info).toContainText('Ann')
     await expect(info).toContainText('1 song')
@@ -146,12 +151,13 @@ test.describe('Song info', () => {
     page.on('pageerror', error => errors.push(error.message))
     await page.goto('/')
     await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-    await page.waitForLoadState('load')
+    await page.reload() // see seedSong: avoid the app's first-load reload mid-test
 
     await page.locator('#create-setlist-button').click()
-    await page.locator('#setlist-name').fill('Leader Test')
-    await page.locator('#setlist-leader').fill('  Ann  ')
-    await page.locator('#create-setlist-form button[type="submit"]').click()
+    const form = page.locator('#create-setlist-form')
+    await form.locator('#name').fill('Leader Test')
+    await form.locator('#leader').fill('  Ann  ')
+    await form.locator('button[type="submit"]').click()
     await page.waitForURL(/\/setlist\//)
     // The redirect from the home page logs an aborted view transition and a null
     // rejection; only check for errors on the new setlist page itself
@@ -165,5 +171,66 @@ test.describe('Song info', () => {
     }).toPass()
     await expect(page.locator('#setlist-info-dialog setlist-info')).toContainText('Ann')
     expect(errors).toEqual([])
+  })
+
+  test('setlist details can be edited from the info dialog', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'edit-test-setlist' })
+    await page.goto('/setlist/edit-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+
+    await page.locator('#app-header .info-button').click()
+    const dialog = page.locator('#setlist-info-dialog')
+    await dialog.locator('.edit-button').click()
+    const form = dialog.locator('setlist-details-form')
+    await expect(form.locator('#leader')).toHaveValue('Ann')
+    // Type with real key presses: page shortcuts (space starts the song, arrows
+    // change song) must leave text fields alone
+    const leader = form.locator('#leader')
+    await leader.fill('')
+    await leader.pressSequentially('Ben Smith')
+    await leader.press('ArrowLeft')
+    await leader.press('ArrowLeft')
+    await leader.pressSequentially('-')
+    await expect(leader).toHaveValue('Ben Smi-th')
+    await form.locator('#date').fill('2026-10-18')
+    await form.locator('#name').fill('Harvest')
+    await form.locator('button[type="submit"]').click()
+
+    // Back to read-only, showing the saved details
+    const modal = dialog.locator('app-modal')
+    await expect(modal).toHaveAttribute('heading', 'Sunday, 18 October 2026 - Harvest')
+    await expect(dialog.locator('setlist-info')).toContainText('Ben Smi-th')
+    // The page header uses the short format (with the year once 2026 is past)
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 18 Oct( 2026)? - Harvest/)
+
+    // Saved: still there after a reload
+    await page.reload()
+    const saved = await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      return (await getCurrentDB()).getSetlist('edit-test-setlist')
+    })
+    expect(saved).toMatchObject({ owner: 'Ben Smi-th', date: '2026-10-18', name: 'Harvest' })
+    expect(errors).toEqual([])
+  })
+
+  test('cancelling a setlist details edit changes nothing', async ({ page }) => {
+    await seedSong(page, { setlistId: 'cancel-test-setlist' })
+    await page.goto('/setlist/cancel-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+
+    await page.locator('#app-header .info-button').click()
+    const dialog = page.locator('#setlist-info-dialog')
+    await dialog.locator('.edit-button').click()
+    await dialog.locator('setlist-details-form #leader').fill('Not saved')
+    await dialog.locator('setlist-details-form .cancel').click()
+
+    await expect(dialog.locator('setlist-info')).toContainText('Ann')
+    const saved = await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      return (await getCurrentDB()).getSetlist('cancel-test-setlist')
+    })
+    expect(saved.owner).toBe('Ann')
   })
 })

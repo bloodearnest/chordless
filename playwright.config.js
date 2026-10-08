@@ -13,6 +13,8 @@ export default defineConfig({
 
   use: {
     baseURL: 'http://localhost:8787',
+    // Dates follow the browser's locale; fix it so expectations are stable
+    locale: 'en-GB',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
