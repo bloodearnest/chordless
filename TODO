@@ -16,6 +16,11 @@ storage/sync
 - edit chordpro/variants
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices)
+- delete setlists (owner only, trashed in Drive on sync, removed on other devices):
+  designed in SYNC_ARCHITECTURE.md, not built
+- immediate background sync of just the changed record (setlist/song), in the
+  service worker, with full sync as the backstop: designed in SYNC_ARCHITECTURE.md,
+  not built. Later: durable offline write queue.
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
 - user-facing Drive health check / cleanup (idea): turn public/dev/drive-audit.html into an
   app feature that finds duplicate or empty setlists and stray organisation folders, and
