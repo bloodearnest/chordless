@@ -37,7 +37,7 @@ export function getWeeksAgo(dateString, now = new Date()) {
  * new Date() would read it as UTC midnight, which is the previous day in
  * timezones behind UTC.
  */
-function parseLocalDate(dateString) {
+export function parseLocalDate(dateString) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString)
   if (match) {
     return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))

@@ -73,7 +73,8 @@ export async function initCreateSetlistModal() {
       time: formData.get('time'),
       type: formData.get('type'),
       name: formData.get('name'),
-      leader: formData.get('leader'),
+      // The form calls it leader; setlists store the leader as owner
+      owner: formData.get('leader')?.trim() || '',
     }
 
     try {

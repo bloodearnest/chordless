@@ -1,13 +1,15 @@
 import { css, html, LitElement } from 'lit'
+import { parseLocalDate } from '../js/utils/date-utils.js'
 
 /**
  * SetlistInfo Component
  *
- * Displays detailed information about a setlist including metadata
+ * Displays detailed information about a setlist. It doesn't show the date and
+ * name: setlist-info-dialog shows those as its heading (see setlistTitle).
  *
  * Properties:
  * @property {Object} setlist - Setlist data object
- * @property {string} leader - Leader name (computed separately)
+ * @property {string} [leader] - Leader name. Defaults to the setlist's owner.
  */
 export class SetlistInfo extends LitElement {
   static properties = {
@@ -35,11 +37,6 @@ export class SetlistInfo extends LitElement {
       gap: 2rem;
     }
 
-    h2 {
-      margin-top: 0;
-      color: var(--header-bg);
-      font-size: var(--font-ui);
-    }
 
     .modal-info-grid {
       display: grid;
@@ -94,40 +91,29 @@ export class SetlistInfo extends LitElement {
       return html`<div class="empty">No setlist information available.</div>`
     }
 
-    return html`
-      <div class="setlist-info-container">${this.renderTitle()} ${this.renderInfoGrid()}</div>
-    `
-  }
-
-  renderTitle() {
-    const formattedDate = this.formatSetlistName(this.setlist.date)
-    const titleText = this.setlist.name ? `${formattedDate} - ${this.setlist.name}` : formattedDate
-
-    return html`<h2>${titleText}</h2>`
-  }
-
-  renderInfoGrid() {
+    // The date and name are the dialog's heading (setlistTitle), so not repeated here
     const songCount = this.setlist.songs ? this.setlist.songs.length : 0
+    const leader = this.leader || this.setlist.owner?.trim()
 
     return html`
-      <div class="modal-info-grid">
-        ${this.renderInfoItem('Date', this.formatSetlistName(this.setlist.date))}
-        ${this.setlist.time ? this.renderInfoItem('Time', this.setlist.time) : ''}
-        ${this.setlist.type ? this.renderInfoItem('Type', this.setlist.type) : ''}
-        ${this.setlist.name ? this.renderInfoItem('Name', this.setlist.name) : ''}
-        ${this.leader ? this.renderInfoItem('Leader', this.leader) : ''}
-        ${this.setlist.venue ? this.renderInfoItem('Venue', this.setlist.venue) : ''}
-        ${this.renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
-        ${
-          this.setlist.createdDate
-            ? this.renderInfoItem('Created', this.formatDateTime(this.setlist.createdDate))
-            : ''
-        }
-        ${
-          this.setlist.modifiedDate
-            ? this.renderInfoItem('Last Modified', this.formatDateTime(this.setlist.modifiedDate))
-            : ''
-        }
+      <div class="setlist-info-container">
+        <div class="modal-info-grid">
+          ${this.setlist.time ? this.renderInfoItem('Time', this.setlist.time) : ''}
+          ${this.setlist.type ? this.renderInfoItem('Type', this.setlist.type) : ''}
+          ${leader ? this.renderInfoItem('Leader', leader) : ''}
+          ${this.setlist.venue ? this.renderInfoItem('Venue', this.setlist.venue) : ''}
+          ${this.renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
+          ${
+            this.setlist.createdDate
+              ? this.renderInfoItem('Created', this.formatDateTime(this.setlist.createdDate))
+              : ''
+          }
+          ${
+            this.setlist.modifiedDate
+              ? this.renderInfoItem('Last Modified', this.formatDateTime(this.setlist.modifiedDate))
+              : ''
+          }
+        </div>
       </div>
     `
   }
@@ -143,20 +129,25 @@ export class SetlistInfo extends LitElement {
     `
   }
 
-  formatSetlistName(dateStr) {
-    // Format YYYY-MM-DD as readable date
-    const date = new Date(dateStr)
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    })
-  }
-
   formatDateTime(isoString) {
     const date = new Date(isoString)
     return date.toLocaleString()
   }
+}
+
+/** Format a setlist's YYYY-MM-DD date for display, as a local date */
+export function formatSetlistDate(dateStr) {
+  return parseLocalDate(dateStr).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+
+/** A setlist's display title: its date, plus its name if it has one */
+export function setlistTitle(setlist) {
+  const date = formatSetlistDate(setlist.date)
+  return setlist.name ? `${date} - ${setlist.name}` : date
 }
 
 // Define the custom element

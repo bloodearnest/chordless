@@ -123,4 +123,47 @@ test.describe('Song info', () => {
     await expect(page.locator('#song-info-dialog song-info')).toContainText('Ann')
     expect(errors).toEqual([])
   })
+
+  test('info button on the setlist overview opens the setlist info dialog', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'info-test-setlist' })
+
+    await page.goto('/setlist/info-test-setlist')
+    await page.locator('#app-header .info-button').click()
+
+    const modal = page.locator('#setlist-info-dialog app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await expect(modal).toHaveAttribute('heading', 'October 11, 2026')
+    const info = page.locator('#setlist-info-dialog setlist-info')
+    await expect(info).toContainText('Ann')
+    await expect(info).toContainText('1 song')
+    expect(errors).toEqual([])
+  })
+
+  test('a leader entered when creating a setlist appears in its info', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.goto('/')
+    await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+    await page.waitForLoadState('load')
+
+    await page.locator('#create-setlist-button').click()
+    await page.locator('#setlist-name').fill('Leader Test')
+    await page.locator('#setlist-leader').fill('  Ann  ')
+    await page.locator('#create-setlist-form button[type="submit"]').click()
+    await page.waitForURL(/\/setlist\//)
+    // The redirect from the home page logs an aborted view transition and a null
+    // rejection; only check for errors on the new setlist page itself
+    errors.length = 0
+
+    // The info button does nothing until the new setlist has loaded
+    const modal = page.locator('#setlist-info-dialog app-modal')
+    await expect(async () => {
+      await page.locator('#app-header .info-button').click()
+      await expect(modal).toHaveAttribute('open', '', { timeout: 500 })
+    }).toPass()
+    await expect(page.locator('#setlist-info-dialog setlist-info')).toContainText('Ann')
+    expect(errors).toEqual([])
+  })
 })

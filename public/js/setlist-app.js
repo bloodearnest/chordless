@@ -453,6 +453,11 @@ class PageApp {
         // Update header to show setlist info
         this.updateHeader(null, true)
 
+        // Header buttons (info, share, edit mode) must work on an empty setlist too.
+        // Both are guarded, so the full setup after the first song is added is fine.
+        this.setupEditMode()
+        this.setupAppHeaderEvents()
+
         // Clear container (will show Add Song button via overview)
         const container = document.querySelector('.song-container')
         container.textContent = ''
@@ -1070,31 +1075,9 @@ class PageApp {
   }
 
   async showSetlistInfo() {
-    const modal = document.getElementById('song-info-modal')
-    const modalBody = document.getElementById('modal-body')
-
-    // Clear previous content
-    modalBody.textContent = ''
-
-    modal.show()
-
-    // Create or get setlist-info component
-    let setlistInfoEl = modalBody.querySelector('setlist-info')
-    if (!setlistInfoEl) {
-      setlistInfoEl = document.createElement('setlist-info')
-      modalBody.appendChild(setlistInfoEl)
-    }
-
-    // Show loading state
-    setlistInfoEl.loading = true
-
-    // Get leader asynchronously
-    const leader = await this.getSetlistLeader()
-
-    // Update component with data
-    setlistInfoEl.loading = false
-    setlistInfoEl.setlist = this.currentSetlist
-    setlistInfoEl.leader = leader
+    const dialog = document.getElementById('setlist-info-dialog')
+    if (!dialog || !this.currentSetlist) return
+    await dialog.show(this.currentSetlist)
   }
 
   scrollToSection(sectionId, newIndex, instant = false) {
@@ -3198,34 +3181,6 @@ class PageApp {
       })
       modal.show()
     }
-  }
-
-  async getSetlistLeader() {
-    const owner = this.currentSetlist?.owner
-    if (owner && owner.trim()) {
-      return owner.trim()
-    }
-
-    // Scan song usage entries for this setlist
-    if (!this.currentSetlist?.songs?.length) {
-      return null
-    }
-
-    for (const songEntry of this.currentSetlist.songs) {
-      if (!songEntry.songId) continue
-      try {
-        const usage = await this.db.getSongUsageFromSetlists(songEntry.songId)
-        const historyEntry = usage.find(h => h.setlistId === this.currentSetlist.id)
-        const historyOwner = historyEntry?.owner
-        if (historyOwner && historyOwner.trim()) {
-          return historyOwner.trim()
-        }
-      } catch (error) {
-        console.warn('[SetlistInfo] Failed to load usage for song', songEntry.songId, error)
-      }
-    }
-
-    return null
   }
 
   filterAddSongResults(searchTerm, resultsContainer) {
