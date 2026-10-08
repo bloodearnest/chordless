@@ -15,8 +15,11 @@ preferences
 storage/sync
 - edit chordpro/variants
 - background syncing (periodic, and fallbacks)
-- conflict resolution (currently last-write-wins)
-- production auth proxy deployment (Cloudflare Worker URL in google-auth.js)
+- conflict resolution (currently Drive wins when edited on two devices)
+- production deployment: point chordless.app at the worker (currently a static Pages deploy)
+- user-facing Drive health check / cleanup (idea): turn public/dev/drive-audit.html into an
+  app feature that finds duplicate or empty setlists and stray organisation folders, and
+  moves them to the Drive trash after confirmation. Would need songs covered too.
 
 live mode
  - button on setlist
