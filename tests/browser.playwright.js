@@ -1,29 +1,7 @@
 // Playwright test runner for browser-based tests
 import { expect, fromDB, openApp, seedSong, test } from './fixtures.js'
 
-test.describe('Application Pages', () => {
-  test('home page should load', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForSelector('#home-view', { timeout: 5000 })
-    const homeView = await page.locator('#home-view').count()
-    expect(homeView).toBe(1)
-  })
-
-  test('setlist page should load', async ({ page }) => {
-    // /setlist.html causes an infinite redirect in wrangler; use the routed URL.
-    // SW must be active first so /setlist/test-uuid is routed to setlist.html.
-    await page.goto('/')
-    await page.waitForFunction(() =>
-      navigator.serviceWorker.ready.then(reg => reg.active?.state === 'activated')
-    )
-    await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-
-    await page.goto('/setlist/test-uuid')
-    await expect(page).toHaveTitle('Setlist - Chordless')
-    await page.waitForSelector('#song-view', { timeout: 5000 })
-    expect(await page.locator('#song-view').count()).toBe(1)
-  })
-
+test.describe('Themes', () => {
   test('every page follows the system dark mode', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
     const background = async url => {
@@ -539,45 +517,39 @@ test.describe('Navigation menu', () => {
     await expect(page.locator('#app-header')).toContainText('Info Test Song')
   })
 
-  test('every page has the app header, whose menu button opens the menu', async ({ page }) => {
+  test('every page has the app header, whose menu button opens and closes the menu', async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'menu-test-setlist' })
     await page.setViewportSize({ width: 390, height: 700 })
-    for (const url of ['/', '/preferences', '/storage', '/bookmarklet', '/import-song']) {
-      await page.goto(url)
-      const header = page.locator('app-header')
-      await expect(header, url).toHaveCount(1)
-      // Nothing for a second row, so no toggle for it
-      await expect(header.locator('.expand-toggle'), url).toHaveCount(0)
-      await header.getByRole('button', { name: 'Navigation menu' }).click()
-      await expect(page.locator('nav-menu .nav-menu-popover'), url).toBeVisible()
-    }
-  })
-
-  for (const path of [
-    '/',
-    '/songs',
-    '/setlist/menu-test-setlist',
-    '/preferences',
-    '/storage',
-    '/bookmarklet',
-  ]) {
-    test(`opens and closes on ${path}`, async ({ page }) => {
-      await seedSong(page, { setlistId: 'menu-test-setlist' })
+    const pages = [
+      { path: '/', controls: false },
+      { path: '/songs', controls: true },
+      { path: '/setlist/menu-test-setlist', controls: true },
+      { path: '/preferences', controls: false },
+      { path: '/storage', controls: false },
+      { path: '/bookmarklet', controls: false },
+      { path: '/import-song', controls: false },
+    ]
+    for (const { path, controls } of pages) {
       await page.goto(path)
+      const header = page.locator('app-header')
+      await expect(header, path).toHaveCount(1)
+      // On a phone, the toggle for the second row only shows when there are controls
+      await expect(header.locator('.expand-toggle'), path).toHaveCount(controls ? 1 : 0)
 
-      // Either the page's own menu button or the app-header's
-      const button = page.locator('#nav-menu-button, app-header .nav-menu-button').first()
+      const button = header.getByRole('button', { name: 'Navigation menu' })
       const menu = page.locator('nav-menu .nav-menu-popover')
-      // Pages wire up once their scripts have run, so retry the first click
+      // The menu listens once its script has run, so retry the first click
       await expect(async () => {
         await button.click()
         await expect(menu).toBeVisible({ timeout: 500 })
-      }).toPass()
-      await expect(menu.getByText('Song Library')).toBeVisible()
-
+      }, path).toPass()
+      await expect(menu.getByText('Song Library'), path).toBeVisible()
       await button.click()
-      await expect(menu).toBeHidden()
-    })
-  }
+      await expect(menu, path).toBeHidden()
+    }
+  })
 })
 
 test.describe('Modals', () => {
