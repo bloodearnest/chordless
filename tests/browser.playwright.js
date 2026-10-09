@@ -863,6 +863,17 @@ test.describe('Media player settings', () => {
 })
 
 test.describe('Storage page', () => {
+  test('the local data summary shows how many setlists and songs are stored', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'summary-setlist' })
+    await page.goto('/storage')
+    const summary = page.locator('storage-summary')
+    await expect(summary.locator('.stat-row', { hasText: 'Setlists' })).toContainText('1')
+    await expect(summary.locator('.stat-row', { hasText: 'Songs' })).toContainText('1')
+    expect(errors).toEqual([])
+  })
+
   test('organisations: a duplicate name is refused in the form, and switching asks first', async ({
     page,
   }) => {

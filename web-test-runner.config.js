@@ -20,6 +20,7 @@ export default {
     'tests/metronome-controller.test.js',
     'tests/key-selector.test.js',
     'tests/nav-menu.test.js',
+    'tests/song-info-dialog.test.js',
     'tests/song-section.test.js',
     'tests/pad-audio-controller.test.js',
     'tests/pad-sets-controller.test.js',

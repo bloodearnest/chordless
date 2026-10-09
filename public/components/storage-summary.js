@@ -1,3 +1,4 @@
+import { Task } from '@lit/task'
 import { css, html, LitElement } from 'lit'
 
 /**
@@ -7,12 +8,6 @@ import { css, html, LitElement } from 'lit'
  * for IndexedDB and Service Worker caches.
  */
 export class StorageSummary extends LitElement {
-  static properties = {
-    loading: { type: Boolean },
-    error: { type: String },
-    stats: { type: Object, attribute: false },
-  }
-
   static styles = css`
     :host {
       display: block;
@@ -80,59 +75,43 @@ export class StorageSummary extends LitElement {
 
   constructor() {
     super()
-    this.loading = true
-    this.error = null
-    this.stats = null
-    this._isMounted = false
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    this._isMounted = true
-    this._loadStats()
-  }
-
-  disconnectedCallback() {
-    this._isMounted = false
-    super.disconnectedCallback()
+    // Counts and sizes of what's stored in this browser, loaded when first rendered
+    this._stats = new Task(this, {
+      task: () => this._loadStats(),
+      args: () => [],
+      onError: error => console.error('[StorageSummary] Failed to load storage stats', error),
+    })
   }
 
   render() {
-    if (this.error) {
-      return html`<div class="error-card">${this.error}</div>`
-    }
+    const loading = () => html`
+      <div class="stat-card">
+        <span class="stat-label">Loading…</span>
+        <span class="stat-value">–</span>
+      </div>
+    `
+    return this._stats.render({
+      initial: loading,
+      pending: loading,
+      complete: stats => this._renderStats(stats),
+      error: () => html`<div class="error-card">Unable to read local storage details.</div>`,
+    })
+  }
 
-    if (this.loading || !this.stats) {
-      return html`
-        <div class="stat-card">
-          <span class="stat-label">Loading…</span>
-          <span class="stat-value">–</span>
-        </div>
-      `
-    }
-
+  _renderStats(stats) {
     return html`
       <div class="summary-grid">
         ${this._renderListStat('Setlists & Songs', [
-          { label: 'Setlists', value: this.stats.setlists },
-          { label: 'Songs', value: this.stats.songs },
+          { label: 'Setlists', value: stats.setlists },
+          { label: 'Songs', value: stats.songs },
         ])}
         ${this._renderListStat('Storage Usage', [
-          { label: 'DB', value: this._formatBytes(this.stats.dbBytes) },
-          { label: 'App Cache', value: this._formatMegabytes(this.stats.appCacheBytes) },
-          { label: 'Media Cache', value: this._formatBytes(this.stats.mediaCacheBytes) },
+          { label: 'DB', value: this._formatBytes(stats.dbBytes) },
+          { label: 'App Cache', value: this._formatMegabytes(stats.appCacheBytes) },
+          { label: 'Media Cache', value: this._formatBytes(stats.mediaCacheBytes) },
         ])}
       </div>
       <p class="footnote">Includes data stored in this browser only.</p>
-    `
-  }
-
-  _renderStat(label, value) {
-    return html`
-      <div class="stat-card">
-        <span class="stat-label">${label}</span>
-        <span class="stat-value">${value ?? '–'}</span>
-      </div>
     `
   }
 
@@ -154,36 +133,27 @@ export class StorageSummary extends LitElement {
     `
   }
 
+  /** Counts and sizes of the setlists, songs and caches stored in this browser */
   async _loadStats() {
-    try {
-      const { getCurrentDB } = await import('../js/db.js')
-      const db = await getCurrentDB()
+    const { getCurrentDB } = await import('../js/db.js')
+    const db = await getCurrentDB()
 
-      const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()])
+    const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()])
 
-      const [dbBytesFromEstimate, cacheUsage] = await Promise.all([
-        this._estimateIndexedDbUsage(),
-        this._estimateCacheUsage(),
-      ])
+    const [dbBytesFromEstimate, cacheUsage] = await Promise.all([
+      this._estimateIndexedDbUsage(),
+      this._estimateCacheUsage(),
+    ])
 
-      const approxDataBytes =
-        dbBytesFromEstimate ?? estimateRecordsSize(setlists) + estimateRecordsSize(songs)
+    const approxDataBytes =
+      dbBytesFromEstimate ?? estimateRecordsSize(setlists) + estimateRecordsSize(songs)
 
-      if (!this._isMounted) return
-
-      this.stats = {
-        setlists: setlists.length,
-        songs: songs.length,
-        dbBytes: approxDataBytes,
-        appCacheBytes: cacheUsage?.appBytes ?? null,
-        mediaCacheBytes: cacheUsage?.mediaBytes ?? null,
-      }
-      this.loading = false
-    } catch (error) {
-      console.error('[StorageSummary] Failed to load storage stats', error)
-      if (!this._isMounted) return
-      this.error = 'Unable to read local storage details.'
-      this.loading = false
+    return {
+      setlists: setlists.length,
+      songs: songs.length,
+      dbBytes: approxDataBytes,
+      appCacheBytes: cacheUsage?.appBytes ?? null,
+      mediaCacheBytes: cacheUsage?.mediaBytes ?? null,
     }
   }
 

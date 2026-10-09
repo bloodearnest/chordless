@@ -1,3 +1,4 @@
+import { Task } from '@lit/task'
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import {
@@ -17,9 +18,6 @@ import { buttonStyles, fieldStyles } from './shared-styles.js'
  */
 export class SelectOrganisation extends LitElement {
   static properties = {
-    _currentOrganisation: { state: true },
-    _organisations: { state: true },
-    _loading: { state: true },
     _showCreateForm: { state: true },
     _newOrganisationName: { state: true },
     _creating: { state: true },
@@ -118,34 +116,23 @@ export class SelectOrganisation extends LitElement {
   constructor() {
     super()
     this._switchModal = createRef()
-    this._currentOrganisation = null
-    this._organisations = []
-    this._loading = true
+    // The organisations, and which is current: loaded when first rendered, and
+    // again after one is created
+    this._orgs = new Task(this, {
+      task: async () => ({
+        organisations: await listOrganisations(),
+        current: getCurrentOrganisation().name, // synchronous, from localStorage
+      }),
+      args: () => [],
+      onError: error => console.error('Failed to load organisations:', error),
+    })
     this._showCreateForm = false
     this._newOrganisationName = ''
     this._creating = false
   }
 
-  connectedCallback() {
-    super.connectedCallback()
-    this._loadOrganisations()
-  }
-
-  async _loadOrganisations() {
-    this._loading = true
-    try {
-      this._organisations = await listOrganisations()
-      const { name } = getCurrentOrganisation() // Synchronous - reads from cache
-      this._currentOrganisation = name
-    } catch (error) {
-      console.error('Failed to load organisations:', error)
-    } finally {
-      this._loading = false
-    }
-  }
-
   async _handleSwitch(org) {
-    if (org.name === this._currentOrganisation) {
+    if (org.name === this._orgs.value?.current) {
       return
     }
 
@@ -174,7 +161,7 @@ export class SelectOrganisation extends LitElement {
       this._formError = 'Please enter an organisation name'
       return
     }
-    if (this._organisations.some(org => org.name === name)) {
+    if (this._orgs.value?.organisations.some(org => org.name === name)) {
       this._formError = 'An organisation with this name already exists'
       return
     }
@@ -185,7 +172,7 @@ export class SelectOrganisation extends LitElement {
     try {
       await createOrganisation(name)
       // The new organisation shows in the list
-      await this._loadOrganisations()
+      await this._orgs.run()
 
       // Hide form
       this._showCreateForm = false
@@ -199,11 +186,18 @@ export class SelectOrganisation extends LitElement {
   }
 
   render() {
-    if (this._loading) {
-      return html`<div class="loading">Loading organisations...</div>`
-    }
+    const loading = () => html`<div class="loading">Loading organisations...</div>`
+    return this._orgs.render({
+      initial: loading,
+      pending: loading,
+      complete: ({ organisations, current }) => this._renderOrganisations(organisations, current),
+      error: error =>
+        html`<p class="form-error" role="alert">Couldn't load organisations: ${error.message}</p>`,
+    })
+  }
 
-    if (this._organisations.length === 0) {
+  _renderOrganisations(organisations, current) {
+    if (organisations.length === 0) {
       return html`
         <div class="empty-state">
           <p>No organisations found. Create your first organisation to get started.</p>
@@ -214,15 +208,15 @@ export class SelectOrganisation extends LitElement {
     return html`
       <div class="organisation-selector">
         <div class="organisations-list">
-          ${this._organisations.map(
+          ${organisations.map(
             org => html`
               <div
-                class="organisation-item ${org.name === this._currentOrganisation ? 'current' : ''}"
+                class="organisation-item ${org.name === current ? 'current' : ''}"
                 @click=${() => this._handleSwitch(org)}
               >
                 <span class="organisation-name">${org.name}</span>
                 ${
-                  org.name === this._currentOrganisation
+                  org.name === current
                     ? html`<span class="organisation-badge">CURRENT</span>`
                     : html`<button
                       class="btn primary switch-button"
