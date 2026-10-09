@@ -2,10 +2,27 @@ import { expect } from '@esm-bundle/chai'
 import {
   createOrganisation,
   ensureCurrentOrganisation,
+  getCurrentOrganisation,
+  getCurrentOrganisationFull,
+  getOrganisationByName,
   listOrganisations,
+  setCurrentOrganisation,
 } from '../public/js/organisation.js'
 
-const { describe, it, beforeEach } = window
+const { describe, it, beforeEach, afterEach } = window
+
+// Other test files, run alongside these, use the current organisation's
+// database: put it back after each test that changes it
+const KEYS = ['current-organisation-id', 'current-organisation-name']
+let saved
+beforeEach(() => {
+  saved = KEYS.map(key => localStorage.getItem(key))
+})
+afterEach(() => {
+  KEYS.forEach((key, i) =>
+    saved[i] === null ? localStorage.removeItem(key) : localStorage.setItem(key, saved[i])
+  )
+})
 
 describe('ensureCurrentOrganisation', () => {
   beforeEach(async () => {
@@ -37,6 +54,34 @@ describe('ensureCurrentOrganisation', () => {
       error = caught
     }
     expect(error?.name).to.equal('ConstraintError')
+  })
+})
+
+describe('the current organisation', () => {
+  const unique = name => `${name} ${crypto.randomUUID().slice(0, 8)}`
+
+  it('is remembered with its name, fetched when not given', async () => {
+    const org = await createOrganisation(unique('Church'))
+    await setCurrentOrganisation(org.id, org.name)
+    expect(getCurrentOrganisation()).to.deep.equal({ id: org.id, name: org.name })
+
+    const other = await createOrganisation(unique('Other'))
+    await setCurrentOrganisation(other.id)
+    expect(getCurrentOrganisation()).to.deep.equal({ id: other.id, name: other.name })
+  })
+
+  it('is found by name', async () => {
+    const org = await createOrganisation(unique('Named'))
+    expect((await getOrganisationByName(org.name)).id).to.equal(org.id)
+    expect(await getOrganisationByName(unique('Nobody'))).to.equal(undefined)
+  })
+
+  it('falls back to the default organisation when the remembered one is gone', async () => {
+    localStorage.setItem('current-organisation-id', 'deleted-organisation')
+    localStorage.setItem('current-organisation-name', 'Deleted')
+    const org = await getCurrentOrganisationFull()
+    expect(org.name).to.equal('Personal')
+    expect(getCurrentOrganisation()).to.deep.equal({ id: org.id, name: 'Personal' })
   })
 })
 
