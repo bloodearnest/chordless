@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { isTypingInField } from '../public/js/utils/keyboard.js'
+import { isInModalDialog, isTypingInField } from '../public/js/utils/keyboard.js'
 
 const { describe, it, afterEach } = window
 
@@ -58,5 +58,44 @@ describe('isTypingInField', () => {
 
     expect(seen.target).to.equal(outer) // what the old checks looked at
     expect(seen.typing).to.equal(true)
+  })
+})
+
+describe('isInModalDialog', () => {
+  let dialog
+
+  afterEach(() => dialog?.remove())
+
+  /** Whether a document listener sees a keydown from `target` as in a modal */
+  function inModal(target) {
+    let result
+    const listener = event => {
+      result = isInModalDialog(event)
+    }
+    document.addEventListener('keydown', listener)
+    target.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, composed: true })
+    )
+    document.removeEventListener('keydown', listener)
+    return result
+  }
+
+  it('is true inside a dialog shown with showModal, even within shadow DOM', () => {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    dialog = host
+    const root = host.attachShadow({ mode: 'open' })
+    root.innerHTML = '<dialog><button>OK</button></dialog>'
+    root.querySelector('dialog').showModal()
+    expect(inModal(root.querySelector('button'))).to.equal(true)
+  })
+
+  it('is false in a dialog shown without showModal, and outside dialogs', () => {
+    dialog = document.createElement('dialog')
+    dialog.innerHTML = '<button>OK</button>'
+    document.body.appendChild(dialog)
+    dialog.show()
+    expect(inModal(dialog.querySelector('button'))).to.equal(false)
+    expect(inModal(document.body)).to.equal(false)
   })
 })

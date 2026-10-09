@@ -1,18 +1,20 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import './icon.js'
 import { buttonStyles } from './shared-styles.js'
 
 /**
  * AppModal Component
  *
- * A reusable modal dialog component with support for different types:
+ * A reusable modal dialog, built on a native <dialog> opened with showModal():
+ * it sits in the top layer (above the page and any popover), traps focus,
+ * makes the page behind it inert, and closes on Esc. Types:
  * - info: Display information with a close button
  * - confirm: Show confirmation dialog with cancel/confirm buttons
  * - custom: Fully custom content via slot
  *
  * Properties:
  * @property {Boolean} open - Whether the modal is open
- * @property {String} title - Modal title (optional)
+ * @property {String} heading - Modal title (optional)
  * @property {String} message - Modal message text (optional, for simple modals)
  * @property {String} type - Modal type: 'info', 'confirm', 'custom' (default: 'custom')
  * @property {String} size - Modal size: 'small', 'medium', 'large', 'fullscreen' (default: 'medium')
@@ -26,13 +28,12 @@ import { buttonStyles } from './shared-styles.js'
  * @slot actions - Custom action buttons (overrides confirm/cancel buttons)
  *
  * Events:
- * @fires close - When modal is closed (via overlay click, close button, or ESC)
+ * @fires close - When modal is closed (via backdrop click, close button, or Esc)
  * @fires confirm - When confirm button is clicked (type='confirm')
  * @fires cancel - When cancel button is clicked (type='confirm')
  *
  * CSS Parts:
- * @csspart overlay - The overlay backdrop
- * @csspart content - The modal content container
+ * @csspart content - The <dialog>; its backdrop is ::part(content)::backdrop
  * @csspart header - The header section
  * @csspart title - The title element
  * @csspart body - The body content section
@@ -59,45 +60,30 @@ export class AppModal extends LitElement {
   static styles = [
     buttonStyles,
     css`
+    /* The <dialog> shows in the top layer, above the page and any popover */
     :host {
-      display: none;
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      z-index: 9999;
-    }
-
-    :host([open]) {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .modal-overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      background-color: var(--modal-backdrop, rgba(0, 0, 0, 0.5));
-      cursor: pointer;
+      display: contents;
     }
 
     .modal-content {
-      position: relative;
       background: var(--modal-bg, white);
+      color: var(--text-color, #1a1a1a);
       border: 1px solid var(--modal-border, transparent);
       border-radius: 8px;
+      padding: 0;
       max-width: 90%;
       max-height: 90vh;
       box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
-      cursor: default;
-      z-index: 1;
+      overflow: hidden;
+    }
+
+    .modal-content[open] {
       display: flex;
       flex-direction: column;
-      overflow: hidden;
+    }
+
+    .modal-content::backdrop {
+      background-color: var(--modal-backdrop, rgba(0, 0, 0, 0.5));
     }
 
     /* Size variants */
@@ -243,27 +229,27 @@ export class AppModal extends LitElement {
     this.hideCloseButton = false
   }
 
-  connectedCallback() {
-    super.connectedCallback()
-    // Listen for ESC key to close modal
-    this._handleEscape = e => {
-      if (e.key === 'Escape' && this.open) {
-        this.close()
-      }
-    }
-    document.addEventListener('keydown', this._handleEscape)
+  updated(changed) {
+    if (!changed.has('open')) return
+    const dialog = this._dialog()
+    if (this.open && !dialog.open) dialog.showModal()
+    if (!this.open && dialog.open) dialog.close()
   }
 
-  disconnectedCallback() {
-    super.disconnectedCallback()
-    document.removeEventListener('keydown', this._handleEscape)
+  _dialog() {
+    return this.renderRoot.querySelector('dialog')
   }
 
   render() {
     return html`
-      <div class="modal-overlay" part="overlay" @click=${this._handleOverlayClick}></div>
-      <div class="modal-content ${this._hasHeader() ? '' : 'headerless'}" part="content">
-        ${this._hasHeader() ? this._renderHeader() : this._renderFloatingClose()}
+      <dialog
+        class="modal-content ${this._hasHeader() ? '' : 'headerless'}"
+        part="content"
+        aria-labelledby=${this.heading ? 'modal-title' : nothing}
+        @click=${this._handleBackdropClick}
+        @close=${this._handleDialogClose}
+      >
+        ${this._hasHeader() ? this._renderHeader() : this._renderCloseButton(true)}
 
         <div class="modal-body" part="body">
           ${this.message ? html`<p class="modal-message">${this.message}</p>` : ''}
@@ -271,7 +257,7 @@ export class AppModal extends LitElement {
         </div>
 
         ${this._renderActions()}
-      </div>
+      </dialog>
     `
   }
 
@@ -279,17 +265,17 @@ export class AppModal extends LitElement {
     return Boolean(this.heading || this.querySelector('[slot="header"]'))
   }
 
-  _renderFloatingClose() {
+  _renderCloseButton(floating = false) {
     if (this.hideCloseButton) return ''
     return html`
       <button
-        class="modal-close floating"
+        class="modal-close ${floating ? 'floating' : ''}"
         part="close-button"
         aria-label="Close"
         @click=${this.close}
       >
-                  <app-icon name="close"></app-icon>
-                </button>
+        <app-icon name="close"></app-icon>
+      </button>
     `
   }
 
@@ -301,15 +287,7 @@ export class AppModal extends LitElement {
       return html`
         <div class="modal-header" part="header">
           <slot name="header"></slot>
-          ${
-            !this.hideCloseButton
-              ? html`
-                <button class="modal-close" part="close-button" aria-label="Close" @click=${this.close}>
-                  <app-icon name="close"></app-icon>
-                </button>
-              `
-              : ''
-          }
+          ${this._renderCloseButton()}
         </div>
       `
     }
@@ -317,19 +295,11 @@ export class AppModal extends LitElement {
     if (this.heading) {
       return html`
         <div class="modal-header" part="header">
-          ${this.heading ? html`<h2 class="modal-title" part="title">${this.heading}</h2>` : ''}
+          <h2 class="modal-title" id="modal-title" part="title">${this.heading}</h2>
           <div class="header-actions" part="header-actions">
             <slot name="header-actions"></slot>
           </div>
-          ${
-            !this.hideCloseButton
-              ? html`
-                <button class="modal-close" part="close-button" aria-label="Close" @click=${this.close}>
-                  <app-icon name="close"></app-icon>
-                </button>
-              `
-              : ''
-          }
+          ${this._renderCloseButton()}
         </div>
       `
     }
@@ -373,11 +343,21 @@ export class AppModal extends LitElement {
     return ''
   }
 
-  _handleOverlayClick(e) {
-    // Only close if clicking directly on overlay, not on modal content
-    if (e.target === e.currentTarget) {
-      this.close()
-    }
+  /** A click on the dialog itself, outside its content, is on the backdrop */
+  _handleBackdropClick(event) {
+    if (event.target !== event.currentTarget) return
+    const box = event.currentTarget.getBoundingClientRect()
+    const inside =
+      event.clientX >= box.left &&
+      event.clientX <= box.right &&
+      event.clientY >= box.top &&
+      event.clientY <= box.bottom
+    if (!inside) this.close()
+  }
+
+  /** The dialog closed itself (Esc), rather than through close() */
+  _handleDialogClose() {
+    if (this.open) this.close()
   }
 
   _handleConfirm() {

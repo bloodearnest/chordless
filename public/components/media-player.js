@@ -5,7 +5,7 @@ import { loadMediaSettings } from '../js/media-settings.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
 import { getActivePadSet } from '../js/pad-set-service.js'
-import { isTypingInField } from '../js/utils/keyboard.js'
+import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.js'
 
 /**
  * MediaPlayer Component
@@ -972,6 +972,8 @@ export class MediaPlayer extends LitElement {
   }
 
   _handleKeydown(event) {
+    // A modal handles its own keys: Esc closes it, Space presses its buttons
+    if (isInModalDialog(event)) return
     // Start song on spacebar
     if (event.code === 'Space' && !isTypingInField(event)) {
       event.preventDefault()

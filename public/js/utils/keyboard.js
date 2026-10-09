@@ -19,3 +19,14 @@ export function isTypingInField(event) {
       'input[type="date"], input[type="time"], input[type="datetime-local"]'
   )
 }
+
+/**
+ * Whether a key event comes from inside an open modal dialog (app-modal's
+ * <dialog>, shown with showModal). Page-wide shortcuts should leave those
+ * alone: the page behind is inert, and Esc belongs to the dialog, which closes
+ * on it unless something calls preventDefault().
+ */
+export function isInModalDialog(event) {
+  const path = event.composedPath?.() ?? []
+  return path.some(node => node instanceof HTMLDialogElement && node.matches(':modal'))
+}

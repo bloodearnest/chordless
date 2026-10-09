@@ -7,7 +7,7 @@ import { ChordProParser } from './parser.js'
 import { claimSetlistsOnce, getOrganisationPeople } from './people.js'
 import { getAvailableKeys, transposeSong } from './transpose.js'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
-import { isTypingInField } from './utils/keyboard.js'
+import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
 import '../components/status-message.js'
 import '../components/song-list.js'
 import '../components/setlist-group.js'
@@ -2756,8 +2756,9 @@ class PageApp {
     if (route.type === 'home') return
 
     document.addEventListener('keydown', e => {
-      // Leave keys alone while typing in a field (e.g. the setlist details form)
-      if (isTypingInField(e)) return
+      // Leave keys alone while typing in a field (e.g. the setlist details form),
+      // or in a modal, which handles its own keys (Esc closes it)
+      if (isTypingInField(e) || isInModalDialog(e)) return
 
       // Handle Escape key to exit edit mode
       if (e.key === 'Escape') {

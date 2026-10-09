@@ -606,6 +606,28 @@ test.describe('Navigation menu', () => {
   }
 })
 
+test.describe('Modals', () => {
+  test('Esc closes a modal on a setlist, leaving the page shortcuts alone', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'esc-test-setlist' })
+    await page.goto('/setlist/esc-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header .edit-toggle').click()
+    await expect(page.locator('body')).toHaveClass(/edit-mode/)
+
+    await page.locator('#app-header .info-button').click()
+    const modal = page.locator('app-modal[open]')
+    await expect(modal).toHaveCount(1)
+    await page.keyboard.press('Escape')
+    await expect(modal).toHaveCount(0)
+    // The Esc was the modal's: edit mode is still on
+    await expect(page.locator('body')).toHaveClass(/edit-mode/)
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('Song settings', () => {
   test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
     const errors = []
