@@ -6,6 +6,7 @@ import {
   selectPadSet,
   uploadPadSet,
 } from '../js/pad-set-service.js'
+import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 export class PadSetManager extends LitElement {
   static properties = {
@@ -21,128 +22,103 @@ export class PadSetManager extends LitElement {
     selectPadSetError: { type: String, state: true },
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
+  static styles = [
+    buttonStyles,
+    fieldStyles,
+    css`
+      :host {
+        display: block;
+      }
 
-    .padset-card {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      padding: 1rem;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 8px;
-      margin-bottom: 0.75rem;
-      position: relative;
-    }
+      .padset-card {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        padding: 1rem;
+        background: var(--tint);
+        border-radius: 8px;
+        margin-bottom: 0.75rem;
+        position: relative;
+      }
 
-    .padset-card input[type='radio'] {
-      margin-right: 0.5rem;
-    }
+      .padset-card:last-child {
+        margin-bottom: 0;
+      }
 
-    .padset-header {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
+      .padset-card input[type='radio'] {
+        margin-right: 0.5rem;
+      }
 
-    .padset-card:last-child {
-      margin-bottom: 0;
-    }
+      .padset-header {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
 
-    .padset-name {
-      font-weight: 600;
-      font-size: var(--font-ui);
-    }
+      .padset-name {
+        font-weight: 600;
+        font-size: var(--font-ui);
+      }
 
-    .padset-meta {
-      font-size: var(--font-ui-small);
-      opacity: 0.7;
-    }
+      .padset-meta {
+        font-size: var(--font-ui-small);
+        opacity: 0.7;
+      }
 
-    form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      margin-top: 1rem;
-    }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
 
-    label {
-      font-size: var(--font-ui);
-      font-weight: 500;
-    }
+      label {
+        font-size: var(--font-ui);
+        font-weight: 500;
+      }
 
-    input[type='text'],
-    input[type='file'] {
-      width: 100%;
-      padding: 0.6rem 0.75rem;
-      border-radius: 4px;
-      border: none;
-      font-size: var(--font-ui);
-    }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
 
-    input[type='file'] {
-      background: rgba(255, 255, 255, 0.08);
-      color: inherit;
-    }
+      .status-message {
+        font-size: var(--font-ui-small);
+        padding: 0.4rem 0.5rem;
+        border-radius: 4px;
+      }
 
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-    }
+      .status-message.error {
+        background: color-mix(in srgb, var(--color-danger, #e74c3c) 15%, transparent);
+        border: 1px solid color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
+      }
 
-    button {
-      border: none;
-      border-radius: 4px;
-      padding: 0.6rem 1rem;
-      font-weight: 600;
-      cursor: pointer;
-    }
+      .status-message.success {
+        background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
+        border: 1px solid color-mix(in srgb, var(--color-success, #27ae60) 40%, transparent);
+      }
 
-    button primary {
-      background: var(--header-bg, #3498db);
-      color: white;
-    }
+      .empty-state {
+        font-size: var(--font-ui);
+        opacity: 0.75;
+        margin-bottom: 0.5rem;
+      }
 
-    .upload-button {
-      background: var(--header-bg, #3498db);
-      color: white;
-    }
+      .padset-message {
+        font-size: var(--font-ui-small);
+        opacity: 0.85;
+      }
 
-    .upload-button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+      .padset-message.success {
+        color: var(--color-success, #27ae60);
+      }
 
-    .status-message {
-      font-size: var(--font-ui-small);
-      padding: 0.4rem 0.5rem;
-      border-radius: 4px;
-    }
-
-    .status-message.error {
-      background: rgba(231, 76, 60, 0.2);
-      border: 1px solid rgba(231, 76, 60, 0.4);
-    }
-
-    .status-message.success {
-      background: rgba(39, 174, 96, 0.2);
-      border: 1px solid rgba(39, 174, 96, 0.4);
-    }
-
-    .empty-state {
-      font-size: var(--font-ui);
-      opacity: 0.75;
-      margin-bottom: 0.5rem;
-    }
-
-    .padset-message {
-      font-size: var(--font-ui-small);
-      opacity: 0.85;
-    }
-  `
+      .padset-message.error {
+        color: var(--color-danger, #e74c3c);
+      }
+    `,
+  ]
 
   constructor() {
     super()
@@ -308,14 +284,14 @@ export class PadSetManager extends LitElement {
       ${this.renderPadSetList()}
       ${
         this.selectPadSetMessage
-          ? html`<div class="padset-message" style="color: #8fd18f;">
+          ? html`<div class="padset-message success">
             ${this.selectPadSetMessage}
           </div>`
           : ''
       }
       ${
         this.selectPadSetError
-          ? html`<div class="padset-message" style="color: #ffb3b3;">${this.selectPadSetError}</div>`
+          ? html`<div class="padset-message error">${this.selectPadSetError}</div>`
           : ''
       }
 
@@ -324,6 +300,7 @@ export class PadSetManager extends LitElement {
           <label for="padset-name">Pad Set Name</label>
           <input
             id="padset-name"
+            class="field"
             type="text"
             .value=${this.padSetName}
             @input=${this._handleNameInput}
@@ -335,6 +312,7 @@ export class PadSetManager extends LitElement {
           <label for="padset-file-input">Pad Set ZIP File</label>
           <input
             id="padset-file-input"
+            class="field"
             type="file"
             accept=".zip"
             @change=${this._handleFileChange}
@@ -353,7 +331,7 @@ export class PadSetManager extends LitElement {
         <div class="actions">
           <button
             type="submit"
-            class="upload-button"
+            class="btn primary"
             ?disabled=${this.uploading || !this._selectedFile}
           >
             ${this.uploading ? 'Uploading…' : 'Upload Pad Set'}

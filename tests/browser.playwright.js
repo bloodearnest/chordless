@@ -37,10 +37,41 @@ test.describe('Application Pages', () => {
     }
   })
 
+  test('settings panels follow the theme, with matching text', async ({ page }) => {
+    const lightness = rgb =>
+      rgb
+        .match(/\d+/g)
+        .slice(0, 3)
+        .reduce((sum, n) => sum + Number(n), 0)
+    for (const scheme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: scheme })
+      for (const [url, host] of [
+        ['/storage', 'storage-page'],
+        ['/preferences', 'app-preferences'],
+      ]) {
+        await page.goto(url)
+        const panel = page.locator(`${host} .panel`).first()
+        await expect(panel).toBeVisible()
+        const { bg, text } = await panel.evaluate(element => ({
+          bg: getComputedStyle(element).backgroundColor,
+          text: getComputedStyle(element).color,
+        }))
+        const label = `${url} in ${scheme} mode`
+        if (scheme === 'light') {
+          expect(lightness(bg), label).toBeGreaterThan(600)
+          expect(lightness(text), label).toBeLessThan(150)
+        } else {
+          expect(lightness(bg), label).toBeLessThan(150)
+          expect(lightness(text), label).toBeGreaterThan(600)
+        }
+      }
+    }
+  })
+
   test('in dark mode a modal is lighter than the page beneath it, and edged', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await page.goto('/storage')
-    await page.locator('storage-page .storage-button.danger').click()
+    await page.locator('storage-page').getByRole('button', { name: 'Clear Local Data' }).click()
     const card = page.locator('storage-page #clear-data-modal').locator('.modal-content')
     await expect(card).toBeVisible()
     const { cardBg, pageBg, border } = await card.evaluate(element => ({
@@ -658,7 +689,7 @@ test.describe('Media player settings', () => {
     await expect(page.locator('media-player')).toBeVisible()
 
     await page.goto('/preferences')
-    const masterToggle = page.locator('media-player-settings .master-toggle')
+    const masterToggle = page.locator('media-player-settings .toggle-switch.master')
     await masterToggle.click()
     await expect(masterToggle).not.toHaveClass(/active/)
 
@@ -693,7 +724,9 @@ test.describe('Storage page', () => {
     await seedSong(page, { setlistId: 'clear-test-setlist' })
     await page.goto('/storage')
 
-    const clearButton = page.locator('storage-page .storage-button.danger')
+    const clearButton = page
+      .locator('storage-page')
+      .getByRole('button', { name: 'Clear Local Data' })
     const modal = page.locator('storage-page #clear-data-modal')
 
     // Cancelling keeps everything

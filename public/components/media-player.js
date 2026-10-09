@@ -621,15 +621,19 @@ export class MediaPlayer extends LitElement {
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.5);
+      background: var(--modal-backdrop, rgba(0, 0, 0, 0.5));
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 2000;
     }
 
+    /* Coloured like app-modal, not the player */
     .settings-content {
-      background: var(--player-bg, #34495e);
+      background: var(--modal-bg, white);
+      border: 1px solid var(--modal-border, transparent);
+      box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
+      color: var(--text-color, #1a1a1a);
       border-radius: 10px;
       padding: 2rem;
       max-width: 500px;
@@ -647,16 +651,15 @@ export class MediaPlayer extends LitElement {
     .settings-title {
       font-size: var(--font-ui);
       font-weight: 600;
-      color: var(--player-text, white);
     }
 
     .close-button {
       width: 2rem;
       height: 2rem;
       border-radius: 50%;
-      border: 1px solid var(--player-text, white);
+      border: 1px solid currentColor;
       background: transparent;
-      color: var(--player-text, white);
+      color: inherit;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -666,7 +669,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .close-button:active {
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--tint-strong);
     }
   `
 

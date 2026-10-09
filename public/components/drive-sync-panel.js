@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.js'
 import { getCurrentOrganisation } from '../js/organisation.js'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
+import { buttonStyles, spinnerStyles } from './shared-styles.js'
 
 /**
  * DriveSyncPanel Component
@@ -18,7 +19,10 @@ export class DriveSyncPanel extends LitElement {
     disabled: { type: Boolean, reflect: true },
   }
 
-  static styles = css`
+  static styles = [
+    buttonStyles,
+    spinnerStyles,
+    css`
     :host {
       display: block;
     }
@@ -37,22 +41,22 @@ export class DriveSyncPanel extends LitElement {
     .sync-status {
       padding: 1rem;
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--tint-subtle);
     }
 
     .sync-status.syncing {
-      background: rgba(52, 152, 219, 0.1);
-      border: 1px solid rgba(52, 152, 219, 0.3);
+      background: color-mix(in srgb, var(--color-primary, #3498db) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-primary, #3498db) 30%, transparent);
     }
 
     .sync-status.error {
-      background: rgba(231, 76, 60, 0.1);
-      border: 1px solid rgba(231, 76, 60, 0.3);
+      background: color-mix(in srgb, var(--color-danger, #e74c3c) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-danger, #e74c3c) 30%, transparent);
     }
 
     .sync-status.success {
-      background: rgba(46, 204, 113, 0.1);
-      border: 1px solid rgba(46, 204, 113, 0.3);
+      background: color-mix(in srgb, var(--color-success, #27ae60) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-success, #27ae60) 30%, transparent);
     }
 
     .status-row {
@@ -73,7 +77,7 @@ export class DriveSyncPanel extends LitElement {
     .progress-bar {
       width: 100%;
       height: 4px;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--tint);
       border-radius: 2px;
       overflow: hidden;
       margin-top: 0.5rem;
@@ -81,42 +85,9 @@ export class DriveSyncPanel extends LitElement {
 
     .progress-fill {
       height: 100%;
-      background: var(--accent-color, #3498db);
+      background: var(--color-primary, #3498db);
       transition: width 0.3s;
       border-radius: 2px;
-    }
-
-    .sync-button {
-      padding: 0.75rem 1.5rem;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-    }
-
-    .sync-button:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .sync-button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .sync-button.primary {
-      background: rgba(52, 152, 219, 0.2);
-    }
-
-    .sync-button.primary:hover:not(:disabled) {
-      background: rgba(52, 152, 219, 0.3);
     }
 
     .last-sync {
@@ -126,31 +97,15 @@ export class DriveSyncPanel extends LitElement {
     }
 
     .error-message {
-      color: #e74c3c;
+      color: var(--color-danger, #e74c3c);
       font-size: var(--font-ui-small);
       margin-top: 0.5rem;
     }
 
-    .spinner {
-      display: inline-block;
-      width: 16px;
-      height: 16px;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
     .unavailable-notice {
       padding: 1rem;
-      background: rgba(243, 156, 18, 0.1);
-      border: 1px solid rgba(243, 156, 18, 0.3);
+      background: color-mix(in srgb, var(--color-warning, #f39c12) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-warning, #f39c12) 30%, transparent);
       border-radius: 6px;
       font-size: var(--font-ui);
     }
@@ -159,7 +114,8 @@ export class DriveSyncPanel extends LitElement {
       color: inherit;
       text-decoration: underline;
     }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -291,13 +247,13 @@ export class DriveSyncPanel extends LitElement {
       <div class="sync-panel">
         ${this.renderSyncStatus()}
 
-        <button class="sync-button primary" ?disabled=${this.syncing} @click=${this.handleSync}>
+        <button class="btn primary" ?disabled=${this.syncing} @click=${this.handleSync}>
           ${
             this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
           }
         </button>
 
-        <button class="sync-button" ?disabled=${this.syncing} @click=${this.handleReset}>
+        <button class="btn" ?disabled=${this.syncing} @click=${this.handleReset}>
           ⤓ Reset from Google Drive
         </button>
 

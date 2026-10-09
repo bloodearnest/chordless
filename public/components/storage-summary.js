@@ -25,7 +25,7 @@ export class StorageSummary extends LitElement {
     }
 
     .stat-card {
-      background: rgba(0, 0, 0, 0.15);
+      background: var(--tint);
       border-radius: 8px;
       padding: 0.75rem;
       display: flex;
@@ -73,8 +73,8 @@ export class StorageSummary extends LitElement {
     .error-card {
       padding: 1rem;
       border-radius: 8px;
-      background: rgba(231, 76, 60, 0.2);
-      border: 1px solid rgba(231, 76, 60, 0.4);
+      background: color-mix(in srgb, var(--color-danger, #e74c3c) 15%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
     }
   `
 

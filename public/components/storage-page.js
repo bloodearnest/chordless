@@ -4,6 +4,7 @@ import './drive-sync-panel.js'
 import './storage-summary.js'
 import './pad-set-manager.js'
 import './select-organisation.js'
+import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.js'
 
 /**
  * StoragePage Component
@@ -22,7 +23,11 @@ export class StoragePage extends LitElement {
     _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
 
-  static styles = css`
+  static styles = [
+    panelStyles,
+    buttonStyles,
+    spinnerStyles,
+    css`
     :host {
       display: block;
     }
@@ -36,37 +41,24 @@ export class StoragePage extends LitElement {
       margin: 0 auto;
     }
 
-    .storage-section {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
+    .panel {
       display: flex;
       flex-direction: column;
       gap: 1rem;
     }
 
-    .storage-section.is-disabled {
+    .panel.is-disabled {
       opacity: 0.5;
     }
 
-    h3 {
-      font-size: var(--font-ui-small);
-      margin: 0 0 1rem 0;
-      font-weight: 600;
+    .danger-zone {
+      border-color: color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
     }
 
     h4 {
       font-size: var(--font-ui);
       margin: 1.5rem 0 1rem 0;
       font-weight: 600;
-    }
-
-    p {
-      font-size: var(--font-ui-small);
-      margin: 0 0 1rem 0;
-      opacity: 0.7;
-      line-height: 1.4;
     }
 
     .auth-status {
@@ -76,13 +68,13 @@ export class StoragePage extends LitElement {
     }
 
     .auth-status.authenticated {
-      background: rgba(39, 174, 96, 0.2);
-      border: 2px solid #27ae60;
+      background: color-mix(in srgb, var(--color-success, #27ae60) 15%, transparent);
+      border: 2px solid var(--color-success, #27ae60);
     }
 
     .auth-status.pending {
-      background: rgba(255, 255, 255, 0.05);
-      border: 2px solid rgba(255, 255, 255, 0.1);
+      background: var(--tint-subtle);
+      border: 2px solid var(--tint);
     }
 
     .auth-status h4 {
@@ -90,9 +82,13 @@ export class StoragePage extends LitElement {
       font-size: var(--font-ui);
     }
 
-    .auth-status p {
+    .panel .auth-status p {
       margin: 0;
       opacity: 1;
+    }
+
+    .panel .auth-note {
+      opacity: 0.6;
     }
 
     .auth-message {
@@ -124,68 +120,21 @@ export class StoragePage extends LitElement {
       gap: 0.75rem;
     }
 
-    .storage-button {
-      display: inline-block;
-      width: 100%;
-      padding: 0.75rem 1.5rem;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-      text-align: center;
-    }
-
-    .storage-button:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .storage-button.primary {
-      background: var(--header-bg, #3498db);
-    }
-
-    .storage-button.primary:hover {
-      background: #2980b9;
-    }
-
-    .storage-button.danger {
-      background-color: rgba(231, 76, 60, 0.2);
-    }
-
-    .storage-button.danger:hover {
-      background-color: rgba(231, 76, 60, 0.3);
-    }
-
     .sync-hint {
       font-size: var(--font-ui-small);
       opacity: 0.8;
     }
 
-    .spinner {
-      border: 3px solid rgba(255, 255, 255, 0.1);
-      border-top: 3px solid white;
-      border-radius: 50%;
+    .auth-status .spinner {
+      display: block;
       width: 30px;
       height: 30px;
-      animation: spin 1s linear infinite;
       margin: 0 auto 1rem;
-    }
-
-    @keyframes spin {
-      0% {
-        transform: rotate(0deg);
-      }
-      100% {
-        transform: rotate(360deg);
-      }
     }
 
     .divider {
       height: 1px;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--tint);
       margin: 0.5rem 0;
     }
 
@@ -194,7 +143,7 @@ export class StoragePage extends LitElement {
       align-items: center;
       gap: 1rem;
       padding: 0.75rem;
-      background: rgba(255, 255, 255, 0.08);
+      background: var(--tint);
       border-radius: 8px;
     }
 
@@ -203,8 +152,8 @@ export class StoragePage extends LitElement {
       height: 48px;
       border-radius: 50%;
       object-fit: cover;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      background: rgba(255, 255, 255, 0.15);
+      border: 2px solid var(--tint-border);
+      background: var(--tint-strong);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -226,7 +175,8 @@ export class StoragePage extends LitElement {
       font-size: var(--font-ui-small);
       opacity: 0.8;
     }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -264,7 +214,7 @@ export class StoragePage extends LitElement {
 
   _renderAuthSection() {
     return html`
-      <div class="storage-section">
+      <div class="panel">
         <h3>🔐 Google Drive Authorization</h3>
 
         ${
@@ -322,13 +272,13 @@ export class StoragePage extends LitElement {
                 </p>
 
                 <div class="button-group">
-                  <button class="storage-button" @click=${this._testTokenRefresh}>
+                  <button class="btn block" @click=${this._testTokenRefresh}>
                     🔄 Test Token Refresh
                   </button>
-                  <button class="storage-button" @click=${this._downloadBackup}>
+                  <button class="btn block" @click=${this._downloadBackup}>
                     📥 Download Auth Backup
                   </button>
-                  <button class="storage-button danger" @click=${this._logout}>
+                  <button class="btn block danger" @click=${this._logout}>
                     🚪 Logout & Revoke Access
                   </button>
                 </div>
@@ -348,16 +298,16 @@ export class StoragePage extends LitElement {
                   <li>📱 Access from any device with a browser</li>
                 </ul>
 
-                <p style="opacity: 0.6; font-size: var(--font-ui-small);">
+                <p class="auth-note">
                   <strong>Note:</strong> Authorization happens locally on your device. Your
                   credentials are encrypted and never stored on our servers.
                 </p>
 
                 <div class="button-group">
-                  <button class="storage-button primary" @click=${this._authorize}>
+                  <button class="btn block primary" @click=${this._authorize}>
                     🔑 Connect with Google
                   </button>
-                  <button class="storage-button" @click=${this._showImportBackup}>
+                  <button class="btn block" @click=${this._showImportBackup}>
                     📤 Import Auth Backup
                   </button>
                 </div>
@@ -379,7 +329,7 @@ export class StoragePage extends LitElement {
 
   _renderLocalSummarySection() {
     return html`
-      <div class="storage-section">
+      <div class="panel">
         <h3>📊 Local Data</h3>
         <p>
           Overview of the setlists, songs, and cached files stored in this browser. Useful for
@@ -392,7 +342,7 @@ export class StoragePage extends LitElement {
 
   _renderOrganisationSection() {
     return html`
-      <div class="storage-section">
+      <div class="panel">
         <h3>🏢 Organisation</h3>
         <p>
           Select which organisation you're currently working with. Each organisation has its own
@@ -405,7 +355,7 @@ export class StoragePage extends LitElement {
 
   _renderSyncSection(disabled = false) {
     return html`
-      <div class="storage-section ${disabled ? 'is-disabled' : ''}">
+      <div class="panel ${disabled ? 'is-disabled' : ''}">
         <h3>🔄 Google Drive Sync</h3>
         <p>
           Sync your setlists and songs with Google Drive. Your data will be stored in the
@@ -425,7 +375,7 @@ export class StoragePage extends LitElement {
 
   _renderPadSetSection() {
     return html`
-      <div class="storage-section">
+      <div class="panel">
         <h3>🎚️ Pad Sets</h3>
         <p>
           Upload zipped pad libraries (with all 12 keys). They are stored locally for instant use
@@ -438,13 +388,13 @@ export class StoragePage extends LitElement {
 
   _renderDangerSection() {
     return html`
-      <div class="storage-section" style="border: 1px solid rgba(231, 76, 60, 0.4);">
+      <div class="panel danger-zone">
         <h3>⚠️ Danger Zone</h3>
         <p>
           Clear all data from IndexedDB and localStorage for this browser. This action cannot be
           undone!
         </p>
-        <button class="storage-button danger" @click=${this._handleClearDatabase}>
+        <button class="btn block danger" @click=${this._handleClearDatabase}>
           Clear Local Data
         </button>
         ${this._clearError ? html`<p role="alert">❌ Failed to clear data: ${this._clearError}</p>` : ''}

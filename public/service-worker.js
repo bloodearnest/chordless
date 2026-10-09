@@ -20,6 +20,7 @@ const ASSETS = [
   '/js/icons.js',
   '/components/media-player.js',
   '/components/media-player-settings.js',
+  '/components/shared-styles.js',
   '/components/icon.js',
   '/manifest.webmanifest',
 ]

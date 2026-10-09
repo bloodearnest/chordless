@@ -5,6 +5,7 @@ import {
   listOrganisations,
   switchOrganisation,
 } from '../js/organisation.js'
+import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 /**
  * SelectOrganisation Component
@@ -21,184 +22,88 @@ export class SelectOrganisation extends LitElement {
     _creating: { type: Boolean, state: true },
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
+  static styles = [
+    buttonStyles,
+    fieldStyles,
+    css`
+      :host {
+        display: block;
+      }
 
-    .organisation-selector {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
-    }
+      .organisations-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
 
-    .organisations-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0.5rem;
-      margin-bottom: 1rem;
-    }
+      .organisation-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: var(--tint-subtle);
+        border-radius: 4px;
+        transition: background 0.2s;
+        cursor: pointer;
+      }
 
-    .organisation-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.75rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      transition: all 0.2s;
-      cursor: pointer;
-    }
+      .organisation-item:hover {
+        background: var(--tint);
+      }
 
-    .organisation-item:hover {
-      background: rgba(255, 255, 255, 0.08);
-    }
+      .organisation-item.current {
+        background: color-mix(in srgb, var(--color-primary, #3498db) 20%, transparent);
+        cursor: default;
+      }
 
-    .organisation-item.current {
-      background: rgba(52, 152, 219, 0.2);
-      cursor: default;
-    }
+      .organisation-name {
+        font-size: var(--font-ui);
+        font-weight: 500;
+      }
 
-    .organisation-name {
-      font-size: var(--font-ui);
-      font-weight: 500;
-    }
+      .organisation-badge {
+        padding: 0.3rem 0.8rem;
+        background: var(--color-primary, #3498db);
+        color: var(--button-text, white);
+        border-radius: 4px;
+        font-size: var(--font-ui-small);
+        font-weight: 600;
+      }
 
-    .organisation-badge {
-      padding: 0.3rem 0.8rem;
-      background: #3498db;
-      color: white;
-      border-radius: 4px;
-      font-size: var(--font-ui-small);
-      font-weight: 600;
-    }
+      .switch-button {
+        padding: 0.5rem 1rem;
+      }
 
-    .switch-button {
-      padding: 0.5rem 1rem;
-      background: #3498db;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
+      .create-form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        padding: 0.75rem;
+        background: var(--tint-subtle);
+        border-radius: 4px;
+      }
 
-    .switch-button:hover {
-      background: #2980b9;
-    }
+      .create-form-buttons {
+        display: flex;
+        gap: 0.5rem;
+      }
 
-    .switch-button:active {
-      transform: scale(0.98);
-    }
+      .create-form-buttons .btn {
+        flex: 1;
+      }
 
-    .create-button {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.75rem;
-      background: rgba(39, 174, 96, 0.2);
-      border: none;
-      color: white;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      transition: all 0.2s;
-      justify-content: center;
-      cursor: pointer;
-      width: 100%;
-    }
+      .loading,
+      .empty-state {
+        text-align: center;
+        opacity: 0.7;
+      }
 
-    .create-button:hover {
-      background: rgba(39, 174, 96, 0.3);
-    }
-
-    .create-form {
-      display: flex;
-      flex-direction: column;
-      gap: 0.75rem;
-      padding: 0.75rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-    }
-
-    .create-form input {
-      padding: 0.75rem;
-      font-size: var(--font-ui);
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      color: white;
-    }
-
-    .create-form input::placeholder {
-      color: rgba(255, 255, 255, 0.5);
-    }
-
-    .create-form input:focus {
-      outline: none;
-      border-color: #27ae60;
-      background: rgba(0, 0, 0, 0.4);
-    }
-
-    .create-form-buttons {
-      display: flex;
-      gap: 0.5rem;
-    }
-
-    .create-form-buttons button {
-      flex: 1;
-      padding: 0.75rem;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .create-form-buttons .submit {
-      background: #27ae60;
-      color: white;
-    }
-
-    .create-form-buttons .submit:hover {
-      background: #229954;
-    }
-
-    .create-form-buttons .cancel {
-      background: rgba(0, 0, 0, 0.3);
-      color: rgba(255, 255, 255, 0.7);
-    }
-
-    .create-form-buttons .cancel:hover {
-      background: rgba(0, 0, 0, 0.4);
-    }
-
-    .loading {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
-      text-align: center;
-      opacity: 0.7;
-    }
-
-    .empty-state {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
-      text-align: center;
-    }
-
-    .empty-state p {
-      opacity: 0.7;
-      margin: 0;
-    }
-  `
+      .empty-state p {
+        margin: 0;
+      }
+    `,
+  ]
 
   constructor() {
     super()
@@ -313,7 +218,7 @@ export class SelectOrganisation extends LitElement {
                   org.name === this._currentOrganisation
                     ? html`<span class="organisation-badge">CURRENT</span>`
                     : html`<button
-                      class="switch-button"
+                      class="btn primary switch-button"
                       @click=${e => {
                         e.stopPropagation()
                         this._handleSwitch(org)
@@ -332,6 +237,7 @@ export class SelectOrganisation extends LitElement {
             ? html`
               <form class="create-form" @submit=${this._handleCreate}>
                 <input
+                  class="field"
                   type="text"
                   placeholder="New organisation name..."
                   .value=${this._newOrganisationName}
@@ -342,20 +248,20 @@ export class SelectOrganisation extends LitElement {
                 <div class="create-form-buttons">
                   <button
                     type="button"
-                    class="cancel"
+                    class="btn"
                     @click=${this._toggleCreateForm}
                     ?disabled=${this._creating}
                   >
                     Cancel
                   </button>
-                  <button type="submit" class="submit" ?disabled=${this._creating}>
+                  <button type="submit" class="btn primary" ?disabled=${this._creating}>
                     ${this._creating ? 'Creating...' : 'Create Organisation'}
                   </button>
                 </div>
               </form>
             `
             : html`
-              <button class="create-button" @click=${this._toggleCreateForm}>
+              <button class="btn block success" @click=${this._toggleCreateForm}>
                 <svg
                   width="20"
                   height="20"

@@ -53,10 +53,10 @@ export class ThemeSettings extends LitElement {
       flex: 1;
       min-width: 120px;
       padding: 0.75rem 1.25rem;
-      border: 2px solid rgba(255, 255, 255, 0.2);
+      border: 2px solid var(--tint-border);
       border-radius: 6px;
-      background: rgba(255, 255, 255, 0.05);
-      color: white;
+      background: var(--tint-subtle);
+      color: inherit;
       font-size: var(--font-ui);
       font-weight: 600;
       cursor: pointer;
@@ -68,13 +68,13 @@ export class ThemeSettings extends LitElement {
     }
 
     .theme-button:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: var(--tint-strong);
     }
 
     .theme-button.active {
       background: var(--color-primary, #3498db);
       border-color: var(--color-primary, #3498db);
+      color: var(--button-text, white);
       box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
     }
 
@@ -96,7 +96,7 @@ export class ThemeSettings extends LitElement {
     .scale-slider {
       flex: 1;
       height: 6px;
-      background: rgba(255, 255, 255, 0.2);
+      background: var(--tint-border);
       border-radius: 3px;
       outline: none;
       -webkit-appearance: none;
@@ -130,7 +130,7 @@ export class ThemeSettings extends LitElement {
       font-weight: 600;
       font-size: var(--font-ui);
       padding: 0.25rem 0.5rem;
-      background: rgba(255, 255, 255, 0.1);
+      background: var(--tint);
       border-radius: 4px;
     }
 
@@ -143,24 +143,23 @@ export class ThemeSettings extends LitElement {
 
     .preset-button {
       padding: 0.4rem 0.8rem;
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      border: 1px solid var(--tint-border);
       border-radius: 4px;
-      background: rgba(255, 255, 255, 0.05);
-      color: white;
+      background: var(--tint-subtle);
+      color: inherit;
       font-size: var(--font-ui-small);
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .preset-button:hover {
-      background: rgba(255, 255, 255, 0.15);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: var(--tint-strong);
     }
 
     .current-theme-info {
       margin-top: 1rem;
       padding: 0.75rem;
-      background: rgba(255, 255, 255, 0.05);
+      background: var(--tint-subtle);
       border-radius: 4px;
       font-size: var(--font-ui-small);
     }
@@ -186,7 +185,7 @@ export class ThemeSettings extends LitElement {
     .system-preference {
       margin-top: 0.5rem;
       padding: 0.5rem;
-      background: rgba(52, 152, 219, 0.1);
+      background: color-mix(in srgb, var(--color-primary, #3498db) 10%, transparent);
       border-left: 3px solid var(--color-primary, #3498db);
       border-radius: 2px;
       font-size: var(--font-ui-small);

@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.js'
 import { getActivePadSet, listPadSets, selectPadSet } from '../js/pad-set-service.js'
+import { fieldStyles, switchStyles } from './shared-styles.js'
 
 /**
  * MediaPlayerSettings Component
@@ -29,137 +30,80 @@ export class MediaPlayerSettings extends LitElement {
     padSetError: { type: String, state: true },
   }
 
-  static styles = css`
-    :host {
-      display: block;
-    }
+  static styles = [
+    switchStyles,
+    fieldStyles,
+    css`
+      :host {
+        display: block;
+      }
 
-    .container {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
-    }
+      h2 {
+        margin: 0 0 1rem 0;
+        font-size: var(--font-ui-small);
+        font-weight: 600;
+      }
 
-    h2 {
-      margin: 0 0 1rem 0;
-      font-size: var(--font-ui-small);
-      font-weight: 600;
-      color: var(--settings-text, white);
-    }
+      .setting-group {
+        margin-bottom: 1.5rem;
+      }
 
-    .setting-group {
-      margin-bottom: 1.5rem;
-    }
+      .setting-group:last-child {
+        margin-bottom: 0;
+      }
 
-    .setting-group:last-child {
-      margin-bottom: 0;
-    }
+      .setting-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        padding: 0.75rem;
+        background: var(--tint);
+        border-radius: 4px;
+        margin-bottom: 0.5rem;
+      }
 
-    .setting-item {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0.75rem;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      margin-bottom: 0.5rem;
-    }
+      .setting-item:last-child {
+        margin-bottom: 0;
+      }
 
-    .setting-item:last-child {
-      margin-bottom: 0;
-    }
+      .setting-item.disabled {
+        opacity: 0.5;
+        pointer-events: none;
+      }
 
-    .setting-item.disabled {
-      opacity: 0.5;
-      pointer-events: none;
-    }
+      .setting-item.indent {
+        margin-left: 1.5rem;
+        background: var(--tint-subtle);
+      }
 
-    .setting-item.indent {
-      margin-left: 1.5rem;
-      background: rgba(255, 255, 255, 0.03);
-    }
+      .setting-label {
+        font-size: var(--font-ui);
+        font-weight: 500;
+      }
 
-    .setting-label {
-      font-size: var(--font-ui);
-      font-weight: 500;
-    }
+      .setting-description {
+        font-size: var(--font-ui-small);
+        opacity: 0.7;
+        margin-top: 0.25rem;
+      }
 
-    .setting-description {
-      font-size: var(--font-ui-small);
-      opacity: 0.7;
-      margin-top: 0.25rem;
-    }
+      .padset-select {
+        margin-top: 0.5rem;
+      }
 
-    .toggle-switch {
-      position: relative;
-      flex-shrink: 0;
-      width: 50px;
-      height: 28px;
-      padding: 0;
-      border: none;
-      background: rgba(0, 0, 0, 0.3);
-      border-radius: 14px;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
+      .padset-message {
+        font-size: var(--font-ui-small);
+        margin-top: 0.4rem;
+        opacity: 0.8;
+      }
 
-    .toggle-switch:focus-visible {
-      outline: 2px solid var(--focus-ring, #3498db);
-      outline-offset: 2px;
-    }
-
-    .toggle-switch.active {
-      background: #3498db;
-    }
-
-    .toggle-switch::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 24px;
-      height: 24px;
-      background: white;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-
-    .toggle-switch.active::after {
-      transform: translateX(22px);
-    }
-
-    .master-toggle {
-      background: rgba(0, 0, 0, 0.3);
-    }
-
-    .master-toggle.active {
-      background: #27ae60;
-    }
-
-    .padset-select {
-      width: 100%;
-      margin-top: 0.5rem;
-      padding: 0.5rem 0.65rem;
-      border-radius: 4px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      font-size: var(--font-ui);
-      background: rgba(0, 0, 0, 0.35);
-      color: #f5f5f5;
-      appearance: none;
-    }
-
-    .padset-select option {
-      background: #1f2c3c;
-      color: #f5f5f5;
-    }
-
-    .padset-message {
-      font-size: var(--font-ui-small);
-      margin-top: 0.4rem;
-      opacity: 0.8;
-    }
-  `
+      .padset-message.error {
+        color: var(--color-danger, #e74c3c);
+        opacity: 1;
+      }
+    `,
+  ]
 
   constructor() {
     super()
@@ -218,7 +162,7 @@ export class MediaPlayerSettings extends LitElement {
       <button
         type="button"
         role="switch"
-        class="toggle-switch ${master ? 'master-toggle' : ''} ${on ? 'active' : ''}"
+        class="toggle-switch ${master ? 'master' : ''} ${on ? 'active' : ''}"
         aria-checked=${on ? 'true' : 'false'}
         aria-label=${label}
         ?disabled=${disabled}
@@ -327,7 +271,7 @@ export class MediaPlayerSettings extends LitElement {
               <select
                 id="padset-select"
                 name="padset-select"
-                class="padset-select"
+                class="field padset-select"
                 .value=${this.selectedPadSetId || ''}
                 @change=${this._handlePadSetChange}
                 ?disabled=${this.padSetLoading || !this.mediaPlayerEnabled || !this.padsEnabled}
@@ -343,7 +287,7 @@ export class MediaPlayerSettings extends LitElement {
               }
               ${
                 this.padSetError
-                  ? html`<div class="padset-message" style="color: #ffb3b3;">
+                  ? html`<div class="padset-message error">
                     ${this.padSetError}
                   </div>`
                   : ''

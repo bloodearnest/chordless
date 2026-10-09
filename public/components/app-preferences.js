@@ -11,6 +11,7 @@ import {
 } from '../js/preferences.js'
 import './theme-settings.js'
 import './media-player-settings.js'
+import { panelStyles } from './shared-styles.js'
 
 /**
  * AppPreferences Component
@@ -25,7 +26,9 @@ export class AppPreferences extends LitElement {
     capoEnabled: { type: Boolean, attribute: false },
   }
 
-  static styles = css`
+  static styles = [
+    panelStyles,
+    css`
     :host {
       display: block;
     }
@@ -35,59 +38,6 @@ export class AppPreferences extends LitElement {
       display: flex;
       flex-direction: column;
       gap: 1.5rem;
-    }
-
-    .preferences-section {
-      background: var(--settings-bg, #34495e);
-      border-radius: 8px;
-      padding: 1.5rem;
-      color: var(--settings-text, white);
-    }
-
-    h3 {
-      font-size: var(--font-ui-small);
-      margin: 0 0 1rem 0;
-      font-weight: 600;
-    }
-
-    h4 {
-      font-size: var(--font-ui);
-      margin: 1.5rem 0 1rem 0;
-      font-weight: 600;
-      color: #e74c3c;
-    }
-
-    p {
-      font-size: var(--font-ui-small);
-      margin: 0 0 1rem 0;
-      opacity: 0.7;
-      line-height: 1.4;
-    }
-
-    .setlist-button {
-      display: inline-block;
-      width: auto;
-      padding: 0.75rem 1.5rem;
-      background: rgba(255, 255, 255, 0.1);
-      color: white;
-      border: none;
-      border-radius: 4px;
-      font-size: var(--font-ui);
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .setlist-button:hover {
-      background: rgba(255, 255, 255, 0.15);
-    }
-
-    .danger-button {
-      background-color: rgba(231, 76, 60, 0.2);
-    }
-
-    .danger-button:hover {
-      background-color: rgba(231, 76, 60, 0.3);
     }
 
     .toggle {
@@ -140,10 +90,8 @@ export class AppPreferences extends LitElement {
       line-height: 1.3;
     }
 
-    a {
-      text-decoration: none;
-    }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -156,13 +104,13 @@ export class AppPreferences extends LitElement {
   render() {
     return html`
       <div class="preferences-content">
-        <div class="preferences-section">
+        <div class="panel">
           <h3>Appearance</h3>
           <p>Customize the look and feel of the app with theme and display settings.</p>
           <theme-settings></theme-settings>
         </div>
 
-        <div class="preferences-section">
+        <div class="panel">
           <h3>Display Defaults</h3>
           <p>Choose how each section appears when you open a setlist.</p>
           <div class="radio-group">
@@ -198,7 +146,7 @@ export class AppPreferences extends LitElement {
           </div>
         </div>
 
-        <div class="preferences-section">
+        <div class="panel">
           <h3>Capo</h3>
           <p>Show a capo control so guitarists can view transposed chords without changing pads.</p>
           <label class="toggle" for="toggle-capo">
@@ -213,7 +161,7 @@ export class AppPreferences extends LitElement {
           </label>
         </div>
 
-        <div class="preferences-section">
+        <div class="panel">
           <h3>Chords</h3>
           <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
           <label class="toggle" for="toggle-use-nashville">
@@ -239,7 +187,7 @@ export class AppPreferences extends LitElement {
           </label>
         </div>
 
-        <div class="preferences-section">
+        <div class="panel">
           <h3>Media Player</h3>
           <p>Configure global media player settings. These settings apply to all setlists.</p>
           <media-player-settings></media-player-settings>

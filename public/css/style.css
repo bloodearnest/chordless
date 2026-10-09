@@ -68,6 +68,16 @@ app-modal:not(:defined) {
   --modal-bg: #ffffff;
   --modal-border: transparent;
   --modal-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  --panel-bg: #f5f6f7;
+  --panel-border: #e3e7ea;
+
+  /* Tints of the text colour, for subtle backgrounds and borders. Mixed from
+     currentColor where they're used, so they darken on light surfaces and
+     lighten on dark ones: one value for both themes. */
+  --tint-subtle: color-mix(in srgb, currentColor 5%, transparent);
+  --tint: color-mix(in srgb, currentColor 9%, transparent);
+  --tint-strong: color-mix(in srgb, currentColor 15%, transparent);
+  --tint-border: color-mix(in srgb, currentColor 22%, transparent);
   --hover-bg: rgba(255, 255, 255, 0.2);
   --active-bg: rgba(255, 255, 255, 0.3);
   --focus-ring: #3498db;

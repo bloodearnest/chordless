@@ -59,6 +59,10 @@ export class ThemeManager {
       'modal-border': 'transparent',
       'modal-shadow': '0 4px 20px rgba(0, 0, 0, 0.3)',
 
+      // Settings panels (Preferences, Storage)
+      'panel-bg': '#f5f6f7',
+      'panel-border': '#e3e7ea',
+
       // Interactive states
       'hover-bg': 'rgba(255, 255, 255, 0.2)',
       'active-bg': 'rgba(255, 255, 255, 0.3)',
@@ -108,6 +112,10 @@ export class ThemeManager {
       'modal-bg': '#242424',
       'modal-border': 'rgba(255, 255, 255, 0.12)',
       'modal-shadow': '0 8px 32px rgba(0, 0, 0, 0.6)',
+
+      // Settings panels (Preferences, Storage)
+      'panel-bg': '#2e2e2e',
+      'panel-border': 'rgba(255, 255, 255, 0.12)',
 
       // Interactive states
       'hover-bg': 'rgba(255, 255, 255, 0.1)',
@@ -159,6 +167,8 @@ export class ThemeManager {
     for (const [key, value] of Object.entries(theme)) {
       this.setVariable(key, value)
     }
+    // So native controls (checkboxes, selects, date pickers, scrollbars) match
+    this.root.style.colorScheme = actualTheme
 
     // Store current theme preference (may be 'system')
     this._currentTheme = themeName

@@ -11,6 +11,12 @@ song edit UI
 
 preferences
   - custom section visibility defaults
+  - revisit the configuration panels (Preferences, Storage, media player settings): too
+    much variety in layout and controls. Settings rows, switches vs checkboxes, toggle
+    buttons vs radios, button sizes all differ; headings repeat ("Appearance" twice,
+    "Media Player Settings" twice). Settle on one settings row pattern in shared-styles.js
+    Decided: on/off settings use checkboxes, not pill-shaped toggle switches (pills are
+    poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 storage/sync
 - edit chordpro/variants
