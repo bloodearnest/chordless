@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "wrangler dev --env dev --port 8787",
     "deploy": "wrangler deploy",
-    "test:node": "node --test tests/worker.test.js tests/events.node.test.js",
+    "test:node": "node --test tests/*.node.test.js",
     "test:web": "web-test-runner --config web-test-runner.config.js",
     "test:browser": "playwright test",
     "test:browser:ui": "playwright test --ui",

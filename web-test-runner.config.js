@@ -1,35 +1,8 @@
 import { playwrightLauncher } from '@web/test-runner-playwright';
 
 export default {
-  files: [
-    'tests/bookmarklet.test.js',
-    'tests/chord-utils.test.js',
-    'tests/date-utils.test.js',
-    'tests/drive-metadata.test.js',
-    'tests/db.test.js',
-    'tests/db-usage.test.js',
-    'tests/drive-sync-conflicts.test.js',
-    'tests/app-modal.test.js',
-    'tests/drive-sync.test.js',
-    'tests/fake-drive.test.js',
-    'tests/keyboard.test.js',
-    'tests/library-song.test.js',
-    'tests/lyrics-normalizer.test.js',
-    'tests/media-player-settings.test.js',
-    'tests/media-settings.test.js',
-    'tests/metronome-controller.test.js',
-    'tests/key-selector.test.js',
-    'tests/nav-menu.test.js',
-    'tests/song-info-dialog.test.js',
-    'tests/song-section.test.js',
-    'tests/pad-audio-controller.test.js',
-    'tests/pad-sets-controller.test.js',
-    'tests/people.test.js',
-    'tests/setlist-details-form.test.js',
-    'tests/setlist-song.test.js',
-    'tests/sync-reconciler.test.js',
-    'tests/transpose.legacy.test.js',
-  ],
+  // Every test file except the node ones (*.node.test.js, run by just test-node)
+  files: ['tests/*.test.js', '!tests/*.node.test.js'],
   nodeResolve: true,
   browsers: [
     playwrightLauncher({
