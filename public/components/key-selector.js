@@ -66,8 +66,8 @@ export class KeySelector extends LitElement {
 
     /* In edit mode, make it look and behave like a button */
     :host([edit-mode]) .key-selector {
-      background-color: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border-color: color-mix(in srgb, currentColor 30%, transparent);
       cursor: pointer;
       pointer-events: auto;
     }
@@ -75,7 +75,8 @@ export class KeySelector extends LitElement {
     /* Popover container */
     .key-popover {
       background-color: var(--header-bg, #2c3e50);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: var(--header-text, #fff);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       border-radius: 8px;
       padding: 0.5rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -117,11 +118,11 @@ export class KeySelector extends LitElement {
     }
 
     .key-option-item:hover {
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
     }
 
     .key-option-item.selected {
-      background-color: rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 30%, transparent);
     }
 
     .key-option-item .key-name {
@@ -131,7 +132,7 @@ export class KeySelector extends LitElement {
     .key-option-item .key-offset {
       flex: 0 0 auto;
       font-size: var(--font-ui);
-      color: rgba(255, 255, 255, 0.5);
+      color: color-mix(in srgb, currentColor 50%, transparent);
     }
   `
 

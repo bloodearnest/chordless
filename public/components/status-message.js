@@ -25,7 +25,7 @@ export class StatusMessage extends LitElement {
       display: block;
       padding: 2rem 1rem;
       text-align: center;
-      color: #2c3e50;
+      color: var(--text-color, #1a1a1a);
       font-family: var(
         --font-family,
         -apple-system,
@@ -37,15 +37,15 @@ export class StatusMessage extends LitElement {
     }
 
     :host([state='loading']) {
-      color: #95a5a6;
+      color: var(--text-tertiary, #95a5a6);
     }
 
     :host([state='empty']) {
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
     }
 
     :host([state='error']) {
-      color: #e74c3c;
+      color: var(--color-danger, #e74c3c);
     }
 
     .status-card {
@@ -58,7 +58,7 @@ export class StatusMessage extends LitElement {
       height: 32px;
       margin: 0 auto 1.5rem;
       border-radius: 50%;
-      border: 3px solid rgba(0, 0, 0, 0.1);
+      border: 3px solid var(--tint-border);
       border-top-color: currentColor;
       animation: spin 0.8s linear infinite;
     }
@@ -69,19 +69,11 @@ export class StatusMessage extends LitElement {
       margin: 0 0 0.6rem;
     }
 
+    /* In the message's colour, a little softer */
     .detail {
       font-size: var(--font-ui);
-      color: rgba(44, 62, 80, 0.85);
+      opacity: 0.9;
       margin: 0;
-    }
-
-    :host([state='loading']) .detail,
-    :host([state='empty']) .detail {
-      color: rgba(127, 140, 141, 0.95);
-    }
-
-    :host([state='error']) .detail {
-      color: rgba(231, 76, 60, 0.9);
     }
 
     ::slotted(*) {

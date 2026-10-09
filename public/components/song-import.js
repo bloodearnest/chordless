@@ -6,6 +6,7 @@ import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.js'
 import './app-modal.js'
 import './setlist-details-form.js'
+import { buttonStyles } from './shared-styles.js'
 
 const SONGSELECT_ORIGIN = 'https://songselect.ccli.com'
 
@@ -48,7 +49,9 @@ export class SongImport extends LitElement {
     _newSetlist: { state: true },
   }
 
-  static styles = css`
+  static styles = [
+    buttonStyles,
+    css`
     /* The page's own reset (* { margin: 0; padding: 0 }) beats :host, so the
        spacing goes on .page */
     :host {
@@ -101,24 +104,9 @@ export class SongImport extends LitElement {
       gap: 0.75rem;
     }
 
-    .duplicate-actions button {
+    .duplicate-actions .btn {
       flex: 1;
-      padding: 0.75rem 1.5rem;
-      border: none;
-      border-radius: 6px;
       font-size: var(--font-ui-small);
-      font-weight: 600;
-      cursor: pointer;
-    }
-
-    .update {
-      background-color: var(--button-bg, #3498db);
-      color: var(--button-text, white);
-    }
-
-    .use-existing {
-      background-color: var(--bg-tertiary, #ecf0f1);
-      color: var(--text-color);
     }
 
     .choices {
@@ -288,19 +276,10 @@ export class SongImport extends LitElement {
 
     .add {
       padding: 0.5rem 1.25rem;
-      border: none;
-      border-radius: 6px;
       font-size: var(--font-ui-small);
-      font-weight: 600;
-      background-color: var(--button-bg, #3498db);
-      color: var(--button-text, white);
-      cursor: pointer;
     }
-
-    .add:hover {
-      background-color: var(--button-hover, #2980b9);
-    }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -570,7 +549,7 @@ export class SongImport extends LitElement {
           <div class="content">
             <label class="title" for="paste">Paste ChordPro</label>
             <textarea id="paste" rows="6" placeholder="{title: Amazing Grace}"></textarea>
-            <button class="add" @click=${this._importPasted}>Import</button>
+            <button class="btn primary add" @click=${this._importPasted}>Import</button>
           </div>
         </div>
         <a class="choice" href="/bookmarklet">
@@ -630,8 +609,8 @@ export class SongImport extends LitElement {
           <strong>⚠️ This song already exists in your library</strong>
           <p>Do you want to update the song with the new version, or use the existing one?</p>
           <div class="duplicate-actions">
-            <button class="update" @click=${() => this._update(item)}>Update Song</button>
-            <button class="use-existing" @click=${() => this._useExisting(item)}>Use Existing</button>
+            <button class="btn primary update" @click=${() => this._update(item)}>Update Song</button>
+            <button class="btn use-existing" @click=${() => this._useExisting(item)}>Use Existing</button>
           </div>
         </div>
       `
@@ -649,8 +628,8 @@ export class SongImport extends LitElement {
               <li>
                 <span>${item.song.title}</span>
                 <span class="duplicate-actions">
-                  <button class="update" @click=${() => this._update(item)}>Update</button>
-                  <button class="use-existing" @click=${() => this._useExisting(item)}>
+                  <button class="btn primary update" @click=${() => this._update(item)}>Update</button>
+                  <button class="btn use-existing" @click=${() => this._useExisting(item)}>
                     Use Existing
                   </button>
                 </span>
@@ -659,11 +638,11 @@ export class SongImport extends LitElement {
           )}
         </ul>
         <div class="duplicate-actions">
-          <button class="update update-all" @click=${() => this._updateAll(unresolved)}>
+          <button class="btn primary update update-all" @click=${() => this._updateAll(unresolved)}>
             Update All
           </button>
           <button
-            class="use-existing use-existing-all"
+            class="btn use-existing use-existing-all"
             @click=${() => unresolved.forEach(item => this._useExisting(item))}
           >
             Use All Existing
@@ -692,7 +671,7 @@ export class SongImport extends LitElement {
                         </option>`
                       })}
                     </select>
-                    <button class="add" @click=${this._addToChosenSetlist}>Add</button>
+                    <button class="btn primary add" @click=${this._addToChosenSetlist}>Add</button>
                   </div>
                 </div>
               </div>

@@ -37,6 +37,22 @@ test.describe('Application Pages', () => {
     }
   })
 
+  test('a status message is readable in dark mode', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.goto('/songs')
+    await page.waitForFunction(() => customElements.get('status-message'))
+    const color = await page.evaluate(() => {
+      const message = document.createElement('status-message')
+      document.body.append(message)
+      return getComputedStyle(message).color
+    })
+    const lightness = color
+      .match(/\d+/g)
+      .slice(0, 3)
+      .reduce((sum, n) => sum + Number(n), 0)
+    expect(lightness).toBeGreaterThan(600)
+  })
+
   test('settings panels follow the theme, with matching text', async ({ page }) => {
     const lightness = rgb =>
       rgb

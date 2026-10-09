@@ -52,15 +52,16 @@ export class CapoSelector extends LitElement {
     }
 
     :host([edit-mode]) .capo-button {
-      background-color: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border-color: color-mix(in srgb, currentColor 30%, transparent);
       cursor: pointer;
       pointer-events: auto;
     }
 
     .capo-popover {
       background-color: var(--header-bg, #2c3e50);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: var(--header-text, #fff);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       border-radius: 8px;
       padding: 0.5rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -92,7 +93,7 @@ export class CapoSelector extends LitElement {
 
     .capo-option:hover,
     .capo-option.selected {
-      background-color: rgba(255, 255, 255, 0.2);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
     }
 
     .capo-option-value {

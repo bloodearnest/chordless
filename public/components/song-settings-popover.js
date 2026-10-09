@@ -21,7 +21,8 @@ export class SongSettingsPopover extends LitElement {
 
     .settings-popover {
       background-color: var(--header-bg, #2c3e50);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      color: var(--header-text, #fff);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       border-radius: 8px;
       padding: 1rem;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
@@ -59,8 +60,8 @@ export class SongSettingsPopover extends LitElement {
     }
 
     .control-button {
-      background-color: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       color: var(--header-text, #fff);
       border-radius: 6px;
       min-width: 2.5rem;
@@ -92,8 +93,8 @@ export class SongSettingsPopover extends LitElement {
     .reset-button {
       grid-column: 1 / 5;
       margin-top: 0.5rem;
-      background-color: rgba(255, 255, 255, 0.2);
-      border: 2px solid rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
       color: var(--header-text, #fff);
       border-radius: 6px;
       min-width: 2.5rem;

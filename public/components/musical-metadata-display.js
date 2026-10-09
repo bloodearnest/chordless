@@ -37,6 +37,7 @@ export class MusicalMetadataDisplay extends LitElement {
       gap: 0.5rem;
       font-size: var(--font-ui-small);
       white-space: nowrap;
+      color: var(--header-text, #fff);
       background: transparent;
       border: 2px solid transparent;
       border-radius: 6px;
@@ -47,19 +48,19 @@ export class MusicalMetadataDisplay extends LitElement {
 
     /* In edit mode, make it look like a button */
     :host([edit-mode]) .metadata-container {
-      background-color: rgba(255, 255, 255, 0.2);
-      border-color: rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border-color: color-mix(in srgb, currentColor 30%, transparent);
       cursor: pointer;
     }
 
     :host([edit-mode]) .metadata-container:hover {
-      background-color: rgba(255, 255, 255, 0.3);
-      border-color: rgba(255, 255, 255, 0.5);
+      background-color: color-mix(in srgb, currentColor 30%, transparent);
+      border-color: color-mix(in srgb, currentColor 50%, transparent);
     }
 
     :host([edit-mode]) .metadata-container:focus {
       outline: none;
-      background-color: rgba(255, 255, 255, 0.3);
+      background-color: color-mix(in srgb, currentColor 30%, transparent);
       border-color: var(--header-text, #fff);
     }
 

@@ -51,7 +51,7 @@ export class SetlistInfo extends LitElement {
     .modal-info-label {
       font-size: var(--font-ui);
       font-weight: 600;
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
       text-transform: uppercase;
     }
 
@@ -63,13 +63,13 @@ export class SetlistInfo extends LitElement {
     .loading {
       text-align: center;
       padding: 2rem;
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
     }
 
     .empty {
       text-align: center;
       padding: 2rem;
-      color: #7f8c8d;
+      color: var(--text-secondary, #7f8c8d);
       font-style: italic;
     }
   `

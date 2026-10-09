@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import './icon.js'
+import { buttonStyles } from './shared-styles.js'
 
 /**
  * AppModal Component
@@ -55,7 +56,9 @@ export class AppModal extends LitElement {
     hideCloseButton: { type: Boolean, attribute: 'hide-close-button' },
   }
 
-  static styles = css`
+  static styles = [
+    buttonStyles,
+    css`
     :host {
       display: none;
       position: fixed;
@@ -216,47 +219,17 @@ export class AppModal extends LitElement {
       border-top: 1px solid var(--border-light, #ecf0f1);
     }
 
+    /* Shared .btn, a little larger */
     .modal-btn {
       padding: 1rem 2rem;
-      font-size: var(--font-ui);
-      border-radius: 4px;
-      border: none;
-      cursor: pointer;
-      font-weight: 600;
-      transition: all 0.2s;
-    }
-
-    .modal-btn-cancel {
-      background-color: var(--bg-tertiary, #ecf0f1);
-      color: var(--text-color, #2c3e50);
-    }
-
-    .modal-btn-cancel:hover {
-      filter: brightness(1.2);
-    }
-
-    .modal-btn-confirm {
-      background-color: var(--button-bg, #3498db);
-      color: var(--button-text, white);
-    }
-
-    .modal-btn-confirm:hover {
-      background-color: var(--button-hover, #2980b9);
-    }
-
-    .modal-btn-confirm.danger {
-      background-color: var(--color-danger, #e74c3c);
-    }
-
-    .modal-btn-confirm.danger:hover {
-      filter: brightness(0.9);
     }
 
     /* Hide elements based on configuration */
     :host([hide-close-button]) .modal-close {
       display: none;
     }
-  `
+  `,
+  ]
 
   constructor() {
     super()
@@ -380,14 +353,14 @@ export class AppModal extends LitElement {
       return html`
         <div class="modal-actions" part="actions">
           <button
-            class="modal-btn modal-btn-cancel"
+            class="btn modal-btn modal-btn-cancel"
             part="cancel-button"
             @click=${this._handleCancel}
           >
             ${this.cancelLabel}
           </button>
           <button
-            class="modal-btn modal-btn-confirm"
+            class="btn primary modal-btn modal-btn-confirm"
             part="confirm-button"
             @click=${this._handleConfirm}
           >

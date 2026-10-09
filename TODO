@@ -8,6 +8,8 @@ song edit UI
         - pad sound 
     - click on/off for this song
         - click pattern
+- key popover on a setlist overview song card: with little room below, it flips upward
+  and its top runs off the screen (key-selector's positioning doesn't clamp to the viewport)
 
 preferences
   - custom section visibility defaults
