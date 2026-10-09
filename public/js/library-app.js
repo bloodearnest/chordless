@@ -667,16 +667,21 @@ export class LibraryApp {
 
     console.log('Re-rendering library song with key:', targetKey)
 
-    // Transpose to target key
-    const originalParsed = this.currentLibraryParsedSong
-    const transposedData = transposeSong(originalParsed, targetKey)
+    // Transpose a copy from the song's own key: transposeSong changes the chart
+    // in place, and the stored one (shared with the parse cache) must stay as is
+    const parsed = structuredClone(this.currentLibraryParsedSong)
+    const originalKey = parsed.metadata.key
+    if (originalKey && targetKey && targetKey !== originalKey) {
+      transposeSong(parsed, originalKey, targetKey)
+    }
+    parsed.metadata.key = targetKey
 
     // Update stored key
     this.currentLibraryKey = targetKey
 
     // Re-render song with transposed data
     const contentElement = document.getElementById('library-song-content')
-    await SongViewManager.renderSongView(transposedData.parsed, contentElement, {
+    await SongViewManager.renderSongView(parsed, contentElement, {
       songIndex: 0,
       capo: this.currentLibraryCapo,
     })

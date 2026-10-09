@@ -184,6 +184,29 @@ function fromDB(page, method, arg) {
   )
 }
 
+test.describe('Song library', () => {
+  test('changing the key transposes the chords, each time from the original', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await page.goto('/songs#info-test-song')
+    await page.reload()
+    await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
+    await page.locator('#library-app-header .edit-toggle').click()
+
+    const keySelector = page.locator('#library-key-selector')
+    const firstChord = page.locator('#library-song-content song-section chord-display').first()
+    await expect(firstChord).toHaveText('G')
+    for (const key of ['A', 'Bb']) {
+      await keySelector.locator('.picker-button').click()
+      await keySelector.getByRole('button', { name: new RegExp(`^${key}\\b`) }).click()
+      await expect(keySelector.locator('.picker-button')).toHaveText(key)
+      await expect(firstChord).toHaveText(key)
+    }
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('Song info', () => {
   test('info button on the songs page opens the song info dialog', async ({ page }) => {
     const errors = []
