@@ -439,18 +439,7 @@ export class AppHeader extends LitElement {
             @click=${this._handleNavMenuClick}
             aria-label="Navigation menu"
           >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
+            <app-icon name="menu" size="24"></app-icon>
           </button>
           <div class="title" part="title">
             ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}

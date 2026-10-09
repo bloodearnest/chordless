@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import './app-modal.js'
 import './app-preferences.js'
+import './icon.js'
 
 /**
  * NavMenu Component
@@ -257,20 +258,7 @@ export class NavMenu extends LitElement {
                           part="nav-item overview-item"
                           @click=${this._handleOverviewClick}
                         >
-                          <svg
-                            class="nav-icon"
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                          >
-                            <rect x="3" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="3" width="7" height="7"></rect>
-                            <rect x="14" y="14" width="7" height="7"></rect>
-                            <rect x="3" y="14" width="7" height="7"></rect>
-                          </svg>
+                          <app-icon name="grid" size="20" class="nav-icon"></app-icon>
                           <span>Overview</span>
                         </button>
                       `
@@ -283,19 +271,7 @@ export class NavMenu extends LitElement {
                         part="nav-item song-item"
                         @click=${() => this._handleSongClick(index)}
                       >
-                        <svg
-                          class="nav-icon"
-                          width="20"
-                          height="20"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                        >
-                          <path d="M9 18V5l12-2v13"></path>
-                          <circle cx="6" cy="18" r="3"></circle>
-                          <circle cx="18" cy="16" r="3"></circle>
-                        </svg>
+                        <app-icon name="music" size="20" class="nav-icon"></app-icon>
                         <span>${song.title}</span>
                       </button>
                     `
@@ -313,18 +289,7 @@ export class NavMenu extends LitElement {
                   @click=${this._handleBackClick}
                   style="margin-bottom: 0.5rem; padding-bottom: 1rem; border-bottom: 1px solid #ecf0f1;"
                 >
-                  <svg
-                    class="nav-icon"
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                  >
-                    <line x1="19" y1="12" x2="5" y2="12"></line>
-                    <polyline points="12 19 5 12 12 5"></polyline>
-                  </svg>
+                  <app-icon name="arrow-left" size="20" class="nav-icon"></app-icon>
                   <span>${this.backLabel}</span>
                 </button>
               `
@@ -332,102 +297,32 @@ export class NavMenu extends LitElement {
           }
 
           <a href="/" class="nav-menu-item" part="nav-item">
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-              <line x1="16" y1="2" x2="16" y2="6"></line>
-              <line x1="8" y1="2" x2="8" y2="6"></line>
-              <line x1="3" y1="10" x2="21" y2="10"></line>
-            </svg>
+            <app-icon name="calendar" size="20" class="nav-icon"></app-icon>
             <span>Setlists</span>
           </a>
 
           <a href="/songs" class="nav-menu-item" part="nav-item">
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M9 18V5l12-2v13"></path>
-              <circle cx="6" cy="18" r="3"></circle>
-              <circle cx="18" cy="16" r="3"></circle>
-            </svg>
+            <app-icon name="music" size="20" class="nav-icon"></app-icon>
             <span>Song Library</span>
           </a>
 
           <button class="nav-menu-item" part="nav-item" @click=${this._handlePreferencesClick}>
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path
-                d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"
-              ></path>
-              <circle cx="12" cy="12" r="3"></circle>
-            </svg>
+            <app-icon name="settings" size="20" class="nav-icon"></app-icon>
             <span>Preferences</span>
           </button>
 
           <a href="/import-song" class="nav-menu-item" part="nav-item">
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"></path>
-            </svg>
+            <app-icon name="upload" size="20" class="nav-icon"></app-icon>
             <span>Import Songs</span>
           </a>
 
           <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
+            <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
             <span>SongSelect Import</span>
           </a>
 
           <a href="/storage" class="nav-menu-item" part="nav-item">
-            <svg
-              class="nav-icon"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-            </svg>
+            <app-icon name="layers" size="20" class="nav-icon"></app-icon>
             <span>Storage</span>
           </a>
         </nav>

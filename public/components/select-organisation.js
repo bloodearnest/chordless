@@ -6,6 +6,7 @@ import {
   switchOrganisation,
 } from '../js/organisation.js'
 import './app-modal.js'
+import './icon.js'
 import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 /**
@@ -271,17 +272,7 @@ export class SelectOrganisation extends LitElement {
             `
             : html`
               <button class="btn block success" @click=${this._toggleCreateForm}>
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                >
-                  <line x1="12" y1="5" x2="12" y2="19"></line>
-                  <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
+                <app-icon name="add" size="20"></app-icon>
                 Create New Organisation
               </button>
             `

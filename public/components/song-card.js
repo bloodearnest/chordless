@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { formatArtistNames } from '../js/song-utils.js'
 import { getWeeksAgo } from '../js/utils/date-utils.js'
+import './icon.js'
 import './key-selector.js'
 
 const MAJOR_KEYS = ['Ab', 'A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G']
@@ -299,24 +300,7 @@ export class SongCard extends LitElement {
               @click=${this.handleDelete}
               aria-label="Remove song"
             >
-              <svg
-                class="delete-icon"
-                width="18"
-                height="18"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              >
-                <polyline points="3 6 5 6 21 6"></polyline>
-                <path
-                  d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"
-                ></path>
-                <line x1="10" y1="11" x2="10" y2="17"></line>
-                <line x1="14" y1="11" x2="14" y2="17"></line>
-              </svg>
+              <app-icon name="delete" size="18" class="delete-icon"></app-icon>
             </button>
             ${this.renderKeyEdit()}
             <div class="drag-handle" part="drag-handle">☰</div>

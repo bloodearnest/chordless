@@ -1,4 +1,5 @@
 import { html, LitElement } from 'lit'
+import './icon.js'
 
 /**
  * SetlistOverview Component
@@ -50,18 +51,7 @@ export class SetlistOverview extends LitElement {
             <div class="song-card-info">
               <div class="song-card-title-row">
                 <div class="song-card-title">
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    style="vertical-align: middle; margin-right: 8px;"
-                  >
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
+                  <app-icon name="add" size="20" style="vertical-align: middle; margin-right: 8px;"></app-icon>
                   Add Song
                 </div>
               </div>

@@ -5,7 +5,7 @@ import { icons } from '../js/icons.js'
 /**
  * Icon Component
  *
- * Displays SVG icons from the icon library with consistent styling.
+ * Displays an icon from the icon library (js/icons.js, Lucide outline icons).
  *
  * Usage:
  *   <app-icon name="play"></app-icon>
@@ -29,9 +29,14 @@ export class Icon extends LitElement {
       vertical-align: middle;
     }
 
+    /* Lucide icons: 2px outlines in the current colour */
     svg {
       display: block;
-      fill: currentColor;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
       width: var(--icon-size, 24px);
       height: var(--icon-size, 24px);
     }
