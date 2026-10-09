@@ -2,6 +2,7 @@ import { playwrightLauncher } from '@web/test-runner-playwright';
 
 export default {
   files: [
+    'tests/bookmarklet.test.js',
     'tests/chord-utils.test.js',
     'tests/date-utils.test.js',
     'tests/drive-metadata.test.js',
