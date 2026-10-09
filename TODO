@@ -80,9 +80,10 @@ sharing
 player
  - fix or remove "Built-in Pads": it has never worked. It loads
    /pads/<key> - WARM - CHURCHFRONT PADS.mp3 (pad-audio-controller.js), and there is no
-   public/pads, so every request 404s. Ideas tried: a Web Audio synthesiser, but
-   everything sounded awful. Removing it means: no default pad set, pads off until one
-   is uploaded, and the pickers say so.
+   public/pads, so every request 404s. Those pads are copyrighted like the songs, so
+   they can't be shipped with the app: users upload pad sets they own. Ideas tried: a
+   Web Audio synthesiser, but everything sounded awful. Removing it means: no default
+   pad set, pads off until one is uploaded, and the pickers say so.
  - keep cached pads in their own Storage Bucket (navigator.storageBuckets, Chromium
    only), marked expendable, so the browser can evict pads without the setlists and
    songs. Pads re-download from Drive. Fall back to the default caches elsewhere.
