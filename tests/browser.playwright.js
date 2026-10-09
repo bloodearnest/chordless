@@ -539,6 +539,30 @@ test.describe('Navigation menu', () => {
   }
 })
 
+test.describe('Song settings', () => {
+  test('changing the BPM in edit mode saves it to the setlist', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'bpm-test-setlist' })
+    await page.goto('/setlist/bpm-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+
+    await page.locator('#app-header .edit-toggle').click()
+    const metadata = page.locator('#musical-metadata')
+    await expect(metadata).toHaveAttribute('edit-mode')
+    await metadata.click()
+    const popover = page.locator('song-settings-popover')
+    await popover.getByRole('button', { name: 'Increase BPM' }).click()
+
+    await expect(popover.locator('.bpm-value')).toHaveText('121')
+    await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(121)
+    const setlist = await fromDB(page, 'getSetlist', 'bpm-test-setlist')
+    expect(setlist.songs[0].tempo).toBe(121)
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('Media player settings', () => {
   test('its switches work from the keyboard, and are off limits while the player is off', async ({
     page,

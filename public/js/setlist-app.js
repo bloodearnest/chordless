@@ -571,7 +571,6 @@ class PageApp {
         // Set up key selector
         this.setupKeySelector()
         this.setupCapoSelector()
-        this.setupBPMEditor()
 
         // Set up Intersection Observer to auto-detect current song
         this.setupSectionObserver()
@@ -864,9 +863,6 @@ class PageApp {
           this.updateCapoSelector(song.currentCapo ?? 0, song.currentKey)
         }
       }
-
-      // Update BPM editor
-      this.updateBPMEditor(song.currentBPM || 120)
 
       // Update song settings popover
       this.updateSongSettingsPopover()
@@ -1872,32 +1868,6 @@ class PageApp {
     this.updateCapoSelector(currentCapo, currentSong?.currentKey || null)
   }
 
-  setupBPMEditor() {
-    const bpmEditor = document.getElementById('bpm-editor')
-    if (!bpmEditor) return
-
-    bpmEditor.editMode = document.body.classList.contains('edit-mode')
-
-    if (!this._bpmChangeHandler) {
-      this._bpmChangeHandler = event => {
-        const newValue = event.detail?.value
-        this.handleBPMChange(newValue)
-      }
-      bpmEditor.addEventListener('bpm-change', this._bpmChangeHandler)
-    }
-
-    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    const currentBPM = currentSong?.currentBPM || 120
-    this.updateBPMEditor(currentBPM)
-  }
-
-  updateBPMEditor(bpm) {
-    const bpmEditor = document.getElementById('bpm-editor')
-    if (bpmEditor) {
-      bpmEditor.value = bpm || 120
-    }
-  }
-
   updateSongSettingsPopover() {
     const songSettingsPopover = document.getElementById('song-settings-popover')
     if (!songSettingsPopover) return
@@ -1932,9 +1902,6 @@ class PageApp {
     await model.save()
 
     console.log('[SongModel] Saved BPM change via model:', newValue)
-
-    // Update the BPM editor display
-    this.updateBPMEditor(newValue)
 
     // Update the musical metadata display with the new BPM
     const musicalMetadata = document.getElementById('musical-metadata')
