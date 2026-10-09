@@ -1,9 +1,10 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import {
   leaderChoices,
   SetlistDetailsCancelEvent,
   SetlistDetailsSaveEvent,
 } from '../public/components/setlist-details-form.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -181,5 +182,10 @@ describe('setlist-details-form', () => {
   it('keeps a type that is not in the standard list', async () => {
     await makeForm({ ...setlist, type: 'Youth Service' })
     expect(field('type').value).to.equal('Youth Service')
+  })
+
+  it('is accessible', async () => {
+    await makeForm(setlist)
+    await expect(form).to.be.accessible(A11Y)
   })
 })

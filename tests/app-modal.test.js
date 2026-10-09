@@ -1,6 +1,7 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { sendKeys, sendMouse } from '@web/test-runner-commands'
 import '../public/components/app-modal.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -61,6 +62,13 @@ describe('app-modal ask()', () => {
     const second = modal.ask()
     await click('.modal-btn-cancel')
     expect(await second).to.equal(false)
+  })
+
+  it('is accessible while asking', async () => {
+    await makeConfirmModal()
+    modal.ask()
+    await modal.updateComplete
+    await expect(modal).to.be.accessible(A11Y)
   })
 })
 
@@ -132,5 +140,11 @@ describe('app-modal dialog', () => {
     await modal.updateComplete
     expect(dialog().open).to.equal(false)
     expect(closes).to.equal(1)
+  })
+
+  it('is accessible when open', async () => {
+    await makeModal()
+    await show()
+    await expect(modal).to.be.accessible(A11Y)
   })
 })

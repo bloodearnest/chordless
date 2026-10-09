@@ -14,6 +14,14 @@ dead code
   library has no capo picker). It also sets capoSelector.key, which isn't a property
   (referenceKey is). Remove it, after checking the rest of song-view-manager for the same
 
+accessibility (found by the axe checks in the unit tests)
+- light theme contrast is below WCAG AA (4.5:1): secondary text #7f8c8d on white is 3.5:1,
+  white on the primary button #3498db is 3.2:1. Candidates that pass: #5f6b6d and #2477ad.
+  The unit tests skip color-contrast until this is decided (A11Y in tests/test-helpers.js)
+- song-section's heading is a <summary> containing the collapse and Show buttons
+  (nested-interactive): move the controls out of the summary, or replace details/summary
+  with a heading and a toggle button
+
 styles
 - css/style.css has many rules for elements that now live inside components' shadow
   DOM, where page CSS can't reach (.nav-menu-item, .key-selector, .expand-toggle, ...).

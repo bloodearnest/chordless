@@ -1,5 +1,6 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/media-player-settings.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -26,5 +27,12 @@ describe('media-player-settings', () => {
 
     const select = settings.shadowRoot.querySelector('select')
     expect(select.value).to.equal('drive-warm')
+  })
+
+  it('is accessible', async () => {
+    settings = document.createElement('media-player-settings')
+    document.body.appendChild(settings)
+    await settings.updateComplete
+    await expect(settings).to.be.accessible(A11Y)
   })
 })

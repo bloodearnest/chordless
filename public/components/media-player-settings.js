@@ -83,6 +83,7 @@ export class MediaPlayerSettings extends LitElement {
       }
 
       .setting-label {
+        display: block;
         font-size: var(--font-ui);
         font-weight: 500;
       }
@@ -215,7 +216,7 @@ export class MediaPlayerSettings extends LitElement {
             }"
           >
             <div style="flex: 1;">
-              <div class="setting-label">Pad Sound Set</div>
+              <label class="setting-label" for="padset-select">Pad Sound Set</label>
               <div class="setting-description">Select which pad audio library to use</div>
               <select
                 id="padset-select"

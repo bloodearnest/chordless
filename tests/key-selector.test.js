@@ -1,5 +1,6 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/key-selector.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -68,6 +69,16 @@ describe('key-selector', () => {
       false
     )
   })
+
+  it('is accessible, in edit mode and with its options open', async () => {
+    await setUp()
+    selector.editMode = true
+    await selector.updateComplete
+    await expect(selector).to.be.accessible(A11Y)
+    selector.shadowRoot.querySelector('.picker-button').click()
+    await settle()
+    await expect(selector).to.be.accessible(A11Y)
+  })
 })
 
 describe('capo-selector', () => {
@@ -116,5 +127,10 @@ describe('capo-selector', () => {
     const box = selector.shadowRoot.querySelector('.picker-popover').getBoundingClientRect()
     expect(box.top).to.be.at.least(0)
     expect(box.bottom).to.be.at.most(window.innerHeight)
+  })
+
+  it('is accessible', async () => {
+    await setUp()
+    await expect(selector).to.be.accessible(A11Y)
   })
 })

@@ -1,5 +1,6 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/song-info-dialog.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -56,5 +57,12 @@ describe('song-info-dialog', () => {
     const message = dialog.shadowRoot.querySelector('status-message')
     expect(message.state).to.equal('error')
     expect(message.detail).to.contain('Song not found')
+  })
+
+  it('is accessible once loaded', async () => {
+    await setUp()
+    dialog.show('fast')
+    await wait(100)
+    await expect(dialog).to.be.accessible(A11Y)
   })
 })

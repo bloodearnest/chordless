@@ -1,6 +1,7 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/bookmarklet-installer.js'
 import { bookmarkletUrl, importFromSongSelect } from '../public/js/songselect-bookmarklet.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -199,5 +200,10 @@ describe('bookmarklet-installer', () => {
     }
     expect(copied).to.equal(bookmarkletUrl(window.location.origin))
     expect($('[role="status"]').textContent).to.contain('Copied')
+  })
+
+  it('is accessible', async () => {
+    await makeInstaller()
+    await expect(installer).to.be.accessible(A11Y)
   })
 })

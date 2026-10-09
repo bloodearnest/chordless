@@ -1,5 +1,6 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/song-section.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -67,5 +68,16 @@ describe('song-section', () => {
     const wrapper = section.shadowRoot.querySelector('.song-section-wrapper')
     expect(getComputedStyle(wrapper).display).to.not.equal('none')
     expect(wrapper.hasAttribute('aria-hidden')).to.equal(false)
+  })
+
+  it('is accessible, in and out of edit mode', async () => {
+    // Known: the heading is a <summary> containing the collapse and Show
+    // buttons (nested-interactive); restructuring it is in the TODO
+    const a11y = { ignoredRules: [...A11Y.ignoredRules, 'nested-interactive'] }
+    await setUp({ editMode: true })
+    await expect(section).to.be.accessible(a11y)
+    section.editMode = false
+    await section.updateComplete
+    await expect(section).to.be.accessible(a11y)
   })
 })

@@ -1,6 +1,7 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import '../public/components/app-header.js'
 import '../public/components/nav-menu.js'
+import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
 
@@ -76,5 +77,16 @@ describe('nav-menu', () => {
     button.click()
     await settle()
     expect(menu.isOpen()).to.equal(false)
+  })
+
+  it('is accessible when open', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    container.querySelector('#menu-button').click()
+    await settle()
+    expect(menu.isOpen()).to.equal(true)
+    await expect(menu).to.be.accessible(A11Y)
   })
 })
