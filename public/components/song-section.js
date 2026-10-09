@@ -487,7 +487,6 @@ export class SongSection extends LitElement {
       class=${classMap(classes)}
       role="region"
       aria-label=${sectionLabel}
-      ?aria-hidden=${this.isHidden && !this.editMode}
       data-song-index=${this.songIndex}
       data-section-index=${this.sectionIndex}
     >
@@ -500,11 +499,7 @@ export class SongSection extends LitElement {
   _renderLabeledSection(label) {
     const detailsOpen = this._shouldDetailsBeOpen()
     return html`
-      <details
-        class="song-section"
-        ?open=${detailsOpen}
-        aria-expanded=${detailsOpen ? 'true' : 'false'}
-      >
+      <details class="song-section" ?open=${detailsOpen}>
         <summary class="section-label" @click=${this._onSummaryClick}>
           <div class="section-header">
             <div class="section-title-wrapper">
@@ -542,7 +537,7 @@ export class SongSection extends LitElement {
       this.style.setProperty('--pill-option-count', 4)
     }
     return html`
-      <div class="section-controls" role="radiogroup" aria-label="Show content options">
+      <div class="section-controls" role="group" aria-label="Show content options">
         <span class="hide-label">Show:</span>
         <div class="hide-pill">
           ${this._renderControlButton('show-all', 'All', showAllActive, !canShowAll)}
@@ -563,8 +558,6 @@ export class SongSection extends LitElement {
         data-action=${action}
         aria-label=${ariaLabel}
         aria-pressed=${active ? 'true' : 'false'}
-        role="radio"
-        aria-checked=${active ? 'true' : 'false'}
         ?disabled=${disabled}
         @click=${this._onControlClick}
       >
