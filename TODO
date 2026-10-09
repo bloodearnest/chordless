@@ -58,11 +58,24 @@ sharing
 - restrict editing others' setlists, using the setlist's ownerId (leader's Google email)
 
 player
+ - keep cached pads in their own Storage Bucket (navigator.storageBuckets, Chromium
+   only), marked expendable, so the browser can evict pads without the setlists and
+   songs. Pads re-download from Drive. Fall back to the default caches elsewhere.
  - click stuttering start
  - survive pageloads? -maybe migrate to SPA
 
 UI
 - autoscaling font
+- install nag ("install to keep your data on this device"): Safari (iOS, and macOS)
+  clears a site's storage after 7 days without a visit unless it's installed,
+  including the sign-in, the org's Drive folder link, unsynced changes, settings and
+  pads. Show it on the home page only (never during a setlist), with "Not now" hiding
+  it for a while. Chromium: an Install button via beforeinstallprompt. iOS: Share ›
+  Add to Home Screen instructions (no API). Mac Safari: File › Add to Dock. Skip when
+  already installed (display-mode: standalone / navigator.standalone). On iOS and Mac
+  Safari the installed app has its own storage, separate from Safari's, so the user
+  must sign in again there; say so in the instructions. Installing also lets Chrome
+  grant persistent storage.
 
 library
  - ccli report nag
