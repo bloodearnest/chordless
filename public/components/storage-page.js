@@ -406,6 +406,14 @@ export class StoragePage extends LitElement {
         confirm-label="Clear Local Data"
         message="This deletes this organisation's setlists and songs on this device, and all settings. Anything not yet synced to Google Drive is lost. This can't be undone."
       ></app-modal>
+      <app-modal
+        id="logout-modal"
+        type="confirm"
+        size="small"
+        heading="Log out of Google Drive?"
+        confirm-label="Log Out"
+        message="This revokes Chordless's access to your Google Drive on this device. You'll need to connect again to sync."
+      ></app-modal>
     `
   }
 
@@ -432,13 +440,7 @@ export class StoragePage extends LitElement {
   }
 
   async _logout() {
-    if (
-      !confirm(
-        'Are you sure you want to logout and revoke Google Drive access?\n\nYou will need to re-authorize to use cloud features.'
-      )
-    ) {
-      return
-    }
+    if (!(await this.renderRoot.querySelector('#logout-modal').ask())) return
 
     try {
       const { logout } = await import('../js/google-auth.js')
@@ -451,7 +453,7 @@ export class StoragePage extends LitElement {
       this._authMessage = { text: '✓ Successfully logged out', type: 'success' }
     } catch (error) {
       console.error('[StoragePage] Logout failed:', error)
-      alert('Error logging out: ' + error.message)
+      this._authMessage = { text: `✗ Logging out failed: ${error.message}`, type: 'error' }
     }
   }
 
@@ -461,7 +463,10 @@ export class StoragePage extends LitElement {
       await downloadBlobBackup()
     } catch (error) {
       console.error('[StoragePage] Backup download failed:', error)
-      alert('Error downloading backup: ' + error.message)
+      this._authMessage = {
+        text: `✗ Downloading the backup failed: ${error.message}`,
+        type: 'error',
+      }
     }
   }
 
@@ -487,7 +492,10 @@ export class StoragePage extends LitElement {
         this._authMessage = { text: '✓ Auth backup imported successfully!', type: 'success' }
       } catch (error) {
         console.error('[StoragePage] Import backup failed:', error)
-        alert('Error importing backup: ' + error.message)
+        this._authMessage = {
+          text: `✗ Importing the backup failed: ${error.message}`,
+          type: 'error',
+        }
       }
     }
     input.click()
@@ -499,13 +507,16 @@ export class StoragePage extends LitElement {
 
       // Check if Service Worker is active
       if (!navigator.serviceWorker.controller) {
-        alert('⚠️ Service Worker not active. Please refresh the page and try again.')
+        this._authMessage = {
+          text: '✗ Service Worker not active. Reload the page and try again.',
+          type: 'error',
+        }
         return
       }
 
       const blobData = await getStoredBlob()
       if (!blobData) {
-        alert('Not authenticated - authorize first')
+        this._authMessage = { text: '✗ Not connected: connect with Google first', type: 'error' }
         return
       }
 
@@ -545,18 +556,16 @@ export class StoragePage extends LitElement {
       const newExpiry = new Date(updatedBlob.metadata.expires_at)
 
       if (newExpiry > new Date()) {
-        alert(
-          '✅ Token refresh test passed!\n\n' +
-            `Old expiry: ${oldExpiry.toLocaleTimeString()}\n` +
-            `New expiry: ${newExpiry.toLocaleTimeString()}\n\n` +
-            'Check console for details.'
-        )
+        this._authMessage = {
+          text: `✓ Token refresh test passed: expiry ${oldExpiry.toLocaleTimeString()} → ${newExpiry.toLocaleTimeString()}`,
+          type: 'success',
+        }
       } else {
         throw new Error('New token still expired!')
       }
     } catch (error) {
       console.error('[Test] ❌ Token refresh failed:', error)
-      alert('❌ Token refresh test failed:\n\n' + error.message)
+      this._authMessage = { text: `✗ Token refresh test failed: ${error.message}`, type: 'error' }
     }
   }
 

@@ -759,6 +759,44 @@ test.describe('Media player settings', () => {
 })
 
 test.describe('Storage page', () => {
+  test('organisations: a duplicate name is refused in the form, and switching asks first', async ({
+    page,
+  }) => {
+    const errors = []
+    const dialogs = []
+    page.on('pageerror', error => errors.push(error.message))
+    page.on('dialog', dialog => {
+      dialogs.push(dialog.message())
+      dialog.dismiss()
+    })
+    await seedSong(page) // opening the app creates the default organisation
+    await page.goto('/storage')
+    const organisations = page.locator('select-organisation')
+    const current = await organisations
+      .locator('.organisation-item.current .organisation-name')
+      .innerText()
+
+    await organisations.getByRole('button', { name: 'Create New Organisation' }).click()
+    await organisations.getByPlaceholder('New organisation name...').fill(current)
+    await organisations.getByRole('button', { name: 'Create Organisation' }).click()
+    await expect(organisations.getByRole('alert')).toContainText('already exists')
+
+    await organisations.getByPlaceholder('New organisation name...').fill('Second Org')
+    await organisations.getByRole('button', { name: 'Create Organisation' }).click()
+    await expect(organisations.locator('.organisation-item')).toHaveCount(2)
+
+    await organisations.getByRole('button', { name: 'Switch' }).click()
+    const modal = organisations.locator('#switch-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await expect(modal).toContainText('Switch to "Second Org"?')
+    await modal.locator('.modal-btn-cancel').click()
+    await expect(modal).not.toHaveAttribute('open', '')
+    await expect(organisations.locator('.organisation-item.current')).toContainText(current)
+    // No native alert() or confirm() along the way
+    expect(dialogs).toEqual([])
+    expect(errors).toEqual([])
+  })
+
   test('says when connecting to Google fails', async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))

@@ -2,6 +2,7 @@ import { css, html, LitElement } from 'lit'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.js'
 import { getCurrentOrganisation } from '../js/organisation.js'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
+import './app-modal.js'
 import { buttonStyles, spinnerStyles } from './shared-styles.js'
 
 /**
@@ -153,14 +154,7 @@ export class DriveSyncPanel extends LitElement {
   async handleReset() {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
-    if (
-      !confirm(
-        "Replace this device's setlists and songs with the copy in Google Drive?\n\n" +
-          "Anything removed from Drive is removed here too. If this device has changes that aren't in Drive yet, nothing is changed."
-      )
-    ) {
-      return
-    }
+    if (!(await this.renderRoot.querySelector('#reset-modal').ask())) return
 
     this.syncing = true
     this.syncError = null
@@ -256,6 +250,14 @@ export class DriveSyncPanel extends LitElement {
         <button class="btn" ?disabled=${this.syncing} @click=${this.handleReset}>
           ⤓ Reset from Google Drive
         </button>
+        <app-modal
+          id="reset-modal"
+          type="confirm"
+          size="small"
+          heading="Reset from Google Drive?"
+          confirm-label="Reset"
+          message="This replaces this device's setlists and songs with the copy in Google Drive. Anything removed from Drive is removed here too. If this device has changes that aren't in Drive yet, nothing is changed."
+        ></app-modal>
 
         ${
           this.lastSyncTime

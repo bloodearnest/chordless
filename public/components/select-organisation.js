@@ -5,6 +5,7 @@ import {
   listOrganisations,
   switchOrganisation,
 } from '../js/organisation.js'
+import './app-modal.js'
 import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 /**
@@ -20,6 +21,7 @@ export class SelectOrganisation extends LitElement {
     _showCreateForm: { type: Boolean, state: true },
     _newOrganisationName: { type: String, state: true },
     _creating: { type: Boolean, state: true },
+    _formError: { state: true }, // why the new organisation wasn't created
   }
 
   static styles = [
@@ -84,6 +86,12 @@ export class SelectOrganisation extends LitElement {
         border-radius: 4px;
       }
 
+      .form-error {
+        margin: 0;
+        color: var(--color-danger, #e74c3c);
+        font-size: var(--font-ui-small);
+      }
+
       .create-form-buttons {
         display: flex;
         gap: 0.5rem;
@@ -138,9 +146,9 @@ export class SelectOrganisation extends LitElement {
       return
     }
 
-    const confirmed = confirm(`Switch to organisation "${org.name}"?\n\nThis will reload the page.`)
-
-    if (confirmed) {
+    const modal = this.renderRoot.querySelector('#switch-modal')
+    modal.message = `Switch to "${org.name}"? This reloads the page.`
+    if (await modal.ask()) {
       await switchOrganisation(org.id)
     }
   }
@@ -148,6 +156,7 @@ export class SelectOrganisation extends LitElement {
   _toggleCreateForm() {
     this._showCreateForm = !this._showCreateForm
     this._newOrganisationName = ''
+    this._formError = ''
   }
 
   _handleNameInput(e) {
@@ -159,25 +168,20 @@ export class SelectOrganisation extends LitElement {
 
     const name = this._newOrganisationName.trim()
     if (!name) {
-      alert('Please enter an organisation name')
+      this._formError = 'Please enter an organisation name'
       return
     }
-
-    // Check if already exists
     if (this._organisations.some(org => org.name === name)) {
-      alert('An organisation with this name already exists')
+      this._formError = 'An organisation with this name already exists'
       return
     }
 
     this._creating = true
+    this._formError = ''
 
     try {
-      // Create organisation (already imported at top)
       await createOrganisation(name)
-
-      alert(`✅ Organisation "${name}" created!`)
-
-      // Reload organisations list
+      // The new organisation shows in the list
       await this._loadOrganisations()
 
       // Hide form
@@ -185,7 +189,7 @@ export class SelectOrganisation extends LitElement {
       this._newOrganisationName = ''
     } catch (error) {
       console.error('Failed to create organisation:', error)
-      alert(`❌ Failed to create organisation: ${error.message}`)
+      this._formError = `Failed to create organisation: ${error.message}`
     } finally {
       this._creating = false
     }
@@ -245,6 +249,11 @@ export class SelectOrganisation extends LitElement {
                   ?disabled=${this._creating}
                   required
                 />
+                ${
+                  this._formError
+                    ? html`<p class="form-error" role="alert">${this._formError}</p>`
+                    : ''
+                }
                 <div class="create-form-buttons">
                   <button
                     type="button"
@@ -277,6 +286,13 @@ export class SelectOrganisation extends LitElement {
               </button>
             `
         }
+        <app-modal
+          id="switch-modal"
+          type="confirm"
+          size="small"
+          heading="Switch organisation?"
+          confirm-label="Switch"
+        ></app-modal>
       </div>
     `
   }
