@@ -133,7 +133,7 @@ export async function getCurrentUserInfo() {
  * Call this once on page load
  */
 export function initGoogleAuth() {
-  return new Promise(resolve => {
+  return new Promise((resolve, reject) => {
     if (window.google?.accounts) {
       resolve()
       return
@@ -145,6 +145,10 @@ export function initGoogleAuth() {
     script.async = true
     script.defer = true
     script.onload = () => resolve()
+    script.onerror = () => {
+      script.remove() // so trying again loads it afresh
+      reject(new Error("Couldn't load Google sign-in. Are you offline?"))
+    }
     document.head.appendChild(script)
   })
 }

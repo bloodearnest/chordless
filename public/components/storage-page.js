@@ -19,6 +19,7 @@ export class StoragePage extends LitElement {
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
+    _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
 
   static styles = css`
@@ -92,6 +93,19 @@ export class StoragePage extends LitElement {
     .auth-status p {
       margin: 0;
       opacity: 1;
+    }
+
+    .auth-message {
+      margin: 1rem 0 0;
+      font-weight: 600;
+    }
+
+    .auth-message.success {
+      color: var(--color-success, #27ae60);
+    }
+
+    .auth-message.error {
+      color: var(--color-danger, #e74c3c);
     }
 
     .feature-list {
@@ -349,6 +363,16 @@ export class StoragePage extends LitElement {
                 </div>
               `
         }
+        ${
+          this._authMessage
+            ? html`<p
+                class="auth-message ${this._authMessage.type}"
+                role=${this._authMessage.type === 'error' ? 'alert' : 'status'}
+              >
+                ${this._authMessage.text}
+              </p>`
+            : ''
+        }
       </div>
     `
   }
@@ -437,6 +461,7 @@ export class StoragePage extends LitElement {
 
   async _authorize() {
     this.authStatus = 'authorizing'
+    this._authMessage = null
     this.requestUpdate()
 
     try {
@@ -447,24 +472,12 @@ export class StoragePage extends LitElement {
       this.isAuthenticated = true
       this.authStatus = 'ready'
 
-      this.dispatchEvent(
-        new CustomEvent('show-message', {
-          bubbles: true,
-          composed: true,
-          detail: { message: '✓ Authorization successful!', type: 'success' },
-        })
-      )
+      this._authMessage = { text: '✓ Authorization successful!', type: 'success' }
     } catch (error) {
       console.error('[StoragePage] Authorization failed:', error)
       this.authStatus = 'ready'
 
-      this.dispatchEvent(
-        new CustomEvent('show-message', {
-          bubbles: true,
-          composed: true,
-          detail: { message: `✗ Authorization failed: ${error.message}`, type: 'error' },
-        })
-      )
+      this._authMessage = { text: `✗ Authorization failed: ${error.message}`, type: 'error' }
     }
   }
 
@@ -485,13 +498,7 @@ export class StoragePage extends LitElement {
       this.userInfo = null
       this.requestUpdate()
 
-      this.dispatchEvent(
-        new CustomEvent('show-message', {
-          bubbles: true,
-          composed: true,
-          detail: { message: '✓ Successfully logged out', type: 'success' },
-        })
-      )
+      this._authMessage = { text: '✓ Successfully logged out', type: 'success' }
     } catch (error) {
       console.error('[StoragePage] Logout failed:', error)
       alert('Error logging out: ' + error.message)
@@ -527,13 +534,7 @@ export class StoragePage extends LitElement {
         this.userInfo = await getCurrentUserInfo()
         this.requestUpdate()
 
-        this.dispatchEvent(
-          new CustomEvent('show-message', {
-            bubbles: true,
-            composed: true,
-            detail: { message: '✓ Auth backup imported successfully!', type: 'success' },
-          })
-        )
+        this._authMessage = { text: '✓ Auth backup imported successfully!', type: 'success' }
       } catch (error) {
         console.error('[StoragePage] Import backup failed:', error)
         alert('Error importing backup: ' + error.message)
@@ -607,15 +608,6 @@ export class StoragePage extends LitElement {
       console.error('[Test] ❌ Token refresh failed:', error)
       alert('❌ Token refresh test failed:\n\n' + error.message)
     }
-  }
-
-  _handleImport() {
-    this.dispatchEvent(
-      new CustomEvent('import-requested', {
-        bubbles: true,
-        composed: true,
-      })
-    )
   }
 
   async _handleClearDatabase() {

@@ -561,6 +561,23 @@ test.describe('Media player settings', () => {
 })
 
 test.describe('Storage page', () => {
+  test('says when connecting to Google fails', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    // Without Google's sign-in script, connecting fails straight away
+    await page.route('https://accounts.google.com/**', route => route.abort())
+    await page.goto('/storage')
+
+    await page
+      .locator('storage-page')
+      .getByRole('button', { name: /Connect with Google/ })
+      .click()
+    await expect(page.locator('storage-page').getByRole('alert')).toContainText(
+      'Authorization failed'
+    )
+    expect(errors).toEqual([])
+  })
+
   test('clearing local data asks first, then clears it', async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
