@@ -158,11 +158,6 @@ export class KeySelector extends LitElement {
     if (changedProperties.has('editMode')) {
       this._updateEditModeAttribute()
     }
-
-    // Setup popover positioning after render
-    if (changedProperties.has('keys') || changedProperties.has('value')) {
-      this._setupPopoverPositioning()
-    }
   }
 
   _updateEditModeAttribute() {
@@ -173,30 +168,20 @@ export class KeySelector extends LitElement {
     }
   }
 
-  _setupPopoverPositioning() {
+  /** Position the popover under the button as it opens, or above it near the bottom */
+  _positionPopover(event) {
+    if (event.newState !== 'open') return
     const button = this.shadowRoot.querySelector('.key-selector')
-    const popover = this.shadowRoot.querySelector('.key-popover')
-
-    if (button && popover) {
-      // Position popover when it opens, flipping upward if near bottom of screen
-      const toggleHandler = e => {
-        if (e.newState === 'open') {
-          const buttonRect = button.getBoundingClientRect()
-          const popoverHeight = popover.offsetHeight
-          const spaceBelow = window.innerHeight - buttonRect.bottom
-          if (spaceBelow < popoverHeight + 8) {
-            popover.style.top = `${buttonRect.top - popoverHeight - 4}px`
-          } else {
-            popover.style.top = `${buttonRect.bottom + 4}px`
-          }
-          popover.style.left = `${buttonRect.left}px`
-        }
-      }
-
-      // Remove old listener if exists
-      popover.removeEventListener('toggle', toggleHandler)
-      popover.addEventListener('toggle', toggleHandler)
+    const popover = event.currentTarget
+    const buttonRect = button.getBoundingClientRect()
+    const popoverHeight = popover.offsetHeight
+    const spaceBelow = window.innerHeight - buttonRect.bottom
+    if (spaceBelow < popoverHeight + 8) {
+      popover.style.top = `${buttonRect.top - popoverHeight - 4}px`
+    } else {
+      popover.style.top = `${buttonRect.bottom + 4}px`
     }
+    popover.style.left = `${buttonRect.left}px`
   }
 
   _handleSelection(key) {
@@ -252,7 +237,12 @@ export class KeySelector extends LitElement {
         <button class="key-selector" popovertarget=${this._popoverId} type="button">
           <span>${displayValue}</span>
         </button>
-        <div id=${this._popoverId} class="key-popover" popover>
+        <div
+          id=${this._popoverId}
+          class="key-popover"
+          popover
+          @toggle=${this._positionPopover}
+        >
           <div class="key-options-list">${this._renderOptions()}</div>
         </div>
       </div>
