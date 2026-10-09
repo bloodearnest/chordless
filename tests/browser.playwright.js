@@ -302,11 +302,103 @@ test.describe('Song import', () => {
     const failed = { type: 'CHORDLESS_IMPORT_FAILED', data: { message: 'Download failed: 403' } }
 
     await postMessageFrom(page, 'https://evil.example', failed)
-    await expect(songImport).toContainText('Waiting for song data')
+    await expect(songImport).toContainText('Import ChordPro Files')
+    await expect(songImport.getByRole('alert')).toHaveCount(0)
 
     await postMessageFrom(page, 'https://songselect.ccli.com', failed)
     await expect(songImport.getByRole('alert')).toContainText('Download failed: 403')
     expect(errors).toEqual([])
+  })
+
+  /** A file for the import page's file picker */
+  function chordproFile(name, content, mimeType = '') {
+    return { name, mimeType, buffer: Buffer.from(content) }
+  }
+
+  test('imports several files into a new setlist, skipping ones that are not text', async ({
+    page,
+  }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await page.goto('/import-song')
+    const songImport = page.locator('song-import')
+    await songImport.locator('input[type="file"]').setInputFiles([
+      chordproFile('First.cho', '{title: First Song}\n\n[C]One'),
+      // No title in the chart: named after the file
+      chordproFile('Second Song.chordpro', '[D]Two'),
+      chordproFile('photo.png', 'not a song', 'image/png'),
+    ])
+
+    await expect(page.getByRole('heading', { name: /2 songs/ })).toBeVisible()
+    await expect(songImport.locator('.songs')).toContainText('First Song')
+    await expect(songImport.locator('.songs')).toContainText('Second Song')
+    await expect(songImport).toContainText('Not imported: photo.png: not a text file')
+
+    await songImport.locator('.new-setlist').click()
+    const modal = songImport.locator('app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await modal.locator('#name').fill('Files Test')
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await modal.locator('button[type="submit"]').click()
+    await page.waitForURL(/\/setlist\//)
+
+    const setlistId = new URL(page.url()).pathname.split('/').pop()
+    const setlist = await fromDB(page, 'getSetlist', setlistId)
+    expect(setlist.songs.map(s => s.songId)).toEqual(['title-firstsong', 'title-secondsong'])
+  })
+
+  test('imports pasted ChordPro into an existing setlist', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'paste-test-setlist' })
+    await page.goto('/import-song')
+    const songImport = page.locator('song-import')
+    await songImport.locator('textarea').fill('{title: Pasted Song}\n\n[E]Pasted')
+    await songImport.locator('.paste .add').click()
+
+    await expect(page.getByRole('heading', { name: /Pasted Song/ })).toBeVisible()
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await songImport.locator('.add-to-setlist .add').click()
+    await page.waitForURL(/\/setlist\/paste-test-setlist/)
+
+    const setlist = await fromDB(page, 'getSetlist', 'paste-test-setlist')
+    expect(setlist.songs.map(s => s.songId)).toEqual(['title-info-test-song', 'title-pastedsong'])
+    const song = await fromDB(page, 'getSong', setlist.songs[1].songUuid)
+    expect(song.importSource).toBe('paste')
+  })
+
+  test('says so when the pasted text is empty', async ({ page }) => {
+    await page.goto('/import-song')
+    const songImport = page.locator('song-import')
+    await songImport.locator('.paste .add').click()
+    await expect(songImport.getByRole('alert')).toContainText('No songs to import')
+    await expect(songImport).toContainText('Import ChordPro Files')
+  })
+
+  test('asks about each song already in the library among several', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await page.goto('/import-song')
+    const songImport = page.locator('song-import')
+    await songImport
+      .locator('input[type="file"]')
+      .setInputFiles([
+        chordproFile('a.cho', '{title: Info Test Song}\n\n[A]Updated'),
+        chordproFile('b.cho', '{title: Brand New}\n\n[B]New'),
+      ])
+
+    await expect(songImport).toContainText('1 of these songs is already in your library')
+    await expect(songImport.locator('.choices')).toHaveCount(0)
+    await songImport.locator('.update-all').click()
+    await expect(songImport.locator('.songs')).toContainText('updated')
+    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
+    await songImport.locator('.library-only').click()
+    await page.waitForURL(/\/songs$/)
+
+    const chart = await fromDB(page, 'getChordPro', 'chordpro-info-test')
+    expect(chart.content).toContain('[A]Updated')
   })
 
   test('saves a new song to the library only', async ({ page }) => {
@@ -383,6 +475,27 @@ test.describe('Song import', () => {
     const song = await fromDB(page, 'getSong', 'info-test-song')
     expect(song.key).toBe('D')
     expect(song.id).toBe('title-info-test-song')
+  })
+})
+
+test.describe('Bookmarklet page', () => {
+  test('hides the phone and tablet tip on a computer', async ({ page }) => {
+    await page.goto('/bookmarklet')
+    await expect(page.locator('.touch-tip')).toBeHidden()
+  })
+
+  test.describe('on a phone', () => {
+    test.use({ isMobile: true, hasTouch: true, viewport: { width: 412, height: 900 } })
+
+    test('suggests importing the ChordPro file instead', async ({ page }) => {
+      await page.goto('/bookmarklet')
+      const tip = page.locator('.touch-tip')
+      await expect(tip).toBeVisible()
+      await expect(tip.getByRole('link', { name: 'Import Songs' })).toHaveAttribute(
+        'href',
+        '/import-song'
+      )
+    })
   })
 })
 

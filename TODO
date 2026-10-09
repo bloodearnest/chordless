@@ -22,6 +22,8 @@ storage/sync
   service worker, with full sync as the backstop: designed in SYNC_ARCHITECTURE.md,
   not built. Later: durable offline write queue.
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
+  then test song import on real devices: file import and paste on Android and iPad, the
+  bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn public/dev/drive-audit.html into an
   app feature that finds duplicate or empty setlists and stray organisation folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
@@ -34,6 +36,11 @@ live mode
 
 tests
  - component tests (using test page?)
+
+song import
+ - share target on mobile (Web Share Target in the manifest, Chromium/Android only):
+   the service worker takes the shared files and hands them to /import-song, which
+   imports files and pasted ChordPro already
 
 ccli import
  - adding the same song twice to set lists

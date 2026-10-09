@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.js'
+import { ChordProParser } from '../js/parser.js'
 import { getOrganisationPeople } from '../js/people.js'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.js'
@@ -8,13 +9,25 @@ import './setlist-details-form.js'
 
 const SONGSELECT_ORIGIN = 'https://songselect.ccli.com'
 
+const parser = new ChordProParser()
+
+const NOT_TEXT = /^(image|audio|video|font)\/|^application\/(pdf|zip)/
+
+/** "Amazing Grace.cho" -> "Amazing Grace" */
+function titleFromFileName(name) {
+  return name.replace(/\.[^.]+$/, '')
+}
+
 /**
  * SongImport Component
  *
- * The page the SongSelect bookmarklet opens. It tells the bookmarklet it's
- * ready, receives the song, saves it to the library (or finds the copy already
- * there), then offers: add it to a setlist, add it to a new setlist, or just
- * keep it in the library. Each choice ends by going to the setlist or library.
+ * Imports songs from ChordPro files the user picks, ChordPro text they paste,
+ * or the SongSelect bookmarklet (this is the page it opens: it tells the
+ * bookmarklet it's ready and receives the song). Each song is saved to the
+ * library, unless a copy is already there, when the user chooses whether to
+ * update it. Then it offers: add the songs to a setlist, add them to a new
+ * setlist, or just keep them in the library. Each choice ends by going to the
+ * setlist or library.
  *
  * Usage:
  *   <song-import></song-import>
@@ -25,11 +38,11 @@ const SONGSELECT_ORIGIN = 'https://songselect.ccli.com'
  */
 export class SongImport extends LitElement {
   static properties = {
-    _state: { state: true }, // 'waiting' | 'choices' | 'error'
+    _state: { state: true }, // 'pick' | 'choices'
     _error: { state: true },
-    _song: { state: true },
-    _isDuplicate: { state: true },
-    _duplicateChoice: { state: true }, // null | 'update' | 'use-existing'
+    // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
+    _imports: { state: true },
+    _skipped: { state: true }, // ['name: reason'], files that weren't songs
     _setlists: { state: true },
     _people: { state: true },
     _newSetlist: { state: true },
@@ -115,6 +128,7 @@ export class SongImport extends LitElement {
     }
 
     .choice {
+      position: relative;
       display: flex;
       align-items: center;
       gap: 1.5rem;
@@ -129,14 +143,96 @@ export class SongImport extends LitElement {
       box-sizing: border-box;
     }
 
-    button.choice {
+    button.choice,
+    label.choice,
+    a.choice {
       cursor: pointer;
       transition:
         border-color 0.2s,
         background-color 0.2s;
     }
 
-    button.choice:hover {
+    a.choice {
+      text-decoration: none;
+    }
+
+    label.choice:focus-within {
+      outline: 2px solid var(--button-bg);
+    }
+
+    /* The whole label opens the picker; the input itself stays reachable by
+       keyboard and screen readers */
+    label.choice input {
+      position: absolute;
+      opacity: 0;
+      width: 1px;
+      height: 1px;
+    }
+
+    textarea {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin: 0.5rem 0;
+      padding: 0.5rem 0.75rem;
+      font-family: monospace;
+      font-size: var(--font-ui-small);
+      border: 2px solid var(--border-light, #ecf0f1);
+      border-radius: 6px;
+      background-color: var(--bg-secondary, #f8f9fa);
+      color: var(--text-color);
+      resize: vertical;
+    }
+
+    textarea:focus {
+      outline: none;
+      border-color: var(--button-bg);
+    }
+
+    .songs {
+      margin: 0 0 1.5rem;
+      padding-left: 1.5rem;
+    }
+
+    .songs li {
+      margin-bottom: 0.25rem;
+    }
+
+    .songs .subtitle {
+      display: inline;
+    }
+
+    .status.error + .duplicate,
+    .status.error + .choices {
+      margin-top: 1rem;
+    }
+
+    .duplicate ul {
+      list-style: none;
+      margin: 0 0 1rem;
+      padding: 0;
+    }
+
+    .duplicate li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #ffc107;
+    }
+
+    .duplicate li > span:first-child {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .duplicate li button {
+      padding: 0.4rem 0.75rem;
+    }
+
+    button.choice:hover,
+    label.choice:hover,
+    a.choice:hover {
       background: var(--bg-secondary, #f8f9fa);
       border-color: var(--button-bg);
     }
@@ -208,11 +304,10 @@ export class SongImport extends LitElement {
 
   constructor() {
     super()
-    this._state = 'waiting'
+    this._state = 'pick'
     this._error = ''
-    this._song = null
-    this._isDuplicate = false
-    this._duplicateChoice = null
+    this._imports = []
+    this._skipped = []
     this._setlists = []
     this._people = []
     this._newSetlist = null
@@ -251,30 +346,78 @@ export class SongImport extends LitElement {
   }
 
   /**
-   * Import a song: {chordproText, metadata: {title, ccliNumber}, source}.
-   * Saves it to the library, unless a copy is already there, and shows the
-   * choices.
+   * Import a song from the bookmarklet: {chordproText, metadata: {title,
+   * ccliNumber}, source}
    */
-  async receive({ chordproText, metadata = {}, source }) {
-    console.log('[Import] Processing import from', source, metadata.title)
+  receive(song) {
+    return this.receiveAll([song])
+  }
+
+  /** Import songs from ChordPro files */
+  async importFiles(files) {
+    const songs = []
+    for (const file of files) {
+      // ChordPro has no registered type, so .cho files come as '' or
+      // application/octet-stream: rule out what's plainly not text instead
+      const chordproText = NOT_TEXT.test(file.type) ? '' : await file.text()
+      if (!chordproText || chordproText.includes('\0')) {
+        songs.push({ name: file.name, skip: 'not a text file' })
+        continue
+      }
+      songs.push({
+        name: file.name,
+        chordproText,
+        metadata: { title: titleFromFileName(file.name) },
+        source: 'file',
+      })
+    }
+    await this.receiveAll(songs)
+  }
+
+  async _onFilesChosen(event) {
+    const files = [...event.target.files]
+    event.target.value = '' // so choosing the same files again still imports
+    if (files.length) await this.importFiles(files)
+  }
+
+  _importPasted() {
+    const chordproText = this.renderRoot.querySelector('textarea').value
+    this.receiveAll([{ name: 'Pasted text', chordproText, source: 'paste' }])
+  }
+
+  /**
+   * Import songs: [{chordproText, metadata: {title, ccliNumber}, source, name}].
+   * Saves each to the library, unless a copy is already there, and shows the
+   * choices. A song with `skip` (a reason) is listed as not imported.
+   */
+  async receiveAll(songs) {
+    console.log('[Import] Importing', songs.length, 'song(s)')
+    this._error = ''
     try {
       this._db = await getCurrentDB()
-      const ccliNumber = metadata.ccliNumber || null
-      const title = metadata.title || 'Untitled'
+      const imports = []
+      const skipped = []
+      for (const { chordproText = '', metadata = {}, source, name, skip } of songs) {
+        if (skip || !chordproText.trim()) {
+          skipped.push(`${name}: ${skip || 'empty'}`)
+          continue
+        }
+        // As createSong does: the chart's own title and CCLI number win
+        const parsed = parser.parse(chordproText).metadata
+        const ccliNumber = parsed.ccliSongNumber || parsed.ccli || metadata.ccliNumber || null
+        const title = parsed.title || metadata.title || 'Untitled'
 
-      const existing = await findExistingSong(ccliNumber, title, this._db)
-      this._song =
-        existing ||
-        (await createSong(chordproText, {
-          ccliNumber,
-          title,
-          source,
-          sourceUrl: null,
-          versionLabel: 'Original (SongSelect)',
-        }))
-      this._isDuplicate = Boolean(existing)
-      this._duplicateChoice = null
-      this._chordproText = chordproText
+        const existing = await findExistingSong(ccliNumber, title, this._db)
+        const song =
+          existing || (await createSong(chordproText, { ccliNumber, title, importSource: source }))
+        imports.push({ song, chordproText, isDuplicate: Boolean(existing), choice: null })
+      }
+      this._skipped = skipped
+      if (!imports.length) {
+        this._showError(`No songs to import. ${skipped.join(', ')}`)
+        return
+      }
+      this._imports = imports
 
       const setlists = await this._db.getAllSetlists()
       this._setlists = setlists.sort((a, b) => b.date.localeCompare(a.date))
@@ -287,7 +430,7 @@ export class SongImport extends LitElement {
 
   _showError(message) {
     this._error = message
-    this._state = 'error'
+    this._state = 'pick'
   }
 
   /** Go to url, unless an imported listener prevents it */
@@ -305,17 +448,19 @@ export class SongImport extends LitElement {
     try {
       const setlist = await this._db.getSetlist(setlistId)
       if (!setlist) throw new Error('Setlist not found')
-      setlist.songs.push({
-        order: setlist.songs.length,
-        songId: this._song.id,
-        songUuid: this._song.uuid,
-        key: null,
-        tempo: null,
-        notes: '',
-      })
+      for (const { song } of this._imports) {
+        setlist.songs.push({
+          order: setlist.songs.length,
+          songId: song.id,
+          songUuid: song.uuid,
+          key: null,
+          tempo: null,
+          notes: '',
+        })
+      }
       setlist.modifiedDate = new Date().toISOString()
       await this._db.saveSetlist(setlist)
-      console.log('[Import] Added song to setlist:', setlistId)
+      console.log('[Import] Added', this._imports.length, 'song(s) to setlist:', setlistId)
       this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
@@ -329,8 +474,9 @@ export class SongImport extends LitElement {
   }
 
   _libraryOnly() {
-    // The song was saved to the library when it arrived
-    this._finish(`/songs#${this._song.uuid}`)
+    // The songs were saved to the library when they arrived
+    const [first, ...rest] = this._imports
+    this._finish(rest.length ? '/songs' : `/songs#${first.song.uuid}`)
   }
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
@@ -375,15 +521,18 @@ export class SongImport extends LitElement {
   }
 
   _renderState() {
-    if (this._state === 'waiting') {
-      return html`<p class="status">Waiting for song data from bookmarklet...</p>`
-    }
-    if (this._state === 'error') {
-      return html`<p class="status error" role="alert">❌ ${this._error}</p>`
-    }
+    if (this._state === 'pick') return this._renderPick()
+    const several = this._imports.length > 1
+    const unresolved = this._imports.filter(item => item.isDuplicate && !item.choice)
     return html`
-      <h2>✅ ${this._song.title}</h2>
-      ${this._isDuplicate && !this._duplicateChoice ? this._renderDuplicate() : this._renderChoices()}
+      <h2>✅ ${several ? `${this._imports.length} songs` : this._imports[0].song.title}</h2>
+      ${several ? this._renderSongList() : ''}
+      ${
+        this._skipped.length
+          ? html`<p class="status error">Not imported: ${this._skipped.join(', ')}</p>`
+          : ''
+      }
+      ${unresolved.length ? this._renderDuplicates(unresolved) : this._renderChoices()}
       <app-modal heading="Create New Setlist">
         ${
           this._newSetlist
@@ -391,7 +540,7 @@ export class SongImport extends LitElement {
               <setlist-details-form
                 .setlist=${this._newSetlist}
                 .people=${this._people}
-                submit-label="Create & Add Song"
+                submit-label=${several ? 'Create & Add Songs' : 'Create & Add Song'}
                 auto-type
                 @save=${this._createSetlist}
                 @cancel=${() => this._newSetlistModal().close()}
@@ -403,31 +552,122 @@ export class SongImport extends LitElement {
     `
   }
 
+  _renderPick() {
+    return html`
+      ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : ''}
+      ${window.opener ? html`<p class="status">Waiting for song data from bookmarklet...</p>` : ''}
+      <div class="choices">
+        <label class="choice files">
+          <span class="icon">📂</span>
+          <span class="content">
+            <span class="title">Import ChordPro Files</span>
+            <span class="subtitle">Choose one or more files</span>
+          </span>
+          <input type="file" multiple @change=${this._onFilesChosen} />
+        </label>
+        <div class="choice paste">
+          <div class="icon">📝</div>
+          <div class="content">
+            <label class="title" for="paste">Paste ChordPro</label>
+            <textarea id="paste" rows="6" placeholder="{title: Amazing Grace}"></textarea>
+            <button class="add" @click=${this._importPasted}>Import</button>
+          </div>
+        </div>
+        <a class="choice" href="/bookmarklet">
+          <span class="icon">🔖</span>
+          <span class="content">
+            <span class="title">Import from SongSelect</span>
+            <span class="subtitle">Bookmarklet, best on desktop</span>
+          </span>
+        </a>
+      </div>
+    `
+  }
+
+  _renderSongList() {
+    const status = { update: 'updated', 'use-existing': 'already in library' }
+    return html`
+      <ol class="songs">
+        ${this._imports.map(
+          ({ song, isDuplicate, choice }) =>
+            html`<li>${song.title} <span class="subtitle">${isDuplicate ? status[choice] || 'already in library' : 'new'}</span></li>`
+        )}
+      </ol>
+    `
+  }
+
   /** Keep the library's copy of a song we already have */
-  _useExisting() {
-    this._duplicateChoice = 'use-existing'
+  _useExisting(item) {
+    this._setChoice(item, 'use-existing')
   }
 
   /** Replace the library's copy of the song with the imported one */
-  async _update() {
+  async _update(item) {
     try {
-      this._song = await overwriteSong(this._song.uuid, this._chordproText, this._db)
-      console.log('[Import] Updated existing song:', this._song.title)
-      this._duplicateChoice = 'update'
+      const song = await overwriteSong(item.song.uuid, item.chordproText, this._db)
+      console.log('[Import] Updated existing song:', song.title)
+      this._setChoice(item, 'update', song)
     } catch (error) {
       console.error('[Import] Failed to update song:', error)
       this._showError(`Failed to update song: ${error.message}`)
     }
   }
 
-  _renderDuplicate() {
+  async _updateAll(items) {
+    // Each update replaces only its own entry, so the others are still current
+    for (const item of items) await this._update(item)
+  }
+
+  _setChoice(item, choice, song = item.song) {
+    this._imports = this._imports.map(i => (i === item ? { ...i, choice, song } : i))
+  }
+
+  _renderDuplicates(unresolved) {
+    if (unresolved.length === 1 && this._imports.length === 1) {
+      const [item] = unresolved
+      return html`
+        <div class="duplicate">
+          <strong>⚠️ This song already exists in your library</strong>
+          <p>Do you want to update the song with the new version, or use the existing one?</p>
+          <div class="duplicate-actions">
+            <button class="update" @click=${() => this._update(item)}>Update Song</button>
+            <button class="use-existing" @click=${() => this._useExisting(item)}>Use Existing</button>
+          </div>
+        </div>
+      `
+    }
     return html`
       <div class="duplicate">
-        <strong>⚠️ This song already exists in your library</strong>
-        <p>Do you want to update the song with the new version, or use the existing one?</p>
+        <strong>
+          ⚠️ ${unresolved.length} of these songs ${unresolved.length > 1 ? 'are' : 'is'} already in
+          your library
+        </strong>
+        <p>Update them with the new versions, or use the existing ones?</p>
+        <ul>
+          ${unresolved.map(
+            item => html`
+              <li>
+                <span>${item.song.title}</span>
+                <span class="duplicate-actions">
+                  <button class="update" @click=${() => this._update(item)}>Update</button>
+                  <button class="use-existing" @click=${() => this._useExisting(item)}>
+                    Use Existing
+                  </button>
+                </span>
+              </li>
+            `
+          )}
+        </ul>
         <div class="duplicate-actions">
-          <button class="update" @click=${this._update}>Update Song</button>
-          <button class="use-existing" @click=${this._useExisting}>Use Existing</button>
+          <button class="update update-all" @click=${() => this._updateAll(unresolved)}>
+            Update All
+          </button>
+          <button
+            class="use-existing use-existing-all"
+            @click=${() => unresolved.forEach(item => this._useExisting(item))}
+          >
+            Use All Existing
+          </button>
         </div>
       </div>
     `
@@ -463,7 +703,9 @@ export class SongImport extends LitElement {
           <span class="icon">➕</span>
           <span class="content">
             <span class="title">Create New Setlist</span>
-            <span class="subtitle">Start a fresh setlist with this song</span>
+            <span class="subtitle">
+              Start a fresh setlist with ${this._imports.length > 1 ? 'these songs' : 'this song'}
+            </span>
           </span>
         </button>
         <button class="choice library-only" @click=${this._libraryOnly}>

@@ -29,6 +29,25 @@
         font-weight: bold;
         float: left;
       }
+      /* Shown on phones and tablets, where the bookmarklet is awkward */
+      .touch-tip {
+        display: none;
+        margin-bottom: 2rem;
+        padding: 1rem 1.25rem;
+        border: 2px solid var(--button-bg);
+        border-radius: 8px;
+        background: var(--bg-secondary);
+        color: var(--text-color);
+        font-size: 1.1rem;
+      }
+      .touch-tip a {
+        color: var(--button-bg);
+      }
+      @media (hover: none) and (pointer: coarse) {
+        .touch-tip {
+          display: block;
+        }
+      }
     </style>
   </head>
   <body>
@@ -59,6 +78,11 @@
         <main class="home-content">
           <div class="settings-content">
             <h2>CCLI SongSelect Importer</h2>
+            <p class="touch-tip">
+              <strong>On a phone or tablet?</strong> The bookmarklet works best on a computer.
+              Instead, download the song's ChordPro file from SongSelect, then open it in
+              <a href="/import-song">Import Songs</a>.
+            </p>
             <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 2rem">
               Import songs from SongSelect directly into your Chordless library with one click using
               this bookmarklet.
@@ -134,9 +158,18 @@
               >
                 Mobile Installation
               </h3>
+              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+                The easiest way on a phone or tablet is to download the song's ChordPro file from
+                SongSelect, then open it in <a href="/import-song">Import Songs</a>.
+              </p>
+              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+                To use the bookmarklet anyway, bookmark any page, then edit the bookmark and paste
+                the code from the "Alternative Method" above as its URL. On Android, run it by
+                typing the bookmark's name in the address bar and tapping it.
+              </p>
               <p style="color: #7f8c8d; font-size: 1.1rem">
-                Use the "Alternative method" above to copy the code and paste it into a bookmark's
-                URL field.
+                On iPhone and iPad, songs it imports in Safari don't reach Chordless installed on
+                the home screen, which keeps its own separate storage.
               </p>
             </div>
 
