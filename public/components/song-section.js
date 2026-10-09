@@ -24,7 +24,7 @@ export class SongSection extends LitElement {
     /** @type {number} Index of this section within the song */
     sectionIndex: { type: Number, attribute: 'section-index', reflect: true },
     /** @type {boolean} Whether edit mode is active */
-    editMode: { type: Boolean, reflect: true, attribute: 'editmode' },
+    editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     /** @type {string} Hide mode: 'none', 'collapse', 'chords', or 'lyrics' */
     hideMode: { type: String, attribute: 'hide-mode' },
     /** @type {boolean} Whether the section is collapsed */
@@ -63,8 +63,7 @@ export class SongSection extends LitElement {
       }
     }
 
-    :host([editmode]) .song-section-wrapper,
-    :host([libraryeditmode]) .song-section-wrapper {
+    :host([edit-mode]) .song-section-wrapper {
       border-style: dotted;
       border-color: var(--border-color, #bdc3c7);
       background-color: var(--bg-secondary, #f9f9f9);
@@ -139,11 +138,11 @@ export class SongSection extends LitElement {
         transform 0.2s;
     }
 
-    :host([editmode]) .song-section-wrapper .section-collapse-toggle {
+    :host([edit-mode]) .song-section-wrapper .section-collapse-toggle {
       opacity: 1;
     }
 
-    :host(:not([editmode])) .song-section-wrapper .section-collapse-toggle {
+    :host(:not([edit-mode])) .song-section-wrapper .section-collapse-toggle {
       pointer-events: none;
     }
 
@@ -181,8 +180,7 @@ export class SongSection extends LitElement {
       transition: opacity 0.25s ease-in-out;
     }
 
-    :host([editmode]) .song-section-wrapper .section-controls,
-    :host([libraryeditmode]) .song-section-wrapper .section-controls {
+    :host([edit-mode]) .song-section-wrapper .section-controls {
       opacity: 1;
       pointer-events: auto;
     }
@@ -196,13 +194,11 @@ export class SongSection extends LitElement {
       display: none;
     }
 
-    :host([editmode]) .song-section-wrapper.section-hidden,
-    :host([libraryeditmode]) .song-section-wrapper.section-hidden {
+    :host([edit-mode]) .song-section-wrapper.section-hidden {
       display: block;
     }
 
-    :host([editmode]) .song-section-wrapper.section-hidden .section-title,
-    :host([libraryeditmode]) .song-section-wrapper.section-hidden .section-title {
+    :host([edit-mode]) .song-section-wrapper.section-hidden .section-title {
       text-decoration: line-through;
       opacity: 0.6;
     }

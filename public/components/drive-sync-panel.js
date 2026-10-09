@@ -151,7 +151,7 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
-  async handleReset() {
+  async _handleReset() {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
     if (!(await this.renderRoot.querySelector('#reset-modal').ask())) return
@@ -185,7 +185,7 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
-  async handleSync() {
+  async _handleSync() {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
     this.syncing = true
@@ -239,15 +239,15 @@ export class DriveSyncPanel extends LitElement {
 
     return html`
       <div class="sync-panel">
-        ${this.renderSyncStatus()}
+        ${this._renderSyncStatus()}
 
-        <button class="btn primary" ?disabled=${this.syncing} @click=${this.handleSync}>
+        <button class="btn primary" ?disabled=${this.syncing} @click=${this._handleSync}>
           ${
             this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
           }
         </button>
 
-        <button class="btn" ?disabled=${this.syncing} @click=${this.handleReset}>
+        <button class="btn" ?disabled=${this.syncing} @click=${this._handleReset}>
           ⤓ Reset from Google Drive
         </button>
         <app-modal
@@ -262,7 +262,7 @@ export class DriveSyncPanel extends LitElement {
         ${
           this.lastSyncTime
             ? html`
-              <div class="last-sync">Last synced: ${this.formatSyncTime(this.lastSyncTime)}</div>
+              <div class="last-sync">Last synced: ${this._formatSyncTime(this.lastSyncTime)}</div>
             `
             : ''
         }
@@ -270,7 +270,7 @@ export class DriveSyncPanel extends LitElement {
     `
   }
 
-  renderSyncStatus() {
+  _renderSyncStatus() {
     if (!this.syncProgress && !this.syncError) {
       return html`
         <div class="sync-status">
@@ -305,12 +305,12 @@ export class DriveSyncPanel extends LitElement {
           <span class="status-icon"> ${isError ? '❌' : isSuccess ? '✓' : '🔄'} </span>
           <span class="status-text">${message}</span>
         </div>
-        ${!isError && !isSuccess ? this.renderProgressBar() : ''}
+        ${!isError && !isSuccess ? this._renderProgressBar() : ''}
       </div>
     `
   }
 
-  renderProgressBar() {
+  _renderProgressBar() {
     const { current, total } = this.syncProgress || {}
     const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0
     const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null
@@ -322,7 +322,7 @@ export class DriveSyncPanel extends LitElement {
     `
   }
 
-  formatSyncTime(isoString) {
+  _formatSyncTime(isoString) {
     const date = new Date(isoString)
     const now = new Date()
     const diffMs = now - date

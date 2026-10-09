@@ -90,7 +90,7 @@ export class StatusMessage extends LitElement {
     }
   `
 
-  renderSpinner() {
+  _renderSpinner() {
     if (this.state !== 'loading') return null
     return html`<div class="spinner" role="presentation" aria-hidden="true"></div>`
   }
@@ -101,7 +101,7 @@ export class StatusMessage extends LitElement {
 
     return html`
       <div class="status-card" role=${role} aria-live=${ariaLive}>
-        ${this.renderSpinner()}
+        ${this._renderSpinner()}
         ${this.message ? html`<p class="message">${this.message}</p>` : null}
         ${this.detail ? html`<p class="detail">${this.detail}</p>` : null}
         <slot></slot>

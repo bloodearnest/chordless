@@ -35,7 +35,7 @@ export class SongCard extends LitElement {
   static properties = {
     song: { type: Object, attribute: false },
     variant: { type: String, reflect: true },
-    editMode: { type: Boolean, reflect: true, attribute: 'editmode' },
+    editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
   }
 
   static styles = css`
@@ -167,7 +167,7 @@ export class SongCard extends LitElement {
       transition: opacity 0.5s ease;
     }
 
-    :host([editmode]) .edit-controls {
+    :host([edit-mode]) .edit-controls {
       opacity: 1;
       pointer-events: auto;
     }
@@ -274,22 +274,22 @@ export class SongCard extends LitElement {
 
     return html`
       <div class="card-wrapper">
-        <div class="card" part="card" @click=${this.handleClick}>
+        <div class="card" part="card" @click=${this._handleClick}>
           <div class="card-content">
             <div class="line1">
               <div class="title" part="title">${this.song.title}</div>
               ${
                 this.variant !== 'setlist' && this.song.artist
                   ? html`
-                    <div class="artist" part="artist">${this.formatArtist(this.song.artist)}</div>
+                    <div class="artist" part="artist">${this._formatArtist(this.song.artist)}</div>
                   `
                   : ''
               }
             </div>
 
             <div class="line2">
-              <div class="meta" part="meta">${this.renderMeta()}</div>
-              ${this.variant !== 'setlist' ? this.renderLastPlayed() : ''}
+              <div class="meta" part="meta">${this._renderMeta()}</div>
+              ${this.variant !== 'setlist' ? this._renderLastPlayed() : ''}
             </div>
           </div>
 
@@ -297,12 +297,12 @@ export class SongCard extends LitElement {
             <button
               class="delete-button"
               part="delete-button"
-              @click=${this.handleDelete}
+              @click=${this._handleDelete}
               aria-label="Remove song"
             >
               <app-icon name="delete" size="18" class="delete-icon"></app-icon>
             </button>
-            ${this.renderKeyEdit()}
+            ${this._renderKeyEdit()}
             <div class="drag-handle" part="drag-handle">☰</div>
           </div>
         </div>
@@ -310,7 +310,7 @@ export class SongCard extends LitElement {
     `
   }
 
-  renderMeta() {
+  _renderMeta() {
     const { metadata } = this.song
     if (!metadata) return ''
 
@@ -331,7 +331,7 @@ export class SongCard extends LitElement {
     return items.join('   ')
   }
 
-  formatArtist(artistString) {
+  _formatArtist(artistString) {
     const cleanedArtists = formatArtistNames(artistString)
 
     if (cleanedArtists.length === 0) return ''
@@ -343,7 +343,7 @@ export class SongCard extends LitElement {
     return cleanedArtists.join(', ')
   }
 
-  renderLastPlayed() {
+  _renderLastPlayed() {
     const { lastUsageInfo, lastUsedAt } = this.song
 
     // Use new lastUsageInfo if available
@@ -376,7 +376,7 @@ export class SongCard extends LitElement {
     return ''
   }
 
-  renderKeyEdit() {
+  _renderKeyEdit() {
     const currentKey = this.song?.currentKey
     const isMinor = currentKey?.endsWith('m')
     const keys = isMinor ? MINOR_KEYS : MAJOR_KEYS
@@ -388,13 +388,13 @@ export class SongCard extends LitElement {
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
           .editMode=${true}
-          @key-change=${this.handleKeyEditChange}
+          @key-change=${this._handleKeyEditChange}
         ></key-selector>
       </div>
     `
   }
 
-  handleKeyEditChange(e) {
+  _handleKeyEditChange(e) {
     e.stopPropagation()
     this.dispatchEvent(
       new CustomEvent('song-key-change', {
@@ -406,7 +406,7 @@ export class SongCard extends LitElement {
   }
 
   // Click handler
-  handleClick() {
+  _handleClick() {
     // In edit mode, don't fire click (avoid accidental navigation)
     if (this.editMode) {
       return
@@ -422,7 +422,7 @@ export class SongCard extends LitElement {
   }
 
   // Delete button handler
-  handleDelete(e) {
+  _handleDelete(e) {
     e.stopPropagation() // Prevent click from bubbling to card
     this.dispatchEvent(
       new CustomEvent('song-delete', {

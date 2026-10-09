@@ -16,12 +16,12 @@ import { buttonStyles, fieldStyles } from './shared-styles.js'
  */
 export class SelectOrganisation extends LitElement {
   static properties = {
-    _currentOrganisation: { type: String, state: true },
-    _organisations: { type: Array, state: true },
-    _loading: { type: Boolean, state: true },
-    _showCreateForm: { type: Boolean, state: true },
-    _newOrganisationName: { type: String, state: true },
-    _creating: { type: Boolean, state: true },
+    _currentOrganisation: { state: true },
+    _organisations: { state: true },
+    _loading: { state: true },
+    _showCreateForm: { state: true },
+    _newOrganisationName: { state: true },
+    _creating: { state: true },
     _formError: { state: true }, // why the new organisation wasn't created
   }
 

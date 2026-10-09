@@ -575,6 +575,18 @@ test.describe('Bookmarklet page', () => {
 })
 
 test.describe('Navigation menu', () => {
+  test("choosing a song in a setlist's menu opens it", async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'menu-song-setlist' })
+    await page.goto('/setlist/menu-song-setlist')
+    await page.locator('setlist-overview song-card').first().waitFor()
+    await page.locator('#app-header').getByRole('button', { name: 'Navigation menu' }).click()
+    await page.locator('nav-menu').getByRole('button', { name: 'Info Test Song' }).click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    expect(errors).toEqual([])
+  })
+
   test('every page has the app header, whose menu button opens the menu', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 700 })
     for (const url of ['/', '/preferences', '/storage', '/bookmarklet', '/import-song']) {

@@ -17,7 +17,7 @@ export class SongDisplay extends LitElement {
     parsed: { type: Object, attribute: false },
     /** @type {number} Song index in setlist */
     songIndex: { type: Number, attribute: 'song-index' },
-    useNashville: { type: Boolean, state: true },
+    _useNashville: { state: true },
     /** @type {number} Current capo value */
     capo: { type: Number },
   }
@@ -32,10 +32,10 @@ export class SongDisplay extends LitElement {
     super()
     this.parsed = null
     this.songIndex = 0
-    this.useNashville = getUseNashvilleNumbers()
+    this._useNashville = getUseNashvilleNumbers()
     this.capo = 0
     this._onNashvilleChange = event => {
-      this.useNashville = !!event.detail
+      this._useNashville = !!event.detail
       this.requestUpdate()
     }
   }
@@ -74,7 +74,7 @@ export class SongDisplay extends LitElement {
         .label=${section.label || ''}
         .songIndex=${this.songIndex}
         .sectionIndex=${index}
-        .displayAsNashville=${this.useNashville}
+        .displayAsNashville=${this._useNashville}
         .displayKey=${displayKey}
         .capo=${capoValue}
         .capoKey=${capoKey}

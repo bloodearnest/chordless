@@ -27,37 +27,37 @@ import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.js'
 export class MediaPlayer extends LitElement {
   static properties = {
     currentKey: { type: String, attribute: 'current-key' },
-    stereoSplitEnabled: { type: Boolean, state: true },
-    _fadingOut: { type: Boolean, state: true },
-    _fadingIn: { type: Boolean, state: true },
-    _showingVolumeSlider: { type: Boolean, state: true },
-    _padVolume: { type: Number, state: true },
-    _clickVolume: { type: Number, state: true },
-    _padsEnabled: { type: Boolean, state: true }, // Global setting (from settings page)
-    _metronomeGlobalEnabled: { type: Boolean, state: true }, // Global setting (from settings page)
-    _padsOn: { type: Boolean, state: true }, // User toggled pads on/off
-    _clickOn: { type: Boolean, state: true }, // User toggled click on/off
-    _collapsed: { type: Boolean, state: true }, // Whether the player is collapsed
-    _showingSettings: { type: Boolean, state: true }, // Whether settings modal is open
-    _dragOffsetX: { type: Number, state: true }, // Drag position X offset
-    _dragOffsetY: { type: Number, state: true }, // Drag position Y offset
+    _stereoSplitEnabled: { state: true },
+    _fadingOut: { state: true },
+    _fadingIn: { state: true },
+    _showingVolumeSlider: { state: true },
+    _padVolume: { state: true },
+    _clickVolume: { state: true },
+    _padsEnabled: { state: true }, // Global setting (from settings page)
+    _metronomeGlobalEnabled: { state: true }, // Global setting (from settings page)
+    _padsOn: { state: true }, // User toggled pads on/off
+    _clickOn: { state: true }, // User toggled click on/off
+    _collapsed: { state: true }, // Whether the player is collapsed
+    _showingSettings: { state: true }, // Whether settings modal is open
+    _dragOffsetX: { state: true }, // Drag position X offset
+    _dragOffsetY: { state: true }, // Drag position Y offset
     // Current song metadata (from song-change event, updated on swipe)
-    _currentSongId: { type: String, state: true },
-    _currentSongTitle: { type: String, state: true },
-    _currentBpm: { type: Number, state: true },
-    _currentTempoNote: { type: String, state: true },
-    _currentTimeSignature: { type: String, state: true },
+    _currentSongId: { state: true },
+    _currentSongTitle: { state: true },
+    _currentBpm: { state: true },
+    _currentTempoNote: { state: true },
+    _currentTimeSignature: { state: true },
     // Active song metadata (loaded in player, only updated when play is pressed)
-    _activeSongId: { type: String, state: true }, // The song ID currently loaded in media player
-    _activeSongKey: { type: String, state: true }, // The song key currently loaded in media player
-    _activeSongBpm: { type: Number, state: true },
-    _activeSongTempoNote: { type: String, state: true },
-    _activeSongTimeSignature: { type: String, state: true },
-    _activeSongTitle: { type: String, state: true },
-    _metronomeRunning: { type: Boolean, state: true },
-    _padLoadFailed: { type: Boolean, state: true },
-    _isPadLoading: { type: Boolean, state: true },
-    _activePadSet: { type: Object, state: true },
+    _activeSongId: { state: true }, // The song ID currently loaded in media player
+    _activeSongKey: { state: true }, // The song key currently loaded in media player
+    _activeSongBpm: { state: true },
+    _activeSongTempoNote: { state: true },
+    _activeSongTimeSignature: { state: true },
+    _activeSongTitle: { state: true },
+    _metronomeRunning: { state: true },
+    _padLoadFailed: { state: true },
+    _isPadLoading: { state: true },
+    _activePadSet: { state: true },
   }
 
   static styles = css`
@@ -628,7 +628,7 @@ export class MediaPlayer extends LitElement {
     const globalSettings = loadMediaSettings()
     this._padsEnabled = globalSettings.padsEnabled
     this._metronomeGlobalEnabled = globalSettings.metronomeEnabled
-    this.stereoSplitEnabled = globalSettings.stereoSplitEnabled
+    this._stereoSplitEnabled = globalSettings.stereoSplitEnabled
 
     // User toggle states (independent of which song is active)
     // Load saved toggle states from localStorage, default to true (on)
@@ -738,7 +738,7 @@ export class MediaPlayer extends LitElement {
 
     this._padsEnabled = settings.padsEnabled !== false
     this._metronomeGlobalEnabled = settings.metronomeEnabled !== false
-    this.stereoSplitEnabled = settings.stereoSplitEnabled === true
+    this._stereoSplitEnabled = settings.stereoSplitEnabled === true
 
     // If only one feature is enabled, ensure it's always "on"
     const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled
@@ -826,7 +826,7 @@ export class MediaPlayer extends LitElement {
     }
 
     // Handle stereo split changes
-    if (changedProperties.has('stereoSplitEnabled')) {
+    if (changedProperties.has('_stereoSplitEnabled')) {
       this._updateAudioRouting()
     }
   }
@@ -974,7 +974,7 @@ export class MediaPlayer extends LitElement {
   _updateStereoMode() {
     if (!this._padController) return
 
-    if (this.stereoSplitEnabled) {
+    if (this._stereoSplitEnabled) {
       this._padController.setStereoMode('left')
     } else {
       this._padController.setStereoMode('both')
@@ -989,7 +989,7 @@ export class MediaPlayer extends LitElement {
 
     this._clickGain.disconnect()
 
-    if (this.stereoSplitEnabled) {
+    if (this._stereoSplitEnabled) {
       // Route click to right channel only
       const splitter = this._audioContext.createChannelSplitter(2)
       const merger = this._audioContext.createChannelMerger(2)
@@ -1510,7 +1510,7 @@ export class MediaPlayer extends LitElement {
                 .mediaPlayerEnabled=${true}
                 .padsEnabled=${this._padsEnabled}
                 .metronomeEnabled=${this._metronomeGlobalEnabled}
-                .stereoSplitEnabled=${this.stereoSplitEnabled}
+                .stereoSplitEnabled=${this._stereoSplitEnabled}
               ></media-player-settings>
             `
             : ''

@@ -18,7 +18,7 @@ export class ChordDisplay extends LitElement {
     invalid: { type: Boolean, reflect: true },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     displayKey: { type: String, attribute: 'display-key' },
-    useUnicodeAccidentals: { type: Boolean, state: true },
+    _useUnicodeAccidentals: { state: true },
     capo: { type: Number },
     capoKey: { type: String, attribute: 'capo-key' },
   }
@@ -29,11 +29,11 @@ export class ChordDisplay extends LitElement {
     this.invalid = false
     this.displayAsNashville = false
     this.displayKey = ''
-    this.useUnicodeAccidentals = getUseUnicodeAccidentals()
+    this._useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.capo = 0
     this.capoKey = ''
     this._onAccidentalPreferenceChange = event => {
-      this.useUnicodeAccidentals = !!event.detail
+      this._useUnicodeAccidentals = !!event.detail
       this.requestUpdate()
     }
   }
@@ -66,7 +66,7 @@ export class ChordDisplay extends LitElement {
       return html`${text}`
     }
     return html`${segments.map(segment => {
-      const value = this.useUnicodeAccidentals
+      const value = this._useUnicodeAccidentals
         ? convertAccidentalsToSymbols(segment.value)
         : segment.value
       return segment.type === 'extension'

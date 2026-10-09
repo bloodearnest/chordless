@@ -25,6 +25,8 @@ import './icon.js'
  *
  * Events:
  * @fires back-click - When back button is clicked
+ * @fires overview-click - When the setlist overview item is clicked
+ * @fires menu-song-click - When a song in the setlist is clicked (detail: {index})
  *
  * CSS Parts:
  * @csspart popover - The popover container
@@ -360,7 +362,7 @@ export class NavMenu extends LitElement {
 
   _handleSongClick(index) {
     this.dispatchEvent(
-      new CustomEvent('song-click', {
+      new CustomEvent('menu-song-click', {
         bubbles: true,
         composed: true,
         detail: { index },

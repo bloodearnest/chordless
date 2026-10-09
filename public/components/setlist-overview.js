@@ -9,7 +9,7 @@ import './icon.js'
  */
 export class SetlistOverview extends LitElement {
   static properties = {
-    songs: { type: Array },
+    songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
   }
 

@@ -46,7 +46,7 @@ export class SongList extends LitElement {
     }
   `
 
-  handleSongClick(song, index, originalEvent) {
+  _handleSongClick(song, index, originalEvent) {
     this.dispatchEvent(
       new CustomEvent('song-select', {
         detail: { song, index, originalEvent },
@@ -56,7 +56,7 @@ export class SongList extends LitElement {
     )
   }
 
-  renderEmptyState() {
+  _renderEmptyState() {
     return html`
       <status-message state="empty" .message=${this.emptyMessage} .detail=${this.emptyDetail}>
       </status-message>
@@ -65,7 +65,7 @@ export class SongList extends LitElement {
 
   render() {
     if (!this.songs || this.songs.length === 0) {
-      return this.renderEmptyState()
+      return this._renderEmptyState()
     }
 
     return html`
@@ -75,7 +75,7 @@ export class SongList extends LitElement {
             <song-card
               .song=${song}
               .variant=${this.variant}
-              @song-click=${event => this.handleSongClick(song, index, event)}
+              @song-click=${event => this._handleSongClick(song, index, event)}
             >
             </song-card>
           `

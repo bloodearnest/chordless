@@ -2840,7 +2840,7 @@ class PageApp {
     })
 
     // Setup song click handler for setlist song navigation
-    navMenu.addEventListener('song-click', e => {
+    navMenu.addEventListener('menu-song-click', e => {
       const songIndex = e.detail.index
       if (songIndex !== undefined && songIndex >= 0) {
         this.navigateToHash(`song-${songIndex}`)

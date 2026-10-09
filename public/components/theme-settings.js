@@ -11,8 +11,8 @@ import { themeManager } from '../js/theme-manager.js'
  */
 export class ThemeSettings extends LitElement {
   static properties = {
-    currentTheme: { type: String, state: true },
-    fontScale: { type: Number, state: true },
+    _currentTheme: { state: true },
+    _fontScale: { state: true },
   }
 
   static styles = css`
@@ -194,8 +194,8 @@ export class ThemeSettings extends LitElement {
 
   constructor() {
     super()
-    this.currentTheme = themeManager.getCurrentTheme()
-    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
+    this._currentTheme = themeManager.getCurrentTheme()
+    this._fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
 
     // Bind theme observer
     this._themeObserver = this._handleThemeChange.bind(this)
@@ -212,8 +212,8 @@ export class ThemeSettings extends LitElement {
   }
 
   _handleThemeChange(theme) {
-    this.currentTheme = theme
-    this.fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
+    this._currentTheme = theme
+    this._fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
   }
 
   _setTheme(theme) {
@@ -231,7 +231,7 @@ export class ThemeSettings extends LitElement {
 
   _handleFontScaleChange(e) {
     const scale = parseFloat(e.target.value)
-    this.fontScale = scale
+    this._fontScale = scale
     themeManager.setFontScale(scale)
 
     // Save to localStorage
@@ -243,7 +243,7 @@ export class ThemeSettings extends LitElement {
   }
 
   _setPresetScale(scale) {
-    this.fontScale = scale
+    this._fontScale = scale
     themeManager.setFontScale(scale)
 
     try {
@@ -259,7 +259,7 @@ export class ThemeSettings extends LitElement {
 
   render() {
     const systemPreference = themeManager.detectSystemPreference()
-    const usingSystemMode = this.currentTheme === 'system'
+    const usingSystemMode = this._currentTheme === 'system'
 
     return html`
       <div class="settings-group">
@@ -269,7 +269,7 @@ export class ThemeSettings extends LitElement {
         </div>
         <div class="theme-buttons">
           <button
-            class="theme-button ${this.currentTheme === 'system' ? 'active' : ''}"
+            class="theme-button ${this._currentTheme === 'system' ? 'active' : ''}"
             @click=${this._detectSystemPreference}
             aria-label="Use system preference"
             title="Follow your system's theme preference automatically"
@@ -278,7 +278,7 @@ export class ThemeSettings extends LitElement {
             <span>System</span>
           </button>
           <button
-            class="theme-button ${this.currentTheme === 'light' ? 'active' : ''}"
+            class="theme-button ${this._currentTheme === 'light' ? 'active' : ''}"
             @click=${() => this._setTheme('light')}
             aria-label="Light theme"
           >
@@ -286,7 +286,7 @@ export class ThemeSettings extends LitElement {
             <span>Light</span>
           </button>
           <button
-            class="theme-button ${this.currentTheme === 'dark' ? 'active' : ''}"
+            class="theme-button ${this._currentTheme === 'dark' ? 'active' : ''}"
             @click=${() => this._setTheme('dark')}
             aria-label="Dark theme"
           >
@@ -317,11 +317,11 @@ export class ThemeSettings extends LitElement {
             min="0.5"
             max="2.0"
             step="0.05"
-            .value=${this.fontScale.toString()}
+            .value=${this._fontScale.toString()}
             @input=${this._handleFontScaleChange}
             aria-label="Font scale slider"
           />
-          <div class="scale-value">${Math.round(this.fontScale * 100)}%</div>
+          <div class="scale-value">${Math.round(this._fontScale * 100)}%</div>
         </div>
         <div class="preset-buttons">
           <button class="preset-button" @click=${() => this._setPresetScale(0.65)}>
@@ -343,12 +343,12 @@ export class ThemeSettings extends LitElement {
         <div class="info-row">
           <span class="info-label">Theme preference:</span>
           <span class="info-value"
-            >${this.currentTheme}${usingSystemMode ? ` (${systemPreference})` : ''}</span
+            >${this._currentTheme}${usingSystemMode ? ` (${systemPreference})` : ''}</span
           >
         </div>
         <div class="info-row">
           <span class="info-label">Font scale:</span>
-          <span class="info-value">${Math.round(this.fontScale * 100)}%</span>
+          <span class="info-value">${Math.round(this._fontScale * 100)}%</span>
         </div>
         ${
           !usingSystemMode

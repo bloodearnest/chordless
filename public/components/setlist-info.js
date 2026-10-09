@@ -12,7 +12,7 @@ import { css, html, LitElement } from 'lit'
  */
 export class SetlistInfo extends LitElement {
   static properties = {
-    setlist: { type: Object },
+    setlist: { type: Object, attribute: false },
     leader: { type: String },
     loading: { type: Boolean },
   }
@@ -97,19 +97,22 @@ export class SetlistInfo extends LitElement {
     return html`
       <div class="setlist-info-container">
         <div class="modal-info-grid">
-          ${this.setlist.time ? this.renderInfoItem('Time', this.setlist.time) : ''}
-          ${this.setlist.type ? this.renderInfoItem('Type', this.setlist.type) : ''}
-          ${leader ? this.renderInfoItem('Leader', leader) : ''}
-          ${this.setlist.venue ? this.renderInfoItem('Venue', this.setlist.venue) : ''}
-          ${this.renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
+          ${this.setlist.time ? this._renderInfoItem('Time', this.setlist.time) : ''}
+          ${this.setlist.type ? this._renderInfoItem('Type', this.setlist.type) : ''}
+          ${leader ? this._renderInfoItem('Leader', leader) : ''}
+          ${this.setlist.venue ? this._renderInfoItem('Venue', this.setlist.venue) : ''}
+          ${this._renderInfoItem('Songs', `${songCount} song${songCount !== 1 ? 's' : ''}`)}
           ${
             this.setlist.createdDate
-              ? this.renderInfoItem('Created', this.formatDateTime(this.setlist.createdDate))
+              ? this._renderInfoItem('Created', this._formatDateTime(this.setlist.createdDate))
               : ''
           }
           ${
             this.setlist.modifiedDate
-              ? this.renderInfoItem('Last Modified', this.formatDateTime(this.setlist.modifiedDate))
+              ? this._renderInfoItem(
+                  'Last Modified',
+                  this._formatDateTime(this.setlist.modifiedDate)
+                )
               : ''
           }
         </div>
@@ -117,7 +120,7 @@ export class SetlistInfo extends LitElement {
     `
   }
 
-  renderInfoItem(label, value) {
+  _renderInfoItem(label, value) {
     if (!value) return ''
 
     return html`
@@ -128,7 +131,7 @@ export class SetlistInfo extends LitElement {
     `
   }
 
-  formatDateTime(isoString) {
+  _formatDateTime(isoString) {
     const date = new Date(isoString)
     return date.toLocaleString()
   }

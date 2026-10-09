@@ -16,8 +16,8 @@ import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.js'
  */
 export class SongInfo extends LitElement {
   static properties = {
-    song: { type: Object },
-    appearances: { type: Array },
+    song: { type: Object, attribute: false },
+    appearances: { type: Array, attribute: false },
     loading: { type: Boolean },
   }
 
@@ -256,7 +256,7 @@ export class SongInfo extends LitElement {
                         <div class="modal-appearance-item">
                           <span class="appearance-date">${appearance.formattedDate}</span>
                           <span class="appearance-relative">${appearance.weeksAgo}</span>
-                          ${this.renderAppearanceMeta(appearance)}
+                          ${this._renderAppearanceMeta(appearance)}
                         </div>
                       `
                     )}
@@ -268,12 +268,12 @@ export class SongInfo extends LitElement {
         </div>
 
         <!-- CCLI section -->
-        ${this.renderCCLI()}
+        ${this._renderCCLI()}
       </div>
     `
   }
 
-  renderAppearanceMeta(appearance) {
+  _renderAppearanceMeta(appearance) {
     const metaParts = []
     if (appearance.leader) {
       metaParts.push(appearance.leader)
@@ -289,7 +289,7 @@ export class SongInfo extends LitElement {
     return ''
   }
 
-  renderCCLI() {
+  _renderCCLI() {
     const ccliNumber =
       this.song.metadata?.ccli || this.song.metadata?.ccliSongNumber || this.song.ccliNumber
     const ccliTrailer = this.song.metadata?.ccliTrailer
@@ -373,14 +373,14 @@ export class SongInfo extends LitElement {
       .slice(0, 6)
       .map(appearance => ({
         date: appearance.date,
-        formattedDate: this.formatDate(appearance.date),
+        formattedDate: this._formatDate(appearance.date),
         weeksAgo: getWeeksAgo(appearance.date),
         playedInKey: appearance.playedInKey,
         leader: appearance.leader,
       }))
   }
 
-  formatDate(dateStr) {
+  _formatDate(dateStr) {
     return formatSetlistDate(dateStr, 'long')
   }
 }

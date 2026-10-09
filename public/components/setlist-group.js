@@ -8,7 +8,7 @@ import { css, html, LitElement } from 'lit'
 export class SetlistGroup extends LitElement {
   static properties = {
     year: { type: String },
-    setlists: { type: Array },
+    setlists: { type: Array, attribute: false },
     expanded: { type: Boolean, reflect: true },
   }
 
@@ -110,7 +110,7 @@ export class SetlistGroup extends LitElement {
     this.expanded = !this.expanded
   }
 
-  renderSetlistRow(setlist) {
+  _renderSetlistRow(setlist) {
     const url = setlist.url || `/setlist/${setlist.id}`
     const name = setlist.displayName || setlist.name || ''
     const songCount =
@@ -138,7 +138,7 @@ export class SetlistGroup extends LitElement {
         >
           ${this.year}
         </button>
-        <div class="year-list">${this.setlists.map(setlist => this.renderSetlistRow(setlist))}</div>
+        <div class="year-list">${this.setlists.map(setlist => this._renderSetlistRow(setlist))}</div>
       </div>
     `
   }

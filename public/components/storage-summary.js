@@ -10,7 +10,7 @@ export class StorageSummary extends LitElement {
   static properties = {
     loading: { type: Boolean },
     error: { type: String },
-    stats: { type: Object },
+    stats: { type: Object, attribute: false },
   }
 
   static styles = css`

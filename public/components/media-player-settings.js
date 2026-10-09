@@ -20,14 +20,14 @@ import { fieldStyles, switchStyles } from './shared-styles.js'
  */
 export class MediaPlayerSettings extends LitElement {
   static properties = {
-    mediaPlayerEnabled: { type: Boolean, state: true },
-    padsEnabled: { type: Boolean, state: true },
-    metronomeEnabled: { type: Boolean, state: true },
-    stereoSplitEnabled: { type: Boolean, state: true },
-    padSets: { type: Array, state: true },
-    selectedPadSetId: { type: String, state: true },
-    padSetLoading: { type: Boolean, state: true },
-    padSetError: { type: String, state: true },
+    mediaPlayerEnabled: { type: Boolean, attribute: false },
+    padsEnabled: { type: Boolean, attribute: false },
+    metronomeEnabled: { type: Boolean, attribute: false },
+    stereoSplitEnabled: { type: Boolean, attribute: false },
+    padSets: { state: true },
+    selectedPadSetId: { state: true },
+    padSetLoading: { state: true },
+    padSetError: { state: true },
   }
 
   static styles = [
