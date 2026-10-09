@@ -29,6 +29,36 @@
         font-weight: bold;
         float: left;
       }
+      .settings-content h3 {
+        font-size: 1.6rem;
+        margin: 3rem 0 1rem;
+        color: var(--text-color);
+      }
+      .settings-section:first-of-type h3 {
+        margin-top: 0;
+      }
+      .settings-content h4 {
+        font-size: 1.4rem;
+        margin: 2rem 0 1rem;
+        color: var(--text-color);
+      }
+      .note {
+        color: var(--text-secondary);
+        font-size: 1.1rem;
+        margin-bottom: 1rem;
+      }
+      .note.lead {
+        margin-bottom: 2rem;
+      }
+      ol.note {
+        padding-left: 1.5rem;
+      }
+      .note a {
+        color: var(--button-bg);
+      }
+      .touch-only {
+        display: none;
+      }
       /* Shown on phones and tablets, where the bookmarklet is awkward */
       .touch-tip {
         display: none;
@@ -46,6 +76,12 @@
       @media (hover: none) and (pointer: coarse) {
         .touch-tip {
           display: block;
+        }
+        .touch-only {
+          display: inline;
+        }
+        .desktop-only {
+          display: none;
         }
       }
     </style>
@@ -83,34 +119,27 @@
               Instead, download the song's ChordPro file from SongSelect, then open it in
               <a href="/import-song">Import Songs</a>.
             </p>
-            <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 2rem">
+            <p class="note lead">
               Import songs from SongSelect directly into your Chordless library with one click using
               this bookmarklet.
             </p>
 
             <div class="settings-section">
-              <h3 style="font-size: 1.6rem; margin-bottom: 1rem; color: var(--header-bg)">
-                Install Bookmarklet
-              </h3>
-              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1.5rem">
+              <h3>Install Bookmarklet</h3>
+              <p class="note desktop-only">
                 <strong>Drag this button to your bookmarks bar:</strong>
               </p>
               <bookmarklet-installer>
-                <h4
-                  style="
-                    font-size: 1.4rem;
-                    margin-top: 2rem;
-                    margin-bottom: 1rem;
-                    color: var(--header-bg);
-                  "
-                >
-                  Alternative Method
-                </h4>
-                <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
-                  If dragging doesn't work, you can manually create a bookmark:
+                <h4>Alternative Method</h4>
+                <p class="note">
+                  <span class="desktop-only">If dragging doesn't work, you</span
+                  ><span class="touch-only">You</span> can create the bookmark yourself:
                 </p>
-                <ol style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
-                  <li>Create a new bookmark (Ctrl+D or Cmd+D)</li>
+                <ol class="note">
+                  <li>
+                    Create a new bookmark<span class="desktop-only"> (Ctrl+D or Cmd+D)</span
+                    ><span class="touch-only"> of any page, then edit it</span>
+                  </li>
                   <li>Name it "Import to Chordless"</li>
                   <li>Copy the code below and paste it as the URL</li>
                 </ol>
@@ -118,16 +147,7 @@
             </div>
 
             <div class="settings-section">
-              <h3
-                style="
-                  font-size: 1.6rem;
-                  margin-top: 3rem;
-                  margin-bottom: 1rem;
-                  color: var(--header-bg);
-                "
-              >
-                Desktop Installation
-              </h3>
+              <h3>Desktop Installation</h3>
               <div class="install-step">
                 <span class="step-number">1</span>
                 <strong>Show your bookmarks bar:</strong> Press <code>Ctrl+Shift+B</code> (Windows)
@@ -148,48 +168,33 @@
             </div>
 
             <div class="settings-section">
-              <h3
-                style="
-                  font-size: 1.6rem;
-                  margin-top: 3rem;
-                  margin-bottom: 1rem;
-                  color: var(--header-bg);
-                "
-              >
-                Mobile Installation
-              </h3>
-              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+              <h3>Mobile Installation</h3>
+              <p class="note">
                 The easiest way on a phone or tablet is to download the song's ChordPro file from
                 SongSelect, then open it in <a href="/import-song">Import Songs</a>.
               </p>
-              <p style="color: #7f8c8d; font-size: 1.1rem; margin-bottom: 1rem">
+              <p class="note">
                 To use the bookmarklet anyway, bookmark any page, then edit the bookmark and paste
                 the code from the "Alternative Method" above as its URL. On Android, run it by
                 typing the bookmark's name in the address bar and tapping it.
               </p>
-              <p style="color: #7f8c8d; font-size: 1.1rem">
+              <p class="note">
                 On iPhone and iPad, songs it imports in Safari don't reach Chordless installed on
                 the home screen, which keeps its own separate storage.
               </p>
             </div>
 
             <div class="settings-section">
-              <h3
-                style="
-                  font-size: 1.6rem;
-                  margin-top: 3rem;
-                  margin-bottom: 1rem;
-                  color: var(--header-bg);
-                "
-              >
-                How It Works
-              </h3>
-              <ol style="color: #7f8c8d; font-size: 1.1rem">
+              <h3>How It Works</h3>
+              <ol class="note">
                 <li>Navigate to a song on SongSelect</li>
-                <li>Click the bookmarklet in your bookmarks bar</li>
-                <li>The bookmarklet fetches the ChordPro file from SongSelect</li>
-                <li>Opens Chordless (or reuses existing tab) and imports the song</li>
-                <li>Song is saved to your IndexedDB library</li>
+                <li>Click the bookmarklet</li>
+                <li>
+                  It opens Chordless's Import Songs page, and downloads the song's ChordPro file
+                  from SongSelect using your login
+                </li>
+                <li>It sends the song to Chordless, which saves it to your library</li>
+                <li>Choose a setlist to add it to, or just keep it in the library</li>
               </ol>
             </div>
           </div>

@@ -482,10 +482,18 @@ test.describe('Bookmarklet page', () => {
   test('hides the phone and tablet tip on a computer', async ({ page }) => {
     await page.goto('/bookmarklet')
     await expect(page.locator('.touch-tip')).toBeHidden()
+    await expect(page.getByText('Ctrl+D or Cmd+D')).toBeVisible()
   })
 
   test.describe('on a phone', () => {
     test.use({ isMobile: true, hasTouch: true, viewport: { width: 412, height: 900 } })
+
+    test('hides the instructions that need a keyboard or bookmarks bar', async ({ page }) => {
+      await page.goto('/bookmarklet')
+      await expect(page.getByText('Ctrl+D or Cmd+D')).toBeHidden()
+      await expect(page.getByText('Drag this button to your bookmarks bar')).toBeHidden()
+      await expect(page.getByText('of any page, then edit it')).toBeVisible()
+    })
 
     test('suggests importing the ChordPro file instead', async ({ page }) => {
       await page.goto('/bookmarklet')

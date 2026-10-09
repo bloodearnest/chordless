@@ -149,7 +149,7 @@ body {
 .home-content h2 {
   font-size: var(--font-ui);
   margin-bottom: 2rem;
-  color: var(--header-bg);
+  color: var(--text-color);
 }
 
 /* Container for sliding between library and song view */
