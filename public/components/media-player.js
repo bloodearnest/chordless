@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.js'
+import './app-modal.js'
 import './icon.js'
 import { loadMediaSettings } from '../js/media-settings.js'
 import { MetronomeController } from '../js/metronome-controller.js'
@@ -614,63 +615,6 @@ export class MediaPlayer extends LitElement {
     .collapsed-button:active {
       background: rgba(52, 73, 94, 0.8);
     }
-
-    .settings-modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: var(--modal-backdrop, rgba(0, 0, 0, 0.5));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 2000;
-    }
-
-    /* Coloured like app-modal, not the player */
-    .settings-content {
-      background: var(--modal-bg, white);
-      border: 1px solid var(--modal-border, transparent);
-      box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
-      color: var(--text-color, #1a1a1a);
-      border-radius: 10px;
-      padding: 2rem;
-      max-width: 500px;
-      width: 90%;
-      position: relative;
-    }
-
-    .settings-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 1.5rem;
-    }
-
-    .settings-title {
-      font-size: var(--font-ui);
-      font-weight: 600;
-    }
-
-    .close-button {
-      width: 2rem;
-      height: 2rem;
-      border-radius: 50%;
-      border: 1px solid currentColor;
-      background: transparent;
-      color: inherit;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      line-height: 1;
-    }
-
-    .close-button:active {
-      background: var(--tint-strong);
-    }
   `
 
   constructor() {
@@ -1266,7 +1210,11 @@ export class MediaPlayer extends LitElement {
 
   _toggleSettings() {
     this._showingSettings = !this._showingSettings
-    console.log('[MediaPlayer] Settings:', this._showingSettings)
+  }
+
+  _closeSettings(event) {
+    // Only our own modal's close, not one bubbling from inside it
+    if (event.target === event.currentTarget) this._showingSettings = false
   }
 
   _startDrag(e) {
@@ -1549,29 +1497,25 @@ export class MediaPlayer extends LitElement {
     }
 
     return html`
-      <!-- Settings modal (outside container so it's not constrained) -->
-      ${
-        this._showingSettings
-          ? html`
-            <div class="settings-modal" @click=${this._toggleSettings}>
-              <div class="settings-content" @click=${e => e.stopPropagation()}>
-                <div class="settings-header">
-                  <div class="settings-title">Media Player Settings</div>
-                  <button class="close-button" @click=${this._toggleSettings} aria-label="Close">
-                    ×
-                  </button>
-                </div>
-                <media-player-settings
-                  .mediaPlayerEnabled=${true}
-                  .padsEnabled=${this._padsEnabled}
-                  .metronomeEnabled=${this._metronomeGlobalEnabled}
-                  .stereoSplitEnabled=${this.stereoSplitEnabled}
-                ></media-player-settings>
-              </div>
-            </div>
-          `
-          : ''
-      }
+      <app-modal
+        heading="Media Player Settings"
+        .open=${this._showingSettings}
+        @close=${this._closeSettings}
+      >
+        ${
+          // Rendered while open, so it shows the settings as they are now
+          this._showingSettings
+            ? html`
+              <media-player-settings
+                .mediaPlayerEnabled=${true}
+                .padsEnabled=${this._padsEnabled}
+                .metronomeEnabled=${this._metronomeGlobalEnabled}
+                .stereoSplitEnabled=${this.stereoSplitEnabled}
+              ></media-player-settings>
+            `
+            : ''
+        }
+      </app-modal>
 
       <div
         class="player"

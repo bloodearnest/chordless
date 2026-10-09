@@ -694,6 +694,26 @@ test.describe('Song settings', () => {
 })
 
 test.describe('Media player settings', () => {
+  test("the player's settings open in a modal, which Esc closes", async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'player-modal-setlist' })
+    await page.goto('/setlist/player-modal-setlist')
+    const player = page.locator('media-player')
+    await player.locator('.collapsed-button').click()
+    await player.getByRole('button', { name: 'Settings' }).click()
+
+    const modal = player.locator('app-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await expect(modal.getByRole('switch', { name: 'Enable Pads' })).toBeVisible()
+    // Esc still closes it after a click inside
+    await modal.getByText('Background pad audio playback').click()
+    await page.keyboard.press('Escape')
+    await expect(modal).not.toHaveAttribute('open', '')
+    await expect(modal.locator('media-player-settings')).toHaveCount(0)
+    expect(errors).toEqual([])
+  })
+
   test('its switches work from the keyboard, and are off limits while the player is off', async ({
     page,
   }) => {
