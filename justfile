@@ -4,8 +4,8 @@
 default:
     @just --list
 
-# Run all tests
-test: test-unit
+# Run all tests: node, browser unit (Web Test Runner) and Playwright
+test: test-node test-unit test-browser-headless
 
 # Run browser unit tests
 test-unit:
@@ -26,6 +26,7 @@ format:
 vendor:
     node scripts/vendor-deps.mjs
 
+# Run the node tests (the auth worker, event names)
 test-node:
     npm run test:node
 
