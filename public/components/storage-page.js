@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import './app-modal.js'
 import './drive-sync-panel.js'
 import './storage-summary.js'
 import './pad-set-manager.js'
@@ -17,6 +18,7 @@ export class StoragePage extends LitElement {
     isAuthenticated: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
+    _clearError: { state: true },
   }
 
   static styles = css`
@@ -241,7 +243,7 @@ export class StoragePage extends LitElement {
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated)}
-        ${this._renderPadSetSection()} ${this._renderImportSection()} ${this._renderDangerSection()}
+        ${this._renderPadSetSection()} ${this._renderDangerSection()}
       </div>
     `
   }
@@ -410,21 +412,6 @@ export class StoragePage extends LitElement {
     `
   }
 
-  _renderImportSection() {
-    return html`
-      <div class="storage-section">
-        <h3>📂 Import from Filesystem</h3>
-        <p>
-          Import setlists and songs from the filesystem. This will scan the sets/ directory and add
-          all found setlists to the database.
-        </p>
-        <button class="storage-button" @click=${this._handleImport}>
-          Import Setlists from Filesystem
-        </button>
-      </div>
-    `
-  }
-
   _renderDangerSection() {
     return html`
       <div class="storage-section" style="border: 1px solid rgba(231, 76, 60, 0.4);">
@@ -436,7 +423,15 @@ export class StoragePage extends LitElement {
         <button class="storage-button danger" @click=${this._handleClearDatabase}>
           Clear Local Data
         </button>
+        ${this._clearError ? html`<p role="alert">❌ Failed to clear data: ${this._clearError}</p>` : ''}
       </div>
+      <app-modal
+        id="clear-data-modal"
+        type="confirm"
+        heading="Clear local data?"
+        confirm-label="Clear Local Data"
+        message="This deletes this organisation's setlists and songs on this device, and all settings. Anything not yet synced to Google Drive is lost. This can't be undone."
+      ></app-modal>
     `
   }
 
@@ -623,13 +618,20 @@ export class StoragePage extends LitElement {
     )
   }
 
-  _handleClearDatabase() {
-    this.dispatchEvent(
-      new CustomEvent('clear-database-requested', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+  async _handleClearDatabase() {
+    const modal = this.renderRoot.querySelector('#clear-data-modal')
+    if (!(await modal.ask())) return
+    try {
+      const { getCurrentDB } = await import('../js/db.js')
+      const db = await getCurrentDB()
+      await db.clearAll()
+      localStorage.clear()
+      sessionStorage.clear()
+      window.location.reload()
+    } catch (error) {
+      console.error('[Storage] Failed to clear local data:', error)
+      this._clearError = error.message
+    }
   }
 }
 

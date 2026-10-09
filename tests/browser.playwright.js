@@ -93,6 +93,17 @@ async function seedSong(page, { setlistId = null } = {}) {
   }, setlistId)
 }
 
+/** Call a method of the app's database, e.g. fromDB(page, 'getSong', uuid) */
+function fromDB(page, method, arg) {
+  return page.evaluate(
+    async ({ method, arg }) => {
+      const { getCurrentDB } = await import('/js/db.js')
+      return (await getCurrentDB())[method](arg)
+    },
+    { method, arg }
+  )
+}
+
 test.describe('Song info', () => {
   test('info button on the songs page opens the song info dialog', async ({ page }) => {
     const errors = []
@@ -261,17 +272,6 @@ test.describe('Song import', () => {
     )
   }
 
-  /** Call a method of the app's database, e.g. fromDB(page, 'getSong', uuid) */
-  function fromDB(page, method, arg) {
-    return page.evaluate(
-      async ({ method, arg }) => {
-        const { getCurrentDB } = await import('/js/db.js')
-        return (await getCurrentDB())[method](arg)
-      },
-      { method, arg }
-    )
-  }
-
   test('saves a new song to the library only', async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
@@ -398,6 +398,31 @@ test.describe('Media player settings', () => {
     await page.goto('/setlist/player-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
     await expect(page.locator('media-player')).toBeHidden()
+    expect(errors).toEqual([])
+  })
+})
+
+test.describe('Storage page', () => {
+  test('clearing local data asks first, then clears it', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'clear-test-setlist' })
+    await page.goto('/storage')
+
+    const clearButton = page.locator('storage-page .storage-button.danger')
+    const modal = page.locator('storage-page #clear-data-modal')
+
+    // Cancelling keeps everything
+    await clearButton.click()
+    await expect(modal).toHaveAttribute('open', '')
+    await modal.locator('.modal-btn-cancel').click()
+    await expect(modal).not.toHaveAttribute('open', '')
+    expect(await fromDB(page, 'getSetlist', 'clear-test-setlist')).toBeTruthy()
+
+    // Confirming clears it and reloads
+    await clearButton.click()
+    await Promise.all([page.waitForEvent('load'), modal.locator('.modal-btn-confirm').click()])
+    expect(await fromDB(page, 'getSetlist', 'clear-test-setlist')).toBeFalsy()
     expect(errors).toEqual([])
   })
 })

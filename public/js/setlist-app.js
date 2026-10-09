@@ -10,7 +10,6 @@ import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
 import { isTypingInField } from './utils/keyboard.js'
 import '../components/status-message.js'
 import '../components/song-list.js'
-import '../components/progress-modal.js'
 import '../components/setlist-group.js'
 
 // Configuration constants
@@ -109,8 +108,6 @@ class PageApp {
       await this.renderHome()
     } else if (route.type === 'setlist') {
       await this.renderSetlist(route.setlistId)
-    } else if (route.type === 'storage') {
-      await this.renderStorage()
     }
 
     // Set up keyboard navigation
@@ -171,11 +168,6 @@ class PageApp {
   async renderHome() {
     // Just render the setlist list
     await this.renderSetlistsTab()
-  }
-
-  async renderStorage() {
-    // Setup the import button on the storage page
-    this.setupStorageImportButton()
   }
 
   async renderSetlistsTab() {
@@ -283,61 +275,6 @@ class PageApp {
     })
 
     return element
-  }
-
-  setupStorageImportButton() {
-    const storagePage = document.getElementById('storage-page')
-    console.log('[PageApp] setupStorageImportButton', !!storagePage)
-    if (!storagePage) return
-
-    if (!this.globalImportHandler) {
-      this.globalImportHandler = () => {
-        this.runImport()
-      }
-      document.addEventListener('import-requested', this.globalImportHandler)
-    }
-  }
-
-  async runImport() {
-    // Dynamically import the importer
-    const { SetlistImporter } = await import('./import.js')
-    const importer = new SetlistImporter() // Defaults to 'TEST' organisation
-    await importer.init()
-
-    // Show progress modal
-    const progressModal = document.createElement('progress-modal')
-    progressModal.heading = 'Importing Setlists'
-    progressModal.message = 'Initializing...'
-    progressModal.progress = 0
-    document.body.appendChild(progressModal)
-
-    try {
-      const result = await importer.importFromServer(progress => {
-        progressModal.updateProgress({
-          message: progress.message,
-          current: progress.current,
-          total: progress.total,
-        })
-      })
-
-      if (result.cancelled) {
-        progressModal.close()
-        return
-      }
-
-      progressModal.setComplete(
-        `Import complete! ${result.setlists} setlists, ${result.songs} songs`
-      )
-
-      // Wait a moment then navigate to home to see imported setlists
-      setTimeout(() => {
-        progressModal.close()
-        window.location.href = '/'
-      }, 1500)
-    } catch (error) {
-      console.error('Import failed:', error)
-      progressModal.setError(`Import failed: ${error.message}`)
-    }
   }
 
   _readCapoPreference() {

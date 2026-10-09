@@ -96,34 +96,6 @@
       import('/js/google-auth.js').then(({ listenForIdTokenRequests }) => {
         listenForIdTokenRequests();
       });
-
-      // Handle clear database requests from storage page
-      customElements.whenDefined('storage-page').then(() => {
-        const storagePage = document.getElementById('storage-page');
-        if (!storagePage) return;
-
-        storagePage.addEventListener('clear-database-requested', async () => {
-          const confirmed = confirm(
-            '⚠️ Are you sure you want to clear ALL data?\n\nThis will delete:\n- All setlists\n- All songs\n- All localStorage data\n\nThis action cannot be undone!'
-          );
-          if (!confirmed) return;
-
-          try {
-            const { getCurrentDB } = await import('/js/db.js');
-            const db = await getCurrentDB();
-            await db.clearAll();
-
-            localStorage.clear();
-            sessionStorage.clear();
-
-            alert('✅ Local data cleared. The page will now reload.');
-            window.location.reload();
-          } catch (error) {
-            console.error('Failed to clear database:', error);
-            alert('❌ Failed to clear data: ' + error.message);
-          }
-        });
-      });
     </script>
     <!-- Import components -->
     <script type="module" src="/components/nav-menu.js"></script>

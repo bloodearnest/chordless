@@ -15,7 +15,6 @@ const ASSETS = [
   '/js/parser.js',
   '/js/setlist-app.js',
   '/js/db.js',
-  '/js/import.js',
   '/js/transpose.js',
   '/js/theme-manager.js',
   '/js/icons.js',
