@@ -2,6 +2,30 @@ import { css, html, LitElement, nothing } from 'lit'
 import './icon.js'
 import { buttonStyles } from './shared-styles.js'
 
+/** The confirm button was pressed (type confirm); the modal then closes */
+export class ModalConfirmEvent extends Event {
+  static type = 'app-modal:confirm'
+  constructor() {
+    super(ModalConfirmEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** The cancel button was pressed (type confirm); the modal then closes */
+export class ModalCancelEvent extends Event {
+  static type = 'app-modal:cancel'
+  constructor() {
+    super(ModalCancelEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** The modal closed, however it was closed */
+export class ModalCloseEvent extends Event {
+  static type = 'app-modal:close'
+  constructor() {
+    super(ModalCloseEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /**
  * AppModal Component
  *
@@ -28,9 +52,9 @@ import { buttonStyles } from './shared-styles.js'
  * @slot actions - Custom action buttons (overrides confirm/cancel buttons)
  *
  * Events:
- * @fires close - When modal is closed (via backdrop click, close button, or Esc)
- * @fires confirm - When confirm button is clicked (type='confirm')
- * @fires cancel - When cancel button is clicked (type='confirm')
+ * @fires ModalCloseEvent - When the modal closes (backdrop click, close button, Esc, or close())
+ * @fires ModalConfirmEvent - When the confirm button is pressed (type='confirm')
+ * @fires ModalCancelEvent - When the cancel button is pressed (type='confirm')
  *
  * CSS Parts:
  * @csspart content - The <dialog>; its backdrop is ::part(content)::backdrop
@@ -361,34 +385,19 @@ export class AppModal extends LitElement {
   }
 
   _handleConfirm() {
-    this.dispatchEvent(
-      new CustomEvent('confirm', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new ModalConfirmEvent())
     this.close()
   }
 
   _handleCancel() {
-    this.dispatchEvent(
-      new CustomEvent('cancel', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new ModalCancelEvent())
     this.close()
   }
 
   // Public API
   close() {
     this.open = false
-    this.dispatchEvent(
-      new CustomEvent('close', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new ModalCloseEvent())
   }
 
   show() {
@@ -407,12 +416,12 @@ export class AppModal extends LitElement {
       }
       // Confirm and cancel both close the modal, so close settles every outcome
       const onClose = () => {
-        this.removeEventListener('confirm', onConfirm)
-        this.removeEventListener('close', onClose)
+        this.removeEventListener(ModalConfirmEvent.type, onConfirm)
+        this.removeEventListener(ModalCloseEvent.type, onClose)
         resolve(confirmed)
       }
-      this.addEventListener('confirm', onConfirm)
-      this.addEventListener('close', onClose)
+      this.addEventListener(ModalConfirmEvent.type, onConfirm)
+      this.addEventListener(ModalCloseEvent.type, onClose)
       this.show()
     })
   }

@@ -5,6 +5,16 @@ import './setlist-details-form.js'
 import { setlistTitle } from '../js/utils/date-utils.js'
 import './setlist-info.js'
 
+/** The setlist's details were edited and saved: changes is the form's details */
+export class SetlistInfoSaveEvent extends Event {
+  static type = 'setlist-info-dialog:save'
+  constructor(setlistId, changes) {
+    super(SetlistInfoSaveEvent.type, { bubbles: true, composed: true })
+    this.setlistId = setlistId
+    this.changes = changes
+  }
+}
+
 /**
  * SetlistInfoDialog Component
  *
@@ -20,7 +30,7 @@ import './setlist-info.js'
  *   dialog.show(setlist)
  *
  * Events:
- * @fires details-save - detail: {setlistId, changes: {date, time, type, name, owner}}
+ * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, owner}
  */
 export class SetlistInfoDialog extends LitElement {
   static properties = {
@@ -62,13 +72,7 @@ export class SetlistInfoDialog extends LitElement {
   _save(event) {
     // Re-dispatch from the dialog rather than letting the form's save escape
     event.stopPropagation()
-    this.dispatchEvent(
-      new CustomEvent('details-save', {
-        bubbles: true,
-        composed: true,
-        detail: { setlistId: this._setlist.id, changes: event.detail },
-      })
-    )
+    this.dispatchEvent(new SetlistInfoSaveEvent(this._setlist.id, event.details))
   }
 
   _cancel(event) {
@@ -82,7 +86,7 @@ export class SetlistInfoDialog extends LitElement {
       <app-modal
         size="fullscreen"
         heading=${this._editing ? `Edit: ${heading}` : heading}
-        @close=${() => {
+        @app-modal:close=${() => {
           this._editing = false
         }}
       >
@@ -109,8 +113,8 @@ export class SetlistInfoDialog extends LitElement {
                 .setlist=${this._setlist}
                 .people=${this.people}
                 submit-label="Save"
-                @save=${this._save}
-                @cancel=${this._cancel}
+                @setlist-details-form:save=${this._save}
+                @setlist-details-form:cancel=${this._cancel}
               ></setlist-details-form>
             `
             : html`<setlist-info .setlist=${this._setlist}></setlist-info>`

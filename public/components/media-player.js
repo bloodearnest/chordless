@@ -2,11 +2,13 @@ import { css, html, LitElement } from 'lit'
 import './help-tooltip.js'
 import './app-modal.js'
 import './icon.js'
+import { SongChangeEvent } from '../js/app-events.js'
 import { loadMediaSettings } from '../js/media-settings.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
-import { getActivePadSet } from '../js/pad-set-service.js'
+import { getActivePadSet, PadSetChangedEvent } from '../js/pad-set-service.js'
 import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.js'
+import { MediaSettingsChangeEvent } from './media-player-settings.js'
 
 /**
  * MediaPlayer Component
@@ -18,7 +20,6 @@ import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.js'
  * @property {Boolean} playing - Whether the player is currently playing
  *
  * Events:
- * @fires play-state-change - When play/pause state changes
  *
  * CSS Parts:
  * @csspart container - The main container
@@ -703,9 +704,9 @@ export class MediaPlayer extends LitElement {
     this._boundHandleSongChange = this._handleSongChange.bind(this)
     this._boundHandlePadSetChange = this._handlePadSetChange.bind(this)
     document.addEventListener('keydown', this._boundHandleKeydown)
-    document.addEventListener('settings-change', this._boundHandleSettingsChange)
-    document.addEventListener('song-change', this._boundHandleSongChange)
-    window.addEventListener('pad-set-changed', this._boundHandlePadSetChange)
+    document.addEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
+    document.addEventListener(SongChangeEvent.type, this._boundHandleSongChange)
+    window.addEventListener(PadSetChangedEvent.type, this._boundHandlePadSetChange)
   }
 
   disconnectedCallback() {
@@ -721,9 +722,9 @@ export class MediaPlayer extends LitElement {
 
     this._cleanup()
     document.removeEventListener('keydown', this._boundHandleKeydown)
-    document.removeEventListener('settings-change', this._boundHandleSettingsChange)
-    document.removeEventListener('song-change', this._boundHandleSongChange)
-    window.removeEventListener('pad-set-changed', this._boundHandlePadSetChange)
+    document.removeEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
+    document.removeEventListener(SongChangeEvent.type, this._boundHandleSongChange)
+    window.removeEventListener(PadSetChangedEvent.type, this._boundHandlePadSetChange)
   }
 
   /** The whole player is hidden while it's turned off in the settings */
@@ -732,7 +733,7 @@ export class MediaPlayer extends LitElement {
   }
 
   _handleSettingsChange(event) {
-    const settings = event.detail
+    const settings = event.settings
     console.log('[MediaPlayer] Settings changed:', settings)
     this._showIfEnabled(settings)
 
@@ -764,7 +765,7 @@ export class MediaPlayer extends LitElement {
   }
 
   _handleSongChange(event) {
-    const song = event.detail.song
+    const song = event.song
     console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
@@ -803,7 +804,7 @@ export class MediaPlayer extends LitElement {
   }
 
   _handlePadSetChange(event) {
-    const padSet = event?.detail?.padSet || getActivePadSet()
+    const padSet = event?.padSet || getActivePadSet()
     this._activePadSet = padSet
     this._padLoadFailed = false
 
@@ -1500,7 +1501,7 @@ export class MediaPlayer extends LitElement {
       <app-modal
         heading="Media Player Settings"
         .open=${this._showingSettings}
-        @close=${this._closeSettings}
+        @app-modal:close=${this._closeSettings}
       >
         ${
           // Rendered while open, so it shows the settings as they are now

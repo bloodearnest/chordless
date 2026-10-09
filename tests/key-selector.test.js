@@ -56,8 +56,8 @@ describe('key-selector', () => {
   it('sends key-change with the chosen key', async () => {
     await setUp()
     let chosen = null
-    selector.addEventListener('key-change', event => {
-      chosen = event.detail.value
+    selector.addEventListener('key-selector:change', event => {
+      chosen = event.value
     })
     selector.shadowRoot.querySelector('.picker-button').click()
     await settle()
@@ -100,8 +100,8 @@ describe('capo-selector', () => {
   it('sends capo-change with the chosen capo, as a number', async () => {
     await setUp()
     let chosen = null
-    selector.addEventListener('capo-change', event => {
-      chosen = event.detail.value
+    selector.addEventListener('capo-selector:change', event => {
+      chosen = event.value
     })
     selector.shadowRoot.querySelector('.picker-button').click()
     await settle()

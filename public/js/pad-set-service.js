@@ -9,6 +9,23 @@ import {
 } from './drive-api.js'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.js'
 
+/** A different pad set was chosen (sent on window) */
+export class PadSetChangedEvent extends Event {
+  static type = 'pad-sets:changed'
+  constructor(padSet) {
+    super(PadSetChangedEvent.type)
+    this.padSet = padSet
+  }
+}
+
+/** The list of pad sets changed (sent on window) */
+export class PadSetListUpdatedEvent extends Event {
+  static type = 'pad-sets:list-updated'
+  constructor() {
+    super(PadSetListUpdatedEvent.type)
+  }
+}
+
 const BUILT_IN_PAD_SET = Object.freeze({
   id: 'builtin',
   name: 'Built-in Pads',
@@ -109,7 +126,7 @@ export async function uploadPadSet(zipFile, padSetName) {
   }
 
   padSetListCache = null
-  window.dispatchEvent(new CustomEvent('pad-set-list-updated'))
+  window.dispatchEvent(new PadSetListUpdatedEvent())
 
   return {
     id: folderId,
@@ -127,7 +144,7 @@ export async function selectPadSet(padSetId) {
   }
 
   writeLocalStorage(PAD_SET_SELECTION_KEY, JSON.stringify(padSet))
-  window.dispatchEvent(new CustomEvent('pad-set-changed', { detail: { padSet } }))
+  window.dispatchEvent(new PadSetChangedEvent(padSet))
   return padSet
 }
 

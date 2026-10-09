@@ -2,6 +2,32 @@ import { css, html, LitElement } from 'lit'
 import './app-modal.js'
 import './app-preferences.js'
 import './icon.js'
+import { HeaderMenuClickEvent } from './app-header.js'
+
+/** The back item was chosen */
+export class MenuBackClickEvent extends Event {
+  static type = 'nav-menu:back-click'
+  constructor() {
+    super(MenuBackClickEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** The setlist overview item was chosen */
+export class MenuOverviewClickEvent extends Event {
+  static type = 'nav-menu:overview-click'
+  constructor() {
+    super(MenuOverviewClickEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** A song in the setlist was chosen; index is its place in the setlist */
+export class MenuSongClickEvent extends Event {
+  static type = 'nav-menu:song-click'
+  constructor(index) {
+    super(MenuSongClickEvent.type, { bubbles: true, composed: true })
+    this.index = index
+  }
+}
 
 /**
  * NavMenu Component
@@ -24,9 +50,9 @@ import './icon.js'
  * @property {String} popoverId - ID for the popover element (default: "nav-menu-popover")
  *
  * Events:
- * @fires back-click - When back button is clicked
- * @fires overview-click - When the setlist overview item is clicked
- * @fires menu-song-click - When a song in the setlist is clicked (detail: {index})
+ * @fires MenuBackClickEvent - When the back item is chosen
+ * @fires MenuOverviewClickEvent - When the setlist overview item is chosen
+ * @fires MenuSongClickEvent - When a song in the setlist is chosen (index)
  *
  * CSS Parts:
  * @csspart popover - The popover container
@@ -194,14 +220,14 @@ export class NavMenu extends LitElement {
     this._onNavMenuClick = this._onNavMenuClick.bind(this)
     this._root = this.getRootNode()
     this._root.addEventListener('click', this._onRootClick)
-    this._root.addEventListener('nav-menu-click', this._onNavMenuClick)
+    this._root.addEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
     document.removeEventListener('click', this._handleClickOutside)
     this._root?.removeEventListener('click', this._onRootClick)
-    this._root?.removeEventListener('nav-menu-click', this._onNavMenuClick)
+    this._root?.removeEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
 
   _onRootClick(e) {
@@ -211,7 +237,7 @@ export class NavMenu extends LitElement {
   }
 
   _onNavMenuClick(e) {
-    this.toggle(e.detail?.trigger || e.target)
+    this.toggle(e.trigger || e.target)
   }
 
   /** Open or close the menu, positioned under the trigger button */
@@ -337,37 +363,21 @@ export class NavMenu extends LitElement {
   }
 
   _handleBackClick() {
-    this.dispatchEvent(
-      new CustomEvent('back-click', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new MenuBackClickEvent())
 
     // Close the popover after back is clicked
     this.closePopover()
   }
 
   _handleOverviewClick() {
-    this.dispatchEvent(
-      new CustomEvent('overview-click', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new MenuOverviewClickEvent())
 
     // Close the popover after overview is clicked
     this.closePopover()
   }
 
   _handleSongClick(index) {
-    this.dispatchEvent(
-      new CustomEvent('menu-song-click', {
-        bubbles: true,
-        composed: true,
-        detail: { index },
-      })
-    )
+    this.dispatchEvent(new MenuSongClickEvent(index))
 
     // Close the popover after song is clicked
     this.closePopover()

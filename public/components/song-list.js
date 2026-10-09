@@ -2,6 +2,17 @@ import { css, html, LitElement } from 'lit'
 import './song-card.js'
 import './status-message.js'
 
+/** A song was chosen; index is its place in the list */
+export class SongSelectEvent extends Event {
+  static type = 'song-list:select'
+  constructor(song, index, originalEvent) {
+    super(SongSelectEvent.type, { bubbles: true, composed: true })
+    this.song = song
+    this.index = index
+    this.originalEvent = originalEvent
+  }
+}
+
 /**
  * SongList component
  *
@@ -47,13 +58,7 @@ export class SongList extends LitElement {
   `
 
   _handleSongClick(song, index, originalEvent) {
-    this.dispatchEvent(
-      new CustomEvent('song-select', {
-        detail: { song, index, originalEvent },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SongSelectEvent(song, index, originalEvent))
   }
 
   _renderEmptyState() {
@@ -75,7 +80,7 @@ export class SongList extends LitElement {
             <song-card
               .song=${song}
               .variant=${this.variant}
-              @song-click=${event => this._handleSongClick(song, index, event)}
+              @song-card:click=${event => this._handleSongClick(song, index, event)}
             >
             </song-card>
           `

@@ -1,4 +1,9 @@
 // Create Setlist Modal Handler
+
+import {
+  SetlistDetailsCancelEvent,
+  SetlistDetailsSaveEvent,
+} from '../components/setlist-details-form.js'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from './db.js'
 import { getOrganisationPeople } from './people.js'
 import { toLocalDateString } from './utils/date-utils.js'
@@ -42,11 +47,11 @@ export async function initCreateSetlistModal() {
     modal.show()
   })
 
-  form.addEventListener('cancel', () => modal.close())
+  form.addEventListener(SetlistDetailsCancelEvent.type, () => modal.close())
 
-  form.addEventListener('save', async event => {
+  form.addEventListener(SetlistDetailsSaveEvent.type, async event => {
     try {
-      const newSetlist = createSetlist(event.detail)
+      const newSetlist = createSetlist(event.details)
       await db.saveSetlist(newSetlist)
       console.log('Setlist created:', newSetlist)
       modal.close()

@@ -1,3 +1,12 @@
+/** The theme was applied (sent on window): theme is the choice ('system', 'light', 'dark'), actualTheme what's shown */
+export class ThemeChangeEvent extends Event {
+  static type = 'theme:change'
+  constructor(theme, actualTheme) {
+    super(ThemeChangeEvent.type)
+    this.theme = theme
+    this.actualTheme = actualTheme
+  }
+}
 /**
  * ThemeManager
  *
@@ -187,11 +196,7 @@ export class ThemeManager {
     this._updateFavicon(actualTheme)
 
     // Dispatch custom event for components that need it
-    window.dispatchEvent(
-      new CustomEvent('theme-change', {
-        detail: { theme: themeName, actualTheme },
-      })
-    )
+    window.dispatchEvent(new ThemeChangeEvent(themeName, actualTheme))
   }
 
   /**

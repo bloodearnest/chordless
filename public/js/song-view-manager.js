@@ -1,3 +1,8 @@
+import { ModalConfirmEvent } from '../components/app-modal.js'
+import { CapoChangeEvent } from '../components/capo-selector.js'
+import { KeyChangeEvent } from '../components/key-selector.js'
+import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
+
 /**
  * Song View Manager
  *
@@ -121,18 +126,18 @@ export function setupKeySelector(keySelector, songModel, callbacks = {}) {
   // Remove old listener if exists
   const oldHandler = keySelector._keyChangeHandler
   if (oldHandler) {
-    keySelector.removeEventListener('key-change', oldHandler)
+    keySelector.removeEventListener(KeyChangeEvent.type, oldHandler)
   }
 
   // Add new listener
   const handler = async event => {
-    const newKey = event.detail?.value
+    const newKey = event.value
     if (newKey && callbacks.onChange) {
       await callbacks.onChange(newKey)
     }
   }
   keySelector._keyChangeHandler = handler
-  keySelector.addEventListener('key-change', handler)
+  keySelector.addEventListener(KeyChangeEvent.type, handler)
 }
 
 /**
@@ -164,18 +169,18 @@ export function setupCapoSelector(capoSelector, songModel, callbacks = {}, optio
   // Remove old listener if exists
   const oldHandler = capoSelector._capoChangeHandler
   if (oldHandler) {
-    capoSelector.removeEventListener('capo-change', oldHandler)
+    capoSelector.removeEventListener(CapoChangeEvent.type, oldHandler)
   }
 
   // Add new listener
   const handler = async event => {
-    const newValue = event.detail?.value
+    const newValue = event.value
     if (newValue !== undefined && callbacks.onChange) {
       await callbacks.onChange(newValue)
     }
   }
   capoSelector._capoChangeHandler = handler
-  capoSelector.addEventListener('capo-change', handler)
+  capoSelector.addEventListener(CapoChangeEvent.type, handler)
 }
 
 /**
@@ -189,31 +194,31 @@ export function setupSectionControls(container, onAction) {
 
   // Remove old listeners if they exist
   if (container._sectionActionHandler) {
-    container.removeEventListener('section-action', container._sectionActionHandler)
+    container.removeEventListener(SectionActionEvent.type, container._sectionActionHandler)
   }
   if (container._sectionToggleHandler) {
-    container.removeEventListener('section-toggle', container._sectionToggleHandler)
+    container.removeEventListener(SectionToggleEvent.type, container._sectionToggleHandler)
   }
 
   // Add section-action listener
   const actionHandler = event => {
-    const { sectionIndex, action } = event.detail || {}
+    const { sectionIndex, action } = event
     if (typeof sectionIndex === 'number' && action && onAction) {
       onAction(sectionIndex, action)
     }
   }
   container._sectionActionHandler = actionHandler
-  container.addEventListener('section-action', actionHandler)
+  container.addEventListener(SectionActionEvent.type, actionHandler)
 
   // Add section-toggle listener (for collapse/expand)
   const toggleHandler = event => {
-    const { sectionIndex } = event.detail || {}
+    const { sectionIndex } = event
     if (typeof sectionIndex === 'number' && onAction) {
       onAction(sectionIndex, 'collapse')
     }
   }
   container._sectionToggleHandler = toggleHandler
-  container.addEventListener('section-toggle', toggleHandler)
+  container.addEventListener(SectionToggleEvent.type, toggleHandler)
 }
 
 /**
@@ -253,14 +258,14 @@ export function setupResetButton(resetButton, confirmModal, onConfirm) {
 
   // Remove old listener if exists
   if (confirmModal._resetConfirmHandler) {
-    confirmModal.removeEventListener('confirm', confirmModal._resetConfirmHandler)
+    confirmModal.removeEventListener(ModalConfirmEvent.type, confirmModal._resetConfirmHandler)
   }
 
   const handler = async () => {
     if (onConfirm) await onConfirm()
   }
   confirmModal._resetConfirmHandler = handler
-  confirmModal.addEventListener('confirm', handler)
+  confirmModal.addEventListener(ModalConfirmEvent.type, handler)
 }
 
 /**

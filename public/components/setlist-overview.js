@@ -1,6 +1,42 @@
 import { html, LitElement } from 'lit'
 import './icon.js'
 
+/** A song's card was clicked; index is its place in the setlist */
+export class OverviewSongClickEvent extends Event {
+  static type = 'setlist-overview:song-click'
+  constructor(index) {
+    super(OverviewSongClickEvent.type, { bubbles: true, composed: true })
+    this.index = index
+  }
+}
+
+/** A song's delete button was pressed */
+export class OverviewSongDeleteEvent extends Event {
+  static type = 'setlist-overview:song-delete'
+  constructor(index) {
+    super(OverviewSongDeleteEvent.type, { bubbles: true, composed: true })
+    this.index = index
+  }
+}
+
+/** A song's key was changed */
+export class OverviewSongKeyChangeEvent extends Event {
+  static type = 'setlist-overview:song-key-change'
+  constructor(index, key) {
+    super(OverviewSongKeyChangeEvent.type, { bubbles: true, composed: true })
+    this.index = index
+    this.key = key
+  }
+}
+
+/** Add Song was pressed */
+export class OverviewAddSongEvent extends Event {
+  static type = 'setlist-overview:add-song'
+  constructor() {
+    super(OverviewAddSongEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /**
  * SetlistOverview Component
  *
@@ -36,9 +72,9 @@ export class SetlistOverview extends LitElement {
                 .song=${song}
                 variant="setlist"
                 .editMode=${this.editMode}
-                @song-click=${() => this._handleSongClick(index)}
-                @song-delete=${() => this._handleSongDelete(index)}
-                @song-key-change=${e => this._handleSongKeyChange(index, e.detail.key)}
+                @song-card:click=${() => this._handleSongClick(index)}
+                @song-card:delete=${() => this._handleSongDelete(index)}
+                @song-card:key-change=${e => this._handleSongKeyChange(index, e.key)}
               ></song-card>
             `
           )}
@@ -63,42 +99,19 @@ export class SetlistOverview extends LitElement {
   }
 
   _handleSongClick(index) {
-    this.dispatchEvent(
-      new CustomEvent('overview-song-click', {
-        detail: { index },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new OverviewSongClickEvent(index))
   }
 
   _handleSongDelete(index) {
-    this.dispatchEvent(
-      new CustomEvent('overview-song-delete', {
-        detail: { index },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new OverviewSongDeleteEvent(index))
   }
 
   _handleSongKeyChange(index, key) {
-    this.dispatchEvent(
-      new CustomEvent('overview-song-key-change', {
-        detail: { index, key },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new OverviewSongKeyChangeEvent(index, key))
   }
 
   _handleAddSong() {
-    this.dispatchEvent(
-      new CustomEvent('overview-add-song', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new OverviewAddSongEvent())
   }
 }
 

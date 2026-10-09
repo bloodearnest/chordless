@@ -3,6 +3,8 @@ import {
   derivePadSetName,
   getActivePadSet,
   listPadSets,
+  PadSetChangedEvent,
+  PadSetListUpdatedEvent,
   selectPadSet,
   uploadPadSet,
 } from '../js/pad-set-service.js'
@@ -139,22 +141,22 @@ export class PadSetManager extends LitElement {
     super.connectedCallback()
     this._loadPadSets()
     this._boundListUpdated = () => this._loadPadSets(true)
-    window.addEventListener('pad-set-list-updated', this._boundListUpdated)
+    window.addEventListener(PadSetListUpdatedEvent.type, this._boundListUpdated)
     this._boundPadSetChanged = event => {
-      const padSet = event.detail?.padSet
+      const padSet = event.padSet
       if (padSet) {
         this._selectedPadSetId = padSet.id
       } else {
         this._selectedPadSetId = getActivePadSet().id
       }
     }
-    window.addEventListener('pad-set-changed', this._boundPadSetChanged)
+    window.addEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
-    window.removeEventListener('pad-set-list-updated', this._boundListUpdated)
-    window.removeEventListener('pad-set-changed', this._boundPadSetChanged)
+    window.removeEventListener(PadSetListUpdatedEvent.type, this._boundListUpdated)
+    window.removeEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
   }
 
   async _loadPadSets(force = false) {

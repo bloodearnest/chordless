@@ -1,6 +1,15 @@
 import { transposeKeyName } from '../js/transpose.js'
 import { OptionPicker } from './option-picker.js'
 
+/** A different capo was chosen; value is the capo (a number) */
+export class CapoChangeEvent extends Event {
+  static type = 'capo-selector:change'
+  constructor(value) {
+    super(CapoChangeEvent.type, { bubbles: true, composed: true })
+    this.value = value
+  }
+}
+
 /**
  * CapoSelector component
  *
@@ -16,7 +25,7 @@ import { OptionPicker } from './option-picker.js'
  * @property {boolean} editMode - Whether the capo can be changed
  *
  * Events:
- * @fires capo-change - When a new capo is selected (detail: {value: number})
+ * @fires CapoChangeEvent - When a new capo is selected (value: number)
  */
 export class CapoSelector extends OptionPicker {
   static properties = {
@@ -26,7 +35,7 @@ export class CapoSelector extends OptionPicker {
     referenceKey: { type: String, attribute: 'reference-key' },
   }
 
-  static changeEvent = 'capo-change'
+  static ChangeEvent = CapoChangeEvent
 
   constructor() {
     super()

@@ -1,5 +1,9 @@
 import { expect } from '@esm-bundle/chai'
-import { leaderChoices } from '../public/components/setlist-details-form.js'
+import {
+  leaderChoices,
+  SetlistDetailsCancelEvent,
+  SetlistDetailsSaveEvent,
+} from '../public/components/setlist-details-form.js'
 
 const { describe, it, afterEach } = window
 
@@ -76,9 +80,9 @@ describe('setlist-details-form', () => {
   }
 
   async function save() {
-    const saved = nextEvent('save')
+    const saved = nextEvent(SetlistDetailsSaveEvent.type)
     form.shadowRoot.querySelector('.submit').click()
-    return (await saved).detail
+    return (await saved).details
   }
 
   afterEach(() => form?.remove())
@@ -154,7 +158,7 @@ describe('setlist-details-form', () => {
 
   it('fires cancel', async () => {
     await makeForm(setlist)
-    const cancelled = nextEvent('cancel')
+    const cancelled = nextEvent(SetlistDetailsCancelEvent.type)
     form.shadowRoot.querySelector('.cancel').click()
     await cancelled
   })

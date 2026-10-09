@@ -7,7 +7,6 @@ import { themeManager } from '../js/theme-manager.js'
  * Provides UI controls for theme customization
  *
  * Events:
- * @fires theme-change - When theme is changed (detail: { theme: 'light' | 'dark' })
  */
 export class ThemeSettings extends LitElement {
   static properties = {
@@ -218,15 +217,6 @@ export class ThemeSettings extends LitElement {
 
   _setTheme(theme) {
     themeManager.setTheme(theme)
-
-    // Dispatch event for parent components
-    this.dispatchEvent(
-      new CustomEvent('theme-change', {
-        detail: { theme },
-        bubbles: true,
-        composed: true,
-      })
-    )
   }
 
   _handleFontScaleChange(e) {

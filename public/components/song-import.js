@@ -8,6 +8,15 @@ import './app-modal.js'
 import './setlist-details-form.js'
 import { buttonStyles } from './shared-styles.js'
 
+/** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
+export class SongImportedEvent extends Event {
+  static type = 'song-import:imported'
+  constructor(url) {
+    super(SongImportedEvent.type, { bubbles: true, composed: true, cancelable: true })
+    this.url = url
+  }
+}
+
 const SONGSELECT_ORIGIN = 'https://songselect.ccli.com'
 
 const parser = new ChordProParser()
@@ -34,7 +43,7 @@ function titleFromFileName(name) {
  *   <song-import></song-import>
  *
  * Events:
- * @fires imported - detail: {url} where the page is about to go. Cancelable:
+ * @fires SongImportedEvent - url, where the page is about to go. Cancelable:
  *   preventDefault() stops the navigation (for tests).
  */
 export class SongImport extends LitElement {
@@ -414,12 +423,7 @@ export class SongImport extends LitElement {
 
   /** Go to url, unless an imported listener prevents it */
   _finish(url) {
-    const event = new CustomEvent('imported', {
-      bubbles: true,
-      composed: true,
-      cancelable: true,
-      detail: { url },
-    })
+    const event = new SongImportedEvent(url)
     if (this.dispatchEvent(event)) window.location.href = url
   }
 
@@ -477,7 +481,7 @@ export class SongImport extends LitElement {
 
   async _createSetlist(event) {
     event.stopPropagation()
-    const setlist = createSetlist(event.detail)
+    const setlist = createSetlist(event.details)
     try {
       await this._db.saveSetlist(setlist)
       console.log('[Import] Created new setlist:', setlist.id)
@@ -521,8 +525,8 @@ export class SongImport extends LitElement {
                 .people=${this._people}
                 submit-label=${several ? 'Create & Add Songs' : 'Create & Add Song'}
                 auto-type
-                @save=${this._createSetlist}
-                @cancel=${() => this._newSetlistModal().close()}
+                @setlist-details-form:save=${this._createSetlist}
+                @setlist-details-form:cancel=${() => this._newSetlistModal().close()}
               ></setlist-details-form>
             `
             : ''

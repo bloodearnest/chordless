@@ -1,5 +1,5 @@
 import { html, LitElement } from 'lit'
-import { getUseUnicodeAccidentals } from '../js/preferences.js'
+import { AccidentalsPreferenceEvent, getUseUnicodeAccidentals } from '../js/preferences.js'
 import {
   convertChordToNashville,
   isNashvilleChord,
@@ -33,7 +33,7 @@ export class ChordDisplay extends LitElement {
     this.capo = 0
     this.capoKey = ''
     this._onAccidentalPreferenceChange = event => {
-      this._useUnicodeAccidentals = !!event.detail
+      this._useUnicodeAccidentals = !!event.enabled
       this.requestUpdate()
     }
   }
@@ -45,11 +45,11 @@ export class ChordDisplay extends LitElement {
 
   connectedCallback() {
     super.connectedCallback()
-    window.addEventListener('accidental-preference-changed', this._onAccidentalPreferenceChange)
+    window.addEventListener(AccidentalsPreferenceEvent.type, this._onAccidentalPreferenceChange)
   }
 
   disconnectedCallback() {
-    window.removeEventListener('accidental-preference-changed', this._onAccidentalPreferenceChange)
+    window.removeEventListener(AccidentalsPreferenceEvent.type, this._onAccidentalPreferenceChange)
     super.disconnectedCallback()
   }
 

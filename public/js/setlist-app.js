@@ -11,6 +11,32 @@ import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
 import '../components/status-message.js'
 import '../components/song-list.js'
 import '../components/setlist-group.js'
+import {
+  EditModeToggleEvent,
+  HeaderExpandToggleEvent,
+  HeaderInfoClickEvent,
+} from '../components/app-header.js'
+import { ModalCloseEvent, ModalConfirmEvent } from '../components/app-modal.js'
+import { CapoChangeEvent } from '../components/capo-selector.js'
+import { KeyChangeEvent } from '../components/key-selector.js'
+import { SongSettingsClickEvent } from '../components/musical-metadata-display.js'
+import {
+  MenuBackClickEvent,
+  MenuOverviewClickEvent,
+  MenuSongClickEvent,
+} from '../components/nav-menu.js'
+import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.js'
+import {
+  OverviewAddSongEvent,
+  OverviewSongClickEvent,
+  OverviewSongDeleteEvent,
+  OverviewSongKeyChangeEvent,
+} from '../components/setlist-overview.js'
+import { SongSelectEvent } from '../components/song-list.js'
+import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
+import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.js'
+import { SongChangeEvent } from './app-events.js'
+import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.js'
 
 // Configuration constants
 const CONFIG = {
@@ -61,14 +87,14 @@ class PageApp {
 
     // Bind overview component event handlers once
     this._onOverviewSongClick = event => {
-      const index = event.detail?.index
+      const index = event.index
       if (typeof index === 'number') {
         this.navigateToHash(`song-${index}`)
       }
     }
 
     this._onOverviewSongDelete = event => {
-      const index = event.detail?.index
+      const index = event.index
       if (typeof index === 'number' && this.songs[index]) {
         this.showDeleteSongConfirmation(index, this.songs[index])
       }
@@ -79,7 +105,7 @@ class PageApp {
     }
 
     this._onOverviewSongKeyChange = event => {
-      const { index, key } = event.detail ?? {}
+      const { index, key } = event
       if (typeof index === 'number' && key) {
         this.changeSongKeyInSetlist(index, key)
       }
@@ -117,9 +143,9 @@ class PageApp {
     this.setupNavigationMenu(route)
 
     window.addEventListener('storage', this._onSectionDefaultsChanged)
-    window.addEventListener('section-defaults-changed', this._onSectionDefaultsChanged)
+    window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged)
     window.addEventListener('storage', this._onCapoPreferenceChange)
-    window.addEventListener('capo-preference-changed', this._onCapoPreferenceChange)
+    window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange)
   }
 
   parseRoute(pathname) {
@@ -589,12 +615,18 @@ class PageApp {
 
   _setOverviewComponent(component) {
     if (this._overviewComponent) {
-      this._overviewComponent.removeEventListener('overview-song-click', this._onOverviewSongClick)
+      this._overviewComponent.removeEventListener(
+        OverviewSongClickEvent.type,
+        this._onOverviewSongClick
+      )
       this._overviewComponent.removeEventListener(
         'overview-song-delete',
         this._onOverviewSongDelete
       )
-      this._overviewComponent.removeEventListener('overview-add-song', this._onOverviewAddSong)
+      this._overviewComponent.removeEventListener(
+        OverviewAddSongEvent.type,
+        this._onOverviewAddSong
+      )
       this._overviewComponent.removeEventListener(
         'overview-song-key-change',
         this._onOverviewSongKeyChange
@@ -604,10 +636,10 @@ class PageApp {
     this._overviewComponent = component
 
     if (component) {
-      component.addEventListener('overview-song-click', this._onOverviewSongClick)
-      component.addEventListener('overview-song-delete', this._onOverviewSongDelete)
-      component.addEventListener('overview-add-song', this._onOverviewAddSong)
-      component.addEventListener('overview-song-key-change', this._onOverviewSongKeyChange)
+      component.addEventListener(OverviewSongClickEvent.type, this._onOverviewSongClick)
+      component.addEventListener(OverviewSongDeleteEvent.type, this._onOverviewSongDelete)
+      component.addEventListener(OverviewAddSongEvent.type, this._onOverviewAddSong)
+      component.addEventListener(OverviewSongKeyChangeEvent.type, this._onOverviewSongKeyChange)
     }
   }
 
@@ -901,13 +933,7 @@ class PageApp {
 
   dispatchSongChange(song) {
     // Dispatch custom event for media player to listen to
-    const event = new CustomEvent('song-change', {
-      detail: { song },
-      bubbles: true,
-      composed: true,
-    })
-
-    document.dispatchEvent(event)
+    document.dispatchEvent(new SongChangeEvent(song))
     console.log('[SongChange] Dispatched song:', song?.songId, song?.title)
   }
 
@@ -922,8 +948,8 @@ class PageApp {
     const dialog = document.getElementById('setlist-info-dialog')
     if (!dialog || !this.currentSetlist) return
     if (!this._setlistDetailsSaveHandler) {
-      this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.detail.changes)
-      dialog.addEventListener('details-save', this._setlistDetailsSaveHandler)
+      this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.changes)
+      dialog.addEventListener(SetlistInfoSaveEvent.type, this._setlistDetailsSaveHandler)
     }
     dialog.people = (await getOrganisationPeople()).people
     await dialog.show(this.currentSetlist)
@@ -1597,7 +1623,7 @@ class PageApp {
     if (!appHeader) return
 
     // Listen to the edit-mode-toggle event from app-header
-    appHeader.addEventListener('edit-mode-toggle', async () => {
+    appHeader.addEventListener(EditModeToggleEvent.type, async () => {
       // Check if we're on overview or song view
       if (this.currentSongIndex < 0) {
         // We're on overview - toggle overview edit mode
@@ -1716,7 +1742,7 @@ class PageApp {
     if (!appHeader) return
 
     // Listen to info button clicks
-    appHeader.addEventListener('info-click', () => {
+    appHeader.addEventListener(HeaderInfoClickEvent.type, () => {
       if (this._currentSongForInfo) {
         this.showSongInfo(this._currentSongForInfo)
       } else {
@@ -1725,8 +1751,8 @@ class PageApp {
     })
 
     // Listen for header-expand-toggle event
-    appHeader.addEventListener('header-expand-toggle', e => {
-      const { expanded } = e.detail
+    appHeader.addEventListener(HeaderExpandToggleEvent.type, e => {
+      const { expanded } = e
       if (expanded) {
         document.body.classList.add('header-expanded')
         document.documentElement.style.setProperty('--header-expanded', '1')
@@ -1744,16 +1770,16 @@ class PageApp {
       songSettingsPopover.setTriggerButton(musicalMetadata)
 
       // Listen to musical metadata clicks (only works in edit mode)
-      musicalMetadata.addEventListener('settings-click', () => {
+      musicalMetadata.addEventListener(SongSettingsClickEvent.type, () => {
         songSettingsPopover.togglePopover()
       })
 
-      songSettingsPopover.addEventListener('bpm-change', async e => {
-        const newValue = e.detail?.value
+      songSettingsPopover.addEventListener(BpmChangeEvent.type, async e => {
+        const newValue = e.value
         await this.handleBPMChange(newValue)
       })
 
-      songSettingsPopover.addEventListener('reset-click', async () => {
+      songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
         // Close the popover first: it's in the top layer, so it and its
         // backdrop would cover the confirmation modal
         songSettingsPopover.closePopover()
@@ -1774,18 +1800,18 @@ class PageApp {
 
     if (!this._sectionActionHandler) {
       this._sectionActionHandler = event => {
-        const { songIndex, sectionIndex, action } = event.detail || {}
+        const { songIndex, sectionIndex, action } = event
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number' || !action) {
           return
         }
         this.setSectionHideMode(songIndex, sectionIndex, action)
       }
-      container.addEventListener('section-action', this._sectionActionHandler)
+      container.addEventListener(SectionActionEvent.type, this._sectionActionHandler)
     }
 
     if (!this._sectionToggleHandler) {
       this._sectionToggleHandler = event => {
-        const { songIndex, sectionIndex } = event.detail || {}
+        const { songIndex, sectionIndex } = event
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number') {
           return
         }
@@ -1795,7 +1821,7 @@ class PageApp {
           this.animateSectionToggle(songIndex, sectionIndex, details)
         }
       }
-      container.addEventListener('section-toggle', this._sectionToggleHandler)
+      container.addEventListener(SectionToggleEvent.type, this._sectionToggleHandler)
     }
   }
 
@@ -1835,10 +1861,10 @@ class PageApp {
 
     if (!this._keyChangeHandler) {
       this._keyChangeHandler = async e => {
-        const newKey = e.detail.value
+        const newKey = e.value
         await this.handleKeyChange(newKey)
       }
-      keySelector.addEventListener('key-change', this._keyChangeHandler)
+      keySelector.addEventListener(KeyChangeEvent.type, this._keyChangeHandler)
     }
 
     // Initialize with current song's key
@@ -1860,10 +1886,10 @@ class PageApp {
 
     if (!this._capoChangeHandler) {
       this._capoChangeHandler = event => {
-        const newValue = event.detail?.value
+        const newValue = event.value
         this.handleCapoChange(newValue)
       }
-      capoSelector.addEventListener('capo-change', this._capoChangeHandler)
+      capoSelector.addEventListener(CapoChangeEvent.type, this._capoChangeHandler)
     }
 
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
@@ -2768,12 +2794,7 @@ class PageApp {
           const appHeader = document.getElementById('app-header')
           if (appHeader) {
             // Trigger the edit-mode-toggle event
-            appHeader.dispatchEvent(
-              new CustomEvent('edit-mode-toggle', {
-                bubbles: true,
-                composed: true,
-              })
-            )
+            appHeader.dispatchEvent(new EditModeToggleEvent())
           }
         }
         return
@@ -2833,22 +2854,22 @@ class PageApp {
     if (!navMenu) return
 
     // Setup back button click handler
-    navMenu.addEventListener('back-click', () => {
+    navMenu.addEventListener(MenuBackClickEvent.type, () => {
       if (this.navBackAction) {
         this.navBackAction()
       }
     })
 
     // Setup song click handler for setlist song navigation
-    navMenu.addEventListener('menu-song-click', e => {
-      const songIndex = e.detail.index
+    navMenu.addEventListener(MenuSongClickEvent.type, e => {
+      const songIndex = e.index
       if (songIndex !== undefined && songIndex >= 0) {
         this.navigateToHash(`song-${songIndex}`)
       }
     })
 
     // Setup overview click handler for setlist navigation
-    navMenu.addEventListener('overview-click', () => {
+    navMenu.addEventListener(MenuOverviewClickEvent.type, () => {
       this.navigateToHash('overview')
     })
 
@@ -2995,7 +3016,7 @@ class PageApp {
         this.addSongModalSongs = null
       }
 
-      modal.addEventListener('close', handleClose, { once: true })
+      modal.addEventListener(ModalCloseEvent.type, handleClose, { once: true })
     } catch (error) {
       console.error('[Add Song Modal] Error loading songs:', error)
       this.showStatusMessage(resultsContainer, {
@@ -3039,8 +3060,8 @@ class PageApp {
     songList.variant = 'library'
     songList.emptyMessage = 'No songs match your search.'
     songList.dense = true
-    songList.addEventListener('song-select', event => {
-      const { song } = event.detail || {}
+    songList.addEventListener(SongSelectEvent.type, event => {
+      const { song } = event
       if (song) {
         this.addSongToSetlist(song)
       }
@@ -3113,10 +3134,10 @@ class PageApp {
     }
 
     const cleanup = () => {
-      modal.removeEventListener('confirm', handleConfirm)
+      modal.removeEventListener(ModalConfirmEvent.type, handleConfirm)
     }
 
-    modal.addEventListener('confirm', handleConfirm, { once: true })
+    modal.addEventListener(ModalConfirmEvent.type, handleConfirm, { once: true })
   }
 
   async changeSongKeyInSetlist(index, newKey) {

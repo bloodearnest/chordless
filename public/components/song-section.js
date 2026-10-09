@@ -9,13 +9,34 @@ import {
 import './bar-group.js'
 import './chord-display.js'
 
+/** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
+export class SectionActionEvent extends Event {
+  static type = 'song-section:action'
+  constructor(songIndex, sectionIndex, action) {
+    super(SectionActionEvent.type, { bubbles: true, composed: true })
+    this.songIndex = songIndex
+    this.sectionIndex = sectionIndex
+    this.action = action
+  }
+}
+
+/** The section's heading was clicked */
+export class SectionToggleEvent extends Event {
+  static type = 'song-section:toggle'
+  constructor(songIndex, sectionIndex) {
+    super(SectionToggleEvent.type, { bubbles: true, composed: true })
+    this.songIndex = songIndex
+    this.sectionIndex = sectionIndex
+  }
+}
+
 /**
  * A custom element for rendering a section of a song with chords and lyrics.
  * Supports collapsing, hiding chords/lyrics, and special bar notation rendering.
  *
  * @element song-section
- * @fires {CustomEvent} section-action - Fired when a control button is clicked
- * @fires {CustomEvent} section-toggle - Fired when section is collapsed/expanded
+ * @fires SectionActionEvent - When a Show option or the collapse button is pressed
+ * @fires SectionToggleEvent - When the section heading is clicked
  */
 export class SongSection extends LitElement {
   static properties = {
@@ -690,24 +711,12 @@ export class SongSection extends LitElement {
     event.preventDefault()
     const action = event.currentTarget.dataset.action
     if (!action) return
-    this.dispatchEvent(
-      new CustomEvent('section-action', {
-        detail: { songIndex: this.songIndex, sectionIndex: this.sectionIndex, action },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SectionActionEvent(this.songIndex, this.sectionIndex, action))
   }
 
   _onSummaryClick(event) {
     event.preventDefault()
-    this.dispatchEvent(
-      new CustomEvent('section-toggle', {
-        detail: { songIndex: this.songIndex, sectionIndex: this.sectionIndex },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SectionToggleEvent(this.songIndex, this.sectionIndex))
   }
 
   _shouldDetailsBeOpen() {

@@ -1,5 +1,13 @@
 import { css, html, LitElement } from 'lit'
 
+/** The key/BPM box was pressed in edit mode, to open the song settings */
+export class SongSettingsClickEvent extends Event {
+  static type = 'musical-metadata:settings-click'
+  constructor() {
+    super(SongSettingsClickEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /**
  * MusicalMetadataDisplay component
  *
@@ -15,7 +23,7 @@ import { css, html, LitElement } from 'lit'
  * @property {boolean} editMode - Whether in edit mode
  *
  * Events:
- * @fires settings-click - When clicked in edit mode
+ * @fires SongSettingsClickEvent - When clicked in edit mode
  */
 export class MusicalMetadataDisplay extends LitElement {
   static properties = {
@@ -93,12 +101,7 @@ export class MusicalMetadataDisplay extends LitElement {
 
   _handleClick() {
     if (this.editMode) {
-      this.dispatchEvent(
-        new CustomEvent('settings-click', {
-          bubbles: true,
-          composed: true,
-        })
-      )
+      this.dispatchEvent(new SongSettingsClickEvent())
     }
   }
 

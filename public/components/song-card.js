@@ -4,6 +4,33 @@ import { getWeeksAgo } from '../js/utils/date-utils.js'
 import './icon.js'
 import './key-selector.js'
 
+/** The card was clicked (not in edit mode) */
+export class SongCardClickEvent extends Event {
+  static type = 'song-card:click'
+  constructor(song) {
+    super(SongCardClickEvent.type, { bubbles: true, composed: true })
+    this.song = song
+  }
+}
+
+/** The delete button was pressed */
+export class SongCardDeleteEvent extends Event {
+  static type = 'song-card:delete'
+  constructor(song) {
+    super(SongCardDeleteEvent.type, { bubbles: true, composed: true })
+    this.song = song
+  }
+}
+
+/** A new key was chosen */
+export class SongCardKeyChangeEvent extends Event {
+  static type = 'song-card:key-change'
+  constructor(key) {
+    super(SongCardKeyChangeEvent.type, { bubbles: true, composed: true })
+    this.key = key
+  }
+}
+
 const MAJOR_KEYS = ['Ab', 'A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G']
 const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm']
 
@@ -21,8 +48,9 @@ const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'F
  * @property {String} variant - Display variant: 'setlist' | 'library'
  *
  * Events:
- * @fires song-click - When card is clicked (detail: {song})
- * @fires song-delete - When delete button is clicked in edit mode (detail: {song})
+ * @fires SongCardClickEvent - When the card is clicked, outside edit mode (song)
+ * @fires SongCardDeleteEvent - When the delete button is pressed in edit mode (song)
+ * @fires SongCardKeyChangeEvent - When a new key is chosen in edit mode (key)
  *
  * CSS Parts:
  * @csspart card - The main card container
@@ -388,7 +416,7 @@ export class SongCard extends LitElement {
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
           .editMode=${true}
-          @key-change=${this._handleKeyEditChange}
+          @key-selector:change=${this._handleKeyEditChange}
         ></key-selector>
       </div>
     `
@@ -396,13 +424,7 @@ export class SongCard extends LitElement {
 
   _handleKeyEditChange(e) {
     e.stopPropagation()
-    this.dispatchEvent(
-      new CustomEvent('song-key-change', {
-        detail: { key: e.detail.value },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SongCardKeyChangeEvent(e.value))
   }
 
   // Click handler
@@ -412,25 +434,13 @@ export class SongCard extends LitElement {
       return
     }
 
-    this.dispatchEvent(
-      new CustomEvent('song-click', {
-        detail: { song: this.song },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SongCardClickEvent(this.song))
   }
 
   // Delete button handler
   _handleDelete(e) {
     e.stopPropagation() // Prevent click from bubbling to card
-    this.dispatchEvent(
-      new CustomEvent('song-delete', {
-        detail: { song: this.song },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new SongCardDeleteEvent(this.song))
   }
 
   connectedCallback() {

@@ -98,7 +98,7 @@ describe('app-modal dialog', () => {
   it('closes on Esc, firing close once', async () => {
     await makeModal()
     let closes = 0
-    modal.addEventListener('close', () => closes++)
+    modal.addEventListener('app-modal:close', () => closes++)
     await show()
     await sendKeys({ press: 'Escape' })
     await modal.updateComplete
@@ -126,7 +126,7 @@ describe('app-modal dialog', () => {
   it('closes from close(), firing close once', async () => {
     await makeModal()
     let closes = 0
-    modal.addEventListener('close', () => closes++)
+    modal.addEventListener('app-modal:close', () => closes++)
     await show()
     modal.close()
     await modal.updateComplete

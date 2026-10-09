@@ -1,5 +1,22 @@
 import { css, html, LitElement } from 'lit'
 
+/** The BPM was changed with - or + */
+export class BpmChangeEvent extends Event {
+  static type = 'song-settings:bpm-change'
+  constructor(value) {
+    super(BpmChangeEvent.type, { bubbles: true, composed: true })
+    this.value = value
+  }
+}
+
+/** Reset was pressed */
+export class SongResetClickEvent extends Event {
+  static type = 'song-settings:reset-click'
+  constructor() {
+    super(SongResetClickEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /**
  * SongSettingsPopover Component
  *
@@ -203,31 +220,19 @@ export class SongSettingsPopover extends LitElement {
   _handleBPMDecrement() {
     const newValue = Math.max(this.bpmMin, this.bpmValue - 1)
     if (newValue !== this.bpmValue) {
-      this.dispatchEvent(
-        new CustomEvent('bpm-change', {
-          detail: { value: newValue },
-          bubbles: true,
-          composed: true,
-        })
-      )
+      this.dispatchEvent(new BpmChangeEvent(newValue))
     }
   }
 
   _handleBPMIncrement() {
     const newValue = Math.min(this.bpmMax, this.bpmValue + 1)
     if (newValue !== this.bpmValue) {
-      this.dispatchEvent(
-        new CustomEvent('bpm-change', {
-          detail: { value: newValue },
-          bubbles: true,
-          composed: true,
-        })
-      )
+      this.dispatchEvent(new BpmChangeEvent(newValue))
     }
   }
 
   _handleReset() {
-    this.dispatchEvent(new CustomEvent('reset-click', { bubbles: true, composed: true }))
+    this.dispatchEvent(new SongResetClickEvent())
   }
 
   render() {

@@ -2,6 +2,23 @@ import { css, html, LitElement } from 'lit'
 import { live } from 'lit/directives/live.js'
 import { determineSetlistType } from '../js/db.js'
 
+/** The form was submitted; details is {date, time, type, name, owner, ownerId} */
+export class SetlistDetailsSaveEvent extends Event {
+  static type = 'setlist-details-form:save'
+  constructor(details) {
+    super(SetlistDetailsSaveEvent.type, { bubbles: true, composed: true })
+    this.details = details
+  }
+}
+
+/** Cancel was pressed */
+export class SetlistDetailsCancelEvent extends Event {
+  static type = 'setlist-details-form:cancel'
+  constructor() {
+    super(SetlistDetailsCancelEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 export const SETLIST_TYPES = ['Church Service', 'Prayer Meeting', 'Event', 'Other']
 
 const NO_LEADER = ''
@@ -52,10 +69,10 @@ export function leaderChoices(setlist = {}, people = []) {
  *   change (for new setlists)
  *
  * Events:
- * @fires save - detail: {date, time, type, name, owner, ownerId}. The leader's
+ * @fires SetlistDetailsSaveEvent - details: {date, time, type, name, owner, ownerId}. The leader's
  *   name is `owner` and their id (Google account email) is `ownerId`, which is
  *   empty for a leader typed in with "Other…".
- * @fires cancel - Cancel was pressed
+ * @fires SetlistDetailsCancelEvent - Cancel was pressed
  */
 export class SetlistDetailsForm extends LitElement {
   static properties = {
@@ -193,22 +210,18 @@ export class SetlistDetailsForm extends LitElement {
     event.preventDefault()
     const data = new FormData(event.target)
     this.dispatchEvent(
-      new CustomEvent('save', {
-        bubbles: true,
-        composed: true,
-        detail: {
-          date: data.get('date'),
-          time: data.get('time'),
-          type: data.get('type'),
-          name: data.get('name')?.trim() || '',
-          ...this._leader(data),
-        },
+      new SetlistDetailsSaveEvent({
+        date: data.get('date'),
+        time: data.get('time'),
+        type: data.get('type'),
+        name: data.get('name')?.trim() || '',
+        ...this._leader(data),
       })
     )
   }
 
   _cancel() {
-    this.dispatchEvent(new CustomEvent('cancel', { bubbles: true, composed: true }))
+    this.dispatchEvent(new SetlistDetailsCancelEvent())
   }
 
   render() {

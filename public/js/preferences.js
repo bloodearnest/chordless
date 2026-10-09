@@ -1,3 +1,39 @@
+/** The Nashville numbers preference changed (sent on window) */
+export class NashvillePreferenceEvent extends Event {
+  static type = 'preferences:nashville-changed'
+  constructor(enabled) {
+    super(NashvillePreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
+
+/** The unicode accidentals preference changed (sent on window) */
+export class AccidentalsPreferenceEvent extends Event {
+  static type = 'preferences:accidentals-changed'
+  constructor(enabled) {
+    super(AccidentalsPreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
+
+/** The section display defaults changed (sent on window) */
+export class SectionDefaultsEvent extends Event {
+  static type = 'preferences:section-defaults-changed'
+  constructor(musicianType, defaults) {
+    super(SectionDefaultsEvent.type)
+    this.musicianType = musicianType
+    this.defaults = defaults
+  }
+}
+
+/** The capo preference changed (sent on window) */
+export class CapoPreferenceEvent extends Event {
+  static type = 'preferences:capo-changed'
+  constructor(enabled) {
+    super(CapoPreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
 const NASHVILLE_PREF_KEY = 'use-nashville'
 const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
 const MUSICIAN_TYPE_KEY = 'musician_type'
@@ -32,7 +68,7 @@ export function setUseNashvilleNumbers(value) {
     localStorage.setItem(NASHVILLE_PREF_KEY, normalized ? '1' : '0')
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('nashville-preference-changed', { detail: normalized }))
+    window.dispatchEvent(new NashvillePreferenceEvent(normalized))
   }
 }
 
@@ -58,7 +94,7 @@ export function setUseUnicodeAccidentals(value) {
     localStorage.setItem(ACCIDENTAL_PREF_KEY, normalized ? '1' : '0')
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('accidental-preference-changed', { detail: normalized }))
+    window.dispatchEvent(new AccidentalsPreferenceEvent(normalized))
   }
 }
 
@@ -105,11 +141,7 @@ export function setMusicianType(value) {
         defaultsDetail = null
       }
     }
-    window.dispatchEvent(
-      new CustomEvent('section-defaults-changed', {
-        detail: { musicianType: normalized, defaults: defaultsDetail },
-      })
-    )
+    window.dispatchEvent(new SectionDefaultsEvent(normalized, defaultsDetail))
   }
 }
 
@@ -144,6 +176,6 @@ export function setCapoPreference(value) {
     }
   }
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('capo-preference-changed', { detail: enabled }))
+    window.dispatchEvent(new CapoPreferenceEvent(enabled))
   }
 }

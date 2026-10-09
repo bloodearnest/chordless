@@ -1,7 +1,22 @@
 import { css, html, LitElement } from 'lit'
 import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.js'
-import { getActivePadSet, listPadSets, selectPadSet } from '../js/pad-set-service.js'
+import {
+  getActivePadSet,
+  listPadSets,
+  PadSetChangedEvent,
+  PadSetListUpdatedEvent,
+  selectPadSet,
+} from '../js/pad-set-service.js'
 import { fieldStyles, switchStyles } from './shared-styles.js'
+
+/** The media player settings changed; settings is the new settings */
+export class MediaSettingsChangeEvent extends Event {
+  static type = 'media-player-settings:change'
+  constructor(settings) {
+    super(MediaSettingsChangeEvent.type, { bubbles: true, composed: true })
+    this.settings = settings
+  }
+}
 
 /**
  * MediaPlayerSettings Component
@@ -16,7 +31,7 @@ import { fieldStyles, switchStyles } from './shared-styles.js'
  * @property {Boolean} stereoSplitEnabled - Enable L/R channel split (pads left, click right)
  *
  * Events:
- * @fires settings-change - When any setting changes
+ * @fires MediaSettingsChangeEvent - When any setting changes (settings)
  */
 export class MediaPlayerSettings extends LitElement {
   static properties = {
@@ -121,19 +136,19 @@ export class MediaPlayerSettings extends LitElement {
     this._loadPadSets()
     this._boundPadSetListUpdated = () => this._loadPadSets(true)
     this._boundPadSetChanged = event => {
-      const padSet = event.detail?.padSet
+      const padSet = event.padSet
       if (padSet) {
         this.selectedPadSetId = padSet.id
       }
     }
-    window.addEventListener('pad-set-list-updated', this._boundPadSetListUpdated)
-    window.addEventListener('pad-set-changed', this._boundPadSetChanged)
+    window.addEventListener(PadSetListUpdatedEvent.type, this._boundPadSetListUpdated)
+    window.addEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
   }
 
   disconnectedCallback() {
     super.disconnectedCallback()
-    window.removeEventListener('pad-set-list-updated', this._boundPadSetListUpdated)
-    window.removeEventListener('pad-set-changed', this._boundPadSetChanged)
+    window.removeEventListener(PadSetListUpdatedEvent.type, this._boundPadSetListUpdated)
+    window.removeEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
   }
 
   _saveSettings() {
@@ -147,13 +162,7 @@ export class MediaPlayerSettings extends LitElement {
     saveMediaSettings(settings)
 
     // Dispatch event so media player can react
-    this.dispatchEvent(
-      new CustomEvent('settings-change', {
-        detail: settings,
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new MediaSettingsChangeEvent(settings))
   }
 
   /** An on/off switch, a real button so it works from the keyboard and screen readers */

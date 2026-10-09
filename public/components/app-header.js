@@ -1,6 +1,40 @@
 import { css, html, LitElement } from 'lit'
 import './icon.js'
 
+/** The menu button was pressed; trigger is the button, to open the menu under */
+export class HeaderMenuClickEvent extends Event {
+  static type = 'app-header:menu-click'
+  constructor(trigger) {
+    super(HeaderMenuClickEvent.type, { bubbles: true, composed: true })
+    this.trigger = trigger
+  }
+}
+
+/** The edit mode button was pressed */
+export class EditModeToggleEvent extends Event {
+  static type = 'app-header:edit-mode-toggle'
+  constructor() {
+    super(EditModeToggleEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** The info button was pressed */
+export class HeaderInfoClickEvent extends Event {
+  static type = 'app-header:info-click'
+  constructor() {
+    super(HeaderInfoClickEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** The second row was shown or hidden (on phones) */
+export class HeaderExpandToggleEvent extends Event {
+  static type = 'app-header:expand-toggle'
+  constructor(expanded) {
+    super(HeaderExpandToggleEvent.type, { bubbles: true, composed: true })
+    this.expanded = expanded
+  }
+}
+
 /**
  * AppHeader Component
  *
@@ -18,10 +52,10 @@ import './icon.js'
  *   home page's create-setlist button)
  *
  * Events:
- * @fires edit-mode-toggle - When edit toggle button is clicked
- * @fires info-click - When info button is clicked
- * @fires nav-menu-click - When nav menu button is clicked (detail: {trigger: the button})
- * @fires header-expand-toggle - When header expand toggle is clicked (detail: {expanded: boolean})
+ * @fires EditModeToggleEvent - When the edit mode button is pressed
+ * @fires HeaderInfoClickEvent - When the info button is pressed
+ * @fires HeaderMenuClickEvent - When the menu button is pressed (trigger: the button)
+ * @fires HeaderExpandToggleEvent - When the second row is shown or hidden (expanded)
  *
  * CSS Parts:
  * @csspart header - The main header element
@@ -499,31 +533,15 @@ export class AppHeader extends LitElement {
   }
 
   _handleNavMenuClick(event) {
-    this.dispatchEvent(
-      new CustomEvent('nav-menu-click', {
-        bubbles: true,
-        composed: true,
-        detail: { trigger: event.currentTarget },
-      })
-    )
+    this.dispatchEvent(new HeaderMenuClickEvent(event.currentTarget))
   }
 
   _handleEditToggle() {
-    this.dispatchEvent(
-      new CustomEvent('edit-mode-toggle', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new EditModeToggleEvent())
   }
 
   _handleInfoClick() {
-    this.dispatchEvent(
-      new CustomEvent('info-click', {
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new HeaderInfoClickEvent())
   }
 
   _handleExpandToggle() {
@@ -531,13 +549,7 @@ export class AppHeader extends LitElement {
     console.log('[AppHeader] Expanded state:', this.expanded)
 
     // Emit custom event instead of direct DOM manipulation
-    this.dispatchEvent(
-      new CustomEvent('header-expand-toggle', {
-        detail: { expanded: this.expanded },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new HeaderExpandToggleEvent(this.expanded))
   }
 }
 

@@ -45,8 +45,12 @@ describe('song-section', () => {
   it('sends section-action for the option pressed', async () => {
     await setUp()
     let detail = null
-    section.addEventListener('section-action', event => {
-      detail = event.detail
+    section.addEventListener('song-section:action', event => {
+      detail = {
+        songIndex: event.songIndex,
+        sectionIndex: event.sectionIndex,
+        action: event.action,
+      }
     })
     showButtons()[3].click()
     expect(detail).to.deep.equal({ songIndex: 0, sectionIndex: 0, action: 'show-none' })

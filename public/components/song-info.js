@@ -12,7 +12,6 @@ import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.js'
  * @property {Array} appearances - Array of appearance records
  *
  * Events:
- * @fires edit - When edit button is clicked (detail: {song})
  */
 export class SongInfo extends LitElement {
   static properties = {

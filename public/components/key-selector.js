@@ -1,5 +1,14 @@
 import { OptionPicker } from './option-picker.js'
 
+/** A different key was chosen; value is the key */
+export class KeyChangeEvent extends Event {
+  static type = 'key-selector:change'
+  constructor(value) {
+    super(KeyChangeEvent.type, { bubbles: true, composed: true })
+    this.value = value
+  }
+}
+
 /**
  * KeySelector component
  *
@@ -15,7 +24,7 @@ import { OptionPicker } from './option-picker.js'
  * @property {boolean} editMode - Whether the key can be changed
  *
  * Events:
- * @fires key-change - When a new key is selected (detail: {value: string})
+ * @fires KeyChangeEvent - When a new key is selected (value: string)
  */
 export class KeySelector extends OptionPicker {
   static properties = {
@@ -25,7 +34,7 @@ export class KeySelector extends OptionPicker {
     originalKey: { type: String, attribute: 'original-key' },
   }
 
-  static changeEvent = 'key-change'
+  static ChangeEvent = KeyChangeEvent
 
   constructor() {
     super()

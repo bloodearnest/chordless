@@ -3,14 +3,14 @@ import { css, html, LitElement } from 'lit'
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
  * a popover of options to choose from. key-selector and capo-selector extend
- * it, giving their options and the event they send:
+ * it, giving their options and the event class they send:
  *
- *   static changeEvent = 'key-change'
+ *   static ChangeEvent = KeyChangeEvent
  *   _options() { return [{ value, label, hint }] }
  *
  * Outside edit mode the value is plain text. Choosing a different option
- * closes the popover and sends changeEvent with detail {value}; the owner sets
- * value in response.
+ * closes the popover and sends a ChangeEvent with the chosen value; the owner
+ * sets value in response.
  *
  * Colours follow the text colour (--header-text, for the navy header), so a
  * light context can restyle it by setting --header-text and --header-bg.
@@ -113,8 +113,8 @@ export class OptionPicker extends LitElement {
     }
   `
 
-  /** The event sent when a different option is chosen (subclasses set it) */
-  static changeEvent = 'change'
+  /** The Event class sent when a different option is chosen (subclasses set it) */
+  static ChangeEvent = null
 
   constructor() {
     super()
@@ -139,13 +139,7 @@ export class OptionPicker extends LitElement {
   _choose(value) {
     if (value === this.value) return
     this._popover()?.hidePopover()
-    this.dispatchEvent(
-      new CustomEvent(this.constructor.changeEvent, {
-        detail: { value },
-        bubbles: true,
-        composed: true,
-      })
-    )
+    this.dispatchEvent(new this.constructor.ChangeEvent(value))
   }
 
   /**

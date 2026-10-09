@@ -8,6 +8,10 @@
 
 import '../components/song-list.js'
 import '../components/status-message.js'
+import { EditModeToggleEvent, HeaderInfoClickEvent } from '../components/app-header.js'
+import { KeyChangeEvent } from '../components/key-selector.js'
+import { SongSelectEvent } from '../components/song-list.js'
+import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 import { getCurrentDB } from './db.js'
 import { ChordProParser } from './parser.js'
 import { createLibrarySongModel } from './song-model-factory.js'
@@ -215,8 +219,8 @@ export class LibraryApp {
     songList.songs = songs
     songList.variant = 'library'
     songList.emptyMessage = 'No songs match your search.'
-    songList.addEventListener('song-select', event => {
-      const { song } = event.detail || {}
+    songList.addEventListener(SongSelectEvent.type, event => {
+      const { song } = event
       if (song) {
         this.viewLibrarySong(song)
       }
@@ -466,7 +470,7 @@ export class LibraryApp {
     this._libraryHeaderEventsSetup = true
 
     // Listen for edit-mode-toggle event
-    appHeader.addEventListener('edit-mode-toggle', () => {
+    appHeader.addEventListener(EditModeToggleEvent.type, () => {
       const isEnteringEditMode = !document.body.classList.contains('edit-mode')
       const keySelector = document.getElementById('library-key-selector')
 
@@ -507,7 +511,7 @@ export class LibraryApp {
     })
 
     // Listen for info button click
-    appHeader.addEventListener('info-click', () => {
+    appHeader.addEventListener(HeaderInfoClickEvent.type, () => {
       if (this.currentLibraryParsedSong && this.currentLibrarySong) {
         this.showLibrarySongInfo(this.currentLibraryParsedSong, this.currentLibrarySong)
       }
@@ -613,8 +617,8 @@ export class LibraryApp {
     if (!keySelector) return
 
     // Listen for key-change events
-    keySelector.addEventListener('key-change', async e => {
-      const newKey = e.detail.value
+    keySelector.addEventListener(KeyChangeEvent.type, async e => {
+      const newKey = e.value
       await this.handleLibraryKeyChange(newKey)
     })
 
@@ -750,20 +754,20 @@ export class LibraryApp {
     // Set up section action handler (hide mode buttons)
     if (!this._librarySectionActionHandler) {
       this._librarySectionActionHandler = event => {
-        const { sectionIndex, action } = event.detail || {}
+        const { sectionIndex, action } = event
         if (typeof sectionIndex !== 'number' || !action) {
           return
         }
         // Library view treats the song as songIndex = 0
         this.setLibrarySectionHideMode(sectionIndex, action)
       }
-      container.addEventListener('section-action', this._librarySectionActionHandler)
+      container.addEventListener(SectionActionEvent.type, this._librarySectionActionHandler)
     }
 
     // Set up section toggle handler (collapse/expand)
     if (!this._librarySectionToggleHandler) {
       this._librarySectionToggleHandler = event => {
-        const { sectionIndex } = event.detail || {}
+        const { sectionIndex } = event
         if (typeof sectionIndex !== 'number') {
           return
         }
@@ -779,7 +783,7 @@ export class LibraryApp {
           }
         }
       }
-      container.addEventListener('section-toggle', this._librarySectionToggleHandler)
+      container.addEventListener(SectionToggleEvent.type, this._librarySectionToggleHandler)
     }
   }
 

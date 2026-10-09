@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import './song-section.js'
-import { getUseNashvilleNumbers } from '../js/preferences.js'
+import { getUseNashvilleNumbers, NashvillePreferenceEvent } from '../js/preferences.js'
 import { transposeKeyName } from '../js/transpose.js'
 
 /**
@@ -35,18 +35,18 @@ export class SongDisplay extends LitElement {
     this._useNashville = getUseNashvilleNumbers()
     this.capo = 0
     this._onNashvilleChange = event => {
-      this._useNashville = !!event.detail
+      this._useNashville = !!event.enabled
       this.requestUpdate()
     }
   }
 
   connectedCallback() {
     super.connectedCallback()
-    window.addEventListener('nashville-preference-changed', this._onNashvilleChange)
+    window.addEventListener(NashvillePreferenceEvent.type, this._onNashvilleChange)
   }
 
   disconnectedCallback() {
-    window.removeEventListener('nashville-preference-changed', this._onNashvilleChange)
+    window.removeEventListener(NashvillePreferenceEvent.type, this._onNashvilleChange)
     super.disconnectedCallback()
   }
 
