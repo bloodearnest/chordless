@@ -540,6 +540,30 @@ test.describe('Navigation menu', () => {
 })
 
 test.describe('Media player settings', () => {
+  test('its switches work from the keyboard, and are off limits while the player is off', async ({
+    page,
+  }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.goto('/preferences')
+    const settings = page.locator('media-player-settings')
+    const player = settings.getByRole('switch', { name: 'Enable Media Player' })
+    const pads = settings.getByRole('switch', { name: 'Enable Pads' })
+    await expect(player).toHaveAttribute('aria-checked', 'true')
+
+    const padsWere = await pads.getAttribute('aria-checked')
+    await pads.focus()
+    await page.keyboard.press('Space')
+    await expect(pads).not.toHaveAttribute('aria-checked', padsWere)
+
+    await player.focus()
+    await page.keyboard.press('Enter')
+    await expect(player).toHaveAttribute('aria-checked', 'false')
+    await expect(pads).toBeDisabled()
+    await expect(settings.getByRole('switch', { name: 'Stereo Split (L/R)' })).toBeDisabled()
+    expect(errors).toEqual([])
+  })
+
   test('turning the media player off in preferences hides it on setlists', async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))

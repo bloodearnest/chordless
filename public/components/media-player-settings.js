@@ -93,12 +93,20 @@ export class MediaPlayerSettings extends LitElement {
 
     .toggle-switch {
       position: relative;
+      flex-shrink: 0;
       width: 50px;
       height: 28px;
+      padding: 0;
+      border: none;
       background: rgba(0, 0, 0, 0.3);
       border-radius: 14px;
       cursor: pointer;
       transition: background 0.2s;
+    }
+
+    .toggle-switch:focus-visible {
+      outline: 2px solid var(--focus-ring, #3498db);
+      outline-offset: 2px;
     }
 
     .toggle-switch.active {
@@ -204,6 +212,21 @@ export class MediaPlayerSettings extends LitElement {
     )
   }
 
+  /** An on/off switch, a real button so it works from the keyboard and screen readers */
+  _renderSwitch(label, on, onToggle, { master = false, disabled = false } = {}) {
+    return html`
+      <button
+        type="button"
+        role="switch"
+        class="toggle-switch ${master ? 'master-toggle' : ''} ${on ? 'active' : ''}"
+        aria-checked=${on ? 'true' : 'false'}
+        aria-label=${label}
+        ?disabled=${disabled}
+        @click=${onToggle}
+      ></button>
+    `
+  }
+
   _toggleMediaPlayer() {
     this.mediaPlayerEnabled = !this.mediaPlayerEnabled
     this._saveSettings()
@@ -272,10 +295,12 @@ export class MediaPlayerSettings extends LitElement {
               <div class="setting-label">Enable Media Player</div>
               <div class="setting-description">Master control for all media player features</div>
             </div>
-            <div
-              class="toggle-switch master-toggle ${this.mediaPlayerEnabled ? 'active' : ''}"
-              @click=${this._toggleMediaPlayer}
-            ></div>
+            ${this._renderSwitch(
+              'Enable Media Player',
+              this.mediaPlayerEnabled,
+              this._toggleMediaPlayer,
+              { master: true }
+            )}
           </div>
         </div>
 
@@ -286,10 +311,9 @@ export class MediaPlayerSettings extends LitElement {
               <div class="setting-label">Enable Pads</div>
               <div class="setting-description">Background pad audio playback</div>
             </div>
-            <div
-              class="toggle-switch ${this.padsEnabled ? 'active' : ''}"
-              @click=${this._togglePads}
-            ></div>
+            ${this._renderSwitch('Enable Pads', this.padsEnabled, this._togglePads, {
+              disabled: !this.mediaPlayerEnabled,
+            })}
           </div>
 
           <div
@@ -335,10 +359,9 @@ export class MediaPlayerSettings extends LitElement {
               <div class="setting-label">Enable Metronome</div>
               <div class="setting-description">Click track with tempo and time signature</div>
             </div>
-            <div
-              class="toggle-switch ${this.metronomeEnabled ? 'active' : ''}"
-              @click=${this._toggleMetronome}
-            ></div>
+            ${this._renderSwitch('Enable Metronome', this.metronomeEnabled, this._toggleMetronome, {
+              disabled: !this.mediaPlayerEnabled,
+            })}
           </div>
 
           <!-- Stereo split (only when metronome enabled) -->
@@ -351,10 +374,12 @@ export class MediaPlayerSettings extends LitElement {
               <div class="setting-label">Stereo Split (L/R)</div>
               <div class="setting-description">Pads → Left, Click → Right</div>
             </div>
-            <div
-              class="toggle-switch ${this.stereoSplitEnabled ? 'active' : ''}"
-              @click=${this._toggleStereoSplit}
-            ></div>
+            ${this._renderSwitch(
+              'Stereo Split (L/R)',
+              this.stereoSplitEnabled,
+              this._toggleStereoSplit,
+              { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
+            )}
           </div>
         </div>
       </div>
