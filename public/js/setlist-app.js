@@ -403,7 +403,8 @@ class PageApp {
         let tempoNote = parsedTempoInfo.tempoNote || null
         if (canonicalSong && canonicalSong.metadata) {
           const canonicalTempoInfo = this._parseTempoMetadata(canonicalSong.metadata.tempo)
-          if (canonicalTempoInfo.bpm !== null) {
+          // The setlist's own tempo, if it has one, wins over the library song's
+          if (canonicalTempoInfo.bpm !== null && !songEntry.tempo) {
             currentBPM = canonicalTempoInfo.bpm
           }
           timeSignature = canonicalSong.metadata.timeSignature || parsed.metadata.time

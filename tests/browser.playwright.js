@@ -540,25 +540,41 @@ test.describe('Navigation menu', () => {
 })
 
 test.describe('Song settings', () => {
-  test('changing the BPM in edit mode saves it to the setlist', async ({ page }) => {
+  test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'bpm-test-setlist' })
-    await page.goto('/setlist/bpm-test-setlist')
-    await page.locator('setlist-overview song-card').first().click()
-    await expect(page.locator('#app-header')).toContainText('Info Test Song')
-
-    await page.locator('#app-header .edit-toggle').click()
+    // Give the library song a tempo of its own
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      const db = await getCurrentDB()
+      const chart = await db.getChordPro('chordpro-info-test')
+      await db.saveChordPro({
+        ...chart,
+        content: chart.content.replace('{key: G}', '{key: G}\n{tempo: 72}'),
+      })
+    })
     const metadata = page.locator('#musical-metadata')
+    const openSong = async () => {
+      await page.goto('/setlist/bpm-test-setlist')
+      await page.locator('setlist-overview song-card').first().click()
+      await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    }
+
+    await openSong()
+    await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(72)
+    await page.locator('#app-header .edit-toggle').click()
     await expect(metadata).toHaveAttribute('edit-mode')
     await metadata.click()
     const popover = page.locator('song-settings-popover')
     await popover.getByRole('button', { name: 'Increase BPM' }).click()
-
-    await expect(popover.locator('.bpm-value')).toHaveText('121')
-    await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(121)
+    await expect(popover.locator('.bpm-value')).toHaveText('73')
+    await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(73)
     const setlist = await fromDB(page, 'getSetlist', 'bpm-test-setlist')
-    expect(setlist.songs[0].tempo).toBe(121)
+    expect(setlist.songs[0].tempo).toBe(73)
+
+    await openSong()
+    await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(73)
     expect(errors).toEqual([])
   })
 })
