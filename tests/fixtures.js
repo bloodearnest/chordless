@@ -86,3 +86,62 @@ function fromDB(page, method, arg) {
     { method, arg }
   )
 }
+
+/** The songs seedSetlist adds: each has a Verse 1 and a Chorus; Alpha's verse is long */
+export const SETLIST_SONGS = [
+  { title: 'Alpha Song', key: 'G', verse: '[G]Alpha [C]verse', chorus: '[D]Alpha [G]chorus' },
+  { title: 'Bravo Song', key: 'D', verse: '[D]Bravo [G]verse', chorus: '[A]Bravo [D]chorus' },
+  { title: 'Charlie Song', key: 'A', verse: '[A]Charlie [D]verse', chorus: '[E]Charlie [A]chorus' },
+]
+
+/**
+ * Open the app and add the three SETLIST_SONGS, and a setlist of them in that
+ * order, each in its own key. Returns the setlist's URL.
+ */
+export async function seedSetlist(page, { setlistId = 'seeded-setlist' } = {}) {
+  await openApp(page, '/songs')
+  await page.evaluate(
+    async ({ setlistId, songs }) => {
+      const { getCurrentDB } = await import('/js/db.js')
+      const db = await getCurrentDB()
+      const now = new Date().toISOString()
+      const entries = []
+      for (const [index, song] of songs.entries()) {
+        const slug = song.title.toLowerCase().replace(/\W+/g, '')
+        // Alpha's verse runs on, so its page can scroll
+        const verse = index === 0 ? Array(40).fill(song.verse).join('\n') : song.verse
+        const content = `{title: ${song.title}}\n{key: ${song.key}}\n\n{comment: Verse 1}\n${verse}\n\n{comment: Chorus}\n${song.chorus}`
+        await db.saveChordPro({
+          id: `chordpro-${slug}`,
+          content,
+          contentHash: slug,
+          lastModified: Date.now(),
+        })
+        await db.saveSong({
+          uuid: `song-${slug}`,
+          id: `title-${slug}`,
+          title: song.title,
+          titleNormalized: slug,
+          key: song.key,
+          isDefault: true,
+          chordproFileId: `chordpro-${slug}`,
+          modifiedDate: now,
+        })
+        entries.push({ songId: `title-${slug}`, songUuid: `song-${slug}`, key: song.key })
+      }
+      await db.saveSetlist({
+        id: setlistId,
+        date: '2026-10-11',
+        time: '10:30',
+        type: 'Church Service',
+        name: '',
+        owner: 'Ann',
+        songs: entries,
+        createdDate: now,
+        modifiedDate: now,
+      })
+    },
+    { setlistId, songs: SETLIST_SONGS }
+  )
+  return `/setlist/${setlistId}`
+}

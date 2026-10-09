@@ -62,6 +62,10 @@ storage/sync
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
 live mode
+ - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
+   overview, then the song again (the section observer's first callback): the media
+   player is told "no song" in between, and for that moment the edit button and arrow
+   keys act on the overview. tests/live.playwright.js opens songs with the arrow instead
  - button on setlist
  - fullscreen
  - keep screen alive
