@@ -16,7 +16,7 @@ import {
   HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
 } from '../components/app-header.js'
-import { ModalCloseEvent, ModalConfirmEvent } from '../components/app-modal.js'
+import { ModalCloseEvent } from '../components/app-modal.js'
 import { CapoChangeEvent } from '../components/capo-selector.js'
 import { KeyChangeEvent } from '../components/key-selector.js'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.js'
@@ -3117,24 +3117,13 @@ class PageApp {
     }
   }
 
-  showDeleteSongConfirmation(index, song) {
-    const modal = document.getElementById('delete-song-modal')
-    const songTitleEl = document.getElementById('delete-song-title')
-
-    songTitleEl.textContent = song.title
-
-    modal.show()
-
-    const handleConfirm = async () => {
+  async showDeleteSongConfirmation(index, song) {
+    document.getElementById('delete-song-title').textContent = song.title
+    // ask() settles on confirm, cancel or close, leaving no listener behind: a
+    // confirm handler left by a cancelled ask would delete a second song later
+    if (await document.getElementById('delete-song-modal').ask()) {
       await this.deleteSongFromSetlist(index)
-      cleanup()
     }
-
-    const cleanup = () => {
-      modal.removeEventListener(ModalConfirmEvent.type, handleConfirm)
-    }
-
-    modal.addEventListener(ModalConfirmEvent.type, handleConfirm, { once: true })
   }
 
   async changeSongKeyInSetlist(index, newKey) {
