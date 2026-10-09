@@ -1754,7 +1754,9 @@ class PageApp {
       })
 
       songSettingsPopover.addEventListener('reset-click', async () => {
-        // Show confirmation modal
+        // Close the popover first: it's in the top layer, so it and its
+        // backdrop would cover the confirmation modal
+        songSettingsPopover.closePopover()
         const modal = document.getElementById('reset-confirm-modal')
         if (modal) {
           const confirmed = await modal.ask()

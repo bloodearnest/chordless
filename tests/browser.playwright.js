@@ -597,6 +597,31 @@ test.describe('Song settings', () => {
     await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(73)
     expect(errors).toEqual([])
   })
+
+  test('asking to reset a song closes the settings popover, which would cover the question', async ({
+    page,
+  }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'reset-test-setlist' })
+    await page.goto('/setlist/reset-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header .edit-toggle').click()
+    await expect(page.locator('#musical-metadata')).toHaveAttribute('edit-mode')
+    await page.locator('#musical-metadata').click()
+    const popover = page.locator('song-settings-popover')
+    await expect.poll(() => popover.evaluate(element => element.isOpen())).toBe(true)
+
+    await popover.getByRole('button', { name: 'Reset song' }).click()
+    const modal = page.locator('#reset-confirm-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    expect(await popover.evaluate(element => element.isOpen())).toBe(false)
+
+    await modal.locator('.modal-btn-cancel').click()
+    await expect(modal).not.toHaveAttribute('open', '')
+    expect(errors).toEqual([])
+  })
 })
 
 test.describe('Media player settings', () => {
