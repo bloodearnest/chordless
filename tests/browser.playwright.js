@@ -36,6 +36,26 @@ test.describe('Application Pages', () => {
       expect(await background(url), url).toBe(dark)
     }
   })
+
+  test('in dark mode a modal is lighter than the page beneath it, and edged', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' })
+    await page.goto('/storage')
+    await page.locator('storage-page .storage-button.danger').click()
+    const card = page.locator('storage-page #clear-data-modal').locator('.modal-content')
+    await expect(card).toBeVisible()
+    const { cardBg, pageBg, border } = await card.evaluate(element => ({
+      cardBg: getComputedStyle(element).backgroundColor,
+      pageBg: getComputedStyle(document.body).backgroundColor,
+      border: getComputedStyle(element).borderTopColor,
+    }))
+    const lightness = rgb =>
+      rgb
+        .match(/\d+/g)
+        .slice(0, 3)
+        .reduce((sum, n) => sum + Number(n), 0)
+    expect(lightness(cardBg)).toBeGreaterThan(lightness(pageBg))
+    expect(border).not.toBe('rgba(0, 0, 0, 0)')
+  })
 })
 
 test.describe('Loading', () => {

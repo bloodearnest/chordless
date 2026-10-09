@@ -78,17 +78,18 @@ export class AppModal extends LitElement {
       left: 0;
       width: 100%;
       height: 100%;
-      background-color: rgba(0, 0, 0, 0.5);
+      background-color: var(--modal-backdrop, rgba(0, 0, 0, 0.5));
       cursor: pointer;
     }
 
     .modal-content {
       position: relative;
-      background: var(--bg-color, white);
+      background: var(--modal-bg, white);
+      border: 1px solid var(--modal-border, transparent);
       border-radius: 8px;
       max-width: 90%;
       max-height: 90vh;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
       cursor: default;
       z-index: 1;
       display: flex;

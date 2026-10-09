@@ -64,6 +64,10 @@ app-modal:not(:defined) {
   --border-light: #ecf0f1;
   --overlay-bg: rgba(0, 0, 0, 0.7);
   --overlay-light: rgba(0, 0, 0, 0.3);
+  --modal-backdrop: rgba(0, 0, 0, 0.5);
+  --modal-bg: #ffffff;
+  --modal-border: transparent;
+  --modal-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   --hover-bg: rgba(255, 255, 255, 0.2);
   --active-bg: rgba(255, 255, 255, 0.3);
   --focus-ring: #3498db;

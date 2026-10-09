@@ -53,6 +53,12 @@ export class ThemeManager {
       'overlay-bg': 'rgba(0, 0, 0, 0.7)',
       'overlay-light': 'rgba(0, 0, 0, 0.3)',
 
+      // Modals: a white card, lifted by a darkened page and a drop shadow
+      'modal-backdrop': 'rgba(0, 0, 0, 0.5)',
+      'modal-bg': '#ffffff',
+      'modal-border': 'transparent',
+      'modal-shadow': '0 4px 20px rgba(0, 0, 0, 0.3)',
+
       // Interactive states
       'hover-bg': 'rgba(255, 255, 255, 0.2)',
       'active-bg': 'rgba(255, 255, 255, 0.3)',
@@ -95,6 +101,13 @@ export class ThemeManager {
       // Overlay colors
       'overlay-bg': 'rgba(0, 0, 0, 0.8)',
       'overlay-light': 'rgba(0, 0, 0, 0.5)',
+
+      // Modals: a shadow barely shows on a dark page, so the card is lighter
+      // than the page, edged with a faint light border, over a darker backdrop
+      'modal-backdrop': 'rgba(0, 0, 0, 0.7)',
+      'modal-bg': '#242424',
+      'modal-border': 'rgba(255, 255, 255, 0.12)',
+      'modal-shadow': '0 8px 32px rgba(0, 0, 0, 0.6)',
 
       // Interactive states
       'hover-bg': 'rgba(255, 255, 255, 0.1)',
