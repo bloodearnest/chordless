@@ -272,6 +272,30 @@ test.describe('Song import', () => {
     )
   }
 
+  /** Deliver a message to the import page as if posted by the bookmarklet */
+  function postMessageFrom(page, origin, data) {
+    return page.evaluate(
+      ({ origin, data }) => window.dispatchEvent(new MessageEvent('message', { origin, data })),
+      { origin, data }
+    )
+  }
+
+  test('shows a failed SongSelect download, and ignores other sites', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await page.goto('/import-song')
+    await page.waitForFunction(() => customElements.get('song-import'))
+    const songImport = page.locator('song-import')
+    const failed = { type: 'CHORDLESS_IMPORT_FAILED', data: { message: 'Download failed: 403' } }
+
+    await postMessageFrom(page, 'https://evil.example', failed)
+    await expect(songImport).toContainText('Waiting for song data')
+
+    await postMessageFrom(page, 'https://songselect.ccli.com', failed)
+    await expect(songImport.getByRole('alert')).toContainText('Download failed: 403')
+    expect(errors).toEqual([])
+  })
+
   test('saves a new song to the library only', async ({ page }) => {
     const errors = []
     page.on('pageerror', error => errors.push(error.message))

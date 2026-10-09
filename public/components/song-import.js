@@ -235,6 +235,8 @@ export class SongImport extends LitElement {
     if (event.data?.type === 'CHORDLESS_IMPORT') {
       console.log('[Import] Received import message from:', event.origin)
       this.receive(event.data.data)
+    } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
+      this._showError(`Import from SongSelect failed: ${event.data.data?.message}`)
     }
   }
 
