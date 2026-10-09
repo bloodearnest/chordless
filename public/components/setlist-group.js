@@ -101,7 +101,7 @@ export class SetlistGroup extends LitElement {
 
     .setlist-song-count {
       font-size: var(--font-ui-small);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       white-space: nowrap;
     }
   `

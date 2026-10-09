@@ -33,7 +33,7 @@ export class ThemeManager {
 
       // Text colors
       'text-color': '#1a1a1a',
-      'text-secondary': '#7f8c8d',
+      'text-secondary': '#5f6b6d',
       'text-tertiary': '#95a5a6',
       'text-muted': '#bdc3c7',
 
@@ -42,12 +42,12 @@ export class ThemeManager {
       'header-text': '#ecf0f1',
 
       // Button colors
-      'button-bg': '#3498db',
-      'button-hover': '#2980b9',
+      'button-bg': '#2477ad',
+      'button-hover': '#1f6a9a',
       'button-text': '#ffffff',
 
       // Accent colors
-      'color-primary': '#3498db',
+      'color-primary': '#2477ad',
       'color-success': '#27ae60',
       'color-warning': '#f39c12',
       'color-danger': '#e74c3c',

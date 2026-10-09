@@ -127,7 +127,7 @@ export class SetlistDetailsForm extends LitElement {
     }
 
     input::placeholder {
-      color: var(--text-secondary, #95a5a6);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     .actions {
@@ -153,7 +153,7 @@ export class SetlistDetailsForm extends LitElement {
     }
 
     .submit {
-      background-color: var(--button-bg, #3498db);
+      background-color: var(--button-bg, #2477ad);
       color: var(--button-text, white);
     }
   `

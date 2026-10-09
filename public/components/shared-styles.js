@@ -71,12 +71,12 @@ export const buttonStyles = css`
   }
 
   .btn.primary {
-    background: var(--button-bg, #3498db);
+    background: var(--button-bg, #2477ad);
     color: var(--button-text, white);
   }
 
   .btn.primary:hover:not(:disabled) {
-    background: var(--button-hover, #2980b9);
+    background: var(--button-hover, #1f6a9a);
   }
 
   .btn.danger {
@@ -115,7 +115,7 @@ export const fieldStyles = css`
   }
 
   .field::placeholder {
-    color: var(--text-secondary, #7f8c8d);
+    color: var(--text-secondary, #5f6b6d);
   }
 
   .field:focus {
@@ -165,7 +165,7 @@ export const switchStyles = css`
   }
 
   .toggle-switch.active {
-    background: var(--button-bg, #3498db);
+    background: var(--button-bg, #2477ad);
   }
 
   .toggle-switch.master.active {

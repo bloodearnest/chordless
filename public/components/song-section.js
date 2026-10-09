@@ -134,7 +134,7 @@ export class SongSection extends LitElement {
 
     .song-section-wrapper .section-title {
       font-size: var(--font-lyrics);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       font-weight: bold;
       font-style: italic;
       white-space: nowrap;
@@ -148,7 +148,7 @@ export class SongSection extends LitElement {
       justify-content: center;
       border: none;
       background: none;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       font-size: var(--font-ui);
       line-height: 1;
       cursor: pointer;
@@ -230,7 +230,7 @@ export class SongSection extends LitElement {
     .song-section-wrapper .section-controls .hide-label {
       font-size: var(--font-ui-small);
       font-weight: 600;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     .song-section-wrapper .hide-pill {
@@ -260,7 +260,7 @@ export class SongSection extends LitElement {
       font-size: calc(var(--font-ui-small) * 0.8);
       font-weight: 600;
       text-transform: uppercase;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       padding: 0.3rem 0.1rem;
       cursor: pointer;
       transition:

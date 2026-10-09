@@ -140,7 +140,7 @@ export class NavMenu extends LitElement {
 
     .nav-icon {
       flex-shrink: 0;
-      color: var(--color-primary, #3498db);
+      color: var(--color-primary, #2477ad);
     }
 
     .setlist-section {
@@ -163,7 +163,7 @@ export class NavMenu extends LitElement {
       padding: 0.5rem 1.5rem;
       font-size: var(--font-ui);
       font-weight: 600;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }

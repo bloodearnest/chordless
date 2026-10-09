@@ -41,7 +41,7 @@ export class StatusMessage extends LitElement {
     }
 
     :host([state='empty']) {
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     :host([state='error']) {

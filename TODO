@@ -15,9 +15,9 @@ dead code
   (referenceKey is). Remove it, after checking the rest of song-view-manager for the same
 
 accessibility (found by the axe checks in the unit tests)
-- light theme contrast is below WCAG AA (4.5:1): secondary text #7f8c8d on white is 3.5:1,
-  white on the primary button #3498db is 3.2:1. Candidates that pass: #5f6b6d and #2477ad.
-  The unit tests skip color-contrast until this is decided (A11Y in tests/test-helpers.js)
+- dark theme buttons: white on #4da6ff is 2.6:1 (hover #3498db 3.2:1), below WCAG AA's
+  4.5:1. Either a deeper blue (#2477ad, as light now uses) or dark text on the light blue.
+  The unit tests only check the light theme's colours
 - song-section's heading is a <summary> containing the collapse and Show buttons
   (nested-interactive): move the controls out of the summary, or replace details/summary
   with a heading and a toggle button

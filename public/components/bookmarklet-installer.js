@@ -42,7 +42,7 @@ export class BookmarkletInstaller extends LitElement {
     }
 
     .hint {
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     textarea {
@@ -69,7 +69,7 @@ export class BookmarkletInstaller extends LitElement {
     }
 
     .copy {
-      background: #28a745;
+      background: #1e7e34;
       color: white;
       border: none;
       padding: 10px 20px;
@@ -80,7 +80,7 @@ export class BookmarkletInstaller extends LitElement {
     }
 
     .copy:hover {
-      background: #218838;
+      background: #19692c;
     }
   `
 

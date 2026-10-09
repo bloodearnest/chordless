@@ -71,15 +71,15 @@ export class ThemeSettings extends LitElement {
     }
 
     .theme-button.active {
-      background: var(--color-primary, #3498db);
-      border-color: var(--color-primary, #3498db);
+      background: var(--color-primary, #2477ad);
+      border-color: var(--color-primary, #2477ad);
       color: var(--button-text, white);
       box-shadow: 0 2px 8px rgba(52, 152, 219, 0.3);
     }
 
     .theme-button.active:hover {
-      background: var(--button-hover, #2980b9);
-      border-color: var(--button-hover, #2980b9);
+      background: var(--button-hover, #1f6a9a);
+      border-color: var(--button-hover, #1f6a9a);
     }
 
     .theme-icon {
@@ -107,7 +107,7 @@ export class ThemeSettings extends LitElement {
       appearance: none;
       width: 20px;
       height: 20px;
-      background: var(--color-primary, #3498db);
+      background: var(--color-primary, #2477ad);
       border-radius: 50%;
       cursor: pointer;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
@@ -116,7 +116,7 @@ export class ThemeSettings extends LitElement {
     .scale-slider::-moz-range-thumb {
       width: 20px;
       height: 20px;
-      background: var(--color-primary, #3498db);
+      background: var(--color-primary, #2477ad);
       border-radius: 50%;
       cursor: pointer;
       border: none;
@@ -184,8 +184,8 @@ export class ThemeSettings extends LitElement {
     .system-preference {
       margin-top: 0.5rem;
       padding: 0.5rem;
-      background: color-mix(in srgb, var(--color-primary, #3498db) 10%, transparent);
-      border-left: 3px solid var(--color-primary, #3498db);
+      background: color-mix(in srgb, var(--color-primary, #2477ad) 10%, transparent);
+      border-left: 3px solid var(--color-primary, #2477ad);
       border-radius: 2px;
       font-size: var(--font-ui-small);
     }

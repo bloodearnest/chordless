@@ -47,8 +47,8 @@ export class DriveSyncPanel extends LitElement {
     }
 
     .sync-status.syncing {
-      background: color-mix(in srgb, var(--color-primary, #3498db) 10%, transparent);
-      border: 1px solid color-mix(in srgb, var(--color-primary, #3498db) 30%, transparent);
+      background: color-mix(in srgb, var(--color-primary, #2477ad) 10%, transparent);
+      border: 1px solid color-mix(in srgb, var(--color-primary, #2477ad) 30%, transparent);
     }
 
     .sync-status.error {
@@ -87,7 +87,7 @@ export class DriveSyncPanel extends LitElement {
 
     .progress-fill {
       height: 100%;
-      background: var(--color-primary, #3498db);
+      background: var(--color-primary, #2477ad);
       transition: width 0.3s;
       border-radius: 2px;
     }

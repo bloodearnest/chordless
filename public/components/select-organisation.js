@@ -55,7 +55,7 @@ export class SelectOrganisation extends LitElement {
       }
 
       .organisation-item.current {
-        background: color-mix(in srgb, var(--color-primary, #3498db) 20%, transparent);
+        background: color-mix(in srgb, var(--color-primary, #2477ad) 20%, transparent);
         cursor: default;
       }
 
@@ -66,7 +66,7 @@ export class SelectOrganisation extends LitElement {
 
       .organisation-badge {
         padding: 0.3rem 0.8rem;
-        background: var(--color-primary, #3498db);
+        background: var(--color-primary, #2477ad);
         color: var(--button-text, white);
         border-radius: 4px;
         font-size: var(--font-ui-small);

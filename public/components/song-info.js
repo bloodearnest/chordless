@@ -66,7 +66,7 @@ export class SongInfo extends LitElement {
 
     .modal-info-label {
       font-size: var(--font-ui);
-      color: var(--text-secondary, #95a5a6);
+      color: var(--text-secondary, #5f6b6d);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
@@ -80,7 +80,7 @@ export class SongInfo extends LitElement {
 
     .modal-appearances-title {
       font-size: var(--font-ui);
-      color: var(--text-secondary, #95a5a6);
+      color: var(--text-secondary, #5f6b6d);
       text-transform: uppercase;
       letter-spacing: 0.5px;
       font-weight: 600;
@@ -100,7 +100,7 @@ export class SongInfo extends LitElement {
       padding: 0.75rem;
       background-color: var(--bg-secondary, #f8f9fa);
       border-radius: 6px;
-      border-left: 3px solid var(--color-primary, #3498db);
+      border-left: 3px solid var(--color-primary, #2477ad);
     }
 
     .appearance-date {
@@ -111,12 +111,12 @@ export class SongInfo extends LitElement {
 
     .appearance-relative {
       font-size: var(--font-ui-small);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     .appearance-meta {
       font-size: var(--font-ui);
-      color: var(--text-secondary, #95a5a6);
+      color: var(--text-secondary, #5f6b6d);
       margin-top: 0.3rem;
     }
 
@@ -130,7 +130,7 @@ export class SongInfo extends LitElement {
       display: inline-flex;
       align-items: center;
       gap: 0.5rem;
-      color: var(--button-bg, #3498db);
+      color: var(--button-bg, #2477ad);
       text-decoration: none;
       font-size: var(--font-ui-small);
       transition: color 0.2s;
@@ -153,7 +153,7 @@ export class SongInfo extends LitElement {
       background-color: var(--bg-secondary, #f8f9fa);
       border-radius: 6px;
       font-size: var(--font-ui);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       white-space: pre-line;
       line-height: 1.6;
     }
@@ -161,13 +161,13 @@ export class SongInfo extends LitElement {
     .loading {
       text-align: center;
       padding: 2rem;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
     }
 
     .empty {
       text-align: center;
       padding: 2rem;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       font-style: italic;
     }
   `

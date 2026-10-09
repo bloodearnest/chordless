@@ -104,7 +104,7 @@ export class SongCard extends LitElement {
     .card:hover {
       transform: translateY(-2px);
       box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-      border-color: var(--color-primary, #3498db);
+      border-color: var(--color-primary, #2477ad);
     }
 
     .card:active {
@@ -143,7 +143,7 @@ export class SongCard extends LitElement {
 
     .artist {
       font-size: var(--font-ui);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       font-style: italic;
       text-align: right;
       white-space: nowrap;
@@ -153,13 +153,13 @@ export class SongCard extends LitElement {
 
     .meta {
       font-size: var(--font-ui);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       flex: 1;
     }
 
     .last-played {
       font-size: var(--font-ui-small);
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       text-align: right;
       white-space: nowrap;
     }
@@ -175,7 +175,7 @@ export class SongCard extends LitElement {
 
     /* Empty state */
     .empty {
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       font-style: italic;
     }
 
@@ -240,7 +240,7 @@ export class SongCard extends LitElement {
       width: 50px;
       background: var(--bg-tertiary, #f8f9fa);
       cursor: grab;
-      color: var(--text-secondary, #95a5a6);
+      color: var(--text-secondary, #5f6b6d);
       font-size: 24px;
       user-select: none;
       touch-action: none;
@@ -251,7 +251,7 @@ export class SongCard extends LitElement {
 
     .drag-handle:hover {
       background: var(--bg-secondary, #ecf0f1);
-      color: var(--color-primary, #3498db);
+      color: var(--color-primary, #2477ad);
     }
 
     .drag-handle:active {

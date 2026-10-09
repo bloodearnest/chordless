@@ -164,7 +164,7 @@ export class AppModal extends LitElement {
       right: 1.5rem;
       background: none;
       border: 2px solid currentColor;
-      color: var(--text-secondary, #7f8c8d);
+      color: var(--text-secondary, #5f6b6d);
       width: 2.5rem;
       height: 2.5rem;
       padding: 0;
