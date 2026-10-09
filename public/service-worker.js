@@ -530,7 +530,6 @@ async function handleRoute(url) {
 
   let htmlFile = HTML_FILES[path]
   if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist'
-  if (!htmlFile && /^\/share\/[a-zA-Z0-9]+$/.test(path)) htmlFile = '/share'
 
   if (!htmlFile) {
     return new Response('Not Found', { status: 404 })

@@ -383,7 +383,7 @@ class PageApp {
         // Update header to show setlist info
         this.updateHeader(null, true)
 
-        // Header buttons (info, share, edit mode) must work on an empty setlist too.
+        // Header buttons (info, edit mode) must work on an empty setlist too.
         // Both are guarded, so the full setup after the first song is added is fine.
         this.setupEditMode()
         this.setupAppHeaderEvents()
@@ -1787,17 +1787,6 @@ class PageApp {
         this.showSongInfo(this._currentSongForInfo)
       } else {
         this.showSetlistInfo()
-      }
-    })
-
-    // Listen to share button clicks
-    appHeader.addEventListener('share-click', () => {
-      const shareModal = document.getElementById('share-modal')
-      const shareSetlist = document.getElementById('share-setlist')
-      if (shareModal && shareSetlist) {
-        // Pass current setlist to share component
-        shareSetlist.setlist = this.currentSetlist
-        shareModal.show()
       }
     })
 
