@@ -14,6 +14,8 @@ import './icon.js'
  *
  * Slots:
  * @slot controls - Center section for page-specific controls (key selector, font controls, etc.)
+ * @slot actions - Buttons that stay in the top row at its end, even on phones (e.g. the
+ *   home page's create-setlist button)
  *
  * Events:
  * @fires edit-mode-toggle - When edit toggle button is clicked
@@ -37,6 +39,7 @@ export class AppHeader extends LitElement {
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
     expanded: { type: Boolean, reflect: true },
+    _slottedControls: { state: true }, // whether anything is in the controls slot
   }
 
   static styles = css`
@@ -243,6 +246,29 @@ export class AppHeader extends LitElement {
       }
     }
 
+    /* Buttons that stay in the top row, at its end (slot="actions") */
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-left: auto;
+    }
+
+    /* Nothing to show in a second row: no toggle for it, and the top row (with
+       any actions) takes the whole width */
+    .header-row-2[hidden] {
+      display: none !important;
+    }
+
+    header:not(.has-controls) .header-row-1 {
+      flex: 1;
+    }
+
+    header:not(.has-controls) .header-row-1 .title {
+      flex: 1;
+      min-width: 0;
+    }
+
     .icon-button {
       background: none;
       border: 2px solid var(--header-text, white);
@@ -294,6 +320,7 @@ export class AppHeader extends LitElement {
     this.editMode = false
     this.disableAnimation = false
     this.expanded = false
+    this._slottedControls = false
     this._previousTitle = ''
     this._animating = false
     this._displayTitle = '' // The title actually shown in the UI
@@ -391,9 +418,19 @@ export class AppHeader extends LitElement {
     }, 0)
   }
 
+  /** Whether there's anything for the second row (controls, edit, info) */
+  _hasControls() {
+    return this.showEditToggle || this.showInfoButton || this._slottedControls
+  }
+
+  _onControlsSlotChange(event) {
+    this._slottedControls = event.target.assignedElements().length > 0
+  }
+
   render() {
+    const hasControls = this._hasControls()
     return html`
-      <header part="header">
+      <header part="header" class=${hasControls ? 'has-controls' : ''}>
         <!-- Row 1: Always visible on mobile -->
         <div class="header-row-1">
           <button
@@ -419,18 +456,25 @@ export class AppHeader extends LitElement {
             ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}
             ${this._displayTitle}
           </div>
-          <button
-            class="icon-button expand-toggle ${this.expanded ? 'active' : ''}"
-            @click=${this._handleExpandToggle}
-            aria-label="Toggle header controls"
-          >
-            ${this.expanded ? '▲' : '▼'}
-          </button>
+          <div class="header-actions"><slot name="actions"></slot></div>
+          ${
+            hasControls
+              ? html`
+                <button
+                  class="icon-button expand-toggle ${this.expanded ? 'active' : ''}"
+                  @click=${this._handleExpandToggle}
+                  aria-label="Toggle header controls"
+                >
+                  ${this.expanded ? '▲' : '▼'}
+                </button>
+              `
+              : ''
+          }
         </div>
 
         <!-- Row 2: Controls (hidden on mobile unless expanded) -->
-        <div class="header-row-2">
-          <slot name="controls"></slot>
+        <div class="header-row-2" ?hidden=${!hasControls}>
+          <slot name="controls" @slotchange=${this._onControlsSlotChange}></slot>
 
           ${
             this.showEditToggle

@@ -11,6 +11,12 @@ song edit UI
 - key popover on a setlist overview song card: with little room below, it flips upward
   and its top runs off the screen (key-selector's positioning doesn't clamp to the viewport)
 
+styles
+- css/style.css has many rules for elements that now live inside components' shadow
+  DOM, where page CSS can't reach (.nav-menu-item, .key-selector, .expand-toggle, ...).
+  Remove them, checking each against the light DOM pages and the two light-DOM
+  components (chord-display, setlist-overview)
+
 preferences
   - custom section visibility defaults
   - revisit the configuration panels (Preferences, Storage, media player settings): too

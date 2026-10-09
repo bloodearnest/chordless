@@ -31,27 +31,10 @@
   <body>
     <div class="app-container">
       <div id="storage-view" class="view">
-        <header>
-          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <h1>Storage</h1>
-          <div></div>
-        </header>
+        <app-header heading="Storage"></app-header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu" for="nav-menu-button"></nav-menu>
+        <nav-menu id="nav-menu"></nav-menu>
 
         <main class="home-content">
           <storage-page id="storage-page"></storage-page>
@@ -101,6 +84,7 @@
     <!-- Initialize theme manager (loads saved preferences automatically) -->
     <script type="module" src="/js/theme-manager.js"></script>
 
+    <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/select-organisation.js"></script>
     <script type="module" src="/components/storage-page.js"></script>

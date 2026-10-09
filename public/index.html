@@ -31,23 +31,9 @@
   <body>
     <div class="app-container">
       <div id="home-view" class="view">
-        <header>
-          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <h1 id="page-title">Chordless</h1>
+        <app-header id="home-app-header" heading="Chordless">
           <button
+            slot="actions"
             class="create-setlist-button"
             id="create-setlist-button"
             aria-label="Create new setlist"
@@ -64,10 +50,10 @@
               <line x1="5" y1="12" x2="19" y2="12"></line>
             </svg>
           </button>
-        </header>
+        </app-header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu" for="nav-menu-button"></nav-menu>
+        <nav-menu id="nav-menu"></nav-menu>
 
         <main class="home-content">
           <div id="setlist-list" class="setlist-list">
@@ -124,13 +110,12 @@
       import { getCurrentOrganisation } from '/js/organisation.js';
 
       const { name } = getCurrentOrganisation();
-      const titleElement = document.getElementById('page-title');
-      if (titleElement) {
-        titleElement.textContent = `Setlists - ${name}`;
-      }
+      // Set before app-header upgrades, so it shows without the title fade
+      document.getElementById('home-app-header').setAttribute('heading', `Setlists - ${name}`);
     </script>
 
     <!-- Import the components -->
+    <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-modal.js"></script>
     <script type="module" src="/components/setlist-details-form.js"></script>

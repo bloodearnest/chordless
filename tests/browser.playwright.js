@@ -575,6 +575,19 @@ test.describe('Bookmarklet page', () => {
 })
 
 test.describe('Navigation menu', () => {
+  test('every page has the app header, whose menu button opens the menu', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 700 })
+    for (const url of ['/', '/preferences', '/storage', '/bookmarklet', '/import-song']) {
+      await page.goto(url)
+      const header = page.locator('app-header')
+      await expect(header, url).toHaveCount(1)
+      // Nothing for a second row, so no toggle for it
+      await expect(header.locator('.expand-toggle'), url).toHaveCount(0)
+      await header.getByRole('button', { name: 'Navigation menu' }).click()
+      await expect(page.locator('nav-menu .nav-menu-popover'), url).toBeVisible()
+    }
+  })
+
   for (const path of [
     '/',
     '/songs',

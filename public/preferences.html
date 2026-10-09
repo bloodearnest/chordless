@@ -31,27 +31,10 @@
   <body>
     <div class="app-container">
       <div id="preferences-view" class="view">
-        <header>
-          <button class="nav-menu-button" id="nav-menu-button" aria-label="Navigation menu">
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <line x1="3" y1="12" x2="21" y2="12"></line>
-              <line x1="3" y1="6" x2="21" y2="6"></line>
-              <line x1="3" y1="18" x2="21" y2="18"></line>
-            </svg>
-          </button>
-          <h1>Preferences</h1>
-          <div></div>
-        </header>
+        <app-header heading="Preferences"></app-header>
 
         <!-- Navigation menu component -->
-        <nav-menu id="nav-menu" for="nav-menu-button"></nav-menu>
+        <nav-menu id="nav-menu"></nav-menu>
 
         <main class="home-content">
           <h2 style="margin: 2rem 1rem 1rem 1rem">Preferences</h2>
@@ -92,6 +75,7 @@
       }
     </script>
     <!-- Import components -->
+    <script type="module" src="/components/app-header.js"></script>
     <script type="module" src="/components/nav-menu.js"></script>
     <script type="module" src="/components/app-preferences.js"></script>
     <script type="module" src="/js/setlist-app.js"></script>
