@@ -207,6 +207,43 @@ test.describe('Song library', () => {
   })
 })
 
+test.describe('Display preferences', () => {
+  test('changing them updates the chords already showing', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page)
+    await page.goto('/songs#info-test-song')
+    await page.reload()
+    await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
+    // Info Test Song is in G: [G]Amazing [C]grace
+    const chords = page.locator('#library-song-content song-section chord-display')
+    await expect(chords.nth(1)).toHaveText('C')
+
+    const set = (name, value) =>
+      page.evaluate(async ({ name, value }) => (await import('/js/preferences.js'))[name](value), {
+        name,
+        value,
+      })
+    await set('setUseNashvilleNumbers', true)
+    await expect(chords.nth(0)).toHaveText('1')
+    await expect(chords.nth(1)).toHaveText('4')
+    await set('setUseNashvilleNumbers', false)
+    await expect(chords.nth(1)).toHaveText('C')
+
+    // Bb in another key shows as B♭ with unicode accidentals
+    await page.locator('#library-app-header .edit-toggle').click()
+    const keySelector = page.locator('#library-key-selector')
+    await keySelector.locator('.picker-button').click()
+    await keySelector
+      .locator('.picker-option', { has: page.locator('.option-label', { hasText: /^F$/ }) })
+      .click()
+    await expect(chords.nth(1)).toHaveText('Bb')
+    await set('setUseUnicodeAccidentals', true)
+    await expect(chords.nth(1)).toHaveText('B♭')
+    expect(errors).toEqual([])
+  })
+})
+
 test.describe('Song info', () => {
   test('info button on the songs page opens the song info dialog', async ({ page }) => {
     const errors = []

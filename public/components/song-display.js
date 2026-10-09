@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import './song-section.js'
-import { getUseNashvilleNumbers, NashvillePreferenceEvent } from '../js/preferences.js'
+import { ContextConsumer } from '@lit/context'
+import { displayPreferencesContext } from '../js/display-preferences.js'
 import { transposeKeyName } from '../js/transpose.js'
 
 /**
@@ -17,7 +18,6 @@ export class SongDisplay extends LitElement {
     parsed: { type: Object, attribute: false },
     /** @type {number} Song index in setlist */
     songIndex: { type: Number, attribute: 'song-index' },
-    _useNashville: { state: true },
     /** @type {number} Current capo value */
     capo: { type: Number },
   }
@@ -32,22 +32,13 @@ export class SongDisplay extends LitElement {
     super()
     this.parsed = null
     this.songIndex = 0
-    this._useNashville = getUseNashvilleNumbers()
     this.capo = 0
-    this._onNashvilleChange = event => {
-      this._useNashville = !!event.enabled
-      this.requestUpdate()
-    }
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    window.addEventListener(NashvillePreferenceEvent.type, this._onNashvilleChange)
-  }
-
-  disconnectedCallback() {
-    window.removeEventListener(NashvillePreferenceEvent.type, this._onNashvilleChange)
-    super.disconnectedCallback()
+    // How chords are shown (Nashville numbers, unicode accidentals), passed
+    // down to the sections; re-renders when a preference changes
+    this._display = new ContextConsumer(this, {
+      context: displayPreferencesContext,
+      subscribe: true,
+    })
   }
 
   render() {
@@ -74,7 +65,8 @@ export class SongDisplay extends LitElement {
         .label=${section.label || ''}
         .songIndex=${this.songIndex}
         .sectionIndex=${index}
-        .displayAsNashville=${this._useNashville}
+        .displayAsNashville=${this._display.value?.nashville ?? false}
+        .unicodeAccidentals=${this._display.value?.unicodeAccidentals ?? false}
         .displayKey=${displayKey}
         .capo=${capoValue}
         .capoKey=${capoKey}

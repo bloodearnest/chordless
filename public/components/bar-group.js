@@ -7,6 +7,8 @@ export class BarGroup extends LitElement {
   static properties = {
     data: { type: Object, attribute: false },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
+    /** Show accidentals as ♯ and ♭ */
+    unicodeAccidentals: { type: Boolean, attribute: 'unicode-accidentals' },
     displayKey: { type: String, attribute: 'display-key' },
     capo: { type: Number },
     capoKey: { type: String, attribute: 'capo-key' },
@@ -86,6 +88,7 @@ export class BarGroup extends LitElement {
     super()
     this.data = null
     this.displayAsNashville = false
+    this.unicodeAccidentals = false
     this.displayKey = ''
     this.capo = 0
     this.capoKey = ''
@@ -157,6 +160,7 @@ export class BarGroup extends LitElement {
           .chord=${chordText}
           .displayKey=${this.displayKey}
           .displayAsNashville=${this.displayAsNashville}
+          .unicodeAccidentals=${this.unicodeAccidentals}
           .capo=${this.capo}
           .capoKey=${this.capoKey}
         ></chord-display>

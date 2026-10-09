@@ -8,6 +8,7 @@ const EXCLUDE_PATTERNS = [
   /\/node\//,
   /\/cjs\//,
   /\/testing\//,
+  /\/src\//, // TypeScript sources (@lit/context ships them)
 ];
 
 // Used only by the Cloudflare Worker (bundled by wrangler from node_modules),

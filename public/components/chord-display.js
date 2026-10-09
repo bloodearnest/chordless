@@ -1,5 +1,4 @@
 import { html, LitElement } from 'lit'
-import { AccidentalsPreferenceEvent, getUseUnicodeAccidentals } from '../js/preferences.js'
 import {
   convertChordToNashville,
   isNashvilleChord,
@@ -18,7 +17,7 @@ export class ChordDisplay extends LitElement {
     invalid: { type: Boolean, reflect: true },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     displayKey: { type: String, attribute: 'display-key' },
-    _useUnicodeAccidentals: { state: true },
+    unicodeAccidentals: { type: Boolean, attribute: 'unicode-accidentals' },
     capo: { type: Number },
     capoKey: { type: String, attribute: 'capo-key' },
   }
@@ -29,28 +28,14 @@ export class ChordDisplay extends LitElement {
     this.invalid = false
     this.displayAsNashville = false
     this.displayKey = ''
-    this._useUnicodeAccidentals = getUseUnicodeAccidentals()
+    this.unicodeAccidentals = false
     this.capo = 0
     this.capoKey = ''
-    this._onAccidentalPreferenceChange = event => {
-      this._useUnicodeAccidentals = !!event.enabled
-      this.requestUpdate()
-    }
   }
 
   createRenderRoot() {
     // Render into light DOM so existing chord styles continue to apply
     return this
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    window.addEventListener(AccidentalsPreferenceEvent.type, this._onAccidentalPreferenceChange)
-  }
-
-  disconnectedCallback() {
-    window.removeEventListener(AccidentalsPreferenceEvent.type, this._onAccidentalPreferenceChange)
-    super.disconnectedCallback()
   }
 
   render() {
@@ -66,7 +51,7 @@ export class ChordDisplay extends LitElement {
       return html`${text}`
     }
     return html`${segments.map(segment => {
-      const value = this._useUnicodeAccidentals
+      const value = this.unicodeAccidentals
         ? convertAccidentalsToSymbols(segment.value)
         : segment.value
       return segment.type === 'extension'

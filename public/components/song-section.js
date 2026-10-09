@@ -59,6 +59,8 @@ export class SongSection extends LitElement {
     lines: { attribute: false },
     /** @type {boolean} Display chords as Nashville numbers */
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
+    /** Show accidentals as ♯ and ♭ */
+    unicodeAccidentals: { type: Boolean, attribute: 'unicode-accidentals' },
     /** @type {string} Key used for Nashville conversion */
     displayKey: { type: String, attribute: 'display-key' },
     /** @type {number} Capo value for display-only transposition */
@@ -404,6 +406,7 @@ export class SongSection extends LitElement {
     this._onControlClick = this._onControlClick.bind(this)
     this._onSummaryClick = this._onSummaryClick.bind(this)
     this.displayAsNashville = false
+    this.unicodeAccidentals = false
     this.displayKey = ''
     this.capo = 0
     this.capoKey = ''
@@ -619,6 +622,7 @@ export class SongSection extends LitElement {
         return html`<bar-group
           .data=${block.data}
           .displayAsNashville=${this.displayAsNashville}
+          .unicodeAccidentals=${this.unicodeAccidentals}
           .displayKey=${this.displayKey}
           .capo=${this.capo}
           .capoKey=${this.capoKey}
@@ -701,6 +705,7 @@ export class SongSection extends LitElement {
           .chord=${chordText}
           .displayKey=${this.displayKey}
           .displayAsNashville=${this.displayAsNashville}
+          .unicodeAccidentals=${this.unicodeAccidentals}
           .invalid=${!!isInvalid}
           .capo=${this.capo}
           .capoKey=${this.capoKey}
