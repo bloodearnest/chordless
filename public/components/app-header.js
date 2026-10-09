@@ -347,7 +347,6 @@ export class AppHeader extends LitElement {
     this._previousTitle = ''
     this._animating = false
     this._displayTitle = '' // The title actually shown in the UI
-    this._pendingTitle = null // Title waiting to be shown after fade-out
   }
 
   connectedCallback() {
@@ -373,11 +372,8 @@ export class AppHeader extends LitElement {
         this._previousTitle = this.heading
         this.requestUpdate()
       } else if (!this._animating) {
-        // Animate the transition
+        // Animate the transition (one already running shows the latest heading when done)
         this._animateTransition()
-      } else {
-        // Animation in progress - queue this update
-        this._pendingTitle = this.heading
       }
     }
   }
@@ -409,9 +405,8 @@ export class AppHeader extends LitElement {
 
     this._animating = false
 
-    // Handle any pending updates
-    if (this._pendingTitle && this._pendingTitle !== this.heading) {
-      this._pendingTitle = null
+    // The heading may have changed again while fading: show the latest
+    if (this._displayTitle !== this.heading) {
       this._animateTransition()
     }
   }
