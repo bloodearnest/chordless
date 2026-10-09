@@ -1,5 +1,5 @@
 // Playwright test runner for browser-based tests
-import { expect, test } from '@playwright/test'
+import { expect, fromDB, openApp, seedSong, test } from './fixtures.js'
 
 test.describe('Application Pages', () => {
   test('home page should load', async ({ page }) => {
@@ -129,65 +129,8 @@ test.describe('Loading', () => {
   })
 })
 
-/** Open the app once so it sets up its organisation and database (the first
- * visit reloads when the service worker takes control), then add a test song,
- * and optionally a setlist containing it. */
-async function seedSong(page, { setlistId = null } = {}) {
-  await page.goto('/songs')
-  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-  // The app reloads itself when the service worker first takes control, which
-  // can land mid-seed. A page loaded under the worker doesn't, so reload first.
-  await page.reload()
-  await page.evaluate(async setlistId => {
-    const { getCurrentDB } = await import('/js/db.js')
-    const db = await getCurrentDB()
-    const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
-    await db.saveChordPro({
-      id: 'chordpro-info-test',
-      content,
-      contentHash: 'test',
-      lastModified: Date.now(),
-    })
-    await db.saveSong({
-      uuid: 'info-test-song',
-      id: 'title-info-test-song',
-      title: 'Info Test Song',
-      titleNormalized: 'infotestsong',
-      isDefault: true,
-      chordproFileId: 'chordpro-info-test',
-      modifiedDate: new Date().toISOString(),
-    })
-    if (setlistId) {
-      await db.saveSetlist({
-        id: setlistId,
-        date: '2026-10-11',
-        time: '10:30',
-        type: 'Church Service',
-        name: '',
-        owner: 'Ann',
-        songs: [{ songId: 'title-info-test-song', key: 'A' }],
-        createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString(),
-      })
-    }
-  }, setlistId)
-}
-
-/** Call a method of the app's database, e.g. fromDB(page, 'getSong', uuid) */
-function fromDB(page, method, arg) {
-  return page.evaluate(
-    async ({ method, arg }) => {
-      const { getCurrentDB } = await import('/js/db.js')
-      return (await getCurrentDB())[method](arg)
-    },
-    { method, arg }
-  )
-}
-
 test.describe('Song library', () => {
   test('changing the key transposes the chords, each time from the original', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await page.goto('/songs#info-test-song')
     await page.reload()
@@ -203,14 +146,11 @@ test.describe('Song library', () => {
       await expect(keySelector.locator('.picker-button')).toHaveText(key)
       await expect(firstChord).toHaveText(key)
     }
-    expect(errors).toEqual([])
   })
 })
 
 test.describe('Display preferences', () => {
   test('changing them updates the chords already showing', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await page.goto('/songs#info-test-song')
     await page.reload()
@@ -240,14 +180,11 @@ test.describe('Display preferences', () => {
     await expect(chords.nth(1)).toHaveText('Bb')
     await set('setUseUnicodeAccidentals', true)
     await expect(chords.nth(1)).toHaveText('B♭')
-    expect(errors).toEqual([])
   })
 })
 
 test.describe('Song info', () => {
   test('info button on the songs page opens the song info dialog', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
 
     await page.goto('/songs#info-test-song')
@@ -260,12 +197,9 @@ test.describe('Song info', () => {
     await expect(modal).toHaveAttribute('open', '')
     await expect(modal).toHaveAttribute('heading', 'Info Test Song')
     await expect(page.locator('#library-song-info-dialog song-info')).toContainText('Key')
-    expect(errors).toEqual([])
   })
 
   test('info button on a setlist song opens the song info dialog', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist#song-0')
@@ -278,12 +212,9 @@ test.describe('Song info', () => {
     await expect(modal).toHaveAttribute('heading', 'Info Test Song')
     // Played in this setlist, so it appears in the history
     await expect(page.locator('#song-info-dialog song-info')).toContainText('Ann')
-    expect(errors).toEqual([])
   })
 
   test('info button on the setlist overview opens the setlist info dialog', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist')
@@ -296,15 +227,10 @@ test.describe('Song info', () => {
     const info = page.locator('#setlist-info-dialog setlist-info')
     await expect(info).toContainText('Ann')
     await expect(info).toContainText('1 song')
-    expect(errors).toEqual([])
   })
 
   test('a leader entered when creating a setlist appears in its info', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
-    await page.goto('/')
-    await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
-    await page.reload() // see seedSong: avoid the app's first-load reload mid-test
+    await openApp(page)
 
     await page.locator('#create-setlist-button').click()
     const form = page.locator('#create-setlist-form')
@@ -313,9 +239,6 @@ test.describe('Song info', () => {
     await form.locator('#leader-other').fill('  Ann  ')
     await form.locator('button[type="submit"]').click()
     await page.waitForURL(/\/setlist\//)
-    // The redirect from the home page logs an aborted view transition and a null
-    // rejection; only check for errors on the new setlist page itself
-    errors.length = 0
 
     // The info button does nothing until the new setlist has loaded
     const modal = page.locator('#setlist-info-dialog app-modal')
@@ -324,12 +247,9 @@ test.describe('Song info', () => {
       await expect(modal).toHaveAttribute('open', '', { timeout: 500 })
     }).toPass()
     await expect(page.locator('#setlist-info-dialog setlist-info')).toContainText('Ann')
-    expect(errors).toEqual([])
   })
 
   test('setlist details can be edited from the info dialog', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'edit-test-setlist' })
     await page.goto('/setlist/edit-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
@@ -372,7 +292,6 @@ test.describe('Song info', () => {
       date: '2026-10-18',
       name: 'Harvest',
     })
-    expect(errors).toEqual([])
   })
 
   test('cancelling a setlist details edit changes nothing', async ({ page }) => {
@@ -421,8 +340,6 @@ test.describe('Song import', () => {
   }
 
   test('shows a failed SongSelect download, and ignores other sites', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await page.goto('/import-song')
     await page.waitForFunction(() => customElements.get('song-import'))
     const songImport = page.locator('song-import')
@@ -434,7 +351,6 @@ test.describe('Song import', () => {
 
     await postMessageFrom(page, 'https://songselect.ccli.com', failed)
     await expect(songImport.getByRole('alert')).toContainText('Download failed: 403')
-    expect(errors).toEqual([])
   })
 
   /** A file for the import page's file picker */
@@ -445,8 +361,6 @@ test.describe('Song import', () => {
   test('imports several files into a new setlist, skipping ones that are not text', async ({
     page,
   }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await page.goto('/import-song')
     const songImport = page.locator('song-import')
@@ -466,7 +380,6 @@ test.describe('Song import', () => {
     const modal = songImport.locator('app-modal')
     await expect(modal).toHaveAttribute('open', '')
     await modal.locator('#name').fill('Files Test')
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await modal.locator('button[type="submit"]').click()
     await page.waitForURL(/\/setlist\//)
 
@@ -476,8 +389,6 @@ test.describe('Song import', () => {
   })
 
   test('imports pasted ChordPro into an existing setlist', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'paste-test-setlist' })
     await page.goto('/import-song')
     const songImport = page.locator('song-import')
@@ -485,7 +396,6 @@ test.describe('Song import', () => {
     await songImport.locator('.paste .add').click()
 
     await expect(page.getByRole('heading', { name: /Pasted Song/ })).toBeVisible()
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await songImport.locator('.add-to-setlist .add').click()
     await page.waitForURL(/\/setlist\/paste-test-setlist/)
 
@@ -504,8 +414,6 @@ test.describe('Song import', () => {
   })
 
   test('asks about each song already in the library among several', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await page.goto('/import-song')
     const songImport = page.locator('song-import')
@@ -520,7 +428,6 @@ test.describe('Song import', () => {
     await expect(songImport.locator('.choices')).toHaveCount(0)
     await songImport.locator('.update-all').click()
     await expect(songImport.locator('.songs')).toContainText('updated')
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await songImport.locator('.library-only').click()
     await page.waitForURL(/\/songs$/)
 
@@ -529,13 +436,10 @@ test.describe('Song import', () => {
   })
 
   test('saves a new song to the library only', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await importSong(page, 'Imported Song')
 
     await expect(page.getByRole('heading', { name: /Imported Song/ })).toBeVisible()
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await page.locator('song-import .library-only').click()
     await page.waitForURL(/\/songs#/)
 
@@ -545,8 +449,6 @@ test.describe('Song import', () => {
   })
 
   test('adds a new song to a new setlist', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await importSong(page, 'Imported Song')
 
@@ -554,7 +456,6 @@ test.describe('Song import', () => {
     const modal = page.locator('song-import app-modal')
     await expect(modal).toHaveAttribute('open', '')
     await modal.locator('#name').fill('Import Test')
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await modal.locator('button[type="submit"]').click()
     await page.waitForURL(/\/setlist\//)
 
@@ -565,8 +466,6 @@ test.describe('Song import', () => {
   })
 
   test('adds a song already in the library to an existing setlist', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'import-test-setlist' })
     await importSong(page, 'Info Test Song')
 
@@ -574,7 +473,6 @@ test.describe('Song import', () => {
     await expect(songImport).toContainText('already exists in your library')
     await songImport.locator('.use-existing').click()
     await expect(songImport.locator('select')).toHaveValue('import-test-setlist')
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await songImport.locator('.add').click()
     await page.waitForURL(/\/setlist\/import-test-setlist/)
 
@@ -585,15 +483,12 @@ test.describe('Song import', () => {
   })
 
   test('updates a song already in the library with the imported one', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page)
     await importSong(page, 'Info Test Song')
 
     const songImport = page.locator('song-import')
     await expect(songImport).toContainText('already exists in your library')
     await songImport.locator('.update').click()
-    expect(errors).toEqual([]) // leaving the page logs an aborted view transition
     await songImport.locator('.library-only').click()
     await page.waitForURL(/\/songs#info-test-song/)
 
@@ -636,15 +531,12 @@ test.describe('Bookmarklet page', () => {
 
 test.describe('Navigation menu', () => {
   test("choosing a song in a setlist's menu opens it", async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'menu-song-setlist' })
     await page.goto('/setlist/menu-song-setlist')
     await page.locator('setlist-overview song-card').first().waitFor()
     await page.locator('#app-header').getByRole('button', { name: 'Navigation menu' }).click()
     await page.locator('nav-menu').getByRole('button', { name: 'Info Test Song' }).click()
     await expect(page.locator('#app-header')).toContainText('Info Test Song')
-    expect(errors).toEqual([])
   })
 
   test('every page has the app header, whose menu button opens the menu', async ({ page }) => {
@@ -669,8 +561,6 @@ test.describe('Navigation menu', () => {
     '/bookmarklet',
   ]) {
     test(`opens and closes on ${path}`, async ({ page }) => {
-      const errors = []
-      page.on('pageerror', error => errors.push(error.message))
       await seedSong(page, { setlistId: 'menu-test-setlist' })
       await page.goto(path)
 
@@ -686,15 +576,12 @@ test.describe('Navigation menu', () => {
 
       await button.click()
       await expect(menu).toBeHidden()
-      expect(errors).toEqual([])
     })
   }
 })
 
 test.describe('Modals', () => {
   test('Esc closes a modal on a setlist, leaving the page shortcuts alone', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'esc-test-setlist' })
     await page.goto('/setlist/esc-test-setlist')
     await page.locator('setlist-overview song-card').first().click()
@@ -709,14 +596,11 @@ test.describe('Modals', () => {
     await expect(modal).toHaveCount(0)
     // The Esc was the modal's: edit mode is still on
     await expect(page.locator('body')).toHaveClass(/edit-mode/)
-    expect(errors).toEqual([])
   })
 })
 
 test.describe('Song settings', () => {
   test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'bpm-test-setlist' })
     // Give the library song a tempo of its own
     await page.evaluate(async () => {
@@ -749,12 +633,9 @@ test.describe('Song settings', () => {
 
     await openSong()
     await expect.poll(() => metadata.evaluate(element => element.bpm)).toBe(73)
-    expect(errors).toEqual([])
   })
 
   test('choosing a capo in the song settings changes it, and keeps it', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'capo-test-setlist' })
     await page.evaluate(() => localStorage.setItem('enable_capo', 'true'))
     await page.goto('/setlist/capo-test-setlist')
@@ -768,14 +649,11 @@ test.describe('Song settings', () => {
     await capo.getByRole('button', { name: /^2\b/ }).click()
     await expect(capo.locator('.picker-button')).toHaveText('2')
     await expect.poll(() => page.locator('#musical-metadata').evaluate(m => m.capoValue)).toBe(2)
-    expect(errors).toEqual([])
   })
 
   test('asking to reset a song closes the settings popover, which would cover the question', async ({
     page,
   }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'reset-test-setlist' })
     await page.goto('/setlist/reset-test-setlist')
     await page.locator('setlist-overview song-card').first().click()
@@ -793,14 +671,11 @@ test.describe('Song settings', () => {
 
     await modal.locator('.modal-btn-cancel').click()
     await expect(modal).not.toHaveAttribute('open', '')
-    expect(errors).toEqual([])
   })
 })
 
 test.describe('Media player settings', () => {
   test("the player's settings open in a modal, which Esc closes", async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'player-modal-setlist' })
     await page.goto('/setlist/player-modal-setlist')
     const player = page.locator('media-player')
@@ -815,14 +690,11 @@ test.describe('Media player settings', () => {
     await page.keyboard.press('Escape')
     await expect(modal).not.toHaveAttribute('open', '')
     await expect(modal.locator('media-player-settings')).toHaveCount(0)
-    expect(errors).toEqual([])
   })
 
   test('its switches work from the keyboard, and are off limits while the player is off', async ({
     page,
   }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await page.goto('/preferences')
     const settings = page.locator('media-player-settings')
     const player = settings.getByRole('switch', { name: 'Enable Media Player' })
@@ -839,12 +711,9 @@ test.describe('Media player settings', () => {
     await expect(player).toHaveAttribute('aria-checked', 'false')
     await expect(pads).toBeDisabled()
     await expect(settings.getByRole('switch', { name: 'Stereo Split (L/R)' })).toBeDisabled()
-    expect(errors).toEqual([])
   })
 
   test('turning the media player off in preferences hides it on setlists', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'player-test-setlist' })
 
     await page.goto('/setlist/player-test-setlist')
@@ -858,28 +727,22 @@ test.describe('Media player settings', () => {
     await page.goto('/setlist/player-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
     await expect(page.locator('media-player')).toBeHidden()
-    expect(errors).toEqual([])
   })
 })
 
 test.describe('Storage page', () => {
   test('the local data summary shows how many setlists and songs are stored', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'summary-setlist' })
     await page.goto('/storage')
     const summary = page.locator('storage-summary')
     await expect(summary.locator('.stat-row', { hasText: 'Setlists' })).toContainText('1')
     await expect(summary.locator('.stat-row', { hasText: 'Songs' })).toContainText('1')
-    expect(errors).toEqual([])
   })
 
   test('organisations: a duplicate name is refused in the form, and switching asks first', async ({
     page,
   }) => {
-    const errors = []
     const dialogs = []
-    page.on('pageerror', error => errors.push(error.message))
     page.on('dialog', dialog => {
       dialogs.push(dialog.message())
       dialog.dismiss()
@@ -909,12 +772,9 @@ test.describe('Storage page', () => {
     await expect(organisations.locator('.organisation-item.current')).toContainText(current)
     // No native alert() or confirm() along the way
     expect(dialogs).toEqual([])
-    expect(errors).toEqual([])
   })
 
   test('says when connecting to Google fails', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     // Without Google's sign-in script, connecting fails straight away
     await page.route('https://accounts.google.com/**', route => route.abort())
     await page.goto('/storage')
@@ -926,12 +786,9 @@ test.describe('Storage page', () => {
     await expect(page.locator('storage-page').getByRole('alert')).toContainText(
       'Authorization failed'
     )
-    expect(errors).toEqual([])
   })
 
   test('clearing local data asks first, then clears it', async ({ page }) => {
-    const errors = []
-    page.on('pageerror', error => errors.push(error.message))
     await seedSong(page, { setlistId: 'clear-test-setlist' })
     await page.goto('/storage')
 
@@ -951,6 +808,5 @@ test.describe('Storage page', () => {
     await clearButton.click()
     await Promise.all([page.waitForEvent('load'), modal.locator('.modal-btn-confirm').click()])
     expect(await fromDB(page, 'getSetlist', 'clear-test-setlist')).toBeFalsy()
-    expect(errors).toEqual([])
   })
 })

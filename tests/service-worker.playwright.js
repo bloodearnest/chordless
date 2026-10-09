@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './fixtures.js'
 
 // Wait for the SW to be installed, activated, and controlling the page.
 // skipWaiting + clients.claim means this happens on first load, but
