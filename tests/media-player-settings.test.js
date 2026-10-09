@@ -15,11 +15,13 @@ describe('media-player-settings', () => {
     // Let its own loading of the pad sets finish first
     await new Promise(resolve => setTimeout(resolve, 50))
 
-    settings.padSets = [
+    // As if the pad sets just loaded, with Warm Pads the active one
+    settings._padSets.list = [
       { id: 'builtin', name: 'Built-in Pads' },
       { id: 'drive-warm', name: 'Warm Pads' },
     ]
-    settings.selectedPadSetId = 'drive-warm'
+    settings._padSets.activeId = 'drive-warm'
+    settings.requestUpdate()
     await settings.updateComplete
 
     const select = settings.shadowRoot.querySelector('select')

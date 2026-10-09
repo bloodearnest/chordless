@@ -22,6 +22,7 @@ export default {
     'tests/nav-menu.test.js',
     'tests/song-section.test.js',
     'tests/pad-audio-controller.test.js',
+    'tests/pad-sets-controller.test.js',
     'tests/people.test.js',
     'tests/setlist-details-form.test.js',
     'tests/setlist-song.test.js',

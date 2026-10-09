@@ -1,26 +1,16 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import {
-  derivePadSetName,
-  getActivePadSet,
-  listPadSets,
-  PadSetChangedEvent,
-  PadSetListUpdatedEvent,
-  selectPadSet,
-  uploadPadSet,
-} from '../js/pad-set-service.js'
+import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.js'
+import { PadSetsController } from '../js/pad-sets-controller.js'
 import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 export class PadSetManager extends LitElement {
   static properties = {
-    _padSets: { state: true },
     _uploading: { state: true },
     _error: { state: true },
     _successMessage: { state: true },
     _padSetName: { state: true },
     _fileName: { state: true },
-    _loading: { state: true },
-    _selectedPadSetId: { state: true },
     _selectPadSetMessage: { state: true },
     _selectPadSetError: { state: true },
   }
@@ -126,51 +116,15 @@ export class PadSetManager extends LitElement {
   constructor() {
     super()
     this._fileInput = createRef()
-    this._padSets = []
+    this._padSets = new PadSetsController(this)
     this._uploading = false
     this._error = ''
     this._successMessage = ''
     this._padSetName = ''
     this._fileName = ''
-    this._loading = true
     this._selectedFile = null
-    this._selectedPadSetId = getActivePadSet().id
     this._selectPadSetMessage = ''
     this._selectPadSetError = ''
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    this._loadPadSets()
-    this._boundListUpdated = () => this._loadPadSets(true)
-    window.addEventListener(PadSetListUpdatedEvent.type, this._boundListUpdated)
-    this._boundPadSetChanged = event => {
-      const padSet = event.padSet
-      if (padSet) {
-        this._selectedPadSetId = padSet.id
-      } else {
-        this._selectedPadSetId = getActivePadSet().id
-      }
-    }
-    window.addEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback()
-    window.removeEventListener(PadSetListUpdatedEvent.type, this._boundListUpdated)
-    window.removeEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
-  }
-
-  async _loadPadSets(force = false) {
-    this._loading = true
-    try {
-      this._padSets = await listPadSets(force)
-    } catch (error) {
-      console.error('[PadSetManager] Failed to load pad sets:', error)
-      this._error = error.message || 'Unable to load pad sets.'
-    } finally {
-      this._loading = false
-    }
   }
 
   _handleFileChange(event) {
@@ -216,7 +170,7 @@ export class PadSetManager extends LitElement {
       this._padSetName = ''
       this._fileName = ''
       this._fileInput.value.value = ''
-      await this._loadPadSets(true)
+      await this._padSets.load(true)
     } catch (error) {
       console.error('[PadSetManager] Upload failed:', error)
       this._error = error.message || 'Failed to upload pad set.'
@@ -225,37 +179,32 @@ export class PadSetManager extends LitElement {
     }
   }
 
-  async _handleDefaultPadSetChange(newIdOrEvent) {
-    const newId = typeof newIdOrEvent === 'string' ? newIdOrEvent : newIdOrEvent.target.value
-    const fallbackTarget = typeof newIdOrEvent !== 'string' ? newIdOrEvent.target : null
-    const previousId = this._selectedPadSetId
-    this._selectedPadSetId = newId
+  async _handleDefaultPadSetChange(event) {
     this._selectPadSetMessage = ''
     this._selectPadSetError = ''
-
     try {
-      await selectPadSet(newId)
+      await this._padSets.select(event.target.value)
       this._selectPadSetMessage = 'Default pad set updated.'
     } catch (error) {
       console.error('[PadSetManager] Failed to set default pad set:', error)
-      this._selectedPadSetId = previousId
-      if (fallbackTarget) {
-        fallbackTarget.value = previousId
-      }
       this._selectPadSetError = error.message || 'Unable to set pad set.'
     }
   }
 
   _renderPadSetList() {
-    if (this._loading) {
+    if (this._padSets.loading) {
       return html`<div class="empty-state">Loading pad sets…</div>`
     }
 
-    if (!this._padSets || this._padSets.length === 0) {
+    if (this._padSets.error) {
+      return html`<div class="status-message error">${this._padSets.error}</div>`
+    }
+
+    if (this._padSets.list.length === 0) {
       return html`<div class="empty-state">No pad sets available yet.</div>`
     }
 
-    return this._padSets.map(
+    return this._padSets.list.map(
       set => html`
         <div class="padset-card">
           <label class="padset-header">
@@ -263,7 +212,7 @@ export class PadSetManager extends LitElement {
               type="radio"
               name="padset-selection"
               .value=${set.id}
-              ?checked=${this._selectedPadSetId === set.id}
+              .checked=${this._padSets.activeId === set.id}
               @change=${e => this._handleDefaultPadSetChange(e)}
             />
             <div>

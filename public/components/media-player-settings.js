@@ -1,12 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.js'
-import {
-  getActivePadSet,
-  listPadSets,
-  PadSetChangedEvent,
-  PadSetListUpdatedEvent,
-  selectPadSet,
-} from '../js/pad-set-service.js'
+import { PadSetsController } from '../js/pad-sets-controller.js'
 import { fieldStyles, switchStyles } from './shared-styles.js'
 
 /** The media player settings changed; settings is the new settings */
@@ -39,10 +33,6 @@ export class MediaPlayerSettings extends LitElement {
     padsEnabled: { type: Boolean, attribute: false },
     metronomeEnabled: { type: Boolean, attribute: false },
     stereoSplitEnabled: { type: Boolean, attribute: false },
-    padSets: { state: true },
-    selectedPadSetId: { state: true },
-    padSetLoading: { state: true },
-    padSetError: { state: true },
   }
 
   static styles = [
@@ -125,30 +115,7 @@ export class MediaPlayerSettings extends LitElement {
 
     Object.assign(this, loadMediaSettings())
 
-    this.padSets = []
-    this.selectedPadSetId = getActivePadSet().id
-    this.padSetLoading = false
-    this.padSetError = ''
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    this._loadPadSets()
-    this._boundPadSetListUpdated = () => this._loadPadSets(true)
-    this._boundPadSetChanged = event => {
-      const padSet = event.padSet
-      if (padSet) {
-        this.selectedPadSetId = padSet.id
-      }
-    }
-    window.addEventListener(PadSetListUpdatedEvent.type, this._boundPadSetListUpdated)
-    window.addEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback()
-    window.removeEventListener(PadSetListUpdatedEvent.type, this._boundPadSetListUpdated)
-    window.removeEventListener(PadSetChangedEvent.type, this._boundPadSetChanged)
+    this._padSets = new PadSetsController(this)
   }
 
   _saveSettings() {
@@ -200,39 +167,12 @@ export class MediaPlayerSettings extends LitElement {
     this._saveSettings()
   }
 
-  async _loadPadSets(force = false) {
-    this.padSetLoading = true
-    this.padSetError = ''
-    try {
-      const sets = await listPadSets(force)
-      this.padSets = sets
-      if (!sets.some(set => set.id === this.selectedPadSetId)) {
-        this.selectedPadSetId = getActivePadSet().id
-      }
-    } catch (error) {
-      console.error('[MediaPlayerSettings] Failed to load pad sets:', error)
-      this.padSetError = error.message || 'Unable to load pad sets.'
-    } finally {
-      this.padSetLoading = false
-    }
-  }
-
   async _handlePadSetChange(event) {
-    const newId = event.target.value
-    const previousId = this.selectedPadSetId
-    this.selectedPadSetId = newId
-    this.padSetLoading = true
-    this.padSetError = ''
-
     try {
-      await selectPadSet(newId)
+      await this._padSets.select(event.target.value)
     } catch (error) {
       console.error('[MediaPlayerSettings] Failed to switch pad set:', error)
-      this.padSetError = error.message || 'Unable to switch pad set.'
-      this.selectedPadSetId = previousId
-      event.target.value = previousId
-    } finally {
-      this.padSetLoading = false
+      event.target.value = this._padSets.activeId
     }
   }
 
@@ -282,16 +222,16 @@ export class MediaPlayerSettings extends LitElement {
                 name="padset-select"
                 class="field padset-select"
                 @change=${this._handlePadSetChange}
-                ?disabled=${this.padSetLoading || !this.mediaPlayerEnabled || !this.padsEnabled}
+                ?disabled=${this._padSets.loading || this._padSets.switching || !this.mediaPlayerEnabled || !this.padsEnabled}
               >
                 ${
                   // Selected on the option, not .value on the select: Lit sets the
                   // select's value before rendering its options, so a value whose
                   // option is new in this render was ignored
-                  this.padSets && this.padSets.length
-                    ? this.padSets.map(
+                  this._padSets.list.length
+                    ? this._padSets.list.map(
                         set => html`
-                          <option value=${set.id} .selected=${set.id === this.selectedPadSetId}>
+                          <option value=${set.id} .selected=${set.id === this._padSets.activeId}>
                             ${set.name}
                           </option>
                         `
@@ -300,13 +240,13 @@ export class MediaPlayerSettings extends LitElement {
                 }
               </select>
               ${
-                this.padSetLoading ? html`<div class="padset-message">Preparing pad set…</div>` : ''
+                this._padSets.loading || this._padSets.switching
+                  ? html`<div class="padset-message">Preparing pad set…</div>`
+                  : ''
               }
               ${
-                this.padSetError
-                  ? html`<div class="padset-message error">
-                    ${this.padSetError}
-                  </div>`
+                this._padSets.error
+                  ? html`<div class="padset-message error">${this._padSets.error}</div>`
                   : ''
               }
             </div>
