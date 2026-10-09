@@ -489,7 +489,13 @@ test.describe('Song settings', () => {
     await capo.locator('.picker-button').click()
     await capo.getByRole('button', { name: /^2\b/ }).click()
     await expect(capo.locator('.picker-button')).toHaveText('2')
-    await expect.poll(() => page.locator('#musical-metadata').evaluate(m => m.capoValue)).toBe(2)
+    const capoShown = () => page.locator('#musical-metadata').evaluate(m => m.capoValue)
+    await expect.poll(capoShown).toBe(2)
+
+    // ...and after a reload
+    await page.reload()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await expect.poll(capoShown).toBe(2)
   })
 
   test('asking to reset a song closes the settings popover, which would cover the question', async ({

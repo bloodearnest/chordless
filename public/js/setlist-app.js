@@ -1171,33 +1171,31 @@ class PageApp {
     this.updateNavigationMenu(route)
   }
 
+  /**
+   * Load this setlist's saved section states and capos, from localStorage
+   * state-<setlistId>, saved by the song models as {sectionState, capoValues}
+   * (keyed by song index). Saves made before the models were flat:
+   * {<songIndex>: sections, capo: capos}, and are still read.
+   */
   loadState() {
     const stateKey = `state-${this.currentSetlistId}`
-    const savedState = localStorage.getItem(stateKey)
-    if (savedState) {
-      try {
-        const parsed = JSON.parse(savedState)
-        // Extract capo data if it exists
-        if (parsed.capo) {
-          // Load capo values into runtime songs
-          if (this._capoEnabled) {
-            Object.keys(parsed.capo).forEach(songIndex => {
-              const index = parseInt(songIndex)
-              if (this.songs[index]) {
-                this.songs[index].currentCapo = this._normalizeCapoValue(parsed.capo[songIndex])
-              }
-            })
-          }
-          // Remove capo from sectionState since it's handled separately
-          delete parsed.capo
-        }
-        this.sectionState = parsed
-      } catch (e) {
-        console.error('Failed to parse saved state:', e)
-        this.sectionState = {}
+    let saved = {}
+    try {
+      saved = JSON.parse(localStorage.getItem(stateKey)) ?? {}
+    } catch (e) {
+      console.error('Failed to parse saved state:', e)
+    }
+    const sections =
+      saved.sectionState ??
+      Object.fromEntries(Object.entries(saved).filter(([key]) => /^\d+$/.test(key)))
+    const capos = saved.capoValues ?? saved.capo ?? {}
+
+    this.sectionState = sections
+    if (this._capoEnabled) {
+      for (const [songIndex, capo] of Object.entries(capos)) {
+        const song = this.songs[Number(songIndex)]
+        if (song) song.currentCapo = this._normalizeCapoValue(capo)
       }
-    } else {
-      this.sectionState = {}
     }
 
     // Apply capo defaults from song user prefs (for songs without explicit setlist override)
@@ -1242,21 +1240,20 @@ class PageApp {
     })
   }
 
+  /** Save the section states and capos, in the song models' format (see loadState) */
   saveState() {
-    const stateKey = `state-${this.currentSetlistId}`
-    const stateToSave = { ...this.sectionState }
-
-    // Save capo values if capo is enabled
+    const capoValues = {}
     if (this._capoEnabled) {
-      stateToSave.capo = {}
       this.songs.forEach((song, index) => {
         if (song.currentCapo !== undefined && song.currentCapo !== 0) {
-          stateToSave.capo[index] = song.currentCapo
+          capoValues[index] = song.currentCapo
         }
       })
     }
-
-    localStorage.setItem(stateKey, JSON.stringify(stateToSave))
+    localStorage.setItem(
+      `state-${this.currentSetlistId}`,
+      JSON.stringify({ sectionState: this.sectionState, capoValues })
+    )
   }
 
   /**
