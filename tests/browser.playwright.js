@@ -23,6 +23,19 @@ test.describe('Application Pages', () => {
     await page.waitForSelector('#song-view', { timeout: 5000 })
     expect(await page.locator('#song-view').count()).toBe(1)
   })
+
+  test('every page follows the system dark mode', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' })
+    const background = async url => {
+      await page.goto(url)
+      await page.waitForFunction(() => document.documentElement.style.length > 0)
+      return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
+    }
+    const dark = await background('/songs')
+    for (const url of ['/import-song', '/bookmarklet', '/storage']) {
+      expect(await background(url), url).toBe(dark)
+    }
+  })
 })
 
 test.describe('Loading', () => {
