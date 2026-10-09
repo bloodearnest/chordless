@@ -272,13 +272,21 @@ export class MediaPlayerSettings extends LitElement {
                 id="padset-select"
                 name="padset-select"
                 class="field padset-select"
-                .value=${this.selectedPadSetId || ''}
                 @change=${this._handlePadSetChange}
                 ?disabled=${this.padSetLoading || !this.mediaPlayerEnabled || !this.padsEnabled}
               >
                 ${
+                  // Selected on the option, not .value on the select: Lit sets the
+                  // select's value before rendering its options, so a value whose
+                  // option is new in this render was ignored
                   this.padSets && this.padSets.length
-                    ? this.padSets.map(set => html` <option value=${set.id}>${set.name}</option> `)
+                    ? this.padSets.map(
+                        set => html`
+                          <option value=${set.id} .selected=${set.id === this.selectedPadSetId}>
+                            ${set.name}
+                          </option>
+                        `
+                      )
                     : html`<option value="builtin">Built-in Pads</option>`
                 }
               </select>

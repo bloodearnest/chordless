@@ -15,6 +15,7 @@ export default {
     'tests/keyboard.test.js',
     'tests/library-song.test.js',
     'tests/lyrics-normalizer.test.js',
+    'tests/media-player-settings.test.js',
     'tests/media-settings.test.js',
     'tests/metronome-controller.test.js',
     'tests/key-selector.test.js',
