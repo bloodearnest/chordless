@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.js'
 import { getCurrentOrganisation } from '../js/organisation.js'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
@@ -120,6 +121,7 @@ export class DriveSyncPanel extends LitElement {
 
   constructor() {
     super()
+    this._resetModal = createRef()
     this.syncAvailable = false
     this.syncing = false
     this.syncProgress = null
@@ -154,7 +156,7 @@ export class DriveSyncPanel extends LitElement {
   async _handleReset() {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
-    if (!(await this.renderRoot.querySelector('#reset-modal').ask())) return
+    if (!(await this._resetModal.value.ask())) return
 
     this.syncing = true
     this.syncError = null
@@ -251,7 +253,7 @@ export class DriveSyncPanel extends LitElement {
           ⤓ Reset from Google Drive
         </button>
         <app-modal
-          id="reset-modal"
+          ${ref(this._resetModal)}
           type="confirm"
           size="small"
           heading="Reset from Google Drive?"

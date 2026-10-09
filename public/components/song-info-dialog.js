@@ -1,4 +1,5 @@
 import { html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './song-info.js'
 
@@ -26,6 +27,7 @@ export class SongInfoDialog extends LitElement {
 
   constructor() {
     super()
+    this._modal = createRef()
     this.db = null
     this._title = ''
     this._song = null
@@ -86,17 +88,17 @@ export class SongInfoDialog extends LitElement {
   }
 
   close() {
-    this.renderRoot?.querySelector('app-modal')?.close()
+    this._modal.value?.close()
   }
 
   async _open() {
     await this.updateComplete
-    this.renderRoot.querySelector('app-modal').show()
+    this._modal.value.show()
   }
 
   render() {
     return html`
-      <app-modal size="fullscreen" heading=${this._title || 'Song info'}>
+      <app-modal ${ref(this._modal)} size="fullscreen" heading=${this._title || 'Song info'}>
         <song-info
           .song=${this._song}
           .appearances=${this._appearances}

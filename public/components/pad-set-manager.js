@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import {
   derivePadSetName,
   getActivePadSet,
@@ -124,6 +125,7 @@ export class PadSetManager extends LitElement {
 
   constructor() {
     super()
+    this._fileInput = createRef()
     this._padSets = []
     this._uploading = false
     this._error = ''
@@ -213,7 +215,7 @@ export class PadSetManager extends LitElement {
       this._selectedFile = null
       this._padSetName = ''
       this._fileName = ''
-      this.shadowRoot.getElementById('padset-file-input').value = ''
+      this._fileInput.value.value = ''
       await this._loadPadSets(true)
     } catch (error) {
       console.error('[PadSetManager] Upload failed:', error)
@@ -314,6 +316,7 @@ export class PadSetManager extends LitElement {
           <label for="padset-file-input">Pad Set ZIP File</label>
           <input
             id="padset-file-input"
+            ${ref(this._fileInput)}
             class="field"
             type="file"
             accept=".zip"

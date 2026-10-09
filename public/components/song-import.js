@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.js'
 import { ChordProParser } from '../js/parser.js'
 import { getOrganisationPeople } from '../js/people.js'
@@ -292,6 +293,9 @@ export class SongImport extends LitElement {
 
   constructor() {
     super()
+    this._paste = createRef()
+    this._setlistSelect = createRef()
+    this._newSetlistModalRef = createRef()
     this._state = 'pick'
     this._error = ''
     this._imports = []
@@ -369,7 +373,7 @@ export class SongImport extends LitElement {
   }
 
   _importPasted() {
-    const chordproText = this.renderRoot.querySelector('textarea').value
+    const chordproText = this._paste.value.value
     this.receiveAll([{ name: 'Pasted text', chordproText, source: 'paste' }])
   }
 
@@ -452,7 +456,7 @@ export class SongImport extends LitElement {
   }
 
   _addToChosenSetlist() {
-    const select = this.renderRoot.querySelector('select')
+    const select = this._setlistSelect.value
     this._addToSetlist(select.value)
   }
 
@@ -496,7 +500,7 @@ export class SongImport extends LitElement {
   }
 
   _newSetlistModal() {
-    return this.renderRoot.querySelector('app-modal')
+    return this._newSetlistModalRef.value
   }
 
   render() {
@@ -516,7 +520,7 @@ export class SongImport extends LitElement {
           : ''
       }
       ${unresolved.length ? this._renderDuplicates(unresolved) : this._renderChoices()}
-      <app-modal heading="Create New Setlist">
+      <app-modal ${ref(this._newSetlistModalRef)} heading="Create New Setlist">
         ${
           this._newSetlist
             ? html`
@@ -552,7 +556,7 @@ export class SongImport extends LitElement {
           <div class="icon">📝</div>
           <div class="content">
             <label class="title" for="paste">Paste ChordPro</label>
-            <textarea id="paste" rows="6" placeholder="{title: Amazing Grace}"></textarea>
+            <textarea id="paste" ${ref(this._paste)} rows="6" placeholder="{title: Amazing Grace}"></textarea>
             <button class="btn primary add" @click=${this._importPasted}>Import</button>
           </div>
         </div>
@@ -667,7 +671,7 @@ export class SongImport extends LitElement {
                 <div class="content">
                   <label class="title" for="setlist">Add to Setlist</label>
                   <div class="setlist-picker">
-                    <select id="setlist">
+                    <select id="setlist" ${ref(this._setlistSelect)}>
                       ${this._setlists.map(setlist => {
                         const date = formatSetlistDate(setlist.date, 'short')
                         return html`<option value=${setlist.id}>

@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './icon.js'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
@@ -171,19 +172,6 @@ export class AppHeader extends LitElement {
       flex-shrink: 0;
     }
 
-    .header-center {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      flex: 0 0 auto;
-      justify-content: flex-end;
-      transition: opacity 0.3s ease-in-out;
-    }
-
-    .header-center.fade-out {
-      opacity: 0;
-    }
-
     ::slotted(.header-controls-slot) {
       display: flex;
       align-items: center;
@@ -347,6 +335,7 @@ export class AppHeader extends LitElement {
 
   constructor() {
     super()
+    this._title = createRef()
     this.heading = ''
     this.showEditToggle = false
     this.showInfoButton = false
@@ -376,10 +365,6 @@ export class AppHeader extends LitElement {
   updated(changedProperties) {
     super.updated(changedProperties)
 
-    // Cache DOM element references after each render
-    this._cachedTitleEl = this.shadowRoot?.querySelector('.title')
-    this._cachedCenterEl = this.shadowRoot?.querySelector('.header-center')
-
     // Handle title changes
     if (changedProperties.has('heading') && this.heading !== this._previousTitle) {
       if (this.disableAnimation) {
@@ -401,13 +386,9 @@ export class AppHeader extends LitElement {
     if (this._animating) return
     this._animating = true
 
-    // Use cached references for initial fade-out
-    const titleEl = this._cachedTitleEl
-    const centerEl = this._cachedCenterEl
-
-    // Fade out old content
+    // Fade out the old title (Lit keeps the same element across renders)
+    const titleEl = this._title.value
     titleEl?.classList.add('fade-out')
-    centerEl?.classList.add('fade-out')
 
     // Wait for fade-out to complete
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -420,15 +401,8 @@ export class AppHeader extends LitElement {
     // Wait for re-render
     await this.updateComplete
 
-    // Get fresh references after re-render
-    const newTitleEl = this.shadowRoot?.querySelector('.title')
-    const newCenterEl = this.shadowRoot?.querySelector('.header-center')
-
-    // Fade in new content
-    requestAnimationFrame(() => {
-      newTitleEl?.classList.remove('fade-out')
-      newCenterEl?.classList.remove('fade-out')
-    })
+    // Fade in the new one
+    requestAnimationFrame(() => titleEl?.classList.remove('fade-out'))
 
     // Wait for fade-in to complete
     await new Promise(resolve => setTimeout(resolve, 300))
@@ -475,7 +449,7 @@ export class AppHeader extends LitElement {
           >
             <app-icon name="menu" size="24"></app-icon>
           </button>
-          <div class="title" part="title">
+          <div class="title" part="title" ${ref(this._title)}>
             ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}
             ${this._displayTitle}
           </div>

@@ -1,4 +1,5 @@
 import { html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './icon.js'
 import './setlist-details-form.js'
@@ -42,6 +43,7 @@ export class SetlistInfoDialog extends LitElement {
 
   constructor() {
     super()
+    this._modalRef = createRef()
     this.people = []
     this._setlist = null
     this._editing = false
@@ -66,7 +68,7 @@ export class SetlistInfoDialog extends LitElement {
   }
 
   _modal() {
-    return this.renderRoot?.querySelector('app-modal')
+    return this._modalRef.value
   }
 
   _save(event) {
@@ -84,6 +86,7 @@ export class SetlistInfoDialog extends LitElement {
     const heading = this._setlist ? setlistTitle(this._setlist, 'long') : 'Setlist info'
     return html`
       <app-modal
+        ${ref(this._modalRef)}
         size="fullscreen"
         heading=${this._editing ? `Edit: ${heading}` : heading}
         @app-modal:close=${() => {

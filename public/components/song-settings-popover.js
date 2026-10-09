@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {
@@ -130,6 +131,7 @@ export class SongSettingsPopover extends LitElement {
 
   constructor() {
     super()
+    this._popover = createRef()
     this.popoverId = 'song-settings-popover'
     this.triggerButton = null
     this.bpmValue = 120
@@ -138,7 +140,7 @@ export class SongSettingsPopover extends LitElement {
   }
 
   get popover() {
-    return this.shadowRoot?.querySelector(`#${this.popoverId}`)
+    return this._popover.value
   }
 
   connectedCallback() {
@@ -240,7 +242,7 @@ export class SongSettingsPopover extends LitElement {
     const canIncrementBPM = this.bpmValue < this.bpmMax
 
     return html`
-      <div id="${this.popoverId}" class="settings-popover" popover="manual">
+      <div id="${this.popoverId}" ${ref(this._popover)} class="settings-popover" popover="manual">
         <div class="settings-content">
           <!-- Row 1: Key selector and Capo selector -->
           <slot name="key-selector"></slot>

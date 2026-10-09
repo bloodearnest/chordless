@@ -1,5 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
+import { createRef, ref } from 'lit/directives/ref.js'
 import { isBarMarker } from '../js/utils/chord-utils.js'
 import {
   formatHiddenLyricsText,
@@ -388,6 +389,7 @@ export class SongSection extends LitElement {
 
   constructor() {
     super()
+    this._wrapper = createRef()
     this.songIndex = 0
     this.sectionIndex = 0
     this.editMode = false
@@ -501,6 +503,7 @@ export class SongSection extends LitElement {
     const sectionLabel = label || `Section ${this.sectionIndex + 1}`
 
     return html` <div
+      ${ref(this._wrapper)}
       class=${classMap(classes)}
       role="region"
       aria-label=${sectionLabel}
@@ -729,7 +732,7 @@ export class SongSection extends LitElement {
   }
 
   _getWrapper() {
-    return this.renderRoot?.querySelector('.song-section-wrapper') || null
+    return this._wrapper.value || null
   }
 
   /**

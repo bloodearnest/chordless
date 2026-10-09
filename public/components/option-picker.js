@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
@@ -118,6 +119,8 @@ export class OptionPicker extends LitElement {
 
   constructor() {
     super()
+    this._button = createRef()
+    this._popoverRef = createRef()
     this.label = ''
     this.editMode = false
   }
@@ -133,7 +136,7 @@ export class OptionPicker extends LitElement {
   }
 
   _popover() {
-    return this.renderRoot.querySelector('.picker-popover')
+    return this._popoverRef.value
   }
 
   _choose(value) {
@@ -149,7 +152,7 @@ export class OptionPicker extends LitElement {
   _positionPopover(event) {
     if (event.newState !== 'open') return
     const popover = event.currentTarget
-    const button = this.renderRoot.querySelector('.picker-button').getBoundingClientRect()
+    const button = this._button.value.getBoundingClientRect()
     const margin = 8
     const height = popover.offsetHeight
     const below = window.innerHeight - button.bottom - margin
@@ -167,10 +170,16 @@ export class OptionPicker extends LitElement {
   render() {
     return html`
       ${this.label ? html`<span class="meta-label">${this.label}:</span>` : ''}
-      <button class="picker-button" type="button" popovertarget="options">
+      <button ${ref(this._button)} class="picker-button" type="button" popovertarget="options">
         ${this._displayValue()}
       </button>
-      <div id="options" class="picker-popover" popover @toggle=${this._positionPopover}>
+      <div
+        id="options"
+        ${ref(this._popoverRef)}
+        class="picker-popover"
+        popover
+        @toggle=${this._positionPopover}
+      >
         ${this._options().map(
           option => html`
             <button

@@ -1,4 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './icon.js'
 import { buttonStyles } from './shared-styles.js'
 
@@ -243,6 +244,7 @@ export class AppModal extends LitElement {
 
   constructor() {
     super()
+    this._dialogRef = createRef()
     this.open = false
     this.heading = ''
     this.message = ''
@@ -261,12 +263,13 @@ export class AppModal extends LitElement {
   }
 
   _dialog() {
-    return this.renderRoot.querySelector('dialog')
+    return this._dialogRef.value
   }
 
   render() {
     return html`
       <dialog
+        ${ref(this._dialogRef)}
         class="modal-content ${this._hasHeader() ? '' : 'headerless'}"
         part="content"
         aria-labelledby=${this.heading ? 'modal-title' : nothing}

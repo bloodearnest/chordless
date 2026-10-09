@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { live } from 'lit/directives/live.js'
+import { createRef, ref } from 'lit/directives/ref.js'
 import { determineSetlistType } from '../js/db.js'
 
 /** The form was submitted; details is {date, time, type, name, owner, ownerId} */
@@ -159,6 +160,10 @@ export class SetlistDetailsForm extends LitElement {
 
   constructor() {
     super()
+    this._dateField = createRef()
+    this._nameField = createRef()
+    this._typeField = createRef()
+    this._leaderField = createRef()
     this.setlist = {}
     this.submitLabel = 'Save'
     this.autoType = false
@@ -169,10 +174,10 @@ export class SetlistDetailsForm extends LitElement {
 
   _guessType() {
     if (!this.autoType) return
-    const date = this.renderRoot.getElementById('date').value
-    const name = this.renderRoot.getElementById('name').value
+    const date = this._dateField.value.value
+    const name = this._nameField.value.value
     if (date) {
-      this.renderRoot.getElementById('type').value = determineSetlistType(date, name)
+      this._typeField.value.value = determineSetlistType(date, name)
     }
   }
 
@@ -187,8 +192,8 @@ export class SetlistDetailsForm extends LitElement {
     // Set selects after render (a .value binding runs before their options
     // exist), and only for a new setlist, so the user's choices aren't undone
     if (changed.has('setlist') || changed.has('people')) {
-      this.renderRoot.getElementById('type').value = this.setlist?.type || SETLIST_TYPES[0]
-      this.renderRoot.getElementById('leader').value = this._leaders.selected
+      this._typeField.value.value = this.setlist?.type || SETLIST_TYPES[0]
+      this._leaderField.value.value = this._leaders.selected
     }
   }
 
@@ -235,6 +240,7 @@ export class SetlistDetailsForm extends LitElement {
           <input
             type="date"
             id="date"
+            ${ref(this._dateField)}
             name="date"
             .value=${live(s.date || '')}
             @change=${this._guessType}
@@ -247,7 +253,7 @@ export class SetlistDetailsForm extends LitElement {
         </div>
         <div class="form-field">
           <label for="type">Type</label>
-          <select id="type" name="type" required>
+          <select id="type" name="type" required ${ref(this._typeField)}>
             ${types.map(type => html`<option value=${type}>${type}</option>`)}
           </select>
         </div>
@@ -256,6 +262,7 @@ export class SetlistDetailsForm extends LitElement {
           <input
             type="text"
             id="name"
+            ${ref(this._nameField)}
             name="name"
             .value=${live(s.name || '')}
             @input=${this._guessType}
@@ -264,7 +271,7 @@ export class SetlistDetailsForm extends LitElement {
         </div>
         <div class="form-field">
           <label for="leader">Leader (optional)</label>
-          <select id="leader" name="leader" @change=${this._leaderChanged}>
+          <select id="leader" name="leader" ${ref(this._leaderField)} @change=${this._leaderChanged}>
             <option value="">No leader</option>
             ${this._leaders.options.map(
               o => html`<option value=${o.value}>${o.person.name}</option>`

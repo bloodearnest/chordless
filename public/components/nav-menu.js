@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './app-preferences.js'
 import './icon.js'
@@ -174,6 +175,8 @@ export class NavMenu extends LitElement {
 
   constructor() {
     super()
+    this._popover = createRef()
+    this._preferencesModal = createRef()
     this.showBackButton = false
     this.backLabel = 'Back'
     this.popoverId = 'nav-menu-popover'
@@ -188,7 +191,7 @@ export class NavMenu extends LitElement {
    * @returns {HTMLElement|null} The popover element
    */
   get popover() {
-    return this.shadowRoot?.querySelector(`#${this.popoverId}`)
+    return this._popover.value
   }
 
   connectedCallback() {
@@ -271,7 +274,13 @@ export class NavMenu extends LitElement {
 
   render() {
     return html`
-      <div id="${this.popoverId}" class="nav-menu-popover" part="popover" popover="manual">
+      <div
+        id="${this.popoverId}"
+        ${ref(this._popover)}
+        class="nav-menu-popover"
+        part="popover"
+        popover="manual"
+      >
         <nav class="nav-menu" part="nav">
           ${
             this.showOverviewLink || this.songs?.length > 0
@@ -356,7 +365,7 @@ export class NavMenu extends LitElement {
         </nav>
       </div>
 
-      <app-modal id="nav-preferences-modal" size="fullscreen" heading="Preferences">
+      <app-modal ${ref(this._preferencesModal)} size="fullscreen" heading="Preferences">
         ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
       </app-modal>
     `
@@ -388,7 +397,7 @@ export class NavMenu extends LitElement {
     this._preferencesOpened = true
     // Wait for next frame to ensure popover is closed before showing modal
     requestAnimationFrame(() => {
-      const modal = this.shadowRoot?.querySelector('#nav-preferences-modal')
+      const modal = this._preferencesModal.value
       if (modal) {
         modal.show()
       }

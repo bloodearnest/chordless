@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './drive-sync-panel.js'
 import './storage-summary.js'
@@ -180,6 +181,8 @@ export class StoragePage extends LitElement {
 
   constructor() {
     super()
+    this._logoutModal = createRef()
+    this._clearDataModal = createRef()
     this.isAuthenticated = false
     this.authStatus = 'checking'
     this.userInfo = null
@@ -401,13 +404,14 @@ export class StoragePage extends LitElement {
       </div>
       <app-modal
         id="clear-data-modal"
+        ${ref(this._clearDataModal)}
         type="confirm"
         heading="Clear local data?"
         confirm-label="Clear Local Data"
         message="This deletes this organisation's setlists and songs on this device, and all settings. Anything not yet synced to Google Drive is lost. This can't be undone."
       ></app-modal>
       <app-modal
-        id="logout-modal"
+        ${ref(this._logoutModal)}
         type="confirm"
         size="small"
         heading="Log out of Google Drive?"
@@ -440,7 +444,7 @@ export class StoragePage extends LitElement {
   }
 
   async _logout() {
-    if (!(await this.renderRoot.querySelector('#logout-modal').ask())) return
+    if (!(await this._logoutModal.value.ask())) return
 
     try {
       const { logout } = await import('../js/google-auth.js')
@@ -570,7 +574,7 @@ export class StoragePage extends LitElement {
   }
 
   async _handleClearDatabase() {
-    const modal = this.renderRoot.querySelector('#clear-data-modal')
+    const modal = this._clearDataModal.value
     if (!(await modal.ask())) return
     try {
       const { getCurrentDB } = await import('../js/db.js')

@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import { bookmarkletUrl } from '../js/songselect-bookmarklet.js'
 
 /**
@@ -85,6 +86,7 @@ export class BookmarkletInstaller extends LitElement {
 
   constructor() {
     super()
+    this._code = createRef()
     this._copyState = null
     this._url = bookmarkletUrl(window.location.origin)
   }
@@ -100,7 +102,7 @@ export class BookmarkletInstaller extends LitElement {
       this._copyState = 'copied'
     } catch (error) {
       console.warn('[Bookmarklet] Could not copy:', error)
-      this.renderRoot.querySelector('textarea').select()
+      this._code.value.select()
       this._copyState = 'failed'
     }
   }
@@ -113,7 +115,7 @@ export class BookmarkletInstaller extends LitElement {
         >
       </p>
       <slot></slot>
-      <textarea readonly aria-label="Bookmarklet code" .value=${this._url}></textarea>
+      <textarea ${ref(this._code)} readonly aria-label="Bookmarklet code" .value=${this._url}></textarea>
       <div class="copy-row">
         <button class="copy" @click=${this._copy}>📋 Copy Code</button>
         <span class="hint" role="status">

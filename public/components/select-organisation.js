@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
 import {
   createOrganisation,
   getCurrentOrganisation,
@@ -116,6 +117,7 @@ export class SelectOrganisation extends LitElement {
 
   constructor() {
     super()
+    this._switchModal = createRef()
     this._currentOrganisation = null
     this._organisations = []
     this._loading = true
@@ -147,7 +149,7 @@ export class SelectOrganisation extends LitElement {
       return
     }
 
-    const modal = this.renderRoot.querySelector('#switch-modal')
+    const modal = this._switchModal.value
     modal.message = `Switch to "${org.name}"? This reloads the page.`
     if (await modal.ask()) {
       await switchOrganisation(org.id)
@@ -279,6 +281,7 @@ export class SelectOrganisation extends LitElement {
         }
         <app-modal
           id="switch-modal"
+          ${ref(this._switchModal)}
           type="confirm"
           size="small"
           heading="Switch organisation?"
