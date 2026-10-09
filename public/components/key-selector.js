@@ -1,140 +1,31 @@
-import { css, html, LitElement } from 'lit'
+import { OptionPicker } from './option-picker.js'
 
 /**
  * KeySelector component
  *
- * Displays the current key and lets the user select a new key with
- * +/- offset indicators and original-key highlighting.
- *
- * Uses shadow DOM with encapsulated styles.
- * Uses native Popover API for the dropdown.
+ * Displays the current key and, in edit mode, lets the user choose another,
+ * each shown with its offset from the current key; the song's original key is
+ * marked with *. See OptionPicker.
  *
  * Properties:
  * @property {string} label - Label text (default: 'Key')
  * @property {string} value - Currently selected key
  * @property {Array<string>} keys - Available keys to select from
  * @property {string} originalKey - Original key of the song (marked with *)
- * @property {boolean} editMode - Whether component is in edit mode (affects styling)
+ * @property {boolean} editMode - Whether the key can be changed
  *
  * Events:
  * @fires key-change - When a new key is selected (detail: {value: string})
  */
-export class KeySelector extends LitElement {
+export class KeySelector extends OptionPicker {
   static properties = {
-    label: { type: String, attribute: 'label' },
-    value: { type: String, attribute: 'value' },
+    ...OptionPicker.properties,
+    value: { type: String },
     keys: { type: Array, attribute: false },
     originalKey: { type: String, attribute: 'original-key' },
-    editMode: { type: Boolean, attribute: false },
   }
 
-  static styles = css`
-    :host {
-      display: contents;
-    }
-
-    .key-display-wrapper {
-      display: contents;
-    }
-
-    .meta-label {
-      opacity: 0.8;
-      font-size: var(--font-ui-small);
-      color: var(--header-text, #fff);
-      margin: 0;
-    }
-
-    .key-selector {
-      background: transparent;
-      color: var(--header-text, #fff);
-      border: 2px solid transparent;
-      border-radius: 6px;
-      padding: 0.4rem 0.6rem;
-      font-size: var(--font-ui);
-      cursor: default;
-      transition: all 0.2s;
-      font-family: inherit;
-      text-align: center;
-      pointer-events: none;
-      white-space: nowrap;
-      min-width: 2.5rem;
-      min-height: 2.5rem;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    /* In edit mode, make it look and behave like a button */
-    :host([edit-mode]) .key-selector {
-      background-color: color-mix(in srgb, currentColor 20%, transparent);
-      border-color: color-mix(in srgb, currentColor 30%, transparent);
-      cursor: pointer;
-      pointer-events: auto;
-    }
-
-    /* Popover container */
-    .key-popover {
-      background-color: var(--header-bg, #2c3e50);
-      color: var(--header-text, #fff);
-      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
-      border-radius: 8px;
-      padding: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      max-height: 80vh;
-      overflow-y: auto;
-      margin: 0;
-      inset: unset;
-    }
-
-    .key-popover::backdrop {
-      background-color: rgba(0, 0, 0, 0.3);
-    }
-
-    /* Key options list */
-    .key-options-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    /* Individual key option */
-    .key-option-item {
-      background-color: transparent;
-      color: var(--header-text, #fff);
-      border: none;
-      border-radius: 6px;
-      padding: 0.75rem 1rem;
-      font-size: var(--font-ui);
-      cursor: pointer;
-      transition: background-color 0.2s;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 1rem;
-      font-family: inherit;
-      text-align: left;
-      width: 100%;
-      white-space: nowrap;
-    }
-
-    .key-option-item:hover {
-      background-color: color-mix(in srgb, currentColor 20%, transparent);
-    }
-
-    .key-option-item.selected {
-      background-color: color-mix(in srgb, currentColor 30%, transparent);
-    }
-
-    .key-option-item .key-name {
-      flex: 0 0 auto;
-    }
-
-    .key-option-item .key-offset {
-      flex: 0 0 auto;
-      font-size: var(--font-ui);
-      color: color-mix(in srgb, currentColor 50%, transparent);
-    }
-  `
+  static changeEvent = 'key-change'
 
   constructor() {
     super()
@@ -142,112 +33,22 @@ export class KeySelector extends LitElement {
     this.value = '-'
     this.keys = []
     this.originalKey = ''
-    this.editMode = false
-    // Generate unique ID for popover
-    this._popoverId = `key-popover-${Math.random().toString(36).substr(2, 9)}`
   }
 
-  connectedCallback() {
-    super.connectedCallback()
-    // Reflect edit-mode as attribute for CSS selectors
-    this._updateEditModeAttribute()
+  _displayValue() {
+    return this.value || '-'
   }
 
-  updated(changedProperties) {
-    super.updated(changedProperties)
-
-    if (changedProperties.has('editMode')) {
-      this._updateEditModeAttribute()
-    }
-  }
-
-  _updateEditModeAttribute() {
-    if (this.editMode) {
-      this.setAttribute('edit-mode', '')
-    } else {
-      this.removeAttribute('edit-mode')
-    }
-  }
-
-  /** Position the popover under the button as it opens, or above it near the bottom */
-  _positionPopover(event) {
-    if (event.newState !== 'open') return
-    const button = this.shadowRoot.querySelector('.key-selector')
-    const popover = event.currentTarget
-    const buttonRect = button.getBoundingClientRect()
-    const popoverHeight = popover.offsetHeight
-    const spaceBelow = window.innerHeight - buttonRect.bottom
-    if (spaceBelow < popoverHeight + 8) {
-      popover.style.top = `${buttonRect.top - popoverHeight - 4}px`
-    } else {
-      popover.style.top = `${buttonRect.bottom + 4}px`
-    }
-    popover.style.left = `${buttonRect.left}px`
-  }
-
-  _handleSelection(key) {
-    if (!key || key === this.value) return
-
-    // Close the popover
-    const popover = this.shadowRoot.querySelector('.key-popover')
-    if (popover) {
-      popover.hidePopover()
-    }
-
-    // Dispatch event
-    this.dispatchEvent(
-      new CustomEvent('key-change', {
-        detail: { value: key },
-        bubbles: true,
-        composed: true,
-      })
-    )
-  }
-
-  _renderOptions() {
-    if (!this.keys || this.keys.length === 0) {
-      return html``
-    }
-
+  _options() {
     const currentIndex = this.keys.indexOf(this.value)
     return this.keys.map((key, index) => {
-      const positionOffset = currentIndex === -1 ? 0 : currentIndex - index
-      const offsetText =
-        positionOffset === 0 ? '' : `${positionOffset > 0 ? '+' : '-'}${Math.abs(positionOffset)}`
-      const keyText = key === this.originalKey ? `${key}*` : key
-      const isSelected = key === this.value
-
-      return html`
-        <button
-          class="key-option-item ${isSelected ? 'selected' : ''}"
-          @click=${() => this._handleSelection(key)}
-          type="button"
-        >
-          <span class="key-name">${keyText}</span>
-          <span class="key-offset">${offsetText}</span>
-        </button>
-      `
+      const offset = currentIndex === -1 ? 0 : currentIndex - index
+      return {
+        value: key,
+        label: key === this.originalKey ? `${key}*` : key,
+        hint: offset === 0 ? '' : `${offset > 0 ? '+' : '-'}${Math.abs(offset)}`,
+      }
     })
-  }
-
-  render() {
-    const displayValue = this.value || '-'
-    return html`
-      <div class="key-display-wrapper">
-        ${this.label ? html`<label class="meta-label">${this.label}:</label>` : ''}
-        <button class="key-selector" popovertarget=${this._popoverId} type="button">
-          <span>${displayValue}</span>
-        </button>
-        <div
-          id=${this._popoverId}
-          class="key-popover"
-          popover
-          @toggle=${this._positionPopover}
-        >
-          <div class="key-options-list">${this._renderOptions()}</div>
-        </div>
-      </div>
-    `
   }
 }
 

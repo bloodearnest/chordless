@@ -23,8 +23,8 @@ describe('key-selector', () => {
 
   it('opens its popover below the button', async () => {
     await setUp()
-    const button = selector.shadowRoot.querySelector('.key-selector')
-    const popover = selector.shadowRoot.querySelector('.key-popover')
+    const button = selector.shadowRoot.querySelector('.picker-button')
+    const popover = selector.shadowRoot.querySelector('.picker-popover')
 
     button.click()
     await settle()
@@ -40,7 +40,7 @@ describe('key-selector', () => {
       selector.value = key
       await selector.updateComplete
     }
-    const button = selector.shadowRoot.querySelector('.key-selector')
+    const button = selector.shadowRoot.querySelector('.picker-button')
     let measured = 0
     const measure = button.getBoundingClientRect.bind(button)
     button.getBoundingClientRect = () => {
@@ -59,13 +59,62 @@ describe('key-selector', () => {
     selector.addEventListener('key-change', event => {
       chosen = event.detail.value
     })
-    selector.shadowRoot.querySelector('.key-selector').click()
+    selector.shadowRoot.querySelector('.picker-button').click()
     await settle()
-    const options = selector.shadowRoot.querySelectorAll('.key-option-item')
+    const options = selector.shadowRoot.querySelectorAll('.picker-option')
     options[2].click()
     expect(chosen).to.equal('E')
-    expect(selector.shadowRoot.querySelector('.key-popover').matches(':popover-open')).to.equal(
+    expect(selector.shadowRoot.querySelector('.picker-popover').matches(':popover-open')).to.equal(
       false
     )
+  })
+})
+
+describe('capo-selector', () => {
+  let selector
+
+  afterEach(() => selector?.remove())
+
+  async function setUp({ value = 0, referenceKey = 'G', top = 10 } = {}) {
+    await import('../public/components/capo-selector.js')
+    selector = document.createElement('capo-selector')
+    selector.value = value
+    selector.referenceKey = referenceKey
+    selector.editMode = true
+    selector.style.cssText = `position: fixed; top: ${top}px; left: 20px`
+    document.body.appendChild(selector)
+    await selector.updateComplete
+    return selector
+  }
+
+  const settle = () => new Promise(resolve => setTimeout(resolve))
+
+  it('offers capo 0 to 11, each with the key the chords are played in', async () => {
+    await setUp()
+    const options = [...selector.shadowRoot.querySelectorAll('.picker-option')]
+    expect(options).to.have.length(12)
+    expect(options[0].textContent.replace(/\s+/g, ' ').trim()).to.equal('0 G')
+    expect(options[2].textContent.replace(/\s+/g, ' ').trim()).to.equal('2 F')
+  })
+
+  it('sends capo-change with the chosen capo, as a number', async () => {
+    await setUp()
+    let chosen = null
+    selector.addEventListener('capo-change', event => {
+      chosen = event.detail.value
+    })
+    selector.shadowRoot.querySelector('.picker-button').click()
+    await settle()
+    selector.shadowRoot.querySelectorAll('.picker-option')[3].click()
+    expect(chosen).to.equal(3)
+  })
+
+  it('keeps its popover on screen when opened near the bottom', async () => {
+    await setUp({ top: window.innerHeight - 60 })
+    selector.shadowRoot.querySelector('.picker-button').click()
+    await settle()
+    const box = selector.shadowRoot.querySelector('.picker-popover').getBoundingClientRect()
+    expect(box.top).to.be.at.least(0)
+    expect(box.bottom).to.be.at.most(window.innerHeight)
   })
 })

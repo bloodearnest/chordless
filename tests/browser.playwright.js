@@ -680,6 +680,25 @@ test.describe('Song settings', () => {
     expect(errors).toEqual([])
   })
 
+  test('choosing a capo in the song settings changes it, and keeps it', async ({ page }) => {
+    const errors = []
+    page.on('pageerror', error => errors.push(error.message))
+    await seedSong(page, { setlistId: 'capo-test-setlist' })
+    await page.evaluate(() => localStorage.setItem('enable_capo', 'true'))
+    await page.goto('/setlist/capo-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header .edit-toggle').click()
+    await page.locator('#musical-metadata').click()
+
+    const capo = page.locator('#capo-selector')
+    await capo.locator('.picker-button').click()
+    await capo.getByRole('button', { name: /^2\b/ }).click()
+    await expect(capo.locator('.picker-button')).toHaveText('2')
+    await expect.poll(() => page.locator('#musical-metadata').evaluate(m => m.capoValue)).toBe(2)
+    expect(errors).toEqual([])
+  })
+
   test('asking to reset a song closes the settings popover, which would cover the question', async ({
     page,
   }) => {

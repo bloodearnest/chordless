@@ -1,203 +1,60 @@
-import { css, html, LitElement } from 'lit'
 import { transposeKeyName } from '../js/transpose.js'
+import { OptionPicker } from './option-picker.js'
 
 /**
- * Capo selector component.
- * Displays the currently selected capo, and when in edit mode allows choosing 0-11 via a popover.
+ * CapoSelector component
+ *
+ * Displays the current capo and, in edit mode, lets the user choose 0 to
+ * maxValue, each shown with the key the chords are played in at that capo
+ * (from referenceKey). See OptionPicker.
+ *
+ * Properties:
+ * @property {string} label - Label text (default: 'Capo')
+ * @property {number} value - Current capo
+ * @property {number} maxValue - Highest capo offered (at most 11)
+ * @property {string} referenceKey - The song's key, to show the key at each capo
+ * @property {boolean} editMode - Whether the capo can be changed
+ *
+ * Events:
+ * @fires capo-change - When a new capo is selected (detail: {value: number})
  */
-export class CapoSelector extends LitElement {
+export class CapoSelector extends OptionPicker {
   static properties = {
-    label: { type: String },
+    ...OptionPicker.properties,
     value: { type: Number },
     maxValue: { type: Number, attribute: 'max-value' },
-    editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
     referenceKey: { type: String, attribute: 'reference-key' },
   }
 
-  static styles = css`
-    :host {
-      display: contents;
-    }
-
-    .capo-wrapper {
-      display: contents;
-    }
-
-    .meta-label {
-      opacity: 0.8;
-      font-size: var(--font-ui-small);
-      color: var(--header-text, #fff);
-      margin: 0;
-      padding-left: 0.5rem;
-    }
-
-    .capo-button {
-      background: transparent;
-      color: var(--header-text, #fff);
-      border: 2px solid transparent;
-      border-radius: 6px;
-      padding: 0.4rem 0.6rem;
-      font-size: var(--font-ui);
-      font-family: inherit;
-      min-width: 2.5rem;
-      min-height: 2.5rem;
-      text-align: center;
-      cursor: default;
-      pointer-events: none;
-      transition: all 0.2s;
-      white-space: nowrap;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    :host([edit-mode]) .capo-button {
-      background-color: color-mix(in srgb, currentColor 20%, transparent);
-      border-color: color-mix(in srgb, currentColor 30%, transparent);
-      cursor: pointer;
-      pointer-events: auto;
-    }
-
-    .capo-popover {
-      background-color: var(--header-bg, #2c3e50);
-      color: var(--header-text, #fff);
-      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
-      border-radius: 8px;
-      padding: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-      max-height: 70vh;
-      overflow-y: auto;
-      margin: 0;
-      inset: unset;
-    }
-
-    .capo-popover::backdrop {
-      background-color: rgba(0, 0, 0, 0.3);
-    }
-
-    .capo-option {
-      width: 100%;
-      border: none;
-      background: transparent;
-      color: var(--header-text, #fff);
-      font-size: var(--font-ui-small);
-      padding: 0.5rem 0.75rem;
-      text-align: left;
-      display: flex;
-      justify-content: space-between;
-      border-radius: 6px;
-      cursor: pointer;
-      font-family: inherit;
-      transition: background-color 0.2s;
-    }
-
-    .capo-option:hover,
-    .capo-option.selected {
-      background-color: color-mix(in srgb, currentColor 20%, transparent);
-    }
-
-    .capo-option-value {
-      font-weight: bold;
-    }
-
-    .capo-option-hint {
-      font-size: var(--font-ui);
-      opacity: 0.7;
-    }
-  `
+  static changeEvent = 'capo-change'
 
   constructor() {
     super()
     this.label = 'Capo'
     this.value = 0
     this.maxValue = 11
-    this.editMode = false
     this.referenceKey = ''
-    this._options = Array.from({ length: 12 }, (_, index) => index)
-    this._popoverId = `capo-popover-${Math.random().toString(36).slice(2)}`
   }
 
-  firstUpdated() {
-    this._setupPopoverPositioning()
+  _displayValue() {
+    return Number.isFinite(this.value) ? this.value : 0
   }
 
-  _setupPopoverPositioning() {
-    const button = this.shadowRoot.querySelector('.capo-button')
-    const popover = this.shadowRoot.querySelector('.capo-popover')
-    if (!button || !popover) return
-
-    const handler = event => {
-      if (event.newState === 'open') {
-        const rect = button.getBoundingClientRect()
-        popover.style.top = `${rect.bottom + 4}px`
-        popover.style.left = `${rect.left}px`
-      }
-    }
-    popover.addEventListener('toggle', handler)
+  _options() {
+    const max = Number(this.maxValue)
+    const highest = Number.isFinite(max) && max >= 0 ? Math.min(Math.floor(max), 11) : 11
+    return Array.from({ length: highest + 1 }, (_, capo) => ({
+      value: capo,
+      label: String(capo),
+      hint: this._keyAtCapo(capo),
+    }))
   }
 
-  updated(changed) {
-    if (changed.has('maxValue')) {
-      const max = Number(this.maxValue)
-      const clamp = Number.isFinite(max) && max >= 0 ? Math.min(Math.floor(max), 11) : 11
-      this._options = Array.from({ length: clamp + 1 }, (_, index) => index)
-    }
-  }
-
-  _handleSelection(newValue) {
-    if (typeof newValue !== 'number' || newValue === this.value) {
-      return
-    }
-    const popover = this.shadowRoot.querySelector('.capo-popover')
-    popover?.hidePopover()
-    this.dispatchEvent(
-      new CustomEvent('capo-change', {
-        detail: { value: newValue },
-        bubbles: true,
-        composed: true,
-      })
-    )
-  }
-
-  _renderOptions() {
-    return this._options.map(option => {
-      const hint = this._getTargetKeyLabel(option)
-      const isSelected = option === this.value
-      return html`
-        <button
-          class="capo-option ${isSelected ? 'selected' : ''}"
-          type="button"
-          @click=${() => this._handleSelection(option)}
-        >
-          <span class="capo-option-value">${option}</span>
-          <span class="capo-option-hint">${hint}</span>
-        </button>
-      `
-    })
-  }
-
-  _getTargetKeyLabel(option) {
-    if (!this.referenceKey) {
-      return option === 0 ? 'Open' : `Down ${option}`
-    }
-    if (option === 0) {
-      return this.referenceKey
-    }
-    const key = transposeKeyName(this.referenceKey, -option)
-    return key || `Down ${option}`
-  }
-
-  render() {
-    const displayValue = Number.isFinite(this.value) ? this.value : 0
-    return html`
-      <div class="capo-wrapper">
-        ${this.label ? html`<label class="meta-label">${this.label}:</label>` : ''}
-        <button class="capo-button" type="button" popovertarget=${this._popoverId}>
-          ${displayValue}
-        </button>
-        <div id=${this._popoverId} class="capo-popover" popover>${this._renderOptions()}</div>
-      </div>
-    `
+  /** The key the chords are played in at this capo, or how far down it is */
+  _keyAtCapo(capo) {
+    if (!this.referenceKey) return capo === 0 ? 'Open' : `Down ${capo}`
+    if (capo === 0) return this.referenceKey
+    return transposeKeyName(this.referenceKey, -capo) || `Down ${capo}`
   }
 }
 
