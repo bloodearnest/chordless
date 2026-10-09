@@ -30,6 +30,9 @@ preferences
     poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 storage/sync
+- db.js and organisation-db.js reject failed writes with tx.error (14 places), which is
+  still null while a request's error is reported: a failure becomes a bare null
+  rejection. Reject with the request's error, as organisation-db's createOrganisation now does
 - setlist-app.js and create-setlist.js still report save/add/delete failures with alert():
   give pages a non-blocking message (toast) instead. (The bookmarklet's alerts stay: they
   show on SongSelect, where Chordless has no UI.)

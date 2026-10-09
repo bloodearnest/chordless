@@ -61,6 +61,32 @@ export function getCurrentOrganisation() {
   return { id, name }
 }
 
+let defaultOrganisationPromise = null
+
+/**
+ * The default organisation, created if there isn't one. Callers at the same
+ * time share one attempt, so it's only created once; and if another page (or
+ * tab) creates it first, it's read back rather than failing on the name.
+ */
+function getOrCreateDefaultOrganisation() {
+  defaultOrganisationPromise ??= (async () => {
+    const db = await getOrgDB()
+    const existing = await db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
+    if (existing) return existing
+    try {
+      const created = await db.createOrganisation(DEFAULT_ORGANISATION_NAME)
+      console.log('[Organisation] Created default organisation:', created.id)
+      return created
+    } catch (error) {
+      if (error?.name !== 'ConstraintError') throw error
+      return db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
+    }
+  })().finally(() => {
+    defaultOrganisationPromise = null
+  })
+  return defaultOrganisationPromise
+}
+
 /**
  * Ensure a current organisation exists, creating default if needed
  * Call this on app startup before using getCurrentOrganisation()
@@ -75,14 +101,7 @@ export async function ensureCurrentOrganisation() {
   }
 
   // No org set - get or create default
-  const db = await getOrgDB()
-  let defaultOrg = await db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
-
-  if (!defaultOrg) {
-    // Create default organisation
-    defaultOrg = await db.createOrganisation(DEFAULT_ORGANISATION_NAME)
-    console.log('[Organisation] Created default organisation:', defaultOrg.id)
-  }
+  const defaultOrg = await getOrCreateDefaultOrganisation()
 
   // Set as current
   await setCurrentOrganisation(defaultOrg.id, defaultOrg.name)
@@ -114,13 +133,7 @@ export async function getCurrentOrganisationFull() {
   }
 
   // No current org or org not found - create/get default
-  let defaultOrg = await db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
-
-  if (!defaultOrg) {
-    // Create default organisation
-    defaultOrg = await db.createOrganisation(DEFAULT_ORGANISATION_NAME)
-    console.log('[Organisation] Created default organisation:', defaultOrg.id)
-  }
+  const defaultOrg = await getOrCreateDefaultOrganisation()
 
   // Set as current
   await setCurrentOrganisation(defaultOrg.id, defaultOrg.name)

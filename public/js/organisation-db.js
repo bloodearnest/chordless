@@ -74,13 +74,13 @@ export class OrganisationDB {
       modifiedDate: new Date().toISOString(),
     }
 
-    const tx = this.db.transaction(['organisations'], 'readwrite')
-    const store = tx.objectStore('organisations')
-    await store.put(organisation)
-
     return new Promise((resolve, reject) => {
+      const tx = this.db.transaction(['organisations'], 'readwrite')
+      const request = tx.objectStore('organisations').put(organisation)
       tx.oncomplete = () => resolve(organisation)
-      tx.onerror = () => reject(tx.error)
+      // The failure is the request's (e.g. ConstraintError for a name in use):
+      // tx.error is still null while it's being reported
+      tx.onerror = () => reject(request.error ?? tx.error)
     })
   }
 
