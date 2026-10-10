@@ -20,7 +20,7 @@ const FILE = 'service-worker.js'
 const NOT_PRECACHED = path =>
   path === FILE || path === '.assetsignore' || /\.(map|sh)$|(^|\/)justfile$/.test(path)
 
-async function bundle(root, precache, version, { minify }) {
+async function bundle(root, precache, version, { minify, target }) {
   const result = await build({
     root,
     configFile: false,
@@ -33,6 +33,7 @@ async function bundle(root, precache, version, { minify }) {
     build: {
       write: false,
       minify,
+      target,
       lib: { entry: join(root, FILE), formats: ['iife'], name: 'chordlessServiceWorker' },
     },
   })
@@ -60,7 +61,8 @@ function precacheFor(outDir) {
   return { urls, version: hash.digest('hex').slice(0, 12) }
 }
 
-export function serviceWorker() {
+/** `target` is the build target of the rest of the app, so the worker matches it */
+export function serviceWorker({ target } = {}) {
   let root
   return {
     name: 'chordless:service-worker',
@@ -73,7 +75,7 @@ export function serviceWorker() {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split('?')[0] !== `/${FILE}`) return next()
         try {
-          const code = await bundle(root, [], 'dev', { minify: false })
+          const code = await bundle(root, [], 'dev', { minify: false, target })
           res.setHeader('Content-Type', 'text/javascript')
           res.setHeader('Cache-Control', 'no-cache')
           res.end(code)
@@ -86,7 +88,7 @@ export function serviceWorker() {
     async writeBundle(options) {
       if (this.environment?.name !== 'client') return
       const { urls, version } = precacheFor(options.dir)
-      const code = await bundle(root, urls, version, { minify: true })
+      const code = await bundle(root, urls, version, { minify: true, target })
       writeFileSync(join(options.dir, FILE), code)
     },
   }

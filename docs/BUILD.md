@@ -64,5 +64,5 @@ dist/chordless_auth_proxy/wrangler.json`. The plugin writes a redirect file for 
 - `wrangler.toml` has `html_handling = "none"`. With the default, `/dev/x.html` redirects to
   `/dev/x`, and Vite's dev server then fails to serve the page's inline module script. The dev
   pages' scripts are files for the same reason (`src/dev/*.js`).
-- Vite does not read `.browserslistrc`. The build target is Vite's default until the
-  browser-support work (see the TODO) sets it.
+- Vite does not read `.browserslistrc`: `TARGET` in `vite.config.js` is the same floor, and is
+  used for the app and for the service worker. Change them together.

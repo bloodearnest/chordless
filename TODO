@@ -15,40 +15,39 @@ bugs
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
 
-browser support (the Vite work has landed: this is next)
-- Goal: work on older tablets and phones, not just current Safari/Chrome, as others will use it.
-  Target: Safari/iOS 15.4, which covers every device that can run iOS/iPadOS 15.8 (iPad Air 2,
-  mini 4, the 2017 iPad, iPhone 6s/7/SE 1st gen). Lower (iOS 12 to 14, e.g. iPad Air 1) would
-  need a legacy polyfill build: not worth it unless asked. .browserslistrc still says Safari 17.5,
-  Chrome 120: it was set for one person's modern devices
-- The import maps are gone (Vite bundles), and the service worker is classic, so what limits the
-  floor now is the build target and the CSS. Vite does not read .browserslistrc: set
-  build.target (and build.cssTarget) in vite.config.js to the agreed floor along with
-  .browserslistrc, and check the built JS and CSS on an old device
-- Then: handle the 42 color-mix() uses (Safari 16.2): 20 are `color-mix(in srgb, currentColor
-  N%, transparent)`, which a fallback colour or an opacity will do; the other 22 mix a theme
-  colour (danger 9, success 7, primary 4, warning 2), so they need derived theme variables
-  (e.g. --color-danger-tint) in theme-manager; check .at(), structuredClone,
-  crypto.randomUUID and dialog use against 15.4; update the README line "targets recent
-  browsers only" and the browser line in CLAUDE.md. (The classic service worker is done)
+browser support
+- Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc
+  and TARGET in vite.config.js (keep them the same). Reasoning: support devices up to about five
+  years old; asking people to update their OS is fine, excluding a device that cannot update is
+  not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:
+  all on 26+, lowest 26.5), but some people dislike updating, so the floor is what the code
+  needs with margin, not the newest. An audit (grep for version-gated features) found nothing
+  between 26.2 and 16.2 that costs anything: the first thing below that is color-mix() (42 uses).
+  View transitions are feature-detected. The 2017 iPad (16.7), the Air 2 and the 2019-2020 models
+  stuck on iOS 18 or lower are mostly outside the window on purpose. The floor is a claim
+  from reading the code, not tested on an old device: do that (Playwright's WebKit is current)
+- No fallbacks or polyfills for what 17 has (nesting, dialog, :has, view transitions as an
+  enhancement). Look through the code for workarounds the floor makes unnecessary
+- Below the floor the app has no message: a browser older than 17 gets whatever happens when
+  it meets syntax or APIs it lacks (first real case: an iPhone on 18.0.1 reported by the team,
+  which is above this floor but was asked to update to 27: check it works). Show a plain "Update
+  your device" page instead: a small classic script in index.html (it runs anywhere) that
+  feature-detects what the floor guarantees (e.g. CSS.supports for nesting or :has(), and
+  structuredClone) and replaces the page with the required versions. Find out first what an
+  older device actually shows
 - Core is setlist navigation (reading and moving through the setlist, offline). The media player
-  is optional and may be off on older devices: it is not loaded when the device has no Web Audio
-  or it is switched off in Preferences (media-player-loader.js), and a player that fails to load
-  is a warning, not an error. Don't make the core depend on it
-- Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often old, often on
-  poor wifi. So: the app must open offline from its cache (done: the build precaches everything,
-  tests/built.playwright.js), data must survive the weeks between (the install nag, below), and a signed-in session
-  and the Drive link must still work after weeks (test an expired token with no network: local
-  setlists must still show)
-- Already done: no Popover API (menu, song settings, key/capo picker are modal <dialog>s via
-  DialogPopup), no CSS nesting, no Navigation API
-- Needs a real old iPad (an iPad 5th gen on iPadOS 16.7 is the best single test) or a device
-  service: Playwright's WebKit is current, so it can't show old-Safari problems. View
-  transitions are Safari 18+, so older iPads simply don't animate between views (fine)
+  is optional and may be off on a device without Web Audio: it is not loaded when the device has
+  none or it is switched off in Preferences (media-player-loader.js), and a player that fails to
+  load is a warning, not an error. Don't make the core depend on it
+- Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often on poor wifi.
+  So: the app must open offline from its cache (done: the build precaches everything,
+  tests/built.playwright.js), data must survive the weeks between (the install nag, below), and
+  a signed-in session and the Drive link must still work after weeks (test an expired token with
+  no network: local setlists must still show)
 
 navigation
-- When the supported browsers all have the Navigation API (Safari/iOS 26.2, Firefox 147, Chrome
-  102), rewrite AppRouter on it and delete the code the platform then does: link interception,
+- When the supported browsers all have the Navigation API (Safari/iOS 26.2, Chrome 102; the floor
+  is Safari/iOS 17 now, and Firefox, from 147, is not targeted), rewrite AppRouter on it and delete the code the platform then does: link interception,
   popstate, history entry keys and the view state in sessionStorage (use the entry's state), and
   the scroll/focus handling. Keep AppRouter the only place that knows. No polyfill for now:
   @virtualstate/navigation is still alpha (last release Oct 2025), doesn't intercept link clicks

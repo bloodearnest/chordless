@@ -240,6 +240,7 @@ export class SongSection extends LitElement {
       overflow: hidden;
       background: var(--bg-tertiary, rgba(255, 255, 255, 0.9));
       box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      -webkit-backdrop-filter: blur(4px);
       backdrop-filter: blur(4px);
     }
 

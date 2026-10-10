@@ -37,7 +37,7 @@ Chordless is deliberately plain: vanilla JavaScript modules and
 [Lit](https://lit.dev/) web components, with [Vite](https://vite.dev/) serving them in
 development (no build step there) and bundling them for production. It's an offline-first
 PWA: a service worker precaches the whole app, and data is kept in IndexedDB. A small Cloudflare Worker serves the files and
-handles Google sign-in. It targets recent browsers only (see `.browserslistrc`), and
+handles Google sign-in. It targets recent browsers (iOS and Safari 17, Chrome and Edge 120: see `.browserslistrc`), and
 uses native browser features wherever it can.
 
 ## Documentation

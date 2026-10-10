@@ -1,10 +1,10 @@
-# Core PWA target: browsers that support import maps, module service workers,
-# CSS View Transitions, and the HTML Popover API without polyfills.
+# The floor: devices up to about five years old, which can all update to this.
+# iOS/iPadOS 17 is a free update on every iPhone and iPad from 2021 on (and much older).
+# It is what the code needs with room to spare: the first thing below 16.2 that the CSS
+# uses is color-mix(). Chrome and Edge update themselves.
+# vite.config.js TARGET must say the same (Vite does not read this file).
+Safari >= 17
+iOS >= 17
 Chrome >= 120
 ChromeAndroid >= 120
 Edge >= 120
-
-# Minimum Apple stack for live iPad use: first release where Safari/iOS keep
-# PWA install working while also supporting import maps, module SW, and popover.
-Safari >= 17.5
-iOS >= 17.5

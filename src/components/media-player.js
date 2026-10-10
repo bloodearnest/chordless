@@ -605,6 +605,7 @@ export class MediaPlayer extends LitElement {
       align-items: center;
       justify-content: center;
       font-size: var(--font-ui);
+      -webkit-backdrop-filter: blur(4px);
       backdrop-filter: blur(4px);
       transition: background 0.2s;
       padding: 0;
