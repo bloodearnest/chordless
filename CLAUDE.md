@@ -14,19 +14,12 @@ Its key features:
 - one touch control (left/right -> change song, up/down -> scroll current song
 - songs can be reordered
 - smart layout/zoom to maximise the text size.
-- once loaded, doesn't require internet
+- works offline
 
 Extra features I would like to add
 
 - quick way to add notes (e.g. "repeat this 4 times", "drop out here", etc)
 - quick edit feature for quick song corrections
-
-## Core model: setlist
-
-A setlist has the following properties
-
-- a date
-- a list of songs in an order, which are chordpro files
 
 ## UI
 
@@ -41,10 +34,11 @@ To do that, you have to enter edit mode explicitly. This has several goals
 ## Tech Stack
 
 - we are using an offline first approach, with proper url navigation and page reload, handled by a service worker
-- we are using newer css techniques to do the transition to avoid FOUS and other things.
+- we are using newer css techniques to do the transition to avoid FOUC and other things.
 - we are using lit for components
 - we are using service worker
 - we are using google auth and gdrive api for remote storage
+- we are using cloudflare workers as out deployment, and wrangler locally
 
 ## Development Standards
 
