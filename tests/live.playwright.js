@@ -34,19 +34,19 @@ test.describe('Moving through a setlist', () => {
 
     for (const [index, title] of [ALPHA, BRAVO, CHARLIE].entries()) {
       await page.keyboard.press('ArrowRight')
-      await expect(page).toHaveURL(new RegExp(`#song-${index}$`))
+      await expect(page).toHaveURL(new RegExp(`/song/${index}$`))
       await expect(header).toContainText(title)
     }
     // The last song is the end
     await page.keyboard.press('ArrowRight')
-    await expect(page).toHaveURL(/#song-2$/)
+    await expect(page).toHaveURL(/\/song\/2$/)
 
     await page.keyboard.press('ArrowLeft')
     await expect(header).toContainText(BRAVO)
     await page.keyboard.press('ArrowLeft')
     await expect(header).toContainText(ALPHA)
     await page.keyboard.press('ArrowLeft')
-    await expect(page).toHaveURL(/#overview$/)
+    await expect(page).toHaveURL(/\/setlist\/[^/]+$/)
     await expect(header).toContainText(/Sun,? 11 Oct/)
   })
 
@@ -179,7 +179,7 @@ test.describe('Editing a setlist', () => {
       .toBe('A')
 
     // Its chords are a tone up: [G]Alpha [C]verse becomes [A]Alpha [D]verse
-    await page.goto(`${url}#song-0`)
+    await page.goto(`${url}/song/0`)
     const chords = page.locator('#song-0 song-section[data-label="Verse 1"] chord-display')
     await expect(chords.nth(0)).toHaveText('A')
     await expect(chords.nth(1)).toHaveText('D')

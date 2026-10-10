@@ -1,8 +1,8 @@
 language js
 
-// Navigation should go through the router once the app is a single page, so that
-// the shell (and the media player in it) survives. Until then this is a warning
-// marking every place that still does a full page load.
+// Moving around the app goes through the router (navigation.js: goTo), so that the
+// shell, and the media player in it, are not thrown away by a page load. The few
+// places that must reload say why, with a biome-ignore.
 or {
   `$loc.href = $_` where {
     $loc <: or {
@@ -10,7 +10,7 @@ or {
       `window.location`,
       `document.location`
     },
-    register_diagnostic(span=$loc, message="Full page navigation: use the router instead of assigning location.href", severity="warn")
+    register_diagnostic(span=$loc, message="Full page navigation: use goTo() (navigation.js) instead of assigning location.href", severity="error")
   },
   `$loc.$method($...)` where {
     $loc <: or {
@@ -23,6 +23,23 @@ or {
       `replace`,
       `reload`
     },
-    register_diagnostic(span=$loc, message="Full page navigation: use the router instead of location.assign/replace/reload", severity="warn")
+    register_diagnostic(span=$loc, message="Full page navigation: use goTo() (navigation.js) instead of location.assign/replace/reload", severity="error")
+  },
+  // The URL says where you are (/setlist/<id>/song/<n>), not its #hash
+  `$loc.hash` where {
+    $loc <: or {
+      `location`,
+      `window.location`,
+      `document.location`
+    },
+    register_diagnostic(span=$loc, message="Routes are paths, not #hashes: see router.js", severity="error")
+  },
+  `$loc.hash = $_` where {
+    $loc <: or {
+      `location`,
+      `window.location`,
+      `document.location`
+    },
+    register_diagnostic(span=$loc, message="Routes are paths, not #hashes: see router.js", severity="error")
   }
 }

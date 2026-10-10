@@ -194,7 +194,7 @@ downloaded (`pullSetlists`).
 - Confirmation via an `app-modal` of `type="confirm"` and `ask()`: "Delete setlist?
   It's moved to the Google Drive trash on the next sync." Confirm label "Delete".
 - The dialog fires e.g. `setlist-delete` with `{ setlistId }`; the page
-  (`setlist-app.js`, next to `saveSetlistDetails`) deletes it and goes home.
+  (`setlist-page.js`, next to `saveSetlistDetails`) deletes it and goes home.
 
 #### Who can delete
 

@@ -7,7 +7,7 @@ import { SectionActionEvent, SectionToggleEvent } from '../components/song-secti
  * Song View Manager
  *
  * Shared, stateless functions for rendering and managing single song views.
- * Used by both the library view and setlist-app.js.
+ * Used by both the library view and setlist-page.js.
  *
  * Design principles:
  * - All functions are stateless

@@ -43,7 +43,7 @@ To do that, you have to enter edit mode explicitly. This has several goals
 ## Development Standards
 
 - Use `just format lint test` to verify all changes. This runs formatting, linting, and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
-- How the tests are organised, and how to write them: `docs/TESTING.md`. Other design and architecture docs are in `docs/` too.
+- How the tests are organised, and how to write them: `docs/TESTING.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too.
 - Only use vanilla js. There should be no build step at all, ever. We use npm to manage versions to _vendor_.
 - Only use js libraries that can be hosted locally within the project and loaded as modules
 - Use modern HTML/CSS/JS. Use .browserlistrc.

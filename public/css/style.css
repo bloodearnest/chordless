@@ -107,11 +107,7 @@ body {
   font-size: var(--font-ui);
 }
 
-/* View Transitions */
-@view-transition {
-  navigation: auto;
-}
-
+/* View Transitions: the router starts one when it swaps the view */
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation-duration: 0.3s;
@@ -148,6 +144,11 @@ body {
 /* The router's outlet adds no box: views are laid out as children of .app-container */
 #view-outlet {
   display: contents;
+}
+
+/* The media player is for setlists; elsewhere it shows only while something is playing */
+body:not([data-view='setlist']) media-player:not([active]) {
+  display: none;
 }
 
 .visually-hidden {

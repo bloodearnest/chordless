@@ -12,11 +12,11 @@ song edit UI
 
 bugs
 - the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
-  so only title and artist are searched (filterSongs in views/library-view.js; setlist-app.js's
+  so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
 
 dead code
-- song-view-manager.js setupCapoSelector() is never called (setlist-app has its own; the
+- song-view-manager.js setupCapoSelector() is never called (setlist-page has its own; the
   library has no capo picker). It also sets capoSelector.key, which isn't a property
   (referenceKey is). Remove it, after checking the rest of song-view-manager for the same
 
@@ -55,7 +55,7 @@ storage/sync
 - db.js and organisation-db.js reject failed writes with tx.error (14 places), which is
   still null while a request's error is reported: a failure becomes a bare null
   rejection. Reject with the request's error, as organisation-db's createOrganisation now does
-- setlist-app.js and create-setlist.js still report save/add/delete failures with alert():
+- setlist-page.js and views/home-view.js still report save/add/delete failures with alert():
   give pages a non-blocking message (toast) instead. (The bookmarklet's alerts stay: they
   show on SongSelect, where Chordless has no UI.)
 - storage page with no organisations says "Create your first organisation" but shows no

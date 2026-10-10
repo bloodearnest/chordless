@@ -178,6 +178,7 @@ export class DriveSyncPanel extends LitElement {
 
       // Local data changed underneath every page, so reload to show it
       this.syncProgress = { stage: 'success', message: '✓ Reset complete, reloading...' }
+      // biome-ignore lint/plugin: the database was replaced under every view, so start afresh
       setTimeout(() => window.location.reload(), 1000)
     } catch (error) {
       console.error('[DriveSyncPanel] Reset from Drive failed:', error)

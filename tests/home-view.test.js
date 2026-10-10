@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { SHELL_ROUTES } from '../public/js/router.js'
+import { ROUTE_NAMES } from '../public/js/router.js'
 import { groupSetlistsByYear } from '../public/js/views/home-view.js'
 import { views } from '../public/js/views/registry.js'
 
@@ -56,7 +56,7 @@ describe('groupSetlistsByYear', () => {
 })
 
 describe('the shell views', () => {
-  it('are exactly the routes the service worker serves the shell for', () => {
-    expect(Object.keys(views).sort()).to.deep.equal([...SHELL_ROUTES].sort())
+  it('are one for every route', () => {
+    expect(Object.keys(views).sort()).to.deep.equal([...ROUTE_NAMES].sort())
   })
 })

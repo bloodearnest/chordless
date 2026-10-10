@@ -7,7 +7,6 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
     <meta name="description" content="Setlist arrangement for worship songs" />
-    <meta name="view-transition" content="same-origin" />
     <meta name="theme-color" content="#2c3e50" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
@@ -38,6 +37,12 @@
       <!-- Navigation menu component: stays while views come and go -->
       <nav-menu id="nav-menu"></nav-menu>
     </div>
+
+    <!-- Media player (floating bottom-right): stays while views come and go, so playing carries on -->
+    <media-player
+      id="media-player"
+      style="position: fixed; bottom: 1rem; right: 1rem; z-index: 1000"
+    ></media-player>
 
     <!-- Tells screen readers about the page when the view changes -->
     <div id="route-announcer" class="visually-hidden" aria-live="polite"></div>

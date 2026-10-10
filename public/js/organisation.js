@@ -185,6 +185,7 @@ export async function switchOrganisation(organisationId) {
     await setCurrentOrganisation(organisationId)
   }
 
+  // biome-ignore lint/plugin: the database is another organisation's now, so start afresh
   window.location.reload()
 }
 

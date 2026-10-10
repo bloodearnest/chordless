@@ -1,12 +1,6 @@
 // Shared Playwright set-up: import test and expect from here, not @playwright/test.
 import { test as base, expect } from '@playwright/test'
 
-/**
- * Page errors that aren't failures: leaving a page while its view transition
- * is still running (e.g. a save that goes straight to another page) aborts it
- */
-const EXPECTED_ERRORS = [/^Transition was aborted because of invalid state/]
-
 export const test = base.extend({
   // Every test fails if its page throws an uncaught error
   pageErrors: [
@@ -14,8 +8,7 @@ export const test = base.extend({
       const errors = []
       page.on('pageerror', error => errors.push(error.message))
       await use(errors)
-      const unexpected = errors.filter(message => !EXPECTED_ERRORS.some(re => re.test(message)))
-      expect(unexpected, 'uncaught errors in the page').toEqual([])
+      expect(errors, 'uncaught errors in the page').toEqual([])
     },
     { auto: true },
   ],

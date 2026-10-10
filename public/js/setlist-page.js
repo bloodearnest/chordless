@@ -1,6 +1,3 @@
-// Page-based application logic for Chordless
-// Works with service worker routing and Navigation API
-
 import { getCurrentDB } from './db.js'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
@@ -20,11 +17,7 @@ import { ModalCloseEvent } from '../components/app-modal.js'
 import { CapoChangeEvent } from '../components/capo-selector.js'
 import { KeyChangeEvent } from '../components/key-selector.js'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.js'
-import {
-  MenuBackClickEvent,
-  MenuOverviewClickEvent,
-  MenuSongClickEvent,
-} from '../components/nav-menu.js'
+import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.js'
 import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.js'
 import {
   OverviewAddSongEvent,
@@ -36,7 +29,9 @@ import { SongSelectEvent } from '../components/song-list.js'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.js'
 import { SongChangeEvent } from './app-events.js'
+import { goTo } from './navigation.js'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.js'
+import { buildUrl } from './router.js'
 
 // Configuration constants
 const CONFIG = {
@@ -62,9 +57,25 @@ const CONFIG = {
 
 const SECTION_DEFAULTS_KEY = 'section_defaults'
 
-class PageApp {
-  constructor() {
-    this.db = null // Will be initialized in init()
+/**
+ * The setlist page: the overview of a setlist and each of its songs, side by
+ * side in a scroll-snap row, with the header, edit mode and the menu's song list.
+ *
+ * Shown by SetlistView, which starts it, tells it when the route changes
+ * (routeChanged) and disposes of it when the view is left: everything it does to
+ * the window, the document, <body> and the menu is undone then.
+ *
+ * Which song is showing is the route (/setlist/<id>/song/<n>). To move, it
+ * navigates (navigateTo); the route change then shows the song.
+ */
+export class SetlistPage {
+  constructor({ setlistId, songIndex = -1 }) {
+    this._setlistId = setlistId
+    this._initialSongIndex = songIndex
+    // Aborted by dispose(): the listeners that outlive the view are added with its signal
+    this._abort = new AbortController()
+    this._disposed = false
+    this.db = null // Will be initialized in start()
     this.parser = new ChordProParser()
     this.currentSongIndex = undefined
     this.songs = []
@@ -89,7 +100,7 @@ class PageApp {
     this._onOverviewSongClick = event => {
       const index = event.index
       if (typeof index === 'number') {
-        this.navigateToHash(`song-${index}`)
+        this.navigateTo(index)
       }
     }
 
@@ -110,83 +121,81 @@ class PageApp {
         this.changeSongKeyInSetlist(index, key)
       }
     }
-
-    this.init()
   }
 
-  async init() {
+  async start() {
     // Initialize IndexedDB with current organisation
     this.db = await getCurrentDB()
 
-    // Check for first-time Google auth and rename org if needed
-    // This must happen before rendering to avoid showing "Personal" briefly
-    const { checkFirstTimeAuth } = await import('./first-time-auth.js')
-    await checkFirstTimeAuth()
+    await this.renderSetlist(this._setlistId, this._initialSongIndex)
+    if (this._disposed) return
 
-    // Set up Navigation API with View Transitions
-    this.setupNavigationAPI()
+    this.setupKeyboardNavigation()
+    this.setupNavigationMenu()
 
-    // Detect current route from window.__ROUTE__ or URL
-    const route = window.__ROUTE__ || this.parseRoute(window.location.pathname)
-
-    // Render based on route
-    if (route.type === 'setlist') {
-      await this.renderSetlist(route.setlistId)
-    }
-
-    // Set up keyboard navigation
-    this.setupKeyboardNavigation(route)
-
-    // Set up navigation menu
-    this.setupNavigationMenu(route)
-
-    window.addEventListener('storage', this._onSectionDefaultsChanged)
-    window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged)
-    window.addEventListener('storage', this._onCapoPreferenceChange)
-    window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange)
+    const { signal } = this._abort
+    window.addEventListener('storage', this._onSectionDefaultsChanged, { signal })
+    window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
+    window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
+    window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
   }
 
-  parseRoute(pathname) {
-    if (pathname === '/' || pathname === '/index.html') {
-      return { type: 'home' }
+  /** The route changed within this setlist: show the song it names */
+  routeChanged(route) {
+    if (this._disposed || !this.currentSetlist) return
+    const index = route.songIndex
+    const section = index >= 0 ? `song-${index}` : 'overview'
+    // Already showing it, e.g. the route is catching up with a swipe
+    if (section !== this._lastVisibleSection) {
+      if (index < 0) this.showOverview(false)
+      else if (index < this.songs.length) this.showSong(index, false)
     }
-
-    if (pathname === '/songs' || pathname === '/songs/' || pathname === '/songs.html') {
-      return { type: 'songs' }
-    }
-
-    if (
-      pathname === '/preferences' ||
-      pathname === '/preferences/' ||
-      pathname === '/preferences.html'
-    ) {
-      return { type: 'preferences' }
-    }
-
-    if (pathname === '/storage' || pathname === '/storage/' || pathname === '/storage.html') {
-      return { type: 'storage' }
-    }
-
-    const setlistMatch = pathname.match(/^\/setlist\/([^/]+)$/)
-    if (setlistMatch) {
-      return { type: 'setlist', setlistId: setlistMatch[1], songIndex: -1 }
-    }
-
-    const songMatch = pathname.match(/^\/setlist\/([^/]+)\/song\/(-?\d+)$/)
-    if (songMatch) {
-      return {
-        type: 'song',
-        setlistId: songMatch[1],
-        songIndex: parseInt(songMatch[2], 10),
-      }
-    }
-
-    return { type: 'home' }
+    this.updateNavigationMenu()
   }
 
-  setupNavigationAPI() {
-    // Just let the browser and service worker handle navigation naturally
-    // View transitions will be handled by CSS @view-transition rule
+  /**
+   * Go to a song, or the overview (-1). Moving from the overview into a song adds
+   * to the history, and back to the overview undoes it; song to song replaces.
+   */
+  navigateTo(index, { replace = false } = {}) {
+    return goTo(buildUrl({ name: 'setlist', setlistId: this.currentSetlistId, songIndex: index }), {
+      replace,
+    })
+  }
+
+  /** Undo what this page did outside its own elements */
+  dispose() {
+    if (this._disposed) return
+    this._disposed = true
+    this._abort.abort()
+    this.sectionObserver?.disconnect()
+    clearTimeout(this._programmaticScrollTimeout)
+
+    // A drag in progress
+    for (const [type, handler] of [
+      ['pointermove', this._dragPointerMoveHandler],
+      ['pointerup', this._dragPointerUpHandler],
+      ['pointercancel', this._dragPointerCancelHandler],
+    ]) {
+      if (handler) document.removeEventListener(type, handler)
+    }
+    document.body.style.userSelect = ''
+
+    // Edit mode is on <body>, which outlives the view; leaving it saves, as exiting does
+    this.exitEditMode()
+    document.body.classList.remove('header-expanded')
+    document.documentElement.style.setProperty('--header-expanded', '0')
+
+    // The menu is the shell's: take the setlist's songs out of it
+    const navMenu = document.getElementById('nav-menu')
+    if (navMenu) {
+      navMenu.songs = []
+      navMenu.setlistTitle = 'Setlist'
+      navMenu.showOverviewLink = false
+    }
+
+    // Nothing is current any more (what is playing carries on)
+    this.dispatchSongChange(null)
   }
 
   showStatusMessage(container, options = {}) {
@@ -231,7 +240,7 @@ class PageApp {
     })
   }
 
-  async renderSetlist(setlistId) {
+  async renderSetlist(setlistId, songIndex = -1) {
     console.log('renderSetlist called with:', setlistId)
     try {
       // Load setlist from IndexedDB
@@ -270,9 +279,9 @@ class PageApp {
         container.appendChild(this.renderFullSetlist(setlist, []))
 
         // Show overview immediately
+        if (songIndex >= 0) this.navigateTo(-1, { replace: true })
         requestAnimationFrame(() => {
-          this.showOverview(true)
-          history.replaceState({ view: 'overview' }, '', window.location.href)
+          if (!this._disposed) this.showOverview(true)
         })
 
         return
@@ -406,18 +415,9 @@ class PageApp {
       this.sectionState = {}
       this.loadState()
 
-      // Check hash BEFORE rendering to determine initial view state
-      const hash = window.location.hash
-      const hashValue = hash.substring(1)
-      const shouldShowSongDirectly = hashValue?.startsWith('song-')
-      console.log(
-        '[Initial Load] hash:',
-        hash,
-        'hashValue:',
-        hashValue,
-        'shouldShowSongDirectly:',
-        shouldShowSongDirectly
-      )
+      // Which view to start in comes from the route; a song that isn't there means the overview
+      const shouldShowSongDirectly = songIndex >= 0 && songIndex < songs.length
+      if (songIndex >= 0 && !shouldShowSongDirectly) this.navigateTo(-1, { replace: true })
 
       // Render all songs on one page
       const container = document.querySelector('.song-container')
@@ -430,77 +430,47 @@ class PageApp {
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
       if (shouldShowSongDirectly) {
-        const songIndex = parseInt(hashValue.split('-')[1], 10)
-        console.log('[Initial Load] Going directly to song index:', songIndex)
-
         const targetSection = container.querySelector(`#song-${songIndex}`)
         if (targetSection) {
           // Set scroll position immediately, before browser paints
-          container.scrollLeft = targetSection.offsetLeft
-          console.log('[Initial Load] Set scroll position to:', targetSection.offsetLeft)
+          // scrollTo, not scrollLeft: the stylesheet's smooth scrolling would animate that
+          container.scrollTo({ left: targetSection.offsetLeft, behavior: 'instant' })
         } else {
           console.warn(`[Initial Load] Could not find target section song-${songIndex}`)
         }
       }
 
-      // Set up navigation based on hash
-      console.log('About to setup hash navigation')
-      this.setupHashNavigation(setlistId, songs.length)
-
-      // Navigate to the correct section based on hash
-      console.log('Current hash:', hash)
-
       // Set up initial view state (no scrolling on page load)
-      if (hash) {
-        if (hashValue === 'overview') {
-          // Overview is already visible by default
-          this._lastVisibleSection = 'overview'
-          this.currentSongIndex = -1
-          this.updateHeader(null, true) // true = instant, no animation
-          this.exitEditMode()
-          this.dispatchSongChange(null)
-          // Set initial history state
-          history.replaceState({ view: 'overview' }, '', window.location.href)
-        } else if (hashValue.startsWith('song-')) {
-          const index = parseInt(hashValue.split('-')[1], 10)
-          // Song is already visible from pre-render setup above
-          this._lastVisibleSection = `song-${index}`
-          this.currentSongIndex = index
-          this.updateHeader(this.songs[index], true) // true = instant, no animation
-          this.applyFontSize(index)
-          this.exitEditMode()
-          // Dispatch song-change event for media player
-          if (this.songs[index]) {
-            this.dispatchSongChange(this.songs[index])
-          }
-          // Set initial history state (without fromOverview since we loaded directly)
-          history.replaceState({ view: 'song', index: index }, '', window.location.href)
-        }
+      if (shouldShowSongDirectly) {
+        // Song is already visible from pre-render setup above
+        this._lastVisibleSection = `song-${songIndex}`
+        this.currentSongIndex = songIndex
+        this.updateHeader(this.songs[songIndex], true) // true = instant, no animation
+        this.applyFontSize(songIndex)
+        this.exitEditMode()
+        this.dispatchSongChange(this.songs[songIndex])
       } else {
         // Default to overview (already visible)
-        console.log('No hash, showing overview')
         this._lastVisibleSection = 'overview'
         this.currentSongIndex = -1
         this.updateHeader(null, true) // true = instant, no animation
         this.exitEditMode()
         this.dispatchSongChange(null)
-        // Set initial history state and add hash
-        const overviewUrl = `${window.location.pathname}#overview`
-        history.replaceState({ view: 'overview' }, '', overviewUrl)
       }
+      this.updateNavigationMenu()
+
+      // The header's buttons (edit mode, info) work as soon as the header shows the setlist,
+      // not a frame later
+      this.setupEditMode()
+      this.setupAppHeaderEvents()
 
       // Wait for layout to complete before other setup
       requestAnimationFrame(() => {
+        if (this._disposed) return
         // Set up drag-and-drop (only enabled in edit mode)
         if (this.overviewEditMode) {
           this.setupOverviewDragDrop()
         }
-
-        // Set up edit mode toggle (handles both overview and song edit modes)
-        this.setupEditMode()
-
-        // Set up app-header event listeners (info button and nav menu)
-        this.setupAppHeaderEvents()
 
         // Set up section control buttons
         this.setupSectionControls()
@@ -568,23 +538,13 @@ class PageApp {
     }
   }
 
+  /** The URL follows a swipe to another song or the overview (not a new history entry) */
   _replaceHistoryForSong(index) {
-    if (typeof window === 'undefined' || !window.history || !window.location) return
-    const currentState = history.state || {}
-    const newUrl = `${window.location.pathname}#song-${index}`
-    const nextState = {
-      ...currentState,
-      view: 'song',
-      index,
-      fromOverview: currentState.fromOverview === true,
-    }
-    history.replaceState(nextState, '', newUrl)
+    this.navigateTo(index, { replace: true })
   }
 
   _replaceHistoryForOverview() {
-    if (typeof window === 'undefined' || !window.history || !window.location) return
-    const newUrl = `${window.location.pathname}#overview`
-    history.replaceState({ view: 'overview' }, '', newUrl)
+    this.navigateTo(-1, { replace: true })
   }
 
   renderFullSetlist(_setlist, songs) {
@@ -907,7 +867,7 @@ class PageApp {
 
     if (instant) {
       // Jump immediately without animation
-      container.scrollLeft = scrollLeft
+      container.scrollTo({ left: scrollLeft, behavior: 'instant' })
       // Re-enable observer immediately for instant scrolls
       this._isProgrammaticScroll = false
     } else {
@@ -919,7 +879,8 @@ class PageApp {
 
       // Re-enable observer after scroll animation completes
       // Smooth scrolling typically takes 300-500ms
-      setTimeout(() => {
+      clearTimeout(this._programmaticScrollTimeout)
+      this._programmaticScrollTimeout = setTimeout(() => {
         this._isProgrammaticScroll = false
       }, 600)
     }
@@ -996,92 +957,6 @@ class PageApp {
     document.querySelectorAll('.section').forEach(section => {
       this.sectionObserver.observe(section)
     })
-  }
-
-  setupHashNavigation(_setlistId, totalSongs) {
-    // Clean up previous handlers to avoid duplicates when re-rendering setlist
-    if (this._popstateHandler) {
-      window.removeEventListener('popstate', this._popstateHandler)
-    }
-    if (this._hashChangeHandler) {
-      window.removeEventListener('hashchange', this._hashChangeHandler)
-    }
-
-    const handleHashNavigation = () => {
-      const hashValue = window.location.hash.substring(1) || 'overview'
-      console.log('[HashNavigation] Handling hash change:', hashValue)
-
-      if (!hashValue || hashValue === 'overview') {
-        this.showOverview(false)
-      } else if (hashValue.startsWith('song-')) {
-        const index = parseInt(hashValue.split('-')[1], 10)
-        if (!Number.isNaN(index) && index >= 0 && index < totalSongs) {
-          this.showSong(index, false)
-        }
-      }
-
-      const route = window.__ROUTE__ || this.parseRoute(window.location.pathname)
-      this.updateNavigationMenu(route)
-    }
-
-    this._popstateHandler = event => {
-      console.log('[Popstate] state:', event.state, 'hash:', window.location.hash)
-      handleHashNavigation()
-    }
-    this._hashChangeHandler = () => {
-      console.log('[HashChange] hash changed to:', window.location.hash)
-      handleHashNavigation()
-    }
-
-    window.addEventListener('popstate', this._popstateHandler)
-    window.addEventListener('hashchange', this._hashChangeHandler)
-
-    console.log('History/hash navigation setup complete for', totalSongs, 'songs')
-  }
-
-  navigateToHash(hash) {
-    const targetIsSong = hash.startsWith('song-')
-    const targetIsOverview = hash === 'overview'
-    const currentIsSong = this.currentSongIndex >= 0
-    const currentIsOverview = this.currentSongIndex < 0
-
-    const newUrl = `${window.location.pathname}#${hash}`
-
-    // Determine navigation action based on current and target
-    if (currentIsOverview && targetIsSong) {
-      // Overview → Song: PUSH (going deeper into the app)
-      const songIndex = parseInt(hash.split('-')[1], 10)
-      history.pushState({ fromOverview: true, view: 'song', index: songIndex }, '', newUrl)
-      this.showSong(songIndex, false)
-    } else if (currentIsSong && targetIsSong) {
-      // Song → Song: REPLACE (lateral navigation within same level)
-      const songIndex = parseInt(hash.split('-')[1], 10)
-      // Preserve fromOverview flag if it exists
-      const fromOverview = history.state?.fromOverview || false
-      history.replaceState({ fromOverview, view: 'song', index: songIndex }, '', newUrl)
-      this.showSong(songIndex, false)
-    } else if (currentIsSong && targetIsOverview) {
-      // Song → Overview: Try to go back if we came from overview
-      if (history.state?.fromOverview) {
-        // We pushed from overview, so we can safely go back
-        // The popstate handler will call showOverview()
-        history.back()
-      } else {
-        // We didn't come from overview (e.g., direct link), so replace
-        history.replaceState({ view: 'overview' }, '', newUrl)
-        this.showOverview(false)
-      }
-    } else {
-      // Overview → Overview or other edge cases: REPLACE
-      history.replaceState({ view: 'overview' }, '', newUrl)
-      if (targetIsOverview) {
-        this.showOverview(false)
-      }
-    }
-
-    // Update navigation menu after changing hash
-    const route = window.__ROUTE__ || this.parseRoute(window.location.pathname)
-    this.updateNavigationMenu(route)
   }
 
   /**
@@ -2688,164 +2563,132 @@ class PageApp {
     return text.replace(/[&<>"']/g, m => map[m])
   }
 
-  setupKeyboardNavigation(route) {
-    if (route.type === 'home') return
+  setupKeyboardNavigation() {
+    document.addEventListener(
+      'keydown',
+      e => {
+        // Leave keys alone while typing in a field (e.g. the setlist details form),
+        // or in a modal, which handles its own keys (Esc closes it)
+        if (isTypingInField(e) || isInModalDialog(e)) return
 
-    document.addEventListener('keydown', e => {
-      // Leave keys alone while typing in a field (e.g. the setlist details form),
-      // or in a modal, which handles its own keys (Esc closes it)
-      if (isTypingInField(e) || isInModalDialog(e)) return
+        // Handle Escape key to exit edit mode
+        if (e.key === 'Escape') {
+          const isEditMode = document.body.classList.contains('edit-mode')
+          if (isEditMode) {
+            e.preventDefault()
+            const appHeader = document.getElementById('app-header')
+            if (appHeader) {
+              // Trigger the edit-mode-toggle event
+              appHeader.dispatchEvent(new EditModeToggleEvent())
+            }
+          }
+          return
+        }
 
-      // Handle Escape key to exit edit mode
-      if (e.key === 'Escape') {
-        const isEditMode = document.body.classList.contains('edit-mode')
-        if (isEditMode) {
-          e.preventDefault()
-          const appHeader = document.getElementById('app-header')
-          if (appHeader) {
-            // Trigger the edit-mode-toggle event
-            appHeader.dispatchEvent(new EditModeToggleEvent())
+        // Don't intercept if modifier keys are pressed (Alt, Ctrl, Meta)
+        // This allows browser shortcuts like Alt+Left/Right to work
+        if (e.altKey || e.ctrlKey || e.metaKey) {
+          return
+        }
+
+        switch (e.key) {
+          case 'ArrowLeft':
+            e.preventDefault()
+            // Navigate to previous song or overview
+            if (this.currentSongIndex > 0) {
+              this.navigateTo(this.currentSongIndex - 1)
+            } else if (this.currentSongIndex === 0) {
+              this.navigateTo(-1)
+            }
+            break
+          case 'ArrowRight':
+            e.preventDefault()
+            // Navigate to next song
+            if (this.currentSongIndex < 0 && this.songs.length > 0) {
+              // From overview to first song
+              this.navigateTo(0)
+            } else if (
+              this.currentSongIndex >= 0 &&
+              this.currentSongIndex < this.songs.length - 1
+            ) {
+              this.navigateTo(this.currentSongIndex + 1)
+            }
+            break
+          case 'ArrowUp': {
+            e.preventDefault()
+            const currentSectionUp =
+              this.currentSongIndex >= 0
+                ? document.getElementById(`song-${this.currentSongIndex}`)
+                : document.getElementById('overview')
+            currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
+            break
+          }
+          case 'ArrowDown': {
+            e.preventDefault()
+            const currentSectionDown =
+              this.currentSongIndex >= 0
+                ? document.getElementById(`song-${this.currentSongIndex}`)
+                : document.getElementById('overview')
+            currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
+            break
           }
         }
-        return
-      }
-
-      // Don't intercept if modifier keys are pressed (Alt, Ctrl, Meta)
-      // This allows browser shortcuts like Alt+Left/Right to work
-      if (e.altKey || e.ctrlKey || e.metaKey) {
-        return
-      }
-
-      switch (e.key) {
-        case 'ArrowLeft':
-          e.preventDefault()
-          // Navigate to previous song or overview
-          if (this.currentSongIndex > 0) {
-            this.navigateToHash(`song-${this.currentSongIndex - 1}`)
-          } else if (this.currentSongIndex === 0) {
-            this.navigateToHash('overview')
-          }
-          break
-        case 'ArrowRight':
-          e.preventDefault()
-          // Navigate to next song
-          if (this.currentSongIndex < 0 && this.songs.length > 0) {
-            // From overview to first song
-            this.navigateToHash('song-0')
-          } else if (this.currentSongIndex >= 0 && this.currentSongIndex < this.songs.length - 1) {
-            this.navigateToHash(`song-${this.currentSongIndex + 1}`)
-          }
-          break
-        case 'ArrowUp': {
-          e.preventDefault()
-          const currentSectionUp =
-            this.currentSongIndex >= 0
-              ? document.getElementById(`song-${this.currentSongIndex}`)
-              : document.getElementById('overview')
-          currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
-          break
-        }
-        case 'ArrowDown': {
-          e.preventDefault()
-          const currentSectionDown =
-            this.currentSongIndex >= 0
-              ? document.getElementById(`song-${this.currentSongIndex}`)
-              : document.getElementById('overview')
-          currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
-          break
-        }
-      }
-    })
+      },
+      { signal: this._abort.signal }
+    )
   }
 
-  setupNavigationMenu(route) {
+  setupNavigationMenu() {
     const navMenu = document.getElementById('nav-menu')
 
     if (!navMenu) return
 
-    // Setup back button click handler
-    navMenu.addEventListener(MenuBackClickEvent.type, () => {
-      if (this.navBackAction) {
-        this.navBackAction()
-      }
-    })
+    // The menu is the shell's, so these go with the abort signal when this page is disposed
+    const { signal } = this._abort
 
     // Setup song click handler for setlist song navigation
-    navMenu.addEventListener(MenuSongClickEvent.type, e => {
-      const songIndex = e.index
-      if (songIndex !== undefined && songIndex >= 0) {
-        this.navigateToHash(`song-${songIndex}`)
-      }
-    })
+    navMenu.addEventListener(
+      MenuSongClickEvent.type,
+      e => {
+        const songIndex = e.index
+        if (songIndex !== undefined && songIndex >= 0) {
+          this.navigateTo(songIndex)
+        }
+      },
+      { signal }
+    )
 
     // Setup overview click handler for setlist navigation
-    navMenu.addEventListener(MenuOverviewClickEvent.type, () => {
-      this.navigateToHash('overview')
-    })
+    navMenu.addEventListener(MenuOverviewClickEvent.type, () => this.navigateTo(-1), { signal })
 
-    // Set initial back button state
-    this.updateNavigationMenu(route)
+    this.updateNavigationMenu()
   }
 
-  updateNavigationMenu(route) {
+  /** The menu lists the setlist's songs, and links to the overview from a song */
+  updateNavigationMenu() {
     const navMenu = document.getElementById('nav-menu')
+    if (!navMenu) return
 
-    // Determine back button label and action based on route
-    let backLabel = 'Back'
-    let backAction = () => window.history.back()
-    let showOverviewLink = false
+    if (this.songs?.length > 0) {
+      navMenu.songs = this.songs
 
-    if (route.type === 'setlist') {
-      // Check if we're viewing a specific song (via hash) or the overview
-      const hash = window.location.hash
-      const isViewingSong = hash?.startsWith('#song-')
-
-      if (isViewingSong) {
-        // When viewing a song, show Overview in the setlist section
-        showOverviewLink = true
-      } else {
-        // When viewing overview, show back to setlists
-        backLabel = 'Back to Setlists'
-        backAction = () => window.history.back()
-      }
-    } else if (route.type === 'song') {
-      backLabel = 'Back to Setlist'
-      backAction = () => (window.location.href = `/setlist/${route.setlistId}`)
-    } else if (route.type === 'settings') {
-      backLabel = 'Back to Home'
-      backAction = () => (window.location.href = '/')
-    }
-
-    if (navMenu) {
-      // Set songs list for setlist routes
-      if (route.type === 'setlist' && this.songs && this.songs.length > 0) {
-        navMenu.songs = this.songs
-
-        // Set setlist title (name if available, otherwise date and type)
-        if (this.currentSetlist) {
-          if (this.currentSetlist.name) {
-            navMenu.setlistTitle = this.currentSetlist.name
-          } else {
-            const datePart = formatSetlistDate(this.currentSetlist.date, 'short')
-            const typePart = this.currentSetlist.type ? ` - ${this.currentSetlist.type}` : ''
-            navMenu.setlistTitle = datePart + typePart
-          }
+      // Set setlist title (name if available, otherwise date and type)
+      if (this.currentSetlist) {
+        if (this.currentSetlist.name) {
+          navMenu.setlistTitle = this.currentSetlist.name
+        } else {
+          const datePart = formatSetlistDate(this.currentSetlist.date, 'short')
+          const typePart = this.currentSetlist.type ? ` - ${this.currentSetlist.type}` : ''
+          navMenu.setlistTitle = datePart + typePart
         }
-      } else {
-        navMenu.songs = []
-        navMenu.setlistTitle = 'Setlist'
       }
-
-      // Set overview link visibility
-      navMenu.showOverviewLink = showOverviewLink
-
-      // Set back button visibility
-      navMenu.showBackButton = false
-      navMenu.setAttribute('back-label', backLabel)
+    } else {
+      navMenu.songs = []
+      navMenu.setlistTitle = 'Setlist'
     }
 
-    // Store action for the click handler
-    this.navBackAction = backAction
+    // When viewing a song, show Overview in the setlist section
+    navMenu.showOverviewLink = this.currentSongIndex >= 0
   }
 
   async openAddSongModal() {
@@ -3149,6 +2992,3 @@ class PageApp {
     }
   }
 }
-
-// Initialize the app
-new PageApp()

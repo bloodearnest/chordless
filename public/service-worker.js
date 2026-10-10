@@ -1,6 +1,5 @@
 // Service Worker for offline-first operation
 import * as AuthDB from '/js/auth-db.js'
-import { matchRoute, SHELL_ROUTES } from '/js/router.js'
 
 // Handles routing and offline caching
 
@@ -14,7 +13,8 @@ const ASSETS = [
   '/',
   '/css/style.css',
   '/js/parser.js',
-  '/js/setlist-app.js',
+  '/js/setlist-page.js',
+  '/js/views/setlist-view.js',
   '/js/app.js',
   '/js/app-router.js',
   '/js/router.js',
@@ -380,8 +380,8 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // API requests - pass through to network
-  if (url.pathname.startsWith('/api/')) {
+  // API and auth requests (the worker's) - pass through to network
+  if (['/api/', '/oauth/', '/session/'].some(prefix => url.pathname.startsWith(prefix))) {
     event.respondWith(fetch(event.request))
     return
   }
@@ -413,7 +413,7 @@ self.addEventListener('fetch', event => {
   const acceptHeader = event.request.headers.get('Accept') || ''
   if (event.request.mode === 'navigate' || acceptHeader.includes('text/html')) {
     console.log('[SW] Handling navigation to:', url.pathname)
-    event.respondWith(handleRoute(url))
+    event.respondWith(handleRoute())
     return
   }
 
@@ -499,21 +499,12 @@ self.addEventListener('fetch', event => {
   event.respondWith(fetch(event.request))
 })
 
-async function handleRoute(url) {
-  const { name } = matchRoute(url)
-
-  // The page to fetch for a URL: the app shell for the routes that are its views,
-  // and the setlist page, which is not a view yet.
-  // Always fetch a clean URL: wrangler strips .html, so fetching /setlist.html
-  // redirects to /setlist, and browser navigations have redirect: 'manual', so a
-  // redirected SW response causes an error.
-  let htmlFile = null
-  if (SHELL_ROUTES.includes(name)) htmlFile = '/'
-  else if (name === 'setlist') htmlFile = '/setlist'
-
-  if (!htmlFile) {
-    return new Response('Not Found', { status: 404 })
-  }
+async function handleRoute() {
+  // Every URL is served by the app shell, index.html, which shows the view for it
+  // (and a not-found view for a URL that is no page). Always fetch the clean URL:
+  // wrangler strips .html, so /index.html redirects to /, and browser navigations
+  // have redirect: 'manual', so a redirected SW response causes an error.
+  const htmlFile = '/'
 
   try {
     const response = await fetch(htmlFile)

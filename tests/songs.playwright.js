@@ -103,7 +103,7 @@ test.describe('Song info', () => {
   test('info button on a setlist song opens the song info dialog', async ({ page }) => {
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
-    await page.goto('/setlist/info-test-setlist#song-0')
+    await page.goto('/setlist/info-test-setlist/song/0')
     // The header shows the song once it has loaded; info refers to it from then on
     await expect(page.locator('#app-header')).toContainText('Info Test Song')
     await page.locator('#app-header').getByRole('button', { name: 'Information' }).click()

@@ -582,6 +582,7 @@ export class StoragePage extends LitElement {
       await db.clearAll()
       localStorage.clear()
       sessionStorage.clear()
+      // biome-ignore lint/plugin: everything stored was cleared, so start afresh
       window.location.reload()
     } catch (error) {
       console.error('[Storage] Failed to clear local data:', error)

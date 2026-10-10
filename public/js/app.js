@@ -1,10 +1,9 @@
 /**
  * The app shell: starts the router, which shows the view for the URL in
- * #view-outlet. The menu, and what lives with it (the media player, to come),
- * stay while views come and go.
+ * #view-outlet. The menu and the media player stay while views come and go.
  */
 import '../components/nav-menu.js'
-import { AppRouter } from './app-router.js'
+import { AppRouter, RouteChangeEvent } from './app-router.js'
 import { checkFirstTimeAuth } from './first-time-auth.js'
 import { setRouter } from './navigation.js'
 import { views } from './views/registry.js'
@@ -21,4 +20,11 @@ const router = new AppRouter({
   views,
 })
 setRouter(router)
+document.addEventListener(RouteChangeEvent.type, event => {
+  document.body.dataset.view = event.route.name
+})
+
 await router.start()
+
+// Not needed to show the first view, so after it
+import('../components/media-player.js')

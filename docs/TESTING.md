@@ -39,6 +39,10 @@ app's own modules, imported directly: there's no build step to test around.
   It throws on anything it doesn't model rather than guessing, and has its own tests
   (`fake-drive.test.js`). `drive-sync.test.js` sets up two devices syncing through one
   fake Drive, which is how cross-device behaviour is tested.
+- **Routing** has pure functions (`router.test.js`: URL to route and back, and how a move
+  changes the history), and the runtime, tested with the real History API, shadow DOM and
+  clicks (`app-router.test.js`). Views are tested like components; `home-view.test.js`
+  also checks there is a view for every route.
 - **Transposition** (`transpose.test.js`) has one test per case, so a failure names
   the chord and key.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
@@ -54,17 +58,18 @@ parallel, each in its own browser context.
 
 | File | Covers |
 | --- | --- |
+| `views.playwright.js` | Moving between views in place: history, titles, the menu, leaving a setlist or the library cleanly, the media player carrying on |
 | `live.playwright.js` | A setlist in use: moving between songs, scrolling, sections, reordering, deleting, keys |
 | `app.playwright.js` | Themes, loading, display preferences, the menu, modals, the storage page |
 | `songs.playwright.js` | The library, song and setlist info, importing, the bookmarklet page |
 | `song-settings.playwright.js` | A song's settings in a setlist, the media player's settings |
-| `service-worker.playwright.js` | Routing through the service worker, and reloading offline |
+| `service-worker.playwright.js` | The service worker serving the shell, and reloading offline |
 | `dev-pages.playwright.js` | Every page in `public/dev/` loads without errors |
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error. It also has:
 
-- `openApp(page, path)`: opens a page once the service worker controls it. The app
+- `openApp(page, path)`: opens a view once the service worker controls it. The app
   reloads itself when that first happens, which would otherwise land mid-test.
 - `seedSong(page, { setlistId })` and `seedSetlist(page)`: put a song, or a setlist of
   three songs (`SETLIST_SONGS`), in the app's database, the way the app stores them.
@@ -72,6 +77,13 @@ fails any test whose page throws an uncaught error. It also has:
   what was saved.
 - `enterEditMode(page)`: turns on edit mode, clicking again if the first click came
   before the app was listening.
+
+To check that a move happened without loading a page, mark the document first
+(`window.sameDocument = true`) and see that the mark survives: `views.playwright.js`
+has `markDocument` and `isSameDocument`. A test that needs to hold back a request with
+`page.route()` should turn the service worker off (`test.use({ serviceWorkers: 'block' })`):
+its first install reloads the page, and Playwright's routes don't see requests the service
+worker makes.
 
 Find elements by role and label (`getByRole('button', { name: 'Remove' })`,
 `getByLabel('Date')`), scoped by component (`page.locator('#app-header')`). CSS classes

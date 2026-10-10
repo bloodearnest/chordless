@@ -814,8 +814,14 @@ export class MediaPlayer extends LitElement {
     }
   }
 
+  /** True from starting a song until it is stopped (shown as the `active` attribute) */
+  get isActive() {
+    return Boolean(this._activeSongId || this._metronomeRunning)
+  }
+
   updated(changedProperties) {
     super.updated(changedProperties)
+    this.toggleAttribute('active', this.isActive)
 
     // Handle key changes - just update the source, don't auto-switch
     if (changedProperties.has('currentKey') && this.currentKey && !this._padsOn) {
