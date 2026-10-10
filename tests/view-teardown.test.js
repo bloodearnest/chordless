@@ -5,13 +5,13 @@
  * app must look as it did before.
  */
 import { expect } from '@open-wc/testing'
-import '../src/components/nav-menu.js'
+import '../src/components/nav-menu.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import '../src/js/views/bookmarklet-view.ts'
-import '../src/js/views/home-view.js'
+import '../src/js/views/home-view.ts'
 import '../src/js/views/import-song-view.ts'
-import '../src/js/views/library-view.js'
+import '../src/js/views/library-view.ts'
 import '../src/js/views/not-found-view.ts'
 import '../src/js/views/preferences-view.ts'
 import '../src/js/views/setlist-view.js'

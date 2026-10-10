@@ -1,7 +1,7 @@
 interface SearchableSong {
-  title?: string
-  artist?: string
-  lyricsText?: string
+  title?: string | null
+  artist?: string | null
+  lyricsText?: string | null
 }
 
 /**

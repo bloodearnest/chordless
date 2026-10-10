@@ -1,6 +1,7 @@
 import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './app-preferences.ts'
 import './icon.ts'
@@ -27,7 +28,8 @@ export class MenuOverviewClickEvent extends Event {
 /** A song in the setlist was chosen; index is its place in the setlist */
 export class MenuSongClickEvent extends Event {
   static type = 'nav-menu:song-click'
-  constructor(index) {
+  readonly index: number
+  constructor(index: number) {
     super(MenuSongClickEvent.type, { bubbles: true, composed: true })
     this.index = index
   }
@@ -66,7 +68,7 @@ export class MenuSongClickEvent extends Event {
  * @csspart back-button - The back button
  */
 export class NavMenu extends LitElement {
-  static properties = {
+  static override properties = {
     triggerId: { type: String, attribute: 'for' },
     showBackButton: { type: Boolean, attribute: 'show-back-button' },
     backLabel: { type: String, attribute: 'back-label' },
@@ -78,7 +80,21 @@ export class NavMenu extends LitElement {
     _preferencesOpened: { state: true },
   }
 
-  static styles = css`
+  declare triggerId: string
+  declare showBackButton: boolean
+  declare backLabel: string
+  declare popoverId: string
+  declare songs: { title: string }[]
+  declare showOverviewLink: boolean
+  declare setlistTitle: string
+  declare _preferencesOpened: boolean
+
+  _popup: DialogPopup
+  _preferencesModal: Ref<AppModal>
+  triggerButton: HTMLElement | null
+  _root?: Node
+
+  static override styles = css`
     :host {
       display: contents;
     }
@@ -192,7 +208,7 @@ export class NavMenu extends LitElement {
     // The menu outlives the views: close it when the view changes. (Not for a move within
     // a view, such as a search typed in the library or a swipe to another song: the user
     // may have the menu open by then.) Choosing a link closes it too: see _onClick
-    let viewName = null
+    let viewName: string | null | undefined = null
     new ContextConsumer(this, {
       context: routeContext,
       subscribe: true,
@@ -204,11 +220,11 @@ export class NavMenu extends LitElement {
   }
 
   /** The <dialog> the menu is in (once rendered) */
-  get dialog() {
+  get dialog(): HTMLDialogElement | undefined {
     return this._popup.element
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     // Open from the trigger button, or from an app-header's menu button
     this._onRootClick = this._onRootClick.bind(this)
@@ -218,31 +234,34 @@ export class NavMenu extends LitElement {
     this._root.addEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
     this._root?.removeEventListener('click', this._onRootClick)
     this._root?.removeEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
 
-  _onRootClick(e) {
+  _onRootClick(e: Event): void {
     if (!this.triggerId) return
-    const trigger = e.composedPath().find(el => el.id === this.triggerId)
+    const trigger = e
+      .composedPath()
+      .find((el): el is HTMLElement => el instanceof HTMLElement && el.id === this.triggerId)
     if (trigger) this.toggle(trigger)
   }
 
-  _onNavMenuClick(e) {
-    this.toggle(e.trigger || e.target)
+  _onNavMenuClick(e: Event): void {
+    const trigger = e instanceof HeaderMenuClickEvent ? e.trigger : undefined
+    this.toggle(trigger || (e.target as HTMLElement | null))
   }
 
   // Position the menu under the trigger button
-  _positionPopover(dialog) {
+  _positionPopover(dialog: HTMLDialogElement): void {
     if (!this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
     dialog.style.top = `${buttonRect.bottom + 4}px`
     dialog.style.left = `${buttonRect.left}px`
   }
 
-  render() {
+  override render() {
     return html`
       <dialog
         id="${this.popoverId}"
@@ -344,33 +363,33 @@ export class NavMenu extends LitElement {
   }
 
   /** A click in the menu: on its backdrop (closes it), or on a link (the router follows it) */
-  _onClick(event) {
+  _onClick(event: MouseEvent): void {
     this._popup.onClick(event)
     if (event.composedPath().some(node => node instanceof HTMLAnchorElement)) this.close()
   }
 
-  _handleBackClick() {
+  _handleBackClick(): void {
     this.dispatchEvent(new MenuBackClickEvent())
 
     // Close the menu after back is clicked
     this.close()
   }
 
-  _handleOverviewClick() {
+  _handleOverviewClick(): void {
     this.dispatchEvent(new MenuOverviewClickEvent())
 
     // Close the menu after overview is clicked
     this.close()
   }
 
-  _handleSongClick(index) {
+  _handleSongClick(index: number): void {
     this.dispatchEvent(new MenuSongClickEvent(index))
 
     // Close the menu after song is clicked
     this.close()
   }
 
-  _handlePreferencesClick() {
+  _handlePreferencesClick(): void {
     this.close()
     this._preferencesOpened = true
     // Wait for next frame to ensure the menu is closed before showing the modal
@@ -383,25 +402,31 @@ export class NavMenu extends LitElement {
   }
 
   /** Open the menu, under the trigger button if it has one */
-  show(trigger) {
+  show(trigger?: HTMLElement | null): void {
     if (trigger) this.triggerButton = trigger
     this._popup.show()
   }
 
-  close() {
+  close(): void {
     this._popup.close()
   }
 
   /** Open or close the menu, positioned under the trigger button */
-  toggle(trigger) {
+  toggle(trigger?: HTMLElement | null): void {
     if (trigger) this.triggerButton = trigger
     this._popup.toggle()
   }
 
-  isOpen() {
+  isOpen(): boolean {
     return this._popup.isOpen
   }
 }
 
 // Define the custom element
 customElements.define('nav-menu', NavMenu)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'nav-menu': NavMenu
+  }
+}

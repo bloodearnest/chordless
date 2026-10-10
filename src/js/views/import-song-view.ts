@@ -1,6 +1,6 @@
 import { html } from 'lit'
 import '../../components/app-header.ts'
-import '../../components/song-import.js'
+import '../../components/song-import.ts'
 import { PageView } from './page-view.ts'
 
 /** Import songs from ChordPro files or pasted text, or from SongSelect via the bookmarklet */

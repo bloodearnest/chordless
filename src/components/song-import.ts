@@ -1,11 +1,16 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { Person, Setlist, SongRecord } from '../js/data-types.ts'
+import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getOrganisationPeople } from '../js/people.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
+import { errorMessage } from '../js/utils/errors.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
 import { goTo } from '../js/navigation.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -13,7 +18,8 @@ import { buttonStyles } from './shared-styles.ts'
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
   static type = 'song-import:imported'
-  constructor(url) {
+  readonly url: string
+  constructor(url: string) {
     super(SongImportedEvent.type, { bubbles: true, composed: true, cancelable: true })
     this.url = url
   }
@@ -25,8 +31,26 @@ const parser = new ChordProParser()
 
 const NOT_TEXT = /^(image|audio|video|font)\/|^application\/(pdf|zip)/
 
+/** A song arriving to be imported (from a file, pasted text or the bookmarklet) */
+export interface IncomingSong {
+  name?: string
+  chordproText?: string
+  metadata?: { title?: string; ccliNumber?: string | null }
+  source?: string
+  /** Why it cannot be imported, if it cannot */
+  skip?: string
+}
+
+/** A song that was imported, and what to do if it was already in the library */
+interface ImportItem {
+  song: SongRecord
+  chordproText: string
+  isDuplicate: boolean
+  choice: 'update' | 'use-existing' | null
+}
+
 /** "Amazing Grace.cho" -> "Amazing Grace" */
-function titleFromFileName(name) {
+function titleFromFileName(name: string): string {
   return name.replace(/\.[^.]+$/, '')
 }
 
@@ -49,7 +73,7 @@ function titleFromFileName(name) {
  *   preventDefault() stops the navigation (for tests).
  */
 export class SongImport extends LitElement {
-  static properties = {
+  static override properties = {
     _state: { state: true }, // 'pick' | 'choices'
     _error: { state: true },
     // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
@@ -60,7 +84,20 @@ export class SongImport extends LitElement {
     _newSetlist: { state: true },
   }
 
-  static styles = [
+  declare _state: 'pick' | 'choices'
+  declare _error: string
+  declare _imports: ImportItem[]
+  declare _skipped: string[]
+  declare _setlists: Setlist[]
+  declare _people: Person[]
+  declare _newSetlist: Partial<Setlist> | null
+
+  _paste: Ref<HTMLTextAreaElement>
+  _setlistSelect: Ref<HTMLSelectElement>
+  _newSetlistModalRef: Ref<AppModal>
+  _db: ChordlessDB | null = null
+
+  static override styles = [
     buttonStyles,
     css`
     /* The page's own reset (* { margin: 0; padding: 0 }) beats :host, so the
@@ -307,18 +344,18 @@ export class SongImport extends LitElement {
     this._onMessage = this._onMessage.bind(this)
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     window.addEventListener('message', this._onMessage)
     this._signalReady()
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
     window.removeEventListener('message', this._onMessage)
   }
 
-  _onMessage(event) {
+  _onMessage(event: MessageEvent): void {
     if (event.origin !== SONGSELECT_ORIGIN) return
     if (event.data?.type === 'CHORDLESS_IMPORT') {
       console.log('[Import] Received import message from:', event.origin)
@@ -329,7 +366,7 @@ export class SongImport extends LitElement {
   }
 
   /** Tell the bookmarklet's page (our opener) that we can take the song */
-  _signalReady() {
+  _signalReady(): void {
     if (!window.opener) return
     try {
       window.opener.postMessage({ type: 'CHORDLESS_READY' }, SONGSELECT_ORIGIN)
@@ -342,13 +379,13 @@ export class SongImport extends LitElement {
    * Import a song from the bookmarklet: {chordproText, metadata: {title,
    * ccliNumber}, source}
    */
-  receive(song) {
+  receive(song: IncomingSong): Promise<void> {
     return this.receiveAll([song])
   }
 
   /** Import songs from ChordPro files */
-  async importFiles(files) {
-    const songs = []
+  async importFiles(files: File[]): Promise<void> {
+    const songs: IncomingSong[] = []
     for (const file of files) {
       // ChordPro has no registered type, so .cho files come as '' or
       // application/octet-stream: rule out what's plainly not text instead
@@ -367,14 +404,15 @@ export class SongImport extends LitElement {
     await this.receiveAll(songs)
   }
 
-  async _onFilesChosen(event) {
-    const files = [...event.target.files]
-    event.target.value = '' // so choosing the same files again still imports
+  async _onFilesChosen(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement
+    const files = [...(input.files ?? [])]
+    input.value = '' // so choosing the same files again still imports
     if (files.length) await this.importFiles(files)
   }
 
-  _importPasted() {
-    const chordproText = this._paste.value.value
+  _importPasted(): void {
+    const chordproText = this._paste.value?.value ?? ''
     this.receiveAll([{ name: 'Pasted text', chordproText, source: 'paste' }])
   }
 
@@ -383,13 +421,14 @@ export class SongImport extends LitElement {
    * Saves each to the library, unless a copy is already there, and shows the
    * choices. A song with `skip` (a reason) is listed as not imported.
    */
-  async receiveAll(songs) {
+  async receiveAll(songs: IncomingSong[]): Promise<void> {
     console.log('[Import] Importing', songs.length, 'song(s)')
     this._error = ''
     try {
-      this._db = await getCurrentDB()
-      const imports = []
-      const skipped = []
+      const db = await getCurrentDB()
+      this._db = db
+      const imports: ImportItem[] = []
+      const skipped: string[] = []
       for (const { chordproText = '', metadata = {}, source, name, skip } of songs) {
         if (skip || !chordproText.trim()) {
           skipped.push(`${name}: ${skip || 'empty'}`)
@@ -400,7 +439,7 @@ export class SongImport extends LitElement {
         const ccliNumber = parsed.ccliSongNumber || parsed.ccli || metadata.ccliNumber || null
         const title = parsed.title || metadata.title || 'Untitled'
 
-        const existing = await findExistingSong(ccliNumber, title, this._db)
+        const existing = await findExistingSong(ccliNumber, title, db)
         const song =
           existing || (await createSong(chordproText, { ccliNumber, title, importSource: source }))
         imports.push({ song, chordproText, isDuplicate: Boolean(existing), choice: null })
@@ -412,29 +451,30 @@ export class SongImport extends LitElement {
       }
       this._imports = imports
 
-      const setlists = await this._db.getAllSetlists()
+      const setlists = await db.getAllSetlists()
       this._setlists = setlists.sort((a, b) => b.date.localeCompare(a.date))
       this._state = 'choices'
     } catch (error) {
       console.error('[Import] Failed to process song:', error)
-      this._showError(`Failed to process song: ${error.message}`)
+      this._showError(`Failed to process song: ${errorMessage(error)}`)
     }
   }
 
-  _showError(message) {
+  _showError(message: string): void {
     this._error = message
     this._state = 'pick'
   }
 
   /** Go to url, unless an imported listener prevents it */
-  _finish(url) {
+  _finish(url: string): void {
     const event = new SongImportedEvent(url)
     if (this.dispatchEvent(event)) goTo(url)
   }
 
-  async _addToSetlist(setlistId) {
+  async _addToSetlist(setlistId: string): Promise<void> {
     try {
-      const setlist = await this._db.getSetlist(setlistId)
+      const db = this._database()
+      const setlist = await db.getSetlist(setlistId)
       if (!setlist) throw new Error('Setlist not found')
       for (const { song } of this._imports) {
         setlist.songs.push({
@@ -447,28 +487,28 @@ export class SongImport extends LitElement {
         })
       }
       setlist.modifiedDate = new Date().toISOString()
-      await this._db.saveSetlist(setlist)
+      await db.saveSetlist(setlist)
       console.log('[Import] Added', this._imports.length, 'song(s) to setlist:', setlistId)
       this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
-      this._showError(`Failed to save song: ${error.message}`)
+      this._showError(`Failed to save song: ${errorMessage(error)}`)
     }
   }
 
-  _addToChosenSetlist() {
+  _addToChosenSetlist(): void {
     const select = this._setlistSelect.value
-    this._addToSetlist(select.value)
+    if (select) this._addToSetlist(select.value)
   }
 
-  _libraryOnly() {
+  _libraryOnly(): void {
     // The songs were saved to the library when they arrived
     const [first, ...rest] = this._imports
     this._finish(rest.length ? '/songs' : `/songs/${first.song.uuid}`)
   }
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
-  async _openNewSetlist() {
+  async _openNewSetlist(): Promise<void> {
     const { people, me } = await getOrganisationPeople()
     const date = toLocalDateString(getNextSunday())
     this._people = people
@@ -481,30 +521,36 @@ export class SongImport extends LitElement {
       ownerId: me?.id || '',
     }
     await this.updateComplete
-    this._newSetlistModal().show()
+    this._newSetlistModal()?.show()
   }
 
-  async _createSetlist(event) {
+  async _createSetlist(event: SetlistDetailsSaveEvent): Promise<void> {
     event.stopPropagation()
     const setlist = createSetlist(event.details)
     try {
-      await this._db.saveSetlist(setlist)
+      await this._database().saveSetlist(setlist)
       console.log('[Import] Created new setlist:', setlist.id)
     } catch (error) {
       console.error('[Import] Error creating setlist:', error)
-      this._newSetlistModal().close()
-      this._showError(`Failed to create setlist: ${error.message}`)
+      this._newSetlistModal()?.close()
+      this._showError(`Failed to create setlist: ${errorMessage(error)}`)
       return
     }
-    this._newSetlistModal().close()
+    this._newSetlistModal()?.close()
     await this._addToSetlist(setlist.id)
   }
 
-  _newSetlistModal() {
+  _newSetlistModal(): AppModal | undefined {
     return this._newSetlistModalRef.value
   }
 
-  render() {
+  /** The library's database, once something has been imported */
+  _database(): ChordlessDB {
+    if (!this._db) throw new Error('Nothing has been imported yet')
+    return this._db
+  }
+
+  override render() {
     return html`<div class="page">${this._renderState()}</div>`
   }
 
@@ -531,7 +577,7 @@ export class SongImport extends LitElement {
                 submit-label=${several ? 'Create & Add Songs' : 'Create & Add Song'}
                 auto-type
                 @setlist-details-form:save=${this._createSetlist}
-                @setlist-details-form:cancel=${() => this._newSetlistModal().close()}
+                @setlist-details-form:cancel=${() => this._newSetlistModal()?.close()}
               ></setlist-details-form>
             `
             : ''
@@ -573,44 +619,51 @@ export class SongImport extends LitElement {
   }
 
   _renderSongList() {
-    const status = { update: 'updated', 'use-existing': 'already in library' }
+    const status: Record<string, string> = {
+      update: 'updated',
+      'use-existing': 'already in library',
+    }
     return html`
       <ol class="songs">
         ${this._imports.map(
           ({ song, isDuplicate, choice }) =>
-            html`<li>${song.title} <span class="subtitle">${isDuplicate ? status[choice] || 'already in library' : 'new'}</span></li>`
+            html`<li>${song.title} <span class="subtitle">${isDuplicate ? (choice && status[choice]) || 'already in library' : 'new'}</span></li>`
         )}
       </ol>
     `
   }
 
   /** Keep the library's copy of a song we already have */
-  _useExisting(item) {
+  _useExisting(item: ImportItem): void {
     this._setChoice(item, 'use-existing')
   }
 
   /** Replace the library's copy of the song with the imported one */
-  async _update(item) {
+  async _update(item: ImportItem): Promise<void> {
     try {
-      const song = await overwriteSong(item.song.uuid, item.chordproText, this._db)
+      const song = await overwriteSong(item.song.uuid, item.chordproText, this._database())
       console.log('[Import] Updated existing song:', song.title)
       this._setChoice(item, 'update', song)
     } catch (error) {
       console.error('[Import] Failed to update song:', error)
-      this._showError(`Failed to update song: ${error.message}`)
+      this._showError(`Failed to update song: ${errorMessage(error)}`)
     }
   }
 
-  async _updateAll(items) {
+  async _updateAll(items: ImportItem[]): Promise<void> {
     // Each update replaces only its own entry, so the others are still current
     for (const item of items) await this._update(item)
   }
 
-  _setChoice(item, choice, song = item.song) {
+  _setChoice(
+    item: ImportItem,
+    choice: 'update' | 'use-existing',
+    song: SongRecord = item.song
+  ): void {
     this._imports = this._imports.map(i => (i === item ? { ...i, choice, song } : i))
   }
 
-  _renderDuplicates(unresolved) {
+  _renderDuplicates(unresolved: ImportItem[]) {
     if (unresolved.length === 1 && this._imports.length === 1) {
       const [item] = unresolved
       return html`
@@ -712,3 +765,9 @@ export class SongImport extends LitElement {
 }
 
 customElements.define('song-import', SongImport)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-import': SongImport
+  }
+}

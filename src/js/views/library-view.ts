@@ -8,53 +8,71 @@
  * for rendering, and the LibrarySong model for saving.
  */
 import { Task } from '@lit/task'
+import type { PropertyValues } from 'lit'
 import { html } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
+import type { AppHeader } from '../../components/app-header.ts'
 import '../../components/app-header.ts'
+import type { AppModal } from '../../components/app-modal.ts'
 import '../../components/app-modal.ts'
+import type { KeyChangeEvent, KeySelector } from '../../components/key-selector.ts'
 import '../../components/key-selector.ts'
 import '../../components/song-card.ts'
 import '../../components/song-display.ts'
+import type { SongInfoDialog } from '../../components/song-info-dialog.ts'
 import '../../components/song-info-dialog.ts'
-import '../../components/song-list.js'
+import type { SongSelectEvent } from '../../components/song-list.ts'
+import '../../components/song-list.ts'
+import type {
+  SectionActionEvent,
+  SectionToggleEvent,
+  SongSection,
+} from '../../components/song-section.ts'
 import '../../components/song-section.ts'
 import '../../components/status-message.ts'
+import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { getCurrentDB } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { ChordProParser } from '../parser.ts'
 import { buildUrl } from '../router.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { getLibrarySongs, getSongWithContent } from '../song-utils.ts'
-import * as SongViewManager from '../song-view-manager.js'
+import * as SongViewManager from '../song-view-manager.ts'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
 import { filterSongs } from '../utils/song-filter.ts'
-import { PageView } from './page-view.ts'
+import { PageView, type ViewState } from './page-view.ts'
 
 const { CONFIG } = SongViewManager
 
+/** The song that is open: its details, which gain the key once it has been changed and saved */
+type OpenSong = SongWithContent & { key?: string | null; originalKey?: string | null }
+
 export class LibraryView extends PageView {
-  static properties = {
+  static override properties = {
     ...PageView.properties,
     _search: { state: true },
     _heading: { state: true },
   }
 
-  #parser = new ChordProParser()
-  #libraryList = createRef()
-  #songView = createRef()
-  #content = createRef()
-  #infoDialog = createRef()
-  #resetModal = createRef()
+  declare _search: string
+  declare _heading: string
 
-  #scrollObserver = null
+  #parser = new ChordProParser()
+  #libraryList = createRef<HTMLElement>()
+  #songView = createRef<HTMLElement>()
+  #content = createRef<HTMLElement>()
+  #infoDialog = createRef<SongInfoDialog>()
+  #resetModal = createRef<AppModal>()
+
+  #scrollObserver: IntersectionObserver | null = null
   #suppressScrollReset = false
-  #scrollResetTimeout = null
+  #scrollResetTimeout: ReturnType<typeof setTimeout> | undefined
 
   // The open song
-  #openUuid = null
-  #song = null
-  #parsed = null
-  #key = null
+  #openUuid: string | null = null
+  #song: OpenSong | null = null
+  #parsed: ParsedChart | null = null
+  #key: string | undefined = undefined
   #fontSize = CONFIG.DEFAULT_FONT_SIZE
   #capo = 0
   #syncing = 0
@@ -75,26 +93,28 @@ export class LibraryView extends PageView {
   // ==================== Lifecycle ====================
 
   /** How far down the list was scrolled (what was searched for is in the URL) */
-  captureViewState() {
+  override captureViewState(): ViewState {
     return { scroll: this.#libraryList.value?.scrollTop }
   }
 
-  willUpdate(changed) {
+  override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('route')) this.#searchFromRoute()
   }
 
-  firstUpdated() {
+  override firstUpdated(): void {
     // Opened on a song: show it straight away, without sliding in from the list
-    if (this.route?.songUuid) this.#scrollTo(this.#songView.value, 'instant')
+    if (this.route?.name === 'songs' && this.route.songUuid) {
+      this.#scrollTo(this.#songView.value, 'instant')
+    }
     this.#observeScrollBack()
     this.restoreScroll(this.#libraryList.value, this.restoredState?.scroll)
   }
 
-  updated(changed) {
+  override updated(changed: PropertyValues<this>): void {
     if (changed.has('route')) this.#syncSong()
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback(): void {
     super.disconnectedCallback()
     this.#scrollObserver?.disconnect()
     clearTimeout(this.#scrollResetTimeout)
@@ -111,25 +131,27 @@ export class LibraryView extends PageView {
    * linked to, and comes back with the back button. Typing replaces the entry, after a
    * pause (browsers limit how often the history can be changed).
    */
-  #searchTimeout = null
+  #searchTimeout: ReturnType<typeof setTimeout> | undefined
   // The search this view has just put in the URL: the route that follows is its own echo
-  #searchEcho = null
+  #searchEcho: string | null = null
 
-  #typed(value) {
+  #typed(value: string): void {
     this._search = value
     clearTimeout(this.#searchTimeout)
     this.#searchTimeout = setTimeout(() => {
       const search = value.trim()
-      if (this.route?.songUuid || (this.route?.search ?? '') === search) return
+      const route = this.route?.name === 'songs' ? this.route : undefined
+      if (route?.songUuid || (route?.search ?? '') === search) return
       this.#searchEcho = search
       goTo(buildUrl({ name: 'songs', search }), { replace: true })
     }, 250)
   }
 
   /** A route that names a search other than one this view put there (a link, reload, back) sets the box */
-  #searchFromRoute() {
-    if (this.route?.songUuid) return
-    const search = this.route?.search ?? ''
+  #searchFromRoute(): void {
+    const route = this.route?.name === 'songs' ? this.route : undefined
+    if (route?.songUuid) return
+    const search = route?.search ?? ''
     const echo = this.#searchEcho
     this.#searchEcho = null
     if (search === echo) return
@@ -137,8 +159,9 @@ export class LibraryView extends PageView {
   }
 
   /** Show the song the route names, or the list if it names none */
-  async #syncSong() {
-    const uuid = this.route?.songUuid ?? null
+  async #syncSong(): Promise<void> {
+    const route = this.route?.name === 'songs' ? this.route : undefined
+    const uuid = route?.songUuid ?? null
     if (uuid === this.#openUuid) return
     const sync = ++this.#syncing
 
@@ -158,25 +181,26 @@ export class LibraryView extends PageView {
     }
   }
 
-  #openSong(song) {
+  #openSong(song: SongWithContent): void {
     goTo(buildUrl({ name: 'songs', songUuid: song.uuid }))
   }
 
   // ==================== Scrolling between the list and the song ====================
 
-  #scrollTo(element, behavior = 'smooth') {
+  #scrollTo(element: Element | null | undefined, behavior: ScrollBehavior = 'smooth'): void {
     element?.scrollIntoView({ behavior, block: 'nearest', inline: 'start' })
   }
 
   /** Swiping back to the list closes the song */
-  #observeScrollBack() {
+  #observeScrollBack(): void {
     const list = this.#libraryList.value
     if (!list) return
     this.#scrollObserver = new IntersectionObserver(
       entries => {
         for (const entry of entries) {
           if (this.#suppressScrollReset) continue
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && this.route?.songUuid) {
+          const route = this.route?.name === 'songs' ? this.route : undefined
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && route?.songUuid) {
             goTo(buildUrl({ name: 'songs' }))
           }
         }
@@ -187,7 +211,7 @@ export class LibraryView extends PageView {
   }
 
   /** Scrolling to the song passes through the list: don't take that for a swipe back */
-  #suppressScrollResetTemporarily(duration = 600) {
+  #suppressScrollResetTemporarily(duration = 600): void {
     this.#suppressScrollReset = true
     clearTimeout(this.#scrollResetTimeout)
     this.#scrollResetTimeout = setTimeout(() => {
@@ -198,21 +222,26 @@ export class LibraryView extends PageView {
   // ==================== Header controls ====================
 
   /** The header's controls for a song, which are hidden until one is open */
-  #control(id) {
-    return this.querySelector(`#${id}`)
+  #control<T extends HTMLElement = HTMLElement>(id: string): T | null {
+    return this.querySelector<T>(`#${id}`)
   }
 
-  #showSongControls(show) {
-    this.#control('library-key-selector').style.display = show ? '' : 'none'
-    this.#control('library-song-meta-header').style.display = show ? 'flex' : 'none'
+  #display(id: string, value: string): void {
+    const element = this.#control(id)
+    if (element) element.style.display = value
+  }
+
+  #showSongControls(show: boolean): void {
+    this.#display('library-key-selector', show ? '' : 'none')
+    this.#display('library-song-meta-header', show ? 'flex' : 'none')
     // Shown by edit mode
-    this.#control('library-reset-button').style.display = 'none'
-    this.#control('library-font-size-controls').style.display = 'none'
+    this.#display('library-reset-button', 'none')
+    this.#display('library-font-size-controls', 'none')
   }
 
   // ==================== Single song ====================
 
-  async #viewSong(song) {
+  async #viewSong(song: OpenSong): Promise<void> {
     this.#song = song
     if (!song.chordpro) {
       console.error('Song has no ChordPro content!', song)
@@ -228,10 +257,11 @@ export class LibraryView extends PageView {
     this.#showSongControls(true)
     if (parsed.metadata.key) this.#updateKeySelector(parsed.metadata.key)
 
-    const meta = []
+    const meta: string[] = []
     if (parsed.metadata.tempo) meta.push(`${parsed.metadata.tempo} BPM`)
     if (parsed.metadata.time) meta.push(parsed.metadata.time)
-    this.#control('library-song-meta-header').textContent = meta.join(' • ')
+    const metaHeader = this.#control('library-song-meta-header')
+    if (metaHeader) metaHeader.textContent = meta.join(' • ')
 
     await this.#renderSong(parsed)
 
@@ -242,7 +272,7 @@ export class LibraryView extends PageView {
     this.#scrollTo(this.#songView.value)
   }
 
-  #closeSong() {
+  #closeSong(): void {
     this.#openUuid = null
     this.#scrollTo(this.#libraryList.value)
     this.#showSongControls(false)
@@ -252,8 +282,9 @@ export class LibraryView extends PageView {
   }
 
   /** Render a (possibly transposed) chart into the song view, and set its sections up */
-  async #renderSong(parsed) {
+  async #renderSong(parsed: ParsedChart): Promise<void> {
     const content = this.#content.value
+    if (!content || !this.#song) return
     await SongViewManager.renderSongView(parsed, content, { songIndex: 0, capo: this.#capo })
     const db = await getCurrentDB()
     const model = createLibrarySongModel(this.#song, db, db.organisationId)
@@ -262,24 +293,24 @@ export class LibraryView extends PageView {
 
   // ==================== Edit mode ====================
 
-  get #editMode() {
+  get #editMode(): boolean {
     return document.body.classList.contains('edit-mode')
   }
 
-  #setEditMode(on) {
-    const header = this.querySelector('#library-app-header')
+  #setEditMode(on: boolean): void {
+    const header = this.querySelector<AppHeader>('#library-app-header')
     document.body.classList.toggle('edit-mode', on)
     if (on) document.body.setAttribute('data-edit-mode', '')
     else document.body.removeAttribute('data-edit-mode')
     if (header) header.editMode = on
-    const keySelector = this.#control('library-key-selector')
+    const keySelector = this.#control<KeySelector>('library-key-selector')
     if (keySelector) keySelector.editMode = on
     this.#sections().forEach(section => {
       section.editMode = on
     })
   }
 
-  #toggleEditMode() {
+  #toggleEditMode(): void {
     if (this.#editMode) {
       this.#setEditMode(false)
       this.#saveSong()
@@ -288,16 +319,16 @@ export class LibraryView extends PageView {
     }
   }
 
-  #sections() {
+  #sections(): SongSection[] {
     const songDisplay = this.#content.value?.querySelector('song-display')
     return [...(songDisplay?.shadowRoot?.querySelectorAll('song-section') ?? [])]
   }
 
-  #section(index) {
+  #section(index: number): SongSection | undefined {
     return this.#sections().find(section => section.getAttribute('section-index') === String(index))
   }
 
-  async #saveSong() {
+  async #saveSong(): Promise<void> {
     if (!this.#song) return
     try {
       const db = await getCurrentDB()
@@ -319,8 +350,8 @@ export class LibraryView extends PageView {
   }
 
   /** The sections not in their default state, by section index */
-  #sectionDefaults() {
-    const defaults = {}
+  #sectionDefaults(): Record<string, SectionState> {
+    const defaults: Record<string, SectionState> = {}
     for (const section of this.#sections()) {
       const index = Number(section.getAttribute('section-index'))
       if (Number.isNaN(index)) continue
@@ -336,22 +367,22 @@ export class LibraryView extends PageView {
 
   // ==================== Key ====================
 
-  #updateKeySelector(selectedKey) {
-    const keySelector = this.#control('library-key-selector')
+  #updateKeySelector(selectedKey: string): void {
+    const keySelector = this.#control<KeySelector>('library-key-selector')
     if (!keySelector) return
     keySelector.value = selectedKey
     keySelector.keys = getAvailableKeys(selectedKey)
-    keySelector.originalKey = this.#song?.originalKey || this.#parsed?.metadata?.key
+    keySelector.originalKey = this.#song?.originalKey || this.#parsed?.metadata?.key || ''
     keySelector.editMode = this.#editMode
   }
 
-  async #changeKey(newKey) {
+  async #changeKey(newKey: string): Promise<void> {
     if (!newKey || !this.#parsed) return
     await this.#renderInKey(newKey)
     this.#updateKeySelector(newKey)
   }
 
-  async #renderInKey(targetKey) {
+  async #renderInKey(targetKey: string | undefined): Promise<void> {
     if (!this.#parsed) return
 
     // Transpose a copy from the song's own key: transposeSong changes the chart
@@ -370,7 +401,7 @@ export class LibraryView extends PageView {
 
   // ==================== Font size ====================
 
-  #changeFontSize(delta) {
+  #changeFontSize(delta: number): void {
     this.#fontSize = Math.min(
       CONFIG.MAX_FONT_SIZE,
       Math.max(CONFIG.MIN_FONT_SIZE, this.#fontSize + delta)
@@ -378,26 +409,26 @@ export class LibraryView extends PageView {
     this.#applyFontSize()
   }
 
-  #applyFontSize() {
-    const songContent = this.#content.value?.querySelector('.song-content')
+  #applyFontSize(): void {
+    const songContent = this.#content.value?.querySelector<HTMLElement>('.song-content')
     if (songContent) songContent.style.fontSize = `${this.#fontSize}rem`
   }
 
   // ==================== Sections ====================
 
-  #onSectionAction(event) {
+  #onSectionAction(event: SectionActionEvent): void {
     const { sectionIndex, action } = event
     if (typeof sectionIndex !== 'number' || !action) return
     this.#setSectionHideMode(sectionIndex, action)
   }
 
-  #onSectionToggle(event) {
+  #onSectionToggle(event: SectionToggleEvent): void {
     if (typeof event.sectionIndex !== 'number') return
     const details = this.#section(event.sectionIndex)?.getDetailsElement()
     if (details) this.#toggleSection(event.sectionIndex, details)
   }
 
-  #setSectionHideMode(sectionIndex, mode) {
+  #setSectionHideMode(sectionIndex: number, mode: string): void {
     const component = this.#section(sectionIndex)
     if (!component) return
 
@@ -407,13 +438,13 @@ export class LibraryView extends PageView {
       return
     }
 
-    const explicitShowMap = {
+    const explicitShowMap: Record<string, HideMode> = {
       'show-all': 'none',
       'show-lyrics': 'chords',
       'show-chords': 'lyrics',
       'show-none': 'hide',
     }
-    const mappedMode = explicitShowMap[mode] || mode
+    const mappedMode = explicitShowMap[mode] || (mode as HideMode)
     const isExplicit = Boolean(explicitShowMap[mode])
 
     if (mappedMode === 'hide') {
@@ -434,7 +465,7 @@ export class LibraryView extends PageView {
     }
   }
 
-  #toggleSection(sectionIndex, detailsElement) {
+  #toggleSection(sectionIndex: number, detailsElement: HTMLDetailsElement): void {
     const component = this.#section(sectionIndex)
     if (!component) return
     const closing = detailsElement.open
@@ -444,28 +475,29 @@ export class LibraryView extends PageView {
 
   // ==================== Reset, and info ====================
 
-  async #reset() {
-    if (!(await this.#resetModal.value.ask())) return
+  async #reset(): Promise<void> {
+    if (!(await this.#resetModal.value?.ask())) return
     if (!this.#parsed || !this.#song) return
 
     // Back to the key it was imported in, and the default size
     const originalKey = this.#song.originalKey || this.#parsed.metadata.key
     this.#fontSize = CONFIG.DEFAULT_FONT_SIZE
-    await this.#renderInKey(originalKey)
+    await this.#renderInKey(originalKey || undefined)
     if (originalKey) this.#updateKeySelector(originalKey)
     await this.#saveSong()
   }
 
-  async #showInfo() {
+  async #showInfo(): Promise<void> {
     if (!this.#parsed || !this.#song) return
     const dialog = this.#infoDialog.value
+    if (!dialog) return
     dialog.db = await getCurrentDB()
     await dialog.show(this.#song.id, { title: this.#parsed.metadata.title })
   }
 
   // ==================== Template ====================
 
-  #renderList(songs) {
+  #renderList(songs: SongWithContent[]) {
     if (songs.length === 0) {
       return html`<status-message
         state="empty"
@@ -477,11 +509,11 @@ export class LibraryView extends PageView {
       variant="library"
       empty-message="No songs match your search."
       .songs=${filterSongs(songs, this._search)}
-      @song-list:select=${event => event.song && this.#openSong(event.song)}
+      @song-list:select=${(event: SongSelectEvent) => event.song && this.#openSong(event.song)}
     ></song-list>`
   }
 
-  render() {
+  override render() {
     return html`
       <app-header
         id="library-app-header"
@@ -527,7 +559,7 @@ export class LibraryView extends PageView {
             id="library-key-selector"
             label="Key"
             style="display: none"
-            @key-selector:change=${event => this.#changeKey(event.value)}
+            @key-selector:change=${(event: KeyChangeEvent) => this.#changeKey(event.value)}
           ></key-selector>
           <div class="song-meta-compact" id="library-song-meta-header" style="display: none"></div>
         </div>
@@ -544,7 +576,7 @@ export class LibraryView extends PageView {
                 class="song-search-input"
                 placeholder="Search songs by title, artist, or lyrics..."
                 .value=${this._search}
-                @input=${event => this.#typed(event.target.value)}
+                @input=${(event: Event) => this.#typed((event.target as HTMLInputElement).value)}
               />
             </div>
             <div id="song-library-list" class="song-library-list">
@@ -569,8 +601,8 @@ export class LibraryView extends PageView {
               id="library-song-content"
               class="library-song-content"
               ${ref(this.#content)}
-              @song-section:action=${event => this.#onSectionAction(event)}
-              @song-section:toggle=${event => this.#onSectionToggle(event)}
+              @song-section:action=${(event: SectionActionEvent) => this.#onSectionAction(event)}
+              @song-section:toggle=${(event: SectionToggleEvent) => this.#onSectionToggle(event)}
             >
               <p>Select a song to view</p>
             </div>
@@ -593,3 +625,9 @@ export class LibraryView extends PageView {
   }
 }
 customElements.define('library-view', LibraryView)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'library-view': LibraryView
+  }
+}

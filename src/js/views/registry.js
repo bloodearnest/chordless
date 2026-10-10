@@ -29,7 +29,7 @@ export const views = {
     () => import('./not-found-view.ts'),
     () => 'Not found - Chordless'
   ),
-  home: view('home-view', () => import('./home-view.js')),
+  home: view('home-view', () => import('./home-view.ts')),
   storage: view(
     'storage-view',
     () => import('./storage-view.ts'),
@@ -47,7 +47,7 @@ export const views = {
   ),
   songs: view(
     'library-view',
-    () => import('./library-view.js'),
+    () => import('./library-view.ts'),
     () => 'Song Library - Chordless'
   ),
   bookmarklet: view(

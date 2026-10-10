@@ -1,5 +1,7 @@
-import { ModalCloseEvent } from '../../components/app-modal.ts'
-import { SongSelectEvent } from '../../components/song-list.js'
+import { type AppModal, ModalCloseEvent } from '../../components/app-modal.ts'
+import { SongSelectEvent } from '../../components/song-list.ts'
+import type { SongWithContent } from '../data-types.ts'
+import type { ChordlessDB } from '../db.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import { filterSongs } from '../utils/song-filter.ts'
 import { showStatusMessage } from '../utils/status-message.ts'
@@ -10,37 +12,43 @@ import { showStatusMessage } from '../utils/status-message.ts'
  * #add-song-modal (an <app-modal>), #add-song-search-input and #add-song-results.
  */
 export class AddSongModal {
-  #root
-  #getDb
-  #onPick
+  #root: Element
+  #getDb: () => ChordlessDB
+  #onPick: (song: SongWithContent) => void
 
   /**
-   * @param {object} options
-   * @param {Element} options.root where the modal's elements are
-   * @param {() => object} options.getDb the organisation's database
-   * @param {(song: object) => void} options.onPick a song was chosen; the modal stays
-   *   open until close() is called
+   * @param options.root where the modal's elements are
+   * @param options.getDb the organisation's database
+   * @param options.onPick a song was chosen; the modal stays open until close() is called
    */
-  constructor({ root, getDb, onPick }) {
+  constructor({
+    root,
+    getDb,
+    onPick,
+  }: {
+    root: Element
+    getDb: () => ChordlessDB
+    onPick: (song: SongWithContent) => void
+  }) {
     this.#root = root
     this.#getDb = getDb
     this.#onPick = onPick
   }
 
-  get #modal() {
-    return this.#root.querySelector('#add-song-modal')
+  get #modal(): AppModal | null {
+    return this.#root.querySelector<AppModal>('#add-song-modal')
   }
 
-  get #input() {
-    return this.#root.querySelector('#add-song-search-input')
+  get #input(): HTMLInputElement | null {
+    return this.#root.querySelector<HTMLInputElement>('#add-song-search-input')
   }
 
-  get #results() {
-    return this.#root.querySelector('#add-song-results')
+  get #results(): HTMLElement | null {
+    return this.#root.querySelector<HTMLElement>('#add-song-results')
   }
 
   /** Show the library to choose from */
-  async open() {
+  async open(): Promise<void> {
     const modal = this.#modal
     const input = this.#input
     const results = this.#results
@@ -71,7 +79,7 @@ export class AddSongModal {
       const listening = new AbortController()
       input.addEventListener(
         'input',
-        event => this.#renderResults(filterSongs(songs, event.target.value)),
+        event => this.#renderResults(filterSongs(songs, (event.target as HTMLInputElement).value)),
         {
           signal: listening.signal,
         }
@@ -87,12 +95,13 @@ export class AddSongModal {
     }
   }
 
-  close() {
+  close(): void {
     this.#modal?.close()
   }
 
-  #renderResults(songs) {
+  #renderResults(songs: SongWithContent[]): void {
     const results = this.#results
+    if (!results) return
     results.textContent = ''
 
     const songList = document.createElement('song-list')
@@ -101,7 +110,8 @@ export class AddSongModal {
     songList.emptyMessage = 'No songs match your search.'
     songList.dense = true
     songList.addEventListener(SongSelectEvent.type, event => {
-      if (event.song) this.#onPick(event.song)
+      const { song } = event as SongSelectEvent
+      if (song) this.#onPick(song)
     })
     results.appendChild(songList)
   }

@@ -49,8 +49,11 @@ export interface ParsedChart {
 
 // ==================== How a section is shown ====================
 
-/** What a section hides: nothing, its chords (lyrics only) or its lyrics (chords only) */
-export type HideMode = 'none' | 'chords' | 'lyrics'
+/**
+ * What a section hides: nothing, its chords (lyrics only) or its lyrics (chords only); or the
+ * whole section is collapsed or hidden
+ */
+export type HideMode = 'none' | 'chords' | 'lyrics' | 'collapse' | 'hide'
 
 export interface SectionState {
   hideMode: HideMode

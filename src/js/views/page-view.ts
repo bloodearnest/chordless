@@ -55,7 +55,10 @@ export class PageView extends LitElement {
    * Scroll an element to `top` once the view has drawn enough to reach it: what it
    * shows may load after it first renders, so wait a little (a third of a second at most).
    */
-  async restoreScroll(element: HTMLElement | null, top: number | undefined): Promise<void> {
+  async restoreScroll(
+    element: HTMLElement | null | undefined,
+    top: number | undefined
+  ): Promise<void> {
     if (!element || !top) return
     await this.updateComplete
     for (let frame = 0; frame < 20; frame++) {

@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { ChartLine, ChartSegment } from '../js/data-types.ts'
+import type { ChartLine, ChartSegment, HideMode } from '../js/data-types.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
   formatHiddenLyricsText,
@@ -85,7 +85,7 @@ export class SongSection extends LitElement {
   declare songIndex: number
   declare sectionIndex: number
   declare editMode: boolean
-  declare hideMode: string
+  declare hideMode: HideMode
   declare isCollapsed: boolean
   declare isHidden: boolean
   declare label: string

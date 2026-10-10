@@ -1,11 +1,15 @@
 import { css, html, LitElement } from 'lit'
+import type { SongWithContent } from '../js/data-types.ts'
 import './song-card.ts'
 import './status-message.ts'
 
 /** A song was chosen; index is its place in the list */
 export class SongSelectEvent extends Event {
   static type = 'song-list:select'
-  constructor(song, index, originalEvent) {
+  readonly song: SongWithContent
+  readonly index: number
+  readonly originalEvent: Event
+  constructor(song: SongWithContent, index: number, originalEvent: Event) {
     super(SongSelectEvent.type, { bubbles: true, composed: true })
     this.song = song
     this.index = index
@@ -20,13 +24,19 @@ export class SongSelectEvent extends Event {
  * Emits a "song-select" event whenever a song card is clicked.
  */
 export class SongList extends LitElement {
-  static properties = {
+  static override properties = {
     songs: { type: Array, attribute: false },
     variant: { type: String, attribute: 'variant' },
     emptyMessage: { type: String, attribute: 'empty-message' },
     emptyDetail: { type: String, attribute: 'empty-detail' },
     dense: { type: Boolean, reflect: true },
   }
+
+  declare songs: SongWithContent[]
+  declare variant: string
+  declare emptyMessage: string
+  declare emptyDetail: string
+  declare dense: boolean
 
   constructor() {
     super()
@@ -37,7 +47,7 @@ export class SongList extends LitElement {
     this.dense = false
   }
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
     }
@@ -57,7 +67,7 @@ export class SongList extends LitElement {
     }
   `
 
-  _handleSongClick(song, index, originalEvent) {
+  _handleSongClick(song: SongWithContent, index: number, originalEvent: Event): void {
     this.dispatchEvent(new SongSelectEvent(song, index, originalEvent))
   }
 
@@ -68,7 +78,7 @@ export class SongList extends LitElement {
     `
   }
 
-  render() {
+  override render() {
     if (!this.songs || this.songs.length === 0) {
       return this._renderEmptyState()
     }
@@ -80,7 +90,7 @@ export class SongList extends LitElement {
             <song-card
               .song=${song}
               .variant=${this.variant}
-              @song-card:click=${event => this._handleSongClick(song, index, event)}
+              @song-card:click=${(event: Event) => this._handleSongClick(song, index, event)}
             >
             </song-card>
           `
@@ -91,3 +101,9 @@ export class SongList extends LitElement {
 }
 
 customElements.define('song-list', SongList)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-list': SongList
+  }
+}

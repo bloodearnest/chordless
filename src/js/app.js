@@ -2,7 +2,7 @@
  * The app shell: starts the router, which shows the view for the URL in
  * #view-outlet. The menu and the media player stay while views come and go.
  */
-import '../components/nav-menu.js'
+import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import { startMediaPlayer } from './media-player-loader.ts'

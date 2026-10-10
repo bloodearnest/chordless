@@ -6,7 +6,7 @@ import {
 import { CapoChangeEvent } from '../components/capo-selector.ts'
 import { KeyChangeEvent } from '../components/key-selector.ts'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.ts'
-import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.js'
+import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.ts'
 import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
@@ -24,7 +24,7 @@ import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl } from './router.ts'
-import { AddSongModal } from './setlist/add-song-modal.js'
+import { AddSongModal } from './setlist/add-song-modal.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'

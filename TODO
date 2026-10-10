@@ -71,8 +71,7 @@ build
 
 dead code
 - song-view-manager.js setupCapoSelector() is never called (setlist-page has its own; the
-  library has no capo picker). It also sets capoSelector.key, which isn't a property
-  (referenceKey is). Remove it, after checking the rest of song-view-manager for the same
+  library has no capo picker). Remove it, after checking the rest of song-view-manager for the same
 
 accessibility (found by the axe checks in the unit tests)
 - dark theme buttons: white on #4da6ff is 2.6:1 (hover #3498db 3.2:1), below WCAG AA's

@@ -1,7 +1,17 @@
-import { ModalConfirmEvent } from '../components/app-modal.ts'
-import { CapoChangeEvent } from '../components/capo-selector.ts'
-import { KeyChangeEvent } from '../components/key-selector.ts'
-import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.ts'
+import { type AppModal, ModalConfirmEvent } from '../components/app-modal.ts'
+import { CapoChangeEvent, type CapoSelector } from '../components/capo-selector.ts'
+import { KeyChangeEvent, type KeySelector } from '../components/key-selector.ts'
+import type { SongDisplay } from '../components/song-display.ts'
+import {
+  SectionActionEvent,
+  SectionToggleEvent,
+  type SongSection,
+} from '../components/song-section.ts'
+import type { ParsedChart, SectionState } from './data-types.ts'
+import type { SongModel } from './models/song-model.ts'
+
+/** An element that keeps the listener this module put on it, to replace it next time */
+type WithListener<E extends HTMLElement, K extends string> = E & { [P in K]?: EventListener }
 
 /**
  * Song View Manager
@@ -42,12 +52,16 @@ const CONFIG = {
 /**
  * Render a song view into a container
  *
- * @param {Object} parsedSong - Parsed ChordPro song data
- * @param {HTMLElement} container - Container to render into
- * @param {Object} options - { songIndex, capo, showControls }
- * @returns {Promise<HTMLElement>} The song-display element
+ * @param parsedSong - Parsed ChordPro song data
+ * @param container - Container to render into
+ * @param options - { songIndex, capo }
+ * @returns The song-display element
  */
-export async function renderSongView(parsedSong, container, options = {}) {
+export async function renderSongView(
+  parsedSong: ParsedChart,
+  container: HTMLElement,
+  options: { songIndex?: number; capo?: number } = {}
+): Promise<SongDisplay> {
   const { songIndex = 0, capo = 0 } = options
 
   container.innerHTML = ''
@@ -77,15 +91,19 @@ export async function renderSongView(parsedSong, container, options = {}) {
 /**
  * Initialize song sections with state from a model
  *
- * @param {HTMLElement} container - Container with song-display elements
- * @param {SongModel} songModel - Song model with section state
- * @param {Object} options - { songIndex, editMode }
+ * @param container - Container with song-display elements
+ * @param songModel - Song model with section state
+ * @param options - { editMode }
  */
-export function initializeSongSections(container, songModel, options = {}) {
+export function initializeSongSections(
+  container: HTMLElement,
+  songModel: SongModel,
+  options: { editMode?: boolean } = {}
+): void {
   const { editMode = false } = options
 
   // Find all song-section elements in shadow DOMs
-  const sections = []
+  const sections: SongSection[] = []
 
   const songDisplays = container.querySelectorAll('song-display')
   songDisplays.forEach(songDisplay => {
@@ -112,16 +130,20 @@ export function initializeSongSections(container, songModel, options = {}) {
 /**
  * Setup key selector with model integration
  *
- * @param {HTMLElement} keySelector - key-selector element
- * @param {SongModel} songModel - Song model
- * @param {Object} callbacks - { onChange: (newKey) => void }
+ * @param keySelector - key-selector element
+ * @param songModel - Song model
+ * @param callbacks - { onChange: (newKey) => void }
  */
-export function setupKeySelector(keySelector, songModel, callbacks = {}) {
+export function setupKeySelector(
+  keySelector: WithListener<KeySelector, '_keyChangeHandler'> | null,
+  songModel: SongModel,
+  callbacks: { onChange?: (newKey: string) => void | Promise<void> } = {}
+): void {
   if (!keySelector) return
 
   // Set current key
-  keySelector.value = songModel.getKey()
-  keySelector.originalKey = songModel.getOriginalKey()
+  keySelector.value = songModel.getKey() ?? ''
+  keySelector.originalKey = songModel.getOriginalKey() ?? ''
 
   // Remove old listener if exists
   const oldHandler = keySelector._keyChangeHandler
@@ -130,8 +152,8 @@ export function setupKeySelector(keySelector, songModel, callbacks = {}) {
   }
 
   // Add new listener
-  const handler = async event => {
-    const newKey = event.value
+  const handler = async (event: Event) => {
+    const newKey = event instanceof KeyChangeEvent ? event.value : undefined
     if (newKey && callbacks.onChange) {
       await callbacks.onChange(newKey)
     }
@@ -143,12 +165,17 @@ export function setupKeySelector(keySelector, songModel, callbacks = {}) {
 /**
  * Setup capo selector with model integration
  *
- * @param {HTMLElement} capoSelector - capo-selector element
- * @param {SongModel} songModel - Song model
- * @param {Object} callbacks - { onChange: (newCapo) => void }
- * @param {Object} options - { enabled }
+ * @param capoSelector - capo-selector element
+ * @param songModel - Song model
+ * @param callbacks - { onChange: (newCapo) => void }
+ * @param options - { enabled }
  */
-export function setupCapoSelector(capoSelector, songModel, callbacks = {}, options = {}) {
+export function setupCapoSelector(
+  capoSelector: WithListener<CapoSelector, '_capoChangeHandler'> | null,
+  songModel: SongModel,
+  callbacks: { onChange?: (newCapo: number) => void | Promise<void> } = {},
+  options: { enabled?: boolean } = {}
+): void {
   if (!capoSelector) return
 
   const { enabled = true } = options
@@ -164,7 +191,7 @@ export function setupCapoSelector(capoSelector, songModel, callbacks = {}, optio
   const currentCapo = songModel.getCapo()
   const currentKey = songModel.getKey()
   capoSelector.value = currentCapo
-  capoSelector.key = currentKey
+  capoSelector.referenceKey = currentKey ?? ''
 
   // Remove old listener if exists
   const oldHandler = capoSelector._capoChangeHandler
@@ -173,8 +200,8 @@ export function setupCapoSelector(capoSelector, songModel, callbacks = {}, optio
   }
 
   // Add new listener
-  const handler = async event => {
-    const newValue = event.value
+  const handler = async (event: Event) => {
+    const newValue = event instanceof CapoChangeEvent ? event.value : undefined
     if (newValue !== undefined && callbacks.onChange) {
       await callbacks.onChange(newValue)
     }
@@ -186,10 +213,13 @@ export function setupCapoSelector(capoSelector, songModel, callbacks = {}, optio
 /**
  * Setup section controls (hide/show buttons)
  *
- * @param {HTMLElement} container - Container with song sections
- * @param {Function} onAction - Callback (sectionIndex, action) => void
+ * @param container - Container with song sections
+ * @param onAction - Callback (sectionIndex, action) => void
  */
-export function setupSectionControls(container, onAction) {
+export function setupSectionControls(
+  container: WithListener<HTMLElement, '_sectionActionHandler' | '_sectionToggleHandler'> | null,
+  onAction: (sectionIndex: number, action: string) => void
+): void {
   if (!container) return
 
   // Remove old listeners if they exist
@@ -201,7 +231,8 @@ export function setupSectionControls(container, onAction) {
   }
 
   // Add section-action listener
-  const actionHandler = event => {
+  const actionHandler = (event: Event) => {
+    if (!(event instanceof SectionActionEvent)) return
     const { sectionIndex, action } = event
     if (typeof sectionIndex === 'number' && action && onAction) {
       onAction(sectionIndex, action)
@@ -211,7 +242,8 @@ export function setupSectionControls(container, onAction) {
   container.addEventListener(SectionActionEvent.type, actionHandler)
 
   // Add section-toggle listener (for collapse/expand)
-  const toggleHandler = event => {
+  const toggleHandler = (event: Event) => {
+    if (!(event instanceof SectionToggleEvent)) return
     const { sectionIndex } = event
     if (typeof sectionIndex === 'number' && onAction) {
       onAction(sectionIndex, 'collapse')
@@ -224,11 +256,15 @@ export function setupSectionControls(container, onAction) {
 /**
  * Setup font size controls
  *
- * @param {HTMLElement} decreaseBtn - Decrease button
- * @param {HTMLElement} increaseBtn - Increase button
- * @param {Object} callbacks - { onDecrease, onIncrease }
+ * @param decreaseBtn - Decrease button
+ * @param increaseBtn - Increase button
+ * @param callbacks - { onDecrease, onIncrease }
  */
-export function setupFontSizeControls(decreaseBtn, increaseBtn, callbacks = {}) {
+export function setupFontSizeControls(
+  decreaseBtn: HTMLElement | null,
+  increaseBtn: HTMLElement | null,
+  callbacks: { onDecrease?: () => void; onIncrease?: () => void } = {}
+): void {
   if (decreaseBtn) {
     decreaseBtn.onclick = () => {
       if (callbacks.onDecrease) callbacks.onDecrease()
@@ -245,11 +281,15 @@ export function setupFontSizeControls(decreaseBtn, increaseBtn, callbacks = {}) 
 /**
  * Setup reset button
  *
- * @param {HTMLElement} resetButton - Reset button element
- * @param {HTMLElement} confirmModal - Confirmation modal
- * @param {Function} onConfirm - Callback when reset is confirmed
+ * @param resetButton - Reset button element
+ * @param confirmModal - Confirmation modal
+ * @param onConfirm - Callback when reset is confirmed
  */
-export function setupResetButton(resetButton, confirmModal, onConfirm) {
+export function setupResetButton(
+  resetButton: HTMLElement | null,
+  confirmModal: WithListener<AppModal, '_resetConfirmHandler'> | null,
+  onConfirm?: () => void | Promise<void>
+): void {
   if (!resetButton || !confirmModal) return
 
   resetButton.onclick = () => {
@@ -271,13 +311,13 @@ export function setupResetButton(resetButton, confirmModal, onConfirm) {
 /**
  * Apply font size to song content
  *
- * @param {HTMLElement} container - Container with .song-content
- * @param {number} fontSize - Font size in pixels
+ * @param container - Container with .song-content
+ * @param fontSize - Font size in pixels
  */
-export function applyFontSize(container, fontSize) {
+export function applyFontSize(container: HTMLElement | null, fontSize: number): void {
   if (!container) return
 
-  const songContent = container.querySelector('.song-content')
+  const songContent = container.querySelector<HTMLElement>('.song-content')
   if (songContent) {
     songContent.style.setProperty('--font-lyrics', `${fontSize}px`)
     songContent.style.setProperty('--font-chords', `${Math.max(fontSize - 2, 12)}px`)
@@ -287,10 +327,10 @@ export function applyFontSize(container, fontSize) {
 /**
  * Update song-display capo value
  *
- * @param {HTMLElement} container - Container with song-display
- * @param {number} capo - Capo value
+ * @param container - Container with song-display
+ * @param capo - Capo value
  */
-export function updateSongDisplayCapo(container, capo) {
+export function updateSongDisplayCapo(container: HTMLElement | null, capo: number): void {
   if (!container) return
 
   const songDisplay = container.querySelector('song-display')
@@ -302,18 +342,21 @@ export function updateSongDisplayCapo(container, capo) {
 /**
  * Get song section component
  *
- * @param {HTMLElement} container - Container to search in
- * @param {number} sectionIndex - Section index
- * @returns {HTMLElement|null} song-section component
+ * @param container - Container to search in
+ * @param sectionIndex - Section index
+ * @returns song-section component
  */
-export function getSongSectionComponent(container, sectionIndex) {
+export function getSongSectionComponent(
+  container: HTMLElement | null,
+  sectionIndex: number
+): SongSection | null {
   if (!container) return null
 
   // Query into song-display shadow roots
   const songDisplays = container.querySelectorAll('song-display')
   for (const songDisplay of songDisplays) {
     if (songDisplay.shadowRoot) {
-      const section = songDisplay.shadowRoot.querySelector(
+      const section = songDisplay.shadowRoot.querySelector<SongSection>(
         `song-section[section-index="${sectionIndex}"]`
       )
       if (section) return section
@@ -326,11 +369,15 @@ export function getSongSectionComponent(container, sectionIndex) {
 /**
  * Update section DOM to reflect model state
  *
- * @param {HTMLElement} container - Container with song sections
- * @param {number} sectionIndex - Section index
- * @param {Object} state - { hideMode, isCollapsed, isHidden }
+ * @param container - Container with song sections
+ * @param sectionIndex - Section index
+ * @param state - { hideMode, isCollapsed, isHidden }
  */
-export function updateSectionDOM(container, sectionIndex, state) {
+export function updateSectionDOM(
+  container: HTMLElement | null,
+  sectionIndex: number,
+  state: Partial<SectionState>
+): void {
   const component = getSongSectionComponent(container, sectionIndex)
   if (!component) return
 
