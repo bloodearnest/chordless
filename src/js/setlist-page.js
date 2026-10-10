@@ -28,9 +28,9 @@ import { AddSongModal } from './setlist/add-song-modal.js'
 import { OverviewReorder } from './setlist/overview-reorder.js'
 import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.js'
 import { getAvailableKeys, transposeSong } from './transpose.js'
-import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
-import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
-import { showStatusMessage } from './utils/status-message.js'
+import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
+import { isInModalDialog, isTypingInField } from './utils/keyboard.ts'
+import { showStatusMessage } from './utils/status-message.ts'
 
 // Configuration constants
 const CONFIG = {

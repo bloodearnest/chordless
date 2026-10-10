@@ -7,7 +7,7 @@ import { loadMediaSettings } from '../js/media-settings.js'
 import { MetronomeController } from '../js/metronome-controller.js'
 import { PadAudioController } from '../js/pad-audio-controller.js'
 import { getActivePadSet, PadSetChangedEvent } from '../js/pad-set-service.js'
-import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.js'
+import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.ts'
 import { MediaSettingsChangeEvent } from './media-player-settings.js'
 
 /**

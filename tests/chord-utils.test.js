@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { convertAccidentalsToSymbols } from '../src/js/utils/chord-utils.js'
+import { convertAccidentalsToSymbols } from '../src/js/utils/chord-utils.ts'
 
 describe('convertAccidentalsToSymbols', () => {
   it('converts sharp root to symbol', () => {

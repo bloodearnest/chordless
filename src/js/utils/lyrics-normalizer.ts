@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 export function segmentHasVisibleLyrics(segment) {
   const value = segment?.lyrics
   if (typeof value !== 'string') {

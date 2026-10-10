@@ -1,8 +1,8 @@
 import { ModalCloseEvent } from '../../components/app-modal.js'
 import { SongSelectEvent } from '../../components/song-list.js'
 import { getLibrarySongs } from '../song-utils.js'
-import { filterSongs } from '../utils/song-filter.js'
-import { showStatusMessage } from '../utils/status-message.js'
+import { filterSongs } from '../utils/song-filter.ts'
+import { showStatusMessage } from '../utils/status-message.ts'
 
 /**
  * The "Add song" modal of a setlist: the library's songs, searchable, to choose one.

@@ -1,6 +1,6 @@
 import { setlistContentHash } from './sync/setlist-hash.js'
-import { parseLocalDate, toLocalDateString } from './utils/date-utils.js'
-import { ensurePersistentStorage } from './utils/persistence.js'
+import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
+import { ensurePersistentStorage } from './utils/persistence.ts'
 
 // IndexedDB wrapper for database operations
 // Manages organisation-specific data: songs, chordpro content, setlists, and local state

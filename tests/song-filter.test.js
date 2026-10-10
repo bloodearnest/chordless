@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { filterSongs } from '../src/js/utils/song-filter.js'
+import { filterSongs } from '../src/js/utils/song-filter.ts'
 
 const { describe, it } = window
 

@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { formatSetlistDate, getWeeksAgo, setlistTitle } from '../src/js/utils/date-utils.js'
+import { formatSetlistDate, getWeeksAgo, setlistTitle } from '../src/js/utils/date-utils.ts'
 
 const { describe, it } = window
 

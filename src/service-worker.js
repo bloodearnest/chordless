@@ -339,8 +339,8 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // JS/CSS: always network-first, bypassing HTTP cache, fallback to SW cache for offline
-  if (url.pathname.match(/\.(css|js)$/)) {
+  // JS/TS/CSS (modules, in dev; the build hashes them and precaches them): network-first, bypassing HTTP cache, fallback to SW cache for offline
+  if (url.pathname.match(/\.(css|js|ts)$/)) {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' })
         .then(response => {

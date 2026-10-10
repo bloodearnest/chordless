@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 let pendingPersistPromise = null
 
 /** Log the persistence result once per tab, rather than on every page load */

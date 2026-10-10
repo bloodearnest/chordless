@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Whether a key event comes from somewhere the user is typing: a text field,
  * select or contenteditable element. Page-wide shortcuts (space, arrows...)

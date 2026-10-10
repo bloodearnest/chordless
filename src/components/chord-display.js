@@ -4,8 +4,8 @@ import {
   isNashvilleChord,
   transposeChordBySemitones,
 } from '../js/transpose.js'
-import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.js'
-import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.js'
+import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.ts'
+import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.ts'
 
 /**
  * Small utility component that renders a chord with optional extensions.

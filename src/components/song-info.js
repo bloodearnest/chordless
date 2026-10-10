@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.js'
+import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 
 /**
  * SongInfo Component

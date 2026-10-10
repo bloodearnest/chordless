@@ -4,7 +4,7 @@ import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from
 import { ChordProParser } from '../js/parser.js'
 import { getOrganisationPeople } from '../js/people.js'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js'
-import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.js'
+import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import './app-modal.js'
 import './setlist-details-form.js'
 import { goTo } from '../js/navigation.js'

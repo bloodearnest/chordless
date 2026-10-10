@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Hash text content (simple hash for now)
  */

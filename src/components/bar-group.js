@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
-import { isBarMarker } from '../js/utils/chord-utils.js'
+import { isBarMarker } from '../js/utils/chord-utils.ts'
 import './chord-display.js'
 
 export class BarGroup extends LitElement {

@@ -25,7 +25,9 @@ export default defineConfig(({ command, isPreview }) => {
     // one the Tailscale funnel points at: keep it
     server: { port: 8787, strictPort: true },
     // Pre-bundle every dependency at start-up: finding one later reloads the page mid-test
-    optimizeDeps: { entries: ['index.html', 'dev/*.html', 'components/**/*.js', 'js/**/*.js'] },
+    optimizeDeps: {
+      entries: ['index.html', 'dev/*.html', 'components/**/*.{js,ts}', 'js/**/*.{js,ts}'],
+    },
     plugins: [serviceWorker({ target: TARGET }), cloudflare({ configPath: '../wrangler.toml' })],
   }
 })

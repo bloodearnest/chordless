@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Utility functions for date formatting and calculations
  */

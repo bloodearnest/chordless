@@ -27,7 +27,7 @@ import { createLibrarySongModel } from '../song-model-factory.js'
 import { getLibrarySongs, getSongWithContent } from '../song-utils.js'
 import * as SongViewManager from '../song-view-manager.js'
 import { getAvailableKeys, transposeSong } from '../transpose.js'
-import { filterSongs } from '../utils/song-filter.js'
+import { filterSongs } from '../utils/song-filter.ts'
 import { PageView } from './page-view.js'
 
 const { CONFIG } = SongViewManager

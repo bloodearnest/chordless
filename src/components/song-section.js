@@ -1,12 +1,12 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { isBarMarker } from '../js/utils/chord-utils.js'
+import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
   formatHiddenLyricsText,
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
-} from '../js/utils/lyrics-normalizer.js'
+} from '../js/utils/lyrics-normalizer.ts'
 import './bar-group.js'
 import './chord-display.js'
 

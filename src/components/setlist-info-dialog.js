@@ -3,7 +3,7 @@ import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './icon.js'
 import './setlist-details-form.js'
-import { setlistTitle } from '../js/utils/date-utils.js'
+import { setlistTitle } from '../js/utils/date-utils.ts'
 import './setlist-info.js'
 
 /** The setlist's details were edited and saved: changes is the form's details */

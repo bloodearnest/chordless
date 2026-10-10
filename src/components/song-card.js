@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { formatArtistNames } from '../js/song-utils.js'
-import { getWeeksAgo } from '../js/utils/date-utils.js'
+import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import './icon.js'
 import './key-selector.js'
 

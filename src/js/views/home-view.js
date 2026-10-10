@@ -12,7 +12,7 @@ import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from
 import { goTo } from '../navigation.js'
 import { getCurrentOrganisation } from '../organisation.js'
 import { claimSetlistsOnce, getOrganisationPeople } from '../people.js'
-import { setlistTitle, toLocalDateString } from '../utils/date-utils.js'
+import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { PageView } from './page-view.js'
 
 /**

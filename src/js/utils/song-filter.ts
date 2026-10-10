@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * The songs whose title, artist or lyrics contain the search term, ignoring case.
  * An empty search matches every song (and gives back the same array).

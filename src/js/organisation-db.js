@@ -2,7 +2,7 @@
 // Stores metadata about organisations (workspaces) in a separate global database
 // Each organisation then has its own ChordlessDB with songs, setlists, etc.
 
-import { ensurePersistentStorage } from './utils/persistence.js'
+import { ensurePersistentStorage } from './utils/persistence.ts'
 
 /**
  * Global Organisations Database

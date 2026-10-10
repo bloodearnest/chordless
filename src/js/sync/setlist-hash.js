@@ -1,4 +1,4 @@
-import { hashText } from '../utils/hash.js'
+import { hashText } from '../utils/hash.ts'
 
 /**
  * Setlist content hashes, for sync to tell local changes from synced ones.

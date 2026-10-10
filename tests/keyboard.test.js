@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { isInModalDialog, isTypingInField } from '../src/js/utils/keyboard.js'
+import { isInModalDialog, isTypingInField } from '../src/js/utils/keyboard.ts'
 
 const { describe, it, afterEach } = window
 
