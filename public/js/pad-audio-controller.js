@@ -103,7 +103,7 @@ export class PadAudioController {
    * @returns {Promise<void>}
    */
   async play(duration = null) {
-    if (!this._audio || !this._audio.src) {
+    if (!this._audio?.src) {
       console.error('[PadAudioController] Cannot play: no audio loaded')
       return
     }

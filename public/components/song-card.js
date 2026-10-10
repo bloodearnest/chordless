@@ -375,7 +375,7 @@ export class SongCard extends LitElement {
     const { lastUsageInfo, lastUsedAt } = this.song
 
     // Use new lastUsageInfo if available
-    if (lastUsageInfo && lastUsageInfo.date) {
+    if (lastUsageInfo?.date) {
       const weeksAgo = getWeeksAgo(lastUsageInfo.date)
       const parts = []
 

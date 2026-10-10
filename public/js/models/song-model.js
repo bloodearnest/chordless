@@ -1,3 +1,4 @@
+// biome-ignore-all lint/correctness/noUnusedFunctionParameters: abstract methods keep their documented signatures
 /**
  * Base class for song data abstraction
  *

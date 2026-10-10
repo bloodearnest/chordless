@@ -85,9 +85,8 @@ describe('PadAudioController', () => {
     window.Audio = MockAudio
     ;({ PadAudioController } = await import('../public/js/pad-audio-controller.js'))
 
-    PadAudioController.prototype._resolvePadUrl = async function (key) {
-      return key ? `https://example.com/pads/${key}.mp3` : null
-    }
+    PadAudioController.prototype._resolvePadUrl = async key =>
+      key ? `https://example.com/pads/${key}.mp3` : null
     PadAudioController.prototype._fadeIn = async function () {
       this._isPlaying = true
       if (this._audio) {
@@ -100,7 +99,7 @@ describe('PadAudioController', () => {
         this._audio.paused = true
       }
     }
-    PadAudioController.prototype._fadeOutPadGain = async function () {}
+    PadAudioController.prototype._fadeOutPadGain = async () => {}
   })
 
   after(() => {

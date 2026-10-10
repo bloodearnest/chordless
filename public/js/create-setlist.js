@@ -58,7 +58,7 @@ export async function initCreateSetlistModal() {
       window.location.href = `/setlist/${newSetlist.id}`
     } catch (error) {
       console.error('Failed to create setlist:', error)
-      alert('Failed to create setlist: ' + error.message)
+      alert(`Failed to create setlist: ${error.message}`)
     }
   })
 }

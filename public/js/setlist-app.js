@@ -1,7 +1,7 @@
 // Page-based application logic for Chordless
 // Works with service worker routing and Navigation API
 
-import { formatTempo, getCurrentDB } from './db.js'
+import { getCurrentDB } from './db.js'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
 import { claimSetlistsOnce, getOrganisationPeople } from './people.js'
@@ -179,7 +179,7 @@ class PageApp {
       return {
         type: 'song',
         setlistId: songMatch[1],
-        songIndex: parseInt(songMatch[2]),
+        songIndex: parseInt(songMatch[2], 10),
       }
     }
 
@@ -259,7 +259,7 @@ class PageApp {
         const yearSection = document.createElement('setlist-group')
         yearSection.year = year
         yearSection.setlists = formattedSetlists
-        yearSection.expanded = year == currentYear
+        yearSection.expanded = Number(year) === currentYear
         listContainer.appendChild(yearSection)
       }
     } catch (error) {
@@ -427,7 +427,7 @@ class PageApp {
         let currentBPM = parsedTempoInfo.bpm
         let timeSignature = parsed.metadata.time // ChordPro uses 'time'
         let tempoNote = parsedTempoInfo.tempoNote || null
-        if (canonicalSong && canonicalSong.metadata) {
+        if (canonicalSong?.metadata) {
           const canonicalTempoInfo = this._parseTempoMetadata(canonicalSong.metadata.tempo)
           // The setlist's own tempo, if it has one, wins over the library song's
           if (canonicalTempoInfo.bpm !== null && !songEntry.tempo) {
@@ -448,7 +448,7 @@ class PageApp {
           }
         }
         // Override with explicit tempoNote if available from database
-        if (canonicalSong && canonicalSong.metadata && canonicalSong.metadata.tempoNote) {
+        if (canonicalSong?.metadata?.tempoNote) {
           tempoNote = canonicalSong.metadata.tempoNote
         }
 
@@ -496,7 +496,7 @@ class PageApp {
       // Check hash BEFORE rendering to determine initial view state
       const hash = window.location.hash
       const hashValue = hash.substring(1)
-      const shouldShowSongDirectly = hashValue && hashValue.startsWith('song-')
+      const shouldShowSongDirectly = hashValue?.startsWith('song-')
       console.log(
         '[Initial Load] hash:',
         hash,
@@ -517,7 +517,7 @@ class PageApp {
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
       if (shouldShowSongDirectly) {
-        const songIndex = parseInt(hashValue.split('-')[1])
+        const songIndex = parseInt(hashValue.split('-')[1], 10)
         console.log('[Initial Load] Going directly to song index:', songIndex)
 
         const targetSection = container.querySelector(`#song-${songIndex}`)
@@ -526,7 +526,7 @@ class PageApp {
           container.scrollLeft = targetSection.offsetLeft
           console.log('[Initial Load] Set scroll position to:', targetSection.offsetLeft)
         } else {
-          console.warn('[Initial Load] Could not find target section song-' + songIndex)
+          console.warn(`[Initial Load] Could not find target section song-${songIndex}`)
         }
       }
 
@@ -549,7 +549,7 @@ class PageApp {
           // Set initial history state
           history.replaceState({ view: 'overview' }, '', window.location.href)
         } else if (hashValue.startsWith('song-')) {
-          const index = parseInt(hashValue.split('-')[1])
+          const index = parseInt(hashValue.split('-')[1], 10)
           // Song is already visible from pre-render setup above
           this._lastVisibleSection = `song-${index}`
           this.currentSongIndex = index
@@ -674,7 +674,7 @@ class PageApp {
     history.replaceState({ view: 'overview' }, '', newUrl)
   }
 
-  renderFullSetlist(setlist, songs) {
+  renderFullSetlist(_setlist, songs) {
     const fragment = document.createDocumentFragment()
 
     // Create overview section rendered by Lit component
@@ -879,7 +879,7 @@ class PageApp {
     }
   }
 
-  _updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, fontSizeControls) {
+  _updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, _fontSizeControls) {
     if (song) {
       // Update key selector
       if (song.currentKey) {
@@ -1060,7 +1060,7 @@ class PageApp {
             this.dispatchSongChange(null)
             this._replaceHistoryForOverview()
           } else if (sectionId.startsWith('song-')) {
-            const index = parseInt(sectionId.split('-')[1])
+            const index = parseInt(sectionId.split('-')[1], 10)
             if (index >= 0 && index < this.songs.length) {
               this.setOverviewEditMode(false)
               this.currentSongIndex = index
@@ -1085,7 +1085,7 @@ class PageApp {
     })
   }
 
-  setupHashNavigation(setlistId, totalSongs) {
+  setupHashNavigation(_setlistId, totalSongs) {
     // Clean up previous handlers to avoid duplicates when re-rendering setlist
     if (this._popstateHandler) {
       window.removeEventListener('popstate', this._popstateHandler)
@@ -1101,7 +1101,7 @@ class PageApp {
       if (!hashValue || hashValue === 'overview') {
         this.showOverview(false)
       } else if (hashValue.startsWith('song-')) {
-        const index = parseInt(hashValue.split('-')[1])
+        const index = parseInt(hashValue.split('-')[1], 10)
         if (!Number.isNaN(index) && index >= 0 && index < totalSongs) {
           this.showSong(index, false)
         }
@@ -1137,19 +1137,19 @@ class PageApp {
     // Determine navigation action based on current and target
     if (currentIsOverview && targetIsSong) {
       // Overview → Song: PUSH (going deeper into the app)
-      const songIndex = parseInt(hash.split('-')[1])
+      const songIndex = parseInt(hash.split('-')[1], 10)
       history.pushState({ fromOverview: true, view: 'song', index: songIndex }, '', newUrl)
       this.showSong(songIndex, false)
     } else if (currentIsSong && targetIsSong) {
       // Song → Song: REPLACE (lateral navigation within same level)
-      const songIndex = parseInt(hash.split('-')[1])
+      const songIndex = parseInt(hash.split('-')[1], 10)
       // Preserve fromOverview flag if it exists
       const fromOverview = history.state?.fromOverview || false
       history.replaceState({ fromOverview, view: 'song', index: songIndex }, '', newUrl)
       this.showSong(songIndex, false)
     } else if (currentIsSong && targetIsOverview) {
       // Song → Overview: Try to go back if we came from overview
-      if (history.state && history.state.fromOverview) {
+      if (history.state?.fromOverview) {
         // We pushed from overview, so we can safely go back
         // The popstate handler will call showOverview()
         history.back()
@@ -1362,7 +1362,7 @@ class PageApp {
     }
 
     const prefs = this._songUserPrefsCache[songId]
-    if (!prefs || !prefs.sectionDefaults) return null
+    if (!prefs?.sectionDefaults) return null
 
     return prefs.sectionDefaults[sectionIndex.toString()] || null
   }
@@ -1545,12 +1545,12 @@ class PageApp {
       const endHeight = content.scrollHeight
 
       // Animate from 0 to full height
-      content.style.height = startHeight + 'px'
+      content.style.height = `${startHeight}px`
       content.style.overflow = 'hidden'
 
       requestAnimationFrame(() => {
         content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-        content.style.height = endHeight + 'px'
+        content.style.height = `${endHeight}px`
 
         // Clean up after animation
         setTimeout(() => {
@@ -1565,12 +1565,12 @@ class PageApp {
       const endHeight = 0
 
       // Set explicit height
-      content.style.height = startHeight + 'px'
+      content.style.height = `${startHeight}px`
       content.style.overflow = 'hidden'
 
       requestAnimationFrame(() => {
         content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-        content.style.height = endHeight + 'px'
+        content.style.height = `${endHeight}px`
 
         // After animation completes, update state
         setTimeout(async () => {
@@ -2162,7 +2162,7 @@ class PageApp {
       this._cardPointerDownHandlers.clear()
     }
 
-    let dragState = {
+    const dragState = {
       active: false,
       button: null,
       startIndex: null,
@@ -2180,7 +2180,7 @@ class PageApp {
     const startDrag = (button, clientY) => {
       dragState.active = true
       dragState.button = button
-      dragState.startIndex = parseInt(button.dataset.songIndex)
+      dragState.startIndex = parseInt(button.dataset.songIndex, 10)
       dragState.currentIndex = dragState.startIndex
       dragState.lastAcceptedIndex = dragState.startIndex
       dragState.startY = clientY
@@ -2238,11 +2238,11 @@ class PageApp {
 
         if (clientY < midY && clientY >= rect.top) {
           // Insert before this button
-          proposedIndex = parseInt(btn.dataset.songIndex)
+          proposedIndex = parseInt(btn.dataset.songIndex, 10)
           break
         } else if (clientY >= midY && clientY < rect.bottom) {
           // Insert after this button
-          proposedIndex = parseInt(btn.dataset.songIndex) + 1
+          proposedIndex = parseInt(btn.dataset.songIndex, 10) + 1
           break
         }
       }
@@ -2345,7 +2345,7 @@ class PageApp {
         // Apply preview animations only if position actually changes
         if (targetIndex !== dragState.startIndex && targetIndex !== dragState.startIndex + 1) {
           buttonsArray.forEach(btn => {
-            const btnIndex = parseInt(btn.dataset.songIndex)
+            const btnIndex = parseInt(btn.dataset.songIndex, 10)
             if (btnIndex === dragState.startIndex) return // Skip dragged item
 
             if (targetIndex < dragState.startIndex) {
@@ -2390,7 +2390,7 @@ class PageApp {
       // Reorder if position changed
       if (targetIndex !== null && targetIndex !== startIndex && targetIndex !== startIndex + 1) {
         // Calculate actual new index (accounting for removal of old position)
-        let newIndex = targetIndex > startIndex ? targetIndex - 1 : targetIndex
+        const newIndex = targetIndex > startIndex ? targetIndex - 1 : targetIndex
 
         // Reorder songs in the setlist
         const movedSong = this.currentSetlist.songs.splice(startIndex, 1)[0]
@@ -2431,7 +2431,7 @@ class PageApp {
           if (newIndex === 0) {
             // Insert at the beginning (after overview)
             const overview = document.getElementById('overview')
-            if (overview && overview.nextSibling) {
+            if (overview?.nextSibling) {
               container.insertBefore(sectionToMove, overview.nextSibling)
             } else {
               container.insertBefore(sectionToMove, container.firstChild)
@@ -2464,7 +2464,7 @@ class PageApp {
           this.applySectionState()
 
           // Re-apply font sizes
-          this.songs.forEach((song, index) => {
+          this.songs.forEach((_song, index) => {
             this.applyFontSize(index)
           })
         }
@@ -2677,9 +2677,9 @@ class PageApp {
 
     // Normalize tempo + signature so media player gets consistent payloads
     const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo ?? song.metadata?.tempo)
-    let currentBPM = parsedTempoInfo.bpm ?? song.currentBPM ?? null
+    const currentBPM = parsedTempoInfo.bpm ?? song.currentBPM ?? null
     let tempoNote = parsedTempoInfo.tempoNote ?? song.metadata?.tempoNote ?? null
-    let timeSignature = parsed.metadata.time || song.metadata?.timeSignature || null
+    const timeSignature = parsed.metadata.time || song.metadata?.timeSignature || null
 
     if (!tempoNote) {
       tempoNote = '1/4'
@@ -2885,7 +2885,7 @@ class PageApp {
     if (route.type === 'setlist') {
       // Check if we're viewing a specific song (via hash) or the overview
       const hash = window.location.hash
-      const isViewingSong = hash && hash.startsWith('#song-')
+      const isViewingSong = hash?.startsWith('#song-')
 
       if (isViewingSong) {
         // When viewing a song, show Overview in the setlist section

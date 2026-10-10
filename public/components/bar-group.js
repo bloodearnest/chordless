@@ -95,7 +95,7 @@ export class BarGroup extends LitElement {
   }
 
   render() {
-    if (!this.data || !this.data.measuresPerLine?.length) {
+    if (!this.data?.measuresPerLine?.length) {
       return html``
     }
 

@@ -178,7 +178,9 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
 
     // Queue all puts in one transaction
-    setlists.forEach(setlist => store.put(cloneForStorage(withNumericTempos(setlist))))
+    for (const setlist of setlists) {
+      store.put(cloneForStorage(withNumericTempos(setlist)))
+    }
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
@@ -235,7 +237,9 @@ export class ChordlessDB {
     const tx = this.db.transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
 
-    songs.forEach(song => store.put(withNumericSongTempos(song)))
+    for (const song of songs) {
+      store.put(withNumericSongTempos(song))
+    }
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
@@ -482,7 +486,7 @@ export class ChordlessDB {
         setlist.leader !== undefined ||
         setlist.createdAt !== undefined ||
         setlist.updatedAt !== undefined ||
-        (setlist.songs && setlist.songs.some(s => s.modifications !== undefined))
+        setlist.songs?.some(s => s.modifications !== undefined)
 
       if (needsMigration) {
         const migrated = this.migrateSetlist(setlist)
@@ -578,7 +582,7 @@ export function parseTempo(tempoStr) {
 
   // Extract base BPM number (first number in the string)
   const bpmMatch = str.match(/(\d+)/)
-  const bpm = bpmMatch ? parseInt(bpmMatch[1]) : null
+  const bpm = bpmMatch ? parseInt(bpmMatch[1], 10) : null
 
   // Extract note subdivision from brackets or text
   let note = '1/4' // Default to quarter note
@@ -730,7 +734,7 @@ export function extractLyricsText(parsed) {
   for (const section of parsed.sections) {
     for (const line of section.lines) {
       for (const segment of line.segments) {
-        if (segment.lyrics && segment.lyrics.trim()) {
+        if (segment.lyrics?.trim()) {
           lyrics.push(segment.lyrics.trim())
         }
       }
@@ -762,7 +766,7 @@ export function determineSetlistType(dateString, name) {
   const dayOfWeek = date.getDay()
 
   // If there's a name, default to Event
-  if (name && name.trim()) {
+  if (name?.trim()) {
     return SETLIST_TYPES.EVENT
   }
 

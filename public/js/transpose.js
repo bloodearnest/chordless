@@ -364,7 +364,7 @@ export function transposeChord(chordString, fromKey, toKey) {
   // Reconstruct chord
   let newChord = newRoot + parsed.extensions
   if (newBass) {
-    newChord += '/' + newBass
+    newChord += `/${newBass}`
   }
 
   if (parsed.wrapperPrefix || parsed.wrapperSuffix) {
@@ -433,7 +433,7 @@ export function transposeChordBySemitones(chordString, semitones, targetKey = nu
 
   let newChord = newRoot + parsed.extensions
   if (newBass) {
-    newChord += '/' + newBass
+    newChord += `/${newBass}`
   }
 
   if (parsed.wrapperPrefix || parsed.wrapperSuffix) {
@@ -452,7 +452,7 @@ export function transposeChordBySemitones(chordString, semitones, targetKey = nu
  * Modifies the parsed structure in place
  */
 export function transposeSong(parsed, fromKey, toKey) {
-  if (!parsed || !parsed.sections) return
+  if (!parsed?.sections) return
 
   for (const section of parsed.sections) {
     for (const line of section.lines) {
@@ -671,7 +671,7 @@ function findDegreeForSemitone(diff, preference = null) {
 
 export function convertChordToNashville(chordText, key) {
   if (!key || !chordText) return chordText
-  let text = chordText
+  const text = chordText
   if (isNashvilleChord(text)) {
     return text
   }

@@ -19,9 +19,10 @@ beforeEach(() => {
   saved = KEYS.map(key => localStorage.getItem(key))
 })
 afterEach(() => {
-  KEYS.forEach((key, i) =>
-    saved[i] === null ? localStorage.removeItem(key) : localStorage.setItem(key, saved[i])
-  )
+  KEYS.forEach((key, i) => {
+    if (saved[i] === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, saved[i])
+  })
 })
 
 describe('ensureCurrentOrganisation', () => {

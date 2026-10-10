@@ -349,26 +349,28 @@ function splitAnd(q) {
 const unquote = s => s.replace(/\\'/g, "'")
 
 function compileClause(clause) {
-  let m
-  if ((m = clause.match(/^'([^']+)' in parents$/))) {
+  let m = clause.match(/^'([^']+)' in parents$/)
+  if (m) {
     const parent = m[1]
     return f => f.parents.includes(parent)
   }
-  if ((m = clause.match(/^trashed\s*=\s*(true|false)$/))) {
+  m = clause.match(/^trashed\s*=\s*(true|false)$/)
+  if (m) {
     const trashed = m[1] === 'true'
     return f => f.trashed === trashed
   }
-  if ((m = clause.match(/^(name|mimeType)\s*=\s*'((?:[^'\\]|\\.)*)'$/))) {
+  m = clause.match(/^(name|mimeType)\s*=\s*'((?:[^'\\]|\\.)*)'$/)
+  if (m) {
     const [, field, value] = m
     return f => f[field] === unquote(value)
   }
-  if ((m = clause.match(/^name contains '((?:[^'\\]|\\.)*)'$/))) {
+  m = clause.match(/^name contains '((?:[^'\\]|\\.)*)'$/)
+  if (m) {
     const value = unquote(m[1])
     return f => f.name.includes(value)
   }
-  if (
-    (m = clause.match(/^(appProperties|properties) has \{ key='([^']*)' and value='([^']*)' \}$/))
-  ) {
+  m = clause.match(/^(appProperties|properties) has \{ key='([^']*)' and value='([^']*)' \}$/)
+  if (m) {
     const [, field, key, value] = m
     return f => f[field][key] === value
   }

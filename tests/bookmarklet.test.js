@@ -26,7 +26,9 @@ describe('bookmarkletUrl', () => {
     const realAlert = window.alert
     window.alert = message => alerts.push(message)
     try {
-      // The script is an async function call; eval returns its promise
+      // The script is an async function call; indirect eval runs it in global scope and returns its promise
+      // biome-ignore lint/security/noGlobalEval: the bookmarklet is a javascript: URL that has to be evaluated
+      // biome-ignore lint/complexity/noCommaOperator: (0, eval) makes the eval indirect (global scope)
       await (0, eval)(scriptOf(bookmarkletUrl('https://chordless.app')))
     } finally {
       window.alert = realAlert
@@ -67,8 +69,8 @@ describe('importFromSongSelect', () => {
         return { ok: download.ok, status: 403, json: async () => ({ payload: download.payload }) }
       },
       setTimeout: () => 0, // never times out
-      addEventListener: (type, listener) => listeners.add(listener),
-      removeEventListener: (type, listener) => listeners.delete(listener),
+      addEventListener: (_type, listener) => listeners.add(listener),
+      removeEventListener: (_type, listener) => listeners.delete(listener),
       ready: (origin = CHORDLESS) => {
         for (const listener of listeners) {
           listener({ origin, data: { type: 'CHORDLESS_READY' } })

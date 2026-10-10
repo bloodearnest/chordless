@@ -254,7 +254,7 @@ export async function exportBlobBackup() {
  * Import blob from backup
  */
 export async function importBlobBackup(backup) {
-  if (!backup || backup.version !== 1 || !backup.blob) {
+  if (backup?.version !== 1 || !backup.blob) {
     throw new Error('Invalid backup format')
   }
 

@@ -292,7 +292,7 @@ export async function requestBackgroundSync(organisationName, organisationId) {
     return
   }
 
-  if (!navigator.serviceWorker || !navigator.serviceWorker.ready) {
+  if (!navigator.serviceWorker?.ready) {
     throw new Error('Service Worker not available')
   }
 

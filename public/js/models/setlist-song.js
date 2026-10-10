@@ -143,8 +143,7 @@ export class SetlistSong extends SongModel {
     // Priority 1: Setlist localStorage
     const setlistState = this._loadSetlistState()
     if (
-      setlistState.sectionState &&
-      setlistState.sectionState[this._songIndex] &&
+      setlistState.sectionState?.[this._songIndex] &&
       setlistState.sectionState[this._songIndex][sectionIndex]
     ) {
       return setlistState.sectionState[this._songIndex][sectionIndex]
@@ -152,7 +151,7 @@ export class SetlistSong extends SongModel {
 
     // Priority 2: Song-user-prefs
     const prefs = getSongUserPrefs(this._songEntry.songId, this._orgId)
-    if (prefs && prefs.sectionDefaults && prefs.sectionDefaults[sectionIndex.toString()]) {
+    if (prefs?.sectionDefaults?.[sectionIndex.toString()]) {
       return prefs.sectionDefaults[sectionIndex.toString()]
     }
 
@@ -177,7 +176,7 @@ export class SetlistSong extends SongModel {
     // Save key and tempo to setlist entry in IndexedDB
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
       const setlist = await this._db.getSetlist(this._setlistId)
-      if (setlist && setlist.songs[this._songIndex]) {
+      if (setlist?.songs[this._songIndex]) {
         if (this._pendingChanges.key !== null) {
           setlist.songs[this._songIndex].key = this._pendingChanges.key
           this._songEntry.key = this._pendingChanges.key
@@ -232,11 +231,11 @@ export class SetlistSong extends SongModel {
     // Clear capo and section states from setlist localStorage
     const setlistState = this._loadSetlistState()
 
-    if (setlistState.capoValues && setlistState.capoValues[this._songIndex.toString()]) {
+    if (setlistState.capoValues?.[this._songIndex.toString()]) {
       delete setlistState.capoValues[this._songIndex.toString()]
     }
 
-    if (setlistState.sectionState && setlistState.sectionState[this._songIndex]) {
+    if (setlistState.sectionState?.[this._songIndex]) {
       delete setlistState.sectionState[this._songIndex]
     }
 

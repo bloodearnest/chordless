@@ -117,7 +117,7 @@ export class LibrarySong extends SongModel {
 
     // Load from song-user-prefs
     const prefs = getSongUserPrefs(this._song.id, this._orgId)
-    if (prefs && prefs.sectionDefaults && prefs.sectionDefaults[sectionIndex.toString()]) {
+    if (prefs?.sectionDefaults?.[sectionIndex.toString()]) {
       return prefs.sectionDefaults[sectionIndex.toString()]
     }
 

@@ -1,0 +1,28 @@
+language js
+
+// Navigation should go through the router once the app is a single page, so that
+// the shell (and the media player in it) survives. Until then this is a warning
+// marking every place that still does a full page load.
+or {
+  `$loc.href = $_` where {
+    $loc <: or {
+      `location`,
+      `window.location`,
+      `document.location`
+    },
+    register_diagnostic(span=$loc, message="Full page navigation: use the router instead of assigning location.href", severity="warn")
+  },
+  `$loc.$method($...)` where {
+    $loc <: or {
+      `location`,
+      `window.location`,
+      `document.location`
+    },
+    $method <: or {
+      `assign`,
+      `replace`,
+      `reload`
+    },
+    register_diagnostic(span=$loc, message="Full page navigation: use the router instead of location.assign/replace/reload", severity="warn")
+  }
+}

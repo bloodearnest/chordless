@@ -5,7 +5,7 @@
 function toMap(records = []) {
   const map = new Map()
   records.forEach(record => {
-    if (record && record.id) {
+    if (record?.id) {
       map.set(record.id, record)
     }
   })

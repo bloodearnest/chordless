@@ -86,7 +86,11 @@ export function extractPadKeyFromFilename(filename) {
   const globalPattern = /\b([A-Ga-g])([#b♯♭]?)/g
   let match
   let candidate = null
-  while ((match = globalPattern.exec(nameWithoutExt)) !== null) {
+  for (
+    match = globalPattern.exec(nameWithoutExt);
+    match !== null;
+    match = globalPattern.exec(nameWithoutExt)
+  ) {
     candidate = match[0]
   }
 

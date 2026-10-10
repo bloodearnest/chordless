@@ -446,7 +446,7 @@ export class SongSection extends LitElement {
     for (const line of lines) {
       const segments = line?.segments || []
       for (const segment of segments) {
-        if (segment.chord && segment.chord.trim()) {
+        if (segment.chord?.trim()) {
           this._hasAnyChords = true
         }
         if (this._segmentHasLyrics(segment)) {
@@ -479,7 +479,7 @@ export class SongSection extends LitElement {
   /** @inheritdoc */
   connectedCallback() {
     super.connectedCallback()
-    if ((!this.label || !this.label.trim()) && this.dataset?.label) {
+    if (!this.label?.trim() && this.dataset?.label) {
       this.label = this.dataset.label
     }
   }
@@ -641,7 +641,7 @@ export class SongSection extends LitElement {
     const normalizedSegments = this._normalizeSegmentLyrics(segments)
 
     // Check if this line has ANY chords
-    const lineHasChords = normalizedSegments.some(seg => seg.chord && seg.chord.trim())
+    const lineHasChords = normalizedSegments.some(seg => seg.chord?.trim())
 
     let hasPreviousLyrics = false
 

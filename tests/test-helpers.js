@@ -8,7 +8,7 @@ export function suppressConsoleLogs() {
   let originalWarn
   let buffered
 
-  beforeEach(function () {
+  beforeEach(() => {
     buffered = []
     originalLog = console.log
     originalWarn = console.warn

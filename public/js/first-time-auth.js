@@ -41,7 +41,7 @@ export async function handleFirstTimeAuth() {
   try {
     // Get user info
     const userInfo = await getCurrentUserInfo()
-    if (!userInfo || !userInfo.name) {
+    if (!userInfo?.name) {
       console.log('[FirstAuth] No user info available, skipping org rename')
       return false
     }
@@ -124,7 +124,7 @@ export async function checkFirstTimeAuth() {
   const userInfo = await getCurrentUserInfo()
 
   // If user is authenticated, handle the rename
-  if (userInfo && userInfo.name) {
+  if (userInfo?.name) {
     return await handleFirstTimeAuth()
   }
 

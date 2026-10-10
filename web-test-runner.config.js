@@ -1,4 +1,4 @@
-import { playwrightLauncher } from '@web/test-runner-playwright';
+import { playwrightLauncher } from '@web/test-runner-playwright'
 
 export default {
   // Every test file except the node ones (*.node.test.js, run by just test-node)
@@ -23,4 +23,4 @@ export default {
       ui: 'bdd',
     },
   },
-};
+}

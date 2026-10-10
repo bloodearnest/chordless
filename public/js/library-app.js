@@ -563,7 +563,7 @@ export class LibraryApp {
       const contentElement = document.getElementById('library-song-content')
       if (contentElement) {
         const songDisplay = contentElement.querySelector('song-display')
-        if (songDisplay && songDisplay.shadowRoot) {
+        if (songDisplay?.shadowRoot) {
           const sections = songDisplay.shadowRoot.querySelectorAll('song-section')
           sections.forEach(section => {
             section.editMode = false
@@ -584,7 +584,7 @@ export class LibraryApp {
     // Find all song-section elements in library view
     const sections = []
     const songDisplay = contentElement.querySelector('song-display')
-    if (songDisplay && songDisplay.shadowRoot) {
+    if (songDisplay?.shadowRoot) {
       sections.push(...songDisplay.shadowRoot.querySelectorAll('song-section'))
     }
 
@@ -778,7 +778,7 @@ export class LibraryApp {
         }
         // Library view treats the song as songIndex = 0
         const songDisplay = container.querySelector('song-display')
-        if (songDisplay && songDisplay.shadowRoot) {
+        if (songDisplay?.shadowRoot) {
           const component = songDisplay.shadowRoot.querySelector(
             `song-section[section-index="${sectionIndex}"]`
           )
@@ -797,7 +797,7 @@ export class LibraryApp {
     if (!container) return
 
     const songDisplay = container.querySelector('song-display')
-    if (!songDisplay || !songDisplay.shadowRoot) return
+    if (!songDisplay?.shadowRoot) return
 
     const component = songDisplay.shadowRoot.querySelector(
       `song-section[section-index="${sectionIndex}"]`
@@ -846,7 +846,7 @@ export class LibraryApp {
     if (!container) return
 
     const songDisplay = container.querySelector('song-display')
-    if (!songDisplay || !songDisplay.shadowRoot) return
+    if (!songDisplay?.shadowRoot) return
 
     const component = songDisplay.shadowRoot.querySelector(
       `song-section[section-index="${sectionIndex}"]`
@@ -869,7 +869,7 @@ export class LibraryApp {
     if (!container) return
 
     const songDisplay = container.querySelector('song-display')
-    if (!songDisplay || !songDisplay.shadowRoot) return
+    if (!songDisplay?.shadowRoot) return
 
     const sections = songDisplay.shadowRoot.querySelectorAll('song-section')
     sections.forEach(section => {
@@ -946,7 +946,9 @@ export class LibraryApp {
     if (state) element.state = state
     if (slotContent) {
       if (Array.isArray(slotContent)) {
-        slotContent.forEach(node => element.appendChild(node))
+        for (const node of slotContent) {
+          element.appendChild(node)
+        }
       } else {
         element.appendChild(slotContent)
       }

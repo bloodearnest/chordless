@@ -244,7 +244,7 @@ export class ThemeManager {
    * @returns {string} - 'light' or 'dark'
    */
   detectSystemPreference() {
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
       return 'dark'
     }
     return 'light'

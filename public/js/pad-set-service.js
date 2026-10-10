@@ -212,7 +212,7 @@ export function getPadCacheUrl(padSetId, key) {
 }
 
 export async function isPadKeyCached(padSet, key) {
-  if (!padSet || padSet.type !== 'drive' || !key) return false
+  if (padSet?.type !== 'drive' || !key) return false
   if (typeof caches === 'undefined') {
     return false
   }
@@ -234,7 +234,7 @@ function uniqueNormalizedPadKeys(keys = []) {
 }
 
 export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
-  if (!padSet || padSet.type !== 'drive') return
+  if (padSet?.type !== 'drive') return
   const normalizedKeys = uniqueNormalizedPadKeys(keys)
   if (normalizedKeys.length === 0) return
 
@@ -303,7 +303,7 @@ async function ensurePadSetMetadata(padSet) {
 
   const cacheState = getCacheState()
   const storedEntry = cacheState[padSet.id]
-  if (storedEntry && storedEntry.files && metadataMatches(storedEntry, padSet)) {
+  if (storedEntry?.files && metadataMatches(storedEntry, padSet)) {
     PAD_SET_METADATA_CACHE.set(padSet.id, storedEntry)
     return storedEntry.files
   }
@@ -340,7 +340,7 @@ async function ensurePadSetMetadata(padSet) {
 }
 
 function metadataMatches(entry, padSet) {
-  if (!entry || !entry.files) return false
+  if (!entry?.files) return false
   if (!padSet?.modifiedTime) return true
   return entry.modifiedTime === padSet.modifiedTime
 }

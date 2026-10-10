@@ -651,7 +651,10 @@ export class SongImport extends LitElement {
           </button>
           <button
             class="btn use-existing use-existing-all"
-            @click=${() => unresolved.forEach(item => this._useExisting(item))}
+            @click=${() =>
+              unresolved.forEach(item => {
+                this._useExisting(item)
+              })}
           >
             Use All Existing
           </button>

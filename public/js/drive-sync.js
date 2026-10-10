@@ -744,10 +744,9 @@ export class DriveSyncManager {
     for (const entry of latestByUuid.values()) {
       const { songUuid, file, props } = entry
       const localSong = await this.organisationDb.getSong(songUuid)
-      const chordproRecord =
-        localSong && localSong.chordproFileId
-          ? await this.organisationDb.getChordPro(localSong.chordproFileId)
-          : null
+      const chordproRecord = localSong?.chordproFileId
+        ? await this.organisationDb.getChordPro(localSong.chordproFileId)
+        : null
 
       let needsDownload = false
       if (!localSong) {
@@ -809,7 +808,9 @@ export class DriveSyncManager {
 
       results
         .filter(r => r.status === 'rejected')
-        .forEach(result => console.error('[DriveSync] Failed to download song:', result.reason))
+        .forEach(result => {
+          console.error('[DriveSync] Failed to download song:', result.reason)
+        })
     }
 
     console.log(`[DriveSync] ✅ Pulled ${downloaded} songs from Drive`)
@@ -1053,7 +1054,7 @@ export class DriveSyncManager {
             const setlist = batch[j]
             const driveFile = uploadedFiles[j]
 
-            if (driveFile && driveFile.id) {
+            if (driveFile?.id) {
               setlist.driveFileId = driveFile.id
               setlist.driveModifiedTime = driveFile.modifiedTime ?? null
               setlist.driveChecksum = driveFile.md5Checksum ?? null
@@ -1253,7 +1254,7 @@ export class DriveSyncManager {
         for (let j = 0; j < fileTracking.length; j++) {
           const tracking = fileTracking[j]
           const driveFile = uploadedFiles[j]
-          if (!driveFile || !driveFile.id) continue
+          if (!driveFile?.id) continue
 
           tracking.song.driveFileId = driveFile.id
           tracking.song.driveProperties = this.songDriveProperties(

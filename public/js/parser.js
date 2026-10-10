@@ -9,7 +9,7 @@ export class ChordProParser {
     const sections = []
     let currentSection = null
     let inTrailer = false
-    let trailerLines = []
+    const trailerLines = []
 
     for (let line of lines) {
       line = line.trim()

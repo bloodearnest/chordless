@@ -216,7 +216,7 @@ export async function createSong(chordproContent, options = {}) {
     uuid: crypto.randomUUID(),
     id: songId,
     variantOf: options.variantOf || null,
-    isDefault: existing ? false : true, // Only first variant is default
+    isDefault: !existing, // Only first variant is default
     variantLabel: options.variantLabel || 'Original',
 
     chordproFileId: chordproFileId,

@@ -12,15 +12,15 @@ test-unit *args:
     @echo "Running browser unit tests with Web Test Runner..."
     @npm run test:web -- {{args}}
 
-# Lint/format JS files with Biome (fast!)
+# Lint JS/JSON files with Biome (fast!)
 lint:
     @echo "Running Biome check..."
-    npx @biomejs/biome check public/components public/js tests public/service-worker.js
+    npx @biomejs/biome check .
 
 # Format project files with Biome
 format:
     @echo "Formatting with Biome..."
-    npx @biomejs/biome format --write public/components public/js tests public/service-worker.js
+    npx @biomejs/biome format --write .
 
 # Copy vendored dependencies from node_modules to vendor/
 vendor:

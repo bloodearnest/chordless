@@ -789,8 +789,7 @@ export class MediaPlayer extends LitElement {
 
     // If we're already playing this song and pads/click are active, refresh playback immediately
     const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId
-    const padsPlaying =
-      this._padsOn && this._activeSongKey && this._padController && this._padController.isPlaying
+    const padsPlaying = this._padsOn && this._activeSongKey && this._padController?.isPlaying
     const clickRunning = this._clickOn && this._metronomeRunning
 
     if (isActiveSong && (padsPlaying || clickRunning)) {
@@ -1077,8 +1076,7 @@ export class MediaPlayer extends LitElement {
         this._activeSongTempoNote !== this._currentTempoNote ||
         this._activeSongTimeSignature !== this._currentTimeSignature)
 
-    const wasPlayingPads =
-      this._padsOn && oldActiveKey && this._padController && this._padController.isPlaying
+    const wasPlayingPads = this._padsOn && oldActiveKey && this._padController?.isPlaying
     const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning
 
     console.log('[MediaPlayer] _startSong state check:', {
@@ -1464,7 +1462,7 @@ export class MediaPlayer extends LitElement {
   }
 
   render() {
-    const padsPlaying = this._padController && this._padController.isPlaying
+    const padsPlaying = this._padController?.isPlaying
     const clickPlaying = this._metronomeRunning
     const isPlaying = padsPlaying || clickPlaying
     const isDownloading = this._isPadLoading

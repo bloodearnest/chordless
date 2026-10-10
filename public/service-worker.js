@@ -87,6 +87,7 @@ self.addEventListener('activate', event => {
           ) {
             return caches.delete(cacheName)
           }
+          return undefined
         })
       )
     })
@@ -189,7 +190,7 @@ self.addEventListener('message', async event => {
 
 // Helper to respond to client messages
 function respondToClient(event, messageId, response) {
-  if (event.ports && event.ports[0]) {
+  if (event.ports?.[0]) {
     event.ports[0].postMessage({ messageId, ...response })
   }
 }
@@ -291,7 +292,7 @@ async function processOperation(operation) {
     return await response.json()
   }
 
-  throw new Error('Unknown operation type: ' + operation.type)
+  throw new Error(`Unknown operation type: ${operation.type}`)
 }
 
 // Request ID token from an active client

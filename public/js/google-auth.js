@@ -48,7 +48,7 @@ function parseJwt(token) {
       atob(base64)
         .split('')
         .map(c => {
-          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+          return `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`
         })
         .join('')
     )
@@ -162,7 +162,7 @@ export async function authorizeWithGoogle() {
   return new Promise((resolve, reject) => {
     const client = google.accounts.oauth2.initCodeClient({
       client_id: GOOGLE_CLIENT_ID,
-      scope: GOOGLE_SCOPES + ' openid email profile',
+      scope: `${GOOGLE_SCOPES} openid email profile`,
       ux_mode: 'popup',
       access_type: 'offline',
       // Force the consent screen every time so Drive scope is always explicitly granted.
@@ -341,7 +341,7 @@ async function refreshAccessToken(blob, existingMetadata = {}) {
 }
 
 async function buildStoredUserProfile(user) {
-  if (!user || !user.picture) {
+  if (!user?.picture) {
     return user
   }
 

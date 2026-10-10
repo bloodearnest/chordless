@@ -42,7 +42,7 @@ export class SongDisplay extends LitElement {
   }
 
   render() {
-    if (!this.parsed || !this.parsed.sections) {
+    if (!this.parsed?.sections) {
       return nothing
     }
 
