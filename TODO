@@ -127,6 +127,11 @@ live mode
  - webrtc sync (live session: following the leader's song/section)
 
 tests
+ - the Playwright tests run against port 8787, the same as `npm run dev`, so they collide
+   with a dev server (or anything else) already on it: with reuseExistingServer they test
+   whatever is there (a different checkout's server, say). Give the tests their own port (playwright.config.js baseURL and webServer, and the
+   `dev` script taking the port), keeping 8787 for development: the IndexedDB origin and
+   the Tailscale funnel depend on it
  - the key and capo pickers (option-picker) have no roles: give the button and its options
    listbox/option semantics, then find them by role in the Playwright tests, which use
    .picker-button and .picker-option now
