@@ -1,7 +1,7 @@
 import { ModalConfirmEvent } from '../components/app-modal.ts'
 import { CapoChangeEvent } from '../components/capo-selector.ts'
 import { KeyChangeEvent } from '../components/key-selector.ts'
-import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
+import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.ts'
 
 /**
  * Song View Manager

@@ -6,7 +6,7 @@ import './chord-display.ts'
 /** One bar of a chord line: its chords and the bar line that ends it */
 export interface Measure {
   chords?: string[]
-  bar?: string
+  bar?: string | null
 }
 
 /** A group of chord lines laid out by bar */

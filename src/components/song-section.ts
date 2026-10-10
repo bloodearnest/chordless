@@ -1,19 +1,24 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { ChartLine, ChartSegment } from '../js/data-types.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
   formatHiddenLyricsText,
   normalizeSegmentsForHiddenChords,
   segmentHasVisibleLyrics,
 } from '../js/utils/lyrics-normalizer.ts'
+import type { BarGroupData, Measure } from './bar-group.ts'
 import './bar-group.ts'
 import './chord-display.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
 export class SectionActionEvent extends Event {
   static type = 'song-section:action'
-  constructor(songIndex, sectionIndex, action) {
+  readonly songIndex: number
+  readonly sectionIndex: number
+  readonly action: string
+  constructor(songIndex: number, sectionIndex: number, action: string) {
     super(SectionActionEvent.type, { bubbles: true, composed: true })
     this.songIndex = songIndex
     this.sectionIndex = sectionIndex
@@ -24,12 +29,20 @@ export class SectionActionEvent extends Event {
 /** The section's heading was clicked */
 export class SectionToggleEvent extends Event {
   static type = 'song-section:toggle'
-  constructor(songIndex, sectionIndex) {
+  readonly songIndex: number
+  readonly sectionIndex: number
+  constructor(songIndex: number, sectionIndex: number) {
     super(SectionToggleEvent.type, { bubbles: true, composed: true })
     this.songIndex = songIndex
     this.sectionIndex = sectionIndex
   }
 }
+
+/** What a section renders: a line of lyrics and chords, or a run of bar-only lines laid out together */
+type ContentBlock = { type: 'bar-group'; data: BarGroupData } | { type: 'line'; line: ChartLine }
+
+/** A segment as rendered; hiding chords marks which join the word before them */
+type RenderedSegment = ChartSegment & { __joinWithPrev?: boolean }
 
 /**
  * A custom element for rendering a section of a song with chords and lyrics.
@@ -40,7 +53,7 @@ export class SectionToggleEvent extends Event {
  * @fires SectionToggleEvent - When the section heading is clicked
  */
 export class SongSection extends LitElement {
-  static properties = {
+  static override properties = {
     /** @type {number} Index of the song this section belongs to */
     songIndex: { type: Number, attribute: 'song-index', reflect: true },
     /** @type {number} Index of this section within the song */
@@ -69,7 +82,26 @@ export class SongSection extends LitElement {
     capoKey: { type: String, attribute: 'capo-key' },
   }
 
-  static styles = css`
+  declare songIndex: number
+  declare sectionIndex: number
+  declare editMode: boolean
+  declare hideMode: string
+  declare isCollapsed: boolean
+  declare isHidden: boolean
+  declare label: string
+  declare displayAsNashville: boolean
+  declare unicodeAccidentals: boolean
+  declare displayKey: string
+  declare capo: number
+  declare capoKey: string
+
+  _wrapper: Ref<HTMLElement>
+  _lines: ChartLine[] | undefined
+  _contentBlocks: ContentBlock[]
+  _hasAnyChords: boolean
+  _hasAnyLyrics: boolean
+
+  static override styles = css`
     .song-section-wrapper {
       padding: 0;
       margin: 0 0 0.1rem 0;
@@ -415,17 +447,15 @@ export class SongSection extends LitElement {
 
   /**
    * Get the lines data for this section
-   * @returns {Array<{segments: Array<{chord: string, lyrics: string}>}>}
    */
-  get lines() {
+  get lines(): ChartLine[] | undefined {
     return this._lines
   }
 
   /**
    * Set the lines data and rebuild content blocks
-   * @param {Array<{segments: Array<{chord: string, lyrics: string}>}>} value
    */
-  set lines(value) {
+  set lines(value: ChartLine[] | undefined) {
     const oldValue = this._lines
     this._lines = value
     if (value && value.length > 0) {
@@ -437,10 +467,10 @@ export class SongSection extends LitElement {
 
   /**
    * Analyze the content to determine what controls should be available
-   * @param {Array} lines - Lines to analyze
+   * @param lines - Lines to analyze
    * @private
    */
-  _analyzeContent(lines) {
+  _analyzeContent(lines: ChartLine[]): void {
     this._hasAnyChords = false
     this._hasAnyLyrics = false
 
@@ -463,9 +493,9 @@ export class SongSection extends LitElement {
 
   /**
    * Get the recommended hideMode based on content analysis
-   * @returns {string} Recommended hideMode: 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
+   * @returns Recommended hideMode: 'lyrics' (show chords only), 'chords' (show lyrics only), or 'none' (show all)
    */
-  getRecommendedHideMode() {
+  getRecommendedHideMode(): 'lyrics' | 'chords' | 'none' {
     if (!this._hasAnyLyrics && this._hasAnyChords) {
       // Only chords, show chords only
       return 'lyrics'
@@ -478,14 +508,14 @@ export class SongSection extends LitElement {
   }
 
   /** @inheritdoc */
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     if (!this.label?.trim() && this.dataset?.label) {
       this.label = this.dataset.label
     }
   }
 
-  cloneNode(deep = true) {
+  override cloneNode(deep = true): Node {
     const clone = super.cloneNode(deep)
     if (clone instanceof SongSection) {
       clone.lines = this._cloneLines(this.lines)
@@ -494,7 +524,7 @@ export class SongSection extends LitElement {
     return clone
   }
 
-  render() {
+  override render() {
     const classes = {
       'song-section-wrapper': true,
       'section-hidden': !!this.isHidden,
@@ -520,7 +550,7 @@ export class SongSection extends LitElement {
 
   // willUpdate not needed - lines setter handles content block building
 
-  _renderLabeledSection(label) {
+  _renderLabeledSection(label: string) {
     const detailsOpen = this._shouldDetailsBeOpen()
     return html`
       <details class="song-section" ?open=${detailsOpen}>
@@ -558,7 +588,7 @@ export class SongSection extends LitElement {
     const canShowAll = canShowLyrics && canShowChords
 
     if (this.style) {
-      this.style.setProperty('--pill-option-count', 4)
+      this.style.setProperty('--pill-option-count', '4')
     }
     return html`
       <div class="section-controls" role="group" aria-label="Show content options">
@@ -573,7 +603,7 @@ export class SongSection extends LitElement {
     `
   }
 
-  _renderControlButton(action, label, active, disabled = false) {
+  _renderControlButton(action: string, label: string, active: boolean, disabled = false) {
     const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`
     const ariaLabel = `Show ${label} in ${sectionLabel}`
     return html`
@@ -633,7 +663,7 @@ export class SongSection extends LitElement {
     })
   }
 
-  _renderLine(line, index) {
+  _renderLine(line: ChartLine | undefined, index: number) {
     const segments = line?.segments || []
     if (segments.length === 0) {
       return nothing
@@ -665,7 +695,12 @@ export class SongSection extends LitElement {
     `
   }
 
-  _renderSegment(segment, previousHadLyrics = false, joinWithPrev = false, lineHasChords = true) {
+  _renderSegment(
+    segment: RenderedSegment,
+    previousHadLyrics = false,
+    joinWithPrev = false,
+    lineHasChords = true
+  ) {
     const hasLyrics = this._segmentHasLyrics(segment)
     const chordText = segment.chord || ''
     const classes = classMap({
@@ -694,7 +729,7 @@ export class SongSection extends LitElement {
     `
   }
 
-  _renderChord(chordText, isInvalid = false) {
+  _renderChord(chordText: string, isInvalid = false) {
     const classes = classMap({
       chord: true,
       bar: isBarMarker(chordText),
@@ -715,44 +750,44 @@ export class SongSection extends LitElement {
     `
   }
 
-  _onControlClick(event) {
+  _onControlClick(event: Event): void {
     event.stopPropagation()
     event.preventDefault()
-    const action = event.currentTarget.dataset.action
+    const action = (event.currentTarget as HTMLElement).dataset.action
     if (!action) return
     this.dispatchEvent(new SectionActionEvent(this.songIndex, this.sectionIndex, action))
   }
 
-  _onSummaryClick(event) {
+  _onSummaryClick(event: Event): void {
     event.preventDefault()
     this.dispatchEvent(new SectionToggleEvent(this.songIndex, this.sectionIndex))
   }
 
-  _shouldDetailsBeOpen() {
+  _shouldDetailsBeOpen(): boolean {
     if (this.editMode) return true
     return !(this.isCollapsed || this.hideMode === 'collapse')
   }
 
-  getDetailsElement() {
-    return this._getWrapper()?.querySelector('details.song-section') || null
+  getDetailsElement(): HTMLDetailsElement | null {
+    return this._getWrapper()?.querySelector<HTMLDetailsElement>('details.song-section') || null
   }
 
-  _getWrapper() {
+  _getWrapper(): HTMLElement | null {
     return this._wrapper.value || null
   }
 
   /**
    * Build content blocks from lines, grouping consecutive bar-only lines together
-   * @param {Array<{segments: Array}>} lines - Raw line data
-   * @returns {Array<{type: string, line?: Object, data?: Object}>} Content blocks for rendering
+   * @param lines - Raw line data
+   * @returns Content blocks for rendering
    * @private
    */
-  _buildContentBlocks(lines) {
+  _buildContentBlocks(lines: ChartLine[]): ContentBlock[] {
     if (!Array.isArray(lines) || lines.length === 0) {
       return []
     }
 
-    const blocks = []
+    const blocks: ContentBlock[] = []
     let i = 0
 
     while (i < lines.length) {
@@ -775,13 +810,13 @@ export class SongSection extends LitElement {
 
   /**
    * Collect consecutive bar-only lines into a group
-   * @param {Array} lines - All lines
-   * @param {number} startIndex - Index to start collecting from
-   * @returns {Array} Group of consecutive bar lines
+   * @param lines - All lines
+   * @param startIndex - Index to start collecting from
+   * @returns Group of consecutive bar lines
    * @private
    */
-  _collectBarGroup(lines, startIndex) {
-    const group = []
+  _collectBarGroup(lines: ChartLine[], startIndex: number): ChartLine[] {
+    const group: ChartLine[] = []
     for (let i = startIndex; i < lines.length; i++) {
       const candidate = lines[i]
       if (this._isBarLineLine(candidate)) {
@@ -795,17 +830,17 @@ export class SongSection extends LitElement {
 
   /**
    * Build structured data for rendering a bar group with aligned measures
-   * @param {Array} lines - Bar-only lines
-   * @returns {{measuresPerLine: Array, maxMeasures: number}} Structured bar group data
+   * @param lines - Bar-only lines
+   * @returns Structured bar group data
    * @private
    */
-  _buildBarGroupData(lines) {
+  _buildBarGroupData(lines: ChartLine[]): BarGroupData {
     if (!lines.length) {
       return { measuresPerLine: [], maxMeasures: 0 }
     }
 
     const measuresPerLine = lines.map(line => {
-      const items = []
+      const items: { chord: string; isBar: boolean }[] = []
       line.segments?.forEach(segment => {
         if (segment.chord) {
           items.push({
@@ -815,8 +850,8 @@ export class SongSection extends LitElement {
         }
       })
 
-      const measures = []
-      let currentMeasure = []
+      const measures: Measure[] = []
+      let currentMeasure: string[] = []
 
       items.forEach(item => {
         if (item.isBar) {
@@ -847,11 +882,11 @@ export class SongSection extends LitElement {
 
   /**
    * Check if a line contains only chords and bar markers (no lyrics)
-   * @param {Object} line - Line to check
-   * @returns {boolean} True if line is bar-only
+   * @param line - Line to check
+   * @returns True if line is bar-only
    * @private
    */
-  _isBarLineLine(line) {
+  _isBarLineLine(line: ChartLine | undefined): boolean {
     if (!line?.segments || line.segments.length === 0) return false
     let hasBar = false
     for (const segment of line.segments) {
@@ -866,11 +901,11 @@ export class SongSection extends LitElement {
 
   /**
    * Deep clone lines data
-   * @param {Array} lines - Lines to clone
-   * @returns {Array} Cloned lines
+   * @param lines - Lines to clone
+   * @returns Cloned lines
    * @private
    */
-  _cloneLines(lines) {
+  _cloneLines(lines: ChartLine[] | undefined): ChartLine[] {
     if (!Array.isArray(lines)) {
       return []
     }
@@ -882,10 +917,8 @@ export class SongSection extends LitElement {
   /**
    * When chords are hidden, collapse filler hyphen markers (e.g. " - ")
    * so lyrics read naturally.
-   * @param {string} text
-   * @returns {string}
    */
-  _formatLyricsText(text, previousHadLyrics = false, joinWithPrev = false) {
+  _formatLyricsText(text: string, previousHadLyrics = false, joinWithPrev = false): string {
     if (!text) {
       return ''
     }
@@ -895,11 +928,11 @@ export class SongSection extends LitElement {
     return formatHiddenLyricsText(text, previousHadLyrics, joinWithPrev)
   }
 
-  _segmentHasLyrics(segment) {
+  _segmentHasLyrics(segment: ChartSegment): boolean {
     return segmentHasVisibleLyrics(segment)
   }
 
-  _normalizeSegmentLyrics(segments) {
+  _normalizeSegmentLyrics(segments: ChartSegment[]): RenderedSegment[] {
     if (!Array.isArray(segments) || segments.length === 0) {
       return []
     }
@@ -911,3 +944,9 @@ export class SongSection extends LitElement {
 }
 
 customElements.define('song-section', SongSection)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-section': SongSection
+  }
+}

@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
-import './song-section.js'
+import './song-section.ts'
 import { ContextConsumer } from '@lit/context'
+import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 
@@ -13,7 +14,7 @@ import { transposeKeyName } from '../js/transpose.ts'
  * @property {number} songIndex - Index of this song in the setlist
  */
 export class SongDisplay extends LitElement {
-  static properties = {
+  static override properties = {
     /** @type {Object} Parsed song data with metadata and sections */
     parsed: { type: Object, attribute: false },
     /** @type {number} Song index in setlist */
@@ -22,7 +23,13 @@ export class SongDisplay extends LitElement {
     capo: { type: Number },
   }
 
-  static styles = css`
+  declare parsed: ParsedChart | null
+  declare songIndex: number
+  declare capo: number
+
+  _display: ContextConsumer<typeof displayPreferencesContext, SongDisplay>
+
+  static override styles = css`
     :host {
       display: block;
     }
@@ -41,7 +48,7 @@ export class SongDisplay extends LitElement {
     })
   }
 
-  render() {
+  override render() {
     if (!this.parsed?.sections) {
       return nothing
     }
@@ -53,7 +60,7 @@ export class SongDisplay extends LitElement {
     return html`${sections}`
   }
 
-  _renderSection(section, index) {
+  _renderSection(section: ChartSection, index: number) {
     const displayKey = this.parsed?.metadata?.key || ''
     const capoValue = Number.isFinite(this.capo)
       ? Math.min(Math.max(Math.round(this.capo), 0), 11)
@@ -80,3 +87,9 @@ export class SongDisplay extends LitElement {
 }
 
 customElements.define('song-display', SongDisplay)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-display': SongDisplay
+  }
+}

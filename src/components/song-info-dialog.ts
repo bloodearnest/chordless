@@ -1,9 +1,20 @@
 import { Task } from '@lit/task'
 import { html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { SongWithContent } from '../js/data-types.ts'
+import type { ChordlessDB } from '../js/db.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import type { Appearance } from './song-info.ts'
 import './song-info.ts'
 import './status-message.ts'
+
+/** What the dialog shows: a song and where it has been played */
+interface InfoData {
+  song: SongWithContent | null
+  appearances: Appearance[]
+  loading: boolean
+}
 
 /**
  * SongInfoDialog Component
@@ -19,11 +30,18 @@ import './status-message.ts'
  * set. showData() shows already-loaded data (used by the dev page).
  */
 export class SongInfoDialog extends LitElement {
-  static properties = {
+  static override properties = {
     db: { attribute: false },
     _title: { state: true },
     _data: { state: true }, // {song, appearances, loading} given to showData()
   }
+
+  declare db: ChordlessDB | null
+  declare _title: string
+  declare _data: InfoData | null
+
+  _modal: Ref<AppModal>
+  _load: Task<[string, string], { song: SongWithContent; appearances: Appearance[] }>
 
   constructor() {
     super()
@@ -64,13 +82,12 @@ export class SongInfoDialog extends LitElement {
 
   /**
    * Open the dialog for a song, then load its details.
-   * @param {string} songId - The song's ID (not a variant's uuid)
-   * @param {object} [options]
-   * @param {string} [options.title] - Title to show, e.g. the setlist's version of
+   * @param songId - The song's ID (not a variant's uuid)
+   * @param options.title - Title to show, e.g. the setlist's version of
    *   it. Defaults to the stored song's. Key and tempo always come from the song
    *   itself (its original), with the keys it was played in listed in its history.
    */
-  async show(songId, { title = '' } = {}) {
+  async show(songId: string, { title = '' }: { title?: string } = {}): Promise<void> {
     this._title = title
     this._data = null
     this._load.run([songId, title])
@@ -78,29 +95,37 @@ export class SongInfoDialog extends LitElement {
   }
 
   /** Open the dialog with already-loaded data (dev pages) */
-  async showData({ song, appearances = [], loading = false }) {
+  async showData({
+    song,
+    appearances = [],
+    loading = false,
+  }: {
+    song: SongWithContent | null
+    appearances?: Appearance[]
+    loading?: boolean
+  }): Promise<void> {
     this._load.abort()
     this._title = song?.title ?? ''
     this._data = { song, appearances, loading }
     await this._open()
   }
 
-  close() {
+  close(): void {
     this._modal.value?.close()
   }
 
-  async _open() {
+  async _open(): Promise<void> {
     await this.updateComplete
-    this._modal.value.show()
+    this._modal.value?.show()
   }
 
-  _renderInfo({ song = null, appearances = [], loading = false }) {
+  _renderInfo({ song = null, appearances = [], loading = false }: Partial<InfoData>) {
     return html`
       <song-info .song=${song} .appearances=${appearances} .loading=${loading}></song-info>
     `
   }
 
-  render() {
+  override render() {
     return html`
       <app-modal ${ref(this._modal)} size="fullscreen" heading=${this._title || 'Song info'}>
         ${
@@ -114,7 +139,7 @@ export class SongInfoDialog extends LitElement {
                   <status-message
                     state="error"
                     message="Couldn't load this song"
-                    .detail=${error?.message ?? ''}
+                    .detail=${error instanceof Error ? error.message : ''}
                   ></status-message>
                 `,
               })
@@ -125,3 +150,9 @@ export class SongInfoDialog extends LitElement {
 }
 
 customElements.define('song-info-dialog', SongInfoDialog)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-info-dialog': SongInfoDialog
+  }
+}

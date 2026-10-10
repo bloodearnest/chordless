@@ -6,7 +6,7 @@ import { getOrganisationPeople } from '../js/people.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import './app-modal.ts'
-import './setlist-details-form.js'
+import './setlist-details-form.ts'
 import { goTo } from '../js/navigation.ts'
 import { buttonStyles } from './shared-styles.ts'
 

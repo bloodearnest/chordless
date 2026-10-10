@@ -3,7 +3,7 @@ import {
   leaderChoices,
   SetlistDetailsCancelEvent,
   SetlistDetailsSaveEvent,
-} from '../src/components/setlist-details-form.js'
+} from '../src/components/setlist-details-form.ts'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window

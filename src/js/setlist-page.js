@@ -7,14 +7,14 @@ import { CapoChangeEvent } from '../components/capo-selector.ts'
 import { KeyChangeEvent } from '../components/key-selector.ts'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.js'
-import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.js'
+import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
 } from '../components/setlist-overview.ts'
-import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
+import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.ts'
 import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.ts'
 import { SongChangeEvent } from './app-events.ts'
 import { getCurrentDB } from './db.ts'

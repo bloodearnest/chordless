@@ -1,15 +1,20 @@
 import { html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { Person, Setlist } from '../js/data-types.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
-import './setlist-details-form.js'
+import type { SetlistDetails, SetlistDetailsSaveEvent } from './setlist-details-form.ts'
+import './setlist-details-form.ts'
 import { setlistTitle } from '../js/utils/date-utils.ts'
 import './setlist-info.ts'
 
 /** The setlist's details were edited and saved: changes is the form's details */
 export class SetlistInfoSaveEvent extends Event {
   static type = 'setlist-info-dialog:save'
-  constructor(setlistId, changes) {
+  readonly setlistId: string
+  readonly changes: SetlistDetails
+  constructor(setlistId: string, changes: SetlistDetails) {
     super(SetlistInfoSaveEvent.type, { bubbles: true, composed: true })
     this.setlistId = setlistId
     this.changes = changes
@@ -34,12 +39,18 @@ export class SetlistInfoSaveEvent extends Event {
  * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, owner}
  */
 export class SetlistInfoDialog extends LitElement {
-  static properties = {
+  static override properties = {
     /** Who can be chosen as leader when editing: [{id, name}] (see people.js) */
     people: { attribute: false },
     _setlist: { state: true },
     _editing: { state: true },
   }
+
+  declare people: Person[]
+  declare _setlist: Setlist | null
+  declare _editing: boolean
+
+  _modalRef: Ref<AppModal>
 
   constructor() {
     super()
@@ -50,39 +61,41 @@ export class SetlistInfoDialog extends LitElement {
   }
 
   /** Show a setlist's details (read-only until the pencil is pressed) */
-  async show(setlist) {
+  async show(setlist: Setlist): Promise<void> {
     this._setlist = setlist
     this._editing = false
     await this.updateComplete
-    this._modal().show()
+    this._modal()?.show()
   }
 
   /** Open straight into editing */
-  async edit(setlist) {
+  async edit(setlist: Setlist): Promise<void> {
     await this.show(setlist)
     this._editing = true
   }
 
-  close() {
+  close(): void {
     this._modal()?.close()
   }
 
-  _modal() {
+  _modal(): AppModal | undefined {
     return this._modalRef.value
   }
 
-  _save(event) {
+  _save(event: SetlistDetailsSaveEvent): void {
     // Re-dispatch from the dialog rather than letting the form's save escape
     event.stopPropagation()
-    this.dispatchEvent(new SetlistInfoSaveEvent(this._setlist.id, event.details))
+    if (this._setlist) {
+      this.dispatchEvent(new SetlistInfoSaveEvent(this._setlist.id, event.details))
+    }
   }
 
-  _cancel(event) {
+  _cancel(event: Event): void {
     event.stopPropagation()
     this._editing = false
   }
 
-  render() {
+  override render() {
     const heading = this._setlist ? setlistTitle(this._setlist, 'long') : 'Setlist info'
     return html`
       <app-modal
@@ -128,3 +141,9 @@ export class SetlistInfoDialog extends LitElement {
 }
 
 customElements.define('setlist-info-dialog', SetlistInfoDialog)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-info-dialog': SetlistInfoDialog
+  }
+}

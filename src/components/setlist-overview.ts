@@ -1,6 +1,6 @@
 import { html, LitElement } from 'lit'
 import './icon.ts'
-import type { SongCardKeyChangeEvent } from './song-card.js'
+import type { SongCardKeyChangeEvent } from './song-card.ts'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {

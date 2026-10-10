@@ -2,12 +2,31 @@ import { css, html, LitElement } from 'lit'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import './icon.ts'
+import type { KeyChangeEvent } from './key-selector.ts'
 import './key-selector.ts'
+
+/** A song as the card shows it: from the library (with its last use) or a setlist (with its key) */
+export interface SongCardSong {
+  title: string
+  artist?: string | null
+  metadata?: {
+    key?: string | null
+    tempo?: string | number | null
+    timeSignature?: string | null
+  } | null
+  /** In a setlist: the key it is in, and the key the chart was written in */
+  currentKey?: string
+  originalKey?: string | null
+  lastUsageInfo?: { date: string; leader: string; key: string | null }
+  /** The older record of when it was last played */
+  lastUsedAt?: string
+}
 
 /** The card was clicked (not in edit mode) */
 export class SongCardClickEvent extends Event {
   static type = 'song-card:click'
-  constructor(song) {
+  readonly song: SongCardSong
+  constructor(song: SongCardSong) {
     super(SongCardClickEvent.type, { bubbles: true, composed: true })
     this.song = song
   }
@@ -16,7 +35,8 @@ export class SongCardClickEvent extends Event {
 /** The delete button was pressed */
 export class SongCardDeleteEvent extends Event {
   static type = 'song-card:delete'
-  constructor(song) {
+  readonly song: SongCardSong
+  constructor(song: SongCardSong) {
     super(SongCardDeleteEvent.type, { bubbles: true, composed: true })
     this.song = song
   }
@@ -25,7 +45,8 @@ export class SongCardDeleteEvent extends Event {
 /** A new key was chosen */
 export class SongCardKeyChangeEvent extends Event {
   static type = 'song-card:key-change'
-  constructor(key) {
+  readonly key: string
+  constructor(key: string) {
     super(SongCardKeyChangeEvent.type, { bubbles: true, composed: true })
     this.key = key
   }
@@ -60,13 +81,19 @@ const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'F
  * @csspart info - The additional info container
  */
 export class SongCard extends LitElement {
-  static properties = {
+  static override properties = {
     song: { type: Object, attribute: false },
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
   }
 
-  static styles = css`
+  declare song: SongCardSong | null
+  declare variant: string
+  declare editMode: boolean
+
+  contextMenuHandler?: (e: Event) => void
+
+  static override styles = css`
     :host {
       display: block;
       font-family: var(
@@ -291,7 +318,7 @@ export class SongCard extends LitElement {
     this.editMode = false
   }
 
-  render() {
+  override render() {
     if (!this.song) {
       return html`
         <div class="card" part="card">
@@ -338,11 +365,11 @@ export class SongCard extends LitElement {
     `
   }
 
-  _renderMeta() {
-    const { metadata } = this.song
+  _renderMeta(): string {
+    const metadata = this.song?.metadata
     if (!metadata) return ''
 
-    const items = []
+    const items: string[] = []
 
     if (metadata.key) {
       items.push(`Key: ${metadata.key}`)
@@ -359,7 +386,7 @@ export class SongCard extends LitElement {
     return items.join('   ')
   }
 
-  _formatArtist(artistString) {
+  _formatArtist(artistString: string) {
     const cleanedArtists = formatArtistNames(artistString)
 
     if (cleanedArtists.length === 0) return ''
@@ -372,12 +399,12 @@ export class SongCard extends LitElement {
   }
 
   _renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt } = this.song
+    const { lastUsageInfo, lastUsedAt } = this.song ?? {}
 
     // Use new lastUsageInfo if available
     if (lastUsageInfo?.date) {
       const weeksAgo = getWeeksAgo(lastUsageInfo.date)
-      const parts = []
+      const parts: string[] = []
 
       // Add leader if available
       if (lastUsageInfo.leader) {
@@ -409,7 +436,7 @@ export class SongCard extends LitElement {
     const isMinor = currentKey?.endsWith('m')
     const keys = isMinor ? MINOR_KEYS : MAJOR_KEYS
     return html`
-      <div class="key-edit-wrapper" @click=${e => e.stopPropagation()}>
+      <div class="key-edit-wrapper" @click=${(e: Event) => e.stopPropagation()}>
         <key-selector
           label="Key"
           .value=${currentKey ?? '-'}
@@ -422,7 +449,7 @@ export class SongCard extends LitElement {
     `
   }
 
-  _handleKeyEditChange(e) {
+  _handleKeyEditChange(e: KeyChangeEvent): void {
     e.stopPropagation()
     this.dispatchEvent(new SongCardKeyChangeEvent(e.value))
   }
@@ -434,26 +461,26 @@ export class SongCard extends LitElement {
       return
     }
 
-    this.dispatchEvent(new SongCardClickEvent(this.song))
+    if (this.song) this.dispatchEvent(new SongCardClickEvent(this.song))
   }
 
   // Delete button handler
-  _handleDelete(e) {
+  _handleDelete(e: Event): void {
     e.stopPropagation() // Prevent click from bubbling to card
-    this.dispatchEvent(new SongCardDeleteEvent(this.song))
+    if (this.song) this.dispatchEvent(new SongCardDeleteEvent(this.song))
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     // Prevent context menu at host level for touch devices
-    this.contextMenuHandler = e => {
+    this.contextMenuHandler = (e: Event) => {
       e.preventDefault()
       e.stopPropagation()
     }
     this.addEventListener('contextmenu', this.contextMenuHandler)
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
     if (this.contextMenuHandler) {
       this.removeEventListener('contextmenu', this.contextMenuHandler)
@@ -463,3 +490,9 @@ export class SongCard extends LitElement {
 
 // Define the custom element
 customElements.define('song-card', SongCard)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-card': SongCard
+  }
+}

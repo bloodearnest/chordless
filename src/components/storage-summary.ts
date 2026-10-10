@@ -7,8 +7,18 @@ import { css, html, LitElement } from 'lit'
  * Displays counts of local setlists/songs plus storage usage estimates
  * for IndexedDB and Service Worker caches.
  */
+/** Counts and sizes of what is stored in this browser */
+interface StorageStats {
+  setlists: number
+  songs: number
+  dbBytes: number
+  appCacheBytes: number | null
+  mediaCacheBytes: number | null
+}
+
 export class StorageSummary extends LitElement {
-  static styles = css`
+  _stats: Task<[], StorageStats>
+  static override styles = css`
     :host {
       display: block;
     }
@@ -83,7 +93,7 @@ export class StorageSummary extends LitElement {
     })
   }
 
-  render() {
+  override render() {
     const loading = () => html`
       <div class="stat-card">
         <span class="stat-label">Loading…</span>
@@ -98,7 +108,7 @@ export class StorageSummary extends LitElement {
     })
   }
 
-  _renderStats(stats) {
+  _renderStats(stats: StorageStats) {
     return html`
       <div class="summary-grid">
         ${this._renderListStat('Setlists & Songs', [
@@ -115,7 +125,7 @@ export class StorageSummary extends LitElement {
     `
   }
 
-  _renderListStat(label, rows) {
+  _renderListStat(label: string, rows: { label: string; value: string | number | null }[]) {
     return html`
       <div class="stat-card">
         <span class="stat-label">${label}</span>
@@ -134,7 +144,7 @@ export class StorageSummary extends LitElement {
   }
 
   /** Counts and sizes of the setlists, songs and caches stored in this browser */
-  async _loadStats() {
+  async _loadStats(): Promise<StorageStats> {
     const { getCurrentDB } = await import('../js/db.ts')
     const db = await getCurrentDB()
 
@@ -157,10 +167,12 @@ export class StorageSummary extends LitElement {
     }
   }
 
-  async _estimateIndexedDbUsage() {
+  async _estimateIndexedDbUsage(): Promise<number | null> {
     if (navigator.storage?.estimate) {
       try {
-        const estimate = await navigator.storage.estimate()
+        // usageDetails is not in the standard, but Chromium has it
+        const estimate: StorageEstimate & { usageDetails?: { indexedDB?: number } } =
+          await navigator.storage.estimate()
         if (estimate?.usageDetails?.indexedDB) {
           return estimate.usageDetails.indexedDB
         }
@@ -171,7 +183,7 @@ export class StorageSummary extends LitElement {
     return null
   }
 
-  async _estimateCacheUsage() {
+  async _estimateCacheUsage(): Promise<{ appBytes: number; mediaBytes: number } | null> {
     if (typeof caches === 'undefined') {
       return null
     }
@@ -204,7 +216,7 @@ export class StorageSummary extends LitElement {
     }
   }
 
-  _formatBytes(bytes) {
+  _formatBytes(bytes: number | null): string {
     if (bytes == null) {
       return '–'
     }
@@ -221,7 +233,7 @@ export class StorageSummary extends LitElement {
     return `${value.toFixed(unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`
   }
 
-  _formatMegabytes(bytes) {
+  _formatMegabytes(bytes: number | null): string {
     if (bytes == null) {
       return '–'
     }
@@ -230,7 +242,7 @@ export class StorageSummary extends LitElement {
   }
 }
 
-function estimateRecordsSize(records) {
+function estimateRecordsSize(records: unknown): number {
   if (!records) return 0
   try {
     const json = JSON.stringify(records)
@@ -243,12 +255,12 @@ function estimateRecordsSize(records) {
 
 const MEDIA_EXTENSIONS = new Set(['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'])
 
-function isMediaRequest(request) {
+function isMediaRequest(request: Request): boolean {
   try {
     const url = new URL(request.url)
     const pathname = url.pathname || ''
     const lastSegment = pathname.split('/').pop() || ''
-    const ext = lastSegment.includes('.') ? lastSegment.split('.').pop().toLowerCase() : ''
+    const ext = lastSegment.includes('.') ? (lastSegment.split('.').pop() ?? '').toLowerCase() : ''
 
     if (!ext) {
       // Treat extensionless requests as app assets (HTML routes, etc.)
@@ -263,3 +275,9 @@ function isMediaRequest(request) {
 }
 
 customElements.define('storage-summary', StorageSummary)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'storage-summary': StorageSummary
+  }
+}

@@ -1,12 +1,31 @@
+import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { live } from 'lit/directives/live.js'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { Person, Setlist } from '../js/data-types.ts'
 import { determineSetlistType } from '../js/db.ts'
+
+/** What the form collects (and a setlist keeps) */
+export interface SetlistDetails {
+  date: string
+  time: string
+  type: string
+  name: string
+  owner: string
+  ownerId: string
+}
+
+/** One leader to choose: the select's value for them, and who they are */
+export interface LeaderChoice {
+  value: string
+  person: Person
+}
 
 /** The form was submitted; details is {date, time, type, name, owner, ownerId} */
 export class SetlistDetailsSaveEvent extends Event {
   static type = 'setlist-details-form:save'
-  constructor(details) {
+  readonly details: SetlistDetails
+  constructor(details: SetlistDetails) {
     super(SetlistDetailsSaveEvent.type, { bubbles: true, composed: true })
     this.details = details
   }
@@ -32,15 +51,16 @@ const OTHER_LEADER = 'other'
  * A leader recorded by name only (before leaders had ids) is matched to a
  * person with that name, so saving the form adds their id.
  *
- * @param {object} setlist - with owner (name) and ownerId (email)
- * @param {Array<{id: string, name: string}>} people
- * @returns {{options: Array<{value: string, person: {id: string, name: string}}>, selected: string}}
+ * @param setlist - with owner (name) and ownerId (email)
  */
-export function leaderChoices(setlist = {}, people = []) {
-  const options = people.map(person => ({ value: `id:${person.id}`, person }))
+export function leaderChoices(
+  setlist: { owner?: string; ownerId?: string } = {},
+  people: Person[] = []
+): { options: LeaderChoice[]; selected: string } {
+  const options: LeaderChoice[] = people.map(person => ({ value: `id:${person.id}`, person }))
   const owner = setlist.owner?.trim() || ''
   const ownerId = setlist.ownerId || ''
-  const same = (a, b) => a.toLowerCase() === b.toLowerCase()
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase()
 
   if (!owner && !ownerId) return { options, selected: NO_LEADER }
 
@@ -50,7 +70,7 @@ export function leaderChoices(setlist = {}, people = []) {
   if (match) return { options, selected: match.value }
 
   // Not one of the people: keep them as a choice rather than lose them
-  const extra = ownerId
+  const extra: LeaderChoice = ownerId
     ? { value: `id:${ownerId}`, person: { id: ownerId, name: owner || ownerId } }
     : { value: `name:${owner}`, person: { id: '', name: owner } }
   return { options: [...options, extra], selected: extra.value }
@@ -76,7 +96,7 @@ export function leaderChoices(setlist = {}, people = []) {
  * @fires SetlistDetailsCancelEvent - Cancel was pressed
  */
 export class SetlistDetailsForm extends LitElement {
-  static properties = {
+  static override properties = {
     setlist: { attribute: false },
     submitLabel: { type: String, attribute: 'submit-label' },
     autoType: { type: Boolean, attribute: 'auto-type' },
@@ -84,7 +104,19 @@ export class SetlistDetailsForm extends LitElement {
     _otherLeader: { state: true },
   }
 
-  static styles = css`
+  declare setlist: Partial<Setlist>
+  declare submitLabel: string
+  declare autoType: boolean
+  declare people: Person[]
+  declare _otherLeader: boolean
+
+  _dateField: Ref<HTMLInputElement>
+  _nameField: Ref<HTMLInputElement>
+  _typeField: Ref<HTMLSelectElement>
+  _leaderField: Ref<HTMLSelectElement>
+  _leaders: { options: LeaderChoice[]; selected: string }
+
+  static override styles = css`
     :host {
       display: block;
     }
@@ -172,67 +204,75 @@ export class SetlistDetailsForm extends LitElement {
     this._leaders = leaderChoices()
   }
 
-  _guessType() {
+  _guessType(): void {
     if (!this.autoType) return
-    const date = this._dateField.value.value
-    const name = this._nameField.value.value
-    if (date) {
-      this._typeField.value.value = determineSetlistType(date, name)
+    const date = this._dateField.value?.value
+    const name = this._nameField.value?.value
+    const typeField = this._typeField.value
+    if (date && typeField) {
+      typeField.value = determineSetlistType(date, name)
     }
   }
 
-  willUpdate(changed) {
+  override willUpdate(changed: PropertyValues<this>): void {
     if (changed.has('setlist') || changed.has('people')) {
       this._leaders = leaderChoices(this.setlist, this.people)
       this._otherLeader = false
     }
   }
 
-  updated(changed) {
+  override updated(changed: PropertyValues<this>): void {
     // Set selects after render (a .value binding runs before their options
     // exist), and only for a new setlist, so the user's choices aren't undone
     if (changed.has('setlist') || changed.has('people')) {
-      this._typeField.value.value = this.setlist?.type || SETLIST_TYPES[0]
-      this._leaderField.value.value = this._leaders.selected
+      const typeField = this._typeField.value
+      const leaderField = this._leaderField.value
+      if (typeField) typeField.value = this.setlist?.type || SETLIST_TYPES[0]
+      if (leaderField) leaderField.value = this._leaders.selected
     }
   }
 
-  _leaderChanged(event) {
-    this._otherLeader = event.target.value === OTHER_LEADER
+  _leaderChanged(event: Event): void {
+    this._otherLeader = (event.target as HTMLSelectElement).value === OTHER_LEADER
   }
 
   /** The chosen leader as { owner, ownerId } */
-  _leader(data) {
+  _leader(data: FormData): { owner: string; ownerId: string } {
     const value = data.get('leader')
     if (value === OTHER_LEADER) {
-      return { owner: data.get('leaderOther')?.trim() || '', ownerId: '' }
+      const other = data.get('leaderOther')
+      return { owner: (typeof other === 'string' && other.trim()) || '', ownerId: '' }
     }
     const person = this._leaders.options.find(o => o.value === value)?.person
     return { owner: person?.name || '', ownerId: person?.id || '' }
   }
 
-  _submit(event) {
+  _submit(event: Event): void {
     event.preventDefault()
-    const data = new FormData(event.target)
+    const data = new FormData(event.target as HTMLFormElement)
+    const field = (name: string): string => {
+      const value = data.get(name)
+      return typeof value === 'string' ? value : ''
+    }
     this.dispatchEvent(
       new SetlistDetailsSaveEvent({
-        date: data.get('date'),
-        time: data.get('time'),
-        type: data.get('type'),
-        name: data.get('name')?.trim() || '',
+        date: field('date'),
+        time: field('time'),
+        type: field('type'),
+        name: field('name').trim(),
         ...this._leader(data),
       })
     )
   }
 
-  _cancel() {
+  _cancel(): void {
     this.dispatchEvent(new SetlistDetailsCancelEvent())
   }
 
-  render() {
-    const s = this.setlist || {}
+  override render() {
+    const s: Partial<Setlist> = this.setlist || {}
     const types =
-      SETLIST_TYPES.includes(s.type) || !s.type ? SETLIST_TYPES : [...SETLIST_TYPES, s.type]
+      !s.type || SETLIST_TYPES.includes(s.type) ? SETLIST_TYPES : [...SETLIST_TYPES, s.type]
     return html`
       <form @submit=${this._submit}>
         <div class="form-field">
@@ -304,3 +344,9 @@ export class SetlistDetailsForm extends LitElement {
 }
 
 customElements.define('setlist-details-form', SetlistDetailsForm)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-details-form': SetlistDetailsForm
+  }
+}

@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import './song-card.js'
+import './song-card.ts'
 import './status-message.ts'
 
 /** A song was chosen; index is its place in the list */
