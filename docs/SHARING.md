@@ -275,9 +275,9 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
 
 - **Removed now:** `share.html`, `share-setlist.js`, the share button and dialog,
   and the `/share/<id>` route.
-- **Removed once the Drive checks above pass:** the worker's `POST /api/share` and
-  `GET /api/share/:id`, and the `SETLISTS` KV binding. The KV namespace itself is in
-  the Cloudflare account and would be deleted there.
+- **Also removed:** the worker's `POST /api/share` and `GET /api/share/:id`, and the
+  `SETLISTS` KV binding (the old link sharing was never finished). The KV namespace itself
+  is still in the Cloudflare account and can be deleted there.
 
 ---
 

@@ -151,7 +151,6 @@ sharing
   link, updated in place, expiring 2 weeks after the setlist date, read-only and
   isolated on the recipient's device, QR code for in-room sharing. Designed in
   docs/SHARING.md Part 2, not built; verify the Drive questions listed there first.
-  Then remove the worker's /api/share endpoints and the SETLISTS KV binding.
 - email media team
 - invite people to an organisation: a dialog to share the org's Drive folder with an
   email address, as read (musicians) or write (leaders) access. The leader dropdown

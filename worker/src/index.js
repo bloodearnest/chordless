@@ -54,16 +54,6 @@ export default {
         return await handleSessionRevoke(request, env)
       }
 
-      // Setlist storage endpoints
-      if (path === '/api/share' && request.method === 'POST') {
-        return await handleShareSetlist(request, env)
-      }
-
-      if (path.startsWith('/api/share/') && request.method === 'GET') {
-        const id = path.split('/')[3]
-        return await handleGetSetlist(id, env)
-      }
-
       // Dev-only component playgrounds (public/dev/). DEV_PAGES is set only in [env.dev]
       // in wrangler.toml (`npm run dev`). Routed here first via run_worker_first.
       if (path === '/dev' || path.startsWith('/dev/')) {
@@ -413,68 +403,6 @@ async function handleSessionRevoke(request, env) {
 }
 
 /**
- * POST /api/share
- *
- * Store a setlist for sharing.
- *
- * Request body:
- * {
- *   setlist: object  // Complete setlist data including songs
- * }
- *
- * Response:
- * {
- *   id: string,      // Short ID for sharing
- *   expires_at: string
- * }
- */
-async function handleShareSetlist(request, env) {
-  const { setlist } = await request.json()
-
-  if (!setlist) {
-    return jsonResponse({ error: 'Missing setlist data' }, 400)
-  }
-
-  // Generate short ID (8 characters)
-  const id = generateShortId()
-
-  // Store in KV with 30-day expiration
-  const expirationTtl = 60 * 60 * 24 * 30 // 30 days in seconds
-  const expiresAt = new Date(Date.now() + expirationTtl * 1000).toISOString()
-
-  await env.SETLISTS.put(id, JSON.stringify({ setlist, created_at: new Date().toISOString() }), {
-    expirationTtl,
-  })
-
-  return jsonResponse({ id, expires_at: expiresAt })
-}
-
-/**
- * GET /api/share/:id
- *
- * Retrieve a shared setlist.
- *
- * Response:
- * {
- *   setlist: object,
- *   created_at: string
- * }
- */
-async function handleGetSetlist(id, env) {
-  if (!id || !/^[a-zA-Z0-9]{8}$/.test(id)) {
-    return jsonResponse({ error: 'Invalid ID format' }, 400)
-  }
-
-  const data = await env.SETLISTS.get(id)
-
-  if (!data) {
-    return jsonResponse({ error: 'Setlist not found or expired' }, 404)
-  }
-
-  return jsonResponse(JSON.parse(data))
-}
-
-/**
  * Encrypt blob data into JWE format
  */
 async function encryptBlob(data, env) {
@@ -506,20 +434,6 @@ async function importEncryptionKey(base64Key) {
     'encrypt',
     'decrypt',
   ])
-}
-
-/**
- * Generate a short ID (8 alphanumeric characters)
- */
-function generateShortId() {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-  let result = ''
-  const randomValues = new Uint8Array(8)
-  crypto.getRandomValues(randomValues)
-  for (let i = 0; i < 8; i++) {
-    result += chars[randomValues[i] % chars.length]
-  }
-  return result
 }
 
 /**
