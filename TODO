@@ -1,13 +1,14 @@
 editing
 - song notes/stickies
+- reset doesn't reset bpm?
+
 
 song edit UI
-- larger single popover for song settings
-    - bpm
-    - pads on/off for this song
-        - pad sound 
-    - click on/off for this song
-        - click pattern
+- pads on/off for this song
+    - pad sound 
+- click on/off for this song
+    - click pattern
+- on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 dead code
 - song-view-manager.js setupCapoSelector() is never called (setlist-app has its own; the
@@ -36,6 +37,14 @@ preferences
     "Media Player Settings" twice). Settle on one settings row pattern in shared-styles.js
     Decided: on/off settings use checkboxes, not pill-shaped toggle switches (pills are
     poor UX), sized for touch (a large box and a big tap target on the whole row).
+
+offline
+- the service worker precaches a hand-written list of files (ASSETS in
+  service-worker.js), missing most modules: the rest are cached only when first fetched,
+  so a page that dynamically imports one (first-time-auth.js, song-utils.js, ...) can
+  fail offline if it hasn't been loaded online yet. Precache every app module, keeping
+  the list in step with the files (a test that compares it with public/ would do, as
+  there's no build step). Also check CDN_ASSETS still matches what pages load
 
 storage/sync
 - db.js and organisation-db.js reject failed writes with tx.error (14 places), which is
@@ -66,13 +75,21 @@ live mode
    overview, then the song again (the section observer's first callback): the media
    player is told "no song" in between, and for that moment the edit button and arrow
    keys act on the overview. tests/live.playwright.js opens songs with the arrow instead
+ - section states are saved asynchronously (_saveSectionStateViaModel), so hiding a
+   section and reloading straight away can lose it
  - button on setlist
  - fullscreen
  - keep screen alive
  - webrtc sync (live session: following the leader's song/section)
 
 tests
- - component tests (using test page?)
+ - the key and capo pickers (option-picker) have no roles: give the button and its options
+   listbox/option semantics, then find them by role in the Playwright tests, which use
+   .picker-button and .picker-option now
+ - coverage: just coverage covers the browser unit tests only, and counts only the files
+   they load. Playwright coverage (page.coverage, Chromium) would show what the
+   end-to-end tests reach
+ - "Lit is in dev mode" in the test logs: check the app ships Lit's production build
 
 song import
  - share target on mobile (Web Share Target in the manifest, Chromium/Android only):
