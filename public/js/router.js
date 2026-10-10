@@ -118,9 +118,9 @@ export function sameRoute(a, b) {
  *
  * @param {object} from the current route
  * @param {object} to the target route
- * @param {{fromOverview?: boolean}} [state] the current history entry's state
+ * @param {{fromOverview?: boolean} | null} [state] the current history entry's state
  */
-export function historyAction(from, to, state = {}) {
+export function historyAction(from, to, state) {
   if (sameRoute(from, to)) return 'replace'
 
   const inSameSetlist =
@@ -131,6 +131,6 @@ export function historyAction(from, to, state = {}) {
   const toSong = to.songIndex >= 0
   if (!fromSong && toSong) return 'push'
   if (fromSong && toSong) return 'replace'
-  if (fromSong && !toSong) return state.fromOverview ? 'back' : 'replace'
+  if (fromSong && !toSong) return state?.fromOverview ? 'back' : 'replace'
   return 'replace'
 }

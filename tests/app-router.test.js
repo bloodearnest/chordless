@@ -1,0 +1,438 @@
+import { expect } from '@esm-bundle/chai'
+import { ContextConsumer } from '@lit/context'
+import { LitElement } from 'lit'
+import { AppRouter, RouteChangeEvent } from '../public/js/app-router.js'
+import { routeContext } from '../public/js/route-context.js'
+
+const { describe, it, beforeEach, afterEach } = window
+
+class RouteConsumer extends LitElement {
+  consumer = new ContextConsumer(this, { context: routeContext, subscribe: true })
+}
+customElements.define('route-consumer', RouteConsumer)
+
+const startUrl = window.location.pathname + window.location.search
+
+/** A view that records the routes the router gives it */
+function fakeView(name) {
+  const view = document.createElement('div')
+  view.dataset.view = name
+  view.routes = []
+  Object.defineProperty(view, 'route', {
+    get: () => view.routes.at(-1),
+    set: route => view.routes.push(route),
+  })
+  return view
+}
+
+describe('AppRouter', () => {
+  let outlet
+  let router
+  let views
+  let loads
+
+  const makeRouter = (extra = {}) => {
+    router?.stop()
+    router = new AppRouter({ outlet, views, transitions: false, ...extra })
+    return router
+  }
+  const routeChanged = () =>
+    new Promise(resolve =>
+      document.addEventListener(RouteChangeEvent.type, resolve, { once: true })
+    )
+
+  beforeEach(() => {
+    outlet = document.createElement('div')
+    document.body.append(outlet)
+    loads = []
+    views = {
+      storage: {
+        load: () => {
+          loads.push('storage')
+          return fakeView('storage')
+        },
+        title: () => 'Storage - Chordless',
+      },
+      songs: { load: () => fakeView('songs') },
+      setlist: {
+        load: route => {
+          loads.push(`setlist:${route.setlistId}`)
+          return fakeView('setlist')
+        },
+        title: route => `Setlist ${route.setlistId}`,
+        sameView: (previous, next) => previous.setlistId === next.setlistId,
+      },
+    }
+    window.history.replaceState(null, '', startUrl)
+  })
+
+  afterEach(() => {
+    router?.stop()
+    outlet.remove()
+    window.history.replaceState(null, '', startUrl)
+  })
+
+  describe('start', () => {
+    it('shows the view for the current URL', async () => {
+      window.history.replaceState(null, '', '/storage')
+      expect(await makeRouter().start()).to.equal(true)
+      expect(outlet.querySelector('[data-view=storage]')).to.exist
+      expect(router.route).to.deep.equal({ name: 'storage' })
+      expect(document.title).to.equal('Storage - Chordless')
+    })
+
+    it('does nothing for a URL with no view', async () => {
+      window.history.replaceState(null, '', '/bookmarklet')
+      expect(await makeRouter().start()).to.equal(false)
+      expect(outlet.children).to.have.length(0)
+      expect(router.route).to.equal(null)
+    })
+
+    it('gives the view its route before attaching it', async () => {
+      window.history.replaceState(null, '', '/setlist/abc/song/2')
+      await makeRouter().start()
+      expect(router.view.route).to.deep.equal({ name: 'setlist', setlistId: 'abc', songIndex: 2 })
+    })
+  })
+
+  describe('navigate', () => {
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+    })
+
+    it('shows the view, pushes the URL and sets the title', async () => {
+      const before = window.history.length
+      expect(await router.navigate('/setlist/abc')).to.equal(true)
+      expect(window.location.pathname).to.equal('/setlist/abc')
+      expect(window.history.length).to.equal(before + 1)
+      expect(outlet.children).to.have.length(1)
+      expect(outlet.firstElementChild.dataset.view).to.equal('setlist')
+      expect(document.title).to.equal('Setlist abc')
+    })
+
+    it('returns false, and changes nothing, for a route with no view', async () => {
+      const before = window.history.length
+      expect(await router.navigate('/bookmarklet')).to.equal(false)
+      expect(window.location.pathname).to.equal('/storage')
+      expect(window.history.length).to.equal(before)
+      expect(router.route).to.deep.equal({ name: 'storage' })
+    })
+
+    it('replaces rather than pushes when asked', async () => {
+      const before = window.history.length
+      await router.navigate('/songs', { replace: true })
+      expect(window.location.pathname).to.equal('/songs')
+      expect(window.history.length).to.equal(before)
+    })
+
+    it('tells the document, with the route it left', async () => {
+      const changed = routeChanged()
+      router.navigate('/songs')
+      const event = await changed
+      expect(event.route).to.deep.equal({ name: 'songs' })
+      expect(event.previous).to.deep.equal({ name: 'storage' })
+    })
+
+    it('keeps the default title for a view with none', async () => {
+      const original = document.title
+      await router.navigate('/songs')
+      expect(document.title).to.equal(original)
+    })
+
+    it('swaps the view in a view transition when the browser has them', async () => {
+      if (!document.startViewTransition) return
+      makeRouter({ transitions: true })
+      await router.start()
+      await router.navigate('/songs')
+      expect(outlet.firstElementChild.dataset.view).to.equal('songs')
+    })
+  })
+
+  describe('moving within a view', () => {
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/setlist/abc')
+      await makeRouter().start()
+    })
+
+    it('keeps the view, and gives it the new route, when the setlist stays the same', async () => {
+      const view = router.view
+      await router.navigate('/setlist/abc/song/1')
+      expect(router.view).to.equal(view)
+      expect(loads).to.deep.equal(['setlist:abc'])
+      expect(view.routes.map(route => route.songIndex)).to.deep.equal([-1, 1])
+    })
+
+    it('replaces the view for another setlist', async () => {
+      const view = router.view
+      await router.navigate('/setlist/xyz')
+      expect(router.view).to.not.equal(view)
+      expect(loads).to.deep.equal(['setlist:abc', 'setlist:xyz'])
+      expect(view.isConnected).to.equal(false)
+    })
+  })
+
+  describe('history', () => {
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/setlist/abc')
+      await makeRouter().start()
+    })
+
+    it('pushes from the overview into a song, and replaces from song to song', async () => {
+      const start = window.history.length
+      await router.navigate('/setlist/abc/song/0')
+      expect(window.history.length).to.equal(start + 1)
+      await router.navigate('/setlist/abc/song/1')
+      expect(window.history.length).to.equal(start + 1)
+      expect(window.location.pathname).to.equal('/setlist/abc/song/1')
+    })
+
+    it('remembers a song was opened from the overview', async () => {
+      await router.navigate('/setlist/abc/song/0')
+      expect(window.history.state).to.deep.equal({ fromOverview: true })
+      await router.navigate('/setlist/abc/song/1')
+      expect(window.history.state).to.deep.equal({ fromOverview: true })
+    })
+
+    it('goes back to the overview a song was opened from', async () => {
+      await router.navigate('/setlist/abc/song/0')
+      const changed = routeChanged()
+      await router.navigate('/setlist/abc')
+      const event = await changed
+      expect(event.route).to.deep.equal({ name: 'setlist', setlistId: 'abc', songIndex: -1 })
+      expect(window.location.pathname).to.equal('/setlist/abc')
+    })
+
+    it('replaces to the overview from a song that was a direct link', async () => {
+      window.history.replaceState(null, '', '/setlist/abc/song/3')
+      router.stop()
+      await makeRouter().start()
+      const start = window.history.length
+      await router.navigate('/setlist/abc')
+      expect(window.history.length).to.equal(start)
+      expect(window.location.pathname).to.equal('/setlist/abc')
+    })
+
+    it('follows the back button', async () => {
+      await router.navigate('/storage')
+      expect(router.route.name).to.equal('storage')
+      const changed = routeChanged()
+      window.history.back()
+      await changed
+      expect(router.route).to.deep.equal({ name: 'setlist', setlistId: 'abc', songIndex: -1 })
+      expect(outlet.firstElementChild.dataset.view).to.equal('setlist')
+    })
+  })
+
+  describe('links', () => {
+    let host
+
+    /** Click a link, in a shadow root as the nav menu has them; true if the router took it */
+    const click = (attributes, init = {}) => {
+      const root = host.shadowRoot
+      root.innerHTML = `<a ${attributes}>link</a>`
+      let routerTookIt = null
+      const finish = event => {
+        routerTookIt = event.defaultPrevented
+        // Never let the test page itself navigate
+        event.preventDefault()
+      }
+      window.addEventListener('click', finish, { once: true })
+      root
+        .querySelector('a')
+        .dispatchEvent(
+          new MouseEvent('click', { bubbles: true, composed: true, cancelable: true, ...init })
+        )
+      return routerTookIt
+    }
+
+    beforeEach(async () => {
+      host = document.createElement('div')
+      host.attachShadow({ mode: 'open' })
+      document.body.append(host)
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+    })
+
+    afterEach(() => host.remove())
+
+    it('follows a link to a route with a view, from inside a shadow root', async () => {
+      const changed = routeChanged()
+      expect(click('href="/songs"')).to.equal(true)
+      await changed
+      expect(window.location.pathname).to.equal('/songs')
+    })
+
+    it('leaves a link to a route with no view to the browser', () => {
+      expect(click('href="/bookmarklet"')).to.equal(false)
+      expect(router.route.name).to.equal('storage')
+    })
+
+    it('leaves other kinds of clicks and links to the browser', () => {
+      expect(click('href="/songs"', { metaKey: true })).to.equal(false)
+      expect(click('href="/songs"', { ctrlKey: true })).to.equal(false)
+      expect(click('href="/songs"', { shiftKey: true })).to.equal(false)
+      expect(click('href="/songs"', { button: 1 })).to.equal(false)
+      expect(click('href="/songs" target="_blank"')).to.equal(false)
+      expect(click('href="/songs" download')).to.equal(false)
+      expect(click('href="/songs" rel="external"')).to.equal(false)
+      expect(click('href="https://example.com/songs"')).to.equal(false)
+      expect(click('href="#top"')).to.equal(false)
+      expect(click('')).to.equal(false)
+      expect(window.location.pathname).to.equal('/storage')
+    })
+  })
+
+  describe('loading a view', () => {
+    let release
+
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+    })
+
+    /** Make the songs view load only when release() is called */
+    const slowSongs = () => {
+      const gate = new Promise(resolve => {
+        release = resolve
+      })
+      views.songs.load = async () => {
+        await gate
+        return fakeView('songs')
+      }
+    }
+
+    it('leaves the URL and the view alone until the new view has loaded', async () => {
+      slowSongs()
+      const done = router.navigate('/songs')
+      await Promise.resolve()
+      expect(window.location.pathname).to.equal('/storage')
+      expect(outlet.firstElementChild.dataset.view).to.equal('storage')
+      release()
+      await done
+      expect(window.location.pathname).to.equal('/songs')
+      expect(outlet.firstElementChild.dataset.view).to.equal('songs')
+    })
+
+    it('shows an error view when loading fails, at the URL asked for', async () => {
+      const original = console.error
+      console.error = () => undefined
+      try {
+        views.songs.load = () => Promise.reject(new Error('offline'))
+        await router.navigate('/songs')
+      } finally {
+        console.error = original
+      }
+      expect(outlet.firstElementChild.getAttribute('role')).to.equal('alert')
+      expect(window.location.pathname).to.equal('/songs')
+      expect(router.route.name).to.equal('songs')
+    })
+
+    it('shows the error view an app supplies', async () => {
+      const original = console.error
+      console.error = () => undefined
+      try {
+        makeRouter({
+          errorView: (route, error) => {
+            const view = document.createElement('p')
+            view.textContent = `${route.name}: ${error.message}`
+            return view
+          },
+        })
+        window.history.replaceState(null, '', '/storage')
+        await router.start()
+        views.songs.load = () => Promise.reject(new Error('offline'))
+        await router.navigate('/songs')
+      } finally {
+        console.error = original
+      }
+      expect(outlet.firstElementChild.textContent).to.equal('songs: offline')
+    })
+
+    it('drops a view that loaded after a newer navigation started', async () => {
+      slowSongs()
+      const slow = router.navigate('/songs')
+      await router.navigate('/setlist/abc')
+      release()
+      await slow
+      expect(window.location.pathname).to.equal('/setlist/abc')
+      expect(outlet.children).to.have.length(1)
+      expect(outlet.firstElementChild.dataset.view).to.equal('setlist')
+      expect(router.route.name).to.equal('setlist')
+    })
+
+    it('shows a not-found view for an unknown URL when the app has one', async () => {
+      views['not-found'] = { load: () => fakeView('not-found') }
+      window.history.replaceState(null, '', '/no-such-page')
+      expect(await makeRouter().start()).to.equal(true)
+      expect(outlet.firstElementChild.dataset.view).to.equal('not-found')
+    })
+  })
+
+  describe('telling assistive technology', () => {
+    let announcer
+
+    beforeEach(async () => {
+      announcer = document.createElement('div')
+      announcer.setAttribute('aria-live', 'polite')
+      document.body.append(announcer)
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter({ announcer }).start()
+    })
+
+    afterEach(() => announcer.remove())
+
+    it('announces the title when the view changes, but not the first view', async () => {
+      expect(announcer.textContent).to.equal('')
+      await router.navigate('/setlist/abc')
+      expect(announcer.textContent).to.equal('Setlist abc')
+    })
+
+    it('does not announce a move within a view', async () => {
+      await router.navigate('/setlist/abc')
+      announcer.textContent = ''
+      await router.navigate('/setlist/abc/song/1')
+      expect(announcer.textContent).to.equal('')
+    })
+
+    it('moves focus to a view that takes focus, and leaves the others', async () => {
+      views.songs.load = () => {
+        const view = fakeView('songs')
+        view.setAttribute('tabindex', '-1')
+        return view
+      }
+      const before = document.activeElement
+      await router.navigate('/setlist/abc')
+      expect(document.activeElement).to.equal(before)
+      await router.navigate('/songs')
+      expect(document.activeElement).to.equal(router.view)
+    })
+  })
+
+  describe('route context', () => {
+    it('provides the route to components, and clears it on stop', async () => {
+      const host = document.createElement('route-consumer')
+      document.body.append(host)
+      const consumer = host.consumer
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+      expect(consumer.value).to.deep.equal({ name: 'storage' })
+      await router.navigate('/songs')
+      expect(consumer.value).to.deep.equal({ name: 'songs' })
+      router.stop()
+      expect(consumer.value).to.equal(null)
+      host.remove()
+    })
+  })
+
+  describe('stop', () => {
+    it('removes the view and stops following links', async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+      const view = router.view
+      router.stop()
+      expect(view.isConnected).to.equal(false)
+      expect(router.route).to.equal(null)
+    })
+  })
+})

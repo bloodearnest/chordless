@@ -166,6 +166,11 @@ describe('historyAction', () => {
     expect(historyAction(song(2), overview, { fromOverview: false })).to.equal('replace')
   })
 
+  it('copes with a history entry that has no state', () => {
+    expect(historyAction(song(2), overview, null)).to.equal('replace')
+    expect(historyAction(overview, song(2), null)).to.equal('push')
+  })
+
   it('replaces when the target is where we already are', () => {
     expect(historyAction(overview, overview)).to.equal('replace')
     expect(historyAction({ name: 'home' }, { name: 'home' })).to.equal('replace')
