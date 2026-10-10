@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../src/components/bookmarklet-installer.js'
+import '../src/components/bookmarklet-installer.ts'
 import { bookmarkletUrl, importFromSongSelect } from '../src/js/songselect-bookmarklet.ts'
 import { A11Y } from './test-helpers.js'
 

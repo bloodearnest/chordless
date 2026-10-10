@@ -1,7 +1,7 @@
 import { html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
-import './icon.js'
+import './icon.ts'
 import './setlist-details-form.js'
 import { setlistTitle } from '../js/utils/date-utils.ts'
 import './setlist-info.ts'

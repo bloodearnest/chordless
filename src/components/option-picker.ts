@@ -1,14 +1,14 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
  * a popup of options to choose from (a modal <dialog>: see DialogPopup). key-selector and capo-selector extend
- * it, giving their options and the event class they send:
+ * it, giving their options and the event they send:
  *
- *   static ChangeEvent = KeyChangeEvent
  *   _options() { return [{ value, label, hint }] }
+ *   _changeEvent(value) { return new KeyChangeEvent(value) }
  *
  * Outside edit mode the value is plain text. Choosing a different option
  * closes the popup and sends a ChangeEvent with the chosen value; the owner
@@ -20,13 +20,28 @@ import { DialogPopup } from '../js/dialog-popup.ts'
  * @property {String} label - Shown before the value, with a colon (optional)
  * @property {Boolean} editMode - Whether the value can be changed (attribute edit-mode)
  */
-export class OptionPicker extends LitElement {
-  static properties = {
+/** One choice in the popup */
+export interface PickerOption<V> {
+  value: V
+  label: string
+  hint: string
+}
+
+export abstract class OptionPicker<V extends string | number> extends LitElement {
+  static override properties = {
     label: { type: String },
     editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
   }
 
-  static styles = css`
+  declare label: string
+  declare editMode: boolean
+  /** The current value; the subclasses declare their properties and set a default */
+  declare value: V
+
+  _button: Ref<HTMLButtonElement>
+  _popup: DialogPopup
+
+  static override styles = css`
     :host {
       display: contents;
     }
@@ -115,9 +130,6 @@ export class OptionPicker extends LitElement {
     }
   `
 
-  /** The Event class sent when a different option is chosen (subclasses set it) */
-  static ChangeEvent = null
-
   constructor() {
     super()
     this._button = createRef()
@@ -127,27 +139,30 @@ export class OptionPicker extends LitElement {
   }
 
   /** The options: [{value, label, hint}] (subclasses implement it) */
-  _options() {
-    return []
-  }
+  abstract _options(): PickerOption<V>[]
+
+  /** The event sent when a different option is chosen (subclasses implement it) */
+  abstract _changeEvent(value: V): Event
 
   /** The value as shown on the button */
-  _displayValue() {
+  _displayValue(): string | number {
     return this.value ?? '-'
   }
 
-  _choose(value) {
+  _choose(value: V): void {
     if (value === this.value) return
     this._popup.close()
-    this.dispatchEvent(new this.constructor.ChangeEvent(value))
+    this.dispatchEvent(this._changeEvent(value))
   }
 
   /**
    * As the popup opens, put it under the button, or above it if there's
    * more room there, kept within the screen
    */
-  _positionPopover(popover) {
-    const button = this._button.value.getBoundingClientRect()
+  _positionPopover(popover: HTMLDialogElement): void {
+    const buttonElement = this._button.value
+    if (!buttonElement) return
+    const button = buttonElement.getBoundingClientRect()
     const margin = 8
     const height = popover.offsetHeight
     const below = window.innerHeight - button.bottom - margin
@@ -162,7 +177,7 @@ export class OptionPicker extends LitElement {
     popover.style.left = `${left}px`
   }
 
-  render() {
+  override render() {
     return html`
       ${this.label ? html`<span class="meta-label">${this.label}:</span>` : ''}
       <button

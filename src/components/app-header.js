@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import './icon.js'
+import './icon.ts'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
 export class HeaderMenuClickEvent extends Event {

@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { themeManager } from '../js/theme-manager.ts'
+import { type ThemeObserver, themeManager } from '../js/theme-manager.ts'
 
 /**
  * ThemeSettings Component
@@ -9,12 +9,17 @@ import { themeManager } from '../js/theme-manager.ts'
  * Events:
  */
 export class ThemeSettings extends LitElement {
-  static properties = {
+  static override properties = {
     _currentTheme: { state: true },
     _fontScale: { state: true },
   }
 
-  static styles = css`
+  declare _currentTheme: string
+  declare _fontScale: number
+
+  _themeObserver: ThemeObserver
+
+  static override styles = css`
     :host {
       display: block;
     }
@@ -200,27 +205,27 @@ export class ThemeSettings extends LitElement {
     this._themeObserver = this._handleThemeChange.bind(this)
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     themeManager.addObserver(this._themeObserver)
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
     themeManager.removeObserver(this._themeObserver)
   }
 
-  _handleThemeChange(theme) {
+  _handleThemeChange(theme: string): void {
     this._currentTheme = theme
     this._fontScale = parseFloat(themeManager.getVariable('font-scale')) || 1.0
   }
 
-  _setTheme(theme) {
+  _setTheme(theme: string): void {
     themeManager.setTheme(theme)
   }
 
-  _handleFontScaleChange(e) {
-    const scale = parseFloat(e.target.value)
+  _handleFontScaleChange(e: Event): void {
+    const scale = parseFloat((e.target as HTMLInputElement).value)
     this._fontScale = scale
     themeManager.setFontScale(scale)
 
@@ -232,7 +237,7 @@ export class ThemeSettings extends LitElement {
     }
   }
 
-  _setPresetScale(scale) {
+  _setPresetScale(scale: number): void {
     this._fontScale = scale
     themeManager.setFontScale(scale)
 
@@ -243,11 +248,11 @@ export class ThemeSettings extends LitElement {
     }
   }
 
-  _detectSystemPreference() {
+  _detectSystemPreference(): void {
     this._setTheme('system')
   }
 
-  render() {
+  override render() {
     const systemPreference = themeManager.detectSystemPreference()
     const usingSystemMode = this._currentTheme === 'system'
 
@@ -356,3 +361,9 @@ export class ThemeSettings extends LitElement {
 }
 
 customElements.define('theme-settings', ThemeSettings)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'theme-settings': ThemeSettings
+  }
+}

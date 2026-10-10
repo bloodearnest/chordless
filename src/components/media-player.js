@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.ts'
 import './app-modal.js'
-import './icon.js'
+import './icon.ts'
 import { SongChangeEvent } from '../js/app-events.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
 import { MetronomeController } from '../js/metronome-controller.ts'

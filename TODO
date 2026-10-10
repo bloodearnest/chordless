@@ -11,6 +11,10 @@ song edit UI
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
+- the song info dialog never shows a song's CCLI trailer, and takes its CCLI number only from the
+  record: SongInfo reads song.metadata.ccli, .ccliSongNumber and .ccliTrailer, but
+  getSongWithContent's metadata has only key, tempo and timeSignature (the chart's own metadata
+  is in song.parsed.metadata). Probably meant to read that; decide, and fix with a test
 - the fallbacks to a song's own key and tempo never work: buildRuntimeSongs (for old setlists
   with no key or tempo of their own) reads canonicalSong.key and .tempo, and LibrarySong reads
   _song.key, .originalKey, .tempo and .originalTempo, but getSongWithContent returns none of

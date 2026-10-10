@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import './icon.js'
+import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /** The confirm button was pressed (type confirm); the modal then closes */

@@ -236,6 +236,10 @@ export interface SongWithContent {
     tempo: string | number | null
     timeSignature: string | null
     tempoNote?: string
+    /** From the chart's CCLI lines. getSongWithContent does not set these (see the TODO) */
+    ccli?: string
+    ccliSongNumber?: string
+    ccliTrailer?: string
   }
   chordpro: string
   chordproFileId: string

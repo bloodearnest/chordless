@@ -1,9 +1,10 @@
-import { OptionPicker } from './option-picker.js'
+import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different key was chosen; value is the key */
 export class KeyChangeEvent extends Event {
   static type = 'key-selector:change'
-  constructor(value) {
+  readonly value: string
+  constructor(value: string) {
     super(KeyChangeEvent.type, { bubbles: true, composed: true })
     this.value = value
   }
@@ -26,15 +27,16 @@ export class KeyChangeEvent extends Event {
  * Events:
  * @fires KeyChangeEvent - When a new key is selected (value: string)
  */
-export class KeySelector extends OptionPicker {
-  static properties = {
+export class KeySelector extends OptionPicker<string> {
+  static override properties = {
     ...OptionPicker.properties,
     value: { type: String },
     keys: { type: Array, attribute: false },
     originalKey: { type: String, attribute: 'original-key' },
   }
 
-  static ChangeEvent = KeyChangeEvent
+  declare keys: string[]
+  declare originalKey: string
 
   constructor() {
     super()
@@ -44,11 +46,15 @@ export class KeySelector extends OptionPicker {
     this.originalKey = ''
   }
 
-  _displayValue() {
+  override _displayValue(): string {
     return this.value || '-'
   }
 
-  _options() {
+  override _changeEvent(value: string): Event {
+    return new KeyChangeEvent(value)
+  }
+
+  override _options(): PickerOption<string>[] {
     const currentIndex = this.keys.indexOf(this.value)
     return this.keys.map((key, index) => {
       const offset = currentIndex === -1 ? 0 : currentIndex - index
@@ -62,3 +68,9 @@ export class KeySelector extends OptionPicker {
 }
 
 customElements.define('key-selector', KeySelector)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'key-selector': KeySelector
+  }
+}

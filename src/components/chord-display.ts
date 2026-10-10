@@ -5,14 +5,17 @@ import {
   transposeChordBySemitones,
 } from '../js/transpose.ts'
 import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.ts'
-import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.ts'
+import {
+  type ChordDisplaySegment,
+  splitChordDisplaySegments,
+} from '../js/utils/lyrics-normalizer.ts'
 
 /**
  * Small utility component that renders a chord with optional extensions.
  * Keeps extension markup consistent across all chord displays.
  */
 export class ChordDisplay extends LitElement {
-  static properties = {
+  static override properties = {
     chord: { type: String },
     invalid: { type: Boolean, reflect: true },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
@@ -21,6 +24,14 @@ export class ChordDisplay extends LitElement {
     capo: { type: Number },
     capoKey: { type: String, attribute: 'capo-key' },
   }
+
+  declare chord: string
+  declare invalid: boolean
+  declare displayAsNashville: boolean
+  declare displayKey: string
+  declare unicodeAccidentals: boolean
+  declare capo: number
+  declare capoKey: string
 
   constructor() {
     super()
@@ -33,12 +44,12 @@ export class ChordDisplay extends LitElement {
     this.capoKey = ''
   }
 
-  createRenderRoot() {
+  override createRenderRoot() {
     // Render into light DOM so existing chord styles continue to apply
     return this
   }
 
-  render() {
+  override render() {
     const text = this._getDisplayText()
     if (!text) {
       return html``
@@ -83,14 +94,14 @@ export class ChordDisplay extends LitElement {
     return -Math.min(capoValue, 11)
   }
 
-  _buildSegments(text) {
+  _buildSegments(text: string): ChordDisplaySegment[] {
     if (isNashvilleChord(text)) {
       return this._buildNashvilleSegments(text)
     }
     return this._buildStandardSegments(text)
   }
 
-  _buildStandardSegments(text) {
+  _buildStandardSegments(text: string): ChordDisplaySegment[] {
     const segments = splitChordDisplaySegments(text)
     if (!segments.length) {
       return [{ type: 'base', value: text }]
@@ -98,7 +109,7 @@ export class ChordDisplay extends LitElement {
     return segments
   }
 
-  _buildNashvilleSegments(text) {
+  _buildNashvilleSegments(text: string): ChordDisplaySegment[] {
     let trimmed = text.trim()
     let prefix = ''
     let suffix = ''
@@ -109,7 +120,7 @@ export class ChordDisplay extends LitElement {
     }
 
     const [main, bass] = trimmed.split('/')
-    const segments = []
+    const segments: ChordDisplaySegment[] = []
 
     if (prefix) {
       segments.push({ type: 'base', value: prefix })
@@ -129,20 +140,20 @@ export class ChordDisplay extends LitElement {
     return segments
   }
 
-  _buildNashvilleCore(value) {
+  _buildNashvilleCore(value: string): ChordDisplaySegment[] {
     const match = value.match(/^([#b♯♭]?)([1-7])(.*)$/)
     if (!match) {
       return [{ type: 'base', value }]
     }
     const [, accidental = '', degree, extension = ''] = match
-    const segments = [{ type: 'base', value: `${accidental}${degree}` }]
+    const segments: ChordDisplaySegment[] = [{ type: 'base', value: `${accidental}${degree}` }]
     if (extension) {
       segments.push(...this._splitExtensionSegments(extension))
     }
     return segments
   }
 
-  _splitExtensionSegments(extensionText) {
+  _splitExtensionSegments(extensionText: string): ChordDisplaySegment[] {
     const mockChord = `C${extensionText}`
     const parsed = splitChordDisplaySegments(mockChord)
     if (!parsed.length) {
@@ -153,3 +164,9 @@ export class ChordDisplay extends LitElement {
 }
 
 customElements.define('chord-display', ChordDisplay)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'chord-display': ChordDisplay
+  }
+}

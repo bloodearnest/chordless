@@ -1,8 +1,8 @@
 import { css, html, LitElement } from 'lit'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
-import './icon.js'
-import './key-selector.js'
+import './icon.ts'
+import './key-selector.ts'
 
 /** The card was clicked (not in edit mode) */
 export class SongCardClickEvent extends Event {

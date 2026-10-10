@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { bookmarkletUrl } from '../js/songselect-bookmarklet.ts'
 
 /**
@@ -14,11 +14,16 @@ import { bookmarkletUrl } from '../js/songselect-bookmarklet.ts'
  *   <bookmarklet-installer></bookmarklet-installer>
  */
 export class BookmarkletInstaller extends LitElement {
-  static properties = {
+  static override properties = {
     _copyState: { state: true }, // null | 'copied' | 'failed'
   }
 
-  static styles = css`
+  declare _copyState: 'copied' | 'failed' | null
+
+  _code: Ref<HTMLTextAreaElement>
+  _url: string
+
+  static override styles = css`
     :host {
       display: block;
     }
@@ -92,22 +97,22 @@ export class BookmarkletInstaller extends LitElement {
   }
 
   /** On this page the bookmarklet would only complain it isn't on SongSelect */
-  _onLinkClick(event) {
+  _onLinkClick(event: Event): void {
     event.preventDefault()
   }
 
-  async _copy() {
+  async _copy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(this._url)
       this._copyState = 'copied'
     } catch (error) {
       console.warn('[Bookmarklet] Could not copy:', error)
-      this._code.value.select()
+      this._code.value?.select()
       this._copyState = 'failed'
     }
   }
 
-  render() {
+  override render() {
     return html`
       <p>
         <a class="link" href=${this._url} @click=${this._onLinkClick} title="Drag me to your bookmarks bar"
@@ -133,3 +138,9 @@ export class BookmarkletInstaller extends LitElement {
 }
 
 customElements.define('bookmarklet-installer', BookmarkletInstaller)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'bookmarklet-installer': BookmarkletInstaller
+  }
+}

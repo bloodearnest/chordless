@@ -1,4 +1,4 @@
-import '/components/icon.js'
+import '/components/icon.ts'
 import '/js/icons.ts'
 
 const container = document.getElementById('icon-container')

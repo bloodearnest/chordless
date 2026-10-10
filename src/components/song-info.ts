@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import type { SongWithContent } from '../js/data-types.ts'
 import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
 
 /**
@@ -13,14 +14,27 @@ import { formatSetlistDate, getWeeksAgo } from '../js/utils/date-utils.ts'
  *
  * Events:
  */
+/** A time the song was played in a setlist */
+export interface Appearance {
+  setlistId: string
+  date: string
+  playedInKey: string | null
+  leader: string
+  setlistName: string
+}
+
 export class SongInfo extends LitElement {
-  static properties = {
+  static override properties = {
     song: { type: Object, attribute: false },
     appearances: { type: Array, attribute: false },
     loading: { type: Boolean },
   }
 
-  static styles = css`
+  declare song: SongWithContent | null
+  declare appearances: Appearance[]
+  declare loading: boolean
+
+  static override styles = css`
     :host {
       display: block;
       font-family: var(
@@ -179,7 +193,7 @@ export class SongInfo extends LitElement {
     this.loading = false
   }
 
-  render() {
+  override render() {
     if (this.loading) {
       return html`<div class="loading">Loading song information...</div>`
     }
@@ -272,7 +286,7 @@ export class SongInfo extends LitElement {
     `
   }
 
-  _renderAppearanceMeta(appearance) {
+  _renderAppearanceMeta(appearance: { leader?: string; playedInKey?: string | null }) {
     const metaParts = []
     if (appearance.leader) {
       metaParts.push(appearance.leader)
@@ -289,9 +303,9 @@ export class SongInfo extends LitElement {
   }
 
   _renderCCLI() {
-    const ccliNumber =
-      this.song.metadata?.ccli || this.song.metadata?.ccliSongNumber || this.song.ccliNumber
-    const ccliTrailer = this.song.metadata?.ccliTrailer
+    const metadata = this.song?.metadata
+    const ccliNumber = metadata?.ccli || metadata?.ccliSongNumber || this.song?.ccliNumber
+    const ccliTrailer = metadata?.ccliTrailer
 
     if (!ccliNumber && !ccliTrailer) {
       return ''
@@ -379,10 +393,16 @@ export class SongInfo extends LitElement {
       }))
   }
 
-  _formatDate(dateStr) {
+  _formatDate(dateStr: string): string {
     return formatSetlistDate(dateStr, 'long')
   }
 }
 
 // Define the custom element
 customElements.define('song-info', SongInfo)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-info': SongInfo
+  }
+}

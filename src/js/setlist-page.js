@@ -3,8 +3,8 @@ import {
   HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
 } from '../components/app-header.js'
-import { CapoChangeEvent } from '../components/capo-selector.js'
-import { KeyChangeEvent } from '../components/key-selector.js'
+import { CapoChangeEvent } from '../components/capo-selector.ts'
+import { KeyChangeEvent } from '../components/key-selector.ts'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.js'
 import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.js'
@@ -15,7 +15,7 @@ import {
   OverviewSongKeyChangeEvent,
 } from '../components/setlist-overview.js'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
-import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.js'
+import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.ts'
 import { SongChangeEvent } from './app-events.ts'
 import { getCurrentDB } from './db.ts'
 import { goTo } from './navigation.ts'

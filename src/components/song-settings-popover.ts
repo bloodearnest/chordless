@@ -5,7 +5,8 @@ import { DialogPopup } from '../js/dialog-popup.ts'
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {
   static type = 'song-settings:bpm-change'
-  constructor(value) {
+  readonly value: number
+  constructor(value: number) {
     super(BpmChangeEvent.type, { bubbles: true, composed: true })
     this.value = value
   }
@@ -27,14 +28,22 @@ export class SongResetClickEvent extends Event {
  * All controls are rendered directly in this component to ensure proper grid alignment.
  */
 export class SongSettingsPopover extends LitElement {
-  static properties = {
+  static override properties = {
     popoverId: { type: String, attribute: 'popover-id' },
     bpmValue: { type: Number, attribute: 'bpm-value' },
     bpmMin: { type: Number, attribute: 'bpm-min' },
     bpmMax: { type: Number, attribute: 'bpm-max' },
   }
 
-  static styles = css`
+  declare popoverId: string
+  declare bpmValue: number
+  declare bpmMin: number
+  declare bpmMax: number
+
+  _popup: DialogPopup
+  triggerButton: HTMLElement | null
+
+  static override styles = css`
     :host {
       display: contents;
     }
@@ -142,15 +151,15 @@ export class SongSettingsPopover extends LitElement {
   }
 
   /** The <dialog> (once rendered) */
-  get dialog() {
+  get dialog(): HTMLDialogElement | undefined {
     return this._popup.element
   }
 
-  setTriggerButton(button) {
+  setTriggerButton(button: HTMLElement | null): void {
     this.triggerButton = button
   }
 
-  _positionPopover(dialog) {
+  _positionPopover(dialog: HTMLDialogElement): void {
     if (!this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
     const left = Math.min(buttonRect.left, window.innerWidth - dialog.offsetWidth - 8)
@@ -158,19 +167,19 @@ export class SongSettingsPopover extends LitElement {
     dialog.style.left = `${Math.max(8, left)}px`
   }
 
-  show() {
+  show(): void {
     this._popup.show()
   }
 
-  close() {
+  close(): void {
     this._popup.close()
   }
 
-  toggle() {
+  toggle(): void {
     this._popup.toggle()
   }
 
-  isOpen() {
+  isOpen(): boolean {
     return this._popup.isOpen
   }
 
@@ -192,7 +201,7 @@ export class SongSettingsPopover extends LitElement {
     this.dispatchEvent(new SongResetClickEvent())
   }
 
-  render() {
+  override render() {
     const canDecrementBPM = this.bpmValue > this.bpmMin
     const canIncrementBPM = this.bpmValue < this.bpmMax
 
@@ -243,3 +252,9 @@ export class SongSettingsPopover extends LitElement {
 }
 
 customElements.define('song-settings-popover', SongSettingsPopover)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'song-settings-popover': SongSettingsPopover
+  }
+}

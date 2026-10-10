@@ -1,5 +1,5 @@
 import { html, LitElement } from 'lit'
-import './icon.js'
+import './icon.ts'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {

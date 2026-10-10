@@ -1,6 +1,6 @@
 import { ModalConfirmEvent } from '../components/app-modal.js'
-import { CapoChangeEvent } from '../components/capo-selector.js'
-import { KeyChangeEvent } from '../components/key-selector.js'
+import { CapoChangeEvent } from '../components/capo-selector.ts'
+import { KeyChangeEvent } from '../components/key-selector.ts'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 
 /**

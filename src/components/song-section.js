@@ -8,7 +8,7 @@ import {
   segmentHasVisibleLyrics,
 } from '../js/utils/lyrics-normalizer.ts'
 import './bar-group.js'
-import './chord-display.js'
+import './chord-display.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
 export class SectionActionEvent extends Event {

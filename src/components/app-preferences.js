@@ -9,7 +9,7 @@ import {
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
 } from '../js/preferences.ts'
-import './theme-settings.js'
+import './theme-settings.ts'
 import './media-player-settings.js'
 import { panelStyles } from './shared-styles.ts'
 

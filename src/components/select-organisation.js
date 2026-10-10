@@ -8,7 +8,7 @@ import {
   switchOrganisation,
 } from '../js/organisation.ts'
 import './app-modal.js'
-import './icon.js'
+import './icon.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
 /**

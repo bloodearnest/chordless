@@ -1,10 +1,11 @@
 import { transposeKeyName } from '../js/transpose.ts'
-import { OptionPicker } from './option-picker.js'
+import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different capo was chosen; value is the capo (a number) */
 export class CapoChangeEvent extends Event {
   static type = 'capo-selector:change'
-  constructor(value) {
+  readonly value: number
+  constructor(value: number) {
     super(CapoChangeEvent.type, { bubbles: true, composed: true })
     this.value = value
   }
@@ -27,15 +28,16 @@ export class CapoChangeEvent extends Event {
  * Events:
  * @fires CapoChangeEvent - When a new capo is selected (value: number)
  */
-export class CapoSelector extends OptionPicker {
-  static properties = {
+export class CapoSelector extends OptionPicker<number> {
+  static override properties = {
     ...OptionPicker.properties,
     value: { type: Number },
     maxValue: { type: Number, attribute: 'max-value' },
     referenceKey: { type: String, attribute: 'reference-key' },
   }
 
-  static ChangeEvent = CapoChangeEvent
+  declare maxValue: number
+  declare referenceKey: string
 
   constructor() {
     super()
@@ -45,11 +47,15 @@ export class CapoSelector extends OptionPicker {
     this.referenceKey = ''
   }
 
-  _displayValue() {
+  override _displayValue(): number {
     return Number.isFinite(this.value) ? this.value : 0
   }
 
-  _options() {
+  override _changeEvent(value: number): Event {
+    return new CapoChangeEvent(value)
+  }
+
+  override _options(): PickerOption<number>[] {
     const max = Number(this.maxValue)
     const highest = Number.isFinite(max) && max >= 0 ? Math.min(Math.floor(max), 11) : 11
     return Array.from({ length: highest + 1 }, (_, capo) => ({
@@ -60,7 +66,7 @@ export class CapoSelector extends OptionPicker {
   }
 
   /** The key the chords are played in at this capo, or how far down it is */
-  _keyAtCapo(capo) {
+  _keyAtCapo(capo: number): string {
     if (!this.referenceKey) return capo === 0 ? 'Open' : `Down ${capo}`
     if (capo === 0) return this.referenceKey
     return transposeKeyName(this.referenceKey, -capo) || `Down ${capo}`
@@ -68,3 +74,9 @@ export class CapoSelector extends OptionPicker {
 }
 
 customElements.define('capo-selector', CapoSelector)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'capo-selector': CapoSelector
+  }
+}

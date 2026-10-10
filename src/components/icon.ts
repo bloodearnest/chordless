@@ -16,12 +16,15 @@ import { icons } from '../js/icons.ts'
  *   - size: Size in pixels (default: 24)
  */
 export class Icon extends LitElement {
-  static properties = {
+  static override properties = {
     name: { type: String },
     size: { type: Number },
   }
 
-  static styles = css`
+  declare name: string
+  declare size: number
+
+  static override styles = css`
     :host {
       display: inline-flex;
       align-items: center;
@@ -48,8 +51,8 @@ export class Icon extends LitElement {
     this.size = 24
   }
 
-  render() {
-    const iconPath = icons[this.name]
+  override render() {
+    const iconPath = (icons as Record<string, string>)[this.name]
 
     if (!iconPath) {
       console.warn(`[Icon] Unknown icon name: ${this.name}`)
@@ -72,3 +75,9 @@ export class Icon extends LitElement {
 }
 
 customElements.define('app-icon', Icon)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'app-icon': Icon
+  }
+}
