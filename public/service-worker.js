@@ -378,13 +378,6 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Always pass through sets directory/files to get real filesystem contents
-  if (url.pathname === '/sets' || url.pathname === '/sets/' || url.pathname.startsWith('/sets/')) {
-    console.log('[SW] Passing through sets request:', url.pathname)
-    event.respondWith(fetch(event.request))
-    return
-  }
-
   // JS/CSS: always network-first, bypassing HTTP cache, fallback to SW cache for offline
   if (url.pathname.match(/\.(css|js)$/)) {
     event.respondWith(

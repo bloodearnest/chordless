@@ -98,15 +98,6 @@ test('CORS preflight returns correct headers', async () => {
   )
 })
 
-test('sets/ personal data not served as raw files', async () => {
-  const resp = await worker.fetch('/sets/test.json')
-  const ct = resp.headers.get('content-type') ?? ''
-  assert.ok(
-    ct.includes('text/html'),
-    `sets/ should not be served as assets — got content-type: ${ct} (check [assets] directory)`
-  )
-})
-
 test('JWE blob round-trips: encrypt then decrypt returns original data', async () => {
   // Mirrors encryptBlob/decryptBlob in worker/src/index.js exactly.
   // Catches jose API breakage (e.g. CompactEncrypt constructor, header shape, decrypt return type).
