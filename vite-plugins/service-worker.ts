@@ -12,15 +12,20 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
-import { build } from 'vite'
+import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
 // Never precached: the worker itself, Cloudflare's asset filter, source maps, and the
 // icon tooling that sits in public/icons
-const NOT_PRECACHED = path =>
+const NOT_PRECACHED = (path: string) =>
   path === FILE || path === '.assetsignore' || /\.(map|sh)$|(^|\/)justfile$/.test(path)
 
-async function bundle(root, precache, version, { minify, target }) {
+async function bundle(
+  root: string,
+  precache: string[],
+  version: string,
+  { minify, target }: { minify: boolean; target?: string[] }
+) {
   const result = await build({
     root,
     configFile: false,
@@ -41,20 +46,23 @@ async function bundle(root, precache, version, { minify, target }) {
       },
     },
   })
-  const { output } = Array.isArray(result) ? result[0] : result
-  return output[0].code
+  const built = Array.isArray(result) ? result[0] : result
+  if (!('output' in built)) throw new Error('The service worker build gave no output')
+  const chunk = built.output[0]
+  if (chunk.type !== 'chunk') throw new Error('The service worker build gave no script')
+  return chunk.code
 }
 
-function listFiles(dir) {
+function listFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry =>
     entry.isDirectory() ? listFiles(join(dir, entry.name)) : [join(dir, entry.name)]
   )
 }
 
 /** The URLs to precache, and a hash of their contents */
-function precacheFor(outDir) {
+function precacheFor(outDir: string) {
   const hash = createHash('sha256')
-  const urls = []
+  const urls: string[] = []
   for (const file of listFiles(outDir).sort()) {
     const path = relative(outDir, file).split(sep).join('/')
     if (NOT_PRECACHED(path)) continue
@@ -66,8 +74,8 @@ function precacheFor(outDir) {
 }
 
 /** `target` is the build target of the rest of the app, so the worker matches it */
-export function serviceWorker({ target } = {}) {
-  let root
+export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
+  let root: string
   return {
     name: 'chordless:service-worker',
 
@@ -91,6 +99,7 @@ export function serviceWorker({ target } = {}) {
 
     async writeBundle(options) {
       if (this.environment?.name !== 'client') return
+      if (!options.dir) return
       const { urls, version } = precacheFor(options.dir)
       const code = await bundle(root, urls, version, { minify: true, target })
       writeFileSync(join(options.dir, FILE), code)

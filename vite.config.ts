@@ -1,6 +1,6 @@
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { defineConfig } from 'vite'
-import { serviceWorker } from './vite-plugins/service-worker.js'
+import { serviceWorker } from './vite-plugins/service-worker.ts'
 
 // The floor, the same as .browserslistrc (which Vite does not read)
 const TARGET = ['safari17', 'chrome120', 'edge120']

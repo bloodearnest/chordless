@@ -9,7 +9,7 @@ Development and production are one codebase with two shapes.
 | Service worker | Bundled per request, **empty precache** | Built once, with the **whole app precached** |
 | Environment | `[env.dev]` in `wrangler.toml` (the dev pages) | The top level |
 
-`vite.config.js` has the settings, with the reasons beside them. Port 8787 is fixed because the
+`vite.config.ts` has the settings, with the reasons beside them. Port 8787 is fixed because the
 browser's data (IndexedDB, sign-in) belongs to the origin and the Tailscale funnel points at it.
 
 ## Layout
@@ -22,7 +22,7 @@ browser's data (IndexedDB, sign-in) belongs to the origin and the Tailscale funn
 
 ## The service worker
 
-`vite-plugins/service-worker.js` builds `src/service-worker.ts` itself, because the app's
+`vite-plugins/service-worker.ts` builds `src/service-worker.ts` itself, because the app's
 needs are unusual:
 
 - **Classic script.** Module service workers need Chrome 91 or later, and are late in
@@ -64,5 +64,5 @@ dist/chordless_auth_proxy/wrangler.json`. The plugin writes a redirect file for 
 - `wrangler.toml` has `html_handling = "none"`. With the default, `/dev/x.html` redirects to
   `/dev/x`, and Vite's dev server then fails to serve the page's inline module script. The dev
   pages' scripts are files for the same reason (`src/dev/*.js`).
-- Vite does not read `.browserslistrc`: `TARGET` in `vite.config.js` is the same floor, and is
+- Vite does not read `.browserslistrc`: `TARGET` in `vite.config.ts` is the same floor, and is
   used for the app and for the service worker. Change them together.
