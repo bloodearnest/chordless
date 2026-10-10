@@ -1,8 +1,7 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Hash text content (simple hash for now)
  */
-export function hashText(text) {
+export function hashText(text: string): string {
   // Simple hash - could be upgraded to crypto.subtle.digest later
   let hash = 0
   for (let i = 0; i < text.length; i++) {

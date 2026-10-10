@@ -1,24 +1,21 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Utility functions for chord processing
  */
 
 /**
  * Check if a chord string is a bar marker
- * @param {string} chord - Chord text to check
- * @returns {boolean} True if chord is a bar marker (|, ||, ||:, :||)
+ * @param chord - Chord text to check
+ * @returns True if chord is a bar marker (|, ||, ||:, :||)
  */
-export function isBarMarker(chord) {
+export function isBarMarker(chord: string): boolean {
   return chord === '|' || chord === '||' || chord === '||:' || chord === ':||'
 }
 
 /**
  * Convert ASCII accidentals (#, b) to their musical symbol equivalents (♯, ♭)
  * without affecting non-accidental text like "dim" or "aug".
- * @param {string} text
- * @returns {string}
  */
-export function convertAccidentalsToSymbols(text) {
+export function convertAccidentalsToSymbols(text: string): string {
   if (!text || typeof text !== 'string') {
     return text
   }
@@ -26,13 +23,13 @@ export function convertAccidentalsToSymbols(text) {
   let result = text
 
   // Replace accidentals immediately following note letters (e.g., Bb, C##)
-  result = result.replace(/([A-G])([#b]+)/g, (_, note, accidentals) => {
+  result = result.replace(/([A-G])([#b]+)/g, (_, note: string, accidentals: string) => {
     const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭')
     return `${note}${converted}`
   })
 
   // Replace accidentals following digits (e.g., 7b5, 9#11)
-  result = result.replace(/(\d)([#b]+)/g, (_, digit, accidentals) => {
+  result = result.replace(/(\d)([#b]+)/g, (_, digit: string, accidentals: string) => {
     const converted = accidentals.replace(/#/g, '♯').replace(/b/g, '♭')
     return `${digit}${converted}`
   })

@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Whether a key event comes from somewhere the user is typing: a text field,
  * select or contenteditable element. Page-wide shortcuts (space, arrows...)
@@ -8,10 +7,10 @@
  * a component's shadow DOM, event.target outside the component is the
  * component itself, not the field.
  */
-export function isTypingInField(event) {
+export function isTypingInField(event: Event): boolean {
   const target = event.composedPath?.()[0] ?? event.target
   if (!(target instanceof Element)) return false
-  if (target.isContentEditable) return true
+  if (target instanceof HTMLElement && target.isContentEditable) return true
   if (target.matches('textarea, select')) return true
   // Inputs you type into (not checkboxes, buttons, ranges...)
   return target.matches(
@@ -27,7 +26,7 @@ export function isTypingInField(event) {
  * alone: the page behind is inert, and Esc belongs to the dialog, which closes
  * on it unless something calls preventDefault().
  */
-export function isInModalDialog(event) {
+export function isInModalDialog(event: Event): boolean {
   const path = event.composedPath?.() ?? []
   return path.some(node => node instanceof HTMLDialogElement && node.matches(':modal'))
 }

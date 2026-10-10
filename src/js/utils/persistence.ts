@@ -1,8 +1,7 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
-let pendingPersistPromise = null
+let pendingPersistPromise: Promise<boolean> | null = null
 
 /** Log the persistence result once per tab, rather than on every page load */
-function logOncePerTab(message) {
+function logOncePerTab(message: string) {
   try {
     if (sessionStorage.getItem('storage-persist-logged') === message) return
     sessionStorage.setItem('storage-persist-logged', message)
@@ -12,7 +11,7 @@ function logOncePerTab(message) {
   console.info(message)
 }
 
-export function ensurePersistentStorage(reason = 'app data') {
+export function ensurePersistentStorage(reason = 'app data'): Promise<boolean> {
   if (typeof navigator === 'undefined' || !navigator.storage?.persist) {
     return Promise.resolve(false)
   }

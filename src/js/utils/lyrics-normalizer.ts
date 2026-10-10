@@ -1,5 +1,22 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
-export function segmentHasVisibleLyrics(segment) {
+/** A piece of a lyric line: the lyrics under (or after) one chord */
+interface LyricSegment {
+  lyrics?: string | null
+}
+
+/** A segment as normalizeSegmentsForHiddenChords gives it back */
+export type NormalizedSegment<T extends LyricSegment> = Omit<T, 'lyrics'> & {
+  lyrics: string
+  /** Whether it continues the previous segment's word, with no space between */
+  __joinWithPrev: boolean
+}
+
+/** One part of a chord as displayed: the root and plain text, or an extension (7, sus4, ...) */
+export interface ChordDisplaySegment {
+  type: 'base' | 'extension'
+  value: string
+}
+
+export function segmentHasVisibleLyrics(segment: LyricSegment | null | undefined): boolean {
   const value = segment?.lyrics
   if (typeof value !== 'string') {
     return false
@@ -8,22 +25,23 @@ export function segmentHasVisibleLyrics(segment) {
   return normalized.length > 0
 }
 
-export function normalizeSegmentsForHiddenChords(segments) {
+export function normalizeSegmentsForHiddenChords<T extends LyricSegment>(
+  segments: T[]
+): NormalizedSegment<T>[] {
   if (!Array.isArray(segments) || segments.length === 0) {
     return []
   }
 
-  const normalized = []
+  const normalized: NormalizedSegment<T>[] = []
   let carryJoin = false
 
   for (const segment of segments) {
-    const clone = { ...segment }
-    const original = clone.lyrics || ''
+    const original = segment.lyrics || ''
     const hasLeadingGlue = /^\s*-\s*/.test(original)
     const hasTrailingGlue = /\s*-\s*$/.test(original)
     const isGlueOnly = /-/.test(original) && original.replace(/[\s-]/g, '') === ''
 
-    clone.__joinWithPrev = carryJoin || hasLeadingGlue
+    const joinWithPrev = carryJoin || hasLeadingGlue
 
     let text = original
     if (text) {
@@ -33,8 +51,7 @@ export function normalizeSegmentsForHiddenChords(segments) {
       text = ''
     }
 
-    clone.lyrics = text
-    normalized.push(clone)
+    normalized.push({ ...segment, lyrics: text, __joinWithPrev: joinWithPrev })
 
     const producesLyrics = text.length > 0
     if (producesLyrics) {
@@ -47,7 +64,11 @@ export function normalizeSegmentsForHiddenChords(segments) {
   return normalized
 }
 
-export function formatHiddenLyricsText(text, previousHadLyrics = false, joinWithPrev = false) {
+export function formatHiddenLyricsText(
+  text: string,
+  previousHadLyrics = false,
+  joinWithPrev = false
+): string {
   if (!text) {
     return ''
   }
@@ -61,12 +82,12 @@ export function formatHiddenLyricsText(text, previousHadLyrics = false, joinWith
 const CHORD_EXTENSION_PATTERN =
   /(maj7|maj9|maj11|maj13|add(?:9|11|13)?|sus(?:2|4)?|sus|dim7|dim|aug(?:\d+)?|\+(?:\d+)?|mMaj7|°7|°|ø7|\d+\([^)]+\)|\(\d+\)|[#b♯♭]?\d+(?:[#b♯♭]\d+)?)/gi
 
-export function splitChordDisplaySegments(chordText) {
+export function splitChordDisplaySegments(chordText: string): ChordDisplaySegment[] {
   if (!chordText) {
     return []
   }
   let text = chordText
-  const segments = []
+  const segments: ChordDisplaySegment[] = []
 
   let hasWrapper = false
   if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {

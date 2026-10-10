@@ -1,16 +1,21 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Utility functions for date formatting and calculations
  */
 
+export type DateStyle = 'short' | 'long'
+export interface DateFormatOptions {
+  locale?: string
+  now?: Date
+}
+
 /**
  * Get a human-readable string for how long ago (or until) a date is, in
  * calendar days
- * @param {string} dateString - ISO date string, or YYYY-MM-DD (read as local)
- * @param {Date} [now] - Defaults to the current time
- * @returns {string} Human-readable relative time (e.g., "2 weeks ago", "yesterday", "in 3 days")
+ * @param dateString - ISO date string, or YYYY-MM-DD (read as local)
+ * @param now - Defaults to the current time
+ * @returns Human-readable relative time (e.g., "2 weeks ago", "yesterday", "in 3 days")
  */
-export function getWeeksAgo(dateString, now = new Date()) {
+export function getWeeksAgo(dateString: string, now: Date = new Date()): string {
   const days = calendarDaysBetween(parseLocalDate(dateString), now)
 
   if (days === 0) return 'today'
@@ -34,8 +39,8 @@ export function getWeeksAgo(dateString, now = new Date()) {
 }
 
 /** A Date as a local YYYY-MM-DD (toISOString would give the UTC date) */
-export function toLocalDateString(date) {
-  const pad = n => String(n).padStart(2, '0')
+export function toLocalDateString(date: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
@@ -44,7 +49,7 @@ export function toLocalDateString(date) {
  * new Date() would read it as UTC midnight, which is the previous day in
  * timezones behind UTC.
  */
-export function parseLocalDate(dateString) {
+export function parseLocalDate(dateString: string): Date {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateString)
   if (match) {
     return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]))
@@ -53,9 +58,11 @@ export function parseLocalDate(dateString) {
 }
 
 /** Whole calendar days from `date` to `now` (negative if `date` is in the future) */
-function calendarDaysBetween(date, now) {
-  const startOfDay = d => new Date(d.getFullYear(), d.getMonth(), d.getDate())
-  return Math.round((startOfDay(now) - startOfDay(date)) / (24 * 60 * 60 * 1000))
+function calendarDaysBetween(date: Date, now: Date): number {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  return Math.round(
+    (startOfDay(now).getTime() - startOfDay(date).getTime()) / (24 * 60 * 60 * 1000)
+  )
 }
 
 /**
@@ -67,17 +74,19 @@ function calendarDaysBetween(date, now) {
  * - 'long' (dialogs, history): en-GB "Sunday, 18 October 2026",
  *   en-US "Sunday, October 18, 2026".
  *
- * @param {string} dateString - YYYY-MM-DD (read as a local date)
- * @param {'short'|'long'} [style]
- * @param {object} [options]
- * @param {string} [options.locale] - Defaults to the device's
- * @param {Date} [options.now] - For deciding whether the year is shown
+ * @param dateString - YYYY-MM-DD (read as a local date)
+ * @param options.locale - Defaults to the device's
+ * @param options.now - For deciding whether the year is shown
  */
-export function formatSetlistDate(dateString, style = 'long', { locale, now = new Date() } = {}) {
+export function formatSetlistDate(
+  dateString: string,
+  style: DateStyle = 'long',
+  { locale, now = new Date() }: DateFormatOptions = {}
+): string {
   const date = parseLocalDate(dateString)
   if (Number.isNaN(date.getTime())) return dateString ?? ''
 
-  const options =
+  const options: Intl.DateTimeFormatOptions =
     style === 'short'
       ? {
           weekday: 'short',
@@ -90,7 +99,11 @@ export function formatSetlistDate(dateString, style = 'long', { locale, now = ne
 }
 
 /** A setlist's display title: its date, plus its name if it has one */
-export function setlistTitle(setlist, style = 'long', options = {}) {
+export function setlistTitle(
+  setlist: { date: string; name?: string | null },
+  style: DateStyle = 'long',
+  options: DateFormatOptions = {}
+): string {
   const date = formatSetlistDate(setlist.date, style, options)
   return setlist.name ? `${date} - ${setlist.name}` : date
 }
