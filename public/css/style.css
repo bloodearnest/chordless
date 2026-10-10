@@ -1454,3 +1454,80 @@ body.edit-mode .key-selector:focus {
     font-size: var(--font-ui);
   }
 }
+
+/* The bookmarklet page */
+bookmarklet-view {
+  .install-step {
+    margin: 15px 0;
+    padding-left: 2rem;
+  }
+  .step-number {
+    display: inline-block;
+    background: #667eea;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    text-align: center;
+    line-height: 24px;
+    margin-left: -2rem;
+    margin-right: 0.5rem;
+    font-weight: bold;
+    float: left;
+  }
+  .settings-content h3 {
+    font-size: 1.6rem;
+    margin: 3rem 0 1rem;
+    color: var(--text-color);
+  }
+  .settings-section:first-of-type h3 {
+    margin-top: 0;
+  }
+  .settings-content h4 {
+    font-size: 1.4rem;
+    margin: 2rem 0 1rem;
+    color: var(--text-color);
+  }
+  .note {
+    color: var(--text-secondary);
+    font-size: 1.1rem;
+    margin-bottom: 1rem;
+  }
+  .note.lead {
+    margin-bottom: 2rem;
+  }
+  ol.note {
+    padding-left: 1.5rem;
+  }
+  .note a {
+    color: var(--button-bg);
+  }
+  .touch-only {
+    display: none;
+  }
+  /* Shown on phones and tablets, where the bookmarklet is awkward */
+  .touch-tip {
+    display: none;
+    margin-bottom: 2rem;
+    padding: 1rem 1.25rem;
+    border: 2px solid var(--button-bg);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-color);
+    font-size: 1.1rem;
+  }
+  .touch-tip a {
+    color: var(--button-bg);
+  }
+  @media (hover: none) and (pointer: coarse) {
+    .touch-tip {
+      display: block;
+    }
+    .touch-only {
+      display: inline;
+    }
+    .desktop-only {
+      display: none;
+    }
+  }
+}

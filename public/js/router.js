@@ -29,7 +29,7 @@ const PAGES = {
  * worker serves for them), rather than pages of their own. Moves over one page
  * at a time; views/registry.js has a view for each.
  */
-export const SHELL_ROUTES = ['home']
+export const SHELL_ROUTES = ['home', 'storage', 'preferences', 'import-song', 'bookmarklet']
 
 const PAGE_PATHS = Object.fromEntries(Object.entries(PAGES).map(([path, name]) => [name, path]))
 

@@ -7,6 +7,7 @@ import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.js'
 import './app-modal.js'
 import './setlist-details-form.js'
+import { goTo } from '../js/navigation.js'
 import { buttonStyles } from './shared-styles.js'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
@@ -428,7 +429,7 @@ export class SongImport extends LitElement {
   /** Go to url, unless an imported listener prevents it */
   _finish(url) {
     const event = new SongImportedEvent(url)
-    if (this.dispatchEvent(event)) window.location.href = url
+    if (this.dispatchEvent(event)) goTo(url)
   }
 
   async _addToSetlist(setlistId) {

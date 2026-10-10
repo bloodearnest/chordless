@@ -1,5 +1,5 @@
 import { Task } from '@lit/task'
-import { html, LitElement } from 'lit'
+import { html } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import { repeat } from 'lit/directives/repeat.js'
 import '../../components/app-header.js'
@@ -13,6 +13,7 @@ import { goTo } from '../navigation.js'
 import { getCurrentOrganisation } from '../organisation.js'
 import { claimSetlistsOnce, getOrganisationPeople } from '../people.js'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.js'
+import { PageView } from './page-view.js'
 
 /**
  * The setlists, grouped by year, newest first, for <setlist-group>s: the
@@ -47,11 +48,7 @@ export function groupSetlistsByYear(setlists, currentYear = new Date().getFullYe
 }
 
 /** The home page: the setlists, and a button to create one */
-export class HomeView extends LitElement {
-  static properties = {
-    route: { attribute: false },
-  }
-
+export class HomeView extends PageView {
   #modal = createRef()
   #form = createRef()
 
@@ -64,15 +61,6 @@ export class HomeView extends LitElement {
     },
     args: () => [],
   })
-
-  connectedCallback() {
-    super.connectedCallback()
-    this.classList.add('view')
-  }
-
-  createRenderRoot() {
-    return this
-  }
 
   async #openCreate() {
     const { people, me } = await getOrganisationPeople()

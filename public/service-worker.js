@@ -510,18 +510,6 @@ async function handleRoute(url) {
     '/songs': '/songs',
     '/songs/': '/songs',
     '/songs.html': '/songs',
-    '/preferences': '/preferences',
-    '/preferences/': '/preferences',
-    '/preferences.html': '/preferences',
-    '/storage': '/storage',
-    '/storage/': '/storage',
-    '/storage.html': '/storage',
-    '/import-song': '/import-song',
-    '/import-song/': '/import-song',
-    '/import-song.html': '/import-song',
-    '/bookmarklet': '/bookmarklet',
-    '/bookmarklet/': '/bookmarklet',
-    '/bookmarklet.html': '/bookmarklet',
   }
 
   // Routes that are views of the app shell are all served by the shell, index.html
