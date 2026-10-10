@@ -19,7 +19,7 @@ import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings
 import { SongChangeEvent } from './app-events.ts'
 import { getCurrentDB } from './db.ts'
 import { goTo } from './navigation.ts'
-import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
+import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'

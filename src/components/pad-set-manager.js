@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.js'
-import { PadSetsController } from '../js/pad-sets-controller.js'
+import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.ts'
+import { PadSetsController } from '../js/pad-sets-controller.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.js'
 
 export class PadSetManager extends LitElement {

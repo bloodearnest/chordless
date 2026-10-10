@@ -5,8 +5,8 @@ import {
   startMediaPlayer,
   wantsMediaPlayer,
   wantsPads,
-} from '../src/js/media-player-loader.js'
-import { preloadPadKeys } from '../src/js/pad-set-service.js'
+} from '../src/js/media-player-loader.ts'
+import { preloadPadKeys } from '../src/js/pad-set-service.ts'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, afterEach } = window

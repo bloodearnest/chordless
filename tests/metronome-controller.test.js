@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { MetronomeController } from '../src/js/metronome-controller.js'
+import { MetronomeController } from '../src/js/metronome-controller.ts'
 
 class MockAudioContext {
   constructor(state = 'running') {

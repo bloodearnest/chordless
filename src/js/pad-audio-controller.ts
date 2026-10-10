@@ -1,5 +1,8 @@
 import { normalizePadKey } from './pad-keys.ts'
-import { ensurePadKeyCached, getPadCacheUrl, isPadKeyCached } from './pad-set-service.js'
+import type { PadSet } from './pad-set-service.ts'
+import { ensurePadKeyCached, getPadCacheUrl, isPadKeyCached } from './pad-set-service.ts'
+
+type StereoMode = 'both' | 'left' | 'right'
 
 /**
  * PadAudioController
@@ -7,12 +10,31 @@ import { ensurePadKeyCached, getPadCacheUrl, isPadKeyCached } from './pad-set-se
  * Handles pad audio loading, playback, fading, crossfading, and stereo routing.
  */
 export class PadAudioController {
+  _audioContext: AudioContext | null
+  _fadeDuration: number
+  _volume: number
+  _stereoMode: StereoMode
+  _audio: HTMLAudioElement | null
+  _padSource: MediaElementAudioSourceNode | null
+  _padGain: GainNode | null
+  _padSplitter: ChannelSplitterNode | null
+  _padMerger: ChannelMergerNode | null
+  _isPlaying: boolean
+  _loadFailed: boolean
+  _fadingIn: boolean
+  _fadingOut: boolean
+  _fadeInterval: ReturnType<typeof setInterval> | null
+  _currentKey: string | null
+  _activePadSet: PadSet | null
+  _padLoadingCount: number
+  _isPadLoading: boolean
+  _boundErrorHandler: (event: Event) => void
+
   /**
-   * @param {AudioContext} audioContext - Web Audio API context
-   * @param {Object} options - Configuration options
-   * @param {number} options.fadeDuration - Fade duration in milliseconds (default: 3000)
+   * @param audioContext - Web Audio API context
+   * @param options.fadeDuration - Fade duration in milliseconds (default: 3000)
    */
-  constructor(audioContext, options = {}) {
+  constructor(audioContext: AudioContext, options: { fadeDuration?: number } = {}) {
     if (!audioContext) {
       throw new Error('AudioContext is required')
     }
@@ -48,61 +70,71 @@ export class PadAudioController {
    * Initialize audio element and Web Audio nodes
    * @private
    */
-  _initAudio() {
-    if (this._audio) return
+  _initAudio(): HTMLAudioElement {
+    if (this._audio) return this._audio
+    const audioContext = this._context()
 
     // Create audio element
-    this._audio = new Audio()
-    this._audio.loop = true
-    this._audio.crossOrigin = 'anonymous'
-    this._audio.addEventListener('error', this._boundErrorHandler)
+    const audio = new Audio()
+    this._audio = audio
+    audio.loop = true
+    audio.crossOrigin = 'anonymous'
+    audio.addEventListener('error', this._boundErrorHandler)
 
     // Create Web Audio nodes
-    this._padSource = this._audioContext.createMediaElementSource(this._audio)
-    this._padGain = this._audioContext.createGain()
-    this._padGain.gain.value = 0 // Start silent
+    const padSource = audioContext.createMediaElementSource(audio)
+    this._padSource = padSource
+    const padGain = audioContext.createGain()
+    this._padGain = padGain
+    padGain.gain.value = 0 // Start silent
 
     // Initial routing
-    this._padSource.connect(this._padGain)
+    padSource.connect(padGain)
     this._updateAudioRouting()
+    return audio
+  }
+
+  /** The audio context; it is gone once cleanup() has run */
+  _context(): AudioContext {
+    if (!this._audioContext) throw new Error('PadAudioController has been cleaned up')
+    return this._audioContext
   }
 
   /**
    * Load pad audio for a specific key
-   * @param {string} key - Musical key (e.g., "C", "D", "E")
-   * @param {Object} padSet - Optional pad set configuration
-   * @returns {Promise<boolean>} True if loaded successfully
+   * @param key - Musical key (e.g., "C", "D", "E")
+   * @param padSet - Optional pad set configuration
+   * @returns True if loaded successfully
    */
-  async loadPad(key, padSet = null) {
+  async loadPad(key: string, padSet: PadSet | null = null): Promise<boolean> {
     if (!key) {
       console.warn('[PadAudioController] Cannot load pad: no key provided')
       return false
     }
 
-    this._initAudio()
+    const audio = this._initAudio()
     this._currentKey = key
     this._activePadSet = padSet
 
     const url = await this._resolvePadUrl(key, padSet)
     if (!url) {
       console.warn(`[PadAudioController] No pad audio available for key "${key}"`)
-      this._audio.removeAttribute('src')
+      audio.removeAttribute('src')
       this._loadFailed = true
       return false
     }
 
     console.log('[PadAudioController] Loading pad:', url)
-    this._audio.src = url
+    audio.src = url
     this._loadFailed = false
     return true
   }
 
   /**
    * Start playing with fade in
-   * @param {number} duration - Optional fade duration override (ms)
-   * @returns {Promise<void>}
+   * @param duration - Optional fade duration override (ms)
    */
-  async play(duration = null) {
+  async play(duration: number | null = null): Promise<void> {
     if (!this._audio?.src) {
       console.error('[PadAudioController] Cannot play: no audio loaded')
       return
@@ -113,10 +145,9 @@ export class PadAudioController {
 
   /**
    * Stop playing with fade out
-   * @param {number} duration - Optional fade duration override (ms)
-   * @returns {Promise<void>}
+   * @param duration - Optional fade duration override (ms)
    */
-  async stop(duration = null) {
+  async stop(duration: number | null = null): Promise<void> {
     if (!this._audio) {
       return
     }
@@ -126,11 +157,10 @@ export class PadAudioController {
 
   /**
    * Crossfade to a new key
-   * @param {string} newKey - New musical key
-   * @param {Object} padSet - Optional pad set configuration
-   * @returns {Promise<void>}
+   * @param newKey - New musical key
+   * @param padSet - Optional pad set configuration
    */
-  async crossfadeTo(newKey, padSet = null) {
+  async crossfadeTo(newKey: string, padSet: PadSet | null = null): Promise<void> {
     console.log('[PadAudioController] Crossfading to', newKey)
 
     const oldAudio = this._audio
@@ -146,29 +176,32 @@ export class PadAudioController {
     }
 
     // Create new audio element
-    this._audio = new Audio()
-    this._audio.loop = true
-    this._audio.crossOrigin = 'anonymous'
-    this._audio.addEventListener('error', this._boundErrorHandler)
+    const newAudio = new Audio()
+    this._audio = newAudio
+    newAudio.loop = true
+    newAudio.crossOrigin = 'anonymous'
+    newAudio.addEventListener('error', this._boundErrorHandler)
 
     // Create new Web Audio nodes
-    const newPadSource = this._audioContext.createMediaElementSource(this._audio)
-    this._padGain = this._audioContext.createGain()
-    this._padGain.gain.value = 0 // Start silent
+    const audioContext = this._context()
+    const newPadSource = audioContext.createMediaElementSource(newAudio)
+    const newPadGain = audioContext.createGain()
+    this._padGain = newPadGain
+    newPadGain.gain.value = 0 // Start silent
 
     // Connect new audio
-    newPadSource.connect(this._padGain)
+    newPadSource.connect(newPadGain)
     this._updateAudioRouting()
 
     // Update source
-    this._audio.src = padUrl
+    newAudio.src = padUrl
     this._currentKey = newKey
     this._activePadSet = padSet
     this._loadFailed = false
 
     // Start playing the new audio
     try {
-      await this._audio.play()
+      await newAudio.play()
       this._isPlaying = true
     } catch (e) {
       console.error('[PadAudioController] Failed to start new audio:', e)
@@ -192,8 +225,8 @@ export class PadAudioController {
         oldPadGain.gain.value = this._volume * (1 - progress)
       }
 
-      // Fade in new
-      this._padGain.gain.value = this._volume * progress
+      // Fade in new (whichever gain is current, as it always was)
+      if (this._padGain) this._padGain.gain.value = this._volume * progress
 
       if (step >= fadeSteps) {
         clearInterval(crossfadeInterval)
@@ -212,9 +245,9 @@ export class PadAudioController {
 
   /**
    * Set the volume level
-   * @param {number} volume - Volume (0.0 to 1.0)
+   * @param volume - Volume (0.0 to 1.0)
    */
-  setVolume(volume) {
+  setVolume(volume: number): void {
     this._volume = volume
     if (this._padGain && this._isPlaying && !this._fadingIn && !this._fadingOut) {
       this._padGain.gain.value = volume
@@ -223,9 +256,9 @@ export class PadAudioController {
 
   /**
    * Set the stereo routing mode
-   * @param {string} mode - 'both', 'left', or 'right'
+   * @param mode - 'both', 'left', or 'right'
    */
-  setStereoMode(mode) {
+  setStereoMode(mode: StereoMode): void {
     if (!['both', 'left', 'right'].includes(mode)) {
       console.warn('[PadAudioController] Invalid stereo mode:', mode)
       return
@@ -237,33 +270,29 @@ export class PadAudioController {
 
   /**
    * Get current playback state
-   * @returns {boolean}
    */
-  get isPlaying() {
-    return this._isPlaying && this._audio && !this._audio.paused
+  get isPlaying(): boolean {
+    return Boolean(this._isPlaying && this._audio && !this._audio.paused)
   }
 
   /**
    * Get load failure state
-   * @returns {boolean}
    */
-  get loadFailed() {
+  get loadFailed(): boolean {
     return this._loadFailed
   }
 
   /**
    * Get current key
-   * @returns {string|null}
    */
-  get currentKey() {
+  get currentKey(): string | null {
     return this._currentKey
   }
 
   /**
    * Get loading state
-   * @returns {boolean}
    */
-  get isLoading() {
+  get isLoading(): boolean {
     return this._isPadLoading
   }
 
@@ -271,7 +300,7 @@ export class PadAudioController {
    * Update audio routing based on stereo mode
    * @private
    */
-  _updateAudioRouting() {
+  _updateAudioRouting(): void {
     if (!this._audioContext || !this._padGain) return
 
     // Disconnect existing routing
@@ -312,7 +341,7 @@ export class PadAudioController {
    * Resolve pad URL for a given key
    * @private
    */
-  async _resolvePadUrl(key, padSet) {
+  async _resolvePadUrl(key: string | null, padSet: PadSet | null): Promise<string | null> {
     if (!key) return null
 
     const padKey = normalizePadKey(key)
@@ -345,13 +374,13 @@ export class PadAudioController {
    * Handle audio loading errors
    * @private
    */
-  _handleAudioError(event) {
-    const source =
-      event?.target?.currentSrc || event?.target?.src || this._audio?.currentSrc || this._audio?.src
+  _handleAudioError(event: Event): void {
+    const target = event?.target as HTMLAudioElement | null
+    const source = target?.currentSrc || target?.src || this._audio?.currentSrc || this._audio?.src
     console.warn(
       '[PadAudioController] Pad audio error:',
       source || this._currentKey || 'unknown source',
-      event?.error || event
+      (event as ErrorEvent)?.error || event
     )
     this._loadFailed = true
     this._fadingIn = false
@@ -361,9 +390,9 @@ export class PadAudioController {
       this._padGain.gain.value = 0
     }
 
-    if (event?.target && !event.target.paused) {
+    if (target && !target.paused) {
       try {
-        event.target.pause()
+        target.pause()
       } catch (err) {
         console.debug('[PadAudioController] Unable to pause errored audio:', err)
       }
@@ -374,19 +403,22 @@ export class PadAudioController {
    * Fade in audio
    * @private
    */
-  async _fadeIn(duration = null) {
-    if (!this._audio) {
+  async _fadeIn(duration: number | null = null): Promise<void> {
+    const audio = this._audio
+    const padGain = this._padGain
+    if (!audio || !padGain) {
       console.error('[PadAudioController] Cannot fade in: no audio loaded')
       return
     }
 
     const fadeDuration = duration || this._fadeDuration
-    console.log('[PadAudioController] Fading in, audio src:', this._audio.src)
+    console.log('[PadAudioController] Fading in, audio src:', audio.src)
 
     // Resume AudioContext if suspended
-    if (this._audioContext.state === 'suspended') {
+    const audioContext = this._context()
+    if (audioContext.state === 'suspended') {
       console.log('[PadAudioController] Resuming AudioContext')
-      await this._audioContext.resume()
+      await audioContext.resume()
     }
 
     // Clear any existing fade interval
@@ -399,14 +431,14 @@ export class PadAudioController {
     this._isPlaying = true
 
     // Check if audio is already playing
-    const alreadyPlaying = !this._audio.paused
-    const startVolume = this._padGain.gain.value
+    const alreadyPlaying = !audio.paused
+    const startVolume = padGain.gain.value
 
     if (!alreadyPlaying) {
       // Start playing at volume 0
-      this._padGain.gain.value = 0
+      padGain.gain.value = 0
       try {
-        await this._audio.play()
+        await audio.play()
       } catch (error) {
         console.error('[PadAudioController] Play failed:', error)
         this._fadingIn = false
@@ -415,16 +447,16 @@ export class PadAudioController {
       }
 
       // Wait for audio to actually start playing
-      await new Promise(resolve => {
+      await new Promise<void>(resolve => {
         const handlePlaying = () => {
-          this._audio.removeEventListener('playing', handlePlaying)
+          audio.removeEventListener('playing', handlePlaying)
           resolve()
         }
 
-        if (!this._audio.paused && this._audio.currentTime > 0) {
+        if (!audio.paused && audio.currentTime > 0) {
           resolve()
         } else {
-          this._audio.addEventListener('playing', handlePlaying)
+          audio.addEventListener('playing', handlePlaying)
           setTimeout(resolve, 200) // Fallback timeout
         }
       })
@@ -433,7 +465,7 @@ export class PadAudioController {
     }
 
     // Fade in with exponential curve
-    const currentVolume = this._padGain.gain.value
+    const currentVolume = padGain.gain.value
     const volumeRange = this._volume - currentVolume
     const steps = 60
     const stepDuration = fadeDuration / steps
@@ -443,12 +475,14 @@ export class PadAudioController {
       currentStep++
       const progress = currentStep / steps
       const newVolume = Math.min(currentVolume + volumeRange * (progress * progress), this._volume)
-      this._padGain.gain.value = newVolume
+      const gain = this._padGain
+      if (!gain) return
+      gain.gain.value = newVolume
 
       if (currentStep >= steps || newVolume >= this._volume) {
-        clearInterval(this._fadeInterval)
+        if (this._fadeInterval) clearInterval(this._fadeInterval)
         this._fadeInterval = null
-        this._padGain.gain.value = this._volume
+        gain.gain.value = this._volume
         this._fadingIn = false
         console.log('[PadAudioController] Fade in complete')
       }
@@ -459,8 +493,9 @@ export class PadAudioController {
    * Fade out audio
    * @private
    */
-  async _fadeOut(duration = null) {
-    if (!this._audio) return
+  async _fadeOut(duration: number | null = null): Promise<void> {
+    const audio = this._audio
+    if (!audio) return
 
     const fadeDuration = duration || this._fadeDuration
     console.log('[PadAudioController] Fading out')
@@ -474,22 +509,24 @@ export class PadAudioController {
 
     const steps = 60
     const stepDuration = fadeDuration / steps
-    const startVolume = this._padGain.gain.value
+    const startVolume = this._padGain?.gain.value ?? 0
 
     let currentStep = 0
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
       this._fadeInterval = setInterval(() => {
         currentStep++
         const progress = currentStep / steps
         const remaining = 1 - progress
         const newVolume = Math.max(startVolume * (remaining * remaining), 0)
-        this._padGain.gain.value = newVolume
+        const gain = this._padGain
+        if (!gain) return
+        gain.gain.value = newVolume
 
         if (currentStep >= steps || newVolume < 0.01) {
-          clearInterval(this._fadeInterval)
+          if (this._fadeInterval) clearInterval(this._fadeInterval)
           this._fadeInterval = null
-          this._padGain.gain.value = 0
-          this._audio.pause()
+          gain.gain.value = 0
+          audio.pause()
           this._fadingOut = false
           this._isPlaying = false
           console.log('[PadAudioController] Fade out complete')
@@ -503,7 +540,10 @@ export class PadAudioController {
    * Fade out a specific gain node (used for crossfading)
    * @private
    */
-  async _fadeOutPadGain(padGain, audioElement) {
+  async _fadeOutPadGain(
+    padGain: GainNode | null,
+    audioElement: HTMLAudioElement | null
+  ): Promise<void> {
     if (!padGain || !audioElement) {
       return Promise.resolve()
     }
@@ -513,7 +553,7 @@ export class PadAudioController {
     const startVolume = padGain.gain.value
 
     let currentStep = 0
-    return new Promise(resolve => {
+    return new Promise<void>(resolve => {
       const fadeInterval = setInterval(() => {
         currentStep++
         const progress = currentStep / steps
@@ -536,7 +576,7 @@ export class PadAudioController {
   /**
    * Clean up resources
    */
-  cleanup() {
+  cleanup(): void {
     if (this._fadeInterval) {
       clearInterval(this._fadeInterval)
       this._fadeInterval = null

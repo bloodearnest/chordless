@@ -20,7 +20,7 @@ export interface DriveFileMetadata {
 }
 
 export interface FileMetadataOptions {
-  organisationId?: string
+  organisationId?: string | null
 }
 
 export const APP_VERSION = '1.0.0'

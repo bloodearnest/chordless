@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai'
 import { LitElement } from 'lit'
-import { PadSetChangedEvent, PadSetListUpdatedEvent } from '../src/js/pad-set-service.js'
-import { PadSetsController } from '../src/js/pad-sets-controller.js'
+import { PadSetChangedEvent, PadSetListUpdatedEvent } from '../src/js/pad-set-service.ts'
+import { PadSetsController } from '../src/js/pad-sets-controller.ts'
 
 const { describe, it, afterEach } = window
 

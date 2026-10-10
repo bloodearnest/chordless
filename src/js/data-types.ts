@@ -63,6 +63,18 @@ export interface SectionState {
 /** A tempo as an import, Drive or an older record may give it: a number of BPM, or a chart's text */
 export type TempoInput = number | string | null | undefined
 
+/** What a device records about a song's synced Drive file */
+export interface SongDriveProperties {
+  songId: string
+  songUuid: string
+  contentHash: string
+  ccliNumber: string
+  title: string
+  titleNormalized: string
+  variantLabel: string
+  appVersion?: string
+}
+
 /** A song variant: the 'songs' store (metadata only; the chart is in the chordpro store) */
 export interface SongRecord {
   uuid: string
@@ -85,14 +97,19 @@ export interface SongRecord {
   time: string | null
 
   importDate: string
-  importUser: string
+  importUser: string | null
   importSource: string
   sourceUrl: string | null
   modifiedDate: string
 
   driveFileId: string | null
   driveModifiedTime: string | null
+  driveChecksum?: string | null
   lastSyncedAt: string | null
+  /** Hash of the chart as last synced: a change since is a local change */
+  syncedContentHash?: string | null
+  /** What this device recorded about the synced file */
+  driveProperties?: SongDriveProperties | null
   contentHash: string
   /** Searchable lyrics; nothing sets this yet (see the TODO) */
   lyricsText?: string
@@ -118,7 +135,8 @@ export interface ChordProRecord {
   contentHash: string
   createdDate?: string
   modifiedDate?: string
-  lastModified?: string
+  /** When it was last edited: a time in ms (from sync) or an ISO string */
+  lastModified?: number | string
 }
 
 /** A song in a setlist: a reference, with this setlist's key and tempo for it */
@@ -206,7 +224,7 @@ export interface SongWithContent {
   ccliNumber: string | null
   titleNormalized: string
   importDate: string
-  importUser: string
+  importUser: string | null
   importSource: string
   modifiedDate: string
   title: string

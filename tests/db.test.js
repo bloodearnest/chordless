@@ -6,7 +6,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.js'
+import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
 
 const uniqueName = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)

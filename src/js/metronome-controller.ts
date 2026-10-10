@@ -4,12 +4,24 @@
  * Handles metronome timing, click scheduling, and audio playback.
  * Supports complex time signatures, compound time, and tempo notes.
  */
+type ClickType = 'heavy' | 'medium' | 'light'
+
 export class MetronomeController {
+  _audioContext: AudioContext | null
+  _clickGain: GainNode | null
+  _isRunning: boolean
+  _beatInterval: number | null
+  _metronomeInterval: ReturnType<typeof setTimeout> | null
+  _metronomeBeat: number
+  _activeOscillators: OscillatorNode[]
+  _timeSignature: string | null
+  _beatsPerBar: number
+
   /**
-   * @param {AudioContext} audioContext - Web Audio API context
-   * @param {GainNode} clickGain - Gain node for click volume control
+   * @param audioContext - Web Audio API context
+   * @param clickGain - Gain node for click volume control
    */
-  constructor(audioContext, clickGain) {
+  constructor(audioContext: AudioContext, clickGain: GainNode) {
     if (!audioContext) {
       throw new Error('AudioContext is required')
     }
@@ -30,19 +42,19 @@ export class MetronomeController {
 
   /**
    * Start the metronome
-   * @param {number} bpm - Beats per minute
-   * @param {string} timeSignature - Time signature (e.g., "4/4", "6/8")
-   * @param {string} tempoNote - Note value for tempo (e.g., "1/4", "1/8")
-   * @returns {boolean} True if started successfully
+   * @param bpm - Beats per minute
+   * @param timeSignature - Time signature (e.g., "4/4", "6/8")
+   * @param tempoNote - Note value for tempo (e.g., "1/4", "1/8")
+   * @returns True if started successfully
    */
-  start(bpm, timeSignature, tempoNote = '1/4') {
+  start(bpm: number | string, timeSignature: string, tempoNote: string | null = '1/4'): boolean {
     if (!bpm || !timeSignature) {
       console.warn('[MetronomeController] Cannot start: missing BPM or time signature')
       return false
     }
 
     // Resume AudioContext if suspended
-    if (this._audioContext.state === 'suspended') {
+    if (this._audioContext?.state === 'suspended') {
       this._audioContext.resume()
     }
 
@@ -93,7 +105,7 @@ export class MetronomeController {
   /**
    * Stop the metronome
    */
-  stop() {
+  stop(): void {
     if (!this._isRunning && !this._metronomeInterval) {
       return
     }
@@ -132,9 +144,9 @@ export class MetronomeController {
 
   /**
    * Set the click volume
-   * @param {number} volume - Volume level (0.0 to 1.0)
+   * @param volume - Volume level (0.0 to 1.0)
    */
-  setVolume(volume) {
+  setVolume(volume: number): void {
     if (this._clickGain) {
       this._clickGain.gain.value = volume
     }
@@ -142,17 +154,15 @@ export class MetronomeController {
 
   /**
    * Check if metronome is currently running
-   * @returns {boolean}
    */
-  get isRunning() {
+  get isRunning(): boolean {
     return this._isRunning
   }
 
   /**
    * Get the current beat interval in milliseconds (for testing)
-   * @returns {number|null}
    */
-  get beatInterval() {
+  get beatInterval(): number | null {
     return this._beatInterval
   }
 
@@ -160,7 +170,7 @@ export class MetronomeController {
    * Normalize tempo note to standard format
    * @private
    */
-  _normalizeTempoNote(value) {
+  _normalizeTempoNote(value: string | null | undefined): string {
     if (!value || value === 'undefined' || value === 'null') {
       return '1/4'
     }
@@ -171,7 +181,7 @@ export class MetronomeController {
    * Calculate quarter note BPM from tempo note BPM
    * @private
    */
-  _calculateQuarterNoteBpm(bpm, tempoNote, timeSignature) {
+  _calculateQuarterNoteBpm(bpm: number, tempoNote: string, timeSignature: string): number {
     let quarterNoteBpm = bpm
 
     const [beatsPerMeasure, noteValue] = timeSignature.split('/').map(Number)
@@ -200,7 +210,7 @@ export class MetronomeController {
    * Get the note value to click on based on time signature
    * @private
    */
-  _getClickNoteValue(timeSignature, noteValue) {
+  _getClickNoteValue(timeSignature: string, noteValue: number): number {
     const [beatsPerMeasure] = timeSignature.split('/').map(Number)
     const isCompoundTime = noteValue === 8 && beatsPerMeasure % 3 === 0
 
@@ -214,7 +224,7 @@ export class MetronomeController {
    * Schedule the next click
    * @private
    */
-  _scheduleNextClick() {
+  _scheduleNextClick(): void {
     if (!this._beatInterval || !this._isRunning) return
 
     this._metronomeInterval = setTimeout(() => {
@@ -230,13 +240,13 @@ export class MetronomeController {
    * Play a single click sound
    * @private
    */
-  _playClick() {
-    if (!this._audioContext || !this._timeSignature) return
+  _playClick(): void {
+    if (!this._audioContext || !this._clickGain || !this._timeSignature) return
 
     const [beatsPerBar, noteValue] = this._timeSignature.split('/').map(Number)
 
     // Determine accent level based on beat position and time signature
-    let clickType = 'light'
+    let clickType: ClickType = 'light'
 
     if (this._metronomeBeat === 0) {
       // First beat is always heavy (downbeat)
@@ -298,7 +308,7 @@ export class MetronomeController {
   /**
    * Clean up resources
    */
-  cleanup() {
+  cleanup(): void {
     this.stop()
     this._audioContext = null
     this._clickGain = null

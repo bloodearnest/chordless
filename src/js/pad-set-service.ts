@@ -7,13 +7,35 @@ import {
   updatePadSetFolderMetadata,
   uploadPadFile,
 } from './drive-api.ts'
-import { wantsPads } from './media-player-loader.js'
+import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
+
+/** A set of pads: the built-in one, or a folder of them in Drive */
+export interface PadSet {
+  id: string
+  name: string
+  type: 'builtin' | 'drive'
+  modifiedTime?: string | null
+}
+
+/** Where a pad's audio is in Drive */
+interface PadFile {
+  fileId: string
+  mimeType: string
+}
+
+/** What is remembered about a Drive pad set's files */
+interface PadSetMetadata {
+  modifiedTime: string
+  cachedAt: string
+  files: Record<string, PadFile>
+}
 
 /** A different pad set was chosen (sent on window) */
 export class PadSetChangedEvent extends Event {
   static type = 'pad-sets:changed'
-  constructor(padSet) {
+  readonly padSet: PadSet
+  constructor(padSet: PadSet) {
     super(PadSetChangedEvent.type)
     this.padSet = padSet
   }
@@ -27,7 +49,7 @@ export class PadSetListUpdatedEvent extends Event {
   }
 }
 
-const BUILT_IN_PAD_SET = Object.freeze({
+const BUILT_IN_PAD_SET: Readonly<PadSet> = Object.freeze({
   id: 'builtin',
   name: 'Built-in Pads',
   type: 'builtin',
@@ -38,14 +60,14 @@ const PAD_SET_SELECTION_KEY = 'padset-selection'
 const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
-const PAD_SET_METADATA_CACHE = new Map()
-const INFLIGHT_PAD_DOWNLOADS = new Map()
+const PAD_SET_METADATA_CACHE = new Map<string, PadSetMetadata>()
+const INFLIGHT_PAD_DOWNLOADS = new Map<string, Promise<void>>()
 const PAD_PRELOAD_DELAY_MS = 50
 
-let padSetListCache = null
-let padSetListPromise = null
+let padSetListCache: PadSet[] | null = null
+let padSetListPromise: Promise<PadSet[]> | null = null
 
-export function getActivePadSet() {
+export function getActivePadSet(): PadSet {
   const stored = readLocalStorage(PAD_SET_SELECTION_KEY)
   if (stored) {
     try {
@@ -58,7 +80,7 @@ export function getActivePadSet() {
   return BUILT_IN_PAD_SET
 }
 
-export async function listPadSets(force = false) {
+export async function listPadSets(force = false): Promise<PadSet[]> {
   if (!force && padSetListCache) {
     return padSetListCache
   }
@@ -68,13 +90,13 @@ export async function listPadSets(force = false) {
   }
 
   padSetListPromise = (async () => {
-    const sets = [BUILT_IN_PAD_SET]
+    const sets: PadSet[] = [BUILT_IN_PAD_SET]
     try {
       const folders = await listPadSetFolders()
       for (const folder of folders) {
-        const padSet = {
+        const padSet: PadSet = {
           id: folder.id,
-          name: folder.appProperties?.padSetName || folder.name,
+          name: folder.appProperties?.padSetName || folder.name || folder.id,
           type: 'drive',
           modifiedTime: folder.modifiedTime,
         }
@@ -92,7 +114,10 @@ export async function listPadSets(force = false) {
   return padSetListPromise
 }
 
-export async function uploadPadSet(zipFile, padSetName) {
+export async function uploadPadSet(
+  zipFile: File | null | undefined,
+  padSetName?: string
+): Promise<PadSet> {
   if (!zipFile) {
     throw new Error('Please select a pad set ZIP file.')
   }
@@ -122,6 +147,7 @@ export async function uploadPadSet(zipFile, padSetName) {
   // Upload each file
   for (const key of PAD_FILE_KEYS) {
     const data = padFiles.get(key)
+    if (!data) throw new Error(`Missing key in pad set: ${key}`)
     const blob = new Blob([data], { type: 'audio/mpeg' })
     await uploadPadFile(folderId, key, blob)
   }
@@ -136,7 +162,7 @@ export async function uploadPadSet(zipFile, padSetName) {
   }
 }
 
-export async function selectPadSet(padSetId) {
+export async function selectPadSet(padSetId: string): Promise<PadSet> {
   const padSets = await listPadSets()
   const padSet = padSets.find(set => set.id === padSetId) || BUILT_IN_PAD_SET
 
@@ -149,7 +175,7 @@ export async function selectPadSet(padSetId) {
   return padSet
 }
 
-export async function ensurePadKeyCached(padSet, key) {
+export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<void> {
   if (padSet.type !== 'drive' || !key) return
   if (typeof caches === 'undefined') {
     console.warn('[PadSetService] Cache Storage is unavailable in this environment.')
@@ -184,7 +210,7 @@ export async function ensurePadKeyCached(padSet, key) {
       `[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name || padSet.id}`
     )
     const metadata = await ensurePadSetMetadata(padSet)
-    const entry = metadata[normalizedKey]
+    const entry = metadata?.[normalizedKey]
     if (!entry) {
       throw new Error(`Pad set "${padSet.name}" is missing key: ${normalizedKey}`)
     }
@@ -208,11 +234,14 @@ export async function ensurePadKeyCached(padSet, key) {
   return downloadPromise
 }
 
-export function getPadCacheUrl(padSetId, key) {
+export function getPadCacheUrl(padSetId: string, key: string): string {
   return `/pad-sets/${encodeURIComponent(padSetId)}/${encodeURIComponent(key)}.mp3`
 }
 
-export async function isPadKeyCached(padSet, key) {
+export async function isPadKeyCached(
+  padSet: PadSet | null | undefined,
+  key: string | null | undefined
+): Promise<boolean> {
   if (padSet?.type !== 'drive' || !key) return false
   if (typeof caches === 'undefined') {
     return false
@@ -229,17 +258,17 @@ export async function isPadKeyCached(padSet, key) {
   return !!cached
 }
 
-function uniqueNormalizedPadKeys(keys = []) {
-  const normalized = keys.map(key => normalizePadKey(key)).filter(Boolean)
+function uniqueNormalizedPadKeys(keys: string[] = []): string[] {
+  const normalized = keys.map(key => normalizePadKey(key)).filter((key): key is string => !!key)
   return Array.from(new Set(normalized))
 }
 
 /**
  * Fetch pads for these keys in the background, so they are there to play. Only a Drive pad
  * set needs it, and only if the player and its pads are on and the device can play them.
- * @returns {number} how many keys it set about fetching
+ * @returns how many keys it set about fetching
  */
-export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
+export function preloadPadKeys(keys: string[] = [], padSet: PadSet = getActivePadSet()): number {
   if (padSet?.type !== 'drive' || !wantsPads()) return 0
   const normalizedKeys = uniqueNormalizedPadKeys(keys)
   if (normalizedKeys.length === 0) return 0
@@ -254,42 +283,45 @@ export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
   return normalizedKeys.length
 }
 
-export function preloadPadKey(key, padSet = getActivePadSet()) {
+export function preloadPadKey(key: string, padSet: PadSet = getActivePadSet()): void {
   if (!key) return
   preloadPadKeys([key], padSet)
 }
 
-export function preloadPadKeysForSongs(songs = [], padSet = getActivePadSet()) {
+export function preloadPadKeysForSongs(
+  songs: { currentKey?: string; metadata?: { key?: string }; originalKey?: string | null }[] = [],
+  padSet: PadSet = getActivePadSet()
+): void {
   if (!songs || songs.length === 0) return
   const keys = songs
     .map(song => song?.currentKey || song?.metadata?.key || song?.originalKey)
-    .filter(Boolean)
+    .filter((key): key is string => !!key)
   preloadPadKeys(keys, padSet)
 }
 
-export function derivePadSetName(filename = '') {
+export function derivePadSetName(filename = ''): string {
   const base = filename.replace(/\.[^.]+$/, '')
   const sanitized = base.replace(/[^a-zA-Z0-9\s-]+/g, '')
   const spaced = sanitized.replace(/[-_]+/g, ' ').trim()
   return spaced || 'New Pad Set'
 }
 
-function getCacheState() {
+function getCacheState(): Record<string, PadSetMetadata> {
   if (typeof localStorage === 'undefined') {
     return {}
   }
   try {
-    return JSON.parse(localStorage.getItem(PAD_SET_CACHE_STATE_KEY)) || {}
+    return JSON.parse(localStorage.getItem(PAD_SET_CACHE_STATE_KEY) ?? 'null') || {}
   } catch {
     return {}
   }
 }
 
-function saveCacheState(state) {
+function saveCacheState(state: Record<string, PadSetMetadata>): void {
   writeLocalStorage(PAD_SET_CACHE_STATE_KEY, JSON.stringify(state))
 }
 
-async function clearPadSetCache(cache, padSetId) {
+async function clearPadSetCache(cache: Cache, padSetId: string): Promise<void> {
   const keys = await cache.keys()
   const prefix = `/pad-sets/${encodeURIComponent(padSetId)}/`
   const removals = keys
@@ -298,7 +330,7 @@ async function clearPadSetCache(cache, padSetId) {
   await Promise.all(removals)
 }
 
-async function ensurePadSetMetadata(padSet) {
+async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadFile> | null> {
   if (padSet.type !== 'drive') {
     return null
   }
@@ -316,7 +348,7 @@ async function ensurePadSetMetadata(padSet) {
   }
 
   const files = await listPadSetFiles(padSet.id)
-  const fileMap = {}
+  const fileMap: Record<string, PadFile> = {}
 
   for (const file of files) {
     const keyFromProps = normalizePadKey(file.appProperties?.padKey)
@@ -334,7 +366,7 @@ async function ensurePadSetMetadata(padSet) {
     throw new Error(`Pad set "${padSet.name}" is missing files for: ${missingKeys.join(', ')}`)
   }
 
-  const entry = {
+  const entry: PadSetMetadata = {
     modifiedTime: padSet.modifiedTime || new Date().toISOString(),
     cachedAt: new Date().toISOString(),
     files: fileMap,
@@ -346,13 +378,13 @@ async function ensurePadSetMetadata(padSet) {
   return fileMap
 }
 
-function metadataMatches(entry, padSet) {
+function metadataMatches(entry: PadSetMetadata | undefined, padSet: PadSet): boolean {
   if (!entry?.files) return false
   if (!padSet?.modifiedTime) return true
   return entry.modifiedTime === padSet.modifiedTime
 }
 
-async function invalidatePadSetCache(padSetId) {
+async function invalidatePadSetCache(padSetId: string): Promise<void> {
   PAD_SET_METADATA_CACHE.delete(padSetId)
   const cacheState = getCacheState()
   if (cacheState[padSetId]) {
@@ -366,7 +398,23 @@ async function invalidatePadSetCache(padSetId) {
   }
 }
 
-async function readZipEntries(file) {
+/** A zip file read far enough to find its entries */
+interface ZipContext {
+  bytes: Uint8Array
+  view: DataView
+  entries: ZipEntry[]
+}
+
+interface ZipEntry {
+  fileName: string
+  flags: number
+  compression: number
+  compressedSize: number
+  uncompressedSize: number
+  localHeaderOffset: number
+}
+
+async function readZipEntries(file: Blob): Promise<ZipContext> {
   const buffer = await file.arrayBuffer()
   const bytes = new Uint8Array(buffer)
   const view = new DataView(buffer)
@@ -379,7 +427,7 @@ async function readZipEntries(file) {
   const centralDirOffset = view.getUint32(eocdOffset + 16, true)
   const totalEntries = view.getUint16(eocdOffset + 10, true)
 
-  const entries = []
+  const entries: ZipEntry[] = []
   let cursor = centralDirOffset
 
   for (let i = 0; i < totalEntries; i++) {
@@ -415,8 +463,10 @@ async function readZipEntries(file) {
   return { bytes, view, entries }
 }
 
-async function extractPadFiles(zipContext) {
-  const padFiles = new Map()
+async function extractPadFiles(
+  zipContext: ZipContext
+): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+  const padFiles = new Map<string, { data: Uint8Array<ArrayBuffer>; pathLength: number }>()
 
   for (const entry of zipContext.entries) {
     if (!entry.fileName || entry.fileName.endsWith('/')) continue
@@ -435,14 +485,17 @@ async function extractPadFiles(zipContext) {
     }
   }
 
-  const normalized = new Map()
+  const normalized = new Map<string, Uint8Array<ArrayBuffer>>()
   for (const [key, value] of padFiles.entries()) {
     normalized.set(key, value.data)
   }
   return normalized
 }
 
-async function extractEntryData(zipContext, entry) {
+async function extractEntryData(
+  zipContext: ZipContext,
+  entry: ZipEntry
+): Promise<Uint8Array<ArrayBuffer>> {
   const { bytes, view } = zipContext
   const { localHeaderOffset } = entry
 
@@ -468,9 +521,9 @@ async function extractEntryData(zipContext, entry) {
   throw new Error(`Unsupported ZIP compression method: ${entry.compression}`)
 }
 
-async function inflateRaw(data) {
+async function inflateRaw(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
   const blob = new Blob([data])
-  const streams = ['deflate-raw', 'deflate']
+  const streams: CompressionFormat[] = ['deflate-raw', 'deflate']
 
   for (const algo of streams) {
     try {
@@ -485,7 +538,7 @@ async function inflateRaw(data) {
   throw new Error('Browser does not support deflate decompression for ZIP uploads')
 }
 
-function findEndOfCentralDirectory(bytes) {
+function findEndOfCentralDirectory(bytes: Uint8Array): number {
   for (let i = bytes.length - 22; i >= 0; i--) {
     if (
       bytes[i] === 0x50 &&
@@ -499,14 +552,14 @@ function findEndOfCentralDirectory(bytes) {
   return -1
 }
 
-function readLocalStorage(key) {
+function readLocalStorage(key: string): string | null {
   if (typeof localStorage === 'undefined') {
     return null
   }
   return localStorage.getItem(key)
 }
 
-function writeLocalStorage(key, value) {
+function writeLocalStorage(key: string, value: string): void {
   if (typeof localStorage === 'undefined') {
     return
   }

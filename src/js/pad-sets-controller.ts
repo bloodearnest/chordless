@@ -1,10 +1,12 @@
+import type { ReactiveController, ReactiveControllerHost } from 'lit'
 import {
   getActivePadSet,
   listPadSets,
+  type PadSet,
   PadSetChangedEvent,
   PadSetListUpdatedEvent,
   selectPadSet,
-} from './pad-set-service.js'
+} from './pad-set-service.ts'
 
 /**
  * PadSetsController: the pad sets and which one is active, for a component
@@ -18,8 +20,17 @@ import {
  * the active pad set when it's changed elsewhere, and updates the host as any
  * of these change.
  */
-export class PadSetsController {
-  constructor(host) {
+export class PadSetsController implements ReactiveController {
+  host: ReactiveControllerHost
+  list: PadSet[]
+  activeId: string
+  loading: boolean
+  switching: boolean
+  error: string
+  _onListUpdated: () => void
+  _onChanged: (event: Event) => void
+
+  constructor(host: ReactiveControllerHost) {
     this.host = host
     this.list = []
     this.activeId = getActivePadSet().id
@@ -28,7 +39,8 @@ export class PadSetsController {
     this.error = ''
     this._onListUpdated = () => this.load(true)
     this._onChanged = event => {
-      this.activeId = event.padSet?.id ?? getActivePadSet().id
+      const padSet = event instanceof PadSetChangedEvent ? event.padSet : undefined
+      this.activeId = padSet?.id ?? getActivePadSet().id
       this.host.requestUpdate()
     }
     host.addController(this)
@@ -46,7 +58,7 @@ export class PadSetsController {
   }
 
   /** Load the list of pad sets; force skips the cached list */
-  async load(force = false) {
+  async load(force = false): Promise<void> {
     this.loading = true
     this.error = ''
     this.host.requestUpdate()
@@ -57,7 +69,7 @@ export class PadSetsController {
       }
     } catch (error) {
       console.error('[PadSets] Failed to load pad sets:', error)
-      this.error = error.message || 'Unable to load pad sets.'
+      this.error = (error instanceof Error && error.message) || 'Unable to load pad sets.'
     } finally {
       this.loading = false
       this.host.requestUpdate()
@@ -68,7 +80,7 @@ export class PadSetsController {
    * Make a pad set the active one. Shows it as active straight away, and
    * goes back to the previous one (and rethrows) if switching fails.
    */
-  async select(id) {
+  async select(id: string): Promise<void> {
     const previous = this.activeId
     this.activeId = id
     this.switching = true
@@ -78,7 +90,7 @@ export class PadSetsController {
       await selectPadSet(id)
     } catch (error) {
       this.activeId = previous
-      this.error = error.message || 'Unable to switch pad set.'
+      this.error = (error instanceof Error && error.message) || 'Unable to switch pad set.'
       throw error
     } finally {
       this.switching = false

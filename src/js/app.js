@@ -5,7 +5,7 @@
 import '../components/nav-menu.js'
 import { AppRouter, RouteChangeEvent } from './app-router.js'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
-import { startMediaPlayer } from './media-player-loader.js'
+import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
 import { views } from './views/registry.js'
 
