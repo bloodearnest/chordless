@@ -4,7 +4,7 @@
  * its key, tempo and any edits to the chart.)
  */
 import { getSongById } from '../song-utils.js'
-import { transposeSong } from '../transpose.js'
+import { transposeSong } from '../transpose.ts'
 
 /**
  * A tempo as written in a chart or stored: 120, "120", "120 (1/8)".

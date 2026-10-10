@@ -24,9 +24,9 @@ import {
   songFileMetadata,
 } from './drive-metadata.js'
 import { OrganisationDB } from './organisation-db.js'
-import { ChordProParser } from './parser.js'
+import { ChordProParser } from './parser.ts'
 import { chartFields, hashText } from './song-utils.js'
-import { setlistContent, setlistContentHash } from './sync/setlist-hash.js'
+import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
 
 /** A setlist's file content in Drive */
 function setlistJson(setlist) {

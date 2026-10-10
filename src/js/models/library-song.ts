@@ -1,5 +1,6 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 import { clearSongUserPrefs, getSongUserPrefs, saveSongUserPrefs } from '../song-user-prefs.ts'
-import { SongModel } from './song-model.js'
+import { SongModel } from './song-model.ts'
 
 /**
  * LibrarySong - Song model for library view

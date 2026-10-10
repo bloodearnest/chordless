@@ -1,4 +1,4 @@
-import type { SongModel } from './models/song-model.js'
+import type { SongModel } from './models/song-model.ts'
 
 /**
  * App-level events with no component to own them. Each module that sends an

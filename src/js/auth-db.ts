@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * AuthDB - IndexedDB wrapper for Google Drive auth blob storage and operation queuing
  *

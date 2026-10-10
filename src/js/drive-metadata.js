@@ -9,7 +9,7 @@
  * it can't go stale here.
  */
 
-import { ChordProParser } from './parser.js'
+import { ChordProParser } from './parser.ts'
 
 export const APP_VERSION = '1.0.0'
 

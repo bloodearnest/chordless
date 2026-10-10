@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.js'
-import { ChordProParser } from '../js/parser.js'
+import { ChordProParser } from '../js/parser.ts'
 import { getOrganisationPeople } from '../js/people.js'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'

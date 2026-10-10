@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.js'
-import { ChordProParser } from '../src/js/parser.js'
+import { ChordProParser } from '../src/js/parser.ts'
 import { buildRuntimeSongs, parseTempoMetadata } from '../src/js/setlist/runtime-songs.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 

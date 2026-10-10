@@ -1,5 +1,5 @@
-import { LibrarySong } from './models/library-song.js'
-import { SetlistSong } from './models/setlist-song.js'
+import { LibrarySong } from './models/library-song.ts'
+import { SetlistSong } from './models/setlist-song.ts'
 
 /**
  * Factory for creating SongModel instances from runtime song data

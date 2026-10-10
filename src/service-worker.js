@@ -1,7 +1,7 @@
 // Service Worker for offline-first operation
 // Built as a classic script by vite-plugins/service-worker.js, which defines the two
 // constants below: the files to precache, and a version (a hash of them)
-import * as AuthDB from '/js/auth-db.js'
+import * as AuthDB from '/js/auth-db.ts'
 
 // Handles routing and offline caching
 

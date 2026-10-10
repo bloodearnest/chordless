@@ -17,7 +17,7 @@ import {
   transposeKeyName,
   transposeNote,
   transposeSong,
-} from '../src/js/transpose.js'
+} from '../src/js/transpose.ts'
 
 function assert(condition, message) {
   expect(condition, message).to.be.true

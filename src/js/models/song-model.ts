@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 // biome-ignore-all lint/correctness/noUnusedFunctionParameters: abstract methods keep their documented signatures
 /**
  * Base class for song data abstraction

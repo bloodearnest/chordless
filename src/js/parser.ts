@@ -1,4 +1,5 @@
-import { normalizeSongChordsToStandard } from './transpose.js'
+// @ts-nocheck: not typed yet (remove this line when converting)
+import { normalizeSongChordsToStandard } from './transpose.ts'
 
 // Custom ChordPro parser for SongSelect format files
 

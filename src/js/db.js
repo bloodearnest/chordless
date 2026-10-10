@@ -1,4 +1,4 @@
-import { setlistContentHash } from './sync/setlist-hash.js'
+import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 

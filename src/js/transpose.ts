@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 // Musical transposition module for chord charts
 
 /**
@@ -264,7 +265,7 @@ export function getAvailableKeys(currentKey) {
   const rotateAmount = currentIndex - middleIndex
 
   // Perform rotation
-  let rotated
+  let rotated: string[]
   if (rotateAmount > 0) {
     // Rotate left: move first N elements to end
     rotated = [...keys.slice(rotateAmount), ...keys.slice(0, rotateAmount)]

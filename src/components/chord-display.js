@@ -3,7 +3,7 @@ import {
   convertChordToNashville,
   isNashvilleChord,
   transposeChordBySemitones,
-} from '../js/transpose.js'
+} from '../js/transpose.ts'
 import { convertAccidentalsToSymbols, isBarMarker } from '../js/utils/chord-utils.ts'
 import { splitChordDisplaySegments } from '../js/utils/lyrics-normalizer.ts'
 

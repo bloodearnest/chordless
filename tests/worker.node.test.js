@@ -41,7 +41,7 @@ test('serves static CSS', async () => {
 })
 
 test('serves static JS', async () => {
-  const resp = await worker.fetch('/js/parser.js')
+  const resp = await worker.fetch('/js/parser.ts')
   assert.equal(resp.status, 200)
   assert.ok(resp.headers.get('content-type')?.includes('javascript'))
 })

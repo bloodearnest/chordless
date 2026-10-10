@@ -1,8 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit'
 import './song-section.js'
 import { ContextConsumer } from '@lit/context'
-import { displayPreferencesContext } from '../js/display-preferences.js'
-import { transposeKeyName } from '../js/transpose.js'
+import { displayPreferencesContext } from '../js/display-preferences.ts'
+import { transposeKeyName } from '../js/transpose.ts'
 
 /**
  * Song Display Component

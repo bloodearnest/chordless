@@ -1,4 +1,4 @@
-import { transposeKeyName } from '../js/transpose.js'
+import { transposeKeyName } from '../js/transpose.ts'
 import { OptionPicker } from './option-picker.js'
 
 /** A different capo was chosen; value is the capo (a number) */

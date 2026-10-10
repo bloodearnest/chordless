@@ -7,7 +7,7 @@
  */
 
 import { getCurrentDB, normalizeTitle } from './db.js'
-import { ChordProParser } from './parser.js'
+import { ChordProParser } from './parser.ts'
 import { hashText } from './utils/hash.ts'
 
 export { hashText }
