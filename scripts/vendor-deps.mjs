@@ -13,7 +13,7 @@ const EXCLUDE_PATTERNS = [
 
 // Used only by the Cloudflare Worker (bundled by wrangler from node_modules),
 // never by the browser, so they must not be copied into public/.
-const WORKER_ONLY = new Set(['jose', 'google-auth-library'])
+const WORKER_ONLY = new Set(['jose', 'oauth4webapi'])
 
 const VENDOR_DIR = 'public/vendor'
 

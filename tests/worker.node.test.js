@@ -140,7 +140,7 @@ test('repo root files are not served', async () => {
 })
 
 test('worker-only packages are not vendored into public/', async () => {
-  for (const path of ['/vendor/jose/package.json', '/vendor/google-auth-library/package.json']) {
+  for (const path of ['/vendor/jose/package.json', '/vendor/oauth4webapi/package.json']) {
     const resp = await worker.fetch(path)
     const ct = resp.headers.get('content-type') ?? ''
     assert.ok(ct.includes('text/html'), `${path} should not be served — got content-type: ${ct}`)

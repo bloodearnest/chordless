@@ -8,8 +8,8 @@
  * - Performs Drive API operations (invite/revoke) on-demand with decrypted blobs
  */
 
-import { OAuth2Client } from 'google-auth-library'
 import * as jose from 'jose'
+import { exchangeCode, refreshAccessToken, verifyIdToken } from './google-auth.js'
 
 /**
  * CORS headers for browser requests
@@ -104,26 +104,13 @@ async function handleOAuthCallback(request, env) {
     return jsonResponse({ error: 'Missing redirect_uri' }, 400)
   }
 
-  // Exchange code for tokens
-  const oauth2Client = new OAuth2Client({
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-    redirectUri,
-  })
-
-  const { tokens } = await oauth2Client.getToken(code)
-  const { refresh_token, access_token, expiry_date, scope, id_token } = tokens
+  // Exchange code for tokens; the ID token is verified (signature, issuer, audience, expiry)
+  const tokens = await exchangeCode(code, redirectUri, env)
+  const { refresh_token, access_token, expires_in, scope, id_token, claims: payload } = tokens
 
   if (!id_token) {
     return jsonResponse({ error: 'No ID token received. Make sure to request openid scope.' }, 400)
   }
-
-  // Verify ID token and extract user info
-  const ticket = await oauth2Client.verifyIdToken({
-    idToken: id_token,
-    audience: env.GOOGLE_CLIENT_ID,
-  })
-  const payload = ticket.getPayload()
   const { email, sub } = payload
 
   if (!refresh_token) {
@@ -171,7 +158,7 @@ async function handleOAuthCallback(request, env) {
   return jsonResponse({
     blob,
     access_token,
-    expires_in: Math.floor((expiry_date - Date.now()) / 1000),
+    expires_in,
     id_token,
     user,
   })
@@ -207,13 +194,8 @@ async function handleTokenRefresh(request, env) {
 
   // Optional: Verify ID token if provided (extra security layer)
   if (id_token) {
-    const oauth2Client = new OAuth2Client(env.GOOGLE_CLIENT_ID)
     try {
-      const ticket = await oauth2Client.verifyIdToken({
-        idToken: id_token,
-        audience: env.GOOGLE_CLIENT_ID,
-      })
-      const payload = ticket.getPayload()
+      const payload = await verifyIdToken(id_token, env)
 
       // Decrypt blob
       const blobData = await decryptBlob(blob, env)
@@ -231,19 +213,9 @@ async function handleTokenRefresh(request, env) {
   // Decrypt blob and refresh access token
   const blobData = await decryptBlob(blob, env)
 
-  const oauth2Client = new OAuth2Client({
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-  })
-  oauth2Client.setCredentials({
-    refresh_token: blobData.refresh_token,
-  })
-  const { token } = await oauth2Client.getAccessToken()
+  const { access_token, expires_in } = await refreshAccessToken(blobData.refresh_token, env)
 
-  return jsonResponse({
-    access_token: token,
-    expires_in: 3600, // Google typically returns 1 hour expiry
-  })
+  return jsonResponse({ access_token, expires_in })
 }
 
 /**
@@ -273,12 +245,7 @@ async function handleSessionInvite(request, env) {
   }
 
   // Verify ID token
-  const oauth2ClientForVerify = new OAuth2Client(env.GOOGLE_CLIENT_ID)
-  const ticket = await oauth2ClientForVerify.verifyIdToken({
-    idToken: id_token,
-    audience: env.GOOGLE_CLIENT_ID,
-  })
-  const payload = ticket.getPayload()
+  const payload = await verifyIdToken(id_token, env)
 
   // Decrypt blob
   const blobData = await decryptBlob(blob, env)
@@ -289,16 +256,7 @@ async function handleSessionInvite(request, env) {
   }
 
   // Refresh access token (needs client secret)
-  const oauth2Client = new OAuth2Client({
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-  })
-  oauth2Client.setCredentials({
-    refresh_token: blobData.refresh_token,
-  })
-  await oauth2Client.getAccessToken() // This refreshes and updates credentials
-
-  const accessToken = oauth2Client.credentials.access_token
+  const { access_token: accessToken } = await refreshAccessToken(blobData.refresh_token, env)
 
   // Call Drive API to add permission
   const driveResponse = await fetch(
@@ -356,12 +314,7 @@ async function handleSessionRevoke(request, env) {
   }
 
   // Verify ID token
-  const oauth2ClientForVerify = new OAuth2Client(env.GOOGLE_CLIENT_ID)
-  const ticket = await oauth2ClientForVerify.verifyIdToken({
-    idToken: id_token,
-    audience: env.GOOGLE_CLIENT_ID,
-  })
-  const payload = ticket.getPayload()
+  const payload = await verifyIdToken(id_token, env)
 
   // Decrypt blob
   const blobData = await decryptBlob(blob, env)
@@ -372,16 +325,7 @@ async function handleSessionRevoke(request, env) {
   }
 
   // Refresh access token (needs client secret)
-  const oauth2Client = new OAuth2Client({
-    clientId: env.GOOGLE_CLIENT_ID,
-    clientSecret: env.GOOGLE_CLIENT_SECRET,
-  })
-  oauth2Client.setCredentials({
-    refresh_token: blobData.refresh_token,
-  })
-  await oauth2Client.getAccessToken()
-
-  const accessToken = oauth2Client.credentials.access_token
+  const { access_token: accessToken } = await refreshAccessToken(blobData.refresh_token, env)
 
   // Call Drive API to remove permission
   const driveResponse = await fetch(

@@ -16,11 +16,11 @@
     "@lit/context": "^1.1.6",
     "@lit/reactive-element": "^2.1.2",
     "@lit/task": "^1.0.3",
-    "google-auth-library": "^11.2.0",
     "jose": "^6.2.12",
     "lit": "^3.3.3",
     "lit-element": "^4.2.2",
-    "lit-html": "^3.3.3"
+    "lit-html": "^3.3.3",
+    "oauth4webapi": "^3.8.8"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
