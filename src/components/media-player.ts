@@ -1,14 +1,22 @@
+import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.ts'
 import './app-modal.ts'
 import './icon.ts'
 import { SongChangeEvent } from '../js/app-events.ts'
-import { loadMediaSettings } from '../js/media-settings.ts'
+import { loadMediaSettings, type MediaSettings } from '../js/media-settings.ts'
 import { MetronomeController } from '../js/metronome-controller.ts'
 import { PadAudioController } from '../js/pad-audio-controller.ts'
-import { getActivePadSet, PadSetChangedEvent } from '../js/pad-set-service.ts'
+import { getActivePadSet, type PadSet, PadSetChangedEvent } from '../js/pad-set-service.ts'
 import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.ts'
 import { MediaSettingsChangeEvent } from './media-player-settings.ts'
+
+type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext }
+
+/** Where a mouse or touch is, whichever it is */
+function pointer(e: MouseEvent | TouchEvent): { clientX: number; clientY: number } {
+  return 'touches' in e ? e.touches[0] : e
+}
 
 /**
  * MediaPlayer Component
@@ -26,7 +34,7 @@ import { MediaSettingsChangeEvent } from './media-player-settings.ts'
  * @csspart play-button - The play/pause button
  */
 export class MediaPlayer extends LitElement {
-  static properties = {
+  static override properties = {
     currentKey: { type: String, attribute: 'current-key' },
     _stereoSplitEnabled: { state: true },
     _fadingOut: { state: true },
@@ -61,7 +69,61 @@ export class MediaPlayer extends LitElement {
     _activePadSet: { state: true },
   }
 
-  static styles = css`
+  declare currentKey: string | null
+  declare _stereoSplitEnabled: boolean
+  declare _fadingOut: boolean
+  declare _fadingIn: boolean
+  declare _showingVolumeSlider: boolean
+  declare _padVolume: number
+  declare _clickVolume: number
+  declare _padsEnabled: boolean
+  declare _metronomeGlobalEnabled: boolean
+  declare _padsOn: boolean
+  declare _clickOn: boolean
+  declare _collapsed: boolean
+  declare _showingSettings: boolean
+  declare _dragOffsetX: number
+  declare _dragOffsetY: number
+  declare _currentSongId: string | null | undefined
+  declare _currentSongTitle: string | null | undefined
+  declare _currentBpm: number | null | undefined
+  declare _currentTempoNote: string | null | undefined
+  declare _currentTimeSignature: string | null | undefined
+  declare _activeSongId: string | null | undefined
+  declare _activeSongKey: string | null
+  declare _activeSongBpm: number | null | undefined
+  declare _activeSongTempoNote: string | null | undefined
+  declare _activeSongTimeSignature: string | null | undefined
+  declare _activeSongTitle: string | null | undefined
+  declare _metronomeRunning: boolean
+  declare _padLoadFailed: boolean
+  declare _isPadLoading: boolean
+  declare _activePadSet: PadSet
+
+  bpm: number
+  tempoNote: string
+  timeSignature: string
+  /** Whether the click is on (set by the master toggle; see _toggleMetronome) */
+  metronomeEnabled?: boolean
+  _fadeInterval?: ReturnType<typeof setInterval> | null
+  _clickMerger?: ChannelMergerNode | null
+  _clickSplitter?: ChannelSplitterNode | null
+  _boundHandleKeydown?: (event: KeyboardEvent) => void
+  _boundHandleSettingsChange?: (event: Event) => void
+  _boundHandleSongChange?: (event: Event) => void
+  _boundHandlePadSetChange?: (event: Event) => void
+  _isDragging: boolean
+  _dragStartX: number
+  _dragStartY: number
+  _activeVolumeControl: 'pad' | 'click' | null
+  _sliderX: number
+  _sliderY: number
+  _audioContext: AudioContext | null
+  _clickGain: GainNode | null
+  _metronomeController: MetronomeController | null
+  _padController: PadAudioController | null
+
+  static override styles = css`
     :host {
       display: inline-block;
     }
@@ -696,21 +758,25 @@ export class MediaPlayer extends LitElement {
     this._fadingOut = false
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     this._showIfEnabled(loadMediaSettings())
     this._initAudio()
-    this._boundHandleKeydown = this._handleKeydown.bind(this)
-    this._boundHandleSettingsChange = this._handleSettingsChange.bind(this)
-    this._boundHandleSongChange = this._handleSongChange.bind(this)
-    this._boundHandlePadSetChange = this._handlePadSetChange.bind(this)
-    document.addEventListener('keydown', this._boundHandleKeydown)
-    document.addEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
-    document.addEventListener(SongChangeEvent.type, this._boundHandleSongChange)
-    window.addEventListener(PadSetChangedEvent.type, this._boundHandlePadSetChange)
+    const keydown = this._handleKeydown.bind(this)
+    const settingsChange = this._handleSettingsChange.bind(this)
+    const songChange = this._handleSongChange.bind(this)
+    const padSetChange = this._handlePadSetChange.bind(this)
+    this._boundHandleKeydown = keydown
+    this._boundHandleSettingsChange = settingsChange
+    this._boundHandleSongChange = songChange
+    this._boundHandlePadSetChange = padSetChange
+    document.addEventListener('keydown', keydown)
+    document.addEventListener(MediaSettingsChangeEvent.type, settingsChange)
+    document.addEventListener(SongChangeEvent.type, songChange)
+    window.addEventListener(PadSetChangedEvent.type, padSetChange)
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
 
     // Cleanup controllers
@@ -722,19 +788,25 @@ export class MediaPlayer extends LitElement {
     }
 
     this._cleanup()
-    document.removeEventListener('keydown', this._boundHandleKeydown)
-    document.removeEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
-    document.removeEventListener(SongChangeEvent.type, this._boundHandleSongChange)
-    window.removeEventListener(PadSetChangedEvent.type, this._boundHandlePadSetChange)
+    if (this._boundHandleKeydown) document.removeEventListener('keydown', this._boundHandleKeydown)
+    if (this._boundHandleSettingsChange) {
+      document.removeEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
+    }
+    if (this._boundHandleSongChange) {
+      document.removeEventListener(SongChangeEvent.type, this._boundHandleSongChange)
+    }
+    if (this._boundHandlePadSetChange) {
+      window.removeEventListener(PadSetChangedEvent.type, this._boundHandlePadSetChange)
+    }
   }
 
   /** The whole player is hidden while it's turned off in the settings */
-  _showIfEnabled(settings) {
+  _showIfEnabled(settings: Partial<MediaSettings>): void {
     this.style.display = settings.mediaPlayerEnabled === false ? 'none' : ''
   }
 
-  _handleSettingsChange(event) {
-    const settings = event.settings
+  _handleSettingsChange(event: Event): void {
+    const settings = (event as MediaSettingsChangeEvent).settings
     console.log('[MediaPlayer] Settings changed:', settings)
     this._showIfEnabled(settings)
 
@@ -765,8 +837,8 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  _handleSongChange(event) {
-    const song = event.song
+  _handleSongChange(event: Event): void {
+    const song = (event as SongChangeEvent).song
     console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
@@ -803,8 +875,8 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _handlePadSetChange(event) {
-    const padSet = event?.padSet || getActivePadSet()
+  _handlePadSetChange(event?: Event): void {
+    const padSet = (event as PadSetChangedEvent | undefined)?.padSet || getActivePadSet()
     this._activePadSet = padSet
     this._padLoadFailed = false
 
@@ -816,11 +888,11 @@ export class MediaPlayer extends LitElement {
   }
 
   /** True from starting a song until it is stopped (shown as the `active` attribute) */
-  get isActive() {
+  get isActive(): boolean {
     return Boolean(this._activeSongId || this._metronomeRunning)
   }
 
-  updated(changedProperties) {
+  override updated(changedProperties: PropertyValues<this>): void {
     super.updated(changedProperties)
     this.toggleAttribute('active', this.isActive)
 
@@ -838,18 +910,22 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _initAudio() {
+  _initAudio(): void {
     if (!this._audioContext) {
       // Initialize Web Audio API context
-      this._audioContext = new (window.AudioContext || window.webkitAudioContext)()
+      const AudioContextClass = window.AudioContext || (window as AudioWindow).webkitAudioContext
+      if (!AudioContextClass) throw new Error('Web Audio is not available on this device')
+      const audioContext = new AudioContextClass()
+      this._audioContext = audioContext
 
       // Create click gain node for metronome
-      this._clickGain = this._audioContext.createGain()
-      this._clickGain.gain.value = this._clickVolume
+      const clickGain = audioContext.createGain()
+      this._clickGain = clickGain
+      clickGain.gain.value = this._clickVolume
 
       // Initialize controllers
-      this._metronomeController = new MetronomeController(this._audioContext, this._clickGain)
-      this._padController = new PadAudioController(this._audioContext, { fadeDuration: 5000 })
+      this._metronomeController = new MetronomeController(audioContext, clickGain)
+      this._padController = new PadAudioController(audioContext, { fadeDuration: 5000 })
 
       // Set initial volumes
       this._padController.setVolume(this._padVolume)
@@ -867,7 +943,7 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _normalizeTempoNote(value) {
+  _normalizeTempoNote(value: string | number | null | undefined): string {
     if (!value) return '1/4'
     if (typeof value === 'number') {
       return `1/${value}`
@@ -899,7 +975,7 @@ export class MediaPlayer extends LitElement {
     return '1/4'
   }
 
-  async _updateAudioSource() {
+  async _updateAudioSource(): Promise<boolean> {
     if (!this.currentKey) return false
 
     // Ensure audio is initialized
@@ -917,12 +993,12 @@ export class MediaPlayer extends LitElement {
     return loaded
   }
 
-  _cleanup() {
+  _cleanup(): void {
     // Cleanup is now handled by controllers in disconnectedCallback
     // This method kept for compatibility
   }
 
-  _handleKeydown(event) {
+  _handleKeydown(event: KeyboardEvent): void {
     // Hidden (off a setlist with nothing playing, or turned off), the player has no
     // claim on the keys: Space belongs to the button or switch that has focus
     if (this.getClientRects().length === 0) return
@@ -940,7 +1016,7 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  async _stop() {
+  async _stop(): Promise<void> {
     console.log('[MediaPlayer] Stop - stopping click and fading out pads')
 
     // Check what's actually playing (panic button semantics: treat existing audio as playing)
@@ -971,7 +1047,7 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  _toggleMetronome() {
+  _toggleMetronome(): void {
     this.metronomeEnabled = !this.metronomeEnabled
 
     if (this.metronomeEnabled) {
@@ -981,7 +1057,7 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _updateStereoMode() {
+  _updateStereoMode(): void {
     if (!this._padController) return
 
     if (this._stereoSplitEnabled) {
@@ -994,7 +1070,7 @@ export class MediaPlayer extends LitElement {
     this._updateClickRouting()
   }
 
-  _updateClickRouting() {
+  _updateClickRouting(): void {
     if (!this._audioContext || !this._clickGain) return
 
     this._clickGain.disconnect()
@@ -1019,12 +1095,12 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _updateAudioRouting() {
+  _updateAudioRouting(): void {
     // Legacy method - redirect to new method
     this._updateStereoMode()
   }
 
-  _startMetronome() {
+  _startMetronome(): void {
     const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm
     const timeSignature =
       this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature
@@ -1046,7 +1122,7 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  _stopMetronome() {
+  _stopMetronome(): void {
     if (!this._metronomeController) {
       return
     }
@@ -1056,7 +1132,7 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  async _startSong() {
+  async _startSong(): Promise<void> {
     if (!this.currentKey) {
       console.warn('[MediaPlayer] No key set, cannot start song')
       return
@@ -1170,7 +1246,7 @@ export class MediaPlayer extends LitElement {
     // Active song properties already set at the beginning of this method
   }
 
-  _togglePads() {
+  _togglePads(): void {
     this._padsOn = !this._padsOn
     console.log('[MediaPlayer] Pads toggle:', this._padsOn)
 
@@ -1190,7 +1266,7 @@ export class MediaPlayer extends LitElement {
     // Song is still "playing" - toggles just control outputs
   }
 
-  _toggleClick() {
+  _toggleClick(): void {
     this._clickOn = !this._clickOn
     console.log('[MediaPlayer] Click toggle:', this._clickOn)
 
@@ -1209,7 +1285,7 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _toggleCollapse() {
+  _toggleCollapse(): void {
     this._collapsed = !this._collapsed
     console.log('[MediaPlayer] Collapsed:', this._collapsed)
 
@@ -1217,24 +1293,23 @@ export class MediaPlayer extends LitElement {
     localStorage.setItem('media-player-collapsed', JSON.stringify(this._collapsed))
   }
 
-  _toggleSettings() {
+  _toggleSettings(): void {
     this._showingSettings = !this._showingSettings
   }
 
-  _closeSettings(event) {
+  _closeSettings(event: Event): void {
     // Only our own modal's close, not one bubbling from inside it
     if (event.target === event.currentTarget) this._showingSettings = false
   }
 
-  _startDrag(e) {
+  _startDrag(e: MouseEvent | TouchEvent): void {
     // Don't start drag if clicking on a button
-    if (e.target.closest('.title-bar-button')) {
+    if ((e.target as Element).closest('.title-bar-button')) {
       return
     }
 
     this._isDragging = true
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const { clientX, clientY } = pointer(e)
 
     this._dragStartX = clientX - this._dragOffsetX
     this._dragStartY = clientY - this._dragOffsetY
@@ -1243,7 +1318,7 @@ export class MediaPlayer extends LitElement {
     e.preventDefault()
 
     // Add global event listeners
-    const handleMove = moveEvent => this._handleDrag(moveEvent)
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => this._handleDrag(moveEvent)
     const handleEnd = () => this._endDrag(handleMove, handleEnd)
 
     document.addEventListener('mousemove', handleMove)
@@ -1252,11 +1327,10 @@ export class MediaPlayer extends LitElement {
     document.addEventListener('touchend', handleEnd)
   }
 
-  _handleDrag(e) {
+  _handleDrag(e: MouseEvent | TouchEvent): void {
     if (!this._isDragging) return
 
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const { clientX, clientY } = pointer(e)
 
     this._dragOffsetX = clientX - this._dragStartX
     this._dragOffsetY = clientY - this._dragStartY
@@ -1264,7 +1338,7 @@ export class MediaPlayer extends LitElement {
     this._applyPosition()
   }
 
-  _endDrag(handleMove, handleEnd) {
+  _endDrag(handleMove: (e: MouseEvent | TouchEvent) => void, handleEnd: () => void): void {
     this._isDragging = false
 
     // Remove global event listeners
@@ -1283,13 +1357,13 @@ export class MediaPlayer extends LitElement {
     )
   }
 
-  _applyPosition() {
+  _applyPosition(): void {
     // Position is now applied directly in the template via style binding
     // Just trigger a re-render
     this.requestUpdate()
   }
 
-  _isCurrentSongActive() {
+  _isCurrentSongActive(): boolean {
     return (
       this._activeSongKey === this.currentKey &&
       this._activeSongBpm === this.bpm &&
@@ -1298,8 +1372,8 @@ export class MediaPlayer extends LitElement {
     )
   }
 
-  async _crossfadeToNewSong() {
-    if (!this._padController) {
+  async _crossfadeToNewSong(): Promise<void> {
+    if (!this._padController || !this.currentKey) {
       console.warn('[MediaPlayer] Cannot crossfade: controller not initialized')
       return
     }
@@ -1311,7 +1385,7 @@ export class MediaPlayer extends LitElement {
     this._padsOn = !this._padLoadFailed
   }
 
-  async _togglePlay() {
+  async _togglePlay(): Promise<void> {
     if (!this.currentKey) {
       console.warn('[MediaPlayer] No key set, cannot play')
       return
@@ -1348,7 +1422,7 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  async _fadeIn() {
+  async _fadeIn(): Promise<void> {
     if (!this._padController) {
       console.error('[MediaPlayer] Cannot fade in: controller not initialized')
       return
@@ -1360,7 +1434,7 @@ export class MediaPlayer extends LitElement {
     this._fadingIn = false
   }
 
-  async _fadeOut() {
+  async _fadeOut(): Promise<void> {
     if (!this._padController) return
 
     this._fadingOut = true
@@ -1368,8 +1442,8 @@ export class MediaPlayer extends LitElement {
     this._fadingOut = false
   }
 
-  async _crossfadeToNewKey() {
-    if (!this._padController) {
+  async _crossfadeToNewKey(): Promise<void> {
+    if (!this._padController || !this.currentKey) {
       console.warn('[MediaPlayer] Cannot crossfade: controller not initialized')
       return
     }
@@ -1384,20 +1458,19 @@ export class MediaPlayer extends LitElement {
     this._fadingIn = false
   }
 
-  _getStatusText() {
+  _getStatusText(): string {
     if (this._fadingIn) return 'Fading in...'
     if (this._fadingOut) return 'Fading out...'
     if (this._padsOn) return 'Playing'
     return 'Stopped'
   }
 
-  _startVolumeControl(e, type) {
+  _startVolumeControl(e: MouseEvent | TouchEvent, type: 'pad' | 'click'): void {
     e.preventDefault()
     e.stopPropagation()
 
     // Get initial touch/click position
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const { clientX, clientY } = pointer(e)
 
     // Position slider near the touch point
     this._sliderX = clientX
@@ -1406,7 +1479,7 @@ export class MediaPlayer extends LitElement {
     this._showingVolumeSlider = true
 
     // Add move/end listeners
-    const handleMove = moveEvent => {
+    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
       this._handleVolumeMove(moveEvent)
     }
 
@@ -1426,13 +1499,13 @@ export class MediaPlayer extends LitElement {
     document.addEventListener('touchend', handleEnd)
   }
 
-  _handleVolumeMove(e) {
+  _handleVolumeMove(e: MouseEvent | TouchEvent): void {
     if (!this._activeVolumeControl) return
 
     e.preventDefault()
 
     // Get vertical position relative to initial touch
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY
+    const { clientY } = pointer(e)
 
     // Calculate delta from start (negative = up, positive = down)
     const delta = this._sliderY - clientY
@@ -1471,7 +1544,7 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  render() {
+  override render() {
     const padsPlaying = this._padController?.isPlaying
     const clickPlaying = this._metronomeRunning
     const isPlaying = padsPlaying || clickPlaying
@@ -1628,8 +1701,8 @@ export class MediaPlayer extends LitElement {
                               class="volume-knob ${
                                 this._activeVolumeControl === 'pad' ? 'dragging' : ''
                               }"
-                              @mousedown=${e => this._startVolumeControl(e, 'pad')}
-                              @touchstart=${e => this._startVolumeControl(e, 'pad')}
+                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'pad')}
+                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'pad')}
                               title="Pad Volume"
                             >
                               <div
@@ -1652,8 +1725,8 @@ export class MediaPlayer extends LitElement {
                               class="volume-knob ${
                                 this._activeVolumeControl === 'click' ? 'dragging' : ''
                               }"
-                              @mousedown=${e => this._startVolumeControl(e, 'click')}
-                              @touchstart=${e => this._startVolumeControl(e, 'click')}
+                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'click')}
+                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'click')}
                               title="Click Volume"
                             >
                               <div
@@ -1734,3 +1807,9 @@ export class MediaPlayer extends LitElement {
 
 // Define the custom element
 customElements.define('media-player', MediaPlayer)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'media-player': MediaPlayer
+  }
+}

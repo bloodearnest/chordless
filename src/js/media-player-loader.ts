@@ -48,7 +48,7 @@ export function wantsPads({
  * @returns whether it loaded
  */
 export async function loadMediaPlayer(
-  load: () => Promise<unknown> = () => import('../components/media-player.js')
+  load: () => Promise<unknown> = () => import('../components/media-player.ts')
 ): Promise<boolean> {
   try {
     await load()

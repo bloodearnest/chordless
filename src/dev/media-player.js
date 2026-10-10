@@ -1,4 +1,4 @@
-import '/components/media-player.js'
+import '/components/media-player.ts'
 import '/components/media-player-settings.ts'
 
 const player = document.getElementById('player')

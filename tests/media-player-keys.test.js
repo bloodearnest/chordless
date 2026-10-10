@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../src/components/media-player.js'
+import '../src/components/media-player.ts'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, beforeEach, afterEach } = window
