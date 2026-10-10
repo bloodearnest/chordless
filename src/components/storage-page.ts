@@ -1,11 +1,21 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { StoredBlob } from '../js/auth-db.ts'
+import type { UserInfo } from '../js/google-auth.ts'
+import { errorMessage } from '../js/utils/errors.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
-import './drive-sync-panel.js'
+import './drive-sync-panel.ts'
 import './storage-summary.ts'
-import './pad-set-manager.js'
+import './pad-set-manager.ts'
 import './select-organisation.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
+
+/** The result of the last sign-in step, shown under the Google section */
+interface AuthMessage {
+  text: string
+  type: 'success' | 'error'
+}
 
 /**
  * StoragePage Component
@@ -16,7 +26,7 @@ import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
  * - Filesystem import
  */
 export class StoragePage extends LitElement {
-  static properties = {
+  static override properties = {
     isAuthenticated: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
@@ -24,7 +34,16 @@ export class StoragePage extends LitElement {
     _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
 
-  static styles = [
+  declare isAuthenticated: boolean
+  declare authStatus: string
+  declare userInfo: UserInfo | null
+  declare _clearError: string
+  declare _authMessage: AuthMessage | null
+
+  _logoutModal: Ref<AppModal>
+  _clearDataModal: Ref<AppModal>
+
+  static override styles = [
     panelStyles,
     buttonStyles,
     spinnerStyles,
@@ -188,12 +207,12 @@ export class StoragePage extends LitElement {
     this.userInfo = null
   }
 
-  async connectedCallback() {
+  override async connectedCallback() {
     super.connectedCallback()
     await this.checkAuthStatus()
   }
 
-  async checkAuthStatus() {
+  async checkAuthStatus(): Promise<void> {
     try {
       const { isAuthenticated, getCurrentUserInfo } = await import('../js/google-auth.ts')
       this.isAuthenticated = await isAuthenticated()
@@ -205,7 +224,7 @@ export class StoragePage extends LitElement {
     }
   }
 
-  render() {
+  override render() {
     return html`
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
@@ -421,7 +440,7 @@ export class StoragePage extends LitElement {
     `
   }
 
-  async _authorize() {
+  async _authorize(): Promise<void> {
     this.authStatus = 'authorizing'
     this._authMessage = null
     this.requestUpdate()
@@ -439,12 +458,12 @@ export class StoragePage extends LitElement {
       console.error('[StoragePage] Authorization failed:', error)
       this.authStatus = 'ready'
 
-      this._authMessage = { text: `✗ Authorization failed: ${error.message}`, type: 'error' }
+      this._authMessage = { text: `✗ Authorization failed: ${errorMessage(error)}`, type: 'error' }
     }
   }
 
-  async _logout() {
-    if (!(await this._logoutModal.value.ask())) return
+  async _logout(): Promise<void> {
+    if (!(await this._logoutModal.value?.ask())) return
 
     try {
       const { logout } = await import('../js/google-auth.ts')
@@ -457,29 +476,29 @@ export class StoragePage extends LitElement {
       this._authMessage = { text: '✓ Successfully logged out', type: 'success' }
     } catch (error) {
       console.error('[StoragePage] Logout failed:', error)
-      this._authMessage = { text: `✗ Logging out failed: ${error.message}`, type: 'error' }
+      this._authMessage = { text: `✗ Logging out failed: ${errorMessage(error)}`, type: 'error' }
     }
   }
 
-  async _downloadBackup() {
+  async _downloadBackup(): Promise<void> {
     try {
       const { downloadBlobBackup } = await import('../js/google-auth.ts')
       await downloadBlobBackup()
     } catch (error) {
       console.error('[StoragePage] Backup download failed:', error)
       this._authMessage = {
-        text: `✗ Downloading the backup failed: ${error.message}`,
+        text: `✗ Downloading the backup failed: ${errorMessage(error)}`,
         type: 'error',
       }
     }
   }
 
-  _showImportBackup() {
+  _showImportBackup(): void {
     const input = document.createElement('input')
     input.type = 'file'
     input.accept = 'application/json,.json'
     input.onchange = async e => {
-      const file = e.target.files[0]
+      const file = (e.target as HTMLInputElement).files?.[0]
       if (!file) return
 
       try {
@@ -497,7 +516,7 @@ export class StoragePage extends LitElement {
       } catch (error) {
         console.error('[StoragePage] Import backup failed:', error)
         this._authMessage = {
-          text: `✗ Importing the backup failed: ${error.message}`,
+          text: `✗ Importing the backup failed: ${errorMessage(error)}`,
           type: 'error',
         }
       }
@@ -505,12 +524,13 @@ export class StoragePage extends LitElement {
     input.click()
   }
 
-  async _testTokenRefresh() {
+  async _testTokenRefresh(): Promise<void> {
     try {
       const { getAccessToken, getStoredBlob } = await import('../js/google-auth.ts')
 
       // Check if Service Worker is active
-      if (!navigator.serviceWorker.controller) {
+      const controller = navigator.serviceWorker.controller
+      if (!controller) {
         this._authMessage = {
           text: '✗ Service Worker not active. Reload the page and try again.',
           type: 'error',
@@ -533,7 +553,7 @@ export class StoragePage extends LitElement {
         expires_at: new Date(Date.now() - 60000).toISOString(),
       }
 
-      await new Promise((resolve, reject) => {
+      await new Promise<unknown>((resolve, reject) => {
         const messageChannel = new MessageChannel()
         const messageId = crypto.randomUUID()
         const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
@@ -545,7 +565,7 @@ export class StoragePage extends LitElement {
           }
         }
 
-        navigator.serviceWorker.controller.postMessage(
+        controller.postMessage(
           { type: 'STORE_BLOB', data: { blob, metadata: expiredMetadata }, messageId },
           [messageChannel.port2]
         )
@@ -555,9 +575,9 @@ export class StoragePage extends LitElement {
       await getAccessToken()
       console.log('[Test] ✅ Token refresh successful!')
 
-      const updatedBlob = await getStoredBlob()
-      const oldExpiry = new Date(metadata.expires_at)
-      const newExpiry = new Date(updatedBlob.metadata.expires_at)
+      const updatedBlob: StoredBlob | undefined = await getStoredBlob()
+      const oldExpiry = new Date(metadata.expires_at ?? 0)
+      const newExpiry = new Date(updatedBlob?.metadata.expires_at ?? 0)
 
       if (newExpiry > new Date()) {
         this._authMessage = {
@@ -569,13 +589,16 @@ export class StoragePage extends LitElement {
       }
     } catch (error) {
       console.error('[Test] ❌ Token refresh failed:', error)
-      this._authMessage = { text: `✗ Token refresh test failed: ${error.message}`, type: 'error' }
+      this._authMessage = {
+        text: `✗ Token refresh test failed: ${errorMessage(error)}`,
+        type: 'error',
+      }
     }
   }
 
-  async _handleClearDatabase() {
+  async _handleClearDatabase(): Promise<void> {
     const modal = this._clearDataModal.value
-    if (!(await modal.ask())) return
+    if (!(await modal?.ask())) return
     try {
       const { getCurrentDB } = await import('../js/db.ts')
       const db = await getCurrentDB()
@@ -586,9 +609,15 @@ export class StoragePage extends LitElement {
       window.location.reload()
     } catch (error) {
       console.error('[Storage] Failed to clear local data:', error)
-      this._clearError = error.message
+      this._clearError = errorMessage(error)
     }
   }
 }
 
 customElements.define('storage-page', StoragePage)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'storage-page': StoragePage
+  }
+}

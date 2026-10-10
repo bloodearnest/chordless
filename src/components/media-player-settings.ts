@@ -1,12 +1,13 @@
 import { css, html, LitElement } from 'lit'
-import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.ts'
+import { loadMediaSettings, type MediaSettings, saveMediaSettings } from '../js/media-settings.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
 import { fieldStyles, switchStyles } from './shared-styles.ts'
 
 /** The media player settings changed; settings is the new settings */
 export class MediaSettingsChangeEvent extends Event {
   static type = 'media-player-settings:change'
-  constructor(settings) {
+  readonly settings: MediaSettings
+  constructor(settings: MediaSettings) {
     super(MediaSettingsChangeEvent.type, { bubbles: true, composed: true })
     this.settings = settings
   }
@@ -28,14 +29,21 @@ export class MediaSettingsChangeEvent extends Event {
  * @fires MediaSettingsChangeEvent - When any setting changes (settings)
  */
 export class MediaPlayerSettings extends LitElement {
-  static properties = {
+  static override properties = {
     mediaPlayerEnabled: { type: Boolean, attribute: false },
     padsEnabled: { type: Boolean, attribute: false },
     metronomeEnabled: { type: Boolean, attribute: false },
     stereoSplitEnabled: { type: Boolean, attribute: false },
   }
 
-  static styles = [
+  declare mediaPlayerEnabled: boolean
+  declare padsEnabled: boolean
+  declare metronomeEnabled: boolean
+  declare stereoSplitEnabled: boolean
+
+  _padSets: PadSetsController
+
+  static override styles = [
     switchStyles,
     fieldStyles,
     css`
@@ -119,8 +127,8 @@ export class MediaPlayerSettings extends LitElement {
     this._padSets = new PadSetsController(this)
   }
 
-  _saveSettings() {
-    const settings = {
+  _saveSettings(): void {
+    const settings: MediaSettings = {
       mediaPlayerEnabled: this.mediaPlayerEnabled,
       padsEnabled: this.padsEnabled,
       metronomeEnabled: this.metronomeEnabled,
@@ -134,7 +142,12 @@ export class MediaPlayerSettings extends LitElement {
   }
 
   /** An on/off switch, a real button so it works from the keyboard and screen readers */
-  _renderSwitch(label, on, onToggle, { master = false, disabled = false } = {}) {
+  _renderSwitch(
+    label: string,
+    on: boolean,
+    onToggle: () => void,
+    { master = false, disabled = false }: { master?: boolean; disabled?: boolean } = {}
+  ) {
     return html`
       <button
         type="button"
@@ -148,36 +161,37 @@ export class MediaPlayerSettings extends LitElement {
     `
   }
 
-  _toggleMediaPlayer() {
+  _toggleMediaPlayer(): void {
     this.mediaPlayerEnabled = !this.mediaPlayerEnabled
     this._saveSettings()
   }
 
-  _togglePads() {
+  _togglePads(): void {
     this.padsEnabled = !this.padsEnabled
     this._saveSettings()
   }
 
-  _toggleMetronome() {
+  _toggleMetronome(): void {
     this.metronomeEnabled = !this.metronomeEnabled
     this._saveSettings()
   }
 
-  _toggleStereoSplit() {
+  _toggleStereoSplit(): void {
     this.stereoSplitEnabled = !this.stereoSplitEnabled
     this._saveSettings()
   }
 
-  async _handlePadSetChange(event) {
+  async _handlePadSetChange(event: Event): Promise<void> {
+    const select = event.target as HTMLSelectElement
     try {
-      await this._padSets.select(event.target.value)
+      await this._padSets.select(select.value)
     } catch (error) {
       console.error('[MediaPlayerSettings] Failed to switch pad set:', error)
-      event.target.value = this._padSets.activeId
+      select.value = this._padSets.activeId
     }
   }
 
-  render() {
+  override render() {
     return html`
       <div class="container">
         <h2>🎵 Media Player Settings</h2>
@@ -291,3 +305,9 @@ export class MediaPlayerSettings extends LitElement {
 
 // Define the custom element
 customElements.define('media-player-settings', MediaPlayerSettings)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'media-player-settings': MediaPlayerSettings
+  }
+}

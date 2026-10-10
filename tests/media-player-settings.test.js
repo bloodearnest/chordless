@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../src/components/media-player-settings.js'
+import '../src/components/media-player-settings.ts'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window

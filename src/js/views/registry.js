@@ -32,17 +32,17 @@ export const views = {
   home: view('home-view', () => import('./home-view.js')),
   storage: view(
     'storage-view',
-    () => import('./storage-view.js'),
+    () => import('./storage-view.ts'),
     () => 'Storage - Chordless'
   ),
   preferences: view(
     'preferences-view',
-    () => import('./preferences-view.js'),
+    () => import('./preferences-view.ts'),
     () => 'Preferences - Chordless'
   ),
   'import-song': view(
     'import-song-view',
-    () => import('./import-song-view.js'),
+    () => import('./import-song-view.ts'),
     () => 'Import Songs - Chordless'
   ),
   songs: view(

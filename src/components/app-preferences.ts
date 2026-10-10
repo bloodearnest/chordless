@@ -10,7 +10,7 @@ import {
   setUseUnicodeAccidentals,
 } from '../js/preferences.ts'
 import './theme-settings.ts'
-import './media-player-settings.js'
+import './media-player-settings.ts'
 import { panelStyles } from './shared-styles.ts'
 
 /**
@@ -19,14 +19,19 @@ import { panelStyles } from './shared-styles.ts'
  * Preferences interface for the application
  */
 export class AppPreferences extends LitElement {
-  static properties = {
+  static override properties = {
     useNashville: { type: Boolean, attribute: false },
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
   }
 
-  static styles = [
+  declare useNashville: boolean
+  declare useUnicodeAccidentals: boolean
+  declare musicianType: string
+  declare capoEnabled: boolean
+
+  static override styles = [
     panelStyles,
     css`
     :host {
@@ -101,7 +106,7 @@ export class AppPreferences extends LitElement {
     this.capoEnabled = getCapoPreference()
   }
 
-  render() {
+  override render() {
     return html`
       <div class="preferences-content">
         <div class="panel">
@@ -196,33 +201,39 @@ export class AppPreferences extends LitElement {
     `
   }
 
-  _isLyricsOnlySelection() {
+  _isLyricsOnlySelection(): boolean {
     return this.musicianType === 'singer' || this.musicianType === 'drummer'
   }
 
-  _onMusicianTypeChange(event) {
-    const value = event.currentTarget.value
+  _onMusicianTypeChange(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).value
     this.musicianType = value
     setMusicianType(value)
   }
 
-  _onNashvilleToggle(event) {
-    const value = event.currentTarget.checked
+  _onNashvilleToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
     this.useNashville = value
     setUseNashvilleNumbers(value)
   }
 
-  _onAccidentalToggle(event) {
-    const value = event.currentTarget.checked
+  _onAccidentalToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
     this.useUnicodeAccidentals = value
     setUseUnicodeAccidentals(value)
   }
 
-  _onCapoToggle(event) {
-    const value = event.currentTarget.checked
+  _onCapoToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
     this.capoEnabled = value
     setCapoPreference(value)
   }
 }
 
 customElements.define('app-preferences', AppPreferences)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'app-preferences': AppPreferences
+  }
+}

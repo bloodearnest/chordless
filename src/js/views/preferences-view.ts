@@ -1,11 +1,11 @@
 import { html } from 'lit'
 import '../../components/app-header.ts'
-import '../../components/app-preferences.js'
+import '../../components/app-preferences.ts'
 import { PageView } from './page-view.ts'
 
 /** The Preferences page (the menu also opens the same preferences in a modal) */
 export class PreferencesView extends PageView {
-  render() {
+  override render() {
     return html`
       <app-header heading="Preferences"></app-header>
       <main class="home-content">
@@ -16,3 +16,9 @@ export class PreferencesView extends PageView {
   }
 }
 customElements.define('preferences-view', PreferencesView)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'preferences-view': PreferencesView
+  }
+}

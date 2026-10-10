@@ -1,10 +1,21 @@
+import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.ts'
 import { getCurrentOrganisation } from '../js/organisation.ts'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.ts'
+import { errorMessage } from '../js/utils/errors.ts'
+import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles, spinnerStyles } from './shared-styles.ts'
+
+/** What the panel shows of a sync: how far it has got (the panel also adds a 'success' stage) */
+interface PanelProgress {
+  stage: string
+  message: string
+  current?: number
+  total?: number
+}
 
 /**
  * DriveSyncPanel Component
@@ -12,7 +23,7 @@ import { buttonStyles, spinnerStyles } from './shared-styles.ts'
  * UI for triggering and monitoring Google Drive sync
  */
 export class DriveSyncPanel extends LitElement {
-  static properties = {
+  static override properties = {
     syncAvailable: { type: Boolean, attribute: false },
     syncing: { type: Boolean, attribute: false },
     syncProgress: { type: Object, attribute: false },
@@ -21,7 +32,16 @@ export class DriveSyncPanel extends LitElement {
     disabled: { type: Boolean, reflect: true },
   }
 
-  static styles = [
+  declare syncAvailable: boolean
+  declare syncing: boolean
+  declare syncProgress: PanelProgress | null
+  declare lastSyncTime: string | null
+  declare syncError: string | null
+  declare disabled: boolean
+
+  _resetModal: Ref<AppModal>
+
+  static override styles = [
     buttonStyles,
     spinnerStyles,
     css`
@@ -130,33 +150,33 @@ export class DriveSyncPanel extends LitElement {
     this.disabled = false
   }
 
-  async connectedCallback() {
+  override async connectedCallback() {
     super.connectedCallback()
     await this.checkSyncAvailability()
     this.loadLastSyncTime()
   }
 
-  updated(changedProperties) {
+  override updated(changedProperties: PropertyValues<this>): void {
     if (changedProperties.has('disabled') && !this.disabled) {
       this.checkSyncAvailability()
     }
   }
 
-  async checkSyncAvailability() {
+  async checkSyncAvailability(): Promise<void> {
     this.syncAvailable = await isSyncAvailable()
   }
 
-  loadLastSyncTime() {
+  loadLastSyncTime(): void {
     const stored = localStorage.getItem('last-sync-time')
     if (stored) {
       this.lastSyncTime = stored
     }
   }
 
-  async _handleReset() {
+  async _handleReset(): Promise<void> {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
-    if (!(await this._resetModal.value.ask())) return
+    if (!(await this._resetModal.value?.ask())) return
 
     this.syncing = true
     this.syncError = null
@@ -182,13 +202,13 @@ export class DriveSyncPanel extends LitElement {
       setTimeout(() => window.location.reload(), 1000)
     } catch (error) {
       console.error('[DriveSyncPanel] Reset from Drive failed:', error)
-      this.syncError = error.message
-      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
+      this.syncError = errorMessage(error)
+      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
       this.syncing = false
     }
   }
 
-  async _handleSync() {
+  async _handleSync(): Promise<void> {
     if (this.syncing || !this.syncAvailable || this.disabled) return
 
     this.syncing = true
@@ -220,13 +240,13 @@ export class DriveSyncPanel extends LitElement {
       }, 2000)
     } catch (error) {
       console.error('[DriveSyncPanel] Sync failed:', error)
-      this.syncError = error.message
-      this.syncProgress = { stage: 'error', message: `Failed: ${error.message}` }
+      this.syncError = errorMessage(error)
+      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
       this.syncing = false
     }
   }
 
-  render() {
+  override render() {
     if (!this.syncAvailable || this.disabled) {
       return html`
         <div class="sync-panel disabled">
@@ -297,7 +317,7 @@ export class DriveSyncPanel extends LitElement {
       `
     }
 
-    const { stage, message } = this.syncProgress
+    const { stage, message } = this.syncProgress ?? { stage: '', message: '' }
     const isError = stage === 'error'
     const isSuccess = stage === 'complete' || stage === 'success'
     const statusClass = isError ? 'error' : isSuccess ? 'success' : 'syncing'
@@ -314,7 +334,7 @@ export class DriveSyncPanel extends LitElement {
   }
 
   _renderProgressBar() {
-    const { current, total } = this.syncProgress || {}
+    const { current, total } = this.syncProgress ?? {}
     const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0
     const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null
     const width = percent !== null ? `${percent}%` : '50%'
@@ -325,10 +345,10 @@ export class DriveSyncPanel extends LitElement {
     `
   }
 
-  _formatSyncTime(isoString) {
+  _formatSyncTime(isoString: string): string {
     const date = new Date(isoString)
     const now = new Date()
-    const diffMs = now - date
+    const diffMs = now.getTime() - date.getTime()
     const diffMins = Math.floor(diffMs / 60000)
     const diffHours = Math.floor(diffMs / 3600000)
     const diffDays = Math.floor(diffMs / 86400000)
@@ -343,3 +363,9 @@ export class DriveSyncPanel extends LitElement {
 }
 
 customElements.define('drive-sync-panel', DriveSyncPanel)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'drive-sync-panel': DriveSyncPanel
+  }
+}

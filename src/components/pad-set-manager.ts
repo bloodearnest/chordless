@@ -1,11 +1,12 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
+import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
 export class PadSetManager extends LitElement {
-  static properties = {
+  static override properties = {
     _uploading: { state: true },
     _error: { state: true },
     _successMessage: { state: true },
@@ -15,7 +16,19 @@ export class PadSetManager extends LitElement {
     _selectPadSetError: { state: true },
   }
 
-  static styles = [
+  declare _uploading: boolean
+  declare _error: string
+  declare _successMessage: string
+  declare _padSetName: string
+  declare _fileName: string
+  declare _selectPadSetMessage: string
+  declare _selectPadSetError: string
+
+  _fileInput: Ref<HTMLInputElement>
+  _padSets: PadSetsController
+  _selectedFile: File | null
+
+  static override styles = [
     buttonStyles,
     fieldStyles,
     css`
@@ -127,8 +140,8 @@ export class PadSetManager extends LitElement {
     this._selectPadSetError = ''
   }
 
-  _handleFileChange(event) {
-    const file = event.target.files?.[0] || null
+  _handleFileChange(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0] || null
     this._selectedFile = file
     if (file) {
       this._fileName = file.name
@@ -140,19 +153,19 @@ export class PadSetManager extends LitElement {
     }
   }
 
-  _handleNameInput(event) {
-    const input = event.target
+  _handleNameInput(event: Event): void {
+    const input = event.target as HTMLInputElement
     const raw = input.value
     const sanitized = raw.replace(/[^a-zA-Z0-9\s-]+/g, '')
     if (sanitized !== raw) {
-      const pos = input.selectionStart - (raw.length - sanitized.length)
+      const pos = (input.selectionStart ?? 0) - (raw.length - sanitized.length)
       input.value = sanitized
       input.setSelectionRange(Math.max(0, pos), Math.max(0, pos))
     }
     this._padSetName = sanitized
   }
 
-  async _handleUpload(event) {
+  async _handleUpload(event: Event): Promise<void> {
     event.preventDefault()
     this._error = ''
     this._successMessage = ''
@@ -169,25 +182,25 @@ export class PadSetManager extends LitElement {
       this._selectedFile = null
       this._padSetName = ''
       this._fileName = ''
-      this._fileInput.value.value = ''
+      if (this._fileInput.value) this._fileInput.value.value = ''
       await this._padSets.load(true)
     } catch (error) {
       console.error('[PadSetManager] Upload failed:', error)
-      this._error = error.message || 'Failed to upload pad set.'
+      this._error = errorMessage(error) || 'Failed to upload pad set.'
     } finally {
       this._uploading = false
     }
   }
 
-  async _handleDefaultPadSetChange(event) {
+  async _handleDefaultPadSetChange(event: Event): Promise<void> {
     this._selectPadSetMessage = ''
     this._selectPadSetError = ''
     try {
-      await this._padSets.select(event.target.value)
+      await this._padSets.select((event.target as HTMLInputElement).value)
       this._selectPadSetMessage = 'Default pad set updated.'
     } catch (error) {
       console.error('[PadSetManager] Failed to set default pad set:', error)
-      this._selectPadSetError = error.message || 'Unable to set pad set.'
+      this._selectPadSetError = errorMessage(error) || 'Unable to set pad set.'
     }
   }
 
@@ -213,7 +226,7 @@ export class PadSetManager extends LitElement {
               name="padset-selection"
               .value=${set.id}
               .checked=${this._padSets.activeId === set.id}
-              @change=${e => this._handleDefaultPadSetChange(e)}
+              @change=${(e: Event) => this._handleDefaultPadSetChange(e)}
             />
             <div>
               <div class="padset-name">${set.name}</div>
@@ -232,7 +245,7 @@ export class PadSetManager extends LitElement {
     )
   }
 
-  render() {
+  override render() {
     return html`
       ${this._renderPadSetList()}
       ${
@@ -297,3 +310,9 @@ export class PadSetManager extends LitElement {
 }
 
 customElements.define('pad-set-manager', PadSetManager)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'pad-set-manager': PadSetManager
+  }
+}

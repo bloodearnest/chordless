@@ -1,5 +1,5 @@
 import '/components/media-player.js'
-import '/components/media-player-settings.js'
+import '/components/media-player-settings.ts'
 
 const player = document.getElementById('player')
 const state = {
