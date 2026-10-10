@@ -13,7 +13,7 @@
     <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Chordless</title>
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="/css/style.css" />
     <script type="importmap">
       {
         "imports": {
@@ -32,39 +32,16 @@
   </head>
   <body>
     <div class="app-container">
-      <div id="home-view" class="view">
-        <app-header id="home-app-header" heading="Chordless">
-          <button
-            slot="actions"
-            class="create-setlist-button"
-            id="create-setlist-button"
-            aria-label="Create new setlist"
-          >
-            <app-icon name="add" size="24"></app-icon>
-          </button>
-        </app-header>
+      <!-- The router shows the view for the URL here -->
+      <div id="view-outlet"></div>
 
-        <!-- Navigation menu component -->
-        <nav-menu id="nav-menu"></nav-menu>
-
-        <main class="home-content">
-          <div id="setlist-list" class="setlist-list">
-            <p>Loading setlists...</p>
-          </div>
-        </main>
-      </div>
-
-      <!-- Create Setlist Modal -->
-      <app-modal id="create-setlist-modal" heading="Create New Setlist">
-        <setlist-details-form
-          id="create-setlist-form"
-          submit-label="Create Setlist"
-          auto-type
-        ></setlist-details-form>
-      </app-modal>
+      <!-- Navigation menu component: stays while views come and go -->
+      <nav-menu id="nav-menu"></nav-menu>
     </div>
 
-    <!-- Import map for Lit -->
+    <!-- Tells screen readers about the page when the view changes -->
+    <div id="route-announcer" class="visually-hidden" aria-live="polite"></div>
+
     <script>
       // Set window name so bookmarklet can find and reuse this tab
       window.name = 'chordless';
@@ -97,21 +74,6 @@
     </script>
 
     <script type="module" src="/js/theme-manager.js"></script>
-    <script type="module">
-      // Update page title with church name
-      import { getCurrentOrganisation } from '/js/organisation.js';
-
-      const { name } = getCurrentOrganisation();
-      // Set before app-header upgrades, so it shows without the title fade
-      document.getElementById('home-app-header').setAttribute('heading', `Setlists - ${name}`);
-    </script>
-
-    <!-- Import the components -->
-    <script type="module" src="/components/app-header.js"></script>
-    <script type="module" src="/components/nav-menu.js"></script>
-    <script type="module" src="/components/app-modal.js"></script>
-    <script type="module" src="/components/setlist-details-form.js"></script>
-    <script type="module" src="js/create-setlist.js"></script>
-    <script type="module" src="js/setlist-app.js"></script>
+    <script type="module" src="/js/app.js"></script>
   </body>
 </html>

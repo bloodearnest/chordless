@@ -1,5 +1,6 @@
 // Service Worker for offline-first operation
 import * as AuthDB from '/js/auth-db.js'
+import { matchRoute, SHELL_ROUTES } from '/js/router.js'
 
 // Handles routing and offline caching
 
@@ -14,6 +15,12 @@ const ASSETS = [
   '/css/style.css',
   '/js/parser.js',
   '/js/setlist-app.js',
+  '/js/app.js',
+  '/js/app-router.js',
+  '/js/router.js',
+  '/js/route-context.js',
+  '/js/navigation.js',
+  '/js/views/registry.js',
   '/js/db.js',
   '/js/transpose.js',
   '/js/theme-manager.js',
@@ -500,8 +507,6 @@ async function handleRoute(url) {
   // Browser navigations have redirect: 'manual', so a redirected SW response causes an error.
   // Always fetch the clean URL — wrangler serves the right .html file without redirecting.
   const HTML_FILES = {
-    '/': '/',
-    '/index.html': '/',
     '/songs': '/songs',
     '/songs/': '/songs',
     '/songs.html': '/songs',
@@ -519,7 +524,8 @@ async function handleRoute(url) {
     '/bookmarklet.html': '/bookmarklet',
   }
 
-  let htmlFile = HTML_FILES[path]
+  // Routes that are views of the app shell are all served by the shell, index.html
+  let htmlFile = SHELL_ROUTES.includes(matchRoute(url).name) ? '/' : HTML_FILES[path]
   if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist'
 
   if (!htmlFile) {
@@ -529,7 +535,9 @@ async function handleRoute(url) {
   try {
     const response = await fetch(htmlFile)
     if (response.ok) {
-      caches.open(CACHE_NAME).then(cache => cache.put(htmlFile, response.clone()))
+      // Clone now: once the page is returned its body is being read, and can't be cloned
+      const copy = response.clone()
+      caches.open(CACHE_NAME).then(cache => cache.put(htmlFile, copy))
     }
     return response
   } catch {

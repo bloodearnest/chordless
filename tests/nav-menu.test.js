@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import '../public/components/app-header.js'
 import '../public/components/nav-menu.js'
+import { provideRoute } from '../public/js/route-context.js'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
@@ -21,6 +22,21 @@ describe('nav-menu', () => {
   const settle = () => new Promise(resolve => setTimeout(resolve))
 
   afterEach(() => container?.remove())
+
+  it('closes when the route changes, as it outlives the views', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    container.querySelector('#menu-button').click()
+    await settle()
+    expect(menu.isOpen()).to.equal(true)
+
+    provideRoute({ name: 'songs' })
+    await settle()
+    expect(menu.isOpen()).to.equal(false)
+    provideRoute(null)
+  })
 
   it('opens and closes from the button named by for', async () => {
     const menu = await setUp(`

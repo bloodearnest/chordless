@@ -1,4 +1,4 @@
-import { expect, test } from './fixtures.js'
+import { expect, seedSetlist, test } from './fixtures.js'
 
 // Wait for the SW to be installed, activated, and controlling the page.
 // skipWaiting + clients.claim means this happens on first load, but
@@ -56,6 +56,23 @@ test('page reloads successfully while offline', async ({ page, context }) => {
     // ERR_INTERNET_DISCONNECTED because the SW was bypassed or crashed
     await page.reload()
     await expect(page).toHaveTitle(/Chordless/)
+  } finally {
+    await context.setOffline(false)
+  }
+})
+
+test('a setlist opened online can be reloaded while offline', async ({ page, context }) => {
+  // Only the home page is precached; the other pages are cached when first opened
+  await seedSetlist(page, { setlistId: 'offline-setlist' })
+  await page.goto('/setlist/offline-setlist')
+  await page.waitForLoadState('networkidle')
+  await expect(page.locator('setlist-overview')).toBeVisible()
+
+  await context.setOffline(true)
+  try {
+    await page.reload()
+    await expect(page).toHaveTitle('Setlist - Chordless')
+    await expect(page.locator('setlist-overview')).toBeVisible()
   } finally {
     await context.setOffline(false)
   }

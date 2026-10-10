@@ -4,7 +4,7 @@
 import { getCurrentDB } from './db.js'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
-import { claimSetlistsOnce, getOrganisationPeople } from './people.js'
+import { getOrganisationPeople } from './people.js'
 import { getAvailableKeys, transposeSong } from './transpose.js'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
 import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
@@ -130,9 +130,7 @@ class PageApp {
     const route = window.__ROUTE__ || this.parseRoute(window.location.pathname)
 
     // Render based on route
-    if (route.type === 'home') {
-      await this.renderHome()
-    } else if (route.type === 'setlist') {
+    if (route.type === 'setlist') {
       await this.renderSetlist(route.setlistId)
     }
 
@@ -189,91 +187,6 @@ class PageApp {
   setupNavigationAPI() {
     // Just let the browser and service worker handle navigation naturally
     // View transitions will be handled by CSS @view-transition rule
-  }
-
-  async renderHome() {
-    // Just render the setlist list
-    await this.renderSetlistsTab()
-  }
-
-  async renderSetlistsTab() {
-    const listContainer = document.getElementById('setlist-list')
-
-    try {
-      // Show loading message
-      this.showStatusMessage(listContainer, {
-        message: 'Loading setlists...',
-        state: 'loading',
-      })
-
-      // One-off: record leader ids on setlists from before they existed
-      await claimSetlistsOnce(this.db, this.db.organisationId)
-      const setlists = await this.db.getAllSetlists()
-
-      if (setlists.length === 0) {
-        // No setlists - show import guidance
-        this.showStatusMessage(listContainer, {
-          message: 'No setlists found in database.',
-          detail: 'Go to Settings to import setlists.',
-          state: 'empty',
-        })
-        return
-      }
-
-      // Group setlists by year
-      const currentYear = new Date().getFullYear()
-      const groupedByYear = {}
-
-      for (const setlist of setlists) {
-        const year = this.extractYear(setlist.date)
-        if (!groupedByYear[year]) {
-          groupedByYear[year] = []
-        }
-        groupedByYear[year].push(setlist)
-      }
-
-      // Sort years descending
-      const years = Object.keys(groupedByYear).sort((a, b) => b - a)
-
-      // Sort setlists within each year by date descending (newest first)
-      for (const year of years) {
-        groupedByYear[year].sort((a, b) => b.date.localeCompare(a.date))
-      }
-
-      // Clear and render setlists
-      listContainer.textContent = ''
-
-      // Render grouped setlists (only current year expanded by default)
-      for (const year of years) {
-        const formattedSetlists = groupedByYear[year].map(setlist => {
-          const songCount = Array.isArray(setlist.songs) ? setlist.songs.length : 0
-          const displayName = setlistTitle(setlist, 'short')
-          return {
-            id: setlist.id,
-            url: `/setlist/${setlist.id}`,
-            displayName,
-            songCount,
-          }
-        })
-
-        const yearSection = document.createElement('setlist-group')
-        yearSection.year = year
-        yearSection.setlists = formattedSetlists
-        yearSection.expanded = Number(year) === currentYear
-        listContainer.appendChild(yearSection)
-      }
-    } catch (error) {
-      console.error('Error loading setlists:', error)
-      this.showStatusMessage(listContainer, {
-        message: 'Error loading setlists. Please check the console.',
-        state: 'error',
-      })
-    }
-  }
-
-  extractYear(dateStr) {
-    const match = dateStr.match(/^(\d{4})/)
-    return match ? match[1] : 'Unknown'
   }
 
   showStatusMessage(container, options = {}) {

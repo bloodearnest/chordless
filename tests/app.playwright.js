@@ -85,8 +85,11 @@ test.describe('Themes', () => {
 })
 
 test.describe('Loading', () => {
-  test('modal content is hidden until app-modal is defined', async ({ page }) => {
-    // Hold app-modal.js until we've checked, so the element stays undefined
+  // No service worker: its first install reloads the page, mid-test
+  test.use({ serviceWorkers: 'block' })
+
+  test('modal content is not in the page until app-modal is defined', async ({ page }) => {
+    // Hold app-modal.js, so the element stays undefined
     let releaseModal
     const modalHeld = new Promise(resolve => {
       releaseModal = resolve
@@ -97,13 +100,17 @@ test.describe('Loading', () => {
     })
 
     await page.goto('/', { waitUntil: 'commit' })
-    const input = page.locator('#create-setlist-modal setlist-details-form')
-    await input.waitFor({ state: 'attached' })
+    await page.waitForFunction(() => document.querySelector('nav-menu'))
+    await page.waitForTimeout(500) // time for the home view to have shown, if it were going to
     expect(await page.evaluate(() => customElements.get('app-modal'))).toBeUndefined()
-    await expect(input).toBeHidden()
+    // The home view waits for app-modal, so its modal's content can't show unstyled
+    await expect(page.locator('#create-setlist-modal')).toHaveCount(0)
+    await expect(page.locator('#create-setlist-modal setlist-details-form')).toHaveCount(0)
 
     releaseModal()
     await page.waitForFunction(() => customElements.get('app-modal'))
+    const input = page.locator('#create-setlist-modal setlist-details-form')
+    await input.waitFor({ state: 'attached' })
     await expect(input).toBeHidden()
   })
 })

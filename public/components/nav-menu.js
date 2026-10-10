@@ -1,8 +1,10 @@
+import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './app-preferences.js'
 import './icon.js'
+import { routeContext } from '../js/route-context.js'
 import { HeaderMenuClickEvent } from './app-header.js'
 
 /** The back item was chosen */
@@ -184,6 +186,12 @@ export class NavMenu extends LitElement {
     this.songs = []
     this.showOverviewLink = false
     this.setlistTitle = 'Setlist'
+    // The menu outlives the views: close it when the route changes
+    new ContextConsumer(this, {
+      context: routeContext,
+      subscribe: true,
+      callback: () => this.closePopover(),
+    })
   }
 
   /**

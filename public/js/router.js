@@ -24,6 +24,13 @@ const PAGES = {
   '/bookmarklet': 'bookmarklet',
 }
 
+/**
+ * The routes that are views in the app shell (index.html, which the service
+ * worker serves for them), rather than pages of their own. Moves over one page
+ * at a time; views/registry.js has a view for each.
+ */
+export const SHELL_ROUTES = ['home']
+
 const PAGE_PATHS = Object.fromEntries(Object.entries(PAGES).map(([path, name]) => [name, path]))
 
 const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
