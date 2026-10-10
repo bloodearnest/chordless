@@ -922,6 +922,9 @@ export class MediaPlayer extends LitElement {
   }
 
   _handleKeydown(event) {
+    // Hidden (off a setlist with nothing playing, or turned off), the player has no
+    // claim on the keys: Space belongs to the button or switch that has focus
+    if (this.getClientRects().length === 0) return
     // A modal handles its own keys: Esc closes it, Space presses its buttons
     if (isInModalDialog(event)) return
     // Start song on spacebar
