@@ -24,12 +24,22 @@ export class SetlistView extends PageView {
 
   firstUpdated() {
     const { setlistId, songIndex } = this.route
-    this.#page = new SetlistPage({ root: this, setlistId, songIndex })
+    this.#page = new SetlistPage({
+      root: this,
+      setlistId,
+      songIndex,
+      restoredState: this.restoredState,
+    })
     this.#page
       .start()
       // The route may have moved on while the setlist was loading
       .then(() => this.#page?.routeChanged(this.route))
       .catch(error => console.error('[SetlistView] Failed to start:', error))
+  }
+
+  /** How far each song (and the overview) was scrolled */
+  captureViewState() {
+    return this.#page?.captureViewState()
   }
 
   updated(changed) {

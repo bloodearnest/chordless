@@ -90,6 +90,15 @@ export class HomeView extends PageView {
     }
   }
 
+  /** The years left open (the user may have opened or closed them), and the scroll */
+  captureViewState() {
+    const expanded = {}
+    for (const group of this.querySelectorAll('setlist-group'))
+      expanded[group.year] = group.expanded
+    const scroll = this.querySelector('main')?.scrollTop
+    return { expanded, scroll }
+  }
+
   #renderGroups(groups) {
     if (groups.length === 0) {
       return html`<status-message
@@ -104,7 +113,7 @@ export class HomeView extends PageView {
       group => html`<setlist-group
         .year=${group.year}
         .setlists=${group.setlists}
-        .expanded=${group.expanded}
+        .expanded=${this.restoredState?.expanded?.[group.year] ?? group.expanded}
       ></setlist-group>`
     )
   }

@@ -74,10 +74,22 @@ export class LibraryView extends PageView {
 
   // ==================== Lifecycle ====================
 
+  /** What was searched for, and how far down the list was scrolled */
+  captureViewState() {
+    return { search: this._search, scroll: this.#libraryList.value?.scrollTop }
+  }
+
+  willUpdate(changed) {
+    if (changed.has('restoredState') && this.restoredState?.search) {
+      this._search = this.restoredState.search
+    }
+  }
+
   firstUpdated() {
     // Opened on a song: show it straight away, without sliding in from the list
     if (this.route?.songUuid) this.#scrollTo(this.#songView.value, 'instant')
     this.#observeScrollBack()
+    this.restoreScroll(this.#libraryList.value, this.restoredState?.scroll)
   }
 
   updated(changed) {
@@ -502,6 +514,7 @@ export class LibraryView extends PageView {
                 id="song-search"
                 class="song-search-input"
                 placeholder="Search songs by title, artist, or lyrics..."
+                .value=${this._search}
                 @input=${event => {
                   this._search = event.target.value
                 }}

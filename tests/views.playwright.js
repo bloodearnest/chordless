@@ -1,4 +1,4 @@
-import { enterEditMode, expect, openApp, seedSetlist, test } from './fixtures.js'
+import { enterEditMode, expect, openApp, seedSetlist, seedSong, test } from './fixtures.js'
 
 // The pages that are views of the app shell change in place: the document, and
 // anything living in it (the media player, to come), stays.
@@ -58,41 +58,41 @@ test.describe('Moving between views', () => {
     await expect(page).toHaveTitle('Storage - Chordless')
   })
 
-  test('every view opens from its URL, with its own title', async ({ page }) => {
-    const views = [
-      ['/', 'home-view', 'Chordless'],
-      ['/storage', 'storage-view', 'Storage - Chordless'],
-      ['/preferences', 'preferences-view', 'Preferences - Chordless'],
-      ['/import-song', 'import-song-view', 'Import Songs - Chordless'],
-      ['/bookmarklet', 'bookmarklet-view', 'Bookmarklet - Chordless'],
-      ['/songs', 'library-view', 'Song Library - Chordless'],
-    ]
-    await openApp(page, '/')
-    for (const [path, tag, title] of views) {
-      await page.goto(path)
-      await expect(page.locator(tag), path).toBeVisible()
-      await expect(page, path).toHaveTitle(title)
+  for (const [path, tag, title] of [
+    ['/', 'home-view', 'Chordless'],
+    ['/storage', 'storage-view', 'Storage - Chordless'],
+    ['/preferences', 'preferences-view', 'Preferences - Chordless'],
+    ['/import-song', 'import-song-view', 'Import Songs - Chordless'],
+    ['/bookmarklet', 'bookmarklet-view', 'Bookmarklet - Chordless'],
+    ['/songs', 'library-view', 'Song Library - Chordless'],
+  ]) {
+    test(`${path} opens ${tag}, titled ${title}`, async ({ page }) => {
+      await openApp(page, path)
+      await expect(page.locator(tag)).toBeVisible()
+      await expect(page).toHaveTitle(title)
       // The only view in the outlet
-      await expect(page.locator('#view-outlet > *'), path).toHaveCount(1)
-    }
-  })
+      await expect(page.locator('#view-outlet > *')).toHaveCount(1)
+    })
+  }
 
-  test('menu links move through the views without loading a page', async ({ page }) => {
-    await openApp(page, '/')
-    await markDocument(page)
-    for (const [name, tag, title] of [
-      ['Import Songs', 'import-song-view', 'Import Songs - Chordless'],
-      ['SongSelect Import', 'bookmarklet-view', 'Bookmarklet - Chordless'],
-      ['Storage', 'storage-view', 'Storage - Chordless'],
-      ['Setlists', 'home-view', 'Chordless'],
-    ]) {
-      await chooseFromMenu(page, name)
-      await expect(page.locator(tag), name).toBeVisible()
-      await expect(page, name).toHaveTitle(title)
-      await expect(page.locator('#view-outlet > *'), name).toHaveCount(1)
-    }
-    expect(await isSameDocument(page)).toBe(true)
-  })
+  for (const [from, link, tag, title] of [
+    ['/', 'Import Songs', 'import-song-view', 'Import Songs - Chordless'],
+    ['/', 'SongSelect Import', 'bookmarklet-view', 'Bookmarklet - Chordless'],
+    ['/', 'Song Library', 'library-view', 'Song Library - Chordless'],
+    ['/storage', 'Setlists', 'home-view', 'Chordless'],
+  ]) {
+    test(`the menu's ${link} link, from ${from}, shows ${tag} without loading a page`, async ({
+      page,
+    }) => {
+      await openApp(page, from)
+      await markDocument(page)
+      await chooseFromMenu(page, link)
+      await expect(page.locator(tag)).toBeVisible()
+      await expect(page).toHaveTitle(title)
+      await expect(page.locator('#view-outlet > *')).toHaveCount(1)
+      expect(await isSameDocument(page)).toBe(true)
+    })
+  }
 
   test('opening a setlist from the home page shows it without loading the page', async ({
     page,
@@ -258,5 +258,108 @@ test.describe('The setlist view', () => {
     await expect(page).toHaveTitle('Not found - Chordless')
     await page.getByRole('link', { name: 'Go to the setlists' }).click()
     await expect(page.locator('home-view')).toBeVisible()
+  })
+})
+
+test.describe('Coming back to a view', () => {
+  test('the library keeps what was searched for', async ({ page }) => {
+    await seedSong(page)
+    await openApp(page, '/songs')
+    await page.locator('#song-search').fill('info')
+    await expect(page.locator('song-list')).toContainText('Info Test Song')
+    await page.locator('#song-search').fill('zzz-nothing')
+    await markDocument(page)
+
+    await chooseFromMenu(page, 'Storage')
+    await expect(page.locator('storage-view')).toBeVisible()
+    await page.goBack()
+
+    await expect(page.locator('library-view')).toBeVisible()
+    await expect(page.locator('#song-search')).toHaveValue('zzz-nothing')
+    await expect(page.locator('song-list')).toContainText('No songs match your search')
+    expect(await isSameDocument(page)).toBe(true)
+  })
+
+  test('a new visit to the library starts with no search', async ({ page }) => {
+    await seedSong(page)
+    await openApp(page, '/songs')
+    await page.locator('#song-search').fill('info')
+    await chooseFromMenu(page, 'Storage')
+    await expect(page.locator('storage-view')).toBeVisible()
+
+    await chooseFromMenu(page, 'Song Library')
+    await expect(page.locator('library-view')).toBeVisible()
+    await expect(page.locator('#song-search')).toHaveValue('')
+  })
+
+  test('the home page keeps the years that were opened', async ({ page }) => {
+    await seedSong(page, { setlistId: 'recent-setlist' })
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      const db = await getCurrentDB()
+      const now = new Date().toISOString()
+      await db.saveSetlist({
+        id: 'old-setlist',
+        date: '2021-03-07',
+        time: '10:30',
+        type: 'Church Service',
+        name: '',
+        owner: 'Ann',
+        songs: [],
+        createdDate: now,
+        modifiedDate: now,
+      })
+    })
+    await page.goto('/')
+    const old = page.locator('setlist-group').filter({ hasText: '2021' })
+    await expect(old).toBeVisible()
+    await expect(old).not.toHaveAttribute('expanded', '')
+    await old.getByRole('button', { name: /2021/ }).click()
+    await expect(old).toHaveAttribute('expanded', '')
+
+    await chooseFromMenu(page, 'Storage')
+    await expect(page.locator('storage-view')).toBeVisible()
+    await page.goBack()
+
+    await expect(page.locator('home-view')).toBeVisible()
+    await expect(old).toHaveAttribute('expanded', '')
+  })
+
+  test('a song comes back scrolled to where it was left', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 500 })
+    await page.goto(`${await seedSetlist(page)}/song/0`)
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    const song = page.locator('#song-0')
+    await song.evaluate(element => {
+      element.scrollTop = 300
+    })
+    await expect.poll(() => song.evaluate(element => element.scrollTop)).toBeGreaterThan(200)
+    const left = await song.evaluate(element => element.scrollTop)
+
+    await chooseFromMenu(page, 'Storage')
+    await expect(page.locator('storage-view')).toBeVisible()
+    await page.goBack()
+
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    await expect
+      .poll(() => page.locator('#song-0').evaluate(element => element.scrollTop))
+      .toBe(left)
+  })
+
+  test('a setlist opened afresh starts at the top', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 500 })
+    const url = `${await seedSetlist(page)}/song/0`
+    await page.goto(url)
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    await page.locator('#song-0').evaluate(element => {
+      element.scrollTop = 300
+    })
+    await chooseFromMenu(page, 'Setlists')
+    await expect(page.locator('home-view')).toBeVisible()
+    await page.locator('setlist-group').first().getByRole('link').first().click()
+    await expect(page.locator('setlist-view')).toBeVisible()
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    expect(await page.locator('#song-0').evaluate(element => element.scrollTop)).toBe(0)
   })
 })

@@ -13,11 +13,17 @@ customElements.define('route-consumer', RouteConsumer)
 
 const startUrl = window.location.pathname + window.location.search
 
-/** A view that records the routes the router gives it */
-function fakeView(name) {
+let captured = 0
+
+/**
+ * A view that records the routes the router gives it. Unless told otherwise it has
+ * state to keep, each capture different, so a test can tell which one it gets back.
+ */
+function fakeView(name, { keepsState = true } = {}) {
   const view = document.createElement('div')
   view.dataset.view = name
   view.routes = []
+  if (keepsState) view.captureViewState = () => ({ name, capture: ++captured })
   Object.defineProperty(view, 'route', {
     get: () => view.routes.at(-1),
     set: route => view.routes.push(route),
@@ -189,9 +195,9 @@ describe('AppRouter', () => {
 
     it('remembers a song was opened from the overview, or the library list', async () => {
       await router.navigate('/setlist/abc/song/0')
-      expect(window.history.state).to.deep.equal({ fromParent: true })
+      expect(window.history.state).to.include({ fromParent: true })
       await router.navigate('/setlist/abc/song/1')
-      expect(window.history.state).to.deep.equal({ fromParent: true })
+      expect(window.history.state).to.include({ fromParent: true })
     })
 
     it('goes back to the overview a song was opened from', async () => {
@@ -422,6 +428,100 @@ describe('AppRouter', () => {
       router.stop()
       expect(consumer.value).to.equal(null)
       host.remove()
+    })
+  })
+
+  describe('coming back to a view', () => {
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+    })
+
+    it('gives the history entries keys: kept by a replace, new for a push', async () => {
+      const first = window.history.state.key
+      expect(first).to.be.a('string')
+      await router.navigate('/songs', { replace: true })
+      expect(window.history.state.key).to.equal(first)
+      await router.navigate('/setlist/abc')
+      expect(window.history.state.key).to.not.equal(first)
+    })
+
+    it('hands back what a view showed when you return with the back button', async () => {
+      const left = router.view.captureViewState()
+      captured-- // the router will capture it again in a moment: the same number comes round
+      await router.navigate('/songs')
+      const back = routeChanged()
+      window.history.back()
+      await back
+      expect(router.view.dataset.view).to.equal('storage')
+      expect(router.view.restoredState).to.deep.equal(left)
+    })
+
+    it('hands back the state of the view you went forward to, too', async () => {
+      await router.navigate('/songs')
+      let changed = routeChanged()
+      window.history.back() // storage, remembering songs' state under its entry
+      await changed
+      changed = routeChanged()
+      window.history.forward()
+      await changed
+      expect(router.view.dataset.view).to.equal('songs')
+      // songs was left when going back: that is what it gets
+      expect(router.view.restoredState).to.include({ name: 'songs' })
+    })
+
+    it('starts a view clean when it is reached by a new navigation', async () => {
+      await router.navigate('/songs')
+      await router.navigate('/storage')
+      expect(router.view.dataset.view).to.equal('storage')
+      expect(router.view.restoredState).to.equal(undefined)
+    })
+
+    it('has nothing to hand back for a view that keeps no state', async () => {
+      views.songs.load = () => fakeView('songs', { keepsState: false })
+      await router.navigate('/songs')
+      await router.navigate('/setlist/abc')
+      const back = routeChanged()
+      window.history.back()
+      await back
+      expect(router.view.dataset.view).to.equal('songs')
+      expect(router.view.restoredState).to.equal(undefined)
+    })
+
+    it('does not capture a view that stays (a move within a setlist)', async () => {
+      await router.navigate('/setlist/abc')
+      const view = router.view
+      const before = captured
+      await router.navigate('/setlist/abc/song/1')
+      expect(router.view).to.equal(view)
+      expect(captured).to.equal(before)
+    })
+
+    /**
+     * Navigate through six entries, ending on another view than the first (moving between
+     * entries of the same view just keeps it), then go back to the first, and say what it
+     * was handed
+     */
+    async function backToTheFirstOfSix() {
+      for (const path of ['/songs', '/storage', '/songs', '/storage', '/songs']) {
+        await router.navigate(path)
+      }
+      const back = routeChanged()
+      window.history.go(-5)
+      await back
+      expect(router.view.dataset.view).to.equal('storage')
+      return router.view.restoredState
+    }
+
+    it('remembers a view for a long trip through the history', async () => {
+      expect(await backToTheFirstOfSix()).to.include({ name: 'storage' })
+    })
+
+    it('forgets the oldest entries when it has too many', async () => {
+      makeRouter({ rememberLimit: 2 })
+      window.history.replaceState(null, '', '/storage')
+      await router.start()
+      expect(await backToTheFirstOfSix()).to.equal(undefined)
     })
   })
 

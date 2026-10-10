@@ -15,6 +15,12 @@
  * leaves the address bar pointing at nothing; a failed load shows an error view.
  * Views own their scrolling, as the page itself does not scroll.
  *
+ * Going back or forward to a view brings it back as it was left: each history
+ * entry has a key, and a view that has `captureViewState()` has what it returns
+ * kept against the entry it was left from; the view shown for that entry again gets
+ * it as `restoredState` (set before it is attached, as `route` is). A new
+ * navigation is a new entry, so starts clean. (Kept in memory: a reload starts clean.)
+ *
  * The current route is also provided as a Lit context (route-context.js), and
  * sent as a RouteChangeEvent.
  */
@@ -41,6 +47,8 @@ export class RouteChangeEvent extends Event {
 
 const ignore = () => undefined
 
+const newKey = () => crypto.randomUUID()
+
 function defaultErrorView() {
   const view = document.createElement('div')
   view.setAttribute('role', 'alert')
@@ -59,6 +67,10 @@ export class AppRouter {
   #view = null
   #navigation = 0
   #started = false
+  // View state by history entry key, and the key of the entry the current view was shown for
+  #viewStates = new Map()
+  #rememberLimit
+  #shownKey = null
 
   /**
    * @param {object} options
@@ -70,6 +82,8 @@ export class AppRouter {
    *   when the view changes
    * @param {(route: object, error: Error) => HTMLElement} [options.errorView]
    *   shown when a view fails to load
+   * @param {number} [options.rememberLimit] how many history entries' view states to keep
+   *   (the browser keeps about 50 entries)
    */
   constructor({
     outlet,
@@ -77,7 +91,9 @@ export class AppRouter {
     transitions = true,
     announcer = null,
     errorView = defaultErrorView,
+    rememberLimit = 50,
   }) {
+    this.#rememberLimit = rememberLimit
     this.#outlet = outlet
     this.#views = views
     this.#transitions = transitions
@@ -113,6 +129,10 @@ export class AppRouter {
     }
     const route = matchRoute(window.location)
     if (!this.handles(route)) return false
+    // The entry we load on needs a key too (state a reload kept has one already)
+    if (!window.history.state?.key) {
+      window.history.replaceState({ ...window.history.state, key: newKey() }, '')
+    }
     await this.#show(route)
     return true
   }
@@ -125,6 +145,8 @@ export class AppRouter {
     this.#view?.remove()
     this.#view = null
     this.#route = null
+    this.#viewStates.clear()
+    this.#shownKey = null
     provideRoute(null)
   }
 
@@ -150,10 +172,14 @@ export class AppRouter {
     const url = buildUrl(route)
     const commit = () => {
       if (action === 'push') {
-        window.history.pushState(isDescent(from, route) ? { fromParent: true } : {}, '', url)
+        const state = { key: newKey() }
+        if (isDescent(from, route)) state.fromParent = true
+        window.history.pushState(state, '', url)
       } else {
-        const fromParent = window.history.state?.fromParent ?? false
-        window.history.replaceState(fromParent ? { fromParent } : {}, '', url)
+        // Replacing keeps the entry, so its key
+        const state = { key: window.history.state?.key ?? newKey() }
+        if (window.history.state?.fromParent) state.fromParent = true
+        window.history.replaceState(state, '', url)
       }
     }
     await this.#show(route, commit)
@@ -216,16 +242,32 @@ export class AppRouter {
     commit()
     view.route = route
     if (!keep) {
+      // What the view being left shows, kept for if its entry is come back to; and what was
+      // kept for the entry this view is for, if it was left before
+      this.#remember(this.#shownKey, this.#view?.captureViewState?.())
+      view.restoredState = this.#viewStates.get(window.history.state?.key)
       await this.#swap(() => this.#outlet.replaceChildren(view))
       if (navigation !== this.#navigation) return
       this.#view = view
     }
+    this.#shownKey = window.history.state?.key ?? null
     this.#route = route
 
     document.title = entry.title?.(route) ?? this.#defaultTitle
     if (!keep) this.#announceView(view, previous)
     provideRoute(route)
     document.dispatchEvent(new RouteChangeEvent(route, previous))
+  }
+
+  /** Keep a view's state against the history entry it was left from, the latest few */
+  #remember(key, state) {
+    if (!key) return
+    this.#viewStates.delete(key)
+    if (state === undefined) return
+    this.#viewStates.set(key, state)
+    if (this.#viewStates.size > this.#rememberLimit) {
+      this.#viewStates.delete(this.#viewStates.keys().next().value)
+    }
   }
 
   /**

@@ -67,9 +67,12 @@ export class SetlistPage {
   /**
    * @param {object} options
    * @param {HTMLElement} options.root the view this page is in: it looks for its elements there
+   * @param {object} [options.restoredState] what captureViewState() gave when the page was
+   *   left, if it is being come back to
    */
-  constructor({ root, setlistId, songIndex = -1 }) {
+  constructor({ root, setlistId, songIndex = -1, restoredState = undefined }) {
     this.root = root
+    this._restoredState = restoredState
     this._setlistId = setlistId
     this._initialSongIndex = songIndex
     // Aborted by dispose(): the listeners that outlive the view are added with its signal
@@ -153,6 +156,25 @@ export class SetlistPage {
   }
 
   /** The route changed within this setlist: show the song it names */
+  /** How far each song (and the overview) is scrolled, to put back if the user returns */
+  captureViewState() {
+    const scrolls = {}
+    for (const section of this.root.querySelectorAll('.section')) {
+      if (section.scrollTop) scrolls[section.id] = section.scrollTop
+    }
+    return Object.keys(scrolls).length > 0 ? { scrolls } : undefined
+  }
+
+  /** Put the sections back where they were scrolled to (once: a reload of the setlist is a fresh start) */
+  _restoreScrolls() {
+    const scrolls = this._restoredState?.scrolls
+    this._restoredState = undefined
+    for (const [id, top] of Object.entries(scrolls ?? {})) {
+      const section = this.root.querySelector(`#${id}`)
+      if (section) section.scrollTop = top
+    }
+  }
+
   routeChanged(route) {
     if (this._disposed || !this.currentSetlist) return
     const index = route.songIndex
@@ -357,6 +379,8 @@ export class SetlistPage {
 
         // Set up Intersection Observer to auto-detect current song
         this.setupSectionObserver()
+
+        this._restoreScrolls()
       })
     } catch (error) {
       console.error('Error loading setlist:', error)

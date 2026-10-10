@@ -47,6 +47,16 @@ the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-c
   `GlobalListeners` (`js/global-listeners.js`) is a reactive controller that removes
   listeners for you; `SetlistPage.dispose()` and `LibraryView` are examples of the rest.
 - Views own their scrolling: the page itself doesn't scroll.
+- **Coming back to a view** with the back or forward button, it should look as it was left.
+  Each history entry has a `key`; when a view is left, the router asks it for
+  `captureViewState()` (anything structured clone accepts, or nothing) and keeps that against
+  the entry, then gives it to the view made for that entry again as `restoredState`
+  (set before attaching, like `route`). A new navigation is a new entry, so starts clean;
+  moving between entries of the same view keeps the live view and restores nothing; a
+  reload forgets (it's kept in memory, for the latest 50 entries).
+  `PageView` keeps the `<main>`'s scroll by default (`restoreScroll()` waits for what the
+  view shows to be tall enough); the library keeps its search and list scroll, the home page
+  the years that were opened, and a setlist how far each song was scrolled.
 
 ## The media player
 
