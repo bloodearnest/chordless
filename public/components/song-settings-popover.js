@@ -1,5 +1,6 @@
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { ref } from 'lit/directives/ref.js'
+import { DialogPopup } from '../js/dialog-popup.js'
 
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {
@@ -21,7 +22,8 @@ export class SongResetClickEvent extends Event {
 /**
  * SongSettingsPopover Component
  *
- * A dropdown popover containing song editing controls (key, capo, BPM, reset).
+ * A popup, in a modal <dialog> under its trigger (see DialogPopup), containing
+ * song editing controls (key, capo, BPM, reset).
  * All controls are rendered directly in this component to ensure proper grid alignment.
  */
 export class SongSettingsPopover extends LitElement {
@@ -131,7 +133,7 @@ export class SongSettingsPopover extends LitElement {
 
   constructor() {
     super()
-    this._popover = createRef()
+    this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
     this.popoverId = 'song-settings-popover'
     this.triggerButton = null
     this.bpmValue = 120
@@ -139,84 +141,37 @@ export class SongSettingsPopover extends LitElement {
     this.bpmMax = 240
   }
 
-  get popover() {
-    return this._popover.value
-  }
-
-  connectedCallback() {
-    super.connectedCallback()
-    this.updateComplete.then(() => {
-      if (this.popover) {
-        this.popover.addEventListener('toggle', e => {
-          if (e.newState === 'open') {
-            this._positionPopover()
-            setTimeout(() => {
-              document.addEventListener('click', this._handleClickOutside)
-            }, 0)
-          } else {
-            document.removeEventListener('click', this._handleClickOutside)
-          }
-        })
-      }
-    })
-    this._handleClickOutside = this._handleClickOutside.bind(this)
-  }
-
-  disconnectedCallback() {
-    super.disconnectedCallback()
-    document.removeEventListener('click', this._handleClickOutside)
-  }
-
-  _handleClickOutside(e) {
-    const popover = this.popover
-    if (!popover) return
-    const clickedInside = e.composedPath().includes(popover)
-    const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton)
-
-    // Check if clicked inside key-selector or capo-selector (including their popovers)
-    const keySelector = document.getElementById('key-selector')
-    const capoSelector = document.getElementById('capo-selector')
-    const clickedKeySelector = keySelector && e.composedPath().includes(keySelector)
-    const clickedCapoSelector = capoSelector && e.composedPath().includes(capoSelector)
-
-    if (!clickedInside && !clickedTrigger && !clickedKeySelector && !clickedCapoSelector) {
-      this.closePopover()
-    }
+  /** The <dialog> (once rendered) */
+  get dialog() {
+    return this._popup.element
   }
 
   setTriggerButton(button) {
     this.triggerButton = button
   }
 
-  _positionPopover() {
-    const popover = this.popover
-    if (!popover || !this.triggerButton) return
+  _positionPopover(dialog) {
+    if (!this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
-    const popoverWidth = popover.offsetWidth
-    const left = Math.min(buttonRect.left, window.innerWidth - popoverWidth - 8)
-    popover.style.top = `${buttonRect.bottom + 4}px`
-    popover.style.left = `${Math.max(8, left)}px`
+    const left = Math.min(buttonRect.left, window.innerWidth - dialog.offsetWidth - 8)
+    dialog.style.top = `${buttonRect.bottom + 4}px`
+    dialog.style.left = `${Math.max(8, left)}px`
   }
 
-  showPopover() {
-    const popover = this.popover
-    this._positionPopover()
-    popover?.showPopover()
+  show() {
+    this._popup.show()
   }
 
-  closePopover() {
-    const popover = this.popover
-    popover?.hidePopover()
+  close() {
+    this._popup.close()
   }
 
-  togglePopover() {
-    const popover = this.popover
-    popover?.togglePopover()
+  toggle() {
+    this._popup.toggle()
   }
 
   isOpen() {
-    const popover = this.popover
-    return popover?.matches(':popover-open') || false
+    return this._popup.isOpen
   }
 
   _handleBPMDecrement() {
@@ -242,7 +197,14 @@ export class SongSettingsPopover extends LitElement {
     const canIncrementBPM = this.bpmValue < this.bpmMax
 
     return html`
-      <div id="${this.popoverId}" ${ref(this._popover)} class="settings-popover" popover="manual">
+      <dialog
+        id="${this.popoverId}"
+        ${ref(this._popup.ref)}
+        class="settings-popover"
+        aria-label="Song settings"
+        @click=${this._popup.onClick}
+        @close=${this._popup.onClose}
+      >
         <div class="settings-content">
           <!-- Row 1: Key selector and Capo selector -->
           <slot name="key-selector"></slot>
@@ -275,7 +237,7 @@ export class SongSettingsPopover extends LitElement {
             Reset
           </button>
         </div>
-      </div>
+      </dialog>
     `
   }
 }

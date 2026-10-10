@@ -1,16 +1,17 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
+import { DialogPopup } from '../js/dialog-popup.js'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
- * a popover of options to choose from. key-selector and capo-selector extend
+ * a popup of options to choose from (a modal <dialog>: see DialogPopup). key-selector and capo-selector extend
  * it, giving their options and the event class they send:
  *
  *   static ChangeEvent = KeyChangeEvent
  *   _options() { return [{ value, label, hint }] }
  *
  * Outside edit mode the value is plain text. Choosing a different option
- * closes the popover and sends a ChangeEvent with the chosen value; the owner
+ * closes the popup and sends a ChangeEvent with the chosen value; the owner
  * sets value in response.
  *
  * Colours follow the text colour (--header-text, for the navy header), so a
@@ -120,7 +121,7 @@ export class OptionPicker extends LitElement {
   constructor() {
     super()
     this._button = createRef()
-    this._popoverRef = createRef()
+    this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
     this.label = ''
     this.editMode = false
   }
@@ -135,23 +136,17 @@ export class OptionPicker extends LitElement {
     return this.value ?? '-'
   }
 
-  _popover() {
-    return this._popoverRef.value
-  }
-
   _choose(value) {
     if (value === this.value) return
-    this._popover()?.hidePopover()
+    this._popup.close()
     this.dispatchEvent(new this.constructor.ChangeEvent(value))
   }
 
   /**
-   * As the popover opens, put it under the button, or above it if there's
+   * As the popup opens, put it under the button, or above it if there's
    * more room there, kept within the screen
    */
-  _positionPopover(event) {
-    if (event.newState !== 'open') return
-    const popover = event.currentTarget
+  _positionPopover(popover) {
     const button = this._button.value.getBoundingClientRect()
     const margin = 8
     const height = popover.offsetHeight
@@ -170,15 +165,23 @@ export class OptionPicker extends LitElement {
   render() {
     return html`
       ${this.label ? html`<span class="meta-label">${this.label}:</span>` : ''}
-      <button ${ref(this._button)} class="picker-button" type="button" popovertarget="options">
+      <button
+        ${ref(this._button)}
+        class="picker-button"
+        type="button"
+        aria-haspopup="dialog"
+        aria-expanded=${this._popup.isOpen ? 'true' : 'false'}
+        @click=${() => this._popup.toggle()}
+      >
         ${this._displayValue()}
       </button>
-      <div
+      <dialog
         id="options"
-        ${ref(this._popoverRef)}
+        ${ref(this._popup.ref)}
         class="picker-popover"
-        popover
-        @toggle=${this._positionPopover}
+        aria-label=${this.label || 'Options'}
+        @click=${this._popup.onClick}
+        @close=${this._popup.onClose}
       >
         ${this._options().map(
           option => html`
@@ -193,7 +196,7 @@ export class OptionPicker extends LitElement {
             </button>
           `
         )}
-      </div>
+      </dialog>
     `
   }
 }

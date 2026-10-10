@@ -4,6 +4,7 @@ import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './app-preferences.js'
 import './icon.js'
+import { DialogPopup } from '../js/dialog-popup.js'
 import { routeContext } from '../js/route-context.js'
 import { HeaderMenuClickEvent } from './app-header.js'
 
@@ -35,7 +36,8 @@ export class MenuSongClickEvent extends Event {
 /**
  * NavMenu Component
  *
- * A navigation menu popover used across the application.
+ * A navigation menu used across the application, shown in a modal <dialog> under
+ * its trigger (see DialogPopup).
  * Contains links to main sections (Setlists, Songs, Preferences, Bookmarklet)
  * and optionally a back button.
  *
@@ -86,6 +88,7 @@ export class NavMenu extends LitElement {
     }
 
     .nav-menu-popover {
+      color: var(--text-color, #2c3e50);
       border: none;
       border-radius: 8px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -177,7 +180,7 @@ export class NavMenu extends LitElement {
 
   constructor() {
     super()
-    this._popover = createRef()
+    this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
     this._preferencesModal = createRef()
     this.showBackButton = false
     this.backLabel = 'Back'
@@ -190,42 +193,17 @@ export class NavMenu extends LitElement {
     new ContextConsumer(this, {
       context: routeContext,
       subscribe: true,
-      callback: () => this.closePopover(),
+      callback: () => this.close(),
     })
   }
 
-  /**
-   * Get the popover element
-   * @returns {HTMLElement|null} The popover element
-   */
-  get popover() {
-    return this._popover.value
+  /** The <dialog> the menu is in (once rendered) */
+  get dialog() {
+    return this._popup.element
   }
 
   connectedCallback() {
     super.connectedCallback()
-    // Set up positioning after the component is rendered
-    this.updateComplete.then(() => {
-      if (this.popover) {
-        this.popover.addEventListener('toggle', e => {
-          if (e.newState === 'open') {
-            // Position the popover before it becomes visible
-            this._positionPopover()
-            // Add click-outside listener when open
-            setTimeout(() => {
-              document.addEventListener('click', this._handleClickOutside)
-            }, 0)
-          } else {
-            // Remove listener when closed
-            document.removeEventListener('click', this._handleClickOutside)
-          }
-        })
-      }
-    })
-
-    // Bind the click outside handler
-    this._handleClickOutside = this._handleClickOutside.bind(this)
-
     // Open from the trigger button, or from an app-header's menu button
     this._onRootClick = this._onRootClick.bind(this)
     this._onNavMenuClick = this._onNavMenuClick.bind(this)
@@ -236,7 +214,6 @@ export class NavMenu extends LitElement {
 
   disconnectedCallback() {
     super.disconnectedCallback()
-    document.removeEventListener('click', this._handleClickOutside)
     this._root?.removeEventListener('click', this._onRootClick)
     this._root?.removeEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
@@ -251,43 +228,24 @@ export class NavMenu extends LitElement {
     this.toggle(e.trigger || e.target)
   }
 
-  /** Open or close the menu, positioned under the trigger button */
-  toggle(trigger) {
-    this.triggerButton = trigger
-    this.togglePopover()
-  }
-
-  _handleClickOutside(e) {
-    const popover = this.popover
-    if (!popover) return
-
-    // Close if clicked outside (browser handles auto-close)
-    const clickedInside = e.composedPath().includes(popover)
-    const clickedTrigger = this.triggerButton && e.composedPath().includes(this.triggerButton)
-
-    if (!clickedInside && !clickedTrigger) {
-      this.closePopover()
-    }
-  }
-
-  // Position the popover relative to the trigger button
-  _positionPopover() {
-    const popover = this.popover
-    if (!popover || !this.triggerButton) return
-
+  // Position the menu under the trigger button
+  _positionPopover(dialog) {
+    if (!this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
-    popover.style.top = `${buttonRect.bottom + 4}px`
-    popover.style.left = `${buttonRect.left}px`
+    dialog.style.top = `${buttonRect.bottom + 4}px`
+    dialog.style.left = `${buttonRect.left}px`
   }
 
   render() {
     return html`
-      <div
+      <dialog
         id="${this.popoverId}"
-        ${ref(this._popover)}
+        ${ref(this._popup.ref)}
         class="nav-menu-popover"
         part="popover"
-        popover="manual"
+        aria-label="Navigation menu"
+        @click=${this._popup.onClick}
+        @close=${this._popup.onClose}
       >
         <nav class="nav-menu" part="nav">
           ${
@@ -371,7 +329,7 @@ export class NavMenu extends LitElement {
             <span>Storage</span>
           </a>
         </nav>
-      </div>
+      </dialog>
 
       <app-modal ${ref(this._preferencesModal)} size="fullscreen" heading="Preferences">
         ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
@@ -382,28 +340,28 @@ export class NavMenu extends LitElement {
   _handleBackClick() {
     this.dispatchEvent(new MenuBackClickEvent())
 
-    // Close the popover after back is clicked
-    this.closePopover()
+    // Close the menu after back is clicked
+    this.close()
   }
 
   _handleOverviewClick() {
     this.dispatchEvent(new MenuOverviewClickEvent())
 
-    // Close the popover after overview is clicked
-    this.closePopover()
+    // Close the menu after overview is clicked
+    this.close()
   }
 
   _handleSongClick(index) {
     this.dispatchEvent(new MenuSongClickEvent(index))
 
-    // Close the popover after song is clicked
-    this.closePopover()
+    // Close the menu after song is clicked
+    this.close()
   }
 
   _handlePreferencesClick() {
-    this.closePopover()
+    this.close()
     this._preferencesOpened = true
-    // Wait for next frame to ensure popover is closed before showing modal
+    // Wait for next frame to ensure the menu is closed before showing the modal
     requestAnimationFrame(() => {
       const modal = this._preferencesModal.value
       if (modal) {
@@ -412,27 +370,24 @@ export class NavMenu extends LitElement {
     })
   }
 
-  // Public API for controlling the popover
-  showPopover() {
-    const popover = this.popover
-    // Position before showing to avoid visual jump
-    this._positionPopover()
-    popover?.showPopover()
+  /** Open the menu, under the trigger button if it has one */
+  show(trigger) {
+    if (trigger) this.triggerButton = trigger
+    this._popup.show()
   }
 
-  closePopover() {
-    const popover = this.popover
-    popover?.hidePopover()
+  close() {
+    this._popup.close()
   }
 
-  togglePopover() {
-    const popover = this.popover
-    popover?.togglePopover()
+  /** Open or close the menu, positioned under the trigger button */
+  toggle(trigger) {
+    if (trigger) this.triggerButton = trigger
+    this._popup.toggle()
   }
 
   isOpen() {
-    const popover = this.popover
-    return popover?.matches(':popover-open') || false
+    return this._popup.isOpen
   }
 }
 

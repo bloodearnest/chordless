@@ -1,6 +1,6 @@
 // App-wide: themes, loading, display preferences, the menu, modals and the
 // storage page
-import { expect, fromDB, seedSong, test } from './fixtures.js'
+import { expect, fromDB, seedSetlist, seedSong, test } from './fixtures.js'
 
 test.describe('Themes', () => {
   test('every page follows the system dark mode', async ({ page }) => {
@@ -191,9 +191,55 @@ test.describe('Navigation menu', () => {
         await expect(menu).toBeVisible({ timeout: 500 })
       }, path).toPass()
       await expect(menu.getByText('Song Library'), path).toBeVisible()
-      await button.click()
+      // The page behind the menu is inert, so tapping the button again lands on the
+      // backdrop over it, which closes the menu
+      const box = await button.boundingBox()
+      await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
       await expect(menu, path).toBeHidden()
     }
+  })
+
+  test.describe('the menu is a modal popup', () => {
+    let menu
+    let openMenu
+
+    test.beforeEach(async ({ page }) => {
+      await seedSetlist(page)
+      await page.goto('/setlist/seeded-setlist')
+      await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+      menu = page.locator('nav-menu .nav-menu-popover')
+      openMenu = async () => {
+        await expect(async () => {
+          await page.getByRole('button', { name: 'Navigation menu' }).click()
+          await expect(menu).toBeVisible({ timeout: 500 })
+        }).toPass()
+      }
+    })
+
+    test('Esc closes it', async ({ page }) => {
+      await openMenu()
+      await page.keyboard.press('Escape')
+      await expect(menu).toBeHidden()
+    })
+
+    test('a tap outside only closes it, without pressing what is under it', async ({ page }) => {
+      await openMenu()
+      const card = await page.locator('setlist-overview song-card').first().boundingBox()
+      await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2)
+      await expect(menu).toBeHidden()
+      // The song under the tap did not open
+      await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)
+    })
+
+    test('the setlist shortcuts wait while it is open', async ({ page }) => {
+      await openMenu()
+      await page.keyboard.press('ArrowRight')
+      await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)
+      await page.keyboard.press('Escape')
+      await expect(menu).toBeHidden()
+      await page.keyboard.press('ArrowRight')
+      await expect(page).toHaveURL(/\/song\/0$/)
+    })
   })
 })
 

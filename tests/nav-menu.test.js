@@ -18,7 +18,7 @@ describe('nav-menu', () => {
     return menu
   }
 
-  /** Wait for the popover's toggle event to have run */
+  /** Let the dialog's close event, and the renders it causes, run */
   const settle = () => new Promise(resolve => setTimeout(resolve))
 
   afterEach(() => container?.remove())
@@ -48,8 +48,8 @@ describe('nav-menu', () => {
     button.click()
     await settle()
     expect(menu.isOpen()).to.equal(true)
-    expect(menu.popover.style.top).to.equal('44px') // 4px below the button
-    expect(menu.popover.style.left).to.equal('20px')
+    expect(menu.dialog.style.top).to.equal('44px') // 4px below the button
+    expect(menu.dialog.style.left).to.equal('20px')
 
     button.click()
     await settle()

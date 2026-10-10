@@ -1556,7 +1556,7 @@ export class SetlistPage {
 
       // Listen to musical metadata clicks (only works in edit mode)
       musicalMetadata.addEventListener(SongSettingsClickEvent.type, () => {
-        songSettingsPopover.togglePopover()
+        songSettingsPopover.toggle()
       })
 
       songSettingsPopover.addEventListener(BpmChangeEvent.type, async e => {
@@ -1565,9 +1565,8 @@ export class SetlistPage {
       })
 
       songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
-        // Close the popover first: it's in the top layer, so it and its
-        // backdrop would cover the confirmation modal
-        songSettingsPopover.closePopover()
+        // Close the settings first, so the question is the only thing showing
+        songSettingsPopover.close()
         const modal = document.getElementById('reset-confirm-modal')
         if (modal) {
           const confirmed = await modal.ask()

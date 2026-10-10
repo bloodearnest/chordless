@@ -137,3 +137,41 @@ test.describe('Media player settings', () => {
     await expect(page.locator('media-player')).toBeHidden()
   })
 })
+
+test.describe('Popups in the song settings', () => {
+  test('a tap outside the key picker, or Esc, closes it and leaves the settings open', async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'popup-test-setlist' })
+    await page.goto('/setlist/popup-test-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await expect(page.locator('#musical-metadata')).toHaveAttribute('edit-mode')
+    await page.locator('#musical-metadata').click()
+    const settings = page.locator('song-settings-popover')
+    await expect.poll(() => settings.evaluate(element => element.isOpen())).toBe(true)
+
+    const key = page.locator('#key-selector')
+    const options = key.locator('.picker-popover')
+    await key.locator('.picker-button').click()
+    await expect(options).toBeVisible()
+    await expect(key.locator('.picker-button')).toHaveAttribute('aria-expanded', 'true')
+
+    // A tap outside. (iPadOS before 18.3 left a popover open for this.)
+    await page.mouse.click(5, 300)
+    await expect(options).toBeHidden()
+    await expect(key.locator('.picker-button')).toHaveAttribute('aria-expanded', 'false')
+    expect(await settings.evaluate(element => element.isOpen())).toBe(true)
+
+    await key.locator('.picker-button').click()
+    await expect(options).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(options).toBeHidden()
+    expect(await settings.evaluate(element => element.isOpen())).toBe(true)
+
+    // The next Esc is the settings'
+    await page.keyboard.press('Escape')
+    await expect.poll(() => settings.evaluate(element => element.isOpen())).toBe(false)
+  })
+})
