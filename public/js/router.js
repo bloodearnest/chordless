@@ -8,6 +8,7 @@
  * A route is a plain object:
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
+ *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
  *   { name: 'preferences' | 'storage' | 'import-song' | 'bookmarklet' }
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
  *                                             /setlist/<id>/song/<n>
@@ -58,17 +59,28 @@ function decode(part) {
 
 /**
  * Parse a location into a route.
- * @param {string | {pathname: string}} location a URL string or path, or a
- *   Location/URL. The query string and hash are ignored.
+ * @param {string | {pathname: string, search?: string}} location a URL string or path,
+ *   or a Location/URL. Only the library's ?q= is read of the query string; the hash is ignored.
  */
 export function matchRoute(location) {
-  const pathname =
-    typeof location === 'string'
-      ? new URL(location, 'http://chordless.invalid').pathname
-      : location.pathname
+  let pathname
+  let search
+  if (typeof location === 'string') {
+    const url = new URL(location, 'http://chordless.invalid')
+    pathname = url.pathname
+    search = url.search
+  } else {
+    pathname = location.pathname
+    search = location.search ?? ''
+  }
   const path = normalizePath(pathname)
 
   const page = PAGES[path]
+  // The library list can be searched: /songs?q=...
+  if (page === 'songs') {
+    const query = new URLSearchParams(search).get('q')
+    return query ? { name: 'songs', search: query } : { name: 'songs' }
+  }
   if (page) return { name: page }
 
   const librarySong = path.match(SONGS_SONG_PATH)
@@ -91,7 +103,8 @@ export function matchRoute(location) {
 export function buildUrl(route) {
   switch (route.name) {
     case 'songs':
-      return route.songUuid ? `/songs/${encodeURIComponent(route.songUuid)}` : '/songs'
+      if (route.songUuid) return `/songs/${encodeURIComponent(route.songUuid)}`
+      return route.search ? `/songs?q=${encodeURIComponent(route.search)}` : '/songs'
     case 'setlist': {
       const base = `/setlist/${encodeURIComponent(route.setlistId)}`
       return route.songIndex >= 0 ? `${base}/song/${route.songIndex}` : base

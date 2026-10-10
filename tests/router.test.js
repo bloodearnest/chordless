@@ -41,8 +41,20 @@ describe('matchRoute', () => {
     ['/', { name: 'home' }],
     ['/index.html', { name: 'home' }],
 
+    // The library list, searched
+    ['/songs?q=grace', { name: 'songs', search: 'grace' }],
+    ['/songs?q=amazing%20grace', { name: 'songs', search: 'amazing grace' }],
+    ['/songs?q=amazing+grace', { name: 'songs', search: 'amazing grace' }],
+    ['/songs?q=', { name: 'songs' }],
+    ['/songs?other=1', { name: 'songs' }],
+    [
+      { pathname: '/songs', search: '?q=hi' },
+      { name: 'songs', search: 'hi' },
+    ],
+
     // A song of the library
     ['/songs/abc-123', { name: 'songs', songUuid: 'abc-123' }],
+    ['/songs/abc-123?q=grace', { name: 'songs', songUuid: 'abc-123' }], // the search is the list's
     ['/songs/abc-123/', { name: 'songs', songUuid: 'abc-123' }],
 
     // A setlist: its overview, or a song when the path names one
@@ -79,6 +91,7 @@ describe('buildUrl', () => {
   const routes = [
     [{ name: 'home' }, '/'],
     [{ name: 'songs' }, '/songs'],
+    [{ name: 'songs', search: 'amazing grace' }, '/songs?q=amazing%20grace'],
     [{ name: 'songs', songUuid: 'abc-123' }, '/songs/abc-123'],
     [{ name: 'preferences' }, '/preferences'],
     [{ name: 'storage' }, '/storage'],

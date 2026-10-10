@@ -12,7 +12,7 @@ const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => resol
  *
  * Coming back to a view with the back or forward button, it should look as it was
  * left. The router asks for `captureViewState()` when the view is left (return
- * something that structured clone accepts, or nothing), and gives what that
+ * something JSON can hold, or nothing), and gives what that
  * returned as `restoredState` when the view is made for that history entry again.
  * By default a view keeps its <main>'s scroll position.
  */

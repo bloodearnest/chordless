@@ -39,7 +39,7 @@ describe('AppRouter', () => {
 
   const makeRouter = (extra = {}) => {
     router?.stop()
-    router = new AppRouter({ outlet, views, transitions: false, ...extra })
+    router = new AppRouter({ outlet, views, transitions: false, storage: null, ...extra })
     return router
   }
   const routeChanged = () =>
@@ -522,6 +522,98 @@ describe('AppRouter', () => {
       window.history.replaceState(null, '', '/storage')
       await router.start()
       expect(await backToTheFirstOfSix()).to.equal(undefined)
+    })
+  })
+
+  describe('across a reload', () => {
+    const STORAGE_KEY = 'chordless:view-states'
+    const storage = window.sessionStorage
+
+    beforeEach(() => storage.removeItem(STORAGE_KEY))
+    afterEach(() => storage.removeItem(STORAGE_KEY))
+
+    /** A new router for the same page, as after a reload: it shares only storage and the history */
+    async function reload() {
+      router.stop()
+      await makeRouter({ storage }).start()
+      return router.view
+    }
+
+    it('hands back the state of a view that was left, to a router that starts afterwards', async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter({ storage }).start()
+      await router.navigate('/songs')
+      const back = routeChanged()
+      window.history.back()
+      await back
+      const left = JSON.parse(storage.getItem(STORAGE_KEY)).find(
+        ([, state]) => state.name === 'storage'
+      )
+      expect(left).to.not.equal(undefined)
+
+      const view = await reload()
+      expect(view.dataset.view).to.equal('storage')
+      expect(view.restoredState).to.deep.equal(left[1])
+    })
+
+    it('keeps the view that is showing when the page is hidden', async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter({ storage }).start()
+      expect(storage.getItem(STORAGE_KEY)).to.equal(null)
+
+      window.dispatchEvent(new Event('pagehide'))
+      const saved = JSON.parse(storage.getItem(STORAGE_KEY))
+      expect(saved).to.have.length(1)
+      expect(saved[0][1]).to.include({ name: 'storage' })
+
+      const view = await reload()
+      expect(view.restoredState).to.deep.equal(saved[0][1])
+    })
+
+    it('keeps it when the tab goes out of sight, but not when it comes back', async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter({ storage }).start()
+      const visible = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState')
+      const setVisibility = value =>
+        Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => value })
+      try {
+        setVisibility('visible')
+        document.dispatchEvent(new Event('visibilitychange'))
+        expect(storage.getItem(STORAGE_KEY)).to.equal(null)
+        setVisibility('hidden')
+        document.dispatchEvent(new Event('visibilitychange'))
+        expect(JSON.parse(storage.getItem(STORAGE_KEY))).to.have.length(1)
+      } finally {
+        delete document.visibilityState
+        Object.defineProperty(Document.prototype, 'visibilityState', visible)
+      }
+    })
+
+    it('starts without state if what is stored cannot be read', async () => {
+      for (const junk of ['not json', '{"a":1}', '42', 'null']) {
+        storage.setItem(STORAGE_KEY, junk)
+        window.history.replaceState(null, '', '/storage')
+        await makeRouter({ storage }).start()
+        expect(router.view.restoredState, junk).to.equal(undefined)
+        router.stop()
+      }
+    })
+
+    it('still works when storage refuses to write', async () => {
+      const full = {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('quota')
+        },
+      }
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter({ storage: full }).start()
+      await router.navigate('/songs')
+      const back = routeChanged()
+      window.history.back()
+      await back
+      // Kept in memory all the same
+      expect(router.view.restoredState).to.include({ name: 'storage' })
     })
   })
 

@@ -19,7 +19,8 @@
  * entry has a key, and a view that has `captureViewState()` has what it returns
  * kept against the entry it was left from; the view shown for that entry again gets
  * it as `restoredState` (set before it is attached, as `route` is). A new
- * navigation is a new entry, so starts clean. (Kept in memory: a reload starts clean.)
+ * navigation is a new entry, so starts clean. The kept state is also in sessionStorage, and
+ * the view being shown is captured as the page is hidden, so a reload restores it too.
  *
  * The current route is also provided as a Lit context (route-context.js), and
  * sent as a RouteChangeEvent.
@@ -49,6 +50,17 @@ const ignore = () => undefined
 
 const newKey = () => crypto.randomUUID()
 
+const STORAGE_KEY = 'chordless:view-states'
+
+/** sessionStorage, if the browser lets this page have it */
+function sessionStorageIfAvailable() {
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
 function defaultErrorView() {
   const view = document.createElement('div')
   view.setAttribute('role', 'alert')
@@ -70,6 +82,7 @@ export class AppRouter {
   // View state by history entry key, and the key of the entry the current view was shown for
   #viewStates = new Map()
   #rememberLimit
+  #storage
   #shownKey = null
 
   /**
@@ -84,6 +97,8 @@ export class AppRouter {
    *   shown when a view fails to load
    * @param {number} [options.rememberLimit] how many history entries' view states to keep
    *   (the browser keeps about 50 entries)
+   * @param {Storage | null} [options.storage] where to keep them across a reload
+   *   (default sessionStorage; null for nowhere)
    */
   constructor({
     outlet,
@@ -92,8 +107,11 @@ export class AppRouter {
     announcer = null,
     errorView = defaultErrorView,
     rememberLimit = 50,
+    storage = sessionStorageIfAvailable(),
   }) {
     this.#rememberLimit = rememberLimit
+    this.#storage = storage
+    this.#loadStates()
     this.#outlet = outlet
     this.#views = views
     this.#transitions = transitions
@@ -126,6 +144,8 @@ export class AppRouter {
       this.#started = true
       document.addEventListener('click', this.#onClick)
       window.addEventListener('popstate', this.#onPopState)
+      window.addEventListener('pagehide', this.#onPageHide)
+      document.addEventListener('visibilitychange', this.#onPageHide)
     }
     const route = matchRoute(window.location)
     if (!this.handles(route)) return false
@@ -140,6 +160,8 @@ export class AppRouter {
   stop() {
     document.removeEventListener('click', this.#onClick)
     window.removeEventListener('popstate', this.#onPopState)
+    window.removeEventListener('pagehide', this.#onPageHide)
+    document.removeEventListener('visibilitychange', this.#onPageHide)
     this.#started = false
     this.#navigation++
     this.#view?.remove()
@@ -184,6 +206,13 @@ export class AppRouter {
     }
     await this.#show(route, commit)
     return true
+  }
+
+  /** The page is going away, or out of sight (a reload, a closed or switched tab): keep the view as it is */
+  #onPageHide = event => {
+    // visibilitychange comes for showing as well as hiding
+    if (event.type === 'visibilitychange' && document.visibilityState !== 'hidden') return
+    this.#remember(this.#shownKey, this.#view?.captureViewState?.())
   }
 
   #onPopState = () => {
@@ -263,10 +292,32 @@ export class AppRouter {
   #remember(key, state) {
     if (!key) return
     this.#viewStates.delete(key)
-    if (state === undefined) return
-    this.#viewStates.set(key, state)
-    if (this.#viewStates.size > this.#rememberLimit) {
-      this.#viewStates.delete(this.#viewStates.keys().next().value)
+    if (state !== undefined) {
+      this.#viewStates.set(key, state)
+      if (this.#viewStates.size > this.#rememberLimit) {
+        this.#viewStates.delete(this.#viewStates.keys().next().value)
+      }
+    }
+    this.#saveStates()
+  }
+
+  /** What was kept before a reload (it must be something JSON can hold) */
+  #loadStates() {
+    try {
+      const saved = JSON.parse(this.#storage?.getItem(STORAGE_KEY) ?? 'null')
+      if (Array.isArray(saved)) {
+        for (const [key, state] of saved) this.#viewStates.set(key, state)
+      }
+    } catch {
+      // unreadable: start without
+    }
+  }
+
+  #saveStates() {
+    try {
+      this.#storage?.setItem(STORAGE_KEY, JSON.stringify([...this.#viewStates]))
+    } catch {
+      // full, or not allowed: the state is kept in memory only
     }
   }
 

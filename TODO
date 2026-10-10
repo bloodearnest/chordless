@@ -15,6 +15,14 @@ bugs
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
 
+navigation
+- When the supported browsers all have the Navigation API (Safari/iOS 26.2, Firefox 147, Chrome
+  102), rewrite AppRouter on it and delete the code the platform then does: link interception,
+  popstate, history entry keys and the view state in sessionStorage (use the entry's state), and
+  the scroll/focus handling. Keep AppRouter the only place that knows. No polyfill for now:
+  @virtualstate/navigation is still alpha (last release Oct 2025), doesn't intercept link clicks
+  (so we'd keep that code), and passes 139 of 306 web-platform tests
+
 dead code
 - song-view-manager.js setupCapoSelector() is never called (setlist-page has its own; the
   library has no capo picker). It also sets capoSelector.key, which isn't a property

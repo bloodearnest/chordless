@@ -262,22 +262,61 @@ test.describe('The setlist view', () => {
 })
 
 test.describe('Coming back to a view', () => {
-  test('the library keeps what was searched for', async ({ page }) => {
+  test('the library search is in the URL, so back, forward and reload keep it', async ({
+    page,
+  }) => {
     await seedSong(page)
     await openApp(page, '/songs')
+    await markDocument(page)
     await page.locator('#song-search').fill('info')
+    await expect(page).toHaveURL(/\/songs\?q=info$/)
     await expect(page.locator('song-list')).toContainText('Info Test Song')
     await page.locator('#song-search').fill('zzz-nothing')
-    await markDocument(page)
+    await expect(page).toHaveURL(/\/songs\?q=zzz-nothing$/)
 
+    // Leaving and coming back
     await chooseFromMenu(page, 'Storage')
     await expect(page.locator('storage-view')).toBeVisible()
     await page.goBack()
-
     await expect(page.locator('library-view')).toBeVisible()
     await expect(page.locator('#song-search')).toHaveValue('zzz-nothing')
     await expect(page.locator('song-list')).toContainText('No songs match your search')
     expect(await isSameDocument(page)).toBe(true)
+
+    // ...and a reload
+    await page.reload()
+    await expect(page.locator('#song-search')).toHaveValue('zzz-nothing')
+    await expect(page.locator('song-list')).toContainText('No songs match your search')
+  })
+
+  test('a link to a search fills the box and filters the list', async ({ page }) => {
+    await seedSong(page)
+    await page.goto('/songs?q=info')
+    await expect(page.locator('#song-search')).toHaveValue('info')
+    await expect(page.locator('song-list')).toContainText('Info Test Song')
+  })
+
+  test('typing a search changes the URL in place, not the history', async ({ page }) => {
+    await seedSong(page)
+    await openApp(page, '/')
+    await chooseFromMenu(page, 'Song Library')
+    await expect(page.locator('library-view')).toBeVisible()
+    for (const text of ['i', 'in', 'inf']) {
+      await page.locator('#song-search').fill(text)
+    }
+    await expect(page).toHaveURL(/\/songs\?q=inf$/)
+
+    // One step back is the page before the library, not an earlier search
+    await page.goBack()
+    await expect(page.locator('home-view')).toBeVisible()
+  })
+
+  test('clearing the search takes it out of the URL', async ({ page }) => {
+    await seedSong(page)
+    await page.goto('/songs?q=info')
+    await expect(page.locator('#song-search')).toHaveValue('info')
+    await page.locator('#song-search').fill('')
+    await expect(page).toHaveURL(/\/songs$/)
   })
 
   test('a new visit to the library starts with no search', async ({ page }) => {
@@ -344,6 +383,51 @@ test.describe('Coming back to a view', () => {
     await expect
       .poll(() => page.locator('#song-0').evaluate(element => element.scrollTop))
       .toBe(left)
+  })
+
+  test('a song stays scrolled through a reload', async ({ page }) => {
+    await page.setViewportSize({ width: 800, height: 500 })
+    await page.goto(`${await seedSetlist(page)}/song/0`)
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    await page.locator('#song-0').evaluate(element => {
+      element.scrollTop = 300
+    })
+    await expect.poll(() => page.locator('#song-0').evaluate(e => e.scrollTop)).toBeGreaterThan(200)
+    const left = await page.locator('#song-0').evaluate(element => element.scrollTop)
+
+    await page.reload()
+
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    await expect.poll(() => page.locator('#song-0').evaluate(e => e.scrollTop)).toBe(left)
+  })
+
+  test('the home page keeps the years that were opened through a reload', async ({ page }) => {
+    await seedSong(page, { setlistId: 'recent-setlist' })
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.js')
+      const db = await getCurrentDB()
+      const now = new Date().toISOString()
+      await db.saveSetlist({
+        id: 'old-setlist',
+        date: '2021-03-07',
+        time: '10:30',
+        type: 'Church Service',
+        name: '',
+        owner: 'Ann',
+        songs: [],
+        createdDate: now,
+        modifiedDate: now,
+      })
+    })
+    await page.goto('/')
+    const old = page.locator('setlist-group').filter({ hasText: '2021' })
+    await old.getByRole('button', { name: /2021/ }).click()
+    await expect(old).toHaveAttribute('expanded', '')
+
+    await page.reload()
+
+    await expect(page.locator('home-view')).toBeVisible()
+    await expect(old).toHaveAttribute('expanded', '')
   })
 
   test('a setlist opened afresh starts at the top', async ({ page }) => {

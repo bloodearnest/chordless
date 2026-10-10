@@ -14,7 +14,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 | URL | Route | View |
 | --- | --- | --- |
 | `/` | `home` | `home-view.js` |
-| `/songs`, `/songs/<uuid>` | `songs` | `library-view.js` |
+| `/songs`, `/songs?q=<search>`, `/songs/<uuid>` | `songs` | `library-view.js` |
 | `/setlist/<id>`, `/setlist/<id>/song/<n>` | `setlist` (`songIndex` -1 is the overview) | `setlist-view.js` |
 | `/storage`, `/preferences`, `/import-song`, `/bookmarklet` | by name | `*-view.js` |
 | anything else | `not-found` | `not-found-view.js` |
@@ -48,15 +48,18 @@ the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-c
   listeners for you; `SetlistPage.dispose()` and `LibraryView` are examples of the rest.
 - Views own their scrolling: the page itself doesn't scroll.
 - **Coming back to a view** with the back or forward button, it should look as it was left.
-  Each history entry has a `key`; when a view is left, the router asks it for
-  `captureViewState()` (anything structured clone accepts, or nothing) and keeps that against
-  the entry, then gives it to the view made for that entry again as `restoredState`
-  (set before attaching, like `route`). A new navigation is a new entry, so starts clean;
-  moving between entries of the same view keeps the live view and restores nothing; a
-  reload forgets (it's kept in memory, for the latest 50 entries).
+  What belongs in the URL goes there: the library's search is `/songs?q=...` (typing replaces
+  the entry, after a short pause), so it survives reload, links and back with no extra code.
+  What doesn't (scroll positions, which years are open) is view state: each history entry has a
+  `key`; when a view is left, or the page is hidden, the router asks it for `captureViewState()`
+  (something JSON can hold, or nothing) and keeps that against the entry, in memory and in
+  `sessionStorage` (the latest 50 entries). When a view is made for that entry again, in
+  response to back, forward or a reload, it gets the state as `restoredState`, set before it
+  attaches like `route`. A new navigation is a new entry, so starts clean; moving between
+  entries of the same view keeps the live view and restores nothing.
   `PageView` keeps the `<main>`'s scroll by default (`restoreScroll()` waits for what the
-  view shows to be tall enough); the library keeps its search and list scroll, the home page
-  the years that were opened, and a setlist how far each song was scrolled.
+  view shows to be tall enough); the library keeps its list scroll, the home page the years
+  that were opened, and a setlist how far each song was scrolled.
 
 ## The media player
 

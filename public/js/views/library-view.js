@@ -74,15 +74,13 @@ export class LibraryView extends PageView {
 
   // ==================== Lifecycle ====================
 
-  /** What was searched for, and how far down the list was scrolled */
+  /** How far down the list was scrolled (what was searched for is in the URL) */
   captureViewState() {
-    return { search: this._search, scroll: this.#libraryList.value?.scrollTop }
+    return { scroll: this.#libraryList.value?.scrollTop }
   }
 
   willUpdate(changed) {
-    if (changed.has('restoredState') && this.restoredState?.search) {
-      this._search = this.restoredState.search
-    }
+    if (changed.has('route')) this.#searchFromRoute()
   }
 
   firstUpdated() {
@@ -100,12 +98,43 @@ export class LibraryView extends PageView {
     super.disconnectedCallback()
     this.#scrollObserver?.disconnect()
     clearTimeout(this.#scrollResetTimeout)
+    clearTimeout(this.#searchTimeout)
     this.#syncing++
     // Edit mode is on <body>, which outlives this view
     this.#setEditMode(false)
   }
 
   // ==================== Route ====================
+
+  /**
+   * What is searched for is in the URL (/songs?q=...), so it survives a reload, can be
+   * linked to, and comes back with the back button. Typing replaces the entry, after a
+   * pause (browsers limit how often the history can be changed).
+   */
+  #searchTimeout = null
+  // The search this view has just put in the URL: the route that follows is its own echo
+  #searchEcho = null
+
+  #typed(value) {
+    this._search = value
+    clearTimeout(this.#searchTimeout)
+    this.#searchTimeout = setTimeout(() => {
+      const search = value.trim()
+      if (this.route?.songUuid || (this.route?.search ?? '') === search) return
+      this.#searchEcho = search
+      goTo(buildUrl({ name: 'songs', search }), { replace: true })
+    }, 250)
+  }
+
+  /** A route that names a search other than one this view put there (a link, reload, back) sets the box */
+  #searchFromRoute() {
+    if (this.route?.songUuid) return
+    const search = this.route?.search ?? ''
+    const echo = this.#searchEcho
+    this.#searchEcho = null
+    if (search === echo) return
+    this._search = search
+  }
 
   /** Show the song the route names, or the list if it names none */
   async #syncSong() {
@@ -515,9 +544,7 @@ export class LibraryView extends PageView {
                 class="song-search-input"
                 placeholder="Search songs by title, artist, or lyrics..."
                 .value=${this._search}
-                @input=${event => {
-                  this._search = event.target.value
-                }}
+                @input=${event => this.#typed(event.target.value)}
               />
             </div>
             <div id="song-library-list" class="song-library-list">
