@@ -8,7 +8,7 @@ import {
   uploadPadFile,
 } from './drive-api.js'
 import { wantsPads } from './media-player-loader.js'
-import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.js'
+import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
 
 /** A different pad set was chosen (sent on window) */
 export class PadSetChangedEvent extends Event {

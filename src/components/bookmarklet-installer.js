@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { bookmarkletUrl } from '../js/songselect-bookmarklet.js'
+import { bookmarkletUrl } from '../js/songselect-bookmarklet.ts'
 
 /**
  * BookmarkletInstaller Component

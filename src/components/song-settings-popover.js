@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
-import { DialogPopup } from '../js/dialog-popup.js'
+import { DialogPopup } from '../js/dialog-popup.ts'
 
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {

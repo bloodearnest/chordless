@@ -4,7 +4,7 @@ import {
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
   NashvillePreferenceEvent,
-} from './preferences.js'
+} from './preferences.ts'
 
 /**
  * How chords are shown, as a Lit context: {nashville, unicodeAccidentals}.

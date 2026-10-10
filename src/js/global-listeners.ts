@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Listeners on window, document and the like, for as long as a Lit element is
  * connected: added when it connects, and all removed when it disconnects.

@@ -6,7 +6,7 @@ import '../components/nav-menu.js'
 import { AppRouter, RouteChangeEvent } from './app-router.js'
 import { checkFirstTimeAuth } from './first-time-auth.js'
 import { startMediaPlayer } from './media-player-loader.js'
-import { setRouter } from './navigation.js'
+import { setRouter } from './navigation.ts'
 import { views } from './views/registry.js'
 
 // Answer the service worker's requests for a Google ID token

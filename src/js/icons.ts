@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Icon library: the inner SVG of each icon, drawn by <app-icon> in a 24x24
  * viewBox as 2px outlines in the current colour.

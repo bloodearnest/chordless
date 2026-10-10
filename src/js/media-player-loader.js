@@ -8,7 +8,7 @@
  * browser version it is: there is no way to tell a slow iPad from a fast one, but
  * Preferences has a switch for the player.
  */
-import { loadMediaSettings } from './media-settings.js'
+import { loadMediaSettings } from './media-settings.ts'
 
 /** Whether this browser has the Web Audio the player is built on */
 export function canPlayAudio(win = window) {

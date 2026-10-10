@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * App-level events with no component to own them. Each module that sends an
  * event defines its class; these are sent by app scripts (setlist-page.js),

@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
-import { DialogPopup } from '../src/js/dialog-popup.js'
+import { DialogPopup } from '../src/js/dialog-popup.ts'
 
 const { describe, it, afterEach } = window
 

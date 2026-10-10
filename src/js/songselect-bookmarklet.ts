@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * The SongSelect bookmarklet.
  *
@@ -29,7 +30,7 @@ export async function importFromSongSelect(chordlessUrl, page = window) {
   const key = keyMatch ? keyMatch[1] : 'C'
 
   // Listen before opening: the import page says it's ready as soon as it loads
-  let resolveReady
+  let resolveReady: () => void
   const ready = new Promise(resolve => {
     resolveReady = resolve
   })
@@ -48,7 +49,7 @@ export async function importFromSongSelect(chordlessUrl, page = window) {
     return
   }
 
-  let message
+  let message: unknown
   try {
     const response = await page.fetch(
       `https://songselect.ccli.com/api/GetSongChordPro?songNumber=${songNumber}&key=${key}&style=Number&columns=1`,

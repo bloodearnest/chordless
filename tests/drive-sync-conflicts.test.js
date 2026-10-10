@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { reconcileRecords, reconcileSetlists, reconcileSongs } from '../src/js/sync/reconciler.js'
+import { reconcileRecords, reconcileSetlists, reconcileSongs } from '../src/js/sync/reconciler.ts'
 
 /**
  * Advanced conflict resolution tests for Drive sync

@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Routes of the app: parsing a URL into a route, building a URL from one, and
  * deciding how a move between two routes touches the browser history.
@@ -63,8 +64,8 @@ function decode(part) {
  *   or a Location/URL. Only the library's ?q= is read of the query string; the hash is ignored.
  */
 export function matchRoute(location) {
-  let pathname
-  let search
+  let pathname: string
+  let search: string
   if (typeof location === 'string') {
     const url = new URL(location, 'http://chordless.invalid')
     pathname = url.pathname

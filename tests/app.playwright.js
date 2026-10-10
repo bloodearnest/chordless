@@ -128,7 +128,7 @@ test.describe('Display preferences', () => {
     await expect(chords.nth(1)).toHaveText('C')
 
     const set = (name, value) =>
-      page.evaluate(async ({ name, value }) => (await import('/js/preferences.js'))[name](value), {
+      page.evaluate(async ({ name, value }) => (await import('/js/preferences.ts'))[name](value), {
         name,
         value,
       })

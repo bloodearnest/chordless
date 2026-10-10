@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Moving to another URL from app code: in place, through the router. (Only where
  * there is no router, as in a test or a dev page, or for a URL it has no view for,

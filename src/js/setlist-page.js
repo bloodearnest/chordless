@@ -16,14 +16,14 @@ import {
 } from '../components/setlist-overview.js'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.js'
-import { SongChangeEvent } from './app-events.js'
+import { SongChangeEvent } from './app-events.ts'
 import { getCurrentDB } from './db.js'
-import { goTo } from './navigation.js'
+import { goTo } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
 import { ChordProParser } from './parser.js'
 import { getOrganisationPeople } from './people.js'
-import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.js'
-import { buildUrl } from './router.js'
+import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
+import { buildUrl } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.js'
 import { OverviewReorder } from './setlist/overview-reorder.js'
 import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.js'
@@ -890,7 +890,7 @@ export class SetlistPage {
   async _applyCapoDefaults() {
     if (!this._capoEnabled) return
 
-    const { getSongUserPrefs } = await import('./song-user-prefs.js')
+    const { getSongUserPrefs } = await import('./song-user-prefs.ts')
 
     this.songs.forEach((song, index) => {
       // Skip if capo already set by setlist state (highest priority)

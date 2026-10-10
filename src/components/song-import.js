@@ -7,7 +7,7 @@ import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.js
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import './app-modal.js'
 import './setlist-details-form.js'
-import { goTo } from '../js/navigation.js'
+import { goTo } from '../js/navigation.ts'
 import { buttonStyles } from './shared-styles.js'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */

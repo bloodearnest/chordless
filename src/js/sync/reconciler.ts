@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 // Generic reconciliation helpers for sync unit tests and future refactors.
 // Accepts in-memory local/remote states and produces a plan of actions
 // (upload, download, delete, noop) without touching IndexedDB or Drive APIs.

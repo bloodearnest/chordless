@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 /** The Nashville numbers preference changed (sent on window) */
 export class NashvillePreferenceEvent extends Event {
   static type = 'preferences:nashville-changed'

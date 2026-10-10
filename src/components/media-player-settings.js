@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.js'
+import { loadMediaSettings, saveMediaSettings } from '../js/media-settings.ts'
 import { PadSetsController } from '../js/pad-sets-controller.js'
 import { fieldStyles, switchStyles } from './shared-styles.js'
 

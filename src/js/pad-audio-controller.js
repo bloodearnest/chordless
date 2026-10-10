@@ -1,4 +1,4 @@
-import { normalizePadKey } from './pad-keys.js'
+import { normalizePadKey } from './pad-keys.ts'
 import { ensurePadKeyCached, getPadCacheUrl, isPadKeyCached } from './pad-set-service.js'
 
 /**

@@ -25,8 +25,8 @@
  * The current route is also provided as a Lit context (route-context.js), and
  * sent as a RouteChangeEvent.
  */
-import { provideRoute } from './route-context.js'
-import { buildUrl, historyAction, isDescent, matchRoute } from './router.js'
+import { provideRoute } from './route-context.ts'
+import { buildUrl, historyAction, isDescent, matchRoute } from './router.ts'
 
 /** The route changed (sent on document, after the new view is showing) */
 export class RouteChangeEvent extends Event {

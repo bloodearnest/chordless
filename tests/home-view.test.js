@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { ROUTE_NAMES } from '../src/js/router.js'
+import { ROUTE_NAMES } from '../src/js/router.ts'
 import { groupSetlistsByYear } from '../src/js/views/home-view.js'
 import { views } from '../src/js/views/registry.js'
 

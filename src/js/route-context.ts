@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 import { ContextProvider, createContext } from '@lit/context'
 
 /**

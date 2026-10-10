@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 import { createRef } from 'lit/directives/ref.js'
 
 /**

@@ -1,4 +1,4 @@
-import { getSongUserPrefs } from '../song-user-prefs.js'
+import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { SongModel } from './song-model.js'
 
 /**

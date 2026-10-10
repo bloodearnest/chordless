@@ -8,7 +8,7 @@ import {
   setMusicianType,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
-} from '../js/preferences.js'
+} from '../js/preferences.ts'
 import './theme-settings.js'
 import './media-player-settings.js'
 import { panelStyles } from './shared-styles.js'

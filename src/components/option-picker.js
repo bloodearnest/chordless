@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { DialogPopup } from '../js/dialog-popup.js'
+import { DialogPopup } from '../js/dialog-popup.ts'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening

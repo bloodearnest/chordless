@@ -1,3 +1,4 @@
+// @ts-nocheck: not typed yet (remove this line when converting)
 export const PAD_FILE_KEYS = Object.freeze([
   'A',
   'A#',
@@ -84,7 +85,7 @@ export function extractPadKeyFromFilename(filename) {
 
   // Fallback: find the last standalone key anywhere in the name
   const globalPattern = /\b([A-Ga-g])([#b♯♭]?)/g
-  let match
+  let match: RegExpExecArray | null
   let candidate = null
   for (
     match = globalPattern.exec(nameWithoutExt);
