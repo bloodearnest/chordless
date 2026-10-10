@@ -1,7 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { live } from 'lit/directives/live.js'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { determineSetlistType } from '../js/db.js'
+import { determineSetlistType } from '../js/db.ts'
 
 /** The form was submitted; details is {date, time, type, name, owner, ownerId} */
 export class SetlistDetailsSaveEvent extends Event {

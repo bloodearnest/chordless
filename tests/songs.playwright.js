@@ -184,7 +184,7 @@ test.describe('Song info', () => {
     // Saved: still there after a reload
     await page.reload()
     const saved = await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       return (await getCurrentDB()).getSetlist('edit-test-setlist')
     })
     expect(saved).toMatchObject({
@@ -209,7 +209,7 @@ test.describe('Song info', () => {
 
     await expect(dialog.locator('setlist-info')).toContainText('Ann')
     const saved = await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       return (await getCurrentDB()).getSetlist('cancel-test-setlist')
     })
     expect(saved.owner).toBe('Ann')

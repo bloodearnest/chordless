@@ -2,6 +2,7 @@
 // Stores metadata about organisations (workspaces) in a separate global database
 // Each organisation then has its own ChordlessDB with songs, setlists, etc.
 
+import type { Organisation } from './data-types.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 /**
@@ -21,36 +22,39 @@ const DB_NAME = 'organisations'
 const DB_VERSION = 1
 
 export class OrganisationDB {
-  constructor() {
-    this.db = null
+  db: IDBDatabase | null = null
+
+  #transaction(mode: IDBTransactionMode): IDBTransaction {
+    if (!this.db) throw new Error('OrganisationDB is not initialised')
+    return this.db.transaction(['organisations'], mode)
   }
 
-  async init() {
+  async init(): Promise<void> {
     if (this.db) {
       return // Already initialized
     }
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(DB_NAME, DB_VERSION)
 
-      request.onerror = event => {
-        console.error('[OrganisationDB] Error opening database:', event.target.error)
+      request.onerror = () => {
+        console.error('[OrganisationDB] Error opening database:', request.error)
         reject(
           new Error(
-            `Failed to open Organisations IndexedDB: ${event.target.error?.message || 'Unknown error'}`
+            `Failed to open Organisations IndexedDB: ${request.error?.message || 'Unknown error'}`
           )
         )
       }
 
-      request.onsuccess = event => {
-        this.db = event.target.result
+      request.onsuccess = () => {
+        this.db = request.result
         console.log('[OrganisationDB] Database initialized successfully')
         ensurePersistentStorage('organisations')
         resolve()
       }
 
-      request.onupgradeneeded = event => {
-        const db = event.target.result
+      request.onupgradeneeded = () => {
+        const db = request.result
 
         console.log('[OrganisationDB] Creating database schema')
 
@@ -66,16 +70,16 @@ export class OrganisationDB {
   /**
    * Create a new organisation
    */
-  async createOrganisation(name) {
-    const organisation = {
+  async createOrganisation(name: string): Promise<Organisation> {
+    const organisation: Organisation = {
       id: crypto.randomUUID(),
       name: name,
       createdDate: new Date().toISOString(),
       modifiedDate: new Date().toISOString(),
     }
 
-    return new Promise((resolve, reject) => {
-      const tx = this.db.transaction(['organisations'], 'readwrite')
+    return new Promise<Organisation>((resolve, reject) => {
+      const tx = this.#transaction('readwrite')
       const request = tx.objectStore('organisations').put(organisation)
       tx.oncomplete = () => resolve(organisation)
       // The failure is the request's (e.g. ConstraintError for a name in use):
@@ -87,12 +91,12 @@ export class OrganisationDB {
   /**
    * Get organisation by ID
    */
-  async getOrganisation(id) {
-    const tx = this.db.transaction(['organisations'], 'readonly')
+  async getOrganisation(id: string): Promise<Organisation | undefined> {
+    const tx = this.#transaction('readonly')
     const store = tx.objectStore('organisations')
     const request = store.get(id)
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Organisation | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -101,13 +105,13 @@ export class OrganisationDB {
   /**
    * Get organisation by name
    */
-  async getOrganisationByName(name) {
-    const tx = this.db.transaction(['organisations'], 'readonly')
+  async getOrganisationByName(name: string): Promise<Organisation | undefined> {
+    const tx = this.#transaction('readonly')
     const store = tx.objectStore('organisations')
     const index = store.index('name')
     const request = index.get(name)
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Organisation | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
@@ -116,12 +120,12 @@ export class OrganisationDB {
   /**
    * Get all organisations
    */
-  async getAllOrganisations() {
-    const tx = this.db.transaction(['organisations'], 'readonly')
+  async getAllOrganisations(): Promise<Organisation[]> {
+    const tx = this.#transaction('readonly')
     const store = tx.objectStore('organisations')
     const request = store.getAll()
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Organisation[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
@@ -130,24 +134,27 @@ export class OrganisationDB {
   /**
    * Update organisation
    */
-  async updateOrganisation(id, updates) {
+  async updateOrganisation(
+    id: string,
+    updates: Partial<Omit<Organisation, 'id'>>
+  ): Promise<Organisation> {
     const org = await this.getOrganisation(id)
     if (!org) {
       throw new Error(`Organisation ${id} not found`)
     }
 
-    const updated = {
+    const updated: Organisation = {
       ...org,
       ...updates,
       id: org.id, // Prevent ID changes
       modifiedDate: new Date().toISOString(),
     }
 
-    const tx = this.db.transaction(['organisations'], 'readwrite')
+    const tx = this.#transaction('readwrite')
     const store = tx.objectStore('organisations')
     await store.put(updated)
 
-    return new Promise((resolve, reject) => {
+    return new Promise<Organisation>((resolve, reject) => {
       tx.oncomplete = () => resolve(updated)
       tx.onerror = () => reject(tx.error)
     })
@@ -156,12 +163,12 @@ export class OrganisationDB {
   /**
    * Delete organisation (does not delete its data database)
    */
-  async deleteOrganisation(id) {
-    const tx = this.db.transaction(['organisations'], 'readwrite')
+  async deleteOrganisation(id: string): Promise<void> {
+    const tx = this.#transaction('readwrite')
     const store = tx.objectStore('organisations')
     await store.delete(id)
 
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })

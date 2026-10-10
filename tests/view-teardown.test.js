@@ -6,7 +6,7 @@
  */
 import { expect } from '@open-wc/testing'
 import '../src/components/nav-menu.js'
-import { getCurrentDB } from '../src/js/db.js'
+import { getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import '../src/js/views/bookmarklet-view.js'
 import '../src/js/views/home-view.js'

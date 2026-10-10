@@ -1,5 +1,5 @@
 import type { LoadedSong, ParsedChart, SectionState } from '../data-types.ts'
-import type { ChordlessDB } from '../db.js'
+import type { ChordlessDB } from '../db.ts'
 import {
   clearSongUserPrefs,
   getSongUserPrefs,

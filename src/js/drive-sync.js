@@ -14,7 +14,7 @@
  * model, but the push path now targets the per-organisation ChordlessDB schema.
  */
 
-import { ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.js'
+import { ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.ts'
 import * as DriveAPI from './drive-api.js'
 import { batchUploadFiles, driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.js'
 import {
@@ -22,8 +22,8 @@ import {
   setlistFileMetadata,
   songFileDetails,
   songFileMetadata,
-} from './drive-metadata.js'
-import { OrganisationDB } from './organisation-db.js'
+} from './drive-metadata.ts'
+import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
 import { chartFields, hashText } from './song-utils.js'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'

@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { getCurrentDB } from '../src/js/db.js'
+import { getCurrentDB } from '../src/js/db.ts'
 import {
   createSong,
   createVariant,

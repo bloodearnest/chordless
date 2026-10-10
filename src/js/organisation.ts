@@ -6,19 +6,20 @@
 // - Current org ID stored in localStorage: current-organisation-id
 // - Current org NAME cached in localStorage: current-organisation-name (for sync access)
 
-import { OrganisationDB } from './organisation-db.js'
+import type { Organisation } from './data-types.ts'
+import { OrganisationDB } from './organisation-db.ts'
 
 const ORGANISATION_ID_KEY = 'current-organisation-id'
 const ORGANISATION_NAME_KEY = 'current-organisation-name'
 const DEFAULT_ORGANISATION_NAME = 'Personal'
 
-let orgDB = null
-let initPromise = null
+let orgDB: OrganisationDB | null = null
+let initPromise: Promise<OrganisationDB> | null = null
 
 /**
  * Get or initialize the organisation database
  */
-async function getOrgDB() {
+async function getOrgDB(): Promise<OrganisationDB> {
   // If we have a DB instance, return it
   if (orgDB) {
     return orgDB
@@ -26,8 +27,7 @@ async function getOrgDB() {
 
   // If initialization is in progress, wait for it
   if (initPromise) {
-    await initPromise
-    return orgDB
+    return initPromise
   }
 
   // Start initialization
@@ -46,29 +46,28 @@ async function getOrgDB() {
     }
   })()
 
-  await initPromise
-  return orgDB
+  return initPromise
 }
 
 /**
  * Get the current organisation from localStorage
  * This is synchronous and reads from cached values
- * @returns {{id: string|null, name: string}} Current organisation {id, name}
+ * @returns Current organisation {id, name}
  */
-export function getCurrentOrganisation() {
+export function getCurrentOrganisation(): { id: string | null; name: string } {
   const id = localStorage.getItem(ORGANISATION_ID_KEY)
   const name = localStorage.getItem(ORGANISATION_NAME_KEY) || DEFAULT_ORGANISATION_NAME
   return { id, name }
 }
 
-let defaultOrganisationPromise = null
+let defaultOrganisationPromise: Promise<Organisation> | null = null
 
 /**
  * The default organisation, created if there isn't one. Callers at the same
  * time share one attempt, so it's only created once; and if another page (or
  * tab) creates it first, it's read back rather than failing on the name.
  */
-function getOrCreateDefaultOrganisation() {
+function getOrCreateDefaultOrganisation(): Promise<Organisation> {
   defaultOrganisationPromise ??= (async () => {
     const db = await getOrgDB()
     const existing = await db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
@@ -78,8 +77,10 @@ function getOrCreateDefaultOrganisation() {
       console.log('[Organisation] Created default organisation:', created.id)
       return created
     } catch (error) {
-      if (error?.name !== 'ConstraintError') throw error
-      return db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
+      if (!(error instanceof Error) || error.name !== 'ConstraintError') throw error
+      const found = await db.getOrganisationByName(DEFAULT_ORGANISATION_NAME)
+      if (!found) throw error
+      return found
     }
   })().finally(() => {
     defaultOrganisationPromise = null
@@ -90,14 +91,14 @@ function getOrCreateDefaultOrganisation() {
 /**
  * Ensure a current organisation exists, creating default if needed
  * Call this on app startup before using getCurrentOrganisation()
- * @returns {Promise<{id: string, name: string}>} Current organisation
+ * @returns Current organisation
  */
-export async function ensureCurrentOrganisation() {
-  const { id } = getCurrentOrganisation()
+export async function ensureCurrentOrganisation(): Promise<{ id: string; name: string }> {
+  const { id, name } = getCurrentOrganisation()
 
   // If we have an org ID, we're good
   if (id) {
-    return getCurrentOrganisation()
+    return { id, name }
   }
 
   // No org set - get or create default
@@ -113,9 +114,9 @@ export async function ensureCurrentOrganisation() {
 /**
  * Get the full current organisation object from database
  * Use this when you need owner, members, timestamps, etc.
- * @returns {Promise<Object>} Current organisation with id, name, owner, members, etc.
+ * @returns Current organisation with id, name, members, etc.
  */
-export async function getCurrentOrganisationFull() {
+export async function getCurrentOrganisationFull(): Promise<Organisation> {
   const db = await getOrgDB()
   const { id } = getCurrentOrganisation()
 
@@ -143,10 +144,13 @@ export async function getCurrentOrganisationFull() {
 /**
  * Set the current organisation by ID
  * Also caches the name in localStorage for synchronous access
- * @param {string} organisationId - ID of organisation to set as current
- * @param {string} organisationName - Name of organisation (optional, will fetch if not provided)
+ * @param organisationId - ID of organisation to set as current
+ * @param organisationName - Name of organisation (optional, will fetch if not provided)
  */
-export async function setCurrentOrganisation(organisationId, organisationName = null) {
+export async function setCurrentOrganisation(
+  organisationId: string,
+  organisationName: string | null = null
+): Promise<void> {
   localStorage.setItem(ORGANISATION_ID_KEY, organisationId)
 
   // Cache the name if provided
@@ -168,9 +172,9 @@ export async function setCurrentOrganisation(organisationId, organisationName = 
 
 /**
  * Switch to a different organisation (saves ID and reloads app)
- * @param {string} organisationId - ID of organisation to switch to
+ * @param organisationId - ID of organisation to switch to
  */
-export async function switchOrganisation(organisationId) {
+export async function switchOrganisation(organisationId: string): Promise<void> {
   // Get the org to cache its name
   try {
     const db = await getOrgDB()
@@ -191,19 +195,18 @@ export async function switchOrganisation(organisationId) {
 
 /**
  * Get all organisations
- * @returns {Promise<Array>} Array of organisation objects
  */
-export async function listOrganisations() {
+export async function listOrganisations(): Promise<Organisation[]> {
   const db = await getOrgDB()
   return await db.getAllOrganisations()
 }
 
 /**
  * Create a new organisation
- * @param {string} name - Name of the organisation
- * @returns {Promise<Object>} Created organisation object
+ * @param name - Name of the organisation
+ * @returns Created organisation object
  */
-export async function createOrganisation(name) {
+export async function createOrganisation(name: string): Promise<Organisation> {
   const db = await getOrgDB()
   return await db.createOrganisation(name)
 }
@@ -211,11 +214,14 @@ export async function createOrganisation(name) {
 /**
  * Rename an organisation
  * Updates the name in the database (ID stays the same, so no data migration needed!)
- * @param {string} organisationId - ID of organisation to rename
- * @param {string} newName - New name for the organisation
- * @returns {Promise<Object>} Updated organisation object
+ * @param organisationId - ID of organisation to rename
+ * @param newName - New name for the organisation
+ * @returns Updated organisation object
  */
-export async function renameOrganisation(organisationId, newName) {
+export async function renameOrganisation(
+  organisationId: string,
+  newName: string
+): Promise<Organisation> {
   const db = await getOrgDB()
 
   // Get current org
@@ -244,10 +250,10 @@ export async function renameOrganisation(organisationId, newName) {
 
 /**
  * Get organisation by name
- * @param {string} name - Organisation name
- * @returns {Promise<Object|null>} Organisation object or null
+ * @param name - Organisation name
+ * @returns Organisation object, if there is one
  */
-export async function getOrganisationByName(name) {
+export async function getOrganisationByName(name: string): Promise<Organisation | undefined> {
   const db = await getOrgDB()
   return await db.getOrganisationByName(name)
 }
@@ -255,9 +261,9 @@ export async function getOrganisationByName(name) {
 /**
  * Delete an organisation and its data database
  * WARNING: This is destructive and cannot be undone
- * @param {string} organisationId - ID of organisation to delete
+ * @param organisationId - ID of organisation to delete
  */
-export async function deleteOrganisation(organisationId) {
+export async function deleteOrganisation(organisationId: string): Promise<void> {
   const db = await getOrgDB()
   const org = await db.getOrganisation(organisationId)
 

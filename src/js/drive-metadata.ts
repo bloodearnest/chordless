@@ -9,7 +9,19 @@
  * it can't go stale here.
  */
 
+import type { ChordProRecord, ParsedChart, Setlist, SongRecord } from './data-types.ts'
 import { ChordProParser } from './parser.ts'
+
+/** The name, type and appProperties a Drive file is created or updated with */
+export interface DriveFileMetadata {
+  name: string
+  mimeType: string
+  appProperties: Record<string, string>
+}
+
+export interface FileMetadataOptions {
+  organisationId?: string
+}
 
 export const APP_VERSION = '1.0.0'
 
@@ -39,7 +51,7 @@ const parser = new ChordProParser()
  * ("Leaders - Tue" -> "leaders---tue"), as they always have, so existing files
  * keep their names.
  */
-function slug(text, { collapseDashes }) {
+function slug(text: string, { collapseDashes }: { collapseDashes: boolean }): string {
   const s = String(text)
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
@@ -51,7 +63,9 @@ function slug(text, { collapseDashes }) {
  * Setlist filename: date-leader-type[-name].json
  * e.g. "2025-11-10-john-smith-church-service.json"
  */
-export function setlistFilename(setlist) {
+export function setlistFilename(
+  setlist: Pick<Setlist, 'id' | 'date' | 'owner' | 'type' | 'name'>
+): string {
   const parts = [setlist.date || setlist.id]
   for (const part of [setlist.owner, setlist.type, setlist.name]) {
     const s = part ? slug(part, { collapseDashes: false }) : ''
@@ -61,16 +75,18 @@ export function setlistFilename(setlist) {
 }
 
 /** Chord chart filename: title[-ccli].txt, e.g. "amazing-grace-4779.txt" */
-export function chordproFilename(title, ccliNumber) {
+export function chordproFilename(title: string, ccliNumber?: string | null): string {
   const base = slug(title, { collapseDashes: true })
   return `${ccliNumber ? `${base}-${ccliNumber}` : base}.txt`
 }
 
 /**
  * Metadata for a setlist's Drive file.
- * @returns {{name: string, mimeType: string, appProperties: object}}
  */
-export function setlistFileMetadata(setlist, { organisationId }) {
+export function setlistFileMetadata(
+  setlist: Pick<Setlist, 'id' | 'date' | 'owner' | 'type' | 'name'>,
+  { organisationId }: FileMetadataOptions
+): DriveFileMetadata {
   return {
     name: setlistFilename(setlist),
     mimeType: 'application/json',
@@ -83,8 +99,13 @@ export function setlistFileMetadata(setlist, { organisationId }) {
 }
 
 /** The title, CCLI number and variant label a song's file is named and labelled by */
-export function songFileDetails(song, chordproFile) {
-  const parsed = chordproFile ? parser.parse(chordproFile.content) : { metadata: {} }
+export function songFileDetails(
+  song: Partial<SongRecord>,
+  chordproFile?: Pick<ChordProRecord, 'content'> | null
+): { title: string; ccliNumber: string; variantLabel: string } {
+  const parsed: Pick<ParsedChart, 'metadata'> = chordproFile
+    ? parser.parse(chordproFile.content)
+    : { metadata: {} }
   return {
     title: song.title || parsed.metadata?.title || 'Untitled',
     ccliNumber: song.ccliNumber || '',
@@ -95,9 +116,12 @@ export function songFileDetails(song, chordproFile) {
 
 /**
  * Metadata for a song variant's chord chart file.
- * @returns {{name: string, mimeType: string, appProperties: object}}
  */
-export function songFileMetadata(song, chordproFile, { organisationId }) {
+export function songFileMetadata(
+  song: Partial<SongRecord> & Pick<SongRecord, 'id'>,
+  chordproFile: Pick<ChordProRecord, 'content'> | null | undefined,
+  { organisationId }: FileMetadataOptions
+): DriveFileMetadata {
   const { title, ccliNumber, variantLabel } = songFileDetails(song, chordproFile)
   return {
     name: chordproFilename(title, ccliNumber),
@@ -122,7 +146,10 @@ export function songFileMetadata(song, chordproFile, { organisationId }) {
  * Metadata for updating an existing file: name and appProperties (not mimeType,
  * which doesn't change), with retired appProperties removed.
  */
-export function forUpdate({ name, appProperties }, kind) {
+export function forUpdate(
+  { name, appProperties }: Pick<DriveFileMetadata, 'name' | 'appProperties'>,
+  kind: 'setlist' | 'song'
+): { name: string; appProperties: Record<string, string | null> } {
   const retired = kind === 'setlist' ? RETIRED_SETLIST_PROPERTIES : RETIRED_SONG_PROPERTIES
   return {
     name,

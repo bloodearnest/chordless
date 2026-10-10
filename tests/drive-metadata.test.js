@@ -5,7 +5,7 @@ import {
   setlistFileMetadata,
   setlistFilename,
   songFileMetadata,
-} from '../src/js/drive-metadata.js'
+} from '../src/js/drive-metadata.ts'
 
 const { describe, it } = window
 

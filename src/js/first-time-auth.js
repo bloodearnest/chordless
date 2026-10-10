@@ -6,7 +6,7 @@
  */
 
 import { getCurrentUserInfo } from './google-auth.js'
-import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.js'
+import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.ts'
 
 const FIRST_AUTH_KEY = 'first-auth-done'
 

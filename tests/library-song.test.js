@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { ChordlessDB } from '../src/js/db.js'
+import { ChordlessDB } from '../src/js/db.ts'
 import { LibrarySong } from '../src/js/models/library-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { suppressConsoleLogs } from './test-helpers.js'

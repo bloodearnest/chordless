@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { ChordlessDB, createSetlist } from '../src/js/db.js'
+import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.js'
 
 const uniqueName = () =>

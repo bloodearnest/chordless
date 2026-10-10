@@ -1,5 +1,5 @@
-import { ChordlessDB } from '/js/db.js'
-import { OrganisationDB } from '/js/organisation-db.js'
+import { ChordlessDB } from '/js/db.ts'
+import { OrganisationDB } from '/js/organisation-db.ts'
 
 const output = document.getElementById('output')
 

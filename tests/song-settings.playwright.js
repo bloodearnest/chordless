@@ -6,7 +6,7 @@ test.describe('Song settings', () => {
     await seedSong(page, { setlistId: 'bpm-test-setlist' })
     // Give the library song a tempo of its own
     await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
       const chart = await db.getChordPro('chordpro-info-test')
       await db.saveChordPro({

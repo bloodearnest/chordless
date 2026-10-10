@@ -15,7 +15,7 @@
  * Song and setlist file names and appProperties come from drive-metadata.js.
  */
 
-import { APP_VERSION } from './drive-metadata.js'
+import { APP_VERSION } from './drive-metadata.ts'
 import * as GoogleAuth from './google-auth.js'
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'

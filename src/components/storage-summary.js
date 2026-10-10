@@ -135,7 +135,7 @@ export class StorageSummary extends LitElement {
 
   /** Counts and sizes of the setlists, songs and caches stored in this browser */
   async _loadStats() {
-    const { getCurrentDB } = await import('../js/db.js')
+    const { getCurrentDB } = await import('../js/db.ts')
     const db = await getCurrentDB()
 
     const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()])

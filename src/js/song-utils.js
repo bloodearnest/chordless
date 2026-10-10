@@ -6,7 +6,7 @@
  * Each variant is a separate song document linked by variantOf field.
  */
 
-import { getCurrentDB, normalizeTitle } from './db.js'
+import { getCurrentDB, normalizeTitle } from './db.ts'
 import { ChordProParser } from './parser.ts'
 import { hashText } from './utils/hash.ts'
 

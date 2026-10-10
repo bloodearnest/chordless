@@ -162,3 +162,28 @@ export interface SetlistLocalState {
   sectionVisibility: Record<string, unknown>
   lastUsedDate: string
 }
+
+// ==================== Organisations ====================
+
+/** A person the organisation's Drive folder is shared with (cached at each sync) */
+export interface OrganisationMember {
+  email: string
+  name?: string
+  role?: string
+}
+
+/** The 'organisations' store: an organisation's identity and its link to Drive */
+export interface Organisation {
+  id: string
+  name: string
+  createdDate: string
+  modifiedDate: string
+  driveFolderId?: string | null
+  members?: OrganisationMember[]
+}
+
+/** A person who can lead setlists: id is their Google account email (empty if only a name) */
+export interface Person {
+  id: string
+  name: string
+}

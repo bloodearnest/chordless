@@ -117,7 +117,7 @@ test.describe('Reloads on purpose, while offline', () => {
       await Promise.all([
         page.waitForEvent('load'),
         page.evaluate(async () => {
-          const { getCurrentOrganisation, switchOrganisation } = await import('/js/organisation.js')
+          const { getCurrentOrganisation, switchOrganisation } = await import('/js/organisation.ts')
           await switchOrganisation(getCurrentOrganisation().id)
         }),
       ])

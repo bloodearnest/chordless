@@ -6,7 +6,7 @@ import {
   getCurrentOrganisation,
   listOrganisations,
   switchOrganisation,
-} from '../js/organisation.js'
+} from '../js/organisation.ts'
 import './app-modal.js'
 import './icon.js'
 import { buttonStyles, fieldStyles } from './shared-styles.js'

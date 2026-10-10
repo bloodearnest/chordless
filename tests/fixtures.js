@@ -45,7 +45,7 @@ export async function waitForServiceWorker(page) {
 export async function seedSong(page, { setlistId = null } = {}) {
   await openApp(page, '/songs')
   await page.evaluate(async setlistId => {
-    const { getCurrentDB } = await import('/js/db.js')
+    const { getCurrentDB } = await import('/js/db.ts')
     const db = await getCurrentDB()
     const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
     await db.saveChordPro({
@@ -83,7 +83,7 @@ export /** Call a method of the app's database, e.g. fromDB(page, 'getSong', uui
 function fromDB(page, method, arg) {
   return page.evaluate(
     async ({ method, arg }) => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       return (await getCurrentDB())[method](arg)
     },
     { method, arg }
@@ -105,7 +105,7 @@ export async function seedSetlist(page, { setlistId = 'seeded-setlist' } = {}) {
   await openApp(page, '/songs')
   await page.evaluate(
     async ({ setlistId, songs }) => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
       const now = new Date().toISOString()
       const entries = []

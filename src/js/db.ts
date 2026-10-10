@@ -1,3 +1,12 @@
+import type {
+  ChordProRecord,
+  ParsedChart,
+  Setlist,
+  SetlistLocalState,
+  SongInput,
+  SongRecord,
+  TempoInput,
+} from './data-types.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
@@ -11,14 +20,18 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 const DB_VERSION = 6
 
 // Setlist types
-export const SETLIST_TYPES = {
+export const SETLIST_TYPES: Readonly<Record<string, string>> = {
   CHURCH_SERVICE: 'Church Service',
   PRAYER_MEETING: 'Prayer Meeting',
   EVENT: 'Event',
   OTHER: 'Other',
 }
 
-function cloneForStorage(value, path = '') {
+/**
+ * A copy of a value that IndexedDB can store: dates as ISO strings, functions, symbols and
+ * promises dropped. What goes in is what comes out, apart from those.
+ */
+function cloneForStorage(value: unknown, path = ''): unknown {
   if (value === null || value === undefined) {
     return value
   }
@@ -38,13 +51,14 @@ function cloneForStorage(value, path = '') {
   }
 
   if (type === 'object') {
-    if (typeof value.then === 'function' && typeof value.catch === 'function') {
+    const object = value as Record<string, unknown>
+    if (typeof object.then === 'function' && typeof object.catch === 'function') {
       console.warn(`[ChordlessDB] Dropping Promise at ${path || '<root>'} before storage`)
       return null
     }
 
-    const cloned = {}
-    for (const [key, val] of Object.entries(value)) {
+    const cloned: Record<string, unknown> = {}
+    for (const [key, val] of Object.entries(object)) {
       if (typeof val === 'function' || typeof val === 'symbol') {
         console.warn(
           `[ChordlessDB] Dropping non-serializable property ${path ? `${path}.` : ''}${key}`
@@ -67,8 +81,41 @@ function cloneForStorage(value, path = '') {
   return value
 }
 
+/** A time a song was played in a setlist (see getSongUsageFromSetlists) */
+export interface SongUsage {
+  setlistId: string
+  setlistDate: string
+  setlistName: string
+  leader: string
+  type: string
+  playedInKey: string | null
+  order: number
+}
+
+/** A setlist from before the current schema (see migrateSetlist) */
+interface LegacySetlist extends Partial<Omit<Setlist, 'songs'>> {
+  id: string
+  date: string
+  leader?: string
+  createdAt?: string
+  updatedAt?: string
+  songs?: {
+    order?: number
+    songId: string
+    songUuid?: string
+    key?: string | null
+    tempo?: TempoInput
+    notes?: string
+    modifications?: { targetKey?: string; bpmOverride?: TempoInput }
+  }[]
+}
+
 export class ChordlessDB {
-  constructor(organisationId) {
+  dbName: string
+  organisationId: string
+  db: IDBDatabase | null
+
+  constructor(organisationId: string) {
     if (!organisationId) {
       throw new Error('organisationId is required for ChordlessDB')
     }
@@ -80,22 +127,28 @@ export class ChordlessDB {
     this.db = null
   }
 
-  async init() {
-    return new Promise((resolve, reject) => {
+  /** A transaction on some stores; the database must have been opened with init() */
+  #transaction(stores: string[], mode: IDBTransactionMode): IDBTransaction {
+    if (!this.db) throw new Error('ChordlessDB is not initialised: call init() first')
+    return this.db.transaction(stores, mode)
+  }
+
+  async init(): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
       const request = indexedDB.open(this.dbName, DB_VERSION)
 
       request.onerror = () => {
         reject(new Error('Failed to open IndexedDB'))
       }
 
-      request.onsuccess = event => {
-        this.db = event.target.result
+      request.onsuccess = () => {
+        this.db = request.result
         resolve()
         ensurePersistentStorage(this.organisationId)
       }
 
       request.onupgradeneeded = event => {
-        const db = event.target.result
+        const db = request.result
         const oldVersion = event.oldVersion
 
         console.log(`[ChordlessDB] Upgrading ${this.dbName} from v${oldVersion} to v${DB_VERSION}`)
@@ -128,7 +181,8 @@ export class ChordlessDB {
           setlistStore.createIndex('owner', 'owner', { unique: false })
         } else {
           // Add owner index if upgrading from old version
-          const transaction = event.target.transaction
+          const transaction = request.transaction
+          if (!transaction) throw new Error('No upgrade transaction')
           const setlistStore = transaction.objectStore('setlists')
           if (!setlistStore.indexNames.contains('owner')) {
             console.log('[ChordlessDB] Adding owner index to setlists')
@@ -142,8 +196,8 @@ export class ChordlessDB {
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
-        if (oldVersion > 0 && oldVersion < 6) {
-          migrateTemposToNumbers(event.target.transaction)
+        if (oldVersion > 0 && oldVersion < 6 && request.transaction) {
+          migrateTemposToNumbers(request.transaction)
         }
 
         // Clean up old stores
@@ -157,12 +211,12 @@ export class ChordlessDB {
 
   // Setlist operations
   /** Save a setlist (its songs' tempos as numbers); resolves with what was stored */
-  async saveSetlist(setlist) {
-    const tx = this.db.transaction(['setlists'], 'readwrite')
+  async saveSetlist(setlist: Setlist): Promise<Setlist> {
+    const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
-    const stored = cloneForStorage(withNumericTempos(setlist))
+    const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
     store.put(stored)
-    return new Promise((resolve, reject) => {
+    return new Promise<Setlist>((resolve, reject) => {
       tx.oncomplete = () => resolve(stored)
       tx.onerror = () => reject(tx.error)
     })
@@ -171,10 +225,10 @@ export class ChordlessDB {
   /**
    * Batch save multiple setlists in one transaction (faster)
    */
-  async saveSetlistsBatch(setlists) {
+  async saveSetlistsBatch(setlists: Setlist[]): Promise<void> {
     if (setlists.length === 0) return
 
-    const tx = this.db.transaction(['setlists'], 'readwrite')
+    const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
 
     // Queue all puts in one transaction
@@ -188,28 +242,28 @@ export class ChordlessDB {
     })
   }
 
-  async getSetlist(id) {
-    const tx = this.db.transaction(['setlists'], 'readonly')
+  async getSetlist(id: string): Promise<Setlist | undefined> {
+    const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.get(id)
-    return new Promise((resolve, reject) => {
+    return new Promise<Setlist | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
   }
 
-  async getAllSetlists() {
-    const tx = this.db.transaction(['setlists'], 'readonly')
+  async getAllSetlists(): Promise<Setlist[]> {
+    const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.getAll()
-    return new Promise((resolve, reject) => {
+    return new Promise<Setlist[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
   }
 
-  async deleteSetlist(id) {
-    const tx = this.db.transaction(['setlists'], 'readwrite')
+  async deleteSetlist(id: string): Promise<void> {
+    const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
     await store.delete(id)
     return new Promise((resolve, reject) => {
@@ -220,21 +274,21 @@ export class ChordlessDB {
 
   // Song operations (per-organisation)
   /** Save a song (its tempos as numbers); resolves with what was stored */
-  async saveSong(song) {
-    const tx = this.db.transaction(['songs'], 'readwrite')
+  async saveSong(song: SongInput): Promise<SongRecord> {
+    const tx = this.#transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
     store.put(stored)
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord>((resolve, reject) => {
       tx.oncomplete = () => resolve(stored)
       tx.onerror = () => reject(tx.error)
     })
   }
 
-  async saveSongsBatch(songs) {
+  async saveSongsBatch(songs: SongInput[]): Promise<void> {
     if (songs.length === 0) return
 
-    const tx = this.db.transaction(['songs'], 'readwrite')
+    const tx = this.#transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
 
     for (const song of songs) {
@@ -247,122 +301,122 @@ export class ChordlessDB {
     })
   }
 
-  async getSong(uuid) {
-    const tx = this.db.transaction(['songs'], 'readonly')
+  async getSong(uuid: string): Promise<SongRecord | undefined> {
+    const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const request = store.get(uuid)
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
   }
 
-  async getAllSongs() {
-    const tx = this.db.transaction(['songs'], 'readonly')
+  async getAllSongs(): Promise<SongRecord[]> {
+    const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const request = store.getAll()
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
   }
 
-  async findSongByCCLI(ccliNumber) {
-    const tx = this.db.transaction(['songs'], 'readonly')
+  async findSongByCCLI(ccliNumber: string): Promise<SongRecord[]> {
+    const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const index = store.index('ccliNumber')
     const request = index.getAll(ccliNumber)
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
   }
 
-  async findSongByNormalizedTitle(titleNormalized) {
-    const tx = this.db.transaction(['songs'], 'readonly')
+  async findSongByNormalizedTitle(titleNormalized: string): Promise<SongRecord[]> {
+    const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const index = store.index('titleNormalized')
     const request = index.getAll(titleNormalized)
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
   }
 
-  async getSongVariants(songId) {
-    const tx = this.db.transaction(['songs'], 'readonly')
+  async getSongVariants(songId: string): Promise<SongRecord[]> {
+    const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const index = store.index('id')
     const request = index.getAll(songId)
-    return new Promise((resolve, reject) => {
+    return new Promise<SongRecord[]>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result || [])
       request.onerror = () => reject(request.error)
     })
   }
 
-  async getDefaultSongVariant(songId) {
+  async getDefaultSongVariant(songId: string): Promise<SongRecord | null> {
     const variants = await this.getSongVariants(songId)
     return variants.find(v => v.isDefault) || variants[0] || null
   }
 
-  async deleteSong(uuid) {
-    const tx = this.db.transaction(['songs'], 'readwrite')
+  async deleteSong(uuid: string): Promise<void> {
+    const tx = this.#transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
     await store.delete(uuid)
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
   // ChordPro operations (per-organisation)
-  async saveChordPro(chordpro) {
-    const tx = this.db.transaction(['chordpro'], 'readwrite')
+  async saveChordPro(chordpro: ChordProRecord): Promise<void> {
+    const tx = this.#transaction(['chordpro'], 'readwrite')
     const store = tx.objectStore('chordpro')
     await store.put(chordpro)
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
-  async getChordPro(id) {
-    const tx = this.db.transaction(['chordpro'], 'readonly')
+  async getChordPro(id: string): Promise<ChordProRecord | undefined> {
+    const tx = this.#transaction(['chordpro'], 'readonly')
     const store = tx.objectStore('chordpro')
     const request = store.get(id)
-    return new Promise((resolve, reject) => {
+    return new Promise<ChordProRecord | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
   }
 
-  async deleteChordPro(id) {
-    const tx = this.db.transaction(['chordpro'], 'readwrite')
+  async deleteChordPro(id: string): Promise<void> {
+    const tx = this.#transaction(['chordpro'], 'readwrite')
     const store = tx.objectStore('chordpro')
     await store.delete(id)
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
-  async findChordProByContentHash(contentHash) {
-    const tx = this.db.transaction(['chordpro'], 'readonly')
+  async findChordProByContentHash(contentHash: string): Promise<ChordProRecord | undefined> {
+    const tx = this.#transaction(['chordpro'], 'readonly')
     const store = tx.objectStore('chordpro')
     const index = store.index('contentHash')
     const request = index.get(contentHash)
-    return new Promise((resolve, reject) => {
+    return new Promise<ChordProRecord | undefined>((resolve, reject) => {
       request.onsuccess = () => resolve(request.result)
       request.onerror = () => reject(request.error)
     })
   }
 
   // Local state operations (per-setlist, per-user)
-  async getLocalState(setlistId) {
-    const tx = this.db.transaction(['setlist_local'], 'readonly')
+  async getLocalState(setlistId: string): Promise<SetlistLocalState> {
+    const tx = this.#transaction(['setlist_local'], 'readonly')
     const store = tx.objectStore('setlist_local')
     const request = store.get(setlistId)
-    return new Promise((resolve, reject) => {
+    return new Promise<SetlistLocalState>((resolve, reject) => {
       request.onsuccess = () => {
         // Return defaults if not found
         resolve(
@@ -380,44 +434,44 @@ export class ChordlessDB {
     })
   }
 
-  async saveLocalState(localState) {
-    const tx = this.db.transaction(['setlist_local'], 'readwrite')
+  async saveLocalState(localState: SetlistLocalState): Promise<void> {
+    const tx = this.#transaction(['setlist_local'], 'readwrite')
     const store = tx.objectStore('setlist_local')
     await store.put(localState)
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
-  async updateLastUsed(setlistId) {
+  async updateLastUsed(setlistId: string): Promise<void> {
     const state = await this.getLocalState(setlistId)
     state.lastUsedDate = new Date().toISOString()
     return this.saveLocalState(state)
   }
 
-  async deleteLocalState(setlistId) {
-    const tx = this.db.transaction(['setlist_local'], 'readwrite')
+  async deleteLocalState(setlistId: string): Promise<void> {
+    const tx = this.#transaction(['setlist_local'], 'readwrite')
     const store = tx.objectStore('setlist_local')
     await store.delete(setlistId)
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
   // Song Usage operations (workspace-specific)
-  async getSongUsageFromSetlists(songId) {
+  async getSongUsageFromSetlists(songId: string): Promise<SongUsage[]> {
     if (!songId) return []
 
-    const tx = this.db.transaction(['setlists'], 'readonly')
+    const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.getAll()
 
-    return new Promise((resolve, reject) => {
+    return new Promise<SongUsage[]>((resolve, reject) => {
       request.onsuccess = () => {
-        const setlists = request.result || []
-        const appearances = []
+        const setlists: Setlist[] = request.result || []
+        const appearances: SongUsage[] = []
 
         for (const setlist of setlists) {
           if (!Array.isArray(setlist.songs)) continue
@@ -445,11 +499,11 @@ export class ChordlessDB {
   }
 
   // Migrate a setlist from old schema to new schema
-  migrateSetlist(oldSetlist) {
+  migrateSetlist(oldSetlist: LegacySetlist): Setlist {
     // Generate UUID if setlist has date-based ID
     const needsNewId = /^\d{4}-\d{2}-\d{2}/.test(oldSetlist.id)
 
-    const newSetlist = {
+    const newSetlist: Setlist = {
       id: needsNewId ? crypto.randomUUID() : oldSetlist.id,
       date: oldSetlist.date,
       time: oldSetlist.time || '10:30',
@@ -457,7 +511,7 @@ export class ChordlessDB {
       name: oldSetlist.name || '',
       owner: oldSetlist.owner || oldSetlist.leader || '', // Rename leader → owner
       songs: (oldSetlist.songs || []).map(song => ({
-        order: song.order,
+        order: song.order ?? 0,
         songId: song.songId,
         songUuid: song.songUuid || song.songId, // Use songId as fallback if songUuid missing
         key: song.key !== undefined ? song.key : song.modifications?.targetKey || null,
@@ -476,8 +530,9 @@ export class ChordlessDB {
   }
 
   // Migrate all setlists in database to new schema
-  async migrateAllSetlists() {
-    const allSetlists = await this.getAllSetlists()
+  async migrateAllSetlists(): Promise<number> {
+    // Old records may still have the old schema's fields
+    const allSetlists = (await this.getAllSetlists()) as LegacySetlist[]
     let migratedCount = 0
 
     for (const setlist of allSetlists) {
@@ -510,20 +565,20 @@ export class ChordlessDB {
 
   // Clear setlists, songs and charts, keeping per-setlist device state
   // (setlist_local). Used to reset from Drive.
-  async clearSyncedData() {
-    const tx = this.db.transaction(['setlists', 'songs', 'chordpro'], 'readwrite')
+  async clearSyncedData(): Promise<void> {
+    const tx = this.#transaction(['setlists', 'songs', 'chordpro'], 'readwrite')
     for (const name of ['setlists', 'songs', 'chordpro']) {
       tx.objectStore(name).clear()
     }
-    return new Promise((resolve, reject) => {
+    return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
       tx.onerror = () => reject(tx.error)
     })
   }
 
   // Clear all data (for re-import)
-  async clearAll() {
-    const tx = this.db.transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite')
+  async clearAll(): Promise<void> {
+    const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite')
 
     const setlistStore = tx.objectStore('setlists')
     const songStore = tx.objectStore('songs')
@@ -543,7 +598,7 @@ export class ChordlessDB {
 }
 
 // Utility functions
-export function normalizeTitle(title) {
+export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
     .replace(/[^\w\s]/g, '') // Remove punctuation
@@ -551,7 +606,7 @@ export function normalizeTitle(title) {
     .trim()
 }
 
-export function hashText(text) {
+export function hashText(text: string): string {
   // Simple hash for conflict detection
   let hash = 0
   for (let i = 0; i < text.length; i++) {
@@ -570,10 +625,10 @@ export function hashText(text) {
  *   "150 (1/8)" -> { bpm: 150, note: "1/8" }
  *   "150 (8th note)" -> { bpm: 150, note: "1/8" }
  *
- * @param {string} tempoStr - Tempo string from ChordPro metadata
- * @returns {{bpm: number|null, note: string}} - Parsed tempo and note subdivision
+ * @param tempoStr - Tempo string from ChordPro metadata
+ * @returns Parsed tempo and note subdivision
  */
-export function parseTempo(tempoStr) {
+export function parseTempo(tempoStr: TempoInput): { bpm: number | null; note: string } {
   if (!tempoStr) {
     return { bpm: null, note: '1/4' }
   }
@@ -611,19 +666,8 @@ export function parseTempo(tempoStr) {
   return { bpm, note }
 }
 
-/**
- * Format tempo for display as "BPM/note"
- * Examples:
- *   150, "1/4" -> "150"
- *   150, "1/8" -> "150/8"
- *   150, "1/16" -> "150/16"
- *
- * @param {number|null} bpm - The BPM number
- * @param {string} tempoNote - The note subdivision (e.g., "1/4", "1/8")
- * @returns {string} - Formatted tempo string
- */
 /** A tempo (number, or a chart's text such as '72' or '150 (1/8)') as a number of BPM, or null */
-export function tempoBpm(tempo) {
+export function tempoBpm(tempo: TempoInput): number | null {
   return parseTempo(tempo).bpm
 }
 
@@ -632,20 +676,20 @@ export function tempoBpm(tempo) {
  * whatever a caller passes (a chart's text, from an import, Drive or an older
  * record), what's stored is a number or null.
  */
-function numericTempo(tempo) {
+function numericTempo(tempo: TempoInput): number | null | undefined {
   return tempo == null || typeof tempo === 'number' ? tempo : tempoBpm(tempo)
 }
 
 /** The song with its tempo and original tempo as numbers */
-function withNumericSongTempos(song) {
+function withNumericSongTempos(song: SongInput): SongRecord {
   const tempo = numericTempo(song.tempo)
   const originalTempo = numericTempo(song.originalTempo)
-  if (tempo === song.tempo && originalTempo === song.originalTempo) return song
-  return { ...song, tempo, originalTempo }
+  if (tempo === song.tempo && originalTempo === song.originalTempo) return song as SongRecord
+  return { ...song, tempo: tempo ?? null, originalTempo: originalTempo ?? null }
 }
 
 /** The setlist with each song's tempo a number (older setlists may hold a chart's text) */
-export function withNumericTempos(setlist) {
+export function withNumericTempos<T extends { songs?: { tempo?: TempoInput }[] }>(setlist: T): T {
   if (!Array.isArray(setlist?.songs)) return setlist
   return {
     ...setlist,
@@ -662,18 +706,20 @@ export function withNumericTempos(setlist) {
  * chart's text). A setlist that was in sync stays in sync: its synced hash is
  * refreshed for the converted content.
  */
-function migrateTemposToNumbers(transaction) {
-  transaction.objectStore('songs').openCursor().onsuccess = event => {
-    const cursor = event.target.result
+function migrateTemposToNumbers(transaction: IDBTransaction) {
+  const songs = transaction.objectStore('songs').openCursor()
+  songs.onsuccess = () => {
+    const cursor = songs.result
     if (!cursor) return
     const converted = withNumericSongTempos(cursor.value)
     if (converted !== cursor.value) cursor.update(converted)
     cursor.continue()
   }
-  transaction.objectStore('setlists').openCursor().onsuccess = event => {
-    const cursor = event.target.result
+  const setlists = transaction.objectStore('setlists').openCursor()
+  setlists.onsuccess = () => {
+    const cursor = setlists.result
     if (!cursor) return
-    const setlist = cursor.value
+    const setlist: Setlist = cursor.value
     const converted = withNumericTempos(setlist)
     if (JSON.stringify(converted) !== JSON.stringify(setlist)) {
       if (setlist.syncedContentHash && setlist.syncedContentHash === setlistContentHash(setlist)) {
@@ -685,7 +731,17 @@ function migrateTemposToNumbers(transaction) {
   }
 }
 
-export function formatTempo(bpm, tempoNote = '1/4') {
+/**
+ * Format tempo for display as "BPM/note"
+ * Examples:
+ *   150, "1/4" -> "150"
+ *   150, "1/8" -> "150/8"
+ *   150, "1/16" -> "150/16"
+ *
+ * @param bpm - The BPM number
+ * @param tempoNote - The note subdivision (e.g., "1/4", "1/8")
+ */
+export function formatTempo(bpm: number | null | undefined, tempoNote = '1/4'): string {
   if (!bpm) return ''
 
   // If quarter note (default), just show BPM
@@ -706,15 +762,15 @@ export function formatTempo(bpm, tempoNote = '1/4') {
  * Helper to get current organisation database
  * Returns a database instance for the currently active organisation
  */
-export async function getCurrentDB() {
-  const { ensureCurrentOrganisation } = await import('./organisation.js')
+export async function getCurrentDB(): Promise<ChordlessDB> {
+  const { ensureCurrentOrganisation } = await import('./organisation.ts')
   const { id } = await ensureCurrentOrganisation()
   const db = new ChordlessDB(id)
   await db.init()
   return db
 }
 
-export function generateSongId(parsed) {
+export function generateSongId(parsed: ParsedChart): string {
   // Prefer CCLI number as deterministic ID
   if (parsed.metadata.ccliSongNumber || parsed.metadata.ccli) {
     const ccli = parsed.metadata.ccliSongNumber || parsed.metadata.ccli
@@ -728,9 +784,9 @@ export function generateSongId(parsed) {
   return `song-${crypto.randomUUID()}`
 }
 
-export function extractLyricsText(parsed) {
+export function extractLyricsText(parsed: ParsedChart): string {
   // Extract lyrics from parsed structure for search
-  const lyrics = []
+  const lyrics: string[] = []
   for (const section of parsed.sections) {
     for (const line of section.lines) {
       for (const segment of line.segments) {
@@ -748,7 +804,7 @@ export function extractLyricsText(parsed) {
 /**
  * Get the next Sunday from today
  */
-export function getNextSunday() {
+export function getNextSunday(): Date {
   const today = new Date()
   const dayOfWeek = today.getDay()
   const daysUntilSunday = dayOfWeek === 0 ? 7 : 7 - dayOfWeek
@@ -761,7 +817,7 @@ export function getNextSunday() {
 /**
  * Determine setlist type based on date and name
  */
-export function determineSetlistType(dateString, name) {
+export function determineSetlistType(dateString: string, name?: string | null): string {
   const date = parseLocalDate(dateString)
   const dayOfWeek = date.getDay()
 
@@ -787,7 +843,21 @@ export function determineSetlistType(dateString, name) {
 /**
  * Create a new setlist object with defaults
  */
-export function createSetlist({ date, time, type, name, owner, ownerId } = {}) {
+export function createSetlist({
+  date,
+  time,
+  type,
+  name,
+  owner,
+  ownerId,
+}: {
+  date?: string | Date
+  time?: string
+  type?: string
+  name?: string
+  owner?: string
+  ownerId?: string
+} = {}): Setlist {
   const setlistDate = date || getNextSunday()
   const dateString = typeof setlistDate === 'string' ? setlistDate : toLocalDateString(setlistDate)
 

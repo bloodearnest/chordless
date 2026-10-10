@@ -7,7 +7,7 @@ import {
   getOrganisationByName,
   listOrganisations,
   setCurrentOrganisation,
-} from '../src/js/organisation.js'
+} from '../src/js/organisation.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 

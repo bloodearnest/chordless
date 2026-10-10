@@ -334,7 +334,7 @@ test.describe('Coming back to a view', () => {
   test('the home page keeps the years that were opened', async ({ page }) => {
     await seedSong(page, { setlistId: 'recent-setlist' })
     await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
       const now = new Date().toISOString()
       await db.saveSetlist({
@@ -404,7 +404,7 @@ test.describe('Coming back to a view', () => {
   test('the home page keeps the years that were opened through a reload', async ({ page }) => {
     await seedSong(page, { setlistId: 'recent-setlist' })
     await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.js')
+      const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
       const now = new Date().toISOString()
       await db.saveSetlist({

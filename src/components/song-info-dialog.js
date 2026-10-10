@@ -36,7 +36,7 @@ export class SongInfoDialog extends LitElement {
     this._load = new Task(this, {
       autoRun: false,
       task: async ([songId, title], { signal }) => {
-        const db = this.db ?? (await (await import('../js/db.js')).getCurrentDB())
+        const db = this.db ?? (await (await import('../js/db.ts')).getCurrentDB())
         const { getSongById } = await import('../js/song-utils.js')
         const [song, usage] = await Promise.all([
           getSongById(songId, db),

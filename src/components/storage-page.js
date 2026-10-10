@@ -577,7 +577,7 @@ export class StoragePage extends LitElement {
     const modal = this._clearDataModal.value
     if (!(await modal.ask())) return
     try {
-      const { getCurrentDB } = await import('../js/db.js')
+      const { getCurrentDB } = await import('../js/db.ts')
       const db = await getCurrentDB()
       await db.clearAll()
       localStorage.clear()
