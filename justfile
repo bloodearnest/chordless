@@ -34,6 +34,14 @@ test-node:
 serve:
     npm run dev
 
+# Build the app and the Worker into dist/
+build:
+    npm run build
+
+# Serve the build in dist/ on port 8788
+preview: build
+    npm run preview -- --port 8788
+
 deploy:
     npm run deploy
 

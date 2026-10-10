@@ -23,13 +23,29 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      testIgnore: 'built.playwright.js',
+    },
+    {
+      // The production build, as `vite preview` serves it: the service worker with its
+      // precache, which the dev server does not have
+      name: 'built',
+      use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:8788' },
+      testMatch: 'built.playwright.js',
     },
   ],
 
-  webServer: {
-    command: 'npm run dev',
-    url: 'http://localhost:8787',
-    reuseExistingServer: !process.env.CI,
-    timeout: 120 * 1000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      url: 'http://localhost:8787',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+    {
+      command: 'npm run build && npm run preview -- --port 8788 --strictPort',
+      url: 'http://localhost:8788',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+  ],
 })

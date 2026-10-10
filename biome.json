@@ -138,6 +138,12 @@
       }
     },
     {
+      "includes": ["src/service-worker.js"],
+      "javascript": {
+        "globals": ["google", "__PRECACHE__", "__CACHE_VERSION__"]
+      }
+    },
+    {
       "includes": ["tests/**/*.js"],
       "linter": {
         "rules": {

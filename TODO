@@ -15,29 +15,29 @@ bugs
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
 
-browser support (parked until the Vite work has landed)
+browser support (the Vite work has landed: this is next)
 - Goal: work on older tablets and phones, not just current Safari/Chrome, as others will use it.
   Target: Safari/iOS 15.4, which covers every device that can run iOS/iPadOS 15.8 (iPad Air 2,
   mini 4, the 2017 iPad, iPhone 6s/7/SE 1st gen). Lower (iOS 12 to 14, e.g. iPad Air 1) would
   need a legacy polyfill build: not worth it unless asked. .browserslistrc still says Safari 17.5,
   Chrome 120: it was set for one person's modern devices
-- Until Vite is in, the real floor is Safari 16.4, because pages use an import map (the Vite
-  production build bundles the code, so the import maps go). So: do this after the Vite work,
-  and set .browserslistrc to the agreed floor then, not before
+- The import maps are gone (Vite bundles), and the service worker is classic, so what limits the
+  floor now is the build target and the CSS. Vite does not read .browserslistrc: set
+  build.target (and build.cssTarget) in vite.config.js to the agreed floor along with
+  .browserslistrc, and check the built JS and CSS on an old device
 - Then: handle the 42 color-mix() uses (Safari 16.2): 20 are `color-mix(in srgb, currentColor
   N%, transparent)`, which a fallback colour or an opacity will do; the other 22 mix a theme
   colour (danger 9, success 7, primary 4, warning 2), so they need derived theme variables
   (e.g. --color-danger-tint) in theme-manager; check .at(), structuredClone,
-  crypto.randomUUID and dialog use against 15.4; make the service worker classic (not a module)
-  for old Android Chrome, if Vite can emit it; update the README line "targets recent browsers
-  only" and the browser line in CLAUDE.md
+  crypto.randomUUID and dialog use against 15.4; update the README line "targets recent
+  browsers only" and the browser line in CLAUDE.md. (The classic service worker is done)
 - Core is setlist navigation (reading and moving through the setlist, offline). The media player
   is optional and may be off on older devices: it is not loaded when the device has no Web Audio
   or it is switched off in Preferences (media-player-loader.js), and a player that fails to load
   is a warning, not an error. Don't make the core depend on it
 - Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often old, often on
-  poor wifi. So: the app must open offline from its cache (needs the full precache from the Vite
-  work), data must survive the weeks between (the install nag, below), and a signed-in session
+  poor wifi. So: the app must open offline from its cache (done: the build precaches everything,
+  tests/built.playwright.js), data must survive the weeks between (the install nag, below), and a signed-in session
   and the Drive link must still work after weeks (test an expired token with no network: local
   setlists must still show)
 - Already done: no Popover API (menu, song settings, key/capo picker are modal <dialog>s via
@@ -53,6 +53,11 @@ navigation
   the scroll/focus handling. Keep AppRouter the only place that knows. No polyfill for now:
   @virtualstate/navigation is still alpha (last release Oct 2025), doesn't intercept link clicks
   (so we'd keep that code), and passes 139 of 306 web-platform tests
+
+build
+- public/icons holds the icon tooling too (justfile, generate-favicons.sh, favicon-base.svg
+  as the source), so they are published with the site. Move the tooling out of public/ (the
+  service worker's precache already skips the two scripts)
 
 dead code
 - song-view-manager.js setupCapoSelector() is never called (setlist-page has its own; the
@@ -83,12 +88,10 @@ preferences
     poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 offline
-- the service worker precaches a hand-written list of files (ASSETS in
-  service-worker.js), missing most modules: the rest are cached only when first fetched,
-  so a page that dynamically imports one (first-time-auth.js, song-utils.js, ...) can
-  fail offline if it hasn't been loaded online yet. Precache every app module, keeping
-  the list in step with the files (a test that compares it with src/ would do, as
-  there's no build step). Also check CDN_ASSETS still matches what pages load
+- the new precache is atomic per version, but nothing tells the user an update is ready: a
+  new service worker takes over on the next visit (skipWaiting + claim) and an open page keeps
+  its old files until it reloads. Decide whether to say "update available" (or reload at a safe
+  moment: never mid-song)
 
 storage/sync
 - db.js and organisation-db.js reject failed writes with tx.error (14 places), which is

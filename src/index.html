@@ -47,7 +47,7 @@
         if (firstInstall) sessionStorage.setItem('sw-first-load', '1');
 
         navigator.serviceWorker
-          .register('/service-worker.js', { type: 'module' })
+          .register('/service-worker.js')
           // Wait until it is active: a page that starts loading before then is not
           // controlled, and clients.claim() does not reach a page still being made
           .then(() => navigator.serviceWorker.ready)

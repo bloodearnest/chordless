@@ -1,40 +1,24 @@
 // Service Worker for offline-first operation
+// Built as a classic script by vite-plugins/service-worker.js, which defines the two
+// constants below: the files to precache, and a version (a hash of them)
 import * as AuthDB from '/js/auth-db.js'
 
 // Handles routing and offline caching
 
-const CACHE_NAME = 'cache-v2'
+const PRECACHE = __PRECACHE__
+const PRECACHED = new Set(PRECACHE)
+const CACHE_NAME = `cache-${__CACHE_VERSION__}`
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 const RUNTIME_CACHE_NAME = 'runtime-v1'
 
-// Only cache critical files needed for offline app shell
-// Other assets (icons, images, fonts) are cached at runtime on first request
-const ASSETS = [
-  '/',
-  '/css/style.css',
-  '/js/parser.js',
-  '/js/setlist-page.js',
-  '/js/views/setlist-view.js',
-  '/js/app.js',
-  '/js/app-router.js',
-  '/js/router.js',
-  '/js/route-context.js',
-  '/js/navigation.js',
-  '/js/views/registry.js',
-  '/js/db.js',
-  '/js/transpose.js',
-  '/js/theme-manager.js',
-  '/js/icons.js',
-  '/components/media-player.js',
-  '/components/media-player-settings.js',
-  '/components/shared-styles.js',
-  '/components/icon.js',
-  '/manifest.webmanifest',
-]
-
 // Install service worker and cache assets
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)))
+  event.waitUntil(
+    caches
+      .open(CACHE_NAME)
+      // Bypass the HTTP cache: a file with no hash in its name must be this version's
+      .then(cache => cache.addAll(PRECACHE.map(url => new Request(url, { cache: 'reload' }))))
+  )
   self.skipWaiting()
 })
 
@@ -343,6 +327,18 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  // Built files, precached when this version installed: named by hash (or versioned with
+  // the cache), so the cached copy is the right one. Everything else of the app's is below.
+  if (PRECACHED.has(url.pathname) && url.pathname !== '/') {
+    event.respondWith(
+      caches
+        .open(CACHE_NAME)
+        .then(cache => cache.match(url.pathname))
+        .then(cached => cached ?? fetch(event.request))
+    )
+    return
+  }
+
   // JS/CSS: always network-first, bypassing HTTP cache, fallback to SW cache for offline
   if (url.pathname.match(/\.(css|js)$/)) {
     event.respondWith(
@@ -390,7 +386,7 @@ self.addEventListener('fetch', event => {
             // Only cache full responses (200), not partial responses (206)
             if (response.ok && response.status === 200) {
               const responseToCache = response.clone()
-              caches.open(CACHE_NAME).then(cache => {
+              caches.open(RUNTIME_CACHE_NAME).then(cache => {
                 cache.put(event.request, responseToCache)
                 console.log('[SW] Cached pad for offline use:', url.pathname)
               })
@@ -467,11 +463,16 @@ async function handleRoute() {
     const response = await fetch(htmlFile)
     if (response.ok) {
       // Clone now: once the page is returned its body is being read, and can't be cloned
-      const copy = response.clone()
-      caches.open(CACHE_NAME).then(cache => cache.put(htmlFile, copy))
+      // With a precache the cached shell stays the one that goes with the cached files: a
+      // newer shell would name files this version has not got, which fails offline.
+      if (PRECACHE.length === 0) {
+        const copy = response.clone()
+        caches.open(CACHE_NAME).then(cache => cache.put(htmlFile, copy))
+      }
     }
     return response
   } catch {
-    return (await caches.match(htmlFile)) ?? new Response('Offline', { status: 503 })
+    const cache = await caches.open(CACHE_NAME)
+    return (await cache.match(htmlFile)) ?? new Response('Offline', { status: 503 })
   }
 }

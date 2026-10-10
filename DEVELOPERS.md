@@ -1,7 +1,9 @@
 # Developing Chordless
 
-There is no build step: the files in `src/` are what gets served. Commands are run
-with [`just`](https://github.com/casey/just); run `just` on its own to list them.
+The app is in `src/` (and `public/` for the icons and manifest), and the Worker in
+`worker/`. In development Vite serves `src/` as it is, with no build step; `just build`
+bundles it for production (see [docs/BUILD.md](docs/BUILD.md)). Commands are run with
+[`just`](https://github.com/casey/just); run `just` on its own to list them.
 
 ## Setup
 
@@ -28,8 +30,8 @@ Without it the app still runs, but you can't sign in or sync with Drive.
 just serve    # http://localhost:8787
 ```
 
-`just serve` runs the app's Cloudflare Worker locally. It serves `src/` and handles
-the OAuth and session routes. The first visit registers the service worker,
+`just serve` runs Vite with the Cloudflare plugin: one server that serves `src/` and
+runs the app's Worker (the OAuth and session routes) in workerd, as in production. The first visit registers the service worker,
 and the page reloads once it is active. In DevTools, filter the console for `[SW]` to
 see its logs.
 
@@ -62,14 +64,15 @@ just format lint test
 | Recipe | What it does |
 | --- | --- |
 | `just setup` | First-time setup (see above) |
-| `just vendor` | Copies vendored dependencies from `node_modules` into `src/vendor/` |
-| `just deploy` | Deploys the Worker and `src/` to Cloudflare |
+| `just build` | Builds the app and the Worker into `dist/` |
+| `just preview` | Serves the build in `dist/` on port 8788, as production would |
+| `just deploy` | Builds, then deploys the Worker and the built app to Cloudflare |
 | `just secrets` | Pushes the secrets in `.dev.vars` to Cloudflare |
 
 ## Conventions
 
-- Vanilla JavaScript only. Never add a build step; npm is only for managing the
-  versions of vendored libraries, which are served locally as modules.
+- Vanilla JavaScript and Lit, with Vite as the only tooling: nothing is transpiled or
+  generated in development. Dependencies are npm packages imported by name.
 - Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
   native browser features.
 - Components are [Lit](https://lit.dev/) web components in `src/components/`.
@@ -79,7 +82,7 @@ just format lint test
 `src/dev/` holds pages for developing components visually, in isolation. With
 `just serve` running, open http://localhost:8787/dev/ for the list.
 
-- They are only served locally: `just serve` uses the `[env.dev]` environment in
+- They are not part of the build (only `src/index.html` is), and are only served locally: `just serve` uses the `[env.dev]` environment in
   `wrangler.toml`, which sets `DEV_PAGES`. The worker returns 404 for `/dev/*` without
   it, so they never reach production. Put other local-only settings in `[env.dev]` too.
 - When adding a page, link it from `src/dev/index.html` and use absolute paths

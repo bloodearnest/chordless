@@ -34,9 +34,9 @@ worship team. Churches are expected to hold a CCLI licence. See
 ## How it's built
 
 Chordless is deliberately plain: vanilla JavaScript modules and
-[Lit](https://lit.dev/) web components, with **no build step**. Dependencies are
-vendored and served locally. It's an offline-first PWA: a service worker caches the
-app, and data is kept in IndexedDB. A small Cloudflare Worker serves the files and
+[Lit](https://lit.dev/) web components, with [Vite](https://vite.dev/) serving them in
+development (no build step there) and bundling them for production. It's an offline-first
+PWA: a service worker precaches the whole app, and data is kept in IndexedDB. A small Cloudflare Worker serves the files and
 handles Google sign-in. It targets recent browsers only (see `.browserslistrc`), and
 uses native browser features wherever it can.
 
@@ -44,6 +44,7 @@ uses native browser features wherever it can.
 
 - [DEVELOPERS.md](DEVELOPERS.md): running it locally, and the checks to run before a commit
 - [docs/TESTING.md](docs/TESTING.md): how the tests are organised and written
+- [docs/BUILD.md](docs/BUILD.md): the Vite build, the service worker and its precache, deploying
 - [docs/DATA_MODEL.md](docs/DATA_MODEL.md): songs, setlists and organisations
 - [docs/SYNC_ARCHITECTURE.md](docs/SYNC_ARCHITECTURE.md): Google Drive sync
 - [docs/SHARING.md](docs/SHARING.md): sharing and licensing

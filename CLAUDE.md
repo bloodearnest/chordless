@@ -44,7 +44,7 @@ To do that, you have to enter edit mode explicitly. This has several goals
 
 - Use `just format lint test` to verify all changes. This runs formatting, linting, and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
 - How the tests are organised, and how to write them: `docs/TESTING.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too.
-- Only use vanilla js. There should be no build step at all, ever. We use npm to manage versions to _vendor_.
-- Only use js libraries that can be hosted locally within the project and loaded as modules
+- Vanilla JS and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
+- The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.js`); see `docs/BUILD.md`
 - Use modern HTML/CSS/JS. Use .browserlistrc.
 - Always try to use browser native features as much as possible
