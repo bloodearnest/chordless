@@ -154,7 +154,9 @@
         "rules": {
           "suspicious": {
             "noConsole": "off",
-            "noEmptyBlockStatements": "off"
+            "noEmptyBlockStatements": "off",
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off"
           }
         }
       },

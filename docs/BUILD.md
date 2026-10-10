@@ -42,7 +42,7 @@ needs are unusual:
   an update.
 
 In dev the precache is empty and the worker caches what it sees, as it always did, so the
-dev server can't show the production behaviour. `tests/built.playwright.js` (the `built`
+dev server can't show the production behaviour. `tests/built.playwright.ts` (the `built`
 Playwright project) tests the build, served by `vite preview` on port 8788.
 
 ## First visit

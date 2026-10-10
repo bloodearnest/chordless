@@ -223,7 +223,7 @@ export function transposeNote(
   note: string | null | undefined,
   semitones: number,
   useFlats: boolean,
-  targetKey: string | null | undefined,
+  targetKey?: string | null,
   preferredAccidental: Accidental | null = null
 ): string | null {
   if (!note) return null

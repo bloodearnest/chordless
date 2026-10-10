@@ -2,7 +2,12 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    // Tests are checked for the app's API (names, arguments, return types), not for null safety
+    // or annotations: they use partial fakes and loosely shaped fixtures on purpose
+    "strict": false,
     "types": ["node"],
+    // The tests import the app's modules inside the page, by the URLs it serves them at
+    "paths": { "/js/*": ["./src/js/*"] },
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo"
   },
   // Code that runs in Node: the build, the Playwright tests (which also reach into the page,

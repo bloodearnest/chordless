@@ -162,10 +162,10 @@ if any local record has changes not in Drive. Per-setlist device state is kept.
 - `tests/fake-drive.js`: in-memory Drive (files, folders, `appProperties` vs
   `properties`, field projection, paging, `md5Checksum`, permissions, a skewable
   server clock, injected failures). Errors on anything it doesn't model.
-- `tests/drive-sync.test.js`: the real `DriveSyncManager` for two simulated devices
+- `tests/drive-sync.test.ts`: the real `DriveSyncManager` for two simulated devices
   sharing one fake Drive: push/pull, conflicts, clock skew, failures part-way,
   paging, organisations and renames, reset, metadata, members.
-- `tests/drive-metadata.test.js`, `tests/fake-drive.test.js`.
+- `tests/drive-metadata.test.ts`, `tests/fake-drive.test.ts`.
 - Not yet: integration tests against real Drive, using a separate Google test account
   with its refresh token in `.dev.vars`. First things to confirm there: uploads
   return `md5Checksum`, and whether metadata-only updates change `modifiedTime`.

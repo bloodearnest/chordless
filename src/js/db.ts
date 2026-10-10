@@ -677,7 +677,8 @@ export function tempoBpm(tempo: TempoInput): number | null {
  * record), what's stored is a number or null.
  */
 function numericTempo(tempo: TempoInput): number | null | undefined {
-  return tempo == null || typeof tempo === 'number' ? tempo : tempoBpm(tempo)
+  if (typeof tempo === 'number') return tempo
+  return tempo == null ? (tempo as null | undefined) : tempoBpm(tempo)
 }
 
 /** The song with its tempo and original tempo as numbers */

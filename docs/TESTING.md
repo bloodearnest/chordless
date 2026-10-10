@@ -5,19 +5,26 @@ Run it before committing.
 
 | Suite | Runs | Files | Recipe |
 | --- | --- | --- | --- |
-| Node | `node --test` | `tests/*.node.test.js` | `just test-node` |
-| Browser unit | Web Test Runner, in Chromium | `tests/*.test.js` (not `*.node.test.js`) | `just test-unit` |
-| End to end | Playwright, against `just serve` | `tests/*.playwright.js` | `just test-browser-headless` |
+| Node | `node --test` | `tests/*.node.test.ts` | `just test-node` |
+| Browser unit | Web Test Runner, in Chromium | `tests/*.test.ts` (not `*.node.test.ts`) | `just test-unit` |
+| End to end | Playwright, against `just serve` | `tests/*.playwright.ts` | `just test-browser-headless` |
 
 New test files are picked up by their name; there's no list to add them to.
+
+Tests are TypeScript, type-checked by `tsc -b` (part of `just lint`) with `strict` off
+(`tsconfig.tests.json`, `tsconfig.node.json`): they are held to the app's API, its names,
+arguments and return types, but not to null safety or annotations, because they use partial
+fakes and loosely shaped fixtures on purpose. Cast a fixture with `as any` where it is
+incomplete. Playwright's `page.evaluate` callbacks run in the page: import app modules there
+by their URL (`await import('/js/db.ts')`).
 
 ## Node tests
 
 For code that doesn't run in a page:
 
-- `worker.node.test.js`: the Cloudflare worker (static files, the SPA fallback, the
+- `worker.node.test.ts`: the Cloudflare worker (static files, the SPA fallback, the
   OAuth and session routes).
-- `events.node.test.js`: every component event class has a unique, namespaced
+- `events.node.test.ts`: every component event class has a unique, namespaced
   `type` (`component:event`), so two events can't collide.
 
 ## Browser unit tests
@@ -31,24 +38,24 @@ app's own modules, imported directly: there's no build step to test around.
   with axe: `await expect(el).to.be.accessible(A11Y)` (`A11Y` is in `test-helpers.js`).
   The colour checks only see the light theme.
 - **Database** tests use the real IndexedDB in the test browser. Tests share it, so
-  give records unique names or ids (see `unique()` in `song-utils.test.js`). Migrations
+  give records unique names or ids (see `unique()` in `song-utils.test.ts`). Migrations
   are tested by building a database at the old version by hand, then opening it with
-  `ChordlessDB` (see `db.test.js`).
+  `ChordlessDB` (see `db.test.ts`).
 - **Drive sync** runs the real `drive-api.js` and `drive-sync.js` against FakeDrive
   (`fake-drive.js`), an in-memory fake of the parts of the Drive v3 API the app uses.
   It throws on anything it doesn't model rather than guessing, and has its own tests
-  (`fake-drive.test.js`). `drive-sync.test.js` sets up two devices syncing through one
+  (`fake-drive.test.ts`). `drive-sync.test.ts` sets up two devices syncing through one
   fake Drive, which is how cross-device behaviour is tested.
-- **Routing** has pure functions (`router.test.js`: URL to route and back, and how a move
+- **Routing** has pure functions (`router.test.ts`: URL to route and back, and how a move
   changes the history), and the runtime, tested with the real History API, shadow DOM and
-  clicks (`app-router.test.js`). Views are tested like components; `home-view.test.js`
+  clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`
   also checks there is a view for every route.
-- **Transposition** (`transpose.test.js`) has one test per case, so a failure names
+- **Transposition** (`transpose.test.ts`) has one test per case, so a failure names
   the chord and key.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
   only for tests that fail.
 
-Run one file with `just test-unit tests/db.test.js`.
+Run one file with `just test-unit tests/db.test.ts`.
 
 ## End-to-end tests
 
@@ -58,13 +65,13 @@ parallel, each in its own browser context.
 
 | File | Covers |
 | --- | --- |
-| `views.playwright.js` | Moving between views in place: history, titles, the menu, leaving a setlist or the library cleanly, the media player carrying on |
-| `live.playwright.js` | A setlist in use: moving between songs, scrolling, sections, reordering, deleting, keys |
-| `app.playwright.js` | Themes, loading, display preferences, the menu, modals, the storage page |
-| `songs.playwright.js` | The library, song and setlist info, importing, the bookmarklet page |
-| `song-settings.playwright.js` | A song's settings in a setlist, the media player's settings |
-| `service-worker.playwright.js` | The service worker serving the shell, and reloading offline |
-| `dev-pages.playwright.js` | Every page in `src/dev/` loads without errors |
+| `views.playwright.ts` | Moving between views in place: history, titles, the menu, leaving a setlist or the library cleanly, the media player carrying on |
+| `live.playwright.ts` | A setlist in use: moving between songs, scrolling, sections, reordering, deleting, keys |
+| `app.playwright.ts` | Themes, loading, display preferences, the menu, modals, the storage page |
+| `songs.playwright.ts` | The library, song and setlist info, importing, the bookmarklet page |
+| `song-settings.playwright.ts` | A song's settings in a setlist, the media player's settings |
+| `service-worker.playwright.ts` | The service worker serving the shell, and reloading offline |
+| `dev-pages.playwright.ts` | Every page in `src/dev/` loads without errors |
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error. It also has:
@@ -79,7 +86,7 @@ fails any test whose page throws an uncaught error. It also has:
   before the app was listening.
 
 To check that a move happened without loading a page, mark the document first
-(`window.sameDocument = true`) and see that the mark survives: `views.playwright.js`
+(`window.sameDocument = true`) and see that the mark survives: `views.playwright.ts`
 has `markDocument` and `isSameDocument`. A test that needs to hold back a request with
 `page.route()` should turn the service worker off (`test.use({ serviceWorkers: 'block' })`):
 its first install reloads the page, and Playwright's routes don't see requests the service

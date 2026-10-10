@@ -7,7 +7,7 @@ default:
 # Run all tests: node, browser unit (Web Test Runner) and Playwright
 test: test-node test-unit test-browser-headless
 
-# Run browser unit tests, optionally just some files: just test-unit tests/db.test.js
+# Run browser unit tests, optionally just some files: just test-unit tests/db.test.ts
 test-unit *args:
     @echo "Running browser unit tests with Web Test Runner..."
     @npm run test:web -- {{args}}
@@ -57,7 +57,7 @@ funnel:
         && tailscale funnel status \
         || sudo tailscale funnel --bg 8787
 
-# Run browser tests with Playwright (headless), optionally with files/options: just test-browser-headless tests/live.playwright.js --repeat-each=5
+# Run browser tests with Playwright (headless), optionally with files/options: just test-browser-headless tests/live.playwright.ts --repeat-each=5
 test-browser-headless *args:
     @echo "Running browser tests with Playwright..."
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
