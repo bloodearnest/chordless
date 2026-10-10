@@ -14,7 +14,7 @@
  * model, but the push path now targets the per-organisation ChordlessDB schema.
  */
 
-import { ChordlessDB, getCurrentDB, normalizeTitle } from './db.js'
+import { ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.js'
 import * as DriveAPI from './drive-api.js'
 import { batchUploadFiles, driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.js'
 import {
@@ -25,7 +25,7 @@ import {
 } from './drive-metadata.js'
 import { OrganisationDB } from './organisation-db.js'
 import { ChordProParser } from './parser.js'
-import { hashText } from './song-utils.js'
+import { chartFields, hashText } from './song-utils.js'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.js'
 
 /** A setlist's file content in Drive */
@@ -623,7 +623,10 @@ export class DriveSyncManager {
 
       const results = await Promise.allSettled(
         batch.map(async ({ driveFile, setlistId, localSetlist }) => {
-          const remote = await DriveAPI.downloadSetlist(driveFile.id)
+          // Older setlists in Drive may hold a chart's text as a tempo. Saving
+          // converts it too, but convert first: the hash recorded as synced must
+          // be of what's stored, or the setlist would look edited here
+          const remote = withNumericTempos(await DriveAPI.downloadSetlist(driveFile.id))
           const remoteHash = setlistContentHash(remote)
 
           if (localSetlist?.syncedContentHash === remoteHash) {
@@ -905,11 +908,14 @@ export class DriveSyncManager {
       ccliNumber,
       title,
       titleNormalized,
-      author: metadata.artist || metadata.author || localSong?.author || null,
-      copyright: metadata.copyright || localSong?.copyright || null,
-      key: metadata.key || localSong?.key || null,
-      tempo: metadata.tempo || localSong?.tempo || null,
-      time: metadata.time || localSong?.time || null,
+      // The chart's fields, as for an imported song, falling back to this
+      // device's copy for any the chart lacks
+      ...Object.fromEntries(
+        Object.entries(chartFields(metadata)).map(([field, value]) => [
+          field,
+          value ?? localSong?.[field] ?? null,
+        ])
+      ),
       importDate:
         localSong?.importDate || props.importDate || file.createdTime || new Date().toISOString(),
       importUser: localSong?.importUser || props.importUser || null,

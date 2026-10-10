@@ -142,6 +142,28 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(onTablet.name).to.equal('Harvest')
     })
 
+    it("turns a Drive setlist's text tempo into a number, without counting it as an edit", async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const songs = [{ order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'G', tempo: 72 }]
+      const setlist = await addSetlist(phone, { songs })
+      await syncDevice(phone)
+      // As an older version uploaded them: the chart's text as the tempo
+      const [file] = drive.listFiles(f => f.appProperties.setlistId === setlist.id)
+      file.content = file.content.replace('"tempo": 72', '"tempo": "72"')
+      expect(driveSetlist(setlist.id).songs[0].tempo).to.equal('72')
+
+      await syncDevice(tablet)
+      const onTablet = await tablet.db.getSetlist(setlist.id)
+      expect(onTablet.songs[0].tempo).to.equal(72)
+      expect(tablet.sync.setlistHasLocalChanges(onTablet)).to.equal(false)
+
+      drive.requests = []
+      await syncDevice(tablet)
+      const writes = drive.requests.filter(r => r.method !== 'GET')
+      expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
+    })
+
     it('downloads every setlist when the listing spans several pages', async () => {
       drive.maxPageSize = 2
       const phone = await makeDevice('phone')
@@ -836,6 +858,27 @@ describe('Drive sync (against FakeDrive)', () => {
       const [file] = drive.listFiles(f => f.appProperties.type === 'chordpro')
       expect(file.content).to.equal('{title: Amazing}\n[G]Grace')
       expect(await songContent(tablet, 'song-1')).to.equal('{title: Amazing}\n[G]Grace')
+    })
+
+    it("gives a downloaded song the chart's fields, as an imported one, with its tempo a number", async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      await addSong(phone, {
+        uuid: 'song-1',
+        title: 'Amazing',
+        content: '{title: Amazing}\n{key: D}\n{tempo: 150 (1/8)}\n{artist: John Newton}\n[D]Grace',
+      })
+      await syncDevice(phone)
+      await syncDevice(tablet)
+
+      const song = await tablet.db.getSong('song-1')
+      expect(song).to.include({
+        key: 'D',
+        originalKey: 'D',
+        tempo: 150,
+        originalTempo: 150,
+        author: 'John Newton',
+      })
     })
 
     it('propagates a chord chart edit', async () => {

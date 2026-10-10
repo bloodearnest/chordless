@@ -238,13 +238,11 @@ export async function createSong(chordproContent, options = {}) {
     contentHash: contentHash,
   }
 
-  await db.saveSong(song)
-
-  return song
+  return db.saveSong(song)
 }
 
 /** The song fields that come from its chart's metadata */
-function chartFields(metadata) {
+export function chartFields(metadata) {
   return {
     author: metadata.artist || metadata.author || null,
     copyright: metadata.copyright || null,
@@ -295,8 +293,7 @@ export async function overwriteSong(songUuid, chordproContent, db = null) {
     contentHash,
     modifiedDate: now,
   }
-  await db.saveSong(updated)
-  return updated
+  return db.saveSong(updated)
 }
 
 /**

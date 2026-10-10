@@ -31,7 +31,7 @@ describe('createSong', () => {
     expect(song.title).to.equal(title)
     expect(song.isDefault).to.equal(true)
     expect(song.key).to.equal('G')
-    expect(song.tempo).to.equal('72') // as written in the chart (BPM edits store numbers)
+    expect(song.tempo).to.equal(72)
 
     const db = await getCurrentDB()
     expect((await db.getSong(song.uuid)).title).to.equal(title)

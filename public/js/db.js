@@ -1,3 +1,4 @@
+import { setlistContentHash } from './sync/setlist-hash.js'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.js'
 import { ensurePersistentStorage } from './utils/persistence.js'
 
@@ -7,7 +8,7 @@ import { ensurePersistentStorage } from './utils/persistence.js'
 // NOTE: This now stores ALL organisation data in one database per organisation.
 // Organisation metadata is stored separately in the 'organisations' database.
 
-const DB_VERSION = 5
+const DB_VERSION = 6
 
 // Setlist types
 export const SETLIST_TYPES = {
@@ -141,6 +142,10 @@ export class ChordlessDB {
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
+        if (oldVersion > 0 && oldVersion < 6) {
+          migrateTemposToNumbers(event.target.transaction)
+        }
+
         // Clean up old stores
         if (db.objectStoreNames.contains('song_usage')) {
           console.log('[ChordlessDB] Removing song_usage store')
@@ -151,12 +156,14 @@ export class ChordlessDB {
   }
 
   // Setlist operations
+  /** Save a setlist (its songs' tempos as numbers); resolves with what was stored */
   async saveSetlist(setlist) {
     const tx = this.db.transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
-    await store.put(cloneForStorage(setlist))
+    const stored = cloneForStorage(withNumericTempos(setlist))
+    store.put(stored)
     return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
+      tx.oncomplete = () => resolve(stored)
       tx.onerror = () => reject(tx.error)
     })
   }
@@ -171,7 +178,7 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
 
     // Queue all puts in one transaction
-    setlists.forEach(setlist => store.put(cloneForStorage(setlist)))
+    setlists.forEach(setlist => store.put(cloneForStorage(withNumericTempos(setlist))))
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
@@ -210,12 +217,14 @@ export class ChordlessDB {
   }
 
   // Song operations (per-organisation)
+  /** Save a song (its tempos as numbers); resolves with what was stored */
   async saveSong(song) {
     const tx = this.db.transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
-    await store.put(song)
+    const stored = withNumericSongTempos(song)
+    store.put(stored)
     return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
+      tx.oncomplete = () => resolve(stored)
       tx.onerror = () => reject(tx.error)
     })
   }
@@ -226,7 +235,7 @@ export class ChordlessDB {
     const tx = this.db.transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
 
-    songs.forEach(song => store.put(song))
+    songs.forEach(song => store.put(withNumericSongTempos(song)))
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
@@ -448,7 +457,7 @@ export class ChordlessDB {
         songId: song.songId,
         songUuid: song.songUuid || song.songId, // Use songId as fallback if songUuid missing
         key: song.key !== undefined ? song.key : song.modifications?.targetKey || null,
-        tempo: song.tempo !== undefined ? song.tempo : song.modifications?.bpmOverride || null,
+        tempo: tempoBpm(song.tempo !== undefined ? song.tempo : song.modifications?.bpmOverride),
         notes: song.notes || '',
       })),
       createdDate: oldSetlist.createdDate || oldSetlist.createdAt || new Date().toISOString(),
@@ -609,6 +618,69 @@ export function parseTempo(tempoStr) {
  * @param {string} tempoNote - The note subdivision (e.g., "1/4", "1/8")
  * @returns {string} - Formatted tempo string
  */
+/** A tempo (number, or a chart's text such as '72' or '150 (1/8)') as a number of BPM, or null */
+export function tempoBpm(tempo) {
+  return parseTempo(tempo).bpm
+}
+
+/**
+ * Tempos are stored as numbers of BPM. The save methods below convert them, so
+ * whatever a caller passes (a chart's text, from an import, Drive or an older
+ * record), what's stored is a number or null.
+ */
+function numericTempo(tempo) {
+  return tempo == null || typeof tempo === 'number' ? tempo : tempoBpm(tempo)
+}
+
+/** The song with its tempo and original tempo as numbers */
+function withNumericSongTempos(song) {
+  const tempo = numericTempo(song.tempo)
+  const originalTempo = numericTempo(song.originalTempo)
+  if (tempo === song.tempo && originalTempo === song.originalTempo) return song
+  return { ...song, tempo, originalTempo }
+}
+
+/** The setlist with each song's tempo a number (older setlists may hold a chart's text) */
+export function withNumericTempos(setlist) {
+  if (!Array.isArray(setlist?.songs)) return setlist
+  return {
+    ...setlist,
+    songs: setlist.songs.map(entry =>
+      entry.tempo === numericTempo(entry.tempo)
+        ? entry
+        : { ...entry, tempo: numericTempo(entry.tempo) }
+    ),
+  }
+}
+
+/**
+ * Version 6: songs' and setlist entries' tempos become numbers (they were a
+ * chart's text). A setlist that was in sync stays in sync: its synced hash is
+ * refreshed for the converted content.
+ */
+function migrateTemposToNumbers(transaction) {
+  transaction.objectStore('songs').openCursor().onsuccess = event => {
+    const cursor = event.target.result
+    if (!cursor) return
+    const converted = withNumericSongTempos(cursor.value)
+    if (converted !== cursor.value) cursor.update(converted)
+    cursor.continue()
+  }
+  transaction.objectStore('setlists').openCursor().onsuccess = event => {
+    const cursor = event.target.result
+    if (!cursor) return
+    const setlist = cursor.value
+    const converted = withNumericTempos(setlist)
+    if (JSON.stringify(converted) !== JSON.stringify(setlist)) {
+      if (setlist.syncedContentHash && setlist.syncedContentHash === setlistContentHash(setlist)) {
+        converted.syncedContentHash = setlistContentHash(converted)
+      }
+      cursor.update(converted)
+    }
+    cursor.continue()
+  }
+}
+
 export function formatTempo(bpm, tempoNote = '1/4') {
   if (!bpm) return ''
 
