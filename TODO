@@ -59,9 +59,9 @@ storage/sync
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices)
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
-  designed in SYNC_ARCHITECTURE.md, not built
+  designed in docs/SYNC_ARCHITECTURE.md, not built
 - immediate background sync of just the changed record (setlist/song), in the
-  service worker, with full sync as the backstop: designed in SYNC_ARCHITECTURE.md,
+  service worker, with full sync as the backstop: designed in docs/SYNC_ARCHITECTURE.md,
   not built. Later: durable offline write queue.
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
   then test song import on real devices: file import and paste on Android and iPad, the
@@ -106,7 +106,7 @@ sharing
 - share links: one setlist with its charts, encrypted in the org's Drive, key in the
   link, updated in place, expiring 2 weeks after the setlist date, read-only and
   isolated on the recipient's device, QR code for in-room sharing. Designed in
-  SHARING.md Part 2, not built; verify the Drive questions listed there first.
+  docs/SHARING.md Part 2, not built; verify the Drive questions listed there first.
   Then remove the worker's /api/share endpoints and the SETLISTS KV binding.
 - email media team
 - invite people to an organisation: a dialog to share the org's Drive folder with an
@@ -114,7 +114,7 @@ sharing
   already lists the folder's members (cached at sync).
 - shared users' devices can't find the org folder yet: the app only has the drive.file
   scope, which only covers files the app created for that user. Needs the Google Picker
-  (user picks the folder once) or a wider scope. See SHARING.md and the worker's
+  (user picks the folder once) or a wider scope. See docs/SHARING.md and the worker's
   /session/invite endpoint.
 - restrict editing others' setlists, using the setlist's ownerId (leader's Google email)
 

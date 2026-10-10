@@ -46,6 +46,7 @@ Notes:
 - The first visit registers the service worker; the page reloads automatically once it is active.
 - Use DevTools Console and filter for `[SW]` to inspect service-worker logs.
 - The importer and Google auth flows rely on HTTPS. Do not fall back to Python/Node static servers; they are unsupported.
+- `just format lint test` checks everything before a commit. See [TESTING.md](TESTING.md) for the test suites.
 
 ## Dev pages (component playgrounds)
 
