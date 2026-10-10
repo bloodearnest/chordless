@@ -24,19 +24,22 @@ export interface ChartSection {
   lines: ChartLine[]
 }
 
-/** The {directive: value} lines of a chart, and the CCLI trailer */
+/**
+ * The {directive: value} lines of a chart, and the CCLI trailer. A tempo is the chart's text,
+ * or a number once a setlist has put its own tempo there (see buildRuntimeSongs).
+ */
 export interface ChartMetadata {
   title?: string
   artist?: string
   author?: string
   key?: string
-  tempo?: string
+  tempo?: string | number
   time?: string
   copyright?: string
   ccli?: string
   ccliSongNumber?: string
   ccliTrailer?: string
-  [directive: string]: string | undefined
+  [directive: string]: string | number | undefined
 }
 
 export interface ParsedChart {
@@ -126,6 +129,8 @@ export interface SetlistEntry {
   key: string | null
   tempo: number | null
   notes: string
+  /** This setlist's own edited ChordPro text for the song, if it has one */
+  chordproEdits?: string
 }
 
 export interface Setlist {
@@ -187,3 +192,68 @@ export interface Person {
   id: string
   name: string
 }
+
+/**
+ * A song as getSongWithContent gives it: the stored record's identity and import details,
+ * what its chart says, and the chart's text and parsed form.
+ */
+export interface SongWithContent {
+  uuid: string
+  id: string
+  variantOf: string | null
+  isDefault: boolean
+  variantLabel: string
+  ccliNumber: string | null
+  titleNormalized: string
+  importDate: string
+  importUser: string
+  importSource: string
+  modifiedDate: string
+  title: string
+  artist: string | null | undefined
+  author: string | null
+  /** For the UI: what the chart says, else what the record says */
+  metadata: {
+    key: string | null | undefined
+    tempo: string | number | null
+    timeSignature: string | null
+    tempoNote?: string
+  }
+  chordpro: string
+  chordproFileId: string
+  parsed: ParsedChart
+  /** Set by getLibrarySongs when asked: the last setlist the song was played in */
+  lastUsageInfo?: { date: string; leader: string; key: string | null }
+}
+
+// ==================== Google Drive ====================
+
+/** A Drive file or folder, with the fields Chordless asks for */
+export interface DriveFile {
+  id: string
+  name?: string
+  mimeType?: string
+  modifiedTime?: string
+  createdTime?: string
+  md5Checksum?: string
+  parents?: string[]
+  trashed?: boolean
+  appProperties?: Record<string, string>
+}
+
+/** One page of a Drive file listing */
+export interface DriveFileList {
+  files?: DriveFile[]
+  nextPageToken?: string
+}
+
+/** What a file is created or updated with (a null appProperty removes that key) */
+export interface DriveFileWrite {
+  name?: string
+  mimeType?: string
+  description?: string
+  parents?: string[]
+  appProperties?: Record<string, string | null>
+}
+
+export type DriveContent = string | Blob | ArrayBuffer | Uint8Array

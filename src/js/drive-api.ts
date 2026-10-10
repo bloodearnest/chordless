@@ -15,8 +15,16 @@
  * Song and setlist file names and appProperties come from drive-metadata.js.
  */
 
+import type {
+  DriveContent,
+  DriveFile,
+  DriveFileList,
+  DriveFileWrite,
+  OrganisationMember,
+  Setlist,
+} from './data-types.ts'
 import { APP_VERSION } from './drive-metadata.ts'
-import * as GoogleAuth from './google-auth.js'
+import * as GoogleAuth from './google-auth.ts'
 
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3'
@@ -32,10 +40,39 @@ const WRITE_FIELDS = 'id,name,mimeType,modifiedTime,md5Checksum'
 
 // Where Drive access tokens come from. Tests replace this to run without the
 // service worker auth flow (see tests/fake-drive.js).
-let getAccessToken = () => GoogleAuth.getAccessToken()
+type AccessTokenProvider = () => Promise<string>
 
-export function setAccessTokenProvider(provider) {
+let getAccessToken: AccessTokenProvider = () => GoogleAuth.getAccessToken()
+
+export function setAccessTokenProvider(provider?: AccessTokenProvider | null) {
   getAccessToken = provider || (() => GoogleAuth.getAccessToken())
+}
+
+/** A failed Drive request, with the HTTP status */
+export interface DriveError extends Error {
+  status: number
+}
+
+/** What Drive's JSON error responses say */
+interface DriveErrorBody {
+  error?: { message?: string }
+}
+
+/** A file to upload with batchUploadFiles */
+export interface DriveUpload {
+  metadata: DriveFileWrite
+  content: string
+  contentType?: string
+}
+
+/** A permission on a file or folder (the fields we ask for) */
+interface DrivePermission {
+  id: string
+  type: string
+  role: string
+  emailAddress?: string
+  displayName?: string
+  deleted?: boolean
 }
 
 /**
@@ -43,9 +80,13 @@ export function setAccessTokenProvider(provider) {
  */
 
 /**
- * Make an authenticated request to Google Drive API
+ * Make an authenticated request to Google Drive API. T is what the endpoint returns as JSON;
+ * a response with no content (DELETE) gives null, so only ask for T where there is one.
  */
-export async function driveRequest(endpoint, options = {}) {
+export async function driveRequest<T = DriveFileList>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
   const token = await getAccessToken()
 
   const headers = {
@@ -60,15 +101,20 @@ export async function driveRequest(endpoint, options = {}) {
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
-    const err = new Error(`Drive API error: ${error.error?.message || response.statusText}`)
-    err.status = response.status
-    throw err
+    const error: DriveErrorBody = await response
+      .json()
+      .catch(() => ({ error: { message: response.statusText } }))
+    throw Object.assign(
+      new Error(`Drive API error: ${error.error?.message || response.statusText}`),
+      {
+        status: response.status,
+      }
+    )
   }
 
   // Handle responses with no content (like DELETE operations)
   if (response.status === 204 || response.headers.get('content-length') === '0') {
-    return null
+    return null as T
   }
 
   return response.json()
@@ -77,11 +123,14 @@ export async function driveRequest(endpoint, options = {}) {
 /**
  * Get a file's metadata, or null if it doesn't exist (404)
  */
-export async function getFile(fileId, fields = 'id,name,parents,trashed') {
+export async function getFile(
+  fileId: string,
+  fields = 'id,name,parents,trashed'
+): Promise<DriveFile | null> {
   try {
-    return await driveRequest(`/files/${fileId}?fields=${fields}`)
+    return await driveRequest<DriveFile>(`/files/${fileId}?fields=${fields}`)
   } catch (error) {
-    if (error.status === 404) return null
+    if (error instanceof Error && (error as DriveError).status === 404) return null
     throw error
   }
 }
@@ -91,20 +140,23 @@ export async function getFile(fileId, fields = 'id,name,parents,trashed') {
  * permission (role is owner, organizer, fileOrganizer, writer, commenter or
  * reader). Group, domain and "anyone" permissions are skipped.
  */
-export async function listFolderPermissions(folderId) {
-  const result = await driveRequest(
+export async function listFolderPermissions(folderId: string): Promise<OrganisationMember[]> {
+  const result = await driveRequest<{ permissions?: DrivePermission[] }>(
     `/files/${folderId}/permissions?fields=permissions(id,type,role,emailAddress,displayName,deleted)`
   )
   return (result.permissions || [])
-    .filter(p => p.type === 'user' && p.emailAddress && !p.deleted)
+    .filter(
+      (p): p is DrivePermission & { emailAddress: string } =>
+        p.type === 'user' && Boolean(p.emailAddress) && !p.deleted
+    )
     .map(p => ({ email: p.emailAddress, name: p.displayName || p.emailAddress, role: p.role }))
 }
 
 /**
  * Rename a file or folder
  */
-export async function renameFile(fileId, name) {
-  return driveRequest(`/files/${fileId}?fields=id,name`, {
+export async function renameFile(fileId: string, name: string): Promise<DriveFile> {
+  return driveRequest<DriveFile>(`/files/${fileId}?fields=id,name`, {
     method: 'PATCH',
     body: JSON.stringify({ name }),
   })
@@ -113,7 +165,7 @@ export async function renameFile(fileId, name) {
 /**
  * Batch delete multiple files (up to 100 at a time)
  */
-export async function batchDeleteFiles(fileIds) {
+export async function batchDeleteFiles(fileIds: string[]): Promise<number | undefined> {
   if (fileIds.length === 0) return
 
   const token = await getAccessToken()
@@ -155,16 +207,15 @@ export async function batchDeleteFiles(fileIds) {
  * Note: Google's Batch API doesn't support file content uploads, only metadata operations.
  * So we use high-concurrency individual uploads instead (much faster than sequential).
  *
- * @param {Array} files - Array of { metadata, content, contentType }
- * @returns {Promise<Array>} - One entry per input file, in the same order: the
- *   uploaded file response, or null if that upload failed. Callers pair results
- *   with their inputs by index, so failures must keep their slot.
+ * @returns One entry per input file, in the same order: the uploaded file response, or null
+ *   if that upload failed. Callers pair results with their inputs by index, so failures must
+ *   keep their slot.
  */
-export async function batchUploadFiles(files) {
+export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile | null)[]> {
   if (files.length === 0) return []
 
   const CONCURRENT_LIMIT = 30 // Upload 30 files at once
-  const results = []
+  const results: (DriveFile | null)[] = []
 
   console.log(
     `[DriveAPI] Uploading ${files.length} files with ${CONCURRENT_LIMIT} concurrent requests...`
@@ -205,7 +256,7 @@ export async function batchUploadFiles(files) {
         )
 
         if (!response.ok) {
-          const error = await response
+          const error: DriveErrorBody = await response
             .json()
             .catch(() => ({ error: { message: response.statusText } }))
           throw new Error(`Upload error: ${error.error?.message || response.statusText}`)
@@ -234,7 +285,11 @@ export async function batchUploadFiles(files) {
  * Create a file in Drive: metadata (name, parents, mimeType, appProperties) and
  * content in one multipart request. Returns the file resource (WRITE_FIELDS).
  */
-export async function createFile(metadata, content, contentType = 'text/plain') {
+export async function createFile(
+  metadata: DriveFileWrite,
+  content: DriveContent,
+  contentType = 'text/plain'
+): Promise<DriveFile> {
   const token = await getAccessToken()
   const boundary = '-------314159265358979323846'
   const encoder = new TextEncoder()
@@ -246,7 +301,7 @@ export async function createFile(metadata, content, contentType = 'text/plain') 
   const headerContent = encoder.encode(`\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n`)
   const closing = encoder.encode(`\r\n--${boundary}--`)
 
-  let contentBlob
+  let contentBlob: Blob
   if (typeof content === 'string') {
     contentBlob = new Blob([encoder.encode(content)])
   } else if (content instanceof Blob) {
@@ -255,7 +310,10 @@ export async function createFile(metadata, content, contentType = 'text/plain') 
     contentBlob = new Blob([content])
   } else if (content instanceof Uint8Array) {
     contentBlob = new Blob([
-      content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength),
+      content.buffer.slice(
+        content.byteOffset,
+        content.byteOffset + content.byteLength
+      ) as ArrayBuffer,
     ])
   } else {
     throw new Error('Unsupported content type for Drive upload')
@@ -278,7 +336,9 @@ export async function createFile(metadata, content, contentType = 'text/plain') 
   )
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
+    const error: DriveErrorBody = await response
+      .json()
+      .catch(() => ({ error: { message: response.statusText } }))
     throw new Error(`Drive upload error: ${error.error?.message || response.statusText}`)
   }
 
@@ -290,7 +350,12 @@ export async function createFile(metadata, content, contentType = 'text/plain') 
  * request. appProperties are merged; a null value removes that key. Returns the
  * file resource (WRITE_FIELDS).
  */
-export async function updateFile(fileId, metadata, content, contentType = 'text/plain') {
+export async function updateFile(
+  fileId: string,
+  metadata: DriveFileWrite,
+  content: string,
+  contentType = 'text/plain'
+): Promise<DriveFile> {
   const token = await getAccessToken()
   const boundary = '-------314159265358979323846'
   const body =
@@ -313,7 +378,9 @@ export async function updateFile(fileId, metadata, content, contentType = 'text/
   )
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: { message: response.statusText } }))
+    const error: DriveErrorBody = await response
+      .json()
+      .catch(() => ({ error: { message: response.statusText } }))
     throw new Error(`Drive update error: ${error.error?.message || response.statusText}`)
   }
 
@@ -323,7 +390,7 @@ export async function updateFile(fileId, metadata, content, contentType = 'text/
 /**
  * Download file content
  */
-async function downloadFile(fileId) {
+async function downloadFile(fileId: string): Promise<string> {
   const token = await getAccessToken()
 
   const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
@@ -339,7 +406,7 @@ async function downloadFile(fileId) {
   return response.text()
 }
 
-export async function downloadFileBinary(fileId) {
+export async function downloadFileBinary(fileId: string): Promise<ArrayBuffer> {
   const token = await getAccessToken()
 
   const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
@@ -366,7 +433,9 @@ export async function downloadFileBinary(fileId) {
  * Find the organisation folder with this name under the root Chordless folder,
  * without creating anything. Returns the folder or null.
  */
-export async function findOrganisationFolderByName(organisationName) {
+export async function findOrganisationFolderByName(
+  organisationName: string
+): Promise<DriveFile | null> {
   const rootFolderId = await findOrCreateRootFolder()
   const query = `name='${organisationName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
@@ -375,7 +444,7 @@ export async function findOrganisationFolderByName(organisationName) {
   return result.files?.[0] ?? null
 }
 
-export async function findOrCreateRootFolder() {
+export async function findOrCreateRootFolder(): Promise<string> {
   console.log('[DriveAPI] Finding/creating root Chordless folder...')
 
   // Search for existing Chordless folder
@@ -391,7 +460,7 @@ export async function findOrCreateRootFolder() {
 
   // Create new root folder
   console.log('[DriveAPI] Creating new Chordless folder...')
-  const folder = await driveRequest('/files', {
+  const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
       name: ROOT_FOLDER_NAME,
@@ -407,7 +476,10 @@ export async function findOrCreateRootFolder() {
 /**
  * Find or create an organisation folder under Chordless/
  */
-export async function findOrCreateOrganisationFolder(organisationName, organisationId) {
+export async function findOrCreateOrganisationFolder(
+  organisationName: string,
+  organisationId: string
+): Promise<{ folderId: string; isNew: boolean }> {
   console.log(`[DriveAPI] Finding/creating organisation folder: ${organisationName}`)
 
   const rootFolderId = await findOrCreateRootFolder()
@@ -428,7 +500,7 @@ export async function findOrCreateOrganisationFolder(organisationName, organisat
 
   // Create new organisation folder with appProperties
   console.log('[DriveAPI] Creating new organisation folder...')
-  const folder = await driveRequest('/files', {
+  const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
       name: organisationName,
@@ -455,7 +527,7 @@ export async function findOrCreateOrganisationFolder(organisationName, organisat
   }
 }
 
-export async function getPadsRootFolder() {
+export async function getPadsRootFolder(): Promise<string> {
   const rootFolderId = await findOrCreateRootFolder()
   let padsFolderId = await findSubfolder(rootFolderId, PADS_FOLDER_NAME)
   if (!padsFolderId) {
@@ -464,7 +536,7 @@ export async function getPadsRootFolder() {
   return padsFolderId
 }
 
-export async function listPadSetFolders() {
+export async function listPadSetFolders(): Promise<DriveFile[]> {
   const padsRootId = await getPadsRootFolder()
   const query = `'${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
@@ -473,7 +545,7 @@ export async function listPadSetFolders() {
   return result.files || []
 }
 
-export async function ensurePadSetFolder(padSetName) {
+export async function ensurePadSetFolder(padSetName: string): Promise<string> {
   const padsRootId = await getPadsRootFolder()
   const query = `name='${padSetName}' and '${padsRootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
@@ -486,7 +558,7 @@ export async function ensurePadSetFolder(padSetName) {
     return folder.id
   }
 
-  const folder = await driveRequest('/files', {
+  const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
       name: padSetName,
@@ -504,8 +576,11 @@ export async function ensurePadSetFolder(padSetName) {
   return folder.id
 }
 
-export async function updatePadSetFolderMetadata(folderId, padSetName) {
-  return driveRequest(`/files/${folderId}`, {
+export async function updatePadSetFolderMetadata(
+  folderId: string,
+  padSetName: string
+): Promise<DriveFile> {
+  return driveRequest<DriveFile>(`/files/${folderId}`, {
     method: 'PATCH',
     body: JSON.stringify({
       name: padSetName,
@@ -519,7 +594,7 @@ export async function updatePadSetFolderMetadata(folderId, padSetName) {
   })
 }
 
-export async function listPadSetFiles(folderId) {
+export async function listPadSetFiles(folderId: string): Promise<DriveFile[]> {
   const query = `'${folderId}' in parents and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime,md5Checksum,mimeType)`
@@ -527,7 +602,7 @@ export async function listPadSetFiles(folderId) {
   return result.files || []
 }
 
-export async function deleteFilesInFolder(folderId) {
+export async function deleteFilesInFolder(folderId: string): Promise<void> {
   const files = await listPadSetFiles(folderId)
   const fileIds = files.map(file => file.id)
   if (fileIds.length > 0) {
@@ -535,8 +610,8 @@ export async function deleteFilesInFolder(folderId) {
   }
 }
 
-export async function uploadPadFile(folderId, key, blob) {
-  const metadata = {
+export async function uploadPadFile(folderId: string, key: string, blob: Blob): Promise<DriveFile> {
+  const metadata: DriveFileWrite = {
     name: `${key}.mp3`,
     parents: [folderId],
     appProperties: {
@@ -554,10 +629,10 @@ export async function uploadPadFile(folderId, key, blob) {
 /**
  * Create a subfolder
  */
-async function createSubfolder(parentId, name) {
+async function createSubfolder(parentId: string, name: string): Promise<string> {
   console.log(`[DriveAPI] Creating subfolder: ${name}`)
 
-  const folder = await driveRequest('/files', {
+  const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
       name: name,
@@ -572,7 +647,7 @@ async function createSubfolder(parentId, name) {
 /**
  * Find subfolder by name within a parent
  */
-async function findSubfolder(parentId, name) {
+async function findSubfolder(parentId: string, name: string): Promise<string | null> {
   const query = `name='${name}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
@@ -588,7 +663,7 @@ async function findSubfolder(parentId, name) {
 /**
  * Get or create songs folder within organisation
  */
-export async function getSongsFolder(orgFolderId) {
+export async function getSongsFolder(orgFolderId: string): Promise<string> {
   let folderId = await findSubfolder(orgFolderId, 'songs')
   if (!folderId) {
     folderId = await createSubfolder(orgFolderId, 'songs')
@@ -599,7 +674,7 @@ export async function getSongsFolder(orgFolderId) {
 /**
  * Get or create setlists folder within organisation
  */
-export async function getSetlistsFolder(orgFolderId) {
+export async function getSetlistsFolder(orgFolderId: string): Promise<string> {
   let folderId = await findSubfolder(orgFolderId, 'setlists')
   if (!folderId) {
     folderId = await createSubfolder(orgFolderId, 'setlists')
@@ -615,7 +690,7 @@ export async function getSetlistsFolder(orgFolderId) {
 /**
  * Download a chordpro file from Drive
  */
-export async function downloadChordProFile(fileId) {
+export async function downloadChordProFile(fileId: string): Promise<string> {
   console.log(`[DriveAPI] Downloading chordpro: ${fileId}`)
   return downloadFile(fileId)
 }
@@ -623,7 +698,7 @@ export async function downloadChordProFile(fileId) {
 /**
  * Download a setlist from Drive
  */
-export async function downloadSetlist(fileId) {
+export async function downloadSetlist(fileId: string): Promise<Setlist> {
   console.log(`[DriveAPI] Downloading setlist: ${fileId}`)
   const content = await downloadFile(fileId)
   return JSON.parse(content)
@@ -632,12 +707,12 @@ export async function downloadSetlist(fileId) {
 /**
  * List all setlists in organisation folder
  */
-export async function listSetlists(organisationFolderId) {
+export async function listSetlists(organisationFolderId: string): Promise<DriveFile[]> {
   const setlistsFolderId = await getSetlistsFolder(organisationFolderId)
 
   const query = `'${setlistsFolderId}' in parents and trashed=false and name contains '.json'`
-  const files = []
-  let pageToken = null
+  const files: DriveFile[] = []
+  let pageToken: string | null = null
 
   // Drive returns at most one page (default 100) per request, so follow nextPageToken
   do {
@@ -662,7 +737,7 @@ export async function listSetlists(organisationFolderId) {
 /**
  * List all Chordless organisation folders
  */
-export async function listOrganisations() {
+export async function listOrganisations(): Promise<DriveFile[]> {
   console.log('[DriveAPI] Listing all Chordless organisations...')
 
   const rootFolderId = await findOrCreateRootFolder()
@@ -685,14 +760,14 @@ export async function listOrganisations() {
 /**
  * Helper function to check if user is authenticated and has Drive access
  */
-export async function checkDriveAccess() {
+export async function checkDriveAccess(): Promise<boolean> {
   try {
     await getAccessToken()
     // Try a simple API call to verify access
     await driveRequest('/about?fields=user')
     return true
   } catch (error) {
-    console.warn('[DriveAPI] No Drive access:', error.message)
+    console.warn('[DriveAPI] No Drive access:', error instanceof Error ? error.message : error)
     return false
   }
 }

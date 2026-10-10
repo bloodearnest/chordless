@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import { nameOrganisationBeforeSync } from '../js/first-time-auth.js'
+import { nameOrganisationBeforeSync } from '../js/first-time-auth.ts'
 import { getCurrentOrganisation } from '../js/organisation.ts'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.js'
 import './app-modal.js'

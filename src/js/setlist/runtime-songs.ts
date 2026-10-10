@@ -3,14 +3,56 @@
  * setlist has for it. (The setlist stores only the song's id and what differs:
  * its key, tempo and any edits to the chart.)
  */
-import { getSongById } from '../song-utils.js'
+
+import type {
+  ParsedChart,
+  Setlist,
+  SetlistEntry,
+  SongWithContent,
+  TempoInput,
+} from '../data-types.ts'
+import type { ChordlessDB } from '../db.ts'
+import { getSongById } from '../song-utils.ts'
 import { transposeSong } from '../transpose.ts'
 
 /**
- * A tempo as written in a chart or stored: 120, "120", "120 (1/8)".
- * @returns {{bpm: number | null, tempoNote: string | null}}
+ * A song of a setlist as the page works with it (see buildRuntimeSongs).
  */
-export function parseTempoMetadata(raw) {
+export interface RuntimeSong {
+  title: string
+  parsed: ParsedChart
+  /** Its position in the setlist */
+  songIndex: number
+  metadata: {
+    title?: string
+    key?: string
+    time?: string
+    tempo: number | null
+    tempoNote: string
+    timeSignature: string | null | undefined
+    [directive: string]: string | number | null | undefined
+  }
+  /** The key the chart is written in; never changes */
+  originalKey: string | null
+  currentKey: string | undefined
+  currentBPM: number | null
+  currentFontSize: number
+  currentCapo: number
+  songId: string
+  sourceText: string
+  hasLocalEdits: boolean
+  /** Kept to make the song's model */
+  _setlistEntry: SetlistEntry
+  _canonicalSong: SongWithContent | null
+}
+
+/**
+ * A tempo as written in a chart or stored: 120, "120", "120 (1/8)".
+ */
+export function parseTempoMetadata(raw: TempoInput): {
+  bpm: number | null
+  tempoNote: string | null
+} {
   if (raw === undefined || raw === null || raw === '') {
     return { bpm: null, tempoNote: null }
   }
@@ -18,7 +60,7 @@ export function parseTempoMetadata(raw) {
     return { bpm: raw, tempoNote: null }
   }
   const str = `${raw}`.trim()
-  let tempoNote = null
+  let tempoNote: string | null = null
   let bpmPart = str
   const parenMatch = str.match(/\(([^)]+)\)/)
   if (parenMatch) {
@@ -38,20 +80,25 @@ export function parseTempoMetadata(raw) {
  * library's, transposed to the setlist's key and given the setlist's tempo. A song
  * missing from the library is left out.
  *
- * @param {object} setlist
- * @param {object} options
- * @param {object} options.db the organisation's database
- * @param {{parse: (text: string) => object}} options.parser a ChordProParser
- * @param {number} options.fontSize the font size, in rem, each song starts at
- * @returns {Promise<object[]>} the songs, as the page works with them
+ * @param options.db the organisation's database
+ * @param options.parser a ChordProParser
+ * @param options.fontSize the font size, in rem, each song starts at
+ * @returns the songs, as the page works with them
  */
-export async function buildRuntimeSongs(setlist, { db, parser, fontSize }) {
-  const songs = []
+export async function buildRuntimeSongs(
+  setlist: Setlist,
+  {
+    db,
+    parser,
+    fontSize,
+  }: { db: ChordlessDB; parser: { parse: (text: string) => ParsedChart }; fontSize: number }
+): Promise<RuntimeSong[]> {
+  const songs: RuntimeSong[] = []
 
   for (const songEntry of setlist.songs) {
     // Get source text (local edits or from Songs collection)
-    let sourceText
-    let canonicalSong = null
+    let sourceText: string
+    let canonicalSong: SongWithContent | null = null
     if (songEntry.chordproEdits) {
       sourceText = songEntry.chordproEdits
     } else {
@@ -72,11 +119,9 @@ export async function buildRuntimeSongs(setlist, { db, parser, fontSize }) {
     const originalKey = parsed.metadata.key || null
 
     // Get target key from setlist (explicit snapshot)
-    // Fallback to canonical song's key for backwards compatibility with old setlists
-    let targetKey = songEntry.key
-    if (targetKey === null || targetKey === undefined) {
-      targetKey = canonicalSong?.key || null
-    }
+    // (The intended fallback for old setlists, the canonical song's key, has never worked:
+    // getSongWithContent gives no top-level key. Kept as it behaves; see the TODO.)
+    const targetKey = songEntry.key ?? null
 
     // Apply transposition if requested and we have a reference key
     if (targetKey && originalKey && targetKey !== originalKey) {
@@ -87,12 +132,8 @@ export async function buildRuntimeSongs(setlist, { db, parser, fontSize }) {
       parsed.metadata.key = targetKey
     }
 
-    // Get target tempo from setlist (explicit snapshot)
-    // Fallback to canonical song's tempo for backwards compatibility with old setlists
-    let targetTempo = songEntry.tempo
-    if (targetTempo === null || targetTempo === undefined) {
-      targetTempo = canonicalSong?.tempo || null
-    }
+    // Get target tempo from setlist (explicit snapshot); same fallback story as the key
+    const targetTempo = songEntry.tempo ?? null
 
     // Apply tempo override
     if (targetTempo) {
@@ -102,7 +143,7 @@ export async function buildRuntimeSongs(setlist, { db, parser, fontSize }) {
     // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
     const parsedTempoInfo = parseTempoMetadata(parsed.metadata.tempo)
     let currentBPM = parsedTempoInfo.bpm
-    let timeSignature = parsed.metadata.time // ChordPro uses 'time'
+    let timeSignature: string | null | undefined = parsed.metadata.time // ChordPro uses 'time'
     let tempoNote = parsedTempoInfo.tempoNote || null
     if (canonicalSong?.metadata) {
       const canonicalTempoInfo = parseTempoMetadata(canonicalSong.metadata.tempo)

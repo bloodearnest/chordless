@@ -6,7 +6,7 @@ import {
   listPadSetFolders,
   updatePadSetFolderMetadata,
   uploadPadFile,
-} from './drive-api.js'
+} from './drive-api.ts'
 import { wantsPads } from './media-player-loader.js'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
 

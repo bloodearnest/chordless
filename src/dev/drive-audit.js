@@ -1,4 +1,4 @@
-import { downloadSetlist, driveRequest } from '/js/drive-api.js'
+import { downloadSetlist, driveRequest } from '/js/drive-api.ts'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 const status = document.getElementById('status')

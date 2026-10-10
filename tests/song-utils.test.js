@@ -13,7 +13,7 @@ import {
   hashText,
   overwriteSong,
   setDefaultVariant,
-} from '../src/js/song-utils.js'
+} from '../src/js/song-utils.ts'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it } = window

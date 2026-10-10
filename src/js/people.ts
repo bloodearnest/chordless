@@ -8,7 +8,7 @@
 
 import type { Person } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import { getCurrentUserInfo } from './google-auth.js'
+import { getCurrentUserInfo } from './google-auth.ts'
 import { getCurrentOrganisationFull } from './organisation.ts'
 
 /** The signed-in user as a person, or null if not signed in */

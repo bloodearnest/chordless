@@ -2,7 +2,7 @@ import { expect } from '@esm-bundle/chai'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { setlistFileMetadata, songFileMetadata } from '../src/js/drive-metadata.ts'
 import { DriveSyncManager } from '../src/js/drive-sync.js'
-import { hashText } from '../src/js/song-utils.js'
+import { hashText } from '../src/js/song-utils.ts'
 import { installFakeDrive } from './fake-drive.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 

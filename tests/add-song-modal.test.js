@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import '../src/components/app-modal.js'
 import { getCurrentDB } from '../src/js/db.ts'
 import { AddSongModal } from '../src/js/setlist/add-song-modal.js'
-import { createSong } from '../src/js/song-utils.js'
+import { createSong } from '../src/js/song-utils.ts'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, beforeEach, afterEach } = window

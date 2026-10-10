@@ -25,7 +25,7 @@
  * rather than guessing, so a test can't silently pass against wrong behaviour.
  */
 
-import { setAccessTokenProvider } from '../src/js/drive-api.js'
+import { setAccessTokenProvider } from '../src/js/drive-api.ts'
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
 const DEFAULT_FILE_FIELDS = ['kind', 'id', 'name', 'mimeType']

@@ -26,7 +26,7 @@ import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.js'
 import { OverviewReorder } from './setlist/overview-reorder.js'
-import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.js'
+import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { isInModalDialog, isTypingInField } from './utils/keyboard.ts'
@@ -948,7 +948,7 @@ export class SetlistPage {
     const song = this.songs[songIndex]
     if (!song) return
 
-    const { createSetlistSongModel, syncSectionStates } = await import('./song-model-factory.js')
+    const { createSetlistSongModel, syncSectionStates } = await import('./song-model-factory.ts')
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
@@ -1599,7 +1599,7 @@ export class SetlistPage {
     song.currentBPM = newValue
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const { createSetlistSongModel } = await import('./song-model-factory.ts')
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
@@ -1637,7 +1637,7 @@ export class SetlistPage {
     song.currentCapo = normalized
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const { createSetlistSongModel } = await import('./song-model-factory.ts')
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
@@ -1676,7 +1676,7 @@ export class SetlistPage {
     song.currentKey = newKey
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.js')
+    const { createSetlistSongModel } = await import('./song-model-factory.ts')
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,

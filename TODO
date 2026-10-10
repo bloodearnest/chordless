@@ -11,6 +11,13 @@ song edit UI
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
+- the fallbacks to a song's own key and tempo never work: buildRuntimeSongs (for old setlists
+  with no key or tempo of their own) reads canonicalSong.key and .tempo, and LibrarySong reads
+  _song.key, .originalKey, .tempo and .originalTempo, but getSongWithContent returns none of
+  them at the top level (only in .metadata). So an old setlist is shown in the chart's own key
+  and tempo, and a library song's getKey()/getTempo() are undefined until changed (so the
+  library view's key comparison always thinks the key changed). Typing it kept the behaviour
+  (see the comments); decide what is meant, fix getSongWithContent or the readers, with tests
 - the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart

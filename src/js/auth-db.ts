@@ -10,10 +10,31 @@
 const DB_NAME = 'auth'
 const DB_VERSION = 1
 
+/** The signed-in Google user, as the worker sent it, with the avatar cached for offline use */
+export interface StoredUser {
+  name: string | null
+  email: string | null
+  picture: string | null
+  given_name: string | null
+  family_name: string | null
+  sub: string | null
+  avatarDataUrl?: string
+  avatarUpdatedAt?: string
+}
+
+/** What is kept beside the encrypted blob */
+export interface AuthMetadata {
+  access_token?: string
+  /** ISO time */
+  expires_at?: string
+  user?: StoredUser | null
+  id_token?: string
+}
+
 /** The encrypted token blob, as stored (the single record 'current') */
 export interface StoredBlob {
   blob: string
-  metadata: Record<string, unknown>
+  metadata: AuthMetadata
   updated_at: string
 }
 
@@ -38,7 +59,7 @@ export interface BlobBackup {
   version: 1
   exported_at: string
   blob: string
-  metadata: Record<string, unknown>
+  metadata: AuthMetadata
 }
 
 const STORES = {
@@ -80,10 +101,7 @@ export function initAuthDB(): Promise<IDBDatabase> {
 /**
  * Store encrypted token blob
  */
-export async function storeBlob(
-  blob: string,
-  metadata: Record<string, unknown> = {}
-): Promise<StoredBlob> {
+export async function storeBlob(blob: string, metadata: AuthMetadata = {}): Promise<StoredBlob> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.BLOB, 'readwrite')
   const store = tx.objectStore(STORES.BLOB)

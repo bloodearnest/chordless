@@ -15,8 +15,8 @@
  */
 
 import { ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.ts'
-import * as DriveAPI from './drive-api.js'
-import { batchUploadFiles, driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.js'
+import * as DriveAPI from './drive-api.ts'
+import { batchUploadFiles, driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.ts'
 import {
   forUpdate,
   setlistFileMetadata,
@@ -25,7 +25,7 @@ import {
 } from './drive-metadata.ts'
 import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
-import { chartFields, hashText } from './song-utils.js'
+import { chartFields, hashText } from './song-utils.ts'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
 
 /** A setlist's file content in Drive */

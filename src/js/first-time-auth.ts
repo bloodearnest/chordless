@@ -5,23 +5,22 @@
  * rename the "Personal" organisation to their name and switch to it.
  */
 
-import { getCurrentUserInfo } from './google-auth.js'
+import { getCurrentUserInfo } from './google-auth.ts'
 import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.ts'
 
 const FIRST_AUTH_KEY = 'first-auth-done'
 
 /**
  * Check if this is the first time user has authenticated
- * @returns {boolean}
  */
-function isFirstAuth() {
+function isFirstAuth(): boolean {
   return !localStorage.getItem(FIRST_AUTH_KEY)
 }
 
 /**
  * Mark first auth as complete
  */
-function markFirstAuthComplete() {
+function markFirstAuthComplete(): void {
   localStorage.setItem(FIRST_AUTH_KEY, 'true')
 }
 
@@ -30,9 +29,9 @@ function markFirstAuthComplete() {
  * If user has authenticated for the first time and is using "Personal" org,
  * rename it to their name and switch to it
  *
- * @returns {Promise<boolean>} True if org was renamed and switched
+ * @returns True if org was renamed and switched
  */
-export async function handleFirstTimeAuth() {
+export async function handleFirstTimeAuth(): Promise<boolean> {
   // Check if this is first auth
   if (!isFirstAuth()) {
     return false
@@ -92,9 +91,9 @@ export async function handleFirstTimeAuth() {
  * renamed later would leave this device on a different folder from the others.
  * Unlike handleFirstTimeAuth it doesn't reload the page.
  *
- * @returns {Promise<boolean>} True if the organisation was renamed
+ * @returns True if the organisation was renamed
  */
-export async function nameOrganisationBeforeSync() {
+export async function nameOrganisationBeforeSync(): Promise<boolean> {
   const { id, name } = getCurrentOrganisation()
   if (!id || name !== 'Personal') {
     return false
@@ -115,7 +114,7 @@ export async function nameOrganisationBeforeSync() {
  * Check and handle first-time auth on app startup
  * Call this from your main app initialization
  */
-export async function checkFirstTimeAuth() {
+export async function checkFirstTimeAuth(): Promise<boolean> {
   if (!isFirstAuth()) {
     return false
   }

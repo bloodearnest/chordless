@@ -29,6 +29,47 @@
  * allowing direct browser-to-Drive API calls for better performance and offline support.
  */
 
+import type {
+  AuthMetadata,
+  BlobBackup,
+  QueuedOperation,
+  StoredBlob,
+  StoredUser,
+} from './auth-db.ts'
+import type { DriveContent, DriveFile, DriveFileList } from './data-types.ts'
+
+/** The signed-in user, as the UI shows them */
+export interface UserInfo {
+  name: string | null
+  email: string | null
+  picture: string | null
+  avatarDataUrl: string | null
+  givenName: string | null
+  familyName: string | null
+}
+
+/** What the service worker answers to a message from the page */
+interface WorkerReply {
+  messageId?: string
+  success: boolean
+  error?: string
+  data?: StoredBlob
+  backup?: BlobBackup
+  operations?: QueuedOperation[]
+  operationId?: number
+}
+
+type WorkerMessageType =
+  | 'STORE_BLOB'
+  | 'GET_BLOB'
+  | 'DELETE_BLOB'
+  | 'EXPORT_BLOB'
+  | 'IMPORT_BLOB'
+  | 'QUEUE_INVITE'
+  | 'QUEUE_REVOKE'
+  | 'GET_PENDING_OPERATIONS'
+  | 'PROCESS_QUEUE'
+
 // Configuration
 const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
@@ -40,7 +81,7 @@ const AUTH_PROXY_URL = ''
 /**
  * Parse JWT and extract payload
  */
-function parseJwt(token) {
+function parseJwt(token: string): Record<string, string> | null {
   try {
     const base64Url = token.split('.')[1]
     const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
@@ -63,7 +104,7 @@ function parseJwt(token) {
  * Get current user info from stored blob
  * Returns { name, email, picture } or null
  */
-export async function getCurrentUserInfo() {
+export async function getCurrentUserInfo(): Promise<UserInfo | null> {
   try {
     const blobData = await getStoredBlob()
     const metadata = blobData?.metadata
@@ -72,7 +113,7 @@ export async function getCurrentUserInfo() {
       return null
     }
 
-    let user = metadata.user || null
+    let user: StoredUser | null = metadata.user || null
     let shouldPersist = false
 
     if (!user && metadata.id_token) {
@@ -132,8 +173,8 @@ export async function getCurrentUserInfo() {
  * Initialize Google Identity Services
  * Call this once on page load
  */
-export function initGoogleAuth() {
-  return new Promise((resolve, reject) => {
+export function initGoogleAuth(): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
     if (window.google?.accounts) {
       resolve()
       return
@@ -153,14 +194,26 @@ export function initGoogleAuth() {
   })
 }
 
+/** What the worker sends back once it has exchanged the authorization code */
+export interface AuthorizeResult {
+  blob: string
+  access_token: string
+  expires_in: number
+  user: StoredUser | null
+}
+
 /**
  * Start OAuth flow to get auth code and exchange for token blob
  */
-export async function authorizeWithGoogle() {
+export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
   await initGoogleAuth()
 
-  return new Promise((resolve, reject) => {
-    const client = google.accounts.oauth2.initCodeClient({
+  return new Promise<AuthorizeResult>((resolve, reject) => {
+    // access_type and prompt are not in Google's typed config, but are sent as they always were
+    const config: google.accounts.oauth2.CodeClientConfig & {
+      access_type: 'offline'
+      prompt: 'consent'
+    } = {
       client_id: GOOGLE_CLIENT_ID,
       scope: `${GOOGLE_SCOPES} openid email profile`,
       ux_mode: 'popup',
@@ -191,7 +244,7 @@ export async function authorizeWithGoogle() {
 
           const normalizedUser = user ? await buildStoredUserProfile(user).catch(() => user) : null
 
-          const metadata = {
+          const metadata: AuthMetadata = {
             access_token,
             expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
             user: normalizedUser,
@@ -212,7 +265,8 @@ export async function authorizeWithGoogle() {
           reject(error)
         }
       },
-    })
+    }
+    const client = google.accounts.oauth2.initCodeClient(config)
 
     client.requestCode()
   })
@@ -230,10 +284,10 @@ export async function authorizeWithGoogle() {
  * - Use silent token refresh via iframe
  * - Trigger new OAuth code flow for fresh ID token (requires user interaction)
  */
-export async function getIdToken() {
+export async function getIdToken(): Promise<string> {
   await initGoogleAuth()
 
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     google.accounts.id.initialize({
       client_id: GOOGLE_CLIENT_ID,
       callback: response => {
@@ -258,7 +312,7 @@ export async function getIdToken() {
 /**
  * Check if user is authenticated (has blob in SW)
  */
-export async function isAuthenticated() {
+export async function isAuthenticated(): Promise<boolean> {
   try {
     const response = await sendToServiceWorker('GET_BLOB')
     return response.success && response.data != null
@@ -272,10 +326,10 @@ export async function isAuthenticated() {
  * Get a valid access token for calling Google Drive API directly.
  * Automatically refreshes if expired.
  *
- * @returns {Promise<string>} Valid access token
- * @throws {Error} If not authenticated or refresh fails
+ * @returns Valid access token
+ * @throws If not authenticated or refresh fails
  */
-export async function getAccessToken() {
+export async function getAccessToken(): Promise<string> {
   const response = await sendToServiceWorker('GET_BLOB')
 
   if (!response.success || !response.data) {
@@ -283,7 +337,7 @@ export async function getAccessToken() {
   }
 
   const { blob, metadata } = response.data
-  const expiresAt = new Date(metadata.expires_at)
+  const expiresAt = new Date(metadata.expires_at ?? 0)
   const now = new Date()
 
   // Add 5 minute buffer before expiry
@@ -291,7 +345,7 @@ export async function getAccessToken() {
 
   if (expiresAt.getTime() - now.getTime() > bufferMs) {
     // Token still valid
-    return metadata.access_token
+    return metadata.access_token ?? ''
   }
 
   // Token expired or about to expire, refresh it
@@ -307,10 +361,13 @@ export async function getAccessToken() {
  * The encrypted blob itself proves ownership, so no ID token is required.
  * Auth proxy decrypts the blob and uses the refresh token to get a new access token.
  *
- * @param {string} blob - Encrypted JWE blob containing refresh token
- * @returns {Promise<string>} New access token
+ * @param blob - Encrypted JWE blob containing refresh token
+ * @returns New access token
  */
-async function refreshAccessToken(blob, existingMetadata = {}) {
+async function refreshAccessToken(
+  blob: string,
+  existingMetadata: AuthMetadata = {}
+): Promise<string> {
   // Call auth proxy to refresh (no ID token needed - blob proves ownership)
   const response = await fetch(`${AUTH_PROXY_URL}/session/refresh`, {
     method: 'POST',
@@ -340,7 +397,7 @@ async function refreshAccessToken(blob, existingMetadata = {}) {
   return access_token
 }
 
-async function buildStoredUserProfile(user) {
+async function buildStoredUserProfile(user: StoredUser): Promise<StoredUser> {
   if (!user?.picture) {
     return user
   }
@@ -367,21 +424,24 @@ async function buildStoredUserProfile(user) {
       avatarUpdatedAt: new Date().toISOString(),
     }
   } catch (error) {
-    console.warn('[Auth] Unable to cache avatar image:', error.message)
+    console.warn(
+      '[Auth] Unable to cache avatar image:',
+      error instanceof Error ? error.message : error
+    )
     return user
   }
 }
 
-function blobToDataUrl(blob) {
-  return new Promise((resolve, reject) => {
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onerror = () => reject(new Error('Failed to read avatar blob'))
-    reader.onload = () => resolve(reader.result)
+    reader.onload = () => resolve(String(reader.result))
     reader.readAsDataURL(blob)
   })
 }
 
-function formatUserInfoForUI(user) {
+function formatUserInfoForUI(user: StoredUser | null): UserInfo | null {
   if (!user) return null
 
   return {
@@ -397,7 +457,7 @@ function formatUserInfoForUI(user) {
 /**
  * Get stored blob from Service Worker
  */
-export async function getStoredBlob() {
+export async function getStoredBlob(): Promise<StoredBlob | undefined> {
   const response = await sendToServiceWorker('GET_BLOB')
   return response.data
 }
@@ -405,32 +465,33 @@ export async function getStoredBlob() {
 /**
  * Logout - delete blob from SW
  */
-export async function logout() {
+export async function logout(): Promise<void> {
   await sendToServiceWorker('DELETE_BLOB')
 }
 
 /**
  * Export blob as backup for user to save
  */
-export async function exportBlobBackup() {
+export async function exportBlobBackup(): Promise<BlobBackup> {
   const response = await sendToServiceWorker('EXPORT_BLOB')
   if (!response.success) {
     throw new Error(response.error || 'Failed to export blob')
   }
+  if (!response.backup) throw new Error('Failed to export blob')
   return response.backup
 }
 
 /**
  * Import blob from backup
  */
-export async function importBlobBackup(backup) {
+export async function importBlobBackup(backup: Partial<BlobBackup>): Promise<void> {
   await sendToServiceWorker('IMPORT_BLOB', { backup })
 }
 
 /**
  * Download blob backup as JSON file
  */
-export async function downloadBlobBackup() {
+export async function downloadBlobBackup(): Promise<void> {
   const backup = await exportBlobBackup()
 
   const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' })
@@ -454,16 +515,21 @@ export async function downloadBlobBackup() {
 /**
  * Upload a file to Google Drive
  *
- * @param {string} name - File name
- * @param {string} mimeType - MIME type (e.g., 'application/json')
- * @param {string|Blob} content - File content
- * @param {string} [folderId] - Optional parent folder ID
- * @returns {Promise<Object>} File metadata from Drive API
+ * @param name - File name
+ * @param mimeType - MIME type (e.g., 'application/json')
+ * @param content - File content
+ * @param folderId - Optional parent folder ID
+ * @returns File metadata from Drive API
  */
-export async function uploadFileToDrive(name, mimeType, content, folderId = null) {
+export async function uploadFileToDrive(
+  name: string,
+  mimeType: string,
+  content: DriveContent,
+  folderId: string | null = null
+): Promise<DriveFile> {
   const accessToken = await getAccessToken()
 
-  const metadata = {
+  const metadata: { name: string; mimeType: string; parents?: string[] } = {
     name,
     mimeType,
   }
@@ -474,7 +540,7 @@ export async function uploadFileToDrive(name, mimeType, content, folderId = null
 
   const form = new FormData()
   form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }))
-  form.append('file', new Blob([content], { type: mimeType }))
+  form.append('file', new Blob([content as BlobPart], { type: mimeType }))
 
   const response = await fetch(
     'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
@@ -498,10 +564,10 @@ export async function uploadFileToDrive(name, mimeType, content, folderId = null
 /**
  * Download a file from Google Drive
  *
- * @param {string} fileId - Drive file ID
- * @returns {Promise<string>} File content as text
+ * @param fileId - Drive file ID
+ * @returns File content as text
  */
-export async function downloadFileFromDrive(fileId) {
+export async function downloadFileFromDrive(fileId: string): Promise<string> {
   const accessToken = await getAccessToken()
 
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
@@ -522,11 +588,14 @@ export async function downloadFileFromDrive(fileId) {
 /**
  * Get file metadata from Google Drive
  *
- * @param {string} fileId - Drive file ID
- * @param {string} [fields] - Optional fields to return (e.g., 'id,name,modifiedTime')
- * @returns {Promise<Object>} File metadata
+ * @param fileId - Drive file ID
+ * @param fields - Optional fields to return (e.g., 'id,name,modifiedTime')
+ * @returns File metadata
  */
-export async function getFileMetadata(fileId, fields = 'id,name,mimeType,modifiedTime') {
+export async function getFileMetadata(
+  fileId: string,
+  fields = 'id,name,mimeType,modifiedTime'
+): Promise<DriveFile> {
   const accessToken = await getAccessToken()
 
   const response = await fetch(
@@ -550,17 +619,17 @@ export async function getFileMetadata(fileId, fields = 'id,name,mimeType,modifie
 /**
  * List files in Google Drive
  *
- * @param {Object} options - Query options
- * @param {string} [options.query] - Search query (e.g., "name contains 'setlist'")
- * @param {string} [options.orderBy] - Order by field (e.g., 'modifiedTime desc')
- * @param {number} [options.pageSize] - Max results per page (default 100)
- * @returns {Promise<Object>} { files: Array, nextPageToken: string }
+ * @param options.query - Search query (e.g., "name contains 'setlist'")
+ * @param options.orderBy - Order by field (e.g., 'modifiedTime desc')
+ * @param options.pageSize - Max results per page (default 100)
  */
-export async function listDriveFiles(options = {}) {
+export async function listDriveFiles(
+  options: { query?: string; orderBy?: string; pageSize?: number } = {}
+): Promise<DriveFileList> {
   const accessToken = await getAccessToken()
 
   const params = new URLSearchParams({
-    pageSize: options.pageSize || 100,
+    pageSize: String(options.pageSize || 100),
     fields: 'files(id,name,mimeType,modifiedTime),nextPageToken',
   })
 
@@ -590,12 +659,16 @@ export async function listDriveFiles(options = {}) {
 /**
  * Update file content on Google Drive
  *
- * @param {string} fileId - Drive file ID
- * @param {string|Blob} content - New file content
- * @param {string} mimeType - MIME type
- * @returns {Promise<Object>} Updated file metadata
+ * @param fileId - Drive file ID
+ * @param content - New file content
+ * @param mimeType - MIME type
+ * @returns Updated file metadata
  */
-export async function updateDriveFile(fileId, content, mimeType) {
+export async function updateDriveFile(
+  fileId: string,
+  content: string | Blob,
+  mimeType: string
+): Promise<DriveFile> {
   const accessToken = await getAccessToken()
 
   const response = await fetch(
@@ -621,10 +694,9 @@ export async function updateDriveFile(fileId, content, mimeType) {
 /**
  * Delete a file from Google Drive
  *
- * @param {string} fileId - Drive file ID
- * @returns {Promise<void>}
+ * @param fileId - Drive file ID
  */
-export async function deleteDriveFile(fileId) {
+export async function deleteDriveFile(fileId: string): Promise<void> {
   const accessToken = await getAccessToken()
 
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
@@ -653,14 +725,14 @@ export async function deleteDriveFile(fileId) {
 /**
  * Queue an invite operation to grant a user read access to a Drive file
  */
-export async function queueInvite(fileId, email) {
+export async function queueInvite(fileId: string, email: string): Promise<WorkerReply> {
   return await sendToServiceWorker('QUEUE_INVITE', { file_id: fileId, email })
 }
 
 /**
  * Queue a revoke operation to remove a user's access to a Drive file
  */
-export async function queueRevoke(fileId, permissionId) {
+export async function queueRevoke(fileId: string, permissionId: string): Promise<WorkerReply> {
   return await sendToServiceWorker('QUEUE_REVOKE', {
     file_id: fileId,
     permission_id: permissionId,
@@ -670,7 +742,7 @@ export async function queueRevoke(fileId, permissionId) {
 /**
  * Get list of pending operations in the queue
  */
-export async function getPendingOperations() {
+export async function getPendingOperations(): Promise<QueuedOperation[]> {
   const response = await sendToServiceWorker('GET_PENDING_OPERATIONS')
   return response.operations || []
 }
@@ -678,35 +750,37 @@ export async function getPendingOperations() {
 /**
  * Manually trigger processing of queued operations
  */
-export async function processQueue() {
+export async function processQueue(): Promise<void> {
   await sendToServiceWorker('PROCESS_QUEUE')
 }
 
 /**
  * Send message to Service Worker and wait for response
  */
-async function sendToServiceWorker(type, data = {}) {
-  if (!navigator.serviceWorker.controller) {
+async function sendToServiceWorker(
+  type: WorkerMessageType,
+  data: Record<string, unknown> = {}
+): Promise<WorkerReply> {
+  const controller = navigator.serviceWorker.controller
+  if (!controller) {
     throw new Error('No service worker controller')
   }
 
-  return new Promise((resolve, reject) => {
+  return new Promise<WorkerReply>((resolve, reject) => {
     const messageChannel = new MessageChannel()
     const messageId = crypto.randomUUID()
     const timeout = setTimeout(() => {
       reject(new Error('Service Worker timeout'))
     }, 10000)
 
-    messageChannel.port1.onmessage = event => {
+    messageChannel.port1.onmessage = (event: MessageEvent<WorkerReply>) => {
       clearTimeout(timeout)
       if (event.data.messageId === messageId) {
         resolve(event.data)
       }
     }
 
-    navigator.serviceWorker.controller.postMessage({ type, data, messageId }, [
-      messageChannel.port2,
-    ])
+    controller.postMessage({ type, data, messageId }, [messageChannel.port2])
   })
 }
 
@@ -717,7 +791,7 @@ async function sendToServiceWorker(type, data = {}) {
  * The Service Worker requests ID tokens when processing queued invite/revoke operations.
  * Currently called in app initialization but not actively used until Drive features are implemented.
  */
-export function listenForIdTokenRequests() {
+export function listenForIdTokenRequests(): void {
   navigator.serviceWorker.addEventListener('message', async event => {
     if (event.data.type === 'REQUEST_ID_TOKEN') {
       try {

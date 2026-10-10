@@ -6,6 +6,14 @@
  * Each variant is a separate song document linked by variantOf field.
  */
 
+import type {
+  ChartMetadata,
+  ParsedChart,
+  SongInput,
+  SongRecord,
+  SongWithContent,
+} from './data-types.ts'
+import type { ChordlessDB } from './db.ts'
 import { getCurrentDB, normalizeTitle } from './db.ts'
 import { ChordProParser } from './parser.ts'
 import { hashText } from './utils/hash.ts'
@@ -13,28 +21,29 @@ import { hashText } from './utils/hash.ts'
 export { hashText }
 
 const parser = new ChordProParser()
-const parseCache = new Map()
+const parseCache = new Map<string, ParsedChart>()
 const MAX_CACHE_SIZE = 100
 
 /**
  * Get full song with parsed metadata from chordpro
  *
- * @param {string} songUuid - Song UUID (specific variant)
- * @param {Object} db - Optional database instance (uses getCurrentDB if not provided)
- * @returns {Promise<Object>} Song with parsed content and metadata
+ * @param songUuid - Song UUID (specific variant)
+ * @param db - Optional database instance (uses getCurrentDB if not provided)
+ * @returns Song with parsed content and metadata
  */
-export async function getSongWithContent(songUuid, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
+export async function getSongWithContent(
+  songUuid: string,
+  db: ChordlessDB | null = null
+): Promise<SongWithContent> {
+  const database = db ?? (await getCurrentDB())
 
-  const song = await db.getSong(songUuid)
+  const song = await database.getSong(songUuid)
   if (!song) {
     throw new Error(`Song not found: ${songUuid}`)
   }
 
   // Get chordpro content
-  const chordpro = await db.getChordPro(song.chordproFileId)
+  const chordpro = await database.getChordPro(song.chordproFileId)
   if (!chordpro) {
     throw new Error(`ChordPro content not found: ${song.chordproFileId}`)
   }
@@ -82,21 +91,23 @@ export async function getSongWithContent(songUuid, db = null) {
 /**
  * The library's songs, by title: one entry for each song (its default variant, not
  * every variant), with its chart parsed. A song that can't be loaded is left out.
- * @param {object} db the organisation's database
- * @param {object} [options]
- * @param {boolean} [options.withLastUsage] also set lastUsageInfo on each song, from
- *   the setlist it was last played in: {date, leader, key}
+ * @param db the organisation's database
+ * @param options.withLastUsage also set lastUsageInfo on each song, from the setlist it was
+ *   last played in: {date, leader, key}
  */
-export async function getLibrarySongs(db, { withLastUsage = false } = {}) {
+export async function getLibrarySongs(
+  db: ChordlessDB,
+  { withLastUsage = false }: { withLastUsage?: boolean } = {}
+): Promise<SongWithContent[]> {
   const records = await db.getAllSongs()
 
   // One song per deterministic id, not one per variant
-  const byId = new Map()
+  const byId = new Map<string, SongRecord>()
   for (const record of records) {
     if (record.isDefault || !byId.has(record.id)) byId.set(record.id, record)
   }
 
-  const songs = []
+  const songs: SongWithContent[] = []
   for (const record of byId.values()) {
     try {
       const song = await getSongWithContent(record.uuid, db)
@@ -124,69 +135,74 @@ export async function getLibrarySongs(db, { withLastUsage = false } = {}) {
 /**
  * Get all variants of a song
  *
- * @param {string} songId - Deterministic song ID
- * @param {Object} db - Optional database instance
- * @returns {Promise<Array>} Array of song variants
+ * @param songId - Deterministic song ID
+ * @param db - Optional database instance
+ * @returns Array of song variants
  */
-export async function getSongVariants(songId, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
-  return await db.getSongVariants(songId)
+export async function getSongVariants(
+  songId: string,
+  db: ChordlessDB | null = null
+): Promise<SongRecord[]> {
+  const database = db ?? (await getCurrentDB())
+  return await database.getSongVariants(songId)
 }
 
 /**
  * Get default variant for a song
  *
- * @param {string} songId - Deterministic song ID
- * @param {Object} db - Optional database instance
- * @returns {Promise<Object|null>} Default variant or null
+ * @param songId - Deterministic song ID
+ * @param db - Optional database instance
+ * @returns Default variant or null
  */
-export async function getDefaultVariant(songId, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
-  return await db.getDefaultSongVariant(songId)
+export async function getDefaultVariant(
+  songId: string,
+  db: ChordlessDB | null = null
+): Promise<SongRecord | null> {
+  const database = db ?? (await getCurrentDB())
+  return await database.getDefaultSongVariant(songId)
 }
 
 /**
  * Get song with content by deterministic ID (gets default variant)
  *
- * @param {string} songId - Deterministic song ID
- * @param {Object} db - Optional database instance
- * @returns {Promise<Object>} Song with parsed content and metadata
+ * @param songId - Deterministic song ID
+ * @param db - Optional database instance
+ * @returns Song with parsed content and metadata
  */
-export async function getSongById(songId, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
+export async function getSongById(
+  songId: string,
+  db: ChordlessDB | null = null
+): Promise<SongWithContent> {
+  const database = db ?? (await getCurrentDB())
 
   // Get default variant for this song
-  const song = await db.getDefaultSongVariant(songId)
+  const song = await database.getDefaultSongVariant(songId)
   if (!song) {
     throw new Error(`Song not found: ${songId}`)
   }
 
   // Return full song with content
-  return await getSongWithContent(song.uuid, db)
+  return await getSongWithContent(song.uuid, database)
 }
 
 /**
  * Find existing song by CCLI number or title
  *
- * @param {string} ccliNumber - CCLI number
- * @param {string} title - Song title
- * @param {Object} db - Optional database instance
- * @returns {Promise<Object|null>} Existing song or null
+ * @param ccliNumber - CCLI number
+ * @param title - Song title
+ * @param db - Optional database instance
+ * @returns Existing song or null
  */
-export async function findExistingSong(ccliNumber, title, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
+export async function findExistingSong(
+  ccliNumber: string | null | undefined,
+  title: string | null | undefined,
+  db: ChordlessDB | null = null
+): Promise<SongRecord | null> {
+  const database = db ?? (await getCurrentDB())
 
   // Try CCLI first
   if (ccliNumber) {
-    const songs = await db.findSongByCCLI(ccliNumber)
+    const songs = await database.findSongByCCLI(ccliNumber)
     if (songs.length > 0) {
       // Return default variant if available
       const defaultSong = songs.find(s => s.isDefault)
@@ -197,7 +213,7 @@ export async function findExistingSong(ccliNumber, title, db = null) {
   // Try normalized title
   if (title) {
     const titleNormalized = normalizeTitle(title)
-    const songs = await db.findSongByNormalizedTitle(titleNormalized)
+    const songs = await database.findSongByNormalizedTitle(titleNormalized)
     if (songs.length > 0) {
       const defaultSong = songs.find(s => s.isDefault)
       return defaultSong || songs[0]
@@ -207,14 +223,30 @@ export async function findExistingSong(ccliNumber, title, db = null) {
   return null
 }
 
+/** What createSong (and createVariant) can be told beyond the chart itself */
+export interface CreateSongOptions {
+  ccliNumber?: string | null
+  title?: string
+  /** Make a new variant even if the song exists */
+  forceNew?: boolean
+  variantOf?: string | null
+  variantLabel?: string
+  importUser?: string
+  importSource?: string
+  sourceUrl?: string | null
+}
+
 /**
  * Create a new song with chordpro content
  *
- * @param {string} chordproContent - ChordPro text
- * @param {Object} options - Additional options
- * @returns {Promise<Object>} Created song
+ * @param chordproContent - ChordPro text
+ * @param options - Additional options
+ * @returns Created song
  */
-export async function createSong(chordproContent, options = {}) {
+export async function createSong(
+  chordproContent: string,
+  options: CreateSongOptions = {}
+): Promise<SongRecord> {
   const db = await getCurrentDB()
 
   // Parse chordpro to extract metadata
@@ -226,7 +258,7 @@ export async function createSong(chordproContent, options = {}) {
   const title = metadata.title || options.title || 'Untitled'
   const titleNormalized = normalizeTitle(title)
 
-  let songId
+  let songId: string
   if (ccliNumber) {
     songId = `ccli-${ccliNumber}`
   } else {
@@ -254,7 +286,7 @@ export async function createSong(chordproContent, options = {}) {
   })
 
   // Create song
-  const song = {
+  const song: SongInput = {
     uuid: crypto.randomUUID(),
     id: songId,
     variantOf: options.variantOf || null,
@@ -284,7 +316,12 @@ export async function createSong(chordproContent, options = {}) {
 }
 
 /** The song fields that come from its chart's metadata */
-export function chartFields(metadata) {
+export function chartFields(
+  metadata: ChartMetadata
+): Pick<
+  SongInput,
+  'author' | 'copyright' | 'key' | 'originalKey' | 'tempo' | 'originalTempo' | 'time'
+> {
   return {
     author: metadata.artist || metadata.author || null,
     copyright: metadata.copyright || null,
@@ -302,25 +339,27 @@ export function chartFields(metadata) {
  * fields); the fields that come from the chart are updated. Sync sees the
  * changed chart and uploads it.
  *
- * @param {string} songUuid - UUID of the song to overwrite
- * @param {string} chordproContent - The new ChordPro content
- * @param {Object} db - Optional database instance (uses getCurrentDB if not provided)
- * @returns {Promise<Object>} The updated song
+ * @param songUuid - UUID of the song to overwrite
+ * @param chordproContent - The new ChordPro content
+ * @param db - Optional database instance (uses getCurrentDB if not provided)
+ * @returns The updated song
  */
-export async function overwriteSong(songUuid, chordproContent, db = null) {
-  if (!db) {
-    db = await getCurrentDB()
-  }
+export async function overwriteSong(
+  songUuid: string,
+  chordproContent: string,
+  db: ChordlessDB | null = null
+): Promise<SongRecord> {
+  const database = db ?? (await getCurrentDB())
 
-  const song = await db.getSong(songUuid)
+  const song = await database.getSong(songUuid)
   if (!song) {
     throw new Error(`Song not found: ${songUuid}`)
   }
-  const chordpro = await db.getChordPro(song.chordproFileId)
+  const chordpro = await database.getChordPro(song.chordproFileId)
   const now = new Date().toISOString()
   const contentHash = hashText(chordproContent)
 
-  await db.saveChordPro({
+  await database.saveChordPro({
     ...chordpro,
     id: song.chordproFileId,
     content: chordproContent,
@@ -329,25 +368,30 @@ export async function overwriteSong(songUuid, chordproContent, db = null) {
   })
   parseCache.delete(song.chordproFileId)
 
-  const updated = {
+  const updated: SongInput = {
     ...song,
     ...chartFields(parser.parse(chordproContent).metadata),
     contentHash,
     modifiedDate: now,
   }
-  return db.saveSong(updated)
+  return database.saveSong(updated)
 }
 
 /**
  * Create a variant of an existing song
  *
- * @param {string} sourceUuid - UUID of song to copy from
- * @param {string} variantLabel - Label for the new variant
- * @param {string} chordproContent - ChordPro content for the variant
- * @param {Object} options - Additional options
- * @returns {Promise<Object>} Created variant
+ * @param sourceUuid - UUID of song to copy from
+ * @param variantLabel - Label for the new variant
+ * @param chordproContent - ChordPro content for the variant
+ * @param options - Additional options
+ * @returns Created variant
  */
-export async function createVariant(sourceUuid, variantLabel, chordproContent, options = {}) {
+export async function createVariant(
+  sourceUuid: string,
+  variantLabel: string,
+  chordproContent: string,
+  options: CreateSongOptions = {}
+): Promise<SongRecord> {
   const db = await getCurrentDB()
 
   const sourceSong = await db.getSong(sourceUuid)
@@ -368,10 +412,9 @@ export async function createVariant(sourceUuid, variantLabel, chordproContent, o
 /**
  * Set a variant as the default for its song
  *
- * @param {string} songUuid - UUID of variant to make default
- * @returns {Promise<void>}
+ * @param songUuid - UUID of variant to make default
  */
-export async function setDefaultVariant(songUuid) {
+export async function setDefaultVariant(songUuid: string): Promise<void> {
   const db = await getCurrentDB()
 
   const song = await db.getSong(songUuid)
@@ -402,9 +445,10 @@ export async function setDefaultVariant(songUuid) {
 /**
  * Parse chordpro with caching
  */
-function getCachedParsed(fileId, content) {
-  if (parseCache.has(fileId)) {
-    return parseCache.get(fileId)
+function getCachedParsed(fileId: string, content: string): ParsedChart {
+  const cached = parseCache.get(fileId)
+  if (cached) {
+    return cached
   }
 
   const parsed = parser.parse(content)
@@ -412,7 +456,7 @@ function getCachedParsed(fileId, content) {
   // Limit cache size
   if (parseCache.size >= MAX_CACHE_SIZE) {
     const firstKey = parseCache.keys().next().value
-    parseCache.delete(firstKey)
+    if (firstKey !== undefined) parseCache.delete(firstKey)
   }
 
   parseCache.set(fileId, parsed)
@@ -423,10 +467,10 @@ function getCachedParsed(fileId, content) {
  * Format artist names from a delimited string
  * Cleans up common prefixes like "Words by", "Music by", etc.
  *
- * @param {string} artistString - Artist string (may contain multiple artists)
- * @returns {Array<string>} Array of cleaned artist names
+ * @param artistString - Artist string (may contain multiple artists)
+ * @returns Array of cleaned artist names
  */
-export function formatArtistNames(artistString) {
+export function formatArtistNames(artistString: string | null | undefined): string[] {
   if (!artistString) return []
 
   // Split by comma, semicolon, or pipe
