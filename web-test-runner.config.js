@@ -4,10 +4,10 @@ export default {
   // Every test file except the node ones (*.node.test.js, run by just test-node)
   files: ['tests/*.test.js', '!tests/*.node.test.js'],
   nodeResolve: true,
-  // Used by just coverage (--coverage): the app's own code, not what it vendors
+  // Used by just coverage (--coverage): the app's own code, not its dependencies
   coverageConfig: {
     include: ['src/**/*.js'],
-    exclude: ['src/vendor/**', 'node_modules/**'],
+    exclude: ['node_modules/**'],
     reportDir: 'coverage',
     reporters: ['html', 'text-summary'],
   },

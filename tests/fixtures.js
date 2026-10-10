@@ -23,8 +23,18 @@ export { expect }
  */
 export async function openApp(page, path = '/') {
   await page.goto(path)
-  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+  await waitForServiceWorker(page)
   await page.reload()
+}
+
+/**
+ * Wait for the first visit to settle: the service worker controls the page, and the page
+ * has done its one reload (index.html sets sessionStorage 'sw-first-load' until then).
+ */
+export async function waitForServiceWorker(page) {
+  await page.waitForFunction(
+    () => navigator.serviceWorker.controller !== null && !sessionStorage.getItem('sw-first-load')
+  )
 }
 
 /**

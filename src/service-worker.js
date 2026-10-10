@@ -32,52 +32,9 @@ const ASSETS = [
   '/manifest.webmanifest',
 ]
 
-// External CDN resources to cache for offline support
-const CDN_ASSETS = [
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/index.js',
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/class-map.js',
-  'https://cdn.jsdelivr.net/npm/lit@3.1.0/directives/style-map.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/reactive-element.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/custom-element.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/property.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/state.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/event-options.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-all.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-async.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-elements.js',
-  'https://cdn.jsdelivr.net/npm/@lit/reactive-element@2.0.4/decorators/query-assigned-nodes.js',
-  'https://cdn.jsdelivr.net/npm/lit-element@4.0.4/lit-element.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/lit-html.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/is-server.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/directive-helpers.js',
-  'https://cdn.jsdelivr.net/npm/lit-html@3.1.0/async-directive.js',
-]
-
 // Install service worker and cache assets
 self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => {
-      // Cache local assets
-      const localCache = cache.addAll(ASSETS)
-
-      // Cache CDN assets (non-blocking, fail silently)
-      const cdnCache = Promise.allSettled(
-        CDN_ASSETS.map(url =>
-          fetch(url, { mode: 'cors' })
-            .then(response => {
-              if (response.ok) {
-                return cache.put(url, response)
-              }
-            })
-            .catch(err => console.log('[SW] Failed to cache CDN asset:', url, err))
-        )
-      )
-
-      return Promise.all([localCache, cdnCache])
-    })
-  )
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)))
   self.skipWaiting()
 })
 

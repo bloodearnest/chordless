@@ -1,6 +1,6 @@
 // App-wide: themes, loading, display preferences, the menu, modals and the
 // storage page
-import { expect, fromDB, seedSetlist, seedSong, test } from './fixtures.js'
+import { expect, fromDB, openApp, seedSetlist, seedSong, test } from './fixtures.js'
 
 test.describe('Themes', () => {
   test('every page follows the system dark mode', async ({ page }) => {
@@ -10,6 +10,7 @@ test.describe('Themes', () => {
       await page.waitForFunction(() => document.documentElement.style.length > 0)
       return page.evaluate(() => getComputedStyle(document.body).backgroundColor)
     }
+    await openApp(page, '/songs')
     const dark = await background('/songs')
     for (const url of ['/import-song', '/bookmarklet', '/storage']) {
       expect(await background(url), url).toBe(dark)
@@ -18,7 +19,7 @@ test.describe('Themes', () => {
 
   test('a status message is readable in dark mode', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
-    await page.goto('/songs')
+    await openApp(page, '/songs')
     await page.waitForFunction(() => customElements.get('status-message'))
     const color = await page.evaluate(() => {
       const message = document.createElement('status-message')
@@ -38,6 +39,7 @@ test.describe('Themes', () => {
         .match(/\d+/g)
         .slice(0, 3)
         .reduce((sum, n) => sum + Number(n), 0)
+    await openApp(page, '/storage')
     for (const scheme of ['light', 'dark']) {
       await page.emulateMedia({ colorScheme: scheme })
       for (const [url, host] of [

@@ -1,13 +1,12 @@
-import { expect, fromDB, seedSetlist, test } from './fixtures.js'
+import { expect, fromDB, seedSetlist, test, waitForServiceWorker } from './fixtures.js'
 
-// Wait for the SW to be installed, activated, and controlling the page.
-// skipWaiting + clients.claim means this happens on first load, but
-// there's still a brief async gap we need to bridge.
+// Wait for the SW to be installed, activated and controlling the page, and for the
+// page's one reload on the first visit to be over.
 async function waitForSW(page) {
   await page.waitForFunction(() => {
     return navigator.serviceWorker.ready.then(reg => reg.active?.state === 'activated')
   })
-  await page.waitForFunction(() => navigator.serviceWorker.controller !== null)
+  await waitForServiceWorker(page)
 }
 
 test('SW registers and controls the page on first load', async ({ page }) => {

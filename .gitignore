@@ -26,3 +26,6 @@ __pycache__/
 .vscode/
 .idea/
 coverage/
+
+# Vite build output
+dist/

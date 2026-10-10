@@ -6,6 +6,8 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "src"
 not_found_handling = "single-page-application"
+# Serve files at the URL they have (/dev/theme.html stays that), no .html stripping
+html_handling = "none"
 binding = "ASSETS"
 # Paths the worker handles before static assets. API routes must be listed:
 # otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.

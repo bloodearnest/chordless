@@ -22,10 +22,6 @@ format:
     @echo "Formatting with Biome..."
     npx @biomejs/biome format --write .
 
-# Copy vendored dependencies from node_modules to vendor/
-vendor:
-    node scripts/vendor-deps.mjs
-
 # Browser unit test coverage of the app's code: a summary, and coverage/index.html.
 # Only files the tests load are counted, so untested modules don't show at all
 coverage:

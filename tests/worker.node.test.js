@@ -139,14 +139,6 @@ test('repo root files are not served', async () => {
   }
 })
 
-test('worker-only packages are not vendored into src/', async () => {
-  for (const path of ['/vendor/jose/package.json', '/vendor/oauth4webapi/package.json']) {
-    const resp = await worker.fetch(path)
-    const ct = resp.headers.get('content-type') ?? ''
-    assert.ok(ct.includes('text/html'), `${path} should not be served — got content-type: ${ct}`)
-  }
-})
-
 test('dev pages are not served without DEV_PAGES (production)', async () => {
   for (const path of ['/dev', '/dev/', '/dev/index.html', '/dev/components.html']) {
     const resp = await worker.fetch(path, { redirect: 'manual' })
@@ -162,7 +154,7 @@ test('dev pages are served in the dev environment (npm run dev)', async () => {
     experimental: { disableExperimentalWarning: true },
   })
   try {
-    const resp = await devWorker.fetch('/dev/components')
+    const resp = await devWorker.fetch('/dev/components.html')
     assert.equal(resp.status, 200)
     assert.match(await resp.text(), /<title>Components Test - Chordless<\/title>/)
   } finally {
