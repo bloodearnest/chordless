@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../src/components/app-modal.js'
+import '../src/components/app-modal.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { AddSongModal } from '../src/js/setlist/add-song-modal.js'
 import { createSong } from '../src/js/song-utils.ts'

@@ -1,7 +1,7 @@
 import { Task } from '@lit/task'
 import { html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import './app-modal.js'
+import './app-modal.ts'
 import './song-info.ts'
 import './status-message.ts'
 

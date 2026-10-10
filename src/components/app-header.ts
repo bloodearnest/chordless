@@ -1,11 +1,13 @@
+import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import './icon.ts'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
 export class HeaderMenuClickEvent extends Event {
   static type = 'app-header:menu-click'
-  constructor(trigger) {
+  readonly trigger: HTMLElement
+  constructor(trigger: HTMLElement) {
     super(HeaderMenuClickEvent.type, { bubbles: true, composed: true })
     this.trigger = trigger
   }
@@ -30,7 +32,8 @@ export class HeaderInfoClickEvent extends Event {
 /** The second row was shown or hidden (on phones) */
 export class HeaderExpandToggleEvent extends Event {
   static type = 'app-header:expand-toggle'
-  constructor(expanded) {
+  readonly expanded: boolean
+  constructor(expanded: boolean) {
     super(HeaderExpandToggleEvent.type, { bubbles: true, composed: true })
     this.expanded = expanded
   }
@@ -66,7 +69,7 @@ export class HeaderExpandToggleEvent extends Event {
  * @csspart info-button - The info button
  */
 export class AppHeader extends LitElement {
-  static properties = {
+  static override properties = {
     heading: { type: String, attribute: 'heading' },
     showEditToggle: { type: Boolean, attribute: 'show-edit-toggle' },
     showInfoButton: { type: Boolean, attribute: 'show-info-button' },
@@ -77,7 +80,21 @@ export class AppHeader extends LitElement {
     _slottedControls: { state: true }, // whether anything is in the controls slot
   }
 
-  static styles = css`
+  declare heading: string
+  declare showEditToggle: boolean
+  declare showInfoButton: boolean
+  declare showLogo: boolean
+  declare editMode: boolean
+  declare disableAnimation: boolean
+  declare expanded: boolean
+  declare _slottedControls: boolean
+
+  _title: Ref<HTMLElement>
+  _previousTitle: string
+  _animating: boolean
+  _displayTitle: string
+
+  static override styles = css`
     :host {
       display: block;
     }
@@ -349,7 +366,7 @@ export class AppHeader extends LitElement {
     this._displayTitle = '' // The title actually shown in the UI
   }
 
-  connectedCallback() {
+  override connectedCallback() {
     super.connectedCallback()
     // Initialize display title
     this._displayTitle = this.heading
@@ -361,7 +378,7 @@ export class AppHeader extends LitElement {
     })
   }
 
-  updated(changedProperties) {
+  override updated(changedProperties: PropertyValues<this>): void {
     super.updated(changedProperties)
 
     // Handle title changes
@@ -378,7 +395,7 @@ export class AppHeader extends LitElement {
     }
   }
 
-  async _animateTransition() {
+  async _animateTransition(): Promise<void> {
     if (this._animating) return
     this._animating = true
 
@@ -412,7 +429,7 @@ export class AppHeader extends LitElement {
   }
 
   // Public method to update without animation
-  setTitleInstant(newTitle) {
+  setTitleInstant(newTitle: string): void {
     this.disableAnimation = true
     this.heading = newTitle
     // Re-enable after a tick
@@ -422,15 +439,15 @@ export class AppHeader extends LitElement {
   }
 
   /** Whether there's anything for the second row (controls, edit, info) */
-  _hasControls() {
+  _hasControls(): boolean {
     return this.showEditToggle || this.showInfoButton || this._slottedControls
   }
 
-  _onControlsSlotChange(event) {
-    this._slottedControls = event.target.assignedElements().length > 0
+  _onControlsSlotChange(event: Event): void {
+    this._slottedControls = (event.target as HTMLSlotElement).assignedElements().length > 0
   }
 
-  render() {
+  override render() {
     const hasControls = this._hasControls()
     return html`
       <header part="header" class=${hasControls ? 'has-controls' : ''}>
@@ -501,8 +518,8 @@ export class AppHeader extends LitElement {
     `
   }
 
-  _handleNavMenuClick(event) {
-    this.dispatchEvent(new HeaderMenuClickEvent(event.currentTarget))
+  _handleNavMenuClick(event: Event): void {
+    this.dispatchEvent(new HeaderMenuClickEvent(event.currentTarget as HTMLElement))
   }
 
   _handleEditToggle() {
@@ -524,3 +541,9 @@ export class AppHeader extends LitElement {
 
 // Define the custom element
 customElements.define('app-header', AppHeader)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'app-header': AppHeader
+  }
+}

@@ -88,7 +88,7 @@ const sampleSongs = [
 
 // Import the components
 import '/components/song-card.js'
-import '/components/app-header.js'
+import '/components/app-header.ts'
 
 let libraryEditMode = false
 let setlistEditMode = false

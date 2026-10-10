@@ -3,8 +3,20 @@ import { classMap } from 'lit/directives/class-map.js'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import './chord-display.ts'
 
+/** One bar of a chord line: its chords and the bar line that ends it */
+export interface Measure {
+  chords?: string[]
+  bar?: string
+}
+
+/** A group of chord lines laid out by bar */
+export interface BarGroupData {
+  measuresPerLine: Measure[][]
+  maxMeasures?: number
+}
+
 export class BarGroup extends LitElement {
-  static properties = {
+  static override properties = {
     data: { type: Object, attribute: false },
     displayAsNashville: { type: Boolean, attribute: 'display-as-nashville' },
     /** Show accidentals as ♯ and ♭ */
@@ -14,7 +26,14 @@ export class BarGroup extends LitElement {
     capoKey: { type: String, attribute: 'capo-key' },
   }
 
-  static styles = css`
+  declare data: BarGroupData | null
+  declare displayAsNashville: boolean
+  declare unicodeAccidentals: boolean
+  declare displayKey: string
+  declare capo: number
+  declare capoKey: string
+
+  static override styles = css`
     .bar-group {
       margin-bottom: 0.5rem;
       display: grid;
@@ -94,7 +113,7 @@ export class BarGroup extends LitElement {
     this.capoKey = ''
   }
 
-  render() {
+  override render() {
     if (!this.data?.measuresPerLine?.length) {
       return html``
     }
@@ -104,7 +123,7 @@ export class BarGroup extends LitElement {
     return html`
       <div class="bar-group" style="grid-template-columns: repeat(${maxColumns}, auto);">
         ${this.data.measuresPerLine.map(
-          (measures, lineIndex) => html`
+          (measures: Measure[], lineIndex: number) => html`
             <div class="chord-line bar-aligned" data-bar-line-index=${lineIndex}>
               ${Array.from({ length: maxColumns }).map((_, measureIndex) => {
                 const measure = measures[measureIndex] || null
@@ -118,7 +137,7 @@ export class BarGroup extends LitElement {
                     ${
                       measure
                         ? [
-                            (measure.chords || []).map(chord =>
+                            (measure.chords || []).map((chord: string) =>
                               this._renderChordOnlySegment(chord)
                             ),
                             measure.bar ? this._renderBarMarker(measure.bar) : '',
@@ -135,12 +154,12 @@ export class BarGroup extends LitElement {
     `
   }
 
-  _renderChordOnlySegment(chordText) {
+  _renderChordOnlySegment(chordText: string) {
     if (!chordText) return html``
     return html` <span class="chord-segment chord-only"> ${this._renderChord(chordText)} </span> `
   }
 
-  _renderBarMarker(barText) {
+  _renderBarMarker(barText: string) {
     if (!barText) return html``
     return html`
       <span class="chord-segment chord-only bar-marker">
@@ -149,7 +168,7 @@ export class BarGroup extends LitElement {
     `
   }
 
-  _renderChord(chordText) {
+  _renderChord(chordText: string) {
     const classes = classMap({
       chord: true,
       bar: isBarMarker(chordText),
@@ -170,3 +189,9 @@ export class BarGroup extends LitElement {
 }
 
 customElements.define('bar-group', BarGroup)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'bar-group': BarGroup
+  }
+}

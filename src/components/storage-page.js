@@ -1,10 +1,10 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import './app-modal.js'
+import './app-modal.ts'
 import './drive-sync-panel.js'
 import './storage-summary.js'
 import './pad-set-manager.js'
-import './select-organisation.js'
+import './select-organisation.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
 /**

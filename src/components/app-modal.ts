@@ -1,5 +1,6 @@
+import type { PropertyValues } from 'lit'
 import { css, html, LitElement, nothing } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -71,7 +72,7 @@ export class ModalCloseEvent extends Event {
  * @csspart cancel-button - The cancel button
  */
 export class AppModal extends LitElement {
-  static properties = {
+  static override properties = {
     open: { type: Boolean, reflect: true },
     heading: { type: String, attribute: 'heading' },
     message: { type: String },
@@ -82,7 +83,18 @@ export class AppModal extends LitElement {
     hideCloseButton: { type: Boolean, attribute: 'hide-close-button' },
   }
 
-  static styles = [
+  declare open: boolean
+  declare heading: string
+  declare message: string
+  declare type: string
+  declare size: string
+  declare confirmLabel: string
+  declare cancelLabel: string
+  declare hideCloseButton: boolean
+
+  _dialogRef: Ref<HTMLDialogElement>
+
+  static override styles = [
     buttonStyles,
     css`
     /* The <dialog> shows in the top layer, above the page and any popover */
@@ -255,18 +267,19 @@ export class AppModal extends LitElement {
     this.hideCloseButton = false
   }
 
-  updated(changed) {
+  override updated(changed: PropertyValues<this>): void {
     if (!changed.has('open')) return
     const dialog = this._dialog()
+    if (!dialog) return
     if (this.open && !dialog.open) dialog.showModal()
     if (!this.open && dialog.open) dialog.close()
   }
 
-  _dialog() {
+  _dialog(): HTMLDialogElement | undefined {
     return this._dialogRef.value
   }
 
-  render() {
+  override render() {
     return html`
       <dialog
         ${ref(this._dialogRef)}
@@ -288,7 +301,7 @@ export class AppModal extends LitElement {
     `
   }
 
-  _hasHeader() {
+  _hasHeader(): boolean {
     return Boolean(this.heading || this.querySelector('[slot="header"]'))
   }
 
@@ -371,9 +384,9 @@ export class AppModal extends LitElement {
   }
 
   /** A click on the dialog itself, outside its content, is on the backdrop */
-  _handleBackdropClick(event) {
+  _handleBackdropClick(event: MouseEvent): void {
     if (event.target !== event.currentTarget) return
-    const box = event.currentTarget.getBoundingClientRect()
+    const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
     const inside =
       event.clientX >= box.left &&
       event.clientX <= box.right &&
@@ -398,21 +411,21 @@ export class AppModal extends LitElement {
   }
 
   // Public API
-  close() {
+  close(): void {
     this.open = false
     this.dispatchEvent(new ModalCloseEvent())
   }
 
-  show() {
+  show(): void {
     this.open = true
   }
 
   /**
    * Show the modal and wait for an answer (type='confirm').
-   * @returns {Promise<boolean>} true if confirmed, false if cancelled or closed
+   * @returns true if confirmed, false if cancelled or closed
    */
-  ask() {
-    return new Promise(resolve => {
+  ask(): Promise<boolean> {
+    return new Promise<boolean>(resolve => {
       let confirmed = false
       const onConfirm = () => {
         confirmed = true
@@ -429,10 +442,16 @@ export class AppModal extends LitElement {
     })
   }
 
-  toggle() {
+  toggle(): void {
     this.open = !this.open
   }
 }
 
 // Define the custom element
 customElements.define('app-modal', AppModal)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'app-modal': AppModal
+  }
+}

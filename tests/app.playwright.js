@@ -96,7 +96,7 @@ test.describe('Loading', () => {
     const modalHeld = new Promise(resolve => {
       releaseModal = resolve
     })
-    await page.route(/\/components\/app-modal\.js$/, async route => {
+    await page.route(/\/components\/app-modal\.ts$/, async route => {
       await modalHeld
       await route.continue()
     })

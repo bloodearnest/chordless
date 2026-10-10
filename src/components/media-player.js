@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import './help-tooltip.ts'
-import './app-modal.js'
+import './app-modal.ts'
 import './icon.ts'
 import { SongChangeEvent } from '../js/app-events.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'

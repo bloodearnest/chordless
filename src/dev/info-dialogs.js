@@ -1,6 +1,6 @@
 import '/components/song-info-dialog.js'
 import '/components/setlist-info-dialog.js'
-import '/components/app-modal.js'
+import '/components/app-modal.ts'
 
 const weeksAgo = weeks => new Date(Date.now() - weeks * 7 * 86400000).toISOString().slice(0, 10)
 

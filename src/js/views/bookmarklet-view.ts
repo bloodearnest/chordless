@@ -1,11 +1,11 @@
 import { html } from 'lit'
-import '../../components/app-header.js'
+import '../../components/app-header.ts'
 import '../../components/bookmarklet-installer.ts'
 import { PageView } from './page-view.ts'
 
 /** How to install the bookmarklet that imports a song from CCLI SongSelect (styled in style.css) */
 export class BookmarkletView extends PageView {
-  render() {
+  override render() {
     return html`
       <app-header heading="Bookmarklet"></app-header>
 
@@ -101,3 +101,9 @@ export class BookmarkletView extends PageView {
   }
 }
 customElements.define('bookmarklet-view', BookmarkletView)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'bookmarklet-view': BookmarkletView
+  }
+}

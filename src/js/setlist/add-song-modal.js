@@ -1,4 +1,4 @@
-import { ModalCloseEvent } from '../../components/app-modal.js'
+import { ModalCloseEvent } from '../../components/app-modal.ts'
 import { SongSelectEvent } from '../../components/song-list.js'
 import { getLibrarySongs } from '../song-utils.ts'
 import { filterSongs } from '../utils/song-filter.ts'

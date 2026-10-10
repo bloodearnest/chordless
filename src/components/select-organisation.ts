@@ -1,15 +1,23 @@
 import { Task } from '@lit/task'
 import { css, html, LitElement } from 'lit'
-import { createRef, ref } from 'lit/directives/ref.js'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { Organisation } from '../js/data-types.ts'
 import {
   createOrganisation,
   getCurrentOrganisation,
   listOrganisations,
   switchOrganisation,
 } from '../js/organisation.ts'
-import './app-modal.js'
+import type { AppModal } from './app-modal.ts'
+import './app-modal.ts'
 import './icon.ts'
 import { buttonStyles, fieldStyles } from './shared-styles.ts'
+
+/** What the component loads: the organisations, and the name of the current one */
+interface OrganisationList {
+  organisations: Organisation[]
+  current: string
+}
 
 /**
  * SelectOrganisation Component
@@ -17,14 +25,22 @@ import { buttonStyles, fieldStyles } from './shared-styles.ts'
  * Displays current organisation and allows switching between them.
  */
 export class SelectOrganisation extends LitElement {
-  static properties = {
+  static override properties = {
     _showCreateForm: { state: true },
     _newOrganisationName: { state: true },
     _creating: { state: true },
     _formError: { state: true }, // why the new organisation wasn't created
   }
 
-  static styles = [
+  declare _showCreateForm: boolean
+  declare _newOrganisationName: string
+  declare _creating: boolean
+  declare _formError: string
+
+  _switchModal: Ref<AppModal>
+  _orgs: Task<[], OrganisationList>
+
+  static override styles = [
     buttonStyles,
     fieldStyles,
     css`
@@ -131,29 +147,30 @@ export class SelectOrganisation extends LitElement {
     this._creating = false
   }
 
-  async _handleSwitch(org) {
+  async _handleSwitch(org: Organisation): Promise<void> {
     if (org.name === this._orgs.value?.current) {
       return
     }
 
     const modal = this._switchModal.value
+    if (!modal) return
     modal.message = `Switch to "${org.name}"? This reloads the page.`
     if (await modal.ask()) {
       await switchOrganisation(org.id)
     }
   }
 
-  _toggleCreateForm() {
+  _toggleCreateForm(): void {
     this._showCreateForm = !this._showCreateForm
     this._newOrganisationName = ''
     this._formError = ''
   }
 
-  _handleNameInput(e) {
-    this._newOrganisationName = e.target.value
+  _handleNameInput(e: Event): void {
+    this._newOrganisationName = (e.target as HTMLInputElement).value
   }
 
-  async _handleCreate(e) {
+  async _handleCreate(e: Event): Promise<void> {
     e.preventDefault()
 
     const name = this._newOrganisationName.trim()
@@ -179,24 +196,24 @@ export class SelectOrganisation extends LitElement {
       this._newOrganisationName = ''
     } catch (error) {
       console.error('Failed to create organisation:', error)
-      this._formError = `Failed to create organisation: ${error.message}`
+      this._formError = `Failed to create organisation: ${error instanceof Error ? error.message : error}`
     } finally {
       this._creating = false
     }
   }
 
-  render() {
+  override render() {
     const loading = () => html`<div class="loading">Loading organisations...</div>`
     return this._orgs.render({
       initial: loading,
       pending: loading,
       complete: ({ organisations, current }) => this._renderOrganisations(organisations, current),
       error: error =>
-        html`<p class="form-error" role="alert">Couldn't load organisations: ${error.message}</p>`,
+        html`<p class="form-error" role="alert">Couldn't load organisations: ${error instanceof Error ? error.message : error}</p>`,
     })
   }
 
-  _renderOrganisations(organisations, current) {
+  _renderOrganisations(organisations: Organisation[], current: string) {
     if (organisations.length === 0) {
       return html`
         <div class="empty-state">
@@ -220,7 +237,7 @@ export class SelectOrganisation extends LitElement {
                     ? html`<span class="organisation-badge">CURRENT</span>`
                     : html`<button
                       class="btn primary switch-button"
-                      @click=${e => {
+                      @click=${(e: Event) => {
                         e.stopPropagation()
                         this._handleSwitch(org)
                       }}
@@ -287,3 +304,9 @@ export class SelectOrganisation extends LitElement {
 }
 
 customElements.define('select-organisation', SelectOrganisation)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'select-organisation': SelectOrganisation
+  }
+}

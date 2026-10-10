@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai'
 import { ContextConsumer } from '@lit/context'
 import { LitElement } from 'lit'
-import { AppRouter, RouteChangeEvent } from '../src/js/app-router.js'
+import { AppRouter, RouteChangeEvent } from '../src/js/app-router.ts'
 import { routeContext } from '../src/js/route-context.ts'
 
 const { describe, it, beforeEach, afterEach } = window

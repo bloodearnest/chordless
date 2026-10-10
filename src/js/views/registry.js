@@ -26,7 +26,7 @@ export const views = {
   },
   'not-found': view(
     'not-found-view',
-    () => import('./not-found-view.js'),
+    () => import('./not-found-view.ts'),
     () => 'Not found - Chordless'
   ),
   home: view('home-view', () => import('./home-view.js')),
@@ -52,7 +52,7 @@ export const views = {
   ),
   bookmarklet: view(
     'bookmarklet-view',
-    () => import('./bookmarklet-view.js'),
+    () => import('./bookmarklet-view.ts'),
     () => 'Bookmarklet - Chordless'
   ),
 }

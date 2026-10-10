@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../src/components/app-header.js'
+import '../src/components/app-header.ts'
 import '../src/components/nav-menu.js'
 import { provideRoute } from '../src/js/route-context.ts'
 import { A11Y } from './test-helpers.js'

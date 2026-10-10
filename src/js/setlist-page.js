@@ -2,7 +2,7 @@ import {
   EditModeToggleEvent,
   HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
-} from '../components/app-header.js'
+} from '../components/app-header.ts'
 import { CapoChangeEvent } from '../components/capo-selector.ts'
 import { KeyChangeEvent } from '../components/key-selector.ts'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.ts'
@@ -13,7 +13,7 @@ import {
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
-} from '../components/setlist-overview.js'
+} from '../components/setlist-overview.ts'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.ts'
 import { SongChangeEvent } from './app-events.ts'

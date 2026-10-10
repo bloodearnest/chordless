@@ -26,25 +26,53 @@
  * sent as a RouteChangeEvent.
  */
 import { provideRoute } from './route-context.ts'
-import { buildUrl, historyAction, isDescent, matchRoute } from './router.ts'
+import { buildUrl, historyAction, isDescent, matchRoute, type Route } from './router.ts'
+import type { ViewState } from './views/page-view.ts'
 
 /** The route changed (sent on document, after the new view is showing) */
 export class RouteChangeEvent extends Event {
   static type = 'router:route-change'
-  constructor(route, previous) {
+  readonly route: Route
+  readonly previous: Route | null
+  constructor(route: Route, previous: Route | null) {
     super(RouteChangeEvent.type)
     this.route = route
     this.previous = previous
   }
 }
 
-/**
- * @typedef {object} ViewEntry
- * @property {(route: object) => HTMLElement | Promise<HTMLElement>} load makes the view
- * @property {(route: object) => string} [title] the document title for a route
- * @property {(previous: object, next: object) => boolean} [sameView] whether moving
- *   between two routes of this view keeps the same element (by default, always)
- */
+/** A view the router shows: an element that is told its route (a PageView, or the error view) */
+export interface ShownView extends HTMLElement {
+  route?: Route
+  restoredState?: ViewState
+  captureViewState?(): ViewState | undefined
+}
+
+export interface ViewEntry {
+  /** makes the view */
+  load: (route: Route) => ShownView | Promise<ShownView>
+  /** the document title for a route */
+  title?: (route: Route) => string
+  /** whether moving between two routes of this view keeps the same element (by default, always) */
+  sameView?: (previous: Route, next: Route) => boolean
+}
+
+export interface AppRouterOptions {
+  /** where views are shown */
+  outlet: Element
+  /** by route name. Add a 'not-found' view to show for URLs that are no page. */
+  views: Record<string, ViewEntry>
+  /** swap views in a view transition */
+  transitions?: boolean
+  /** an aria-live region, told the page title when the view changes */
+  announcer?: Element | null
+  /** shown when a view fails to load */
+  errorView?: (route: Route, error: unknown) => ShownView
+  /** how many history entries' view states to keep (the browser keeps about 50 entries) */
+  rememberLimit?: number
+  /** where to keep them across a reload (default sessionStorage; null for nowhere) */
+  storage?: Storage | null
+}
 
 const ignore = () => undefined
 
@@ -53,7 +81,7 @@ const newKey = () => crypto.randomUUID()
 const STORAGE_KEY = 'chordless:view-states'
 
 /** sessionStorage, if the browser lets this page have it */
-function sessionStorageIfAvailable() {
+function sessionStorageIfAvailable(): Storage | null {
   try {
     return window.sessionStorage
   } catch {
@@ -61,7 +89,7 @@ function sessionStorageIfAvailable() {
   }
 }
 
-function defaultErrorView() {
+function defaultErrorView(): ShownView {
   const view = document.createElement('div')
   view.setAttribute('role', 'alert')
   view.textContent = 'This page could not be loaded. Reload to try again.'
@@ -69,37 +97,22 @@ function defaultErrorView() {
 }
 
 export class AppRouter {
-  #outlet
-  #views
-  #defaultTitle
-  #transitions
-  #announcer
-  #errorView
-  #route = null
-  #view = null
+  #outlet: Element
+  #views: Record<string, ViewEntry>
+  #defaultTitle: string
+  #transitions: boolean
+  #announcer: Element | null
+  #errorView: (route: Route, error: unknown) => ShownView
+  #route: Route | null = null
+  #view: ShownView | null = null
   #navigation = 0
   #started = false
   // View state by history entry key, and the key of the entry the current view was shown for
-  #viewStates = new Map()
-  #rememberLimit
-  #storage
-  #shownKey = null
+  #viewStates = new Map<string, ViewState>()
+  #rememberLimit: number
+  #storage: Storage | null
+  #shownKey: string | null = null
 
-  /**
-   * @param {object} options
-   * @param {Element} options.outlet where views are shown
-   * @param {Record<string, ViewEntry>} options.views by route name. Add a
-   *   'not-found' view to show for URLs that are no page.
-   * @param {boolean} [options.transitions] swap views in a view transition
-   * @param {Element} [options.announcer] an aria-live region, told the page title
-   *   when the view changes
-   * @param {(route: object, error: Error) => HTMLElement} [options.errorView]
-   *   shown when a view fails to load
-   * @param {number} [options.rememberLimit] how many history entries' view states to keep
-   *   (the browser keeps about 50 entries)
-   * @param {Storage | null} [options.storage] where to keep them across a reload
-   *   (default sessionStorage; null for nowhere)
-   */
   constructor({
     outlet,
     views,
@@ -108,7 +121,7 @@ export class AppRouter {
     errorView = defaultErrorView,
     rememberLimit = 50,
     storage = sessionStorageIfAvailable(),
-  }) {
+  }: AppRouterOptions) {
     this.#rememberLimit = rememberLimit
     this.#storage = storage
     this.#loadStates()
@@ -121,25 +134,25 @@ export class AppRouter {
   }
 
   /** The route being shown (null before start) */
-  get route() {
+  get route(): Route | null {
     return this.#route
   }
 
   /** The element showing it */
-  get view() {
+  get view(): ShownView | null {
     return this.#view
   }
 
   /** True if this route has a view, so moving to it needs no page load */
-  handles(route) {
+  handles(route: Route): boolean {
     return route.name in this.#views
   }
 
   /**
    * Listen for clicks and history moves, and show the view for the current URL.
-   * @returns {Promise<boolean>} false if the current URL is not handled here
+   * @returns false if the current URL is not handled here
    */
-  async start() {
+  async start(): Promise<boolean> {
     if (!this.#started) {
       this.#started = true
       document.addEventListener('click', this.#onClick)
@@ -157,7 +170,7 @@ export class AppRouter {
     return true
   }
 
-  stop() {
+  stop(): void {
     document.removeEventListener('click', this.#onClick)
     window.removeEventListener('popstate', this.#onPopState)
     window.removeEventListener('pagehide', this.#onPageHide)
@@ -174,12 +187,14 @@ export class AppRouter {
 
   /**
    * Go to a route, adding to the history as historyAction() decides.
-   * @param {string | object} target a URL or route
-   * @param {{replace?: boolean}} [options]
-   * @returns {Promise<boolean>} false if there is no view for it, and nothing
-   *   was done: the caller should load the page
+   * @param target a URL or route
+   * @returns false if there is no view for it, and nothing was done: the caller should load
+   *   the page
    */
-  async navigate(target, { replace = false } = {}) {
+  async navigate(
+    target: string | Route,
+    { replace = false }: { replace?: boolean } = {}
+  ): Promise<boolean> {
     const route = typeof target === 'string' ? matchRoute(target) : target
     if (!this.handles(route)) return false
 
@@ -194,12 +209,14 @@ export class AppRouter {
     const url = buildUrl(route)
     const commit = () => {
       if (action === 'push') {
-        const state = { key: newKey() }
-        if (isDescent(from, route)) state.fromParent = true
+        const state: { key: string; fromParent?: boolean } = { key: newKey() }
+        if (from && isDescent(from, route)) state.fromParent = true
         window.history.pushState(state, '', url)
       } else {
         // Replacing keeps the entry, so its key
-        const state = { key: window.history.state?.key ?? newKey() }
+        const state: { key: string; fromParent?: boolean } = {
+          key: window.history.state?.key ?? newKey(),
+        }
         if (window.history.state?.fromParent) state.fromParent = true
         window.history.replaceState(state, '', url)
       }
@@ -209,13 +226,13 @@ export class AppRouter {
   }
 
   /** The page is going away, or out of sight (a reload, a closed or switched tab): keep the view as it is */
-  #onPageHide = event => {
+  #onPageHide = (event: Event): void => {
     // visibilitychange comes for showing as well as hiding
     if (event.type === 'visibilitychange' && document.visibilityState !== 'hidden') return
     this.#remember(this.#shownKey, this.#view?.captureViewState?.())
   }
 
-  #onPopState = () => {
+  #onPopState = (): void => {
     const route = matchRoute(window.location)
     if (this.handles(route)) {
       this.#show(route)
@@ -225,11 +242,13 @@ export class AppRouter {
     }
   }
 
-  #onClick = event => {
+  #onClick = (event: MouseEvent): void => {
     if (event.defaultPrevented || event.button !== 0) return
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
 
-    const link = event.composedPath().find(node => node instanceof HTMLAnchorElement)
+    const link = event
+      .composedPath()
+      .find((node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement)
     if (!link?.hasAttribute('href')) return
     if (link.target && link.target !== '_self') return
     if (link.hasAttribute('download') || link.relList.contains('external')) return
@@ -250,7 +269,7 @@ export class AppRouter {
    * Show a route: load its view (or keep the current one if it stays the same),
    * then `commit` the URL, then show it.
    */
-  async #show(route, commit = ignore) {
+  async #show(route: Route, commit: () => void = ignore): Promise<void> {
     const previous = this.#route
     const entry = this.#views[route.name]
     const keep = this.#view && previous && this.#isSameView(previous, route)
@@ -259,7 +278,7 @@ export class AppRouter {
     // search put in the URL after a pause would when the user has just tapped a link)
     const navigation = keep ? this.#navigation : ++this.#navigation
 
-    let view = this.#view
+    let view: ShownView | null = this.#view
     if (!keep) {
       try {
         view = await entry.load(route)
@@ -271,6 +290,7 @@ export class AppRouter {
       if (navigation !== this.#navigation) return
     }
 
+    if (!view) return
     commit()
     view.route = route
     if (!keep) {
@@ -292,20 +312,21 @@ export class AppRouter {
   }
 
   /** Keep a view's state against the history entry it was left from, the latest few */
-  #remember(key, state) {
+  #remember(key: string | null, state: ViewState | undefined): void {
     if (!key) return
     this.#viewStates.delete(key)
     if (state !== undefined) {
       this.#viewStates.set(key, state)
       if (this.#viewStates.size > this.#rememberLimit) {
-        this.#viewStates.delete(this.#viewStates.keys().next().value)
+        const oldest = this.#viewStates.keys().next().value
+        if (oldest !== undefined) this.#viewStates.delete(oldest)
       }
     }
     this.#saveStates()
   }
 
   /** What was kept before a reload (it must be something JSON can hold) */
-  #loadStates() {
+  #loadStates(): void {
     try {
       const saved = JSON.parse(this.#storage?.getItem(STORAGE_KEY) ?? 'null')
       if (Array.isArray(saved)) {
@@ -316,7 +337,7 @@ export class AppRouter {
     }
   }
 
-  #saveStates() {
+  #saveStates(): void {
     try {
       this.#storage?.setItem(STORAGE_KEY, JSON.stringify([...this.#viewStates]))
     } catch {
@@ -328,7 +349,7 @@ export class AppRouter {
    * Tell assistive technology the page changed: announce its title, and move
    * focus to the view if it takes focus (has a tabindex).
    */
-  #announceView(view, previous) {
+  #announceView(view: ShownView, previous: Route | null): void {
     // Not for the first view: the page has just loaded, which the browser announces
     // itself, and focus is where it put it
     if (!previous) return
@@ -336,12 +357,12 @@ export class AppRouter {
     if (view.hasAttribute('tabindex')) view.focus({ preventScroll: true })
   }
 
-  #isSameView(previous, next) {
+  #isSameView(previous: Route, next: Route): boolean {
     if (previous.name !== next.name) return false
     return this.#views[next.name].sameView?.(previous, next) ?? true
   }
 
-  async #swap(update) {
+  async #swap(update: () => void): Promise<void> {
     if (this.#transitions && document.startViewTransition) {
       const transition = document.startViewTransition(update)
       // A transition skipped for a newer one rejects these, which is harmless

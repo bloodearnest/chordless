@@ -1,10 +1,12 @@
 import { html, LitElement } from 'lit'
 import './icon.ts'
+import type { SongCardKeyChangeEvent } from './song-card.js'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {
   static type = 'setlist-overview:song-click'
-  constructor(index) {
+  readonly index: number
+  constructor(index: number) {
     super(OverviewSongClickEvent.type, { bubbles: true, composed: true })
     this.index = index
   }
@@ -13,7 +15,8 @@ export class OverviewSongClickEvent extends Event {
 /** A song's delete button was pressed */
 export class OverviewSongDeleteEvent extends Event {
   static type = 'setlist-overview:song-delete'
-  constructor(index) {
+  readonly index: number
+  constructor(index: number) {
     super(OverviewSongDeleteEvent.type, { bubbles: true, composed: true })
     this.index = index
   }
@@ -22,7 +25,9 @@ export class OverviewSongDeleteEvent extends Event {
 /** A song's key was changed */
 export class OverviewSongKeyChangeEvent extends Event {
   static type = 'setlist-overview:song-key-change'
-  constructor(index, key) {
+  readonly index: number
+  readonly key: string
+  constructor(index: number, key: string) {
     super(OverviewSongKeyChangeEvent.type, { bubbles: true, composed: true })
     this.index = index
     this.key = key
@@ -44,10 +49,13 @@ export class OverviewAddSongEvent extends Event {
  * components, and exposes events for navigation, deletion, and adding songs.
  */
 export class SetlistOverview extends LitElement {
-  static properties = {
+  static override properties = {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
   }
+
+  declare songs: unknown[] /* TYPE */
+  declare editMode: boolean
 
   constructor() {
     super()
@@ -56,11 +64,11 @@ export class SetlistOverview extends LitElement {
   }
 
   // Render into light DOM so existing CSS/selectors keep working
-  createRenderRoot() {
+  override createRenderRoot() {
     return this
   }
 
-  render() {
+  override render() {
     return html`
       <div class="setlist-overview">
         <div class="overview-songs">
@@ -74,7 +82,7 @@ export class SetlistOverview extends LitElement {
                 .editMode=${this.editMode}
                 @song-card:click=${() => this._handleSongClick(index)}
                 @song-card:delete=${() => this._handleSongDelete(index)}
-                @song-card:key-change=${e => this._handleSongKeyChange(index, e.key)}
+                @song-card:key-change=${(e: SongCardKeyChangeEvent) => this._handleSongKeyChange(index, e.key)}
               ></song-card>
             `
           )}
@@ -98,15 +106,15 @@ export class SetlistOverview extends LitElement {
     `
   }
 
-  _handleSongClick(index) {
+  _handleSongClick(index: number): void {
     this.dispatchEvent(new OverviewSongClickEvent(index))
   }
 
-  _handleSongDelete(index) {
+  _handleSongDelete(index: number): void {
     this.dispatchEvent(new OverviewSongDeleteEvent(index))
   }
 
-  _handleSongKeyChange(index, key) {
+  _handleSongKeyChange(index: number, key: string): void {
     this.dispatchEvent(new OverviewSongKeyChangeEvent(index, key))
   }
 
@@ -116,3 +124,9 @@ export class SetlistOverview extends LitElement {
 }
 
 customElements.define('setlist-overview', SetlistOverview)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-overview': SetlistOverview
+  }
+}

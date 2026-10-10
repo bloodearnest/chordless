@@ -1,10 +1,10 @@
 import { html } from 'lit'
-import '../../components/app-header.js'
+import '../../components/app-header.ts'
 import { PageView } from './page-view.ts'
 
 /** For a URL that is no page of the app */
 export class NotFoundView extends PageView {
-  render() {
+  override render() {
     return html`
       <app-header heading="Not found"></app-header>
       <main class="home-content">
@@ -15,3 +15,9 @@ export class NotFoundView extends PageView {
   }
 }
 customElements.define('not-found-view', NotFoundView)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'not-found-view': NotFoundView
+  }
+}

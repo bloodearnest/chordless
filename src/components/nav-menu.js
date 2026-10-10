@@ -1,12 +1,12 @@
 import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
-import './app-modal.js'
+import './app-modal.ts'
 import './app-preferences.js'
 import './icon.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
 import { routeContext } from '../js/route-context.ts'
-import { HeaderMenuClickEvent } from './app-header.js'
+import { HeaderMenuClickEvent } from './app-header.ts'
 
 /** The back item was chosen */
 export class MenuBackClickEvent extends Event {

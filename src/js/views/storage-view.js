@@ -1,6 +1,6 @@
 import { html } from 'lit'
-import '../../components/app-header.js'
-import '../../components/select-organisation.js'
+import '../../components/app-header.ts'
+import '../../components/select-organisation.ts'
 import '../../components/storage-page.js'
 import { PageView } from './page-view.ts'
 

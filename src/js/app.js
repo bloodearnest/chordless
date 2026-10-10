@@ -3,7 +3,7 @@
  * #view-outlet. The menu and the media player stay while views come and go.
  */
 import '../components/nav-menu.js'
-import { AppRouter, RouteChangeEvent } from './app-router.js'
+import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
