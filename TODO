@@ -183,22 +183,29 @@ UI
   with the organisations and their Drive-folder links (organisation-db.js), the songs and
   setlists (db.js) and the current-org marker (localStorage). So there is nothing on the device
   to restore from: recovery needs either the user or the server.
-  - Detect it: a marker in localStorage ("this device has data") that is missing while the
-    app is opened fresh. Then say "Safari cleared this device's data" and offer sign-in.
-  - Simple (try first): the user signs in again. google-auth.js already uses
-    access_type: 'offline' with prompt: 'consent', so a new sign-in should be issued a new
-    refresh token, and the existing first-sign-in sync (checkFirstTimeAuth renames the Personal
-    org to the Google name, Sync joins the existing same-named Drive folder) brings the setlists
-    back. Verify with a real wipe. It needs the network and one tap at church.
-  - Automatic (only if the simple way proves too much for people at church): the worker also
-    sets the blob as an HttpOnly, Secure, SameSite=Lax cookie (Path=/session) on /oauth/callback,
-    clears it on /session/revoke, and POST /session/restore returns what /oauth/callback does.
-    WebKit's tracking prevention (webkit.org/tracking-prevention) caps cookies created in
-    JavaScript, not Set-Cookie ones (except under CNAME cloaking to a third party), so it
-    survives the eviction. It is an auth change: review with the user. Needs a same-origin
-    check (Origin / Sec-Fetch-Site) on /session/*, no Access-Control-Allow-Credentials with a
-    reflected origin, the current `Access-Control-Allow-Origin: *` restricted, "Clear Local
-    Data" clearing the cookie too, and chordless.app not being a CNAME to another domain
+  - Plan (decided): the server keeps a copy of the blob in a cookie, and the app restores from it.
+    - the worker also sets the blob as an HttpOnly, Secure, SameSite=Lax cookie (Path=/session,
+      long Max-Age) on /oauth/callback, and clears it on /session/revoke. WebKit's tracking
+      prevention (webkit.org/tracking-prevention) caps cookies created in JavaScript, not
+      Set-Cookie ones (except under CNAME cloaking to a third party), so it survives the eviction
+    - POST /session/restore reads the cookie and returns what /oauth/callback does (blob,
+      access_token, user), so the client can store the blob again
+    - detect an eviction: a localStorage marker ("this device has data") that is missing when the
+      app opens, and /session/restore answers yes. Then show "Safari cleared this device's data:
+      restoring your setlists from Google Drive" and run the existing first-sign-in sync
+      (checkFirstTimeAuth renames the Personal org to the Google name, Sync joins the existing
+      same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
+      to asking the user to sign in again: google-auth.js uses access_type: 'offline' with
+      prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
+    - needs the network, so say so plainly at church
+    - it is an auth change: review it with the user before building
+    - security: a same-origin check (Origin / Sec-Fetch-Site) on /session/*; no
+      Access-Control-Allow-Credentials with a reflected origin; restrict the current
+      `Access-Control-Allow-Origin: *` (already on the production list); "Clear Local Data" and
+      sign-out must clear the cookie too, or they would restore what the user wiped; check that
+      chordless.app is not a CNAME to another registrable domain
+    - tests: worker unit tests for set, restore and clear; a Playwright test that wipes
+      IndexedDB and localStorage with the cookie kept and sees the restore
   - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
     often (see the background sync item)
 - autoscaling font
