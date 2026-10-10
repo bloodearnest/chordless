@@ -10,6 +10,11 @@ song edit UI
     - click pattern
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
+bugs
+- the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
+  so only title and artist are searched (filterSongs in views/library-view.js; setlist-app.js's
+  add-song search has the same). Build lyricsText when a song is loaded, or search the chart
+
 dead code
 - song-view-manager.js setupCapoSelector() is never called (setlist-app has its own; the
   library has no capo picker). It also sets capoSelector.key, which isn't a property

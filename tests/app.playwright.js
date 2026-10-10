@@ -118,7 +118,7 @@ test.describe('Loading', () => {
 test.describe('Display preferences', () => {
   test('changing them updates the chords already showing', async ({ page }) => {
     await seedSong(page)
-    await page.goto('/songs#info-test-song')
+    await page.goto('/songs/info-test-song')
     await page.reload()
     await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
     // Info Test Song is in G: [G]Amazing [C]grace

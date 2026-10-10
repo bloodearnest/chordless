@@ -1,0 +1,594 @@
+/**
+ * The song library: a searchable list of songs, and the song you open from it.
+ * The list and the song sit side by side in a scroll-snap container: opening a
+ * song scrolls to it, and swiping back to the list closes it.
+ *
+ * Which song is open comes from the route (/songs/<uuid>): choosing a song
+ * navigates there, and the view shows what the route says. Uses song-view-manager
+ * for rendering, and the LibrarySong model for saving.
+ */
+import { Task } from '@lit/task'
+import { html } from 'lit'
+import { createRef, ref } from 'lit/directives/ref.js'
+import '../../components/app-header.js'
+import '../../components/app-modal.js'
+import '../../components/key-selector.js'
+import '../../components/song-card.js'
+import '../../components/song-display.js'
+import '../../components/song-info-dialog.js'
+import '../../components/song-list.js'
+import '../../components/song-section.js'
+import '../../components/status-message.js'
+import { getCurrentDB } from '../db.js'
+import { goTo } from '../navigation.js'
+import { ChordProParser } from '../parser.js'
+import { buildUrl } from '../router.js'
+import { createLibrarySongModel } from '../song-model-factory.js'
+import { getSongWithContent } from '../song-utils.js'
+import * as SongViewManager from '../song-view-manager.js'
+import { getAvailableKeys, transposeSong } from '../transpose.js'
+import { PageView } from './page-view.js'
+
+const { CONFIG } = SongViewManager
+
+/** Songs whose title, artist or lyrics contain the search term */
+export function filterSongs(songs, searchTerm) {
+  const term = searchTerm.toLowerCase().trim()
+  if (!term) return songs
+  return songs.filter(song =>
+    [song.title, song.artist, song.lyricsText].some(text =>
+      (text || '').toLowerCase().includes(term)
+    )
+  )
+}
+
+export class LibraryView extends PageView {
+  static properties = {
+    ...PageView.properties,
+    _search: { state: true },
+    _heading: { state: true },
+  }
+
+  #parser = new ChordProParser()
+  #libraryList = createRef()
+  #songView = createRef()
+  #content = createRef()
+  #infoDialog = createRef()
+  #resetModal = createRef()
+
+  #scrollObserver = null
+  #suppressScrollReset = false
+  #scrollResetTimeout = null
+
+  // The open song
+  #openUuid = null
+  #song = null
+  #parsed = null
+  #key = null
+  #fontSize = CONFIG.DEFAULT_FONT_SIZE
+  #capo = 0
+  #syncing = 0
+
+  constructor() {
+    super()
+    this._search = ''
+    this._heading = 'Song Library'
+  }
+
+  /** The library, by title, each song with when it was last used */
+  #songs = new Task(this, {
+    task: async () => {
+      const db = await getCurrentDB()
+      const records = await db.getAllSongs()
+
+      // One song per deterministic id, not one per variant
+      const byId = new Map()
+      for (const record of records) {
+        if (record.isDefault || !byId.has(record.id)) byId.set(record.id, record)
+      }
+
+      const songs = []
+      for (const record of byId.values()) {
+        try {
+          const song = await getSongWithContent(record.uuid)
+          const usage = await db.getSongUsageFromSetlists(song.id)
+          if (usage?.length > 0) {
+            song.lastUsageInfo = {
+              date: usage[0].setlistDate,
+              leader: usage[0].leader,
+              key: usage[0].playedInKey,
+            }
+          }
+          songs.push(song)
+        } catch (error) {
+          console.error(`Error loading song ${record.uuid}:`, error)
+        }
+      }
+      return songs.sort((a, b) =>
+        (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase())
+      )
+    },
+    args: () => [],
+  })
+
+  // ==================== Lifecycle ====================
+
+  firstUpdated() {
+    // Opened on a song: show it straight away, without sliding in from the list
+    if (this.route?.songUuid) this.#scrollTo(this.#songView.value, 'instant')
+    this.#observeScrollBack()
+  }
+
+  updated(changed) {
+    if (changed.has('route')) this.#syncSong()
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback()
+    this.#scrollObserver?.disconnect()
+    clearTimeout(this.#scrollResetTimeout)
+    this.#syncing++
+    // Edit mode is on <body>, which outlives this view
+    this.#setEditMode(false)
+  }
+
+  // ==================== Route ====================
+
+  /** Show the song the route names, or the list if it names none */
+  async #syncSong() {
+    const uuid = this.route?.songUuid ?? null
+    if (uuid === this.#openUuid) return
+    const sync = ++this.#syncing
+
+    if (!uuid) {
+      this.#closeSong()
+      return
+    }
+    this.#openUuid = uuid
+    try {
+      const song = await getSongWithContent(uuid)
+      if (sync !== this.#syncing) return
+      await this.#viewSong(song)
+    } catch (error) {
+      console.error('Song not found:', uuid, error)
+      this.#openUuid = null
+      if (sync === this.#syncing) await goTo(buildUrl({ name: 'songs' }), { replace: true })
+    }
+  }
+
+  #openSong(song) {
+    goTo(buildUrl({ name: 'songs', songUuid: song.uuid }))
+  }
+
+  // ==================== Scrolling between the list and the song ====================
+
+  #scrollTo(element, behavior = 'smooth') {
+    element?.scrollIntoView({ behavior, block: 'nearest', inline: 'start' })
+  }
+
+  /** Swiping back to the list closes the song */
+  #observeScrollBack() {
+    const list = this.#libraryList.value
+    if (!list) return
+    this.#scrollObserver = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (this.#suppressScrollReset) continue
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && this.route?.songUuid) {
+            goTo(buildUrl({ name: 'songs' }))
+          }
+        }
+      },
+      { threshold: [0.5, 1.0] }
+    )
+    this.#scrollObserver.observe(list)
+  }
+
+  /** Scrolling to the song passes through the list: don't take that for a swipe back */
+  #suppressScrollResetTemporarily(duration = 600) {
+    this.#suppressScrollReset = true
+    clearTimeout(this.#scrollResetTimeout)
+    this.#scrollResetTimeout = setTimeout(() => {
+      this.#suppressScrollReset = false
+    }, duration)
+  }
+
+  // ==================== Header controls ====================
+
+  /** The header's controls for a song, which are hidden until one is open */
+  #control(id) {
+    return this.querySelector(`#${id}`)
+  }
+
+  #showSongControls(show) {
+    this.#control('library-key-selector').style.display = show ? '' : 'none'
+    this.#control('library-song-meta-header').style.display = show ? 'flex' : 'none'
+    // Shown by edit mode
+    this.#control('library-reset-button').style.display = 'none'
+    this.#control('library-font-size-controls').style.display = 'none'
+  }
+
+  // ==================== Single song ====================
+
+  async #viewSong(song) {
+    this.#song = song
+    if (!song.chordpro) {
+      console.error('Song has no ChordPro content!', song)
+      throw new Error('Song has no ChordPro content')
+    }
+
+    // Already-parsed data if there is any
+    const parsed = song.parsed || this.#parser.parse(song.chordpro)
+    this.#parsed = parsed
+    this.#key = parsed.metadata.key
+    this._heading = parsed.metadata.title || 'Untitled'
+
+    this.#showSongControls(true)
+    if (parsed.metadata.key) this.#updateKeySelector(parsed.metadata.key)
+
+    const meta = []
+    if (parsed.metadata.tempo) meta.push(`${parsed.metadata.tempo} BPM`)
+    if (parsed.metadata.time) meta.push(parsed.metadata.time)
+    this.#control('library-song-meta-header').textContent = meta.join(' • ')
+
+    await this.#renderSong(parsed)
+
+    this.#fontSize ||= CONFIG.DEFAULT_FONT_SIZE
+    this.#applyFontSize()
+
+    this.#suppressScrollResetTemporarily()
+    this.#scrollTo(this.#songView.value)
+  }
+
+  #closeSong() {
+    this.#openUuid = null
+    this.#scrollTo(this.#libraryList.value)
+    this.#showSongControls(false)
+    this._heading = 'Song Library'
+    this.#setEditMode(false)
+    this.#song = null
+  }
+
+  /** Render a (possibly transposed) chart into the song view, and set its sections up */
+  async #renderSong(parsed) {
+    const content = this.#content.value
+    await SongViewManager.renderSongView(parsed, content, { songIndex: 0, capo: this.#capo })
+    const db = await getCurrentDB()
+    const model = createLibrarySongModel(this.#song, db, db.organisationId)
+    SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
+  }
+
+  // ==================== Edit mode ====================
+
+  get #editMode() {
+    return document.body.classList.contains('edit-mode')
+  }
+
+  #setEditMode(on) {
+    const header = this.querySelector('#library-app-header')
+    document.body.classList.toggle('edit-mode', on)
+    if (on) document.body.setAttribute('data-edit-mode', '')
+    else document.body.removeAttribute('data-edit-mode')
+    if (header) header.editMode = on
+    const keySelector = this.#control('library-key-selector')
+    if (keySelector) keySelector.editMode = on
+    this.#sections().forEach(section => {
+      section.editMode = on
+    })
+  }
+
+  #toggleEditMode() {
+    if (this.#editMode) {
+      this.#setEditMode(false)
+      this.#saveSong()
+    } else {
+      this.#setEditMode(true)
+    }
+  }
+
+  #sections() {
+    const songDisplay = this.#content.value?.querySelector('song-display')
+    return [...(songDisplay?.shadowRoot?.querySelectorAll('song-section') ?? [])]
+  }
+
+  #section(index) {
+    return this.#sections().find(section => section.getAttribute('section-index') === String(index))
+  }
+
+  async #saveSong() {
+    if (!this.#song) return
+    try {
+      const db = await getCurrentDB()
+      const model = createLibrarySongModel(this.#song, db, db.organisationId)
+
+      if (this.#key && this.#key !== model.getKey()) model.setKey(this.#key)
+
+      for (const [index, state] of Object.entries(this.#sectionDefaults())) {
+        model.setSectionState(Number(index), state)
+      }
+      if (this.#capo) model.setCapo(this.#capo)
+
+      await model.save()
+
+      if (this.#key && this.#key !== this.#song.key) this.#song.key = this.#key
+    } catch (error) {
+      console.error('Error saving library song:', error)
+    }
+  }
+
+  /** The sections not in their default state, by section index */
+  #sectionDefaults() {
+    const defaults = {}
+    for (const section of this.#sections()) {
+      const index = Number(section.getAttribute('section-index'))
+      if (Number.isNaN(index)) continue
+      const hideMode = section.hideMode || 'none'
+      const isCollapsed = section.isCollapsed || false
+      const isHidden = section.isHidden || false
+      if (hideMode !== 'none' || isCollapsed || isHidden) {
+        defaults[index.toString()] = { hideMode, isCollapsed, isHidden }
+      }
+    }
+    return defaults
+  }
+
+  // ==================== Key ====================
+
+  #updateKeySelector(selectedKey) {
+    const keySelector = this.#control('library-key-selector')
+    if (!keySelector) return
+    keySelector.value = selectedKey
+    keySelector.keys = getAvailableKeys(selectedKey)
+    keySelector.originalKey = this.#song?.originalKey || this.#parsed?.metadata?.key
+    keySelector.editMode = this.#editMode
+  }
+
+  async #changeKey(newKey) {
+    if (!newKey || !this.#parsed) return
+    await this.#renderInKey(newKey)
+    this.#updateKeySelector(newKey)
+  }
+
+  async #renderInKey(targetKey) {
+    if (!this.#parsed) return
+
+    // Transpose a copy from the song's own key: transposeSong changes the chart
+    // in place, and the stored one (shared with the parse cache) must stay as is
+    const parsed = structuredClone(this.#parsed)
+    const originalKey = parsed.metadata.key
+    if (originalKey && targetKey && targetKey !== originalKey) {
+      transposeSong(parsed, originalKey, targetKey)
+    }
+    parsed.metadata.key = targetKey
+    this.#key = targetKey
+
+    await this.#renderSong(parsed)
+    this.#applyFontSize()
+  }
+
+  // ==================== Font size ====================
+
+  #changeFontSize(delta) {
+    this.#fontSize = Math.min(
+      CONFIG.MAX_FONT_SIZE,
+      Math.max(CONFIG.MIN_FONT_SIZE, this.#fontSize + delta)
+    )
+    this.#applyFontSize()
+  }
+
+  #applyFontSize() {
+    const songContent = this.#content.value?.querySelector('.song-content')
+    if (songContent) songContent.style.fontSize = `${this.#fontSize}rem`
+  }
+
+  // ==================== Sections ====================
+
+  #onSectionAction(event) {
+    const { sectionIndex, action } = event
+    if (typeof sectionIndex !== 'number' || !action) return
+    this.#setSectionHideMode(sectionIndex, action)
+  }
+
+  #onSectionToggle(event) {
+    if (typeof event.sectionIndex !== 'number') return
+    const details = this.#section(event.sectionIndex)?.getDetailsElement()
+    if (details) this.#toggleSection(event.sectionIndex, details)
+  }
+
+  #setSectionHideMode(sectionIndex, mode) {
+    const component = this.#section(sectionIndex)
+    if (!component) return
+
+    if (mode === 'collapse') {
+      const details = component.getDetailsElement()
+      if (details) this.#toggleSection(sectionIndex, details)
+      return
+    }
+
+    const explicitShowMap = {
+      'show-all': 'none',
+      'show-lyrics': 'chords',
+      'show-chords': 'lyrics',
+      'show-none': 'hide',
+    }
+    const mappedMode = explicitShowMap[mode] || mode
+    const isExplicit = Boolean(explicitShowMap[mode])
+
+    if (mappedMode === 'hide') {
+      if (isExplicit) {
+        component.isHidden = true
+        component.hideMode = 'hide'
+        component.isCollapsed = false
+      } else {
+        component.isHidden = !component.isHidden
+        if (component.isHidden) {
+          component.hideMode = 'hide'
+          component.isCollapsed = false
+        }
+      }
+    } else {
+      component.isHidden = false
+      component.hideMode = mappedMode
+    }
+  }
+
+  #toggleSection(sectionIndex, detailsElement) {
+    const component = this.#section(sectionIndex)
+    if (!component) return
+    const closing = detailsElement.open
+    component.isCollapsed = closing
+    detailsElement.open = !closing
+  }
+
+  // ==================== Reset, and info ====================
+
+  async #reset() {
+    if (!(await this.#resetModal.value.ask())) return
+    if (!this.#parsed || !this.#song) return
+
+    // Back to the key it was imported in, and the default size
+    const originalKey = this.#song.originalKey || this.#parsed.metadata.key
+    this.#fontSize = CONFIG.DEFAULT_FONT_SIZE
+    await this.#renderInKey(originalKey)
+    if (originalKey) this.#updateKeySelector(originalKey)
+    await this.#saveSong()
+  }
+
+  async #showInfo() {
+    if (!this.#parsed || !this.#song) return
+    const dialog = this.#infoDialog.value
+    dialog.db = await getCurrentDB()
+    await dialog.show(this.#song.id, { title: this.#parsed.metadata.title })
+  }
+
+  // ==================== Template ====================
+
+  #renderList(songs) {
+    if (songs.length === 0) {
+      return html`<status-message
+        state="empty"
+        message="No songs in library."
+        detail="Import setlists to populate the song library."
+      ></status-message>`
+    }
+    return html`<song-list
+      variant="library"
+      empty-message="No songs match your search."
+      .songs=${filterSongs(songs, this._search)}
+      @song-list:select=${event => event.song && this.#openSong(event.song)}
+    ></song-list>`
+  }
+
+  render() {
+    return html`
+      <app-header
+        id="library-app-header"
+        .heading=${this._heading}
+        show-edit-toggle
+        show-info-button
+        @app-header:edit-mode-toggle=${() => this.#toggleEditMode()}
+        @app-header:info-click=${() => this.#showInfo()}
+      >
+        <div slot="controls" class="header-controls-slot">
+          <button
+            class="reset-button edit-mode-control"
+            id="library-reset-button"
+            aria-label="Reset song"
+            style="display: none"
+            @click=${() => this.#reset()}
+          >
+            ↺
+          </button>
+          <div
+            class="font-size-controls edit-mode-control"
+            id="library-font-size-controls"
+            style="display: none"
+          >
+            <button
+              class="font-size-btn"
+              id="library-font-size-decrease"
+              aria-label="Decrease font size"
+              @click=${() => this.#changeFontSize(-CONFIG.FONT_SIZE_STEP)}
+            >
+              A−
+            </button>
+            <button
+              class="font-size-btn"
+              id="library-font-size-increase"
+              aria-label="Increase font size"
+              @click=${() => this.#changeFontSize(CONFIG.FONT_SIZE_STEP)}
+            >
+              A+
+            </button>
+          </div>
+          <key-selector
+            id="library-key-selector"
+            label="Key"
+            style="display: none"
+            @key-selector:change=${event => this.#changeKey(event.value)}
+          ></key-selector>
+          <div class="song-meta-compact" id="library-song-meta-header" style="display: none"></div>
+        </div>
+      </app-header>
+
+      <main class="songs-main">
+        <div class="songs-content-container" id="songs-content-container">
+          <!-- The list (slides left when viewing a song) -->
+          <div class="library-view" ${ref(this.#libraryList)}>
+            <div class="song-library-header">
+              <input
+                type="search"
+                id="song-search"
+                class="song-search-input"
+                placeholder="Search songs by title, artist, or lyrics..."
+                @input=${event => {
+                  this._search = event.target.value
+                }}
+              />
+            </div>
+            <div id="song-library-list" class="song-library-list">
+              ${this.#songs.render({
+                pending: () =>
+                  html`<status-message state="loading" message="Loading songs..."></status-message>`,
+                complete: songs => this.#renderList(songs),
+                error: error => {
+                  console.error('Error loading songs:', error)
+                  return html`<status-message
+                    state="error"
+                    message="Error loading songs. Please check the console."
+                  ></status-message>`
+                },
+              })}
+            </div>
+          </div>
+
+          <!-- The song (slides in from the right) -->
+          <div id="library-song-view" class="library-song-view" ${ref(this.#songView)}>
+            <div
+              id="library-song-content"
+              class="library-song-content"
+              ${ref(this.#content)}
+              @song-section:action=${event => this.#onSectionAction(event)}
+              @song-section:toggle=${event => this.#onSectionToggle(event)}
+            >
+              <p>Select a song to view</p>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <song-info-dialog id="library-song-info-dialog" ${ref(this.#infoDialog)}></song-info-dialog>
+
+      <app-modal
+        id="library-reset-confirm-modal"
+        type="confirm"
+        heading="Reset Song?"
+        message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+        confirm-label="Reset"
+        cancel-label="Cancel"
+        ${ref(this.#resetModal)}
+      ></app-modal>
+    `
+  }
+}
+customElements.define('library-view', LibraryView)

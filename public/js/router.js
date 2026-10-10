@@ -29,7 +29,14 @@ const PAGES = {
  * worker serves for them), rather than pages of their own. Moves over one page
  * at a time; views/registry.js has a view for each.
  */
-export const SHELL_ROUTES = ['home', 'storage', 'preferences', 'import-song', 'bookmarklet']
+export const SHELL_ROUTES = [
+  'home',
+  'storage',
+  'preferences',
+  'import-song',
+  'bookmarklet',
+  'songs',
+]
 
 const PAGE_PATHS = Object.fromEntries(Object.entries(PAGES).map(([path, name]) => [name, path]))
 
@@ -113,31 +120,51 @@ export function sameRoute(a, b) {
 }
 
 /**
+ * Where a route sits in a section of the app that has a list or overview and
+ * things inside it: the library (its list, then a song) and a setlist (its
+ * overview, then a song). Null for routes that are not in such a section.
+ * @returns {{section: string, depth: number} | null}
+ */
+function placeOf(route) {
+  if (route.name === 'songs') return { section: 'songs', depth: route.songUuid ? 1 : 0 }
+  if (route.name === 'setlist') {
+    return { section: `setlist:${route.setlistId}`, depth: route.songIndex >= 0 ? 1 : 0 }
+  }
+  return null
+}
+
+/** True when going from the list/overview of a section into one of its songs */
+export function isDescent(from, to) {
+  const a = placeOf(from)
+  const b = placeOf(to)
+  return Boolean(a && b && a.section === b.section && a.depth === 0 && b.depth === 1)
+}
+
+/**
  * How moving from one route to another changes the browser history:
  *
  *   'push'     add an entry (going deeper into the app)
  *   'replace'  swap the current entry (a lateral move, or no move at all)
  *   'back'     go back one entry (undoing an earlier push)
  *
- * In a setlist: overview to a song pushes; song to song replaces; song to
- * overview goes back if the song was reached from the overview (the entry we
- * pushed), and replaces if it was a direct link. Moves between pages push.
+ * Within the library or a setlist: from the list/overview into a song pushes;
+ * song to song replaces; song to the list/overview goes back if the song was
+ * reached from it (the entry we pushed, marked `fromParent` in the history
+ * state), and replaces if it was a direct link. Moves between pages push.
  *
  * @param {object} from the current route
  * @param {object} to the target route
- * @param {{fromOverview?: boolean} | null} [state] the current history entry's state
+ * @param {{fromParent?: boolean} | null} [state] the current history entry's state
  */
 export function historyAction(from, to, state) {
   if (sameRoute(from, to)) return 'replace'
 
-  const inSameSetlist =
-    from.name === 'setlist' && to.name === 'setlist' && from.setlistId === to.setlistId
-  if (!inSameSetlist) return 'push'
+  const a = placeOf(from)
+  const b = placeOf(to)
+  if (!a || !b || a.section !== b.section) return 'push'
 
-  const fromSong = from.songIndex >= 0
-  const toSong = to.songIndex >= 0
-  if (!fromSong && toSong) return 'push'
-  if (fromSong && toSong) return 'replace'
-  if (fromSong && !toSong) return state?.fromOverview ? 'back' : 'replace'
+  if (a.depth === 0 && b.depth === 1) return 'push'
+  if (a.depth === 1 && b.depth === 1) return 'replace'
+  if (a.depth === 1 && b.depth === 0) return state?.fromParent ? 'back' : 'replace'
   return 'replace'
 }

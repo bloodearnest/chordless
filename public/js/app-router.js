@@ -19,7 +19,7 @@
  * sent as a RouteChangeEvent.
  */
 import { provideRoute } from './route-context.js'
-import { buildUrl, historyAction, matchRoute } from './router.js'
+import { buildUrl, historyAction, isDescent, matchRoute } from './router.js'
 
 /** The route changed (sent on document, after the new view is showing) */
 export class RouteChangeEvent extends Event {
@@ -150,11 +150,10 @@ export class AppRouter {
     const url = buildUrl(route)
     const commit = () => {
       if (action === 'push') {
-        const fromOverview = from.name === 'setlist' && from.songIndex < 0 && route.songIndex >= 0
-        window.history.pushState(fromOverview ? { fromOverview: true } : {}, '', url)
+        window.history.pushState(isDescent(from, route) ? { fromParent: true } : {}, '', url)
       } else {
-        const fromOverview = window.history.state?.fromOverview ?? false
-        window.history.replaceState(fromOverview ? { fromOverview } : {}, '', url)
+        const fromParent = window.history.state?.fromParent ?? false
+        window.history.replaceState(fromParent ? { fromParent } : {}, '', url)
       }
     }
     await this.#show(route, commit)

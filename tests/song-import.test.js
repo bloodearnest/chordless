@@ -90,7 +90,7 @@ describe('song-import', () => {
     const url = finished(element)
     $(element, '.library-only').click()
     const song = await songTitled(title)
-    expect(await url).to.equal(`/songs#${song.uuid}`)
+    expect(await url).to.equal(`/songs/${song.uuid}`)
     expect(song.importSource).to.equal('paste')
   })
 

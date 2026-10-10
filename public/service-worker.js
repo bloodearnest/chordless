@@ -500,21 +500,16 @@ self.addEventListener('fetch', event => {
 })
 
 async function handleRoute(url) {
-  const path = url.pathname
+  const { name } = matchRoute(url)
 
-  // Map all URL variants to the clean URL to fetch.
-  // Wrangler strips .html extensions, so fetching /storage.html redirects to /storage.
-  // Browser navigations have redirect: 'manual', so a redirected SW response causes an error.
-  // Always fetch the clean URL — wrangler serves the right .html file without redirecting.
-  const HTML_FILES = {
-    '/songs': '/songs',
-    '/songs/': '/songs',
-    '/songs.html': '/songs',
-  }
-
-  // Routes that are views of the app shell are all served by the shell, index.html
-  let htmlFile = SHELL_ROUTES.includes(matchRoute(url).name) ? '/' : HTML_FILES[path]
-  if (!htmlFile && /^\/setlist\/[^/]+$/.test(path)) htmlFile = '/setlist'
+  // The page to fetch for a URL: the app shell for the routes that are its views,
+  // and the setlist page, which is not a view yet.
+  // Always fetch a clean URL: wrangler strips .html, so fetching /setlist.html
+  // redirects to /setlist, and browser navigations have redirect: 'manual', so a
+  // redirected SW response causes an error.
+  let htmlFile = null
+  if (SHELL_ROUTES.includes(name)) htmlFile = '/'
+  else if (name === 'setlist') htmlFile = '/setlist'
 
   if (!htmlFile) {
     return new Response('Not Found', { status: 404 })

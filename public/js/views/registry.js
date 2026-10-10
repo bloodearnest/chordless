@@ -31,6 +31,11 @@ export const views = {
     () => import('./import-song-view.js'),
     () => 'Import Songs - Chordless'
   ),
+  songs: view(
+    'library-view',
+    () => import('./library-view.js'),
+    () => 'Song Library - Chordless'
+  ),
   bookmarklet: view(
     'bookmarklet-view',
     () => import('./bookmarklet-view.js'),

@@ -4,7 +4,7 @@ import { expect, fromDB, openApp, seedSong, test } from './fixtures.js'
 test.describe('Song library', () => {
   test('changing the key transposes the chords, each time from the original', async ({ page }) => {
     await seedSong(page)
-    await page.goto('/songs#info-test-song')
+    await page.goto('/songs/info-test-song')
     await page.reload()
     await expect(page.locator('#library-app-header')).toContainText('Info Test Song')
     await page
@@ -24,11 +24,71 @@ test.describe('Song library', () => {
   })
 })
 
+test.describe('Song library navigation', () => {
+  test('choosing a song opens it at its own URL, and back returns to the list', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await openApp(page, '/songs')
+    await page.evaluate(() => {
+      window.sameDocument = true
+    })
+    const heading = page.locator('#library-app-header')
+    await expect(heading).toContainText('Song Library')
+
+    await page.locator('song-list').getByText('Info Test Song').first().click()
+    await expect(page).toHaveURL(/\/songs\/info-test-song$/)
+    await expect(heading).toContainText('Info Test Song')
+    await expect(page.locator('#library-song-content song-section').first()).toBeVisible()
+
+    await page.goBack()
+    await expect(page).toHaveURL(/\/songs$/)
+    await expect(heading).toContainText('Song Library')
+    await expect(page.locator('#library-key-selector')).toBeHidden()
+    expect(await page.evaluate(() => window.sameDocument)).toBe(true)
+
+    await page.goForward()
+    await expect(heading).toContainText('Info Test Song')
+  })
+
+  test('a song that does not exist sends you back to the list', async ({ page }) => {
+    await seedSong(page)
+    await page.goto('/songs/no-such-song')
+    await expect(page).toHaveURL(/\/songs$/)
+    await expect(page.locator('#library-app-header')).toContainText('Song Library')
+  })
+
+  test('leaving the library while in edit mode leaves edit mode', async ({ page }) => {
+    await seedSong(page)
+    await page.goto('/songs/info-test-song')
+    await page
+      .locator('#library-app-header')
+      .getByRole('button', { name: 'Toggle edit mode' })
+      .click()
+    await expect(page.locator('body')).toHaveClass(/edit-mode/)
+
+    await page.getByRole('button', { name: 'Navigation menu' }).click()
+    await page.locator('nav-menu').getByRole('link', { name: 'Storage' }).click()
+    await expect(page.locator('storage-view')).toBeVisible()
+    await expect(page.locator('body')).not.toHaveClass(/edit-mode/)
+  })
+
+  test('searching narrows the list', async ({ page }) => {
+    await seedSong(page)
+    await openApp(page, '/songs')
+    await expect(page.locator('song-list')).toContainText('Info Test Song')
+    await page.locator('#song-search').fill('zzz-nothing')
+    await expect(page.locator('song-list')).toContainText('No songs match your search')
+    await page.locator('#song-search').fill('info test')
+    await expect(page.locator('song-list')).toContainText('Info Test Song')
+  })
+})
+
 test.describe('Song info', () => {
   test('info button on the songs page opens the song info dialog', async ({ page }) => {
     await seedSong(page)
 
-    await page.goto('/songs#info-test-song')
+    await page.goto('/songs/info-test-song')
     await page.reload()
     // The header shows the song once it has loaded; info refers to it from then on
     await expect(page.locator('#library-app-header')).toContainText('Info Test Song')

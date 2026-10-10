@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai'
 import {
   buildUrl,
   historyAction,
+  isDescent,
   matchRoute,
   normalizePath,
   sameRoute,
@@ -158,12 +159,12 @@ describe('historyAction', () => {
   })
 
   it('goes back from a song to the overview it was opened from', () => {
-    expect(historyAction(song(2), overview, { fromOverview: true })).to.equal('back')
+    expect(historyAction(song(2), overview, { fromParent: true })).to.equal('back')
   })
 
   it('replaces from a song to the overview when it was a direct link', () => {
     expect(historyAction(song(2), overview)).to.equal('replace')
-    expect(historyAction(song(2), overview, { fromOverview: false })).to.equal('replace')
+    expect(historyAction(song(2), overview, { fromParent: false })).to.equal('replace')
   })
 
   it('copes with a history entry that has no state', () => {
@@ -179,6 +180,37 @@ describe('historyAction', () => {
   it('pushes when moving between pages', () => {
     expect(historyAction({ name: 'home' }, { name: 'songs' })).to.equal('push')
     expect(historyAction(song(1), { name: 'storage' })).to.equal('push')
+  })
+
+  describe('in the library', () => {
+    const list = { name: 'songs' }
+    const librarySong = uuid => ({ name: 'songs', songUuid: uuid })
+
+    it('pushes from the list into a song, and replaces from song to song', () => {
+      expect(historyAction(list, librarySong('a'))).to.equal('push')
+      expect(historyAction(librarySong('a'), librarySong('b'))).to.equal('replace')
+    })
+
+    it('goes back from a song to the list it was opened from', () => {
+      expect(historyAction(librarySong('a'), list, { fromParent: true })).to.equal('back')
+      expect(historyAction(librarySong('a'), list)).to.equal('replace')
+    })
+
+    it('pushes between the library and other pages', () => {
+      expect(historyAction({ name: 'home' }, list)).to.equal('push')
+      expect(historyAction(librarySong('a'), { name: 'storage' })).to.equal('push')
+    })
+  })
+
+  describe('isDescent', () => {
+    it('is true from a list or overview into one of its own songs only', () => {
+      expect(isDescent({ name: 'songs' }, { name: 'songs', songUuid: 'a' })).to.equal(true)
+      expect(isDescent(overview, song(0))).to.equal(true)
+      expect(isDescent(song(0), song(1))).to.equal(false)
+      expect(isDescent(song(0), overview)).to.equal(false)
+      expect(isDescent({ name: 'home' }, { name: 'songs', songUuid: 'a' })).to.equal(false)
+      expect(isDescent(overview, { name: 'setlist', setlistId: 'b', songIndex: 0 })).to.equal(false)
+    })
   })
 
   it('pushes when moving to a different setlist', () => {

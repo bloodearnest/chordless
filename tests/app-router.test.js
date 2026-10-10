@@ -187,11 +187,11 @@ describe('AppRouter', () => {
       expect(window.location.pathname).to.equal('/setlist/abc/song/1')
     })
 
-    it('remembers a song was opened from the overview', async () => {
+    it('remembers a song was opened from the overview, or the library list', async () => {
       await router.navigate('/setlist/abc/song/0')
-      expect(window.history.state).to.deep.equal({ fromOverview: true })
+      expect(window.history.state).to.deep.equal({ fromParent: true })
       await router.navigate('/setlist/abc/song/1')
-      expect(window.history.state).to.deep.equal({ fromOverview: true })
+      expect(window.history.state).to.deep.equal({ fromParent: true })
     })
 
     it('goes back to the overview a song was opened from', async () => {

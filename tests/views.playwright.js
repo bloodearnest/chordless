@@ -1,4 +1,4 @@
-import { expect, openApp, test } from './fixtures.js'
+import { expect, openApp, seedSetlist, test } from './fixtures.js'
 
 // The pages that are views of the app shell change in place: the document, and
 // anything living in it (the media player, to come), stays.
@@ -65,6 +65,7 @@ test.describe('Moving between views', () => {
       ['/preferences', 'preferences-view', 'Preferences - Chordless'],
       ['/import-song', 'import-song-view', 'Import Songs - Chordless'],
       ['/bookmarklet', 'bookmarklet-view', 'Bookmarklet - Chordless'],
+      ['/songs', 'library-view', 'Song Library - Chordless'],
     ]
     await openApp(page, '/')
     for (const [path, tag, title] of views) {
@@ -94,11 +95,12 @@ test.describe('Moving between views', () => {
   })
 
   test('a link to a page that is not a view yet loads the page', async ({ page }) => {
+    await seedSetlist(page, { setlistId: 'link-setlist' })
     await openApp(page, '/')
     await markDocument(page)
-    await chooseFromMenu(page, 'Song Library')
-    await expect(page).toHaveURL(/\/songs$/)
-    await expect(page).toHaveTitle('Song Library - Chordless')
+    await page.locator('setlist-group').first().getByRole('link').first().click()
+    await expect(page).toHaveURL(/\/setlist\/link-setlist/)
+    await expect(page).toHaveTitle('Setlist - Chordless')
     expect(await isSameDocument(page)).toBe(false)
   })
 

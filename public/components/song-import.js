@@ -464,7 +464,7 @@ export class SongImport extends LitElement {
   _libraryOnly() {
     // The songs were saved to the library when they arrived
     const [first, ...rest] = this._imports
-    this._finish(rest.length ? '/songs' : `/songs#${first.song.uuid}`)
+    this._finish(rest.length ? '/songs' : `/songs/${first.song.uuid}`)
   }
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
