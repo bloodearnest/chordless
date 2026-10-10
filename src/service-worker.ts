@@ -1,7 +1,10 @@
 // Service Worker for offline-first operation
 // Built as a classic script by vite-plugins/service-worker.js, which defines the two
 // constants below: the files to precache, and a version (a hash of them)
-import * as AuthDB from '/js/auth-db.ts'
+import * as AuthDB from './js/auth-db.ts'
+import { errorMessage } from './js/utils/errors.ts'
+
+declare const self: ServiceWorkerGlobalScope
 
 // Handles routing and offline caching
 
@@ -132,12 +135,16 @@ self.addEventListener('message', async event => {
     }
   } catch (error) {
     console.error('[SW] Error handling message:', error)
-    respondToClient(event, messageId, { success: false, error: error.message })
+    respondToClient(event, messageId, { success: false, error: errorMessage(error) })
   }
 })
 
 // Helper to respond to client messages
-function respondToClient(event, messageId, response) {
+function respondToClient(
+  event: ExtendableMessageEvent,
+  messageId: string,
+  response: Record<string, unknown>
+) {
   if (event.ports?.[0]) {
     event.ports[0].postMessage({ messageId, ...response })
   }
@@ -173,7 +180,7 @@ async function processOperationQueue() {
         console.log('[SW] Operation', operation.id, 'completed')
       } catch (error) {
         console.error('[SW] Operation', operation.id, 'failed:', error)
-        await AuthDB.updateOperationStatus(operation.id, 'failed', error.message)
+        await AuthDB.updateOperationStatus(operation.id, 'failed', errorMessage(error))
       }
     }
 
@@ -185,7 +192,7 @@ async function processOperationQueue() {
 }
 
 // Process a single operation
-async function processOperation(operation) {
+async function processOperation(operation: AuthDB.QueuedOperation) {
   // Get blob
   const blobData = await AuthDB.getBlob()
   if (!blobData) {
@@ -240,11 +247,11 @@ async function processOperation(operation) {
     return await response.json()
   }
 
-  throw new Error(`Unknown operation type: ${operation.type}`)
+  throw new Error(`Unknown operation type: ${(operation as { type: string }).type}`)
 }
 
 // Request ID token from an active client
-async function requestIdTokenFromClient() {
+async function requestIdTokenFromClient(): Promise<string | null> {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
 
   if (clients.length === 0) {
@@ -252,7 +259,7 @@ async function requestIdTokenFromClient() {
   }
 
   // Ask the first client for an ID token
-  return new Promise(resolve => {
+  return new Promise<string | null>(resolve => {
     const messageChannel = new MessageChannel()
     const timeout = setTimeout(() => resolve(null), 5000)
 
@@ -350,7 +357,8 @@ self.addEventListener('fetch', event => {
           }
           return response
         })
-        .catch(() => caches.match(event.request))
+        // (with nothing cached, respondWith(undefined) was a network error: so is this)
+        .catch(async () => (await caches.match(event.request)) ?? Response.error())
     )
     return
   }

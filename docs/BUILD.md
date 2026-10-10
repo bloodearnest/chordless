@@ -22,7 +22,7 @@ browser's data (IndexedDB, sign-in) belongs to the origin and the Tailscale funn
 
 ## The service worker
 
-`vite-plugins/service-worker.js` builds `src/service-worker.js` itself, because the app's
+`vite-plugins/service-worker.js` builds `src/service-worker.ts` itself, because the app's
 needs are unusual:
 
 - **Classic script.** Module service workers need Chrome 91 or later, and are late in

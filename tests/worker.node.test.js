@@ -40,10 +40,12 @@ test('serves static CSS', async () => {
   assert.ok(resp.headers.get('content-type')?.includes('text/css'))
 })
 
-test('serves static JS', async () => {
-  const resp = await worker.fetch('/service-worker.js')
+test('serves source files as files, not the app shell', async () => {
+  // (The source is TypeScript, which Vite compiles: wrangler serves the directory as it is)
+  const resp = await worker.fetch('/js/db.ts')
   assert.equal(resp.status, 200)
-  assert.ok(resp.headers.get('content-type')?.includes('javascript'))
+  assert.ok(!resp.headers.get('content-type')?.includes('text/html'))
+  assert.ok((await resp.text()).includes('export'))
 })
 
 test('SPA fallback: unknown path returns HTML, not 404', async () => {

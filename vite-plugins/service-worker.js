@@ -1,4 +1,4 @@
-// Builds src/service-worker.js as a classic (non-module) script, so it also runs where
+// Builds src/service-worker.ts as a classic (non-module) script, so it also runs where
 // module service workers don't (Chrome before 91, older Firefox), with its one import bundled in.
 //
 // In a production build it also injects the precache: every file the build emitted, so the
@@ -34,7 +34,11 @@ async function bundle(root, precache, version, { minify, target }) {
       write: false,
       minify,
       target,
-      lib: { entry: join(root, FILE), formats: ['iife'], name: 'chordlessServiceWorker' },
+      lib: {
+        entry: join(root, 'service-worker.ts'),
+        formats: ['iife'],
+        name: 'chordlessServiceWorker',
+      },
     },
   })
   const { output } = Array.isArray(result) ? result[0] : result
