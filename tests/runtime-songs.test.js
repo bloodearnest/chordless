@@ -7,22 +7,22 @@ import { suppressConsoleLogs } from './test-helpers.js'
 const { describe, it, before } = window
 
 describe('parseTempoMetadata', () => {
-  it('reads a number, or a number as text', () => {
-    expect(parseTempoMetadata(120)).to.deep.equal({ bpm: 120, tempoNote: null })
-    expect(parseTempoMetadata('96')).to.deep.equal({ bpm: 96, tempoNote: null })
-    expect(parseTempoMetadata('72.5')).to.deep.equal({ bpm: 72.5, tempoNote: null })
-  })
-
-  it('reads the note value in brackets', () => {
-    expect(parseTempoMetadata('60 (1/8)')).to.deep.equal({ bpm: 60, tempoNote: '1/8' })
-    expect(parseTempoMetadata(' 80( 1/2 ) ')).to.deep.equal({ bpm: 80, tempoNote: '1/2' })
-  })
-
-  it('has nothing for no tempo, or text with no number', () => {
-    for (const raw of [undefined, null, '', 'fast']) {
-      expect(parseTempoMetadata(raw), String(raw)).to.deep.equal({ bpm: null, tempoNote: null })
-    }
-  })
+  const cases = [
+    [120, { bpm: 120, tempoNote: null }],
+    ['96', { bpm: 96, tempoNote: null }],
+    ['72.5', { bpm: 72.5, tempoNote: null }],
+    ['60 (1/8)', { bpm: 60, tempoNote: '1/8' }],
+    [' 80( 1/2 ) ', { bpm: 80, tempoNote: '1/2' }],
+    [undefined, { bpm: null, tempoNote: null }],
+    [null, { bpm: null, tempoNote: null }],
+    ['', { bpm: null, tempoNote: null }],
+    ['fast', { bpm: null, tempoNote: null }],
+  ]
+  for (const [raw, expected] of cases) {
+    it(`${JSON.stringify(raw) ?? 'undefined'} is ${JSON.stringify(expected)}`, () => {
+      expect(parseTempoMetadata(raw)).to.deep.equal(expected)
+    })
+  }
 })
 
 describe('buildRuntimeSongs', () => {
@@ -117,47 +117,40 @@ describe('buildRuntimeSongs', () => {
     expect(song.title).to.equal('Song 4')
   })
 
-  describe('tempo', () => {
-    it("takes the setlist's tempo over the chart's", async () => {
-      const songId = await addSong(chart('{tempo: 72}'))
-      const [song] = await build([{ songId, tempo: 90, order: 0 }])
-      expect(song.currentBPM).to.equal(90)
-      expect(song.metadata.tempo).to.equal(90)
-    })
-
-    it("uses the chart's tempo when the setlist has none", async () => {
-      const songId = await addSong(chart('{tempo: 72}'))
-      const [song] = await build([{ songId, order: 0 }])
-      expect(song.currentBPM).to.equal(72)
-    })
-
-    it('has no BPM when neither has a tempo', async () => {
-      const songId = await addSong(chart())
-      const [song] = await build([{ songId, order: 0 }])
-      expect(song.currentBPM).to.equal(null)
-    })
-  })
-
-  describe('the note the tempo counts', () => {
-    it('is quarter notes by default', async () => {
-      const songId = await addSong(chart('{tempo: 80}'))
-      const [song] = await build([{ songId, order: 0 }])
-      expect(song.metadata.tempoNote).to.equal('1/4')
-    })
-
-    it('follows the time signature: 6/8 counts in eighths', async () => {
-      const songId = await addSong(chart('{tempo: 100}\n{time: 6/8}'))
-      const [song] = await build([{ songId, order: 0 }])
-      expect(song.metadata.timeSignature).to.equal('6/8')
-      expect(song.metadata.tempoNote).to.equal('1/8')
-    })
-
-    it('keeps a note written with the tempo', async () => {
-      const songId = await addSong(chart('{tempo: 60 (1/2)}'))
-      const [song] = await build([{ songId, order: 0 }])
-      expect(song.currentBPM).to.equal(60)
-      expect(song.metadata.tempoNote).to.equal('1/2')
-    })
+  describe('tempo, and the note it counts', () => {
+    // [what happens, the chart's extra lines, the setlist's tempo, what the song gets]
+    const cases = [
+      ["the setlist's tempo wins over the chart's", '{tempo: 72}', 90, { bpm: 90, note: '1/4' }],
+      [
+        "the chart's tempo is used when the setlist has none",
+        '{tempo: 72}',
+        undefined,
+        { bpm: 72, note: '1/4' },
+      ],
+      ['there is no BPM when neither has a tempo', '', undefined, { bpm: null, note: '1/4' }],
+      [
+        '6/8 counts in eighths',
+        '{tempo: 100}\n{time: 6/8}',
+        undefined,
+        { bpm: 100, note: '1/8', time: '6/8' },
+      ],
+      [
+        'a note written with the tempo is kept',
+        '{tempo: 60 (1/2)}',
+        undefined,
+        { bpm: 60, note: '1/2' },
+      ],
+    ]
+    for (const [what, extra, tempo, expected] of cases) {
+      it(what, async () => {
+        const songId = await addSong(chart(extra))
+        const [song] = await build([{ songId, tempo, order: 0 }])
+        expect(song.currentBPM).to.equal(expected.bpm)
+        expect(song.metadata.tempo).to.equal(expected.bpm)
+        expect(song.metadata.tempoNote).to.equal(expected.note)
+        if (expected.time) expect(song.metadata.timeSignature).to.equal(expected.time)
+      })
+    }
   })
 
   it('keeps the setlist entry, and the library song, for the models', async () => {

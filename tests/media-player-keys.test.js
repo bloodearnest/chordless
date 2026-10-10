@@ -36,30 +36,19 @@ describe('the media player and the keyboard', () => {
     return event.defaultPrevented
   }
 
-  it('takes Space and Esc while it is showing', () => {
-    expect(player.getClientRects().length).to.be.greaterThan(0)
-    expect(press('Space')).to.equal(true)
-    expect(press('Escape')).to.equal(true)
-  })
-
-  it('leaves Space to the button that has it while it is hidden', () => {
-    player.style.display = 'none'
-    expect(press('Space')).to.equal(false)
-    expect(press('Escape')).to.equal(false)
-  })
-
-  it('leaves the keys alone when it is turned off in the settings', () => {
-    // as _showIfEnabled hides it
-    player.style.display = 'none'
-    expect(press('Space')).to.equal(false)
-  })
-
-  it('takes them again when it shows again', () => {
-    player.style.display = 'none'
-    expect(press('Space')).to.equal(false)
-    player.style.display = ''
-    expect(press('Space')).to.equal(true)
-  })
+  // Showing, the player takes Space and Esc. Hidden (off a setlist with nothing playing, or turned
+  // off in the settings: both set display none), the keys are the focused button's
+  for (const [state, display, taken] of [
+    ['showing', '', true],
+    ['hidden', 'none', false],
+  ]) {
+    for (const code of ['Space', 'Escape']) {
+      it(`${code} while the player is ${state}: ${taken ? 'taken' : 'left alone'}`, () => {
+        player.style.display = display
+        expect(press(code)).to.equal(taken)
+      })
+    }
+  }
 
   it('has an active attribute only while a song is started', async () => {
     expect(player.isActive).to.equal(false)

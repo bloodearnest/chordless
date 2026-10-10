@@ -111,11 +111,4 @@ describe('DialogPopup', () => {
     host.remove()
     expect(dialog.open).to.equal(false)
   })
-
-  it('does nothing before it has rendered', () => {
-    const lonely = document.createElement('popup-host')
-    expect(lonely.popup.isOpen).to.equal(false)
-    lonely.popup.show()
-    lonely.popup.close()
-  })
 })

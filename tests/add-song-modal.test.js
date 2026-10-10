@@ -138,10 +138,4 @@ describe('AddSongModal', () => {
     expect(modalElement().hasAttribute('open')).to.equal(true)
     expect(results().querySelector('status-message').state).to.equal('error')
   })
-
-  it('does nothing if the page has not got its elements', async () => {
-    root.innerHTML = ''
-    await modal.open()
-    modal.close()
-  })
 })

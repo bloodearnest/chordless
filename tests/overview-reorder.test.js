@@ -3,57 +3,65 @@ import { nextDropIndex, OverviewReorder } from '../public/js/setlist/overview-re
 
 const { describe, it, beforeEach, afterEach } = window
 
+const cardsAt = (tops, height) => tops.map((top, index) => ({ index, top, bottom: top + height }))
 // Four cards, each 50px tall with a 10px gap: 0-50, 60-110, 120-170, 180-230
-const cardsAt = () => [0, 60, 120, 180].map((top, index) => ({ index, top, bottom: top + 50 }))
+const tall = cardsAt([0, 60, 120, 180], 50)
+// Four cards 30px tall with no gap: 0-30, 30-60, 60-90, 90-120
+const small = cardsAt([0, 30, 60, 90], 30)
 
 describe('nextDropIndex', () => {
-  const drop = (clientY, dragged, lastAccepted) =>
-    nextDropIndex(cardsAt(), { dragged, clientY, lastAccepted })
-
-  it('drops before a card when the pointer is over its top half', () => {
-    expect(drop(125, 0, 0)).to.equal(2) // top half of card 2 (middle 145)
-  })
-
-  it('drops after a card when the pointer is over its bottom half', () => {
-    expect(drop(165, 0, 0)).to.equal(3) // bottom half of card 2
-  })
-
-  it('drops at the top when the pointer is above every card', () => {
-    expect(drop(-30, 2, 2)).to.equal(0)
-  })
-
-  it('drops at the end when the pointer is below every card', () => {
-    expect(drop(300, 1, 1)).to.equal(4)
-  })
-
-  it('stays where it was while the pointer is in a gap', () => {
-    expect(drop(115, 0, 2)).to.equal(2)
-  })
-
-  it('ignores the card being dragged', () => {
-    // Over its own place: nothing else is under the pointer, so it keeps its target
-    expect(drop(25, 0, 0)).to.equal(0)
-  })
-
-  it('does not switch to a new target until the pointer is clearly past the old one', () => {
-    // Cards 30px tall with no gap: 0-30, 30-60, 60-90, 90-120. Accepted: 2 (top 60).
-    const small = [0, 30, 60, 90].map((top, index) => ({ index, top, bottom: top + 30 }))
-    const drop = clientY => nextDropIndex(small, { dragged: 3, clientY, lastAccepted: 2 })
-    // The top half of card 1 proposes 1, but 40 is only 20px from 60: it holds
-    expect(drop(40)).to.equal(2)
-    // 39 is 21px away: it switches
-    expect(drop(39)).to.equal(1)
-  })
-
-  it('measures from the end of the list when the accepted target is the end', () => {
-    // Accepted: 4 (after the last card, bottom 230). Going up into the last card's top half
-    expect(drop(195, 0, 4)).to.equal(3) // 35px from 230: switches
-    expect(drop(215, 0, 4)).to.equal(4) // that's in its bottom half: proposes 4: unchanged
-  })
-
-  it('has nothing to do with no cards', () => {
-    expect(nextDropIndex([], { dragged: 0, clientY: 10, lastAccepted: 0 })).to.equal(0)
-  })
+  // [what happens, the cards, the drag so far, the position it drops at]
+  const cases = [
+    [
+      'over the top half of a card: before it',
+      tall,
+      { dragged: 0, clientY: 125, lastAccepted: 0 },
+      2,
+    ],
+    [
+      'over the bottom half of a card: after it',
+      tall,
+      { dragged: 0, clientY: 165, lastAccepted: 0 },
+      3,
+    ],
+    ['above every card: at the top', tall, { dragged: 2, clientY: -30, lastAccepted: 2 }, 0],
+    ['below every card: at the end', tall, { dragged: 1, clientY: 300, lastAccepted: 1 }, 4],
+    ['in a gap: where it was', tall, { dragged: 0, clientY: 115, lastAccepted: 2 }, 2],
+    ['over its own place: where it was', tall, { dragged: 0, clientY: 25, lastAccepted: 0 }, 0],
+    // Accepted: 2 (top 60). The top half of card 1 proposes 1, but a switch needs the pointer
+    // more than 20px from the accepted position
+    [
+      '20px from the accepted position: holds',
+      small,
+      { dragged: 3, clientY: 40, lastAccepted: 2 },
+      2,
+    ],
+    [
+      '21px from the accepted position: switches',
+      small,
+      { dragged: 3, clientY: 39, lastAccepted: 2 },
+      1,
+    ],
+    // Accepted: 4 (the end, measured from the last card's bottom, 230)
+    [
+      'from the end, far enough up: switches',
+      tall,
+      { dragged: 0, clientY: 195, lastAccepted: 4 },
+      3,
+    ],
+    [
+      'from the end, proposing the end again: unchanged',
+      tall,
+      { dragged: 0, clientY: 215, lastAccepted: 4 },
+      4,
+    ],
+    ['no cards', [], { dragged: 0, clientY: 10, lastAccepted: 0 }, 0],
+  ]
+  for (const [what, cards, drag, expected] of cases) {
+    it(`${what} (pointer at ${drag.clientY}: ${expected})`, () => {
+      expect(nextDropIndex(cards, drag)).to.equal(expected)
+    })
+  }
 })
 
 describe('OverviewReorder', () => {
@@ -215,11 +223,5 @@ describe('OverviewReorder', () => {
     // Still listening: a second drag works
     await drag(3, -50)
     expect(moves).to.have.length(2)
-  })
-
-  it('does nothing without an overview or cards', () => {
-    root.innerHTML = ''
-    reorder.enable()
-    reorder.disable()
   })
 })
