@@ -17,7 +17,13 @@ const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const JWKS_URI = 'https://www.googleapis.com/oauth2/v3/certs'
 const TIMEOUT_MS = 10_000
 
-const authorizationServer = {
+/** The two secrets the token endpoint and the ID token check need */
+export interface GoogleEnv {
+  GOOGLE_CLIENT_ID: string
+  GOOGLE_CLIENT_SECRET: string
+}
+
+const authorizationServer: oauth.AuthorizationServer = {
   issuer: ISSUER,
   token_endpoint: TOKEN_ENDPOINT,
   jwks_uri: JWKS_URI,
@@ -34,7 +40,11 @@ const requestOptions = () => ({ signal: AbortSignal.timeout(TIMEOUT_MS) })
  * (this app's client id) and expiry. Throws if any is wrong; returns the claims.
  * `keys` is for tests: it replaces Google's signing keys.
  */
-export async function verifyIdToken(idToken, env, keys = googleKeys) {
+export async function verifyIdToken(
+  idToken: string,
+  env: GoogleEnv,
+  keys: jose.JWTVerifyGetKey = googleKeys
+) {
   const { payload } = await jose.jwtVerify(idToken, keys, {
     algorithms: ['RS256'],
     issuer: ISSUERS,
@@ -49,8 +59,8 @@ export async function verifyIdToken(idToken, env, keys = googleKeys) {
  * Returns { refresh_token, access_token, expires_in, scope, id_token, claims }, where
  * claims are the verified ID token's.
  */
-export async function exchangeCode(code, redirectUri, env) {
-  const client = { client_id: env.GOOGLE_CLIENT_ID }
+export async function exchangeCode(code: string, redirectUri: string, env: GoogleEnv) {
+  const client: oauth.Client = { client_id: env.GOOGLE_CLIENT_ID }
   const clientAuth = oauth.ClientSecretPost(env.GOOGLE_CLIENT_SECRET)
 
   // The sign-in popup sends no `state` and no PKCE verifier, so there are none to check
@@ -76,8 +86,8 @@ export async function exchangeCode(code, redirectUri, env) {
 }
 
 /** Get a new access token with a refresh token. Returns { access_token, expires_in }. */
-export async function refreshAccessToken(refreshToken, env) {
-  const client = { client_id: env.GOOGLE_CLIENT_ID }
+export async function refreshAccessToken(refreshToken: string, env: GoogleEnv) {
+  const client: oauth.Client = { client_id: env.GOOGLE_CLIENT_ID }
   const clientAuth = oauth.ClientSecretPost(env.GOOGLE_CLIENT_SECRET)
 
   const response = await oauth.refreshTokenGrantRequest(

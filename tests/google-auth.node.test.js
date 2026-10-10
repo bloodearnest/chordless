@@ -1,12 +1,12 @@
 /**
- * The worker's ID token check (worker/src/google-auth.js). Tokens are signed with a key
+ * The worker's ID token check (worker/src/google-auth.ts). Tokens are signed with a key
  * made here, which stands in for Google's signing keys.
  */
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import * as jose from 'jose'
-import { verifyIdToken } from '../worker/src/google-auth.js'
+import { verifyIdToken } from '../worker/src/google-auth.ts'
 
 const env = { GOOGLE_CLIENT_ID: 'client-123.apps.googleusercontent.com' }
 const { publicKey, privateKey } = await jose.generateKeyPair('RS256', { extractable: true })

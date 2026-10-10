@@ -14,7 +14,7 @@ import { unstable_dev } from 'wrangler'
 let worker
 
 before(async () => {
-  worker = await unstable_dev('worker/src/index.js', {
+  worker = await unstable_dev('worker/src/index.ts', {
     config: 'wrangler.toml',
     logLevel: 'error',
     experimental: { disableExperimentalWarning: true },
@@ -82,7 +82,7 @@ test('worker API: /session/refresh route exists', async () => {
 
 test('worker source is not served as JavaScript', async () => {
   // Only src/ is served; anything outside it falls through to the SPA fallback (text/html)
-  const resp = await worker.fetch('/worker/src/index.js')
+  const resp = await worker.fetch('/worker/src/index.ts')
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
     ct.includes('text/html'),
@@ -101,7 +101,7 @@ test('CORS preflight returns correct headers', async () => {
 })
 
 test('JWE blob round-trips: encrypt then decrypt returns original data', async () => {
-  // Mirrors encryptBlob/decryptBlob in worker/src/index.js exactly.
+  // Mirrors encryptBlob/decryptBlob in worker/src/index.ts exactly.
   // Catches jose API breakage (e.g. CompactEncrypt constructor, header shape, decrypt return type).
   const keyData = globalThis.crypto.getRandomValues(new Uint8Array(32))
   const secret = await globalThis.crypto.subtle.importKey(
@@ -149,7 +149,7 @@ test('dev pages are not served without DEV_PAGES (production)', async () => {
 })
 
 test('dev pages are served in the dev environment (npm run dev)', async () => {
-  const devWorker = await unstable_dev('worker/src/index.js', {
+  const devWorker = await unstable_dev('worker/src/index.ts', {
     config: 'wrangler.toml',
     env: 'dev',
     logLevel: 'error',

@@ -9,7 +9,32 @@
  */
 
 import * as jose from 'jose'
-import { exchangeCode, refreshAccessToken, verifyIdToken } from './google-auth.js'
+import { exchangeCode, type GoogleEnv, refreshAccessToken, verifyIdToken } from './google-auth.ts'
+
+/** The worker's bindings, variables and secrets (see wrangler.toml) */
+interface Env extends GoogleEnv {
+  ASSETS: { fetch(request: Request): Promise<Response> }
+  /** Set only in [env.dev]: serve the component playgrounds */
+  DEV_PAGES?: string
+  /** Used when the client sends no redirect_uri */
+  GOOGLE_REDIRECT_URI?: string
+  /** Base64 AES-256 key for the token blobs */
+  JWE_ENCRYPTION_KEY: string
+}
+
+/** What the encrypted blob holds: the owner, and the refresh token */
+interface BlobData {
+  owner_email: string | undefined
+  owner_sub: string | undefined
+  scopes: string
+  refresh_token: string
+  created_at: string
+  blob_id: string
+  /** Key ID, for rotation */
+  kid: string
+}
+
+const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
  * CORS headers for browser requests
@@ -25,7 +50,7 @@ const CORS_HEADERS = {
  * Router - handles incoming requests
  */
 export default {
-  async fetch(request, env, _ctx) {
+  async fetch(request: Request, env: Env, _ctx: unknown) {
     // Handle CORS preflight
     if (request.method === 'OPTIONS') {
       return new Response(null, { headers: CORS_HEADERS })
@@ -67,7 +92,7 @@ export default {
       return env.ASSETS.fetch(request)
     } catch (error) {
       console.error('Worker error:', error)
-      return jsonResponse({ error: 'Internal server error', message: error.message }, 500)
+      return jsonResponse({ error: 'Internal server error', message: message(error) }, 500)
     }
   },
 }
@@ -89,7 +114,7 @@ export default {
  *   expires_in: number      // Access token TTL (seconds)
  * }
  */
-async function handleOAuthCallback(request, env) {
+async function handleOAuthCallback(request: Request, env: Env) {
   const body = await request.json()
   const { code, redirect_uri } = body
 
@@ -108,10 +133,11 @@ async function handleOAuthCallback(request, env) {
   const tokens = await exchangeCode(code, redirectUri, env)
   const { refresh_token, access_token, expires_in, scope, id_token, claims: payload } = tokens
 
-  if (!id_token) {
+  if (!id_token || !payload) {
     return jsonResponse({ error: 'No ID token received. Make sure to request openid scope.' }, 400)
   }
-  const { email, sub } = payload
+  const email = payload.email as string | undefined
+  const sub = payload.sub
 
   if (!refresh_token) {
     return jsonResponse(
@@ -134,7 +160,7 @@ async function handleOAuthCallback(request, env) {
   }
 
   // Create JWE blob
-  const blobData = {
+  const blobData: BlobData = {
     owner_email: email,
     owner_sub: sub,
     scopes: scope,
@@ -185,7 +211,7 @@ async function handleOAuthCallback(request, env) {
  *   expires_in: number      // Access token TTL (seconds)
  * }
  */
-async function handleTokenRefresh(request, env) {
+async function handleTokenRefresh(request: Request, env: Env) {
   const { blob, id_token } = await request.json()
 
   if (!blob) {
@@ -206,7 +232,7 @@ async function handleTokenRefresh(request, env) {
       }
     } catch (error) {
       // If ID token verification fails, continue without it (blob is still valid proof)
-      console.warn('ID token verification failed, proceeding with blob only:', error.message)
+      console.warn('ID token verification failed, proceeding with blob only:', message(error))
     }
   }
 
@@ -237,7 +263,7 @@ async function handleTokenRefresh(request, env) {
  *   permission_id: string
  * }
  */
-async function handleSessionInvite(request, env) {
+async function handleSessionInvite(request: Request, env: Env) {
   const { blob, id_token, file_id, email } = await request.json()
 
   if (!blob || !id_token || !file_id || !email) {
@@ -306,7 +332,7 @@ async function handleSessionInvite(request, env) {
  *   success: boolean
  * }
  */
-async function handleSessionRevoke(request, env) {
+async function handleSessionRevoke(request: Request, env: Env) {
   const { blob, id_token, file_id, permission_id } = await request.json()
 
   if (!blob || !id_token || !file_id || !permission_id) {
@@ -349,7 +375,7 @@ async function handleSessionRevoke(request, env) {
 /**
  * Encrypt blob data into JWE format
  */
-async function encryptBlob(data, env) {
+async function encryptBlob(data: BlobData, env: Env) {
   const secret = await importEncryptionKey(env.JWE_ENCRYPTION_KEY)
 
   const jwe = await new jose.CompactEncrypt(new TextEncoder().encode(JSON.stringify(data)))
@@ -362,7 +388,7 @@ async function encryptBlob(data, env) {
 /**
  * Decrypt JWE blob
  */
-async function decryptBlob(jwe, env) {
+async function decryptBlob(jwe: string, env: Env): Promise<BlobData> {
   const secret = await importEncryptionKey(env.JWE_ENCRYPTION_KEY)
 
   const { plaintext } = await jose.compactDecrypt(jwe, secret)
@@ -372,7 +398,7 @@ async function decryptBlob(jwe, env) {
 /**
  * Import symmetric encryption key from base64 string
  */
-async function importEncryptionKey(base64Key) {
+async function importEncryptionKey(base64Key: string) {
   const keyData = Uint8Array.from(atob(base64Key), c => c.charCodeAt(0))
   return await crypto.subtle.importKey('raw', keyData, { name: 'AES-GCM', length: 256 }, false, [
     'encrypt',
@@ -383,7 +409,7 @@ async function importEncryptionKey(base64Key) {
 /**
  * Helper to return JSON responses with CORS
  */
-function jsonResponse(data, status = 200) {
+function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
