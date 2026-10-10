@@ -19,17 +19,12 @@
  * }
  */
 
-/** How one section of a song is shown (hideMode: what to hide, e.g. 'none' or 'chords') */
-export interface SectionPrefs {
-  hideMode: string
-  isCollapsed: boolean
-  isHidden: boolean
-}
+import type { SectionState } from './data-types.ts'
 
 /** One song's preferences, by section index */
 export interface SongUserPrefs {
   capo?: number
-  sectionDefaults?: Record<string, SectionPrefs>
+  sectionDefaults?: Record<string, SectionState>
 }
 
 /**

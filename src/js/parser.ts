@@ -1,16 +1,22 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type {
+  ChartLine,
+  ChartMetadata,
+  ChartSection,
+  ChartSegment,
+  ParsedChart,
+} from './data-types.ts'
 import { normalizeSongChordsToStandard } from './transpose.ts'
 
 // Custom ChordPro parser for SongSelect format files
 
 export class ChordProParser {
-  parse(content) {
+  parse(content: string): ParsedChart {
     const lines = content.split('\n')
-    const metadata = {}
-    const sections = []
-    let currentSection = null
+    const metadata: ChartMetadata = {}
+    const sections: ChartSection[] = []
+    let currentSection: ChartSection | null = null
     let inTrailer = false
-    const trailerLines = []
+    const trailerLines: string[] = []
 
     for (let line of lines) {
       line = line.trim()
@@ -87,15 +93,15 @@ export class ChordProParser {
       metadata.ccliTrailer = trailerLines.join('\n')
     }
 
-    const parsed = { metadata, sections }
+    const parsed: ParsedChart = { metadata, sections }
     if (parsed.metadata.key) {
       normalizeSongChordsToStandard(parsed, parsed.metadata.key)
     }
     return parsed
   }
 
-  parseLine(line) {
-    const segments = []
+  parseLine(line: string): ChartLine {
+    const segments: ChartSegment[] = []
     let currentChord = ''
     let currentLyrics = ''
     let inChord = false

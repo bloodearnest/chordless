@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * AuthDB - IndexedDB wrapper for Google Drive auth blob storage and operation queuing
  *
@@ -11,6 +10,37 @@
 const DB_NAME = 'auth'
 const DB_VERSION = 1
 
+/** The encrypted token blob, as stored (the single record 'current') */
+export interface StoredBlob {
+  blob: string
+  metadata: Record<string, unknown>
+  updated_at: string
+}
+
+/** A queued request for the worker to make once the device is online and signed in */
+export type OperationRequest =
+  | { type: 'invite'; file_id: string; email: string }
+  | { type: 'revoke'; file_id: string; permission_id: string }
+
+export type OperationStatus = 'pending' | 'completed' | 'failed'
+
+export type QueuedOperation = OperationRequest & {
+  id: number
+  status: OperationStatus
+  timestamp: string
+  retry_count: number
+  last_error: string | null
+  updated_at?: string
+}
+
+/** A blob exported for the user to keep */
+export interface BlobBackup {
+  version: 1
+  exported_at: string
+  blob: string
+  metadata: Record<string, unknown>
+}
+
 const STORES = {
   BLOB: 'auth-blob', // Stores the encrypted token blob
   QUEUE: 'operation-queue', // Stores pending operations
@@ -19,15 +49,15 @@ const STORES = {
 /**
  * Initialize IndexedDB
  */
-export function initAuthDB() {
-  return new Promise((resolve, reject) => {
+export function initAuthDB(): Promise<IDBDatabase> {
+  return new Promise<IDBDatabase>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION)
 
     request.onerror = () => reject(request.error)
     request.onsuccess = () => resolve(request.result)
 
-    request.onupgradeneeded = event => {
-      const db = event.target.result
+    request.onupgradeneeded = () => {
+      const db = request.result
 
       // Blob store - single record containing the encrypted token blob
       if (!db.objectStoreNames.contains(STORES.BLOB)) {
@@ -50,18 +80,21 @@ export function initAuthDB() {
 /**
  * Store encrypted token blob
  */
-export async function storeBlob(blob, metadata = {}) {
+export async function storeBlob(
+  blob: string,
+  metadata: Record<string, unknown> = {}
+): Promise<StoredBlob> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.BLOB, 'readwrite')
   const store = tx.objectStore(STORES.BLOB)
 
-  const data = {
+  const data: StoredBlob = {
     blob,
     metadata,
     updated_at: new Date().toISOString(),
   }
 
-  await new Promise((resolve, reject) => {
+  await new Promise<IDBValidKey>((resolve, reject) => {
     const request = store.put(data, 'current')
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -74,12 +107,12 @@ export async function storeBlob(blob, metadata = {}) {
 /**
  * Retrieve encrypted token blob
  */
-export async function getBlob() {
+export async function getBlob(): Promise<StoredBlob | undefined> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.BLOB, 'readonly')
   const store = tx.objectStore(STORES.BLOB)
 
-  const result = await new Promise((resolve, reject) => {
+  const result = await new Promise<StoredBlob | undefined>((resolve, reject) => {
     const request = store.get('current')
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -92,12 +125,12 @@ export async function getBlob() {
 /**
  * Delete token blob (on logout)
  */
-export async function deleteBlob() {
+export async function deleteBlob(): Promise<void> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.BLOB, 'readwrite')
   const store = tx.objectStore(STORES.BLOB)
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const request = store.delete('current')
     request.onsuccess = () => resolve()
     request.onerror = () => reject(request.error)
@@ -109,7 +142,7 @@ export async function deleteBlob() {
 /**
  * Queue an operation (invite or revoke)
  */
-export async function queueOperation(operation) {
+export async function queueOperation(operation: OperationRequest): Promise<number> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.QUEUE, 'readwrite')
   const store = tx.objectStore(STORES.QUEUE)
@@ -122,9 +155,9 @@ export async function queueOperation(operation) {
     last_error: null,
   }
 
-  const id = await new Promise((resolve, reject) => {
+  const id = await new Promise<number>((resolve, reject) => {
     const request = store.add(queueItem)
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => resolve(Number(request.result))
     request.onerror = () => reject(request.error)
   })
 
@@ -135,13 +168,13 @@ export async function queueOperation(operation) {
 /**
  * Get all pending operations
  */
-export async function getPendingOperations() {
+export async function getPendingOperations(): Promise<QueuedOperation[]> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.QUEUE, 'readonly')
   const store = tx.objectStore(STORES.QUEUE)
   const index = store.index('status')
 
-  const results = await new Promise((resolve, reject) => {
+  const results = await new Promise<QueuedOperation[]>((resolve, reject) => {
     const request = index.getAll('pending')
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -154,13 +187,17 @@ export async function getPendingOperations() {
 /**
  * Update operation status
  */
-export async function updateOperationStatus(id, status, error = null) {
+export async function updateOperationStatus(
+  id: number,
+  status: OperationStatus,
+  error: string | null = null
+): Promise<void> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.QUEUE, 'readwrite')
   const store = tx.objectStore(STORES.QUEUE)
 
   // Get current operation
-  const operation = await new Promise((resolve, reject) => {
+  const operation = await new Promise<QueuedOperation | undefined>((resolve, reject) => {
     const request = store.get(id)
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -179,7 +216,7 @@ export async function updateOperationStatus(id, status, error = null) {
   }
   operation.updated_at = new Date().toISOString()
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const request = store.put(operation)
     request.onsuccess = () => resolve()
     request.onerror = () => reject(request.error)
@@ -191,12 +228,12 @@ export async function updateOperationStatus(id, status, error = null) {
 /**
  * Delete completed/failed operations
  */
-export async function deleteOperation(id) {
+export async function deleteOperation(id: number): Promise<void> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.QUEUE, 'readwrite')
   const store = tx.objectStore(STORES.QUEUE)
 
-  await new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const request = store.delete(id)
     request.onsuccess = () => resolve()
     request.onerror = () => reject(request.error)
@@ -208,22 +245,22 @@ export async function deleteOperation(id) {
 /**
  * Clear all completed operations (older than 24 hours)
  */
-export async function clearCompletedOperations() {
+export async function clearCompletedOperations(): Promise<void> {
   const db = await initAuthDB()
   const tx = db.transaction(STORES.QUEUE, 'readwrite')
   const store = tx.objectStore(STORES.QUEUE)
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const results = await new Promise((resolve, reject) => {
+  const results = await new Promise<QueuedOperation[]>((resolve, reject) => {
     const request = store.getAll()
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
   })
 
   for (const op of results) {
-    if (op.status === 'completed' && op.updated_at < cutoff) {
-      await new Promise((resolve, reject) => {
+    if (op.status === 'completed' && op.updated_at !== undefined && op.updated_at < cutoff) {
+      await new Promise<void>((resolve, reject) => {
         const request = store.delete(op.id)
         request.onsuccess = () => resolve()
         request.onerror = () => reject(request.error)
@@ -237,7 +274,7 @@ export async function clearCompletedOperations() {
 /**
  * Export blob as backup (for user to save)
  */
-export async function exportBlobBackup() {
+export async function exportBlobBackup(): Promise<BlobBackup> {
   const data = await getBlob()
   if (!data) {
     throw new Error('No auth blob found')
@@ -254,7 +291,9 @@ export async function exportBlobBackup() {
 /**
  * Import blob from backup
  */
-export async function importBlobBackup(backup) {
+export async function importBlobBackup(
+  backup: Partial<BlobBackup> | null | undefined
+): Promise<void> {
   if (backup?.version !== 1 || !backup.blob) {
     throw new Error('Invalid backup format')
   }

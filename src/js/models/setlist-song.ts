@@ -1,4 +1,5 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type { LoadedSong, ParsedChart, SectionState, SetlistEntry } from '../data-types.ts'
+import type { ChordlessDB } from '../db.js'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { SongModel } from './song-model.ts'
 
@@ -18,16 +19,47 @@ import { SongModel } from './song-model.ts'
  * Conditional capo inheritance:
  * - Only applies song-user-prefs capo if setlist entry key === canonical song key
  */
+/** Changes made but not yet saved */
+interface PendingChanges {
+  key: string | null
+  tempo: number | null
+  capo: number | null
+  sectionStates: Record<number, SectionState>
+}
+
+/** What a setlist keeps in localStorage for this device (not synced) */
+interface SetlistViewState {
+  /** Per song index, then per section index */
+  sectionState?: Record<number | string, Record<number | string, SectionState>>
+  /** Per song index */
+  capoValues?: Record<string, number>
+}
+
 export class SetlistSong extends SongModel {
+  _songEntry: SetlistEntry
+  _canonical: LoadedSong
+  _setlistId: string
+  _db: ChordlessDB
+  _orgId: string
+  _songIndex: number
+  _pendingChanges: PendingChanges
+
   /**
-   * @param {Object} songEntry - Setlist song entry (from setlist.songs[])
-   * @param {Object} canonicalSong - Canonical song data with parsed content
-   * @param {string} setlistId - Setlist ID
-   * @param {Object} db - Database instance
-   * @param {string} orgId - Organisation ID
-   * @param {number} songIndex - Index of this song in the setlist
+   * @param songEntry - Setlist song entry (from setlist.songs[])
+   * @param canonicalSong - Canonical song data with parsed content
+   * @param setlistId - Setlist ID
+   * @param db - Database instance
+   * @param orgId - Organisation ID
+   * @param songIndex - Index of this song in the setlist
    */
-  constructor(songEntry, canonicalSong, setlistId, db, orgId, songIndex = 0) {
+  constructor(
+    songEntry: SetlistEntry,
+    canonicalSong: LoadedSong,
+    setlistId: string,
+    db: ChordlessDB,
+    orgId: string,
+    songIndex = 0
+  ) {
     super()
     this._songEntry = songEntry
     this._canonical = canonicalSong
@@ -47,29 +79,29 @@ export class SetlistSong extends SongModel {
 
   // ==================== Core Properties ====================
 
-  get id() {
+  override get id(): string {
     return this._songEntry.songId
   }
 
-  get uuid() {
+  override get uuid(): string {
     return this._canonical.uuid
   }
 
-  get title() {
+  override get title(): string {
     return this._canonical.title || 'Untitled'
   }
 
-  get artist() {
+  override get artist(): string | null {
     return this._canonical.author || this._canonical.artist || null
   }
 
-  get parsed() {
+  override get parsed(): ParsedChart {
     return this._canonical.parsed
   }
 
   // ==================== Mutable Properties ====================
 
-  getKey() {
+  override getKey(): string | null | undefined {
     // Return pending change if it exists, otherwise entry's explicit key
     if (this._pendingChanges.key !== null) {
       return this._pendingChanges.key
@@ -77,15 +109,15 @@ export class SetlistSong extends SongModel {
     return this._songEntry.key
   }
 
-  setKey(key) {
+  override setKey(key: string): void {
     this._pendingChanges.key = key
   }
 
-  getOriginalKey() {
+  override getOriginalKey(): string | null | undefined {
     return this._canonical.originalKey || this._canonical.key
   }
 
-  getTempo() {
+  override getTempo(): number | null | undefined {
     // Return pending change if it exists, otherwise entry's explicit tempo
     if (this._pendingChanges.tempo !== null) {
       return this._pendingChanges.tempo
@@ -93,15 +125,15 @@ export class SetlistSong extends SongModel {
     return this._songEntry.tempo
   }
 
-  setTempo(tempo) {
+  override setTempo(tempo: number): void {
     this._pendingChanges.tempo = tempo
   }
 
-  getOriginalTempo() {
+  override getOriginalTempo(): number | null | undefined {
     return this._canonical.originalTempo || this._canonical.tempo
   }
 
-  getCapo() {
+  override getCapo(): number {
     // Return pending change if it exists
     if (this._pendingChanges.capo !== null) {
       return this._pendingChanges.capo
@@ -131,11 +163,11 @@ export class SetlistSong extends SongModel {
     return 0
   }
 
-  setCapo(capo) {
+  override setCapo(capo: number | string): void {
     this._pendingChanges.capo = this._normalizeCapo(capo)
   }
 
-  getSectionState(sectionIndex) {
+  override getSectionState(sectionIndex: number): SectionState {
     // Return pending change if it exists
     if (this._pendingChanges.sectionStates[sectionIndex]) {
       return this._pendingChanges.sectionStates[sectionIndex]
@@ -164,7 +196,7 @@ export class SetlistSong extends SongModel {
     }
   }
 
-  setSectionState(sectionIndex, state) {
+  override setSectionState(sectionIndex: number, state: Partial<SectionState>): void {
     this._pendingChanges.sectionStates[sectionIndex] = {
       ...this.getSectionState(sectionIndex),
       ...state,
@@ -173,7 +205,7 @@ export class SetlistSong extends SongModel {
 
   // ==================== Persistence ====================
 
-  async save() {
+  override async save(): Promise<void> {
     // Save key and tempo to setlist entry in IndexedDB
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
       const setlist = await this._db.getSetlist(this._setlistId)
@@ -224,10 +256,10 @@ export class SetlistSong extends SongModel {
     }
   }
 
-  async reset() {
+  override async reset(): Promise<void> {
     // Reset key and tempo to original from canonical song
-    this._pendingChanges.key = this.getOriginalKey()
-    this._pendingChanges.tempo = this.getOriginalTempo()
+    this._pendingChanges.key = this.getOriginalKey() ?? null
+    this._pendingChanges.tempo = this.getOriginalTempo() ?? null
 
     // Clear capo and section states from setlist localStorage
     const setlistState = this._loadSetlistState()
@@ -251,13 +283,13 @@ export class SetlistSong extends SongModel {
 
   // ==================== Protected Methods ====================
 
-  _getUnderlyingSong() {
+  protected override _getUnderlyingSong(): LoadedSong {
     return this._canonical
   }
 
   // ==================== Helpers ====================
 
-  _loadSetlistState() {
+  _loadSetlistState(): SetlistViewState {
     const key = `state-${this._setlistId}`
     try {
       const state = localStorage.getItem(key)
@@ -273,7 +305,7 @@ export class SetlistSong extends SongModel {
     }
   }
 
-  _saveSetlistState(state) {
+  _saveSetlistState(state: SetlistViewState) {
     const key = `state-${this._setlistId}`
     try {
       localStorage.setItem(key, JSON.stringify(state))

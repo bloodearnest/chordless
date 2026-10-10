@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 import { ContextProvider, createContext } from '@lit/context'
 import {
   AccidentalsPreferenceEvent,
@@ -17,9 +16,17 @@ import {
  *
  * (song-display does, and passes the values down to its sections and chords).
  */
-export const displayPreferencesContext = createContext(Symbol('display-preferences'))
+/** How chords are shown */
+export interface DisplayPreferences {
+  nashville: boolean
+  unicodeAccidentals: boolean
+}
 
-function current() {
+export const displayPreferencesContext = createContext<DisplayPreferences>(
+  Symbol('display-preferences')
+)
+
+function current(): DisplayPreferences {
   return { nashville: getUseNashvilleNumbers(), unicodeAccidentals: getUseUnicodeAccidentals() }
 }
 

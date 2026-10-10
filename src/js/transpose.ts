@@ -1,11 +1,22 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type { ParsedChart } from './data-types.ts'
+
 // Musical transposition module for chord charts
+
+interface KeyInfo {
+  mode: 'major' | 'minor'
+  sharps?: number
+  flats?: number
+  useFlats: boolean
+}
+
+/** Which way to spell a note that has two names (C# or Db) */
+type Accidental = 'sharp' | 'flat'
 
 /**
  * Key information database
  * Defines which keys are major/minor and whether they use sharps or flats
  */
-const KEY_INFO = {
+const KEY_INFO: Record<string, KeyInfo> = {
   // Major keys (sharps)
   C: { mode: 'major', sharps: 0, useFlats: false },
   G: { mode: 'major', sharps: 1, useFlats: false },
@@ -54,7 +65,7 @@ const NOTES_FLAT = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 
 /**
  * Convert note to semitone number (C=0, C#=1, etc.)
  */
-function noteToSemitone(note) {
+function noteToSemitone(note: string): number {
   let normalized = note.replace(/♯/, '#').replace(/♭/, 'b')
 
   // Handle enharmonic edge cases
@@ -71,7 +82,12 @@ function noteToSemitone(note) {
  * Convert semitone number to note name
  * Special handling: B becomes Cb in very flat keys (Gb, Cb)
  */
-function semitoneToNote(semitone, useFlats, targetKey, preferredAccidental = null) {
+function semitoneToNote(
+  semitone: number,
+  useFlats: boolean,
+  targetKey: string | null | undefined,
+  preferredAccidental: Accidental | null = null
+): string {
   const normalized = ((semitone % 12) + 12) % 12
   let useFlatNaming = useFlats
 
@@ -103,11 +119,31 @@ function semitoneToNote(semitone, useFlats, targetKey, preferredAccidental = nul
   return note
 }
 
+/** A chord taken apart (see parseChord) */
+export interface ParsedChord {
+  root: string | null
+  extensions: string
+  bass: string | null
+  isValid: boolean
+  /** A bar line or other mark that is not a chord to transpose */
+  isSpecial?: boolean
+  original: string
+  /** '(' and ')' when the chord was in brackets */
+  wrapperPrefix?: string
+  wrapperSuffix?: string
+}
+
+/** The result of transposing a chord */
+export interface TransposeResult {
+  chord: string
+  transposed: boolean
+  valid: boolean
+}
+
 /**
  * Parse a chord string into components
- * Returns: { root, extensions, bass, isValid, original }
  */
-export function parseChord(chordString) {
+export function parseChord(chordString: string): ParsedChord {
   // Skip special non-chord values
   if (
     !chordString ||
@@ -160,7 +196,7 @@ export function parseChord(chordString) {
   const extensions = mainPart.substring(root.length)
 
   // Parse bass note if present
-  let bass = null
+  let bass: string | null = null
   if (bassPart) {
     const bassMatch = bassPart.match(/^([A-G][#b♯♭]?)/)
     if (bassMatch) {
@@ -183,7 +219,13 @@ export function parseChord(chordString) {
 /**
  * Transpose a single note by semitones
  */
-export function transposeNote(note, semitones, useFlats, targetKey, preferredAccidental = null) {
+export function transposeNote(
+  note: string | null | undefined,
+  semitones: number,
+  useFlats: boolean,
+  targetKey: string | null | undefined,
+  preferredAccidental: Accidental | null = null
+): string | null {
   if (!note) return null
   const originalSemitone = noteToSemitone(note)
   if (originalSemitone === -1) return null
@@ -197,7 +239,7 @@ export function transposeNote(note, semitones, useFlats, targetKey, preferredAcc
  * Sorted in chromatic order, rotated so current key is in the middle
  * Excludes uncommon enharmonic keys (Db, Gb, Cb, D#m, G#m, A#m) from UI selection
  */
-export function getAvailableKeys(currentKey) {
+export function getAvailableKeys(currentKey: string | null | undefined): string[] {
   if (!currentKey) return []
 
   const keyInfo = KEY_INFO[currentKey]
@@ -283,7 +325,10 @@ export function getAvailableKeys(currentKey) {
 /**
  * Calculate semitone offset between two keys
  */
-export function getKeyOffset(fromKey, toKey) {
+export function getKeyOffset(
+  fromKey: string | null | undefined,
+  toKey: string | null | undefined
+): number {
   if (!fromKey || !toKey) return 0
 
   // Get root notes of keys (strip 'm' for minor)
@@ -300,9 +345,12 @@ export function getKeyOffset(fromKey, toKey) {
 
 /**
  * Transpose a chord from one key to another
- * Returns: { chord, transposed, valid }
  */
-export function transposeChord(chordString, fromKey, toKey) {
+export function transposeChord(
+  chordString: string,
+  fromKey: string | null | undefined,
+  toKey: string | null | undefined
+): TransposeResult {
   const parsed = parseChord(chordString)
 
   // Special chords pass through unchanged
@@ -334,7 +382,7 @@ export function transposeChord(chordString, fromKey, toKey) {
   }
 
   // Determine whether to use flats or sharps
-  const toKeyInfo = KEY_INFO[toKey]
+  const toKeyInfo = toKey ? KEY_INFO[toKey] : undefined
   const useFlats = toKeyInfo ? toKeyInfo.useFlats : false
 
   // Transpose root
@@ -349,7 +397,7 @@ export function transposeChord(chordString, fromKey, toKey) {
   }
 
   // Transpose bass if present
-  let newBass = null
+  let newBass: string | null = null
   if (parsed.bass) {
     const bassPreference = determineAccidentalPreference(parsed.bass)
     newBass = transposeNote(parsed.bass, semitones, useFlats, toKey, bassPreference)
@@ -379,7 +427,11 @@ export function transposeChord(chordString, fromKey, toKey) {
   }
 }
 
-export function transposeChordBySemitones(chordString, semitones, targetKey = null) {
+export function transposeChordBySemitones(
+  chordString: string,
+  semitones: number,
+  targetKey: string | null = null
+): TransposeResult {
   const parsed = parseChord(chordString)
 
   if (parsed.isSpecial) {
@@ -419,7 +471,7 @@ export function transposeChordBySemitones(chordString, semitones, targetKey = nu
     }
   }
 
-  let newBass = null
+  let newBass: string | null = null
   if (parsed.bass) {
     const bassPreference = determineAccidentalPreference(parsed.bass)
     newBass = transposeNote(parsed.bass, semitones, useFlats, targetKey, bassPreference)
@@ -452,7 +504,11 @@ export function transposeChordBySemitones(chordString, semitones, targetKey = nu
  * Transpose all chords in parsed song structure
  * Modifies the parsed structure in place
  */
-export function transposeSong(parsed, fromKey, toKey) {
+export function transposeSong(
+  parsed: ParsedChart | null | undefined,
+  fromKey: string | null | undefined,
+  toKey: string | null | undefined
+): void {
   if (!parsed?.sections) return
 
   for (const section of parsed.sections) {
@@ -473,12 +529,12 @@ export function transposeSong(parsed, fromKey, toKey) {
   }
 }
 
-export function transposeKeyName(key, semitones) {
+export function transposeKeyName(key: string, semitones: number): string {
   if (!key || !semitones) return key
   const mode = KEY_INFO[key]?.mode || (key.endsWith('m') ? 'minor' : 'major')
   const root = extractKeyRoot(key)
-  const rootSemitone = noteToSemitone(root)
-  if (!mode || rootSemitone === -1) {
+  const rootSemitone = root ? noteToSemitone(root) : -1
+  if (!root || !mode || rootSemitone === -1) {
     return key
   }
   const targetSemitone = (((rootSemitone + semitones) % 12) + 12) % 12
@@ -486,7 +542,7 @@ export function transposeKeyName(key, semitones) {
     const info = KEY_INFO[candidate]
     if (info.mode !== mode) return false
     const candidateRoot = extractKeyRoot(candidate)
-    return noteToSemitone(candidateRoot) === targetSemitone
+    return candidateRoot !== null && noteToSemitone(candidateRoot) === targetSemitone
   })
   if (candidates.length === 0) {
     const fallback = transposeChordBySemitones(key, semitones)
@@ -505,7 +561,7 @@ export function transposeKeyName(key, semitones) {
   return candidates[0]
 }
 
-const DEGREE_OFFSETS = {
+const DEGREE_OFFSETS: Record<number, number> = {
   1: 0,
   2: 2,
   3: 4,
@@ -516,7 +572,7 @@ const DEGREE_OFFSETS = {
 }
 
 const DISALLOWED_DEGREE_ACCIDENTALS = new Set(['#3', 'b4', '#7', 'b1'])
-const DEFAULT_ACCIDENTAL_BY_DIFF = {
+const DEFAULT_ACCIDENTAL_BY_DIFF: Record<number, Accidental> = {
   1: 'sharp',
   3: 'flat',
   6: 'sharp',
@@ -526,17 +582,17 @@ const DEFAULT_ACCIDENTAL_BY_DIFF = {
 
 const NASHVILLE_CORE_REGEX = /^([#b♯♭]?)([1-7])(.*)$/
 
-function extractKeyRoot(key) {
+function extractKeyRoot(key: string | null | undefined): string | null {
   if (!key) return null
   const match = key.match(/^([A-G][#b♯♭]?)/)
   return match ? match[1].replace(/♯/, '#').replace(/♭/, 'b') : null
 }
 
-function getKeyInfo(key) {
-  return KEY_INFO[key] || KEY_INFO[key?.replace(/m$/, '')] || null
+function getKeyInfo(key: string): KeyInfo | null {
+  return KEY_INFO[key] || KEY_INFO[key.replace(/m$/, '')] || null
 }
 
-function accidentToOffset(accidental) {
+function accidentToOffset(accidental: string | undefined): number {
   if (!accidental) return 0
   const clean = accidental.replace('♯', '#').replace('♭', 'b')
   if (clean === '#') return 1
@@ -544,7 +600,7 @@ function accidentToOffset(accidental) {
   return 0
 }
 
-export function isNashvilleChord(chordText) {
+export function isNashvilleChord(chordText: string | null | undefined): boolean {
   if (!chordText) return false
   let text = chordText.trim()
   if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
@@ -556,7 +612,10 @@ export function isNashvilleChord(chordText) {
   return true
 }
 
-function convertDegreeToNote(degreeMatch, key) {
+function convertDegreeToNote(
+  degreeMatch: RegExpMatchArray | null,
+  key: string | null
+): string | null {
   if (!degreeMatch || !key) return null
   const keyRoot = extractKeyRoot(key)
   if (!keyRoot) return null
@@ -572,7 +631,10 @@ function convertDegreeToNote(degreeMatch, key) {
   return semitoneToNote(targetSemitone, useFlats, key)
 }
 
-export function convertNashvilleChordToStandard(chordText, key) {
+export function convertNashvilleChordToStandard(
+  chordText: string,
+  key: string | null | undefined
+): string {
   if (!isNashvilleChord(chordText) || !key) {
     return chordText
   }
@@ -587,7 +649,7 @@ export function convertNashvilleChordToStandard(chordText, key) {
   const parts = text.split('/')
   const mainMatch = parts[0].match(NASHVILLE_CORE_REGEX)
   const rootNote = convertDegreeToNote(mainMatch, key)
-  if (!rootNote) return chordText
+  if (!mainMatch || !rootNote) return chordText
   let chord = rootNote + (mainMatch[3] || '')
   if (parts[1]) {
     const bassMatch = parts[1].match(NASHVILLE_CORE_REGEX)
@@ -602,23 +664,29 @@ export function convertNashvilleChordToStandard(chordText, key) {
   return chord
 }
 
-function determineAccidentalPreference(note) {
+function determineAccidentalPreference(note: string | null | undefined): Accidental | null {
   if (!note) return null
   if (note.includes('b') || note.includes('♭')) return 'flat'
   if (note.includes('#') || note.includes('♯')) return 'sharp'
   return null
 }
 
-function getDefaultAccidentalForDiff(diff) {
+function getDefaultAccidentalForDiff(diff: number): Accidental | null {
   if (typeof diff !== 'number') {
     return null
   }
   return DEFAULT_ACCIDENTAL_BY_DIFF[diff] || null
 }
 
-function findDegreeForSemitone(diff, preference = null) {
+/** A scale degree as written in Nashville numbers: '#', 'b' or '' before 1 to 7 */
+interface Degree {
+  accidental: string
+  degree: string
+}
+
+function findDegreeForSemitone(diff: number, preference: Accidental | null = null): Degree | null {
   const normalized = ((diff % 12) + 12) % 12
-  const candidates = []
+  const candidates: (Degree & { distance: number })[] = []
 
   for (const [degree, offset] of Object.entries(DEGREE_OFFSETS)) {
     if (normalized === offset) {
@@ -670,7 +738,7 @@ function findDegreeForSemitone(diff, preference = null) {
   return { accidental: best.accidental, degree: best.degree }
 }
 
-export function convertChordToNashville(chordText, key) {
+export function convertChordToNashville(chordText: string, key: string | null | undefined): string {
   if (!key || !chordText) return chordText
   const text = chordText
   if (isNashvilleChord(text)) {
@@ -706,7 +774,10 @@ export function convertChordToNashville(chordText, key) {
   return result
 }
 
-export function normalizeSongChordsToStandard(parsed, key) {
+export function normalizeSongChordsToStandard(
+  parsed: ParsedChart | null | undefined,
+  key: string | null | undefined
+): void {
   if (!parsed?.sections || !key) {
     return
   }

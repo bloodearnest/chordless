@@ -1,4 +1,4 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type { Setlist } from '../data-types.ts'
 import { hashText } from '../utils/hash.ts'
 
 /**
@@ -16,23 +16,26 @@ export const SETLIST_SYNC_FIELDS = [
   'lastSyncedAt',
   'syncedContentHash',
   '_lastSyncHash',
-]
+] as const
+
+type SyncField = (typeof SETLIST_SYNC_FIELDS)[number]
 
 /** A setlist without this device's sync state: what gets stored in Drive */
-export function setlistContent(setlist) {
-  const content = { ...setlist }
+export function setlistContent(setlist: Setlist): Omit<Setlist, SyncField> {
+  const content: Partial<Setlist> = { ...setlist }
   for (const field of SETLIST_SYNC_FIELDS) delete content[field]
-  return content
+  return content as Omit<Setlist, SyncField>
 }
 
 /** JSON with object keys sorted, so equal content always hashes the same */
-export function stableStringify(value) {
+export function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
   if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
-      .filter(key => value[key] !== undefined)
+    const record = value as Record<string, unknown>
+    const entries = Object.keys(record)
+      .filter(key => record[key] !== undefined)
       .sort()
-      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
+      .map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
     return `{${entries.join(',')}}`
   }
   return JSON.stringify(value)
@@ -43,7 +46,7 @@ export function stableStringify(value) {
  * is left out too: it records when it was saved, so a save that changes nothing
  * (or an edit that's undone) doesn't count as a change.
  */
-export function setlistContentHash(setlist) {
+export function setlistContentHash(setlist: Setlist): string {
   const { modifiedDate: _modifiedDate, ...content } = setlistContent(setlist)
   return hashText(stableStringify(content))
 }

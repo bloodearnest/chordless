@@ -1,5 +1,11 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
-import { clearSongUserPrefs, getSongUserPrefs, saveSongUserPrefs } from '../song-user-prefs.ts'
+import type { LoadedSong, ParsedChart, SectionState } from '../data-types.ts'
+import type { ChordlessDB } from '../db.js'
+import {
+  clearSongUserPrefs,
+  getSongUserPrefs,
+  type SongUserPrefs,
+  saveSongUserPrefs,
+} from '../song-user-prefs.ts'
 import { SongModel } from './song-model.ts'
 
 /**
@@ -14,13 +20,26 @@ import { SongModel } from './song-model.ts'
  * 1. Song-user-prefs (localStorage)
  * 2. App defaults
  */
+/** Changes made but not yet saved */
+interface PendingChanges {
+  key: string | null
+  tempo: number | null
+  capo: number | null
+  sectionStates: Record<number, SectionState>
+}
+
 export class LibrarySong extends SongModel {
+  _song: LoadedSong
+  _db: ChordlessDB
+  _orgId: string
+  _pendingChanges: PendingChanges
+
   /**
-   * @param {Object} song - Full song object with parsed content
-   * @param {Object} db - Database instance
-   * @param {string} orgId - Organisation ID
+   * @param song - Full song object with parsed content
+   * @param db - Database instance
+   * @param orgId - Organisation ID
    */
-  constructor(song, db, orgId) {
+  constructor(song: LoadedSong, db: ChordlessDB, orgId: string) {
     super()
     this._song = song
     this._db = db
@@ -37,29 +56,29 @@ export class LibrarySong extends SongModel {
 
   // ==================== Core Properties ====================
 
-  get id() {
+  override get id(): string {
     return this._song.id
   }
 
-  get uuid() {
+  override get uuid(): string {
     return this._song.uuid
   }
 
-  get title() {
+  override get title(): string {
     return this._song.title || 'Untitled'
   }
 
-  get artist() {
+  override get artist(): string | null {
     return this._song.author || this._song.artist || null
   }
 
-  get parsed() {
+  override get parsed(): ParsedChart {
     return this._song.parsed
   }
 
   // ==================== Mutable Properties ====================
 
-  getKey() {
+  override getKey(): string | null | undefined {
     // Return pending change if it exists, otherwise current key
     if (this._pendingChanges.key !== null) {
       return this._pendingChanges.key
@@ -67,15 +86,15 @@ export class LibrarySong extends SongModel {
     return this._song.key
   }
 
-  setKey(key) {
+  override setKey(key: string): void {
     this._pendingChanges.key = key
   }
 
-  getOriginalKey() {
+  override getOriginalKey(): string | null | undefined {
     return this._song.originalKey || this._song.key
   }
 
-  getTempo() {
+  override getTempo(): number | null | undefined {
     // Return pending change if it exists, otherwise current tempo
     if (this._pendingChanges.tempo !== null) {
       return this._pendingChanges.tempo
@@ -83,15 +102,15 @@ export class LibrarySong extends SongModel {
     return this._song.tempo
   }
 
-  setTempo(tempo) {
+  override setTempo(tempo: number): void {
     this._pendingChanges.tempo = tempo
   }
 
-  getOriginalTempo() {
+  override getOriginalTempo(): number | null | undefined {
     return this._song.originalTempo || this._song.tempo
   }
 
-  getCapo() {
+  override getCapo(): number {
     // Return pending change if it exists
     if (this._pendingChanges.capo !== null) {
       return this._pendingChanges.capo
@@ -106,11 +125,11 @@ export class LibrarySong extends SongModel {
     return 0
   }
 
-  setCapo(capo) {
+  override setCapo(capo: number | string): void {
     this._pendingChanges.capo = this._normalizeCapo(capo)
   }
 
-  getSectionState(sectionIndex) {
+  override getSectionState(sectionIndex: number): SectionState {
     // Return pending change if it exists
     if (this._pendingChanges.sectionStates[sectionIndex]) {
       return this._pendingChanges.sectionStates[sectionIndex]
@@ -130,7 +149,7 @@ export class LibrarySong extends SongModel {
     }
   }
 
-  setSectionState(sectionIndex, state) {
+  override setSectionState(sectionIndex: number, state: Partial<SectionState>): void {
     this._pendingChanges.sectionStates[sectionIndex] = {
       ...this.getSectionState(sectionIndex),
       ...state,
@@ -139,7 +158,7 @@ export class LibrarySong extends SongModel {
 
   // ==================== Persistence ====================
 
-  async save() {
+  override async save(): Promise<void> {
     // Save key and tempo to database
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
       const song = await this._db.getSong(this._song.uuid)
@@ -158,7 +177,7 @@ export class LibrarySong extends SongModel {
     }
 
     // Save capo and section states to song-user-prefs
-    const prefsToSave = {}
+    const prefsToSave: SongUserPrefs = {}
 
     if (this._pendingChanges.capo !== null) {
       prefsToSave.capo = this._pendingChanges.capo
@@ -169,13 +188,12 @@ export class LibrarySong extends SongModel {
       const existingPrefs = getSongUserPrefs(this._song.id, this._orgId)
       const existingSections = existingPrefs?.sectionDefaults || {}
 
-      prefsToSave.sectionDefaults = {
-        ...existingSections,
-      }
+      const sectionDefaults: Record<string, SectionState> = { ...existingSections }
 
       for (const [index, state] of Object.entries(this._pendingChanges.sectionStates)) {
-        prefsToSave.sectionDefaults[index.toString()] = state
+        sectionDefaults[index.toString()] = state
       }
+      prefsToSave.sectionDefaults = sectionDefaults
     }
 
     if (Object.keys(prefsToSave).length > 0) {
@@ -191,10 +209,10 @@ export class LibrarySong extends SongModel {
     }
   }
 
-  async reset() {
+  override async reset(): Promise<void> {
     // Reset key and tempo to original values
-    this._pendingChanges.key = this.getOriginalKey()
-    this._pendingChanges.tempo = this.getOriginalTempo()
+    this._pendingChanges.key = this.getOriginalKey() ?? null
+    this._pendingChanges.tempo = this.getOriginalTempo() ?? null
 
     // Clear capo and section states from song-user-prefs
     clearSongUserPrefs(this._song.id, this._orgId)
@@ -207,7 +225,7 @@ export class LibrarySong extends SongModel {
 
   // ==================== Protected Methods ====================
 
-  _getUnderlyingSong() {
+  protected override _getUnderlyingSong(): LoadedSong {
     return this._song
   }
 }
