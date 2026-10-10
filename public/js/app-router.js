@@ -251,10 +251,13 @@ export class AppRouter {
    * then `commit` the URL, then show it.
    */
   async #show(route, commit = ignore) {
-    const navigation = ++this.#navigation
     const previous = this.#route
     const entry = this.#views[route.name]
     const keep = this.#view && previous && this.#isSameView(previous, route)
+    // Only a navigation that loads a view can be overtaken by a newer one. A move within the
+    // view is done at once, and must not cancel a change of view that is still loading (as a
+    // search put in the URL after a pause would when the user has just tapped a link)
+    const navigation = keep ? this.#navigation : ++this.#navigation
 
     let view = this.#view
     if (!keep) {

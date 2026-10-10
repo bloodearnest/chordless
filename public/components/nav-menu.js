@@ -189,11 +189,17 @@ export class NavMenu extends LitElement {
     this.songs = []
     this.showOverviewLink = false
     this.setlistTitle = 'Setlist'
-    // The menu outlives the views: close it when the route changes
+    // The menu outlives the views: close it when the view changes. (Not for a move within
+    // a view, such as a search typed in the library or a swipe to another song: the user
+    // may have the menu open by then.) Choosing a link closes it too: see _onClick
+    let viewName = null
     new ContextConsumer(this, {
       context: routeContext,
       subscribe: true,
-      callback: () => this.close(),
+      callback: route => {
+        if (route?.name !== viewName) this.close()
+        viewName = route?.name
+      },
     })
   }
 
@@ -244,7 +250,7 @@ export class NavMenu extends LitElement {
         class="nav-menu-popover"
         part="popover"
         aria-label="Navigation menu"
-        @click=${this._popup.onClick}
+        @click=${this._onClick}
         @close=${this._popup.onClose}
       >
         <nav class="nav-menu" part="nav">
@@ -335,6 +341,12 @@ export class NavMenu extends LitElement {
         ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
       </app-modal>
     `
+  }
+
+  /** A click in the menu: on its backdrop (closes it), or on a link (the router follows it) */
+  _onClick(event) {
+    this._popup.onClick(event)
+    if (event.composedPath().some(node => node instanceof HTMLAnchorElement)) this.close()
   }
 
   _handleBackClick() {

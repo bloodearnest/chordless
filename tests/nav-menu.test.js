@@ -38,6 +38,42 @@ describe('nav-menu', () => {
     provideRoute(null)
   })
 
+  it('stays open for a move within the view, which the user may be in the middle of', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    provideRoute({ name: 'songs' })
+    container.querySelector('#menu-button').click()
+    await settle()
+    expect(menu.isOpen()).to.equal(true)
+
+    provideRoute({ name: 'songs', search: 'grace' })
+    await settle()
+    expect(menu.isOpen()).to.equal(true)
+
+    provideRoute({ name: 'storage' })
+    await settle()
+    expect(menu.isOpen()).to.equal(false)
+    provideRoute(null)
+  })
+
+  it('closes when one of its links is chosen, even to where it already is', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    container.querySelector('#menu-button').click()
+    await settle()
+    expect(menu.isOpen()).to.equal(true)
+
+    const link = menu.shadowRoot.querySelector('a.nav-menu-item')
+    link.addEventListener('click', event => event.preventDefault(), { once: true })
+    link.click()
+    await settle()
+    expect(menu.isOpen()).to.equal(false)
+  })
+
   it('opens and closes from the button named by for', async () => {
     const menu = await setUp(`
       <button id="menu-button" style="position: fixed; top: 10px; left: 20px; height: 30px">Menu</button>

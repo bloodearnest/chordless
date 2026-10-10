@@ -169,6 +169,24 @@ describe('AppRouter', () => {
       expect(view.routes.map(route => route.songIndex)).to.deep.equal([-1, 1])
     })
 
+    it('does not cancel a change of view that is still loading', async () => {
+      let release
+      views.storage.load = () =>
+        new Promise(resolve => {
+          release = () => resolve(fakeView('storage'))
+        })
+      const going = router.navigate('/storage')
+      // While storage loads, the setlist moves on within itself
+      await router.navigate('/setlist/abc/song/1', { replace: true })
+      expect(router.view.dataset.view).to.equal('setlist')
+      expect(window.location.pathname).to.equal('/setlist/abc/song/1')
+
+      release()
+      await going
+      expect(router.view.dataset.view).to.equal('storage')
+      expect(window.location.pathname).to.equal('/storage')
+    })
+
     it('replaces the view for another setlist', async () => {
       const view = router.view
       await router.navigate('/setlist/xyz')
