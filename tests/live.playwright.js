@@ -1,6 +1,6 @@
 // The setlist page in use: moving between songs, scrolling, sections, and
 // editing the setlist (order, deleting, keys)
-import { expect, fromDB, SETLIST_SONGS, seedSetlist, test } from './fixtures.js'
+import { enterEditMode, expect, fromDB, SETLIST_SONGS, seedSetlist, test } from './fixtures.js'
 
 const [ALPHA, BRAVO, CHARLIE] = SETLIST_SONGS.map(song => song.title)
 
@@ -74,7 +74,7 @@ test.describe('Sections', () => {
     const verse = song.locator('song-section[data-label="Verse 1"]')
     const chorus = song.locator('song-section[data-label="Chorus"]')
 
-    await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+    await enterEditMode(page)
     await chorus.getByRole('button', { name: 'Show None in Chorus' }).click()
     await verse.getByRole('button', { name: 'Show Lyrics in Verse 1' }).click()
     await header.getByRole('button', { name: 'Toggle edit mode' }).click()
@@ -85,6 +85,16 @@ test.describe('Sections', () => {
       await expect(verse.locator('chord-display').first(), `verse chords ${when}`).toBeHidden()
     }
     await check('before reloading')
+    // The states are saved asynchronously: reload once the chorus's is stored
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            JSON.parse(localStorage.getItem('state-seeded-setlist'))?.sectionState?.[0]?.[1]
+              ?.hideMode
+        )
+      )
+      .toBe('hide')
     await page.reload()
     await expect(header).toContainText(ALPHA)
     await check('after reloading')
@@ -115,7 +125,7 @@ test.describe('Editing a setlist', () => {
     await page.goto(await seedSetlist(page))
     const cards = page.locator('setlist-overview song-card')
     await expect(cards).toHaveCount(3)
-    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await enterEditMode(page)
 
     // Drag Alpha by its handle to below Charlie
     const handle = cards.nth(0).locator('.drag-handle')
@@ -137,7 +147,7 @@ test.describe('Editing a setlist', () => {
     await page.goto(await seedSetlist(page))
     const cards = page.locator('setlist-overview song-card')
     await expect(cards).toHaveCount(3)
-    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await enterEditMode(page)
     const modal = page.locator('app-modal[open]')
 
     await cards.nth(1).getByRole('button', { name: 'Remove song' }).click()
@@ -146,7 +156,7 @@ test.describe('Editing a setlist', () => {
     await expect(cards).toHaveCount(3)
 
     await cards.nth(1).getByRole('button', { name: 'Remove song' }).click()
-    await modal.locator('.modal-btn-confirm').click()
+    await modal.getByRole('button', { name: 'Remove' }).click()
     await expect(cards).toHaveCount(2)
     await expect.poll(() => storedOrder(page)).toEqual([ALPHA, CHARLIE].map(uuid))
   })
@@ -155,7 +165,7 @@ test.describe('Editing a setlist', () => {
     const url = await seedSetlist(page)
     await page.goto(url)
     const cards = page.locator('setlist-overview song-card')
-    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await enterEditMode(page)
 
     // Alpha is in G; choose A
     const keySelector = cards.nth(0).locator('key-selector')

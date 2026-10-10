@@ -145,3 +145,17 @@ export async function seedSetlist(page, { setlistId = 'seeded-setlist' } = {}) {
   )
   return `/setlist/${setlistId}`
 }
+
+/**
+ * Turn on edit mode with the header's toggle. A click that lands before the
+ * app is listening does nothing, so click again until it takes.
+ */
+export async function enterEditMode(page) {
+  const header = page.locator('#app-header')
+  await expect(async () => {
+    if (!(await header.evaluate(el => el.hasAttribute('edit-mode')))) {
+      await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+    }
+    await expect(header).toHaveAttribute('edit-mode', '', { timeout: 1000 })
+  }).toPass()
+}
