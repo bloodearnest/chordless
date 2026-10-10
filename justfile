@@ -26,6 +26,11 @@ format:
 vendor:
     node scripts/vendor-deps.mjs
 
+# Browser unit test coverage of the app's code: a summary, and coverage/index.html.
+# Only files the tests load are counted, so untested modules don't show at all
+coverage:
+    npx web-test-runner --config web-test-runner.config.js --coverage
+
 # Run the node tests (the auth worker, event names)
 test-node:
     npm run test:node

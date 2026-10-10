@@ -4,6 +4,13 @@ export default {
   // Every test file except the node ones (*.node.test.js, run by just test-node)
   files: ['tests/*.test.js', '!tests/*.node.test.js'],
   nodeResolve: true,
+  // Used by just coverage (--coverage): the app's own code, not what it vendors
+  coverageConfig: {
+    include: ['public/**/*.js'],
+    exclude: ['public/vendor/**', 'node_modules/**'],
+    reportDir: 'coverage',
+    reporters: ['html', 'text-summary'],
+  },
   browsers: [
     playwrightLauncher({
       product: 'chromium',
