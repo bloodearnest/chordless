@@ -1,4 +1,4 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type { ReactiveController, ReactiveControllerHost } from 'lit'
 import { createRef } from 'lit/directives/ref.js'
 
 /**
@@ -25,31 +25,31 @@ import { createRef } from 'lit/directives/ref.js'
  * Style the dialog to reset the browser's own (margin, inset, border, padding,
  * colours); position it with fixed top and left, set by `position`.
  */
-export class DialogPopup {
+export class DialogPopup implements ReactiveController {
   /** Put it on the <dialog>: ${ref(popup.ref)} */
-  ref = createRef()
+  ref = createRef<HTMLDialogElement>()
 
-  #host
-  #position
+  #host: ReactiveControllerHost
+  #position: ((dialog: HTMLDialogElement) => void) | undefined
 
   /**
-   * @param {import('lit').ReactiveControllerHost} host
-   * @param {object} [options]
-   * @param {(dialog: HTMLDialogElement) => void} [options.position] places the
-   *   dialog, called as it opens (it can then be measured)
+   * @param options.position places the dialog, called as it opens (it can then be measured)
    */
-  constructor(host, { position } = {}) {
+  constructor(
+    host: ReactiveControllerHost,
+    { position }: { position?: (dialog: HTMLDialogElement) => void } = {}
+  ) {
     this.#host = host
     this.#position = position
     host.addController(this)
   }
 
   /** The <dialog>, once rendered */
-  get element() {
+  get element(): HTMLDialogElement | undefined {
     return this.ref.value
   }
 
-  get isOpen() {
+  get isOpen(): boolean {
     return this.element?.open ?? false
   }
 
@@ -63,7 +63,7 @@ export class DialogPopup {
   }
 
   close() {
-    if (this.isOpen) this.element.close()
+    if (this.isOpen) this.element?.close()
   }
 
   toggle() {
@@ -72,7 +72,7 @@ export class DialogPopup {
   }
 
   /** @click on the dialog: a click on the backdrop closes it */
-  onClick = event => {
+  onClick = (event: MouseEvent) => {
     const dialog = this.element
     // Clicks inside land on what they hit; the dialog itself is hit by its padding and backdrop
     if (!dialog || event.target !== dialog) return

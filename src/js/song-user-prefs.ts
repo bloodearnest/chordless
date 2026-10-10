@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Song User Preferences Module
  *
@@ -20,13 +19,26 @@
  * }
  */
 
+/** How one section of a song is shown (hideMode: what to hide, e.g. 'none' or 'chords') */
+export interface SectionPrefs {
+  hideMode: string
+  isCollapsed: boolean
+  isHidden: boolean
+}
+
+/** One song's preferences, by section index */
+export interface SongUserPrefs {
+  capo?: number
+  sectionDefaults?: Record<string, SectionPrefs>
+}
+
 /**
  * Get user preferences for a specific song
- * @param {string} songId - Deterministic song ID (e.g., "ccli-12345" or "title-...")
- * @param {string} orgId - Organisation ID
- * @returns {Object|null} Song preferences or null if none exist
+ * @param songId - Deterministic song ID (e.g., "ccli-12345" or "title-...")
+ * @param orgId - Organisation ID
+ * @returns Song preferences or null if none exist
  */
-export function getSongUserPrefs(songId, orgId) {
+export function getSongUserPrefs(songId: string, orgId: string): SongUserPrefs | null {
   if (!songId || !orgId) return null
 
   try {
@@ -41,11 +53,10 @@ export function getSongUserPrefs(songId, orgId) {
 
 /**
  * Save user preferences for a specific song
- * @param {string} songId - Deterministic song ID
- * @param {string} orgId - Organisation ID
- * @param {Object} prefs - Preferences object { capo?, sectionDefaults? }
+ * @param songId - Deterministic song ID
+ * @param orgId - Organisation ID
  */
-export function saveSongUserPrefs(songId, orgId, prefs) {
+export function saveSongUserPrefs(songId: string, orgId: string, prefs: SongUserPrefs) {
   if (!songId || !orgId) {
     console.warn('[SongUserPrefs] Cannot save: missing songId or orgId')
     return
@@ -70,10 +81,10 @@ export function saveSongUserPrefs(songId, orgId, prefs) {
 
 /**
  * Clear user preferences for a specific song
- * @param {string} songId - Deterministic song ID
- * @param {string} orgId - Organisation ID
+ * @param songId - Deterministic song ID
+ * @param orgId - Organisation ID
  */
-export function clearSongUserPrefs(songId, orgId) {
+export function clearSongUserPrefs(songId: string, orgId: string) {
   if (!songId || !orgId) return
 
   try {
@@ -89,10 +100,10 @@ export function clearSongUserPrefs(songId, orgId) {
 
 /**
  * Get all song preferences for the organisation (for debugging/export)
- * @param {string} orgId - Organisation ID
- * @returns {Object} All preferences
+ * @param orgId - Organisation ID
+ * @returns All preferences, by song ID
  */
-export function getAllSongUserPrefs(orgId) {
+export function getAllSongUserPrefs(orgId: string): Record<string, SongUserPrefs> {
   if (!orgId) return {}
 
   try {
@@ -106,9 +117,9 @@ export function getAllSongUserPrefs(orgId) {
 
 /**
  * Clear all song preferences for the organisation
- * @param {string} orgId - Organisation ID
+ * @param orgId - Organisation ID
  */
-export function clearAllSongUserPrefs(orgId) {
+export function clearAllSongUserPrefs(orgId: string) {
   if (!orgId) return
 
   try {

@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * The SongSelect bookmarklet.
  *
@@ -14,7 +13,10 @@
  * CHORDLESS_IMPORT, or CHORDLESS_IMPORT_FAILED if the download failed. See
  * song-import.js.
  */
-export async function importFromSongSelect(chordlessUrl, page = window) {
+export async function importFromSongSelect(
+  chordlessUrl: string,
+  page: typeof window = window
+): Promise<void> {
   if (!page.location.href.includes('songselect.ccli.com')) {
     page.alert('Please navigate to a SongSelect song page first.')
     return
@@ -25,16 +27,16 @@ export async function importFromSongSelect(chordlessUrl, page = window) {
     return
   }
   const songNumber = urlMatch[1]
-  const title = page.document.querySelector('h1')?.textContent.trim()
-  const keyMatch = page.document.body.textContent.match(/Key:\s*([A-G][b#]?)/i)
+  const title = page.document.querySelector('h1')?.textContent?.trim()
+  const keyMatch = page.document.body.textContent?.match(/Key:\s*([A-G][b#]?)/i)
   const key = keyMatch ? keyMatch[1] : 'C'
 
   // Listen before opening: the import page says it's ready as soon as it loads
   let resolveReady: () => void
-  const ready = new Promise(resolve => {
+  const ready = new Promise<void>(resolve => {
     resolveReady = resolve
   })
-  const onMessage = event => {
+  const onMessage = (event: MessageEvent) => {
     if (event.origin === chordlessUrl && event.data?.type === 'CHORDLESS_READY') resolveReady()
   }
   page.addEventListener('message', onMessage)
@@ -68,10 +70,13 @@ export async function importFromSongSelect(chordlessUrl, page = window) {
     }
   } catch (error) {
     // Tell the import page, so it doesn't wait for a song that isn't coming
-    message = { type: 'CHORDLESS_IMPORT_FAILED', data: { message: error.message } }
+    message = {
+      type: 'CHORDLESS_IMPORT_FAILED',
+      data: { message: error instanceof Error ? error.message : String(error) },
+    }
   }
 
-  const timedOut = new Promise(resolve => page.setTimeout(() => resolve('timeout'), 20000))
+  const timedOut = new Promise<string>(resolve => page.setTimeout(() => resolve('timeout'), 20000))
   const outcome = await Promise.race([ready, timedOut])
   page.removeEventListener('message', onMessage)
   if (outcome === 'timeout') {
@@ -86,6 +91,6 @@ export async function importFromSongSelect(chordlessUrl, page = window) {
  * `origin`. Fully percent-encoded, so pasting it into a bookmark's URL field
  * keeps its line breaks.
  */
-export function bookmarkletUrl(origin) {
+export function bookmarkletUrl(origin: string): string {
   return `javascript:${encodeURIComponent(`(${importFromSongSelect})(${JSON.stringify(origin)})`)}`
 }

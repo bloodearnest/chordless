@@ -1,4 +1,5 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+import type { ReactiveController, ReactiveControllerHost } from 'lit'
+
 /**
  * Listeners on window, document and the like, for as long as a Lit element is
  * connected: added when it connects, and all removed when it disconnects.
@@ -14,31 +15,43 @@
  *     this.#listeners.add(window, 'storage', this.#onStorage, { passive: true })
  *   }
  */
-export class GlobalListeners {
-  #entries = []
-  #abort = null
+interface Entry {
+  target: EventTarget
+  type: string
+  listener: EventListener
+  options: AddEventListenerOptions
+}
 
-  /** @param {import('lit').ReactiveControllerHost} host */
-  constructor(host) {
+export class GlobalListeners implements ReactiveController {
+  #entries: Entry[] = []
+  #abort: AbortController | null = null
+
+  constructor(host: ReactiveControllerHost) {
     host.addController(this)
   }
 
   /**
    * Listen on a target while the host is connected. Safe to call before or
    * after the host connects.
-   * @param {EventTarget} target
-   * @param {string} type
-   * @param {EventListener} listener
-   * @param {AddEventListenerOptions} [options]
+   *
+   * The listener is typed by its own event parameter (E), which the caller
+   * knows and the target's type name cannot say.
    */
-  add(target, type, listener, options = {}) {
-    this.#entries.push({ target, type, listener, options })
-    if (this.#abort) this.#listen(this.#entries.at(-1))
+  add<E extends Event>(
+    target: EventTarget,
+    type: string,
+    listener: (event: E) => void,
+    options: AddEventListenerOptions = {}
+  ) {
+    const entry: Entry = { target, type, listener: listener as EventListener, options }
+    this.#entries.push(entry)
+    if (this.#abort) this.#listen(entry, this.#abort.signal)
   }
 
   hostConnected() {
-    this.#abort = new AbortController()
-    for (const entry of this.#entries) this.#listen(entry)
+    const abort = new AbortController()
+    this.#abort = abort
+    for (const entry of this.#entries) this.#listen(entry, abort.signal)
   }
 
   hostDisconnected() {
@@ -46,7 +59,7 @@ export class GlobalListeners {
     this.#abort = null
   }
 
-  #listen({ target, type, listener, options }) {
-    target.addEventListener(type, listener, { ...options, signal: this.#abort.signal })
+  #listen({ target, type, listener, options }: Entry, signal: AbortSignal) {
+    target.addEventListener(type, listener, { ...options, signal })
   }
 }

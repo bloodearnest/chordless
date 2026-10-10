@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Routes of the app: parsing a URL into a route, building a URL from one, and
  * deciding how a move between two routes touches the browser history.
@@ -6,7 +5,7 @@
  * Pure functions, with no DOM or history access, so they are easy to test and
  * can be shared by the page code and the service worker.
  *
- * A route is a plain object:
+ * A route is a plain object (see Route):
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
@@ -16,8 +15,17 @@
  *   { name: 'not-found', path }
  */
 
+/** Routes that are a path of their own and nothing else (and the library's list) */
+export type PageName = 'home' | 'preferences' | 'storage' | 'import-song' | 'bookmarklet'
+
+export type Route =
+  | { name: PageName }
+  | { name: 'songs'; songUuid?: string; search?: string }
+  | { name: 'setlist'; setlistId: string; songIndex: number }
+  | { name: 'not-found'; path: string }
+
 /** Pages that are a path of their own and nothing else. */
-const PAGES = {
+const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/': 'home',
   '/songs': 'songs',
   '/preferences': 'preferences',
@@ -26,13 +34,15 @@ const PAGES = {
   '/bookmarklet': 'bookmarklet',
 }
 
-const PAGE_PATHS = Object.fromEntries(Object.entries(PAGES).map(([path, name]) => [name, path]))
+const PAGE_PATHS: Record<string, string> = Object.fromEntries(
+  Object.entries(PAGES).map(([path, name]) => [name, path])
+)
 
 /**
  * Every route name. Each is a view of the app shell (see views/registry.js),
  * which the service worker serves for every URL.
  */
-export const ROUTE_NAMES = [...Object.values(PAGES), 'setlist', 'not-found']
+export const ROUTE_NAMES: Route['name'][] = [...Object.values(PAGES), 'setlist', 'not-found']
 
 const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
 const SETLIST_PATH = /^\/setlist\/([^/]+)$/
@@ -42,7 +52,7 @@ const SETLIST_SONG_PATH = /^\/setlist\/([^/]+)\/song\/(\d+)$/
  * The clean path for a URL path: no trailing slash, no .html. (Wrangler serves
  * /songs for songs.html, and /index.html is the home page.)
  */
-export function normalizePath(pathname) {
+export function normalizePath(pathname: string): string {
   let path = pathname || '/'
   if (path === '/index.html') return '/'
   path = path.replace(/\.html$/, '')
@@ -50,7 +60,7 @@ export function normalizePath(pathname) {
   return path || '/'
 }
 
-function decode(part) {
+function decode(part: string): string {
   try {
     return decodeURIComponent(part)
   } catch {
@@ -60,10 +70,10 @@ function decode(part) {
 
 /**
  * Parse a location into a route.
- * @param {string | {pathname: string, search?: string}} location a URL string or path,
- *   or a Location/URL. Only the library's ?q= is read of the query string; the hash is ignored.
+ * @param location a URL string or path, or a Location/URL. Only the library's ?q= is read of
+ *   the query string; the hash is ignored.
  */
-export function matchRoute(location) {
+export function matchRoute(location: string | { pathname: string; search?: string }): Route {
   let pathname: string
   let search: string
   if (typeof location === 'string') {
@@ -101,7 +111,7 @@ export function matchRoute(location) {
 }
 
 /** The URL path for a route. The inverse of matchRoute. */
-export function buildUrl(route) {
+export function buildUrl(route: Route): string {
   switch (route.name) {
     case 'songs':
       if (route.songUuid) return `/songs/${encodeURIComponent(route.songUuid)}`
@@ -121,7 +131,7 @@ export function buildUrl(route) {
 }
 
 /** True when two routes are the same place. */
-export function sameRoute(a, b) {
+export function sameRoute(a: Route, b: Route): boolean {
   return buildUrl(a) === buildUrl(b)
 }
 
@@ -129,9 +139,8 @@ export function sameRoute(a, b) {
  * Where a route sits in a section of the app that has a list or overview and
  * things inside it: the library (its list, then a song) and a setlist (its
  * overview, then a song). Null for routes that are not in such a section.
- * @returns {{section: string, depth: number} | null}
  */
-function placeOf(route) {
+function placeOf(route: Route): { section: string; depth: number } | null {
   if (route.name === 'songs') return { section: 'songs', depth: route.songUuid ? 1 : 0 }
   if (route.name === 'setlist') {
     return { section: `setlist:${route.setlistId}`, depth: route.songIndex >= 0 ? 1 : 0 }
@@ -140,7 +149,7 @@ function placeOf(route) {
 }
 
 /** True when going from the list/overview of a section into one of its songs */
-export function isDescent(from, to) {
+export function isDescent(from: Route, to: Route): boolean {
   const a = placeOf(from)
   const b = placeOf(to)
   return Boolean(a && b && a.section === b.section && a.depth === 0 && b.depth === 1)
@@ -158,11 +167,15 @@ export function isDescent(from, to) {
  * reached from it (the entry we pushed, marked `fromParent` in the history
  * state), and replaces if it was a direct link. Moves between pages push.
  *
- * @param {object} from the current route
- * @param {object} to the target route
- * @param {{fromParent?: boolean} | null} [state] the current history entry's state
+ * @param from the current route
+ * @param to the target route
+ * @param state the current history entry's state
  */
-export function historyAction(from, to, state) {
+export function historyAction(
+  from: Route,
+  to: Route,
+  state?: { fromParent?: boolean } | null
+): 'push' | 'replace' | 'back' {
   if (sameRoute(from, to)) return 'replace'
 
   const a = placeOf(from)

@@ -1,10 +1,31 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 // Generic reconciliation helpers for sync unit tests and future refactors.
 // Accepts in-memory local/remote states and produces a plan of actions
 // (upload, download, delete, noop) without touching IndexedDB or Drive APIs.
 
-function toMap(records = []) {
-  const map = new Map()
+/** What reconciling needs of a song or setlist record */
+interface SyncRecord {
+  id?: string
+  deletedAt?: string | null
+  modifiedDate?: string | number | Date | null
+}
+
+export type PlanAction = 'upload' | 'download' | 'deleteRemote' | 'deleteLocal' | 'noop'
+
+export interface PlanEntry<T extends SyncRecord> {
+  action: PlanAction
+  entityType: string
+  id: string | undefined
+  record: T | undefined
+}
+
+export interface ReconcileOptions {
+  /** On a tie in modified date: take the remote copy (the default) or upload the local one */
+  preferRemoteOnConflict?: boolean
+  entityType?: string
+}
+
+function toMap<T extends SyncRecord>(records: T[]): Map<string, T> {
+  const map = new Map<string, T>()
   records.forEach(record => {
     if (record?.id) {
       map.set(record.id, record)
@@ -13,20 +34,28 @@ function toMap(records = []) {
   return map
 }
 
-function normalizeDate(value) {
+function normalizeDate(value: SyncRecord['modifiedDate']): number {
   if (!value) return 0
   const time = new Date(value).getTime()
   return Number.isNaN(time) ? 0 : time
 }
 
-function buildEntry(action, entityType, record) {
+function buildEntry<T extends SyncRecord>(
+  action: PlanAction,
+  entityType: string,
+  record: T | undefined
+): PlanEntry<T> {
   return { action, entityType, id: record?.id, record }
 }
 
-export function reconcileRecords(localRecords = [], remoteRecords = [], options = {}) {
+export function reconcileRecords<T extends SyncRecord>(
+  localRecords: T[] = [],
+  remoteRecords: T[] = [],
+  options: ReconcileOptions = {}
+): PlanEntry<T>[] {
   const { preferRemoteOnConflict = true, entityType = 'record' } = options
 
-  const plan = []
+  const plan: PlanEntry<T>[] = []
   const localMap = toMap(localRecords)
   const remoteMap = toMap(remoteRecords)
   const ids = new Set([...localMap.keys(), ...remoteMap.keys()])
@@ -84,10 +113,18 @@ export function reconcileRecords(localRecords = [], remoteRecords = [], options 
   return plan
 }
 
-export function reconcileSetlists(local = [], remote = [], options = {}) {
+export function reconcileSetlists<T extends SyncRecord>(
+  local: T[] = [],
+  remote: T[] = [],
+  options: ReconcileOptions = {}
+) {
   return reconcileRecords(local, remote, { ...options, entityType: 'setlist' })
 }
 
-export function reconcileSongs(local = [], remote = [], options = {}) {
+export function reconcileSongs<T extends SyncRecord>(
+  local: T[] = [],
+  remote: T[] = [],
+  options: ReconcileOptions = {}
+) {
   return reconcileRecords(local, remote, { ...options, entityType: 'song' })
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 export const PAD_FILE_KEYS = Object.freeze([
   'A',
   'A#',
@@ -12,11 +11,11 @@ export const PAD_FILE_KEYS = Object.freeze([
   'F#',
   'G',
   'G#',
-])
+] as const)
 
-export const PAD_FILE_KEY_SET = new Set(PAD_FILE_KEYS)
+export const PAD_FILE_KEY_SET = new Set<string>(PAD_FILE_KEYS)
 
-export const ENHARMONIC_KEY_MAP = {
+export const ENHARMONIC_KEY_MAP: Readonly<Record<string, string>> = {
   Bb: 'A#',
   Db: 'C#',
   Eb: 'D#',
@@ -30,10 +29,8 @@ export const ENHARMONIC_KEY_MAP = {
 
 /**
  * Normalize an arbitrary key label (e.g., "bb", "A_flat") to one of the canonical pad keys.
- * @param {string} key
- * @returns {string|null}
  */
-export function normalizePadKey(key) {
+export function normalizePadKey(key: string | null | undefined): string | null {
   if (!key) return null
 
   const cleaned = `${key}`
@@ -62,10 +59,8 @@ export function normalizePadKey(key) {
 
 /**
  * Attempt to extract the first recognizable pad key from a filename.
- * @param {string} filename
- * @returns {string|null}
  */
-export function extractPadKeyFromFilename(filename) {
+export function extractPadKeyFromFilename(filename: string | null | undefined): string | null {
   if (!filename) return null
   const base = filename.split('/').pop() || filename
   const nameWithoutExt = base.replace(/\.[^.]+$/, '')
@@ -86,7 +81,7 @@ export function extractPadKeyFromFilename(filename) {
   // Fallback: find the last standalone key anywhere in the name
   const globalPattern = /\b([A-Ga-g])([#b♯♭]?)/g
   let match: RegExpExecArray | null
-  let candidate = null
+  let candidate: string | null = null
   for (
     match = globalPattern.exec(nameWithoutExt);
     match !== null;

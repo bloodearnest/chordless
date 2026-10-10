@@ -1,5 +1,5 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 import { ContextProvider, createContext } from '@lit/context'
+import type { Route } from './router.ts'
 
 /**
  * The route being shown (see router.js), as a Lit context. Null before the
@@ -10,7 +10,7 @@ import { ContextProvider, createContext } from '@lit/context'
  *
  *   new ContextConsumer(this, { context: routeContext, subscribe: true })
  */
-export const routeContext = createContext(Symbol('route'))
+export const routeContext = createContext<Route | null>(Symbol('route'))
 
 const provider = new ContextProvider(document.documentElement, {
   context: routeContext,
@@ -18,6 +18,6 @@ const provider = new ContextProvider(document.documentElement, {
 })
 
 /** Called by the router when the route changes */
-export function provideRoute(route) {
+export function provideRoute(route: Route | null) {
   provider.setValue(route)
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
 /**
  * Global media player settings, kept in localStorage.
  *
@@ -11,11 +10,18 @@ const KEY = 'media-settings'
 // Written by older versions of the media player's own settings dialog
 const OLD_KEY = 'mediaPlayerSettings'
 
+export interface MediaSettings {
+  mediaPlayerEnabled: boolean
+  padsEnabled: boolean
+  metronomeEnabled: boolean
+  stereoSplitEnabled: boolean
+}
+
 /** Read the settings, filling in defaults */
-export function loadMediaSettings(storage = localStorage) {
-  let saved = {}
+export function loadMediaSettings(storage: Pick<Storage, 'getItem'> = localStorage): MediaSettings {
+  let saved: Partial<MediaSettings> = {}
   try {
-    saved = JSON.parse(storage.getItem(KEY) ?? storage.getItem(OLD_KEY)) || {}
+    saved = JSON.parse(storage.getItem(KEY) ?? storage.getItem(OLD_KEY) ?? 'null') || {}
   } catch {
     // Unreadable settings: use the defaults
   }
@@ -27,7 +33,10 @@ export function loadMediaSettings(storage = localStorage) {
   }
 }
 
-export function saveMediaSettings(settings, storage = localStorage) {
+export function saveMediaSettings(
+  settings: MediaSettings,
+  storage: Pick<Storage, 'setItem' | 'removeItem'> = localStorage
+) {
   storage.setItem(KEY, JSON.stringify(settings))
   storage.removeItem(OLD_KEY)
 }

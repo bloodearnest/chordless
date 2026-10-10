@@ -1,8 +1,18 @@
-// @ts-nocheck: not typed yet (remove this line when converting)
+const MUSICIAN_TYPES = ['general', 'singer', 'drummer', 'guitarist'] as const
+export type MusicianType = (typeof MUSICIAN_TYPES)[number]
+
+function isMusicianType(value: unknown): value is MusicianType {
+  return MUSICIAN_TYPES.includes(value as MusicianType)
+}
+
+/** What each part of a song shows by default, as stored: { all: 'all' | 'lyrics' | ... } */
+export type SectionDefaults = Record<string, string>
+
 /** The Nashville numbers preference changed (sent on window) */
 export class NashvillePreferenceEvent extends Event {
   static type = 'preferences:nashville-changed'
-  constructor(enabled) {
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
     super(NashvillePreferenceEvent.type)
     this.enabled = enabled
   }
@@ -11,7 +21,8 @@ export class NashvillePreferenceEvent extends Event {
 /** The unicode accidentals preference changed (sent on window) */
 export class AccidentalsPreferenceEvent extends Event {
   static type = 'preferences:accidentals-changed'
-  constructor(enabled) {
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
     super(AccidentalsPreferenceEvent.type)
     this.enabled = enabled
   }
@@ -20,7 +31,9 @@ export class AccidentalsPreferenceEvent extends Event {
 /** The section display defaults changed (sent on window) */
 export class SectionDefaultsEvent extends Event {
   static type = 'preferences:section-defaults-changed'
-  constructor(musicianType, defaults) {
+  readonly musicianType: MusicianType
+  readonly defaults: SectionDefaults | null
+  constructor(musicianType: MusicianType, defaults: SectionDefaults | null) {
     super(SectionDefaultsEvent.type)
     this.musicianType = musicianType
     this.defaults = defaults
@@ -30,7 +43,8 @@ export class SectionDefaultsEvent extends Event {
 /** The capo preference changed (sent on window) */
 export class CapoPreferenceEvent extends Event {
   static type = 'preferences:capo-changed'
-  constructor(enabled) {
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
     super(CapoPreferenceEvent.type)
     this.enabled = enabled
   }
@@ -42,12 +56,12 @@ const SECTION_DEFAULTS_KEY = 'section_defaults'
 const ENABLE_CAPO_KEY = 'enable_capo'
 const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
 
-let cachedUseNashville = null
-let cachedUseUnicodeAccidentals = null
-let cachedMusicianType = null
-let cachedCapoPreference = null
+let cachedUseNashville: boolean | null = null
+let cachedUseUnicodeAccidentals: boolean | null = null
+let cachedMusicianType: MusicianType | null = null
+let cachedCapoPreference: boolean | null = null
 
-function readPreference() {
+function readPreference(): boolean {
   if (cachedUseNashville !== null) return cachedUseNashville
   if (typeof localStorage === 'undefined') {
     cachedUseNashville = false
@@ -58,11 +72,11 @@ function readPreference() {
   return cachedUseNashville
 }
 
-export function getUseNashvilleNumbers() {
+export function getUseNashvilleNumbers(): boolean {
   return readPreference()
 }
 
-export function setUseNashvilleNumbers(value) {
+export function setUseNashvilleNumbers(value: boolean) {
   const normalized = !!value
   cachedUseNashville = normalized
   if (typeof localStorage !== 'undefined') {
@@ -73,7 +87,7 @@ export function setUseNashvilleNumbers(value) {
   }
 }
 
-function readAccidentalPreference() {
+function readAccidentalPreference(): boolean {
   if (cachedUseUnicodeAccidentals !== null) return cachedUseUnicodeAccidentals
   if (typeof localStorage === 'undefined') {
     cachedUseUnicodeAccidentals = false
@@ -84,11 +98,11 @@ function readAccidentalPreference() {
   return cachedUseUnicodeAccidentals
 }
 
-export function getUseUnicodeAccidentals() {
+export function getUseUnicodeAccidentals(): boolean {
   return readAccidentalPreference()
 }
 
-export function setUseUnicodeAccidentals(value) {
+export function setUseUnicodeAccidentals(value: boolean) {
   const normalized = !!value
   cachedUseUnicodeAccidentals = normalized
   if (typeof localStorage !== 'undefined') {
@@ -99,24 +113,23 @@ export function setUseUnicodeAccidentals(value) {
   }
 }
 
-function readMusicianTypePreference() {
+function readMusicianTypePreference(): MusicianType {
   if (cachedMusicianType !== null) return cachedMusicianType
   if (typeof localStorage === 'undefined') {
     cachedMusicianType = 'general'
     return cachedMusicianType
   }
   const stored = localStorage.getItem(MUSICIAN_TYPE_KEY)
-  cachedMusicianType = stored || 'general'
+  cachedMusicianType = isMusicianType(stored) ? stored : 'general'
   return cachedMusicianType
 }
 
-export function getMusicianType() {
+export function getMusicianType(): MusicianType {
   return readMusicianTypePreference()
 }
 
-export function setMusicianType(value) {
-  const validTypes = ['general', 'singer', 'drummer', 'guitarist']
-  const normalized = validTypes.includes(value) ? value : 'general'
+export function setMusicianType(value: string) {
+  const normalized = isMusicianType(value) ? value : 'general'
   cachedMusicianType = normalized
 
   if (typeof localStorage !== 'undefined') {
@@ -133,7 +146,7 @@ export function setMusicianType(value) {
   }
 
   if (typeof window !== 'undefined') {
-    let defaultsDetail = null
+    let defaultsDetail: SectionDefaults | null = null
     if (typeof localStorage !== 'undefined') {
       try {
         const storedDefaults = localStorage.getItem(SECTION_DEFAULTS_KEY)
@@ -146,7 +159,7 @@ export function setMusicianType(value) {
   }
 }
 
-function readCapoPreferenceFromStorage() {
+function readCapoPreferenceFromStorage(): boolean {
   if (typeof localStorage === 'undefined') {
     return false
   }
@@ -157,14 +170,14 @@ function readCapoPreferenceFromStorage() {
   })
 }
 
-export function getCapoPreference() {
+export function getCapoPreference(): boolean {
   if (cachedCapoPreference === null) {
     cachedCapoPreference = readCapoPreferenceFromStorage()
   }
   return cachedCapoPreference
 }
 
-export function setCapoPreference(value) {
+export function setCapoPreference(value: boolean) {
   const enabled = !!value
   cachedCapoPreference = enabled
   if (typeof localStorage !== 'undefined') {
