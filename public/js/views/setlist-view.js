@@ -24,7 +24,7 @@ export class SetlistView extends PageView {
 
   firstUpdated() {
     const { setlistId, songIndex } = this.route
-    this.#page = new SetlistPage({ setlistId, songIndex })
+    this.#page = new SetlistPage({ root: this, setlistId, songIndex })
     this.#page
       .start()
       // The route may have moved on while the setlist was loading

@@ -1,6 +1,14 @@
 // The setlist page in use: moving between songs, scrolling, sections, and
 // editing the setlist (order, deleting, keys)
-import { enterEditMode, expect, fromDB, SETLIST_SONGS, seedSetlist, test } from './fixtures.js'
+import {
+  enterEditMode,
+  expect,
+  fromDB,
+  SETLIST_SONGS,
+  seedSetlist,
+  seedSong,
+  test,
+} from './fixtures.js'
 
 const [ALPHA, BRAVO, CHARLIE] = SETLIST_SONGS.map(song => song.title)
 
@@ -141,6 +149,31 @@ test.describe('Editing a setlist', () => {
     await page.reload()
     await expect(cards.nth(0)).toContainText(BRAVO)
     await expect(cards.nth(2)).toContainText(ALPHA)
+  })
+
+  test('adding a song from the library puts it at the end of the setlist, and saves it', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await page.goto(await seedSetlist(page))
+    const cards = page.locator('setlist-overview song-card')
+    await expect(cards).toHaveCount(3)
+    await enterEditMode(page)
+
+    await page.getByRole('button', { name: 'Add Song' }).click()
+    const modal = page.locator('#add-song-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await page.locator('#add-song-search-input').fill('info test')
+    await modal.locator('song-list').getByText('Info Test Song').click()
+
+    await expect(modal).not.toHaveAttribute('open', '')
+    await expect(cards).toHaveCount(4)
+    await expect(cards.nth(3)).toContainText('Info Test Song')
+    await expect
+      .poll(async () => (await fromDB(page, 'getSetlist', 'seeded-setlist')).songs.length)
+      .toBe(4)
+    await page.reload()
+    await expect(cards).toHaveCount(4)
   })
 
   test('deleting a song asks first, then removes it from the setlist', async ({ page }) => {

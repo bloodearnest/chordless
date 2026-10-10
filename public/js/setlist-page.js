@@ -1,19 +1,8 @@
-import { getCurrentDB } from './db.js'
-import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
-import { ChordProParser } from './parser.js'
-import { getOrganisationPeople } from './people.js'
-import { getAvailableKeys, transposeSong } from './transpose.js'
-import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
-import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
-import '../components/status-message.js'
-import '../components/song-list.js'
-import '../components/setlist-group.js'
 import {
   EditModeToggleEvent,
   HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
 } from '../components/app-header.js'
-import { ModalCloseEvent } from '../components/app-modal.js'
 import { CapoChangeEvent } from '../components/capo-selector.js'
 import { KeyChangeEvent } from '../components/key-selector.js'
 import { SongSettingsClickEvent } from '../components/musical-metadata-display.js'
@@ -25,13 +14,23 @@ import {
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
 } from '../components/setlist-overview.js'
-import { SongSelectEvent } from '../components/song-list.js'
 import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.js'
 import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.js'
 import { SongChangeEvent } from './app-events.js'
+import { getCurrentDB } from './db.js'
 import { goTo } from './navigation.js'
+import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.js'
+import { ChordProParser } from './parser.js'
+import { getOrganisationPeople } from './people.js'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.js'
 import { buildUrl } from './router.js'
+import { AddSongModal } from './setlist/add-song-modal.js'
+import { OverviewReorder } from './setlist/overview-reorder.js'
+import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.js'
+import { getAvailableKeys, transposeSong } from './transpose.js'
+import { formatSetlistDate, setlistTitle } from './utils/date-utils.js'
+import { isInModalDialog, isTypingInField } from './utils/keyboard.js'
+import { showStatusMessage } from './utils/status-message.js'
 
 // Configuration constants
 const CONFIG = {
@@ -40,10 +39,6 @@ const CONFIG = {
   MIN_FONT_SIZE: 0.8, // rem
   MAX_FONT_SIZE: 3.0, // rem
   FONT_SIZE_STEP: 0.1, // rem
-
-  // Drag and drop
-  POSITION_THRESHOLD: 20, // px - minimum movement to change target position
-  DRAG_START_THRESHOLD: 5, // px - movement before starting drag
 
   // Scrolling
   KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
@@ -69,7 +64,12 @@ const SECTION_DEFAULTS_KEY = 'section_defaults'
  * navigates (navigateTo); the route change then shows the song.
  */
 export class SetlistPage {
-  constructor({ setlistId, songIndex = -1 }) {
+  /**
+   * @param {object} options
+   * @param {HTMLElement} options.root the view this page is in: it looks for its elements there
+   */
+  constructor({ root, setlistId, songIndex = -1 }) {
+    this.root = root
     this._setlistId = setlistId
     this._initialSongIndex = songIndex
     // Aborted by dispose(): the listeners that outlive the view are added with its signal
@@ -112,8 +112,20 @@ export class SetlistPage {
     }
 
     this._onOverviewAddSong = () => {
-      this.openAddSongModal()
+      this._addSongModal.open()
     }
+
+    this._reorder = new OverviewReorder({
+      root: this.root,
+      isEnabled: () => this.overviewEditMode,
+      onMove: (from, to) => this.moveSong(from, to),
+    })
+
+    this._addSongModal = new AddSongModal({
+      root: this.root,
+      getDb: () => this.db,
+      onPick: song => this.addSongToSetlist(song),
+    })
 
     this._onOverviewSongKeyChange = event => {
       const { index, key } = event
@@ -171,15 +183,8 @@ export class SetlistPage {
     this.sectionObserver?.disconnect()
     clearTimeout(this._programmaticScrollTimeout)
 
-    // A drag in progress
-    for (const [type, handler] of [
-      ['pointermove', this._dragPointerMoveHandler],
-      ['pointerup', this._dragPointerUpHandler],
-      ['pointercancel', this._dragPointerCancelHandler],
-    ]) {
-      if (handler) document.removeEventListener(type, handler)
-    }
-    document.body.style.userSelect = ''
+    // A drag in progress, and the listeners for the next
+    this._reorder.disable()
 
     // Edit mode is on <body>, which outlives the view; leaving it saves, as exiting does
     this.exitEditMode()
@@ -196,33 +201,6 @@ export class SetlistPage {
 
     // Nothing is current any more (what is playing carries on)
     this.dispatchSongChange(null)
-  }
-
-  showStatusMessage(container, options = {}) {
-    if (!container) return null
-    container.textContent = ''
-    const element = this.createStatusMessageElement(options)
-    container.appendChild(element)
-    return element
-  }
-
-  createStatusMessageElement({
-    message = '',
-    detail = '',
-    state = 'info',
-    slotContent = null,
-  } = {}) {
-    const element = document.createElement('status-message')
-    if (message) element.message = message
-    if (detail) element.detail = detail
-    element.state = state
-
-    const slotItems = Array.isArray(slotContent) ? slotContent : slotContent ? [slotContent] : []
-    slotItems.forEach(node => {
-      element.appendChild(node)
-    })
-
-    return element
   }
 
   _readCapoPreference() {
@@ -248,8 +226,8 @@ export class SetlistPage {
 
       if (!setlist) {
         console.error('[ERROR] Setlist not found in IndexedDB:', setlistId)
-        const container = document.querySelector('.song-container')
-        this.showStatusMessage(container, {
+        const container = this.root.querySelector('.song-container')
+        showStatusMessage(container, {
           message: 'Setlist not found.',
           state: 'error',
         })
@@ -274,7 +252,7 @@ export class SetlistPage {
         this.setupAppHeaderEvents()
 
         // Clear container (will show Add Song button via overview)
-        const container = document.querySelector('.song-container')
+        const container = this.root.querySelector('.song-container')
         container.textContent = ''
         container.appendChild(this.renderFullSetlist(setlist, []))
 
@@ -290,116 +268,11 @@ export class SetlistPage {
       console.log('Loaded setlist:', setlist.date, setlist.songs.length, 'songs')
 
       // Parse each song on-demand
-      const songs = []
-      const { getSongById } = await import('./song-utils.js')
-
-      for (const songEntry of setlist.songs) {
-        // Get source text (local edits or from Songs collection)
-        let sourceText
-        let canonicalSong = null
-        if (songEntry.chordproEdits) {
-          sourceText = songEntry.chordproEdits
-        } else {
-          // Get song with content using deterministic ID
-          try {
-            canonicalSong = await getSongById(songEntry.songId, this.db)
-            sourceText = canonicalSong.chordpro
-          } catch (error) {
-            console.error('[ERROR] Song not found in DB:', songEntry.songId, error)
-            continue
-          }
-        }
-
-        // Parse the chordpro
-        const parsed = this.parser.parse(sourceText)
-
-        // Capture original key from ChordPro file (for transposition reference)
-        const originalKey = parsed.metadata.key || null
-
-        // Get target key from setlist (explicit snapshot)
-        // Fallback to canonical song's key for backwards compatibility with old setlists
-        let targetKey = songEntry.key
-        if (targetKey === null || targetKey === undefined) {
-          targetKey = canonicalSong?.key || null
-        }
-
-        // Apply transposition if requested and we have a reference key
-        if (targetKey && originalKey && targetKey !== originalKey) {
-          transposeSong(parsed, originalKey, targetKey)
-          parsed.metadata.key = targetKey
-        } else if (targetKey && !originalKey) {
-          // Still reflect the requested key in metadata even if we can't transpose
-          parsed.metadata.key = targetKey
-        }
-
-        // Get target tempo from setlist (explicit snapshot)
-        // Fallback to canonical song's tempo for backwards compatibility with old setlists
-        let targetTempo = songEntry.tempo
-        if (targetTempo === null || targetTempo === undefined) {
-          targetTempo = canonicalSong?.tempo || null
-        }
-
-        // Apply tempo override
-        if (targetTempo) {
-          parsed.metadata.tempo = targetTempo
-        }
-
-        // Use tempo and time signature from database if available (already parsed), otherwise use ChordPro
-        const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo)
-        let currentBPM = parsedTempoInfo.bpm
-        let timeSignature = parsed.metadata.time // ChordPro uses 'time'
-        let tempoNote = parsedTempoInfo.tempoNote || null
-        if (canonicalSong?.metadata) {
-          const canonicalTempoInfo = this._parseTempoMetadata(canonicalSong.metadata.tempo)
-          // The setlist's own tempo, if it has one, wins over the library song's
-          if (canonicalTempoInfo.bpm !== null && !songEntry.tempo) {
-            currentBPM = canonicalTempoInfo.bpm
-          }
-          timeSignature = canonicalSong.metadata.timeSignature || parsed.metadata.time
-          tempoNote = canonicalTempoInfo.tempoNote || tempoNote
-        }
-
-        // Derive default tempoNote from time signature denominator if not explicitly set
-        if (!tempoNote) {
-          tempoNote = '1/4' // Default to quarter notes
-        }
-        if (timeSignature && (!tempoNote || tempoNote === '1/4')) {
-          const [, denominator] = timeSignature.split('/').map(s => s.trim())
-          if (denominator) {
-            tempoNote = `1/${denominator}`
-          }
-        }
-        // Override with explicit tempoNote if available from database
-        if (canonicalSong?.metadata?.tempoNote) {
-          tempoNote = canonicalSong.metadata.tempoNote
-        }
-
-        // Create song object for runtime
-        const runtimeSong = {
-          title: parsed.metadata.title || `Song ${songEntry.order + 1}`,
-          parsed: parsed,
-          songIndex: songEntry.order,
-          metadata: {
-            ...parsed.metadata,
-            tempo: currentBPM,
-            tempoNote: tempoNote,
-            timeSignature: timeSignature,
-          },
-          originalKey: originalKey, // Immutable original
-          currentKey: parsed.metadata.key,
-          currentBPM: currentBPM,
-          currentFontSize: CONFIG.DEFAULT_FONT_SIZE, // fontSize is now in setlist_local, not modifications
-          currentCapo: 0, // Capo is loaded from localStorage in loadState()
-          songId: songEntry.songId,
-          sourceText: sourceText,
-          hasLocalEdits: songEntry.chordproEdits !== null,
-          // Store references needed for model creation
-          _setlistEntry: songEntry,
-          _canonicalSong: canonicalSong,
-        }
-
-        songs.push(runtimeSong)
-      }
+      const songs = await buildRuntimeSongs(setlist, {
+        db: this.db,
+        parser: this.parser,
+        fontSize: CONFIG.DEFAULT_FONT_SIZE,
+      })
 
       console.log('Parsed songs:', songs.length)
 
@@ -420,7 +293,7 @@ export class SetlistPage {
       if (songIndex >= 0 && !shouldShowSongDirectly) this.navigateTo(-1, { replace: true })
 
       // Render all songs on one page
-      const container = document.querySelector('.song-container')
+      const container = this.root.querySelector('.song-container')
       console.log('Rendering full setlist into container:', container)
       // Clear container and append fragment
       container.textContent = ''
@@ -469,7 +342,7 @@ export class SetlistPage {
         if (this._disposed) return
         // Set up drag-and-drop (only enabled in edit mode)
         if (this.overviewEditMode) {
-          this.setupOverviewDragDrop()
+          this._reorder.enable()
         }
 
         // Set up section control buttons
@@ -487,8 +360,8 @@ export class SetlistPage {
       })
     } catch (error) {
       console.error('Error loading setlist:', error)
-      const container = document.querySelector('.song-container')
-      this.showStatusMessage(container, {
+      const container = this.root.querySelector('.song-container')
+      showStatusMessage(container, {
         message: 'Error loading songs. Please check the console.',
         state: 'error',
       })
@@ -588,7 +461,7 @@ export class SetlistPage {
     return fragment
   }
 
-  _initializeSongSections(root = document) {
+  _initializeSongSections(root = this.root) {
     const isEditMode = document.body.classList.contains('edit-mode')
 
     // Find all song-section elements, including those inside song-display shadow DOMs
@@ -623,13 +496,13 @@ export class SetlistPage {
 
   _getSongSectionComponent(songIndex, sectionIndex) {
     // First try direct query (in case not in shadow DOM)
-    let section = document.querySelector(
+    let section = this.root.querySelector(
       `song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`
     )
     if (section) return section
 
     // Query into song-display shadow roots
-    const songDisplays = document.querySelectorAll('song-display')
+    const songDisplays = this.root.querySelectorAll('song-display')
     for (const songDisplay of songDisplays) {
       if (songDisplay.shadowRoot) {
         section = songDisplay.shadowRoot.querySelector(
@@ -677,9 +550,9 @@ export class SetlistPage {
   async exitEditMode() {
     const isEditMode = document.body.classList.contains('edit-mode')
     if (isEditMode) {
-      const appHeader = document.getElementById('app-header')
-      const keySelector = document.getElementById('key-selector')
-      const capoSelector = document.getElementById('capo-selector')
+      const appHeader = this.root.querySelector('#app-header')
+      const keySelector = this.root.querySelector('#key-selector')
+      const capoSelector = this.root.querySelector('#capo-selector')
       document.body.classList.remove('edit-mode')
       document.body.removeAttribute('data-edit-mode')
       if (appHeader) {
@@ -708,11 +581,11 @@ export class SetlistPage {
   }
 
   async updateHeader(song, instant = false) {
-    const appHeader = document.getElementById('app-header')
-    const musicalMetadata = document.getElementById('musical-metadata')
-    const keySelector = document.getElementById('key-selector')
-    const capoSelector = document.getElementById('capo-selector')
-    const fontSizeControls = document.querySelector('.font-size-controls')
+    const appHeader = this.root.querySelector('#app-header')
+    const musicalMetadata = this.root.querySelector('#musical-metadata')
+    const keySelector = this.root.querySelector('#key-selector')
+    const capoSelector = this.root.querySelector('#capo-selector')
+    const fontSizeControls = this.root.querySelector('.font-size-controls')
 
     // Determine new title
     let newTitle
@@ -811,14 +684,14 @@ export class SetlistPage {
   }
 
   async showSongInfo(song) {
-    const dialog = document.getElementById('song-info-dialog')
+    const dialog = this.root.querySelector('#song-info-dialog')
     if (!dialog) return
     dialog.db = this.db
     await dialog.show(song.songId, { title: song.title })
   }
 
   async showSetlistInfo() {
-    const dialog = document.getElementById('setlist-info-dialog')
+    const dialog = this.root.querySelector('#setlist-info-dialog')
     if (!dialog || !this.currentSetlist) return
     if (!this._setlistDetailsSaveHandler) {
       this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.changes)
@@ -833,7 +706,7 @@ export class SetlistPage {
    * dialog. On failure the dialog stays in edit mode with what was typed.
    */
   async saveSetlistDetails(changes) {
-    const dialog = document.getElementById('setlist-info-dialog')
+    const dialog = this.root.querySelector('#setlist-info-dialog')
     const setlist = this.currentSetlist
     const previous = { ...setlist }
     try {
@@ -852,8 +725,8 @@ export class SetlistPage {
   }
 
   scrollToSection(sectionId, newIndex, instant = false) {
-    const section = document.getElementById(sectionId)
-    const container = document.querySelector('.song-container')
+    const section = this.root.querySelector(`#${sectionId}`)
+    const container = this.root.querySelector('.song-container')
 
     console.log('Scrolling to:', sectionId, 'index:', newIndex, 'instant:', instant)
 
@@ -896,7 +769,7 @@ export class SetlistPage {
       this.sectionObserver.disconnect()
     }
 
-    const container = document.querySelector('.song-container')
+    const container = this.root.querySelector('.song-container')
     if (!container) return
 
     // Track the most recently visible section to avoid duplicate updates
@@ -954,7 +827,7 @@ export class SetlistPage {
     )
 
     // Observe all sections (overview + all songs)
-    document.querySelectorAll('.section').forEach(section => {
+    this.root.querySelectorAll('.section').forEach(section => {
       this.sectionObserver.observe(section)
     })
   }
@@ -1404,7 +1277,7 @@ export class SetlistPage {
     if (this._editModeSetup) return
     this._editModeSetup = true
 
-    const appHeader = document.getElementById('app-header')
+    const appHeader = this.root.querySelector('#app-header')
     if (!appHeader) return
 
     // Listen to the edit-mode-toggle event from app-header
@@ -1426,36 +1299,36 @@ export class SetlistPage {
         appHeader.editMode = true
 
         // Update musical metadata to edit mode (makes it clickable)
-        const musicalMetadata = document.getElementById('musical-metadata')
+        const musicalMetadata = this.root.querySelector('#musical-metadata')
         if (musicalMetadata) {
           musicalMetadata.editMode = true
         }
 
         // Update key selector edit mode
-        const keySelector = document.getElementById('key-selector')
+        const keySelector = this.root.querySelector('#key-selector')
         if (keySelector) {
           keySelector.editMode = true
         }
-        const capoSelector = document.getElementById('capo-selector')
+        const capoSelector = this.root.querySelector('#capo-selector')
         if (capoSelector && this._capoEnabled) {
           capoSelector.editMode = true
         }
 
         // Clear inline display:none if it was set during previous exit
-        document.querySelectorAll('.edit-mode-control').forEach(el => {
+        this.root.querySelectorAll('.edit-mode-control').forEach(el => {
           el.style.display = ''
         })
 
         // Trigger fade-in for all edit mode controls after a frame
         requestAnimationFrame(() => {
-          document.querySelectorAll('.edit-mode-control').forEach(el => {
+          this.root.querySelectorAll('.edit-mode-control').forEach(el => {
             el.classList.add('fade-in')
           })
         })
 
         // After fade completes, mark normal controls as fade-complete
         setTimeout(() => {
-          document.querySelectorAll('.normal-mode-control').forEach(el => {
+          this.root.querySelectorAll('.normal-mode-control').forEach(el => {
             el.classList.add('fade-complete')
           })
         }, 250)
@@ -1470,28 +1343,28 @@ export class SetlistPage {
         appHeader.editMode = false
 
         // Update musical metadata to normal mode (not clickable)
-        const musicalMetadata = document.getElementById('musical-metadata')
+        const musicalMetadata = this.root.querySelector('#musical-metadata')
         if (musicalMetadata) {
           musicalMetadata.editMode = false
         }
 
         // Update key selector edit mode
-        const keySelector = document.getElementById('key-selector')
+        const keySelector = this.root.querySelector('#key-selector')
         if (keySelector) {
           keySelector.editMode = false
         }
-        const capoSelector = document.getElementById('capo-selector')
+        const capoSelector = this.root.querySelector('#capo-selector')
         if (capoSelector) {
           capoSelector.editMode = false
         }
 
         // Remove fade-in classes from edit controls (triggers fade out)
-        document.querySelectorAll('.edit-mode-control').forEach(el => {
+        this.root.querySelectorAll('.edit-mode-control').forEach(el => {
           el.classList.remove('fade-in')
         })
 
         // Remove fade-complete from normal controls (makes them visible again)
-        document.querySelectorAll('.normal-mode-control').forEach(el => {
+        this.root.querySelectorAll('.normal-mode-control').forEach(el => {
           el.classList.remove('fade-complete')
         })
 
@@ -1501,7 +1374,7 @@ export class SetlistPage {
         // Wait for fade to complete, then save and cleanup
         setTimeout(async () => {
           // Hide edit controls completely now that fade is done
-          document.querySelectorAll('.edit-mode-control').forEach(el => {
+          this.root.querySelectorAll('.edit-mode-control').forEach(el => {
             el.style.display = 'none'
           })
 
@@ -1523,7 +1396,7 @@ export class SetlistPage {
     if (this._appHeaderEventsSetup) return
     this._appHeaderEventsSetup = true
 
-    const appHeader = document.getElementById('app-header')
+    const appHeader = this.root.querySelector('#app-header')
     if (!appHeader) return
 
     // Listen to info button clicks
@@ -1548,8 +1421,8 @@ export class SetlistPage {
     })
 
     // Setup song settings popover
-    const musicalMetadata = document.getElementById('musical-metadata')
-    const songSettingsPopover = document.getElementById('song-settings-popover')
+    const musicalMetadata = this.root.querySelector('#musical-metadata')
+    const songSettingsPopover = this.root.querySelector('#song-settings-popover')
     if (musicalMetadata && songSettingsPopover) {
       // Set the trigger button for positioning
       songSettingsPopover.setTriggerButton(musicalMetadata)
@@ -1567,7 +1440,7 @@ export class SetlistPage {
       songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
         // Close the settings first, so the question is the only thing showing
         songSettingsPopover.close()
-        const modal = document.getElementById('reset-confirm-modal')
+        const modal = this.root.querySelector('#reset-confirm-modal')
         if (modal) {
           const confirmed = await modal.ask()
           if (confirmed) {
@@ -1579,7 +1452,7 @@ export class SetlistPage {
   }
 
   setupSectionControls() {
-    const container = document.querySelector('.song-container')
+    const container = this.root.querySelector('.song-container')
     if (!container) return
 
     if (!this._sectionActionHandler) {
@@ -1610,7 +1483,7 @@ export class SetlistPage {
   }
 
   updateKeySelector(selectedKey) {
-    const keySelector = document.getElementById('key-selector')
+    const keySelector = this.root.querySelector('#key-selector')
     if (!keySelector) return
 
     // Get available keys rotated around the selected key
@@ -1631,7 +1504,7 @@ export class SetlistPage {
 
   updateCapoSelector(value, currentKey = null) {
     if (!this._capoEnabled) return
-    const capoSelector = document.getElementById('capo-selector')
+    const capoSelector = this.root.querySelector('#capo-selector')
     if (!capoSelector) return
     capoSelector.value = this._normalizeCapoValue(value)
     capoSelector.referenceKey = currentKey || this._currentKeyForCapo || ''
@@ -1640,7 +1513,7 @@ export class SetlistPage {
   }
 
   setupKeySelector() {
-    const keySelector = document.getElementById('key-selector')
+    const keySelector = this.root.querySelector('#key-selector')
     if (!keySelector) return
 
     if (!this._keyChangeHandler) {
@@ -1661,7 +1534,7 @@ export class SetlistPage {
   }
 
   setupCapoSelector() {
-    const capoSelector = document.getElementById('capo-selector')
+    const capoSelector = this.root.querySelector('#capo-selector')
     if (!capoSelector) return
 
     if (!this._capoEnabled) {
@@ -1682,7 +1555,7 @@ export class SetlistPage {
   }
 
   updateSongSettingsPopover() {
-    const songSettingsPopover = document.getElementById('song-settings-popover')
+    const songSettingsPopover = this.root.querySelector('#song-settings-popover')
     if (!songSettingsPopover) return
 
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
@@ -1717,7 +1590,7 @@ export class SetlistPage {
     console.log('[SongModel] Saved BPM change via model:', newValue)
 
     // Update the musical metadata display with the new BPM
-    const musicalMetadata = document.getElementById('musical-metadata')
+    const musicalMetadata = this.root.querySelector('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.bpm = newValue
     }
@@ -1758,7 +1631,7 @@ export class SetlistPage {
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
 
     // Update the musical metadata display with the new capo value
-    const musicalMetadata = document.getElementById('musical-metadata')
+    const musicalMetadata = this.root.querySelector('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.capoValue = normalized
     }
@@ -1800,7 +1673,7 @@ export class SetlistPage {
     this.updateKeySelector(newKey)
 
     // Update the musical metadata display with the new key
-    const musicalMetadata = document.getElementById('musical-metadata')
+    const musicalMetadata = this.root.querySelector('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.keyValue = newKey
     }
@@ -1818,7 +1691,7 @@ export class SetlistPage {
   }
 
   async _animateSlottedContent(updateCallback) {
-    const controlsSlot = document.querySelector('.header-controls-slot')
+    const controlsSlot = this.root.querySelector('.header-controls-slot')
 
     // Fade out (use the controls slot to fade everything together)
     if (controlsSlot) {
@@ -1844,7 +1717,7 @@ export class SetlistPage {
     if (songIndex < 0 || songIndex >= this.songs.length) return
 
     const song = this.songs[songIndex]
-    const songSection = document.getElementById(`song-${songIndex}`)
+    const songSection = this.root.querySelector(`#song-${songIndex}`)
 
     if (songSection) {
       const songContainer = songSection.querySelector('.song-content')
@@ -1910,7 +1783,7 @@ export class SetlistPage {
     } else if (originalKey) {
       console.log('[resetCurrentSong] Key already correct, just updating displays')
       // Key is already correct, just update displays
-      const musicalMetadata = document.getElementById('musical-metadata')
+      const musicalMetadata = this.root.querySelector('#musical-metadata')
       if (musicalMetadata) {
         musicalMetadata.keyValue = originalKey
         musicalMetadata.bpm = song.currentBPM || null
@@ -1923,473 +1796,88 @@ export class SetlistPage {
     this.saveState()
   }
 
-  setupOverviewDragDrop() {
-    const overviewSongs = document.querySelector('.overview-songs')
-    if (!overviewSongs) return
-
-    const buttons = Array.from(document.querySelectorAll('.overview-song-card'))
-    if (buttons.length === 0) return
-
-    // Clean up any existing global event listeners
-    if (this._dragPointerMoveHandler) {
-      document.removeEventListener('pointermove', this._dragPointerMoveHandler)
-    }
-    if (this._dragPointerUpHandler) {
-      document.removeEventListener('pointerup', this._dragPointerUpHandler)
-    }
-    if (this._dragPointerCancelHandler) {
-      document.removeEventListener('pointercancel', this._dragPointerCancelHandler)
-    }
-
-    // Clean up any existing card-level listeners
-    if (this._cardPointerDownHandlers) {
-      this._cardPointerDownHandlers.forEach((handler, button) => {
-        button.removeEventListener('pointerdown', handler)
-      })
-      this._cardPointerDownHandlers.clear()
-    }
-
-    const dragState = {
-      active: false,
-      button: null,
-      startIndex: null,
-      currentIndex: null,
-      lastAcceptedIndex: null,
-      startY: 0,
-      currentY: 0,
-      buttonInitialTop: 0,
-      buttonHeight: 0,
-      rafId: null,
-      pointerId: null,
-      pointerType: null,
-    }
-
-    const startDrag = (button, clientY) => {
-      dragState.active = true
-      dragState.button = button
-      dragState.startIndex = parseInt(button.dataset.songIndex, 10)
-      dragState.currentIndex = dragState.startIndex
-      dragState.lastAcceptedIndex = dragState.startIndex
-      dragState.startY = clientY
-      dragState.currentY = clientY
-
-      // Store initial button position and height
-      const rect = button.getBoundingClientRect()
-      dragState.buttonInitialTop = rect.top
-      dragState.buttonHeight = rect.height
-
-      // Add visual feedback
-      button.classList.add('dragging')
-      overviewSongs.classList.add('reordering')
-
-      // Prevent text selection during drag
-      document.body.style.userSelect = 'none'
-
-      // Show initial drop indicator at original position
-      performDragUpdate()
-    }
-
-    const updateDrag = clientY => {
-      if (!dragState.active) return
-
-      dragState.currentY = clientY
-
-      // Update dragged button position IMMEDIATELY (no throttling for smooth following)
-      const offsetY = clientY - dragState.startY
-      dragState.button.style.transform = `scale(1.05) translateY(${offsetY}px)`
-
-      // Throttle drop target calculations with requestAnimationFrame
-      if (dragState.rafId) return
-
-      dragState.rafId = requestAnimationFrame(() => {
-        dragState.rafId = null
-        performDragUpdate()
-      })
-    }
-
-    const performDragUpdate = () => {
-      if (!dragState.active) return
-
-      const clientY = dragState.currentY
-
-      // Find which button is being hovered over
-      const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'))
-      let proposedIndex = null
-
-      for (let i = 0; i < buttonsArray.length; i++) {
-        const btn = buttonsArray[i]
-        if (btn === dragState.button) continue
-
-        const rect = btn.getBoundingClientRect()
-        const midY = rect.top + rect.height / 2
-
-        if (clientY < midY && clientY >= rect.top) {
-          // Insert before this button
-          proposedIndex = parseInt(btn.dataset.songIndex, 10)
-          break
-        } else if (clientY >= midY && clientY < rect.bottom) {
-          // Insert after this button
-          proposedIndex = parseInt(btn.dataset.songIndex, 10) + 1
-          break
-        }
-      }
-
-      // If no specific target, determine from position
-      if (proposedIndex === null) {
-        const firstRect = buttonsArray[0]?.getBoundingClientRect()
-        const lastRect = buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect()
-
-        if (firstRect && clientY < firstRect.top) {
-          proposedIndex = 0
-        } else if (lastRect && clientY > lastRect.bottom) {
-          proposedIndex = buttonsArray.length
-        } else {
-          proposedIndex = dragState.lastAcceptedIndex
-        }
-      }
-
-      // Apply hysteresis: only accept new position if sufficiently different
-      // Calculate if we need to switch positions
-      let shouldUpdatePosition = false
-
-      if (proposedIndex !== dragState.lastAcceptedIndex) {
-        // Find Y position of current accepted target
-        let currentY
-        if (dragState.lastAcceptedIndex === 0) {
-          currentY = buttonsArray[0]?.getBoundingClientRect().top || 0
-        } else if (dragState.lastAcceptedIndex >= buttonsArray.length) {
-          currentY =
-            buttonsArray[buttonsArray.length - 1]?.getBoundingClientRect().bottom || clientY
-        } else {
-          currentY =
-            buttonsArray[dragState.lastAcceptedIndex]?.getBoundingClientRect().top || clientY
-        }
-
-        // Only switch if we've moved past the threshold
-        const distance = Math.abs(clientY - currentY)
-        if (distance > CONFIG.POSITION_THRESHOLD) {
-          shouldUpdatePosition = true
-        }
-      }
-
-      // Update accepted position if threshold met
-      if (shouldUpdatePosition) {
-        dragState.lastAcceptedIndex = proposedIndex
-      }
-
-      const targetIndex = dragState.lastAcceptedIndex
-
-      // Clear all drop indicators
-      buttonsArray.forEach(btn => {
-        btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down')
-        btn.style.removeProperty('--drag-card-height')
-      })
-
-      // Apply drop indicator - always show where it will land
-      if (targetIndex !== null) {
-        // Determine which button to show the indicator on
-        let indicatorButton = null
-        let indicatorClass = null
-
-        if (targetIndex === dragState.startIndex) {
-          // At original position - show placeholder where it was
-          // Use the button immediately after (or before if last)
-          if (dragState.startIndex < buttonsArray.length - 1) {
-            // Not the last button - show above the next button
-            indicatorButton = buttonsArray[dragState.startIndex + 1]
-            indicatorClass = 'drag-over-above'
-          } else if (dragState.startIndex > 0) {
-            // Last button - show below the previous button
-            indicatorButton = buttonsArray[dragState.startIndex - 1]
-            indicatorClass = 'drag-over-below'
-          }
-        } else if (targetIndex === dragState.startIndex + 1) {
-          // Adjacent to original - same as original position
-          if (dragState.startIndex < buttonsArray.length - 1) {
-            indicatorButton = buttonsArray[dragState.startIndex + 1]
-            indicatorClass = 'drag-over-above'
-          } else if (dragState.startIndex > 0) {
-            indicatorButton = buttonsArray[dragState.startIndex - 1]
-            indicatorClass = 'drag-over-below'
-          }
-        } else if (targetIndex < dragState.startIndex) {
-          // Moving up - show above the target position
-          indicatorButton = buttonsArray[targetIndex]
-          indicatorClass = 'drag-over-above'
-        } else {
-          // Moving down - show below the button before the target
-          indicatorButton = buttonsArray[targetIndex - 1]
-          indicatorClass = 'drag-over-below'
-        }
-
-        // Apply the indicator class (never on the dragged button)
-        if (indicatorButton && indicatorButton !== dragState.button) {
-          indicatorButton.classList.add(indicatorClass)
-          // Set the drop indicator height to match the dragged card
-          indicatorButton.style.setProperty('--drag-card-height', `${dragState.buttonHeight}px`)
-        }
-
-        // Apply preview animations only if position actually changes
-        if (targetIndex !== dragState.startIndex && targetIndex !== dragState.startIndex + 1) {
-          buttonsArray.forEach(btn => {
-            const btnIndex = parseInt(btn.dataset.songIndex, 10)
-            if (btnIndex === dragState.startIndex) return // Skip dragged item
-
-            if (targetIndex < dragState.startIndex) {
-              // Moving up in list
-              if (btnIndex >= targetIndex && btnIndex < dragState.startIndex) {
-                btn.classList.add('will-move-down')
-              }
-            } else {
-              // Moving down in list
-              if (btnIndex > dragState.startIndex && btnIndex < targetIndex) {
-                btn.classList.add('will-move-up')
-              }
-            }
-          })
-        }
-      }
-
-      dragState.currentIndex = targetIndex
-    }
-
-    const endDrag = async () => {
-      if (!dragState.active) return
-
-      const button = dragState.button
-      const startIndex = dragState.startIndex
-      const targetIndex = dragState.currentIndex
-      let overviewNeedsRefresh = false
-
-      // Tell component that drag happened, suppress its click
-      // Clean up visual state
-      button.classList.remove('dragging')
-      button.style.transform = '' // Reset transform
-      overviewSongs.classList.remove('reordering')
-      document.body.style.userSelect = ''
-
-      const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'))
-      buttonsArray.forEach(btn => {
-        btn.classList.remove('drag-over-above', 'drag-over-below', 'will-move-up', 'will-move-down')
-        btn.style.removeProperty('--drag-card-height')
-      })
-
-      // Reorder if position changed
-      if (targetIndex !== null && targetIndex !== startIndex && targetIndex !== startIndex + 1) {
-        // Calculate actual new index (accounting for removal of old position)
-        const newIndex = targetIndex > startIndex ? targetIndex - 1 : targetIndex
-
-        // Reorder songs in the setlist
-        const movedSong = this.currentSetlist.songs.splice(startIndex, 1)[0]
-        this.currentSetlist.songs.splice(newIndex, 0, movedSong)
-
-        // Update order field for each song
-        this.currentSetlist.songs.forEach((song, index) => {
-          song.order = index
-        })
-
-        // Reorder runtime songs array
-        const movedRuntimeSong = this.songs.splice(startIndex, 1)[0]
-        this.songs.splice(newIndex, 0, movedRuntimeSong)
-
-        // Save to database
-        this.currentSetlist.modifiedDate = new Date().toISOString()
-        await this.db.saveSetlist(this.currentSetlist)
-        overviewNeedsRefresh = true
-
-        // Re-order song sections in the DOM to match new order
-        const container = document.querySelector('.song-container')
-
-        // Get all song sections in their current DOM order
-        const songSections = Array.from(document.querySelectorAll('.section[id^="song-"]'))
-
-        // The section that was at startIndex moved to newIndex
-        // We need to physically move that DOM section
-        const sectionToMove = songSections[startIndex]
-
-        if (sectionToMove) {
-          // Remove the section from its current position
-          sectionToMove.remove()
-
-          // Get a fresh list of sections after removal
-          const remainingSections = Array.from(document.querySelectorAll('.section[id^="song-"]'))
-
-          // Insert at the new position
-          if (newIndex === 0) {
-            // Insert at the beginning (after overview)
-            const overview = document.getElementById('overview')
-            if (overview?.nextSibling) {
-              container.insertBefore(sectionToMove, overview.nextSibling)
-            } else {
-              container.insertBefore(sectionToMove, container.firstChild)
-            }
-          } else if (newIndex >= remainingSections.length) {
-            // Insert at the end
-            container.appendChild(sectionToMove)
-          } else {
-            // Insert before the section that's currently at the target position
-            const targetSection = remainingSections[newIndex]
-            if (targetSection && targetSection.parentNode === container) {
-              container.insertBefore(sectionToMove, targetSection)
-            } else {
-              container.appendChild(sectionToMove)
-            }
-          }
-
-          // Now update all section IDs and data-song-index attributes to match new order
-          const updatedSections = Array.from(document.querySelectorAll('.section[id^="song-"]'))
-          updatedSections.forEach((section, index) => {
-            section.id = `song-${index}`
-
-            // Update data-song-index on all wrappers inside this section
-            section.querySelectorAll('[data-song-index]').forEach(el => {
-              el.dataset.songIndex = index
-            })
-          })
-
-          // Re-apply section states with new indices
-          this.applySectionState()
-
-          // Re-apply font sizes
-          this.songs.forEach((_song, index) => {
-            this.applyFontSize(index)
-          })
-        }
-      }
-
-      // Cancel any pending animation frame
-      if (dragState.rafId) {
-        cancelAnimationFrame(dragState.rafId)
-      }
-
-      // Reset drag state
-      dragState.active = false
-      dragState.button = null
-      dragState.startIndex = null
-      dragState.currentIndex = null
-      dragState.lastAcceptedIndex = null
-      dragState.pointerId = null
-      dragState.pointerType = null
-
-      if (overviewNeedsRefresh) {
-        this._refreshOverviewComponentSongs()
-        if (this.overviewEditMode) {
-          this.setupOverviewDragDrop()
-        }
-      }
-    }
-
-    const cancelDrag = () => {
-      if (dragState.rafId) {
-        cancelAnimationFrame(dragState.rafId)
-      }
-
-      if (dragState.active) {
-        // Clean up visual state without reordering
-        if (dragState.button) {
-          dragState.button.classList.remove('dragging')
-          dragState.button.style.transform = '' // Reset transform
-        }
-        overviewSongs.classList.remove('reordering')
-        document.body.style.userSelect = ''
-
-        const buttonsArray = Array.from(document.querySelectorAll('.overview-song-card'))
-        buttonsArray.forEach(btn => {
-          btn.classList.remove(
-            'drag-over-above',
-            'drag-over-below',
-            'will-move-up',
-            'will-move-down'
-          )
-        })
-      }
-
-      dragState.active = false
-      dragState.button = null
-      dragState.startIndex = null
-      dragState.currentIndex = null
-      dragState.lastAcceptedIndex = null
-      dragState.pointerId = null
-      dragState.pointerType = null
-    }
-
-    // Store card handlers so we can clean them up later
-    this._cardPointerDownHandlers = this._cardPointerDownHandlers || new Map()
-
-    // Attach drag handlers to cards (we'll check if the handle was clicked)
-    buttons.forEach(button => {
-      const handler = e => {
-        // Don't start drag if not in edit mode
-        if (!this.overviewEditMode) return
-
-        // Don't start drag if already dragging
-        if (dragState.active) return
-
-        // Only handle primary pointer (left mouse button, primary touch)
-        if (!e.isPrimary) return
-
-        // Check if the event originated from the drag handle
-        // We need to check the composed path since the handle is in shadow DOM
-        const path = e.composedPath()
-        const dragHandle = path.find(el => el.classList?.contains('drag-handle'))
-
-        if (!dragHandle) return // Only drag when handle is grabbed
-
-        // Prevent the click from bubbling
-        e.stopPropagation()
-
-        // Store pointer info
-        dragState.button = button
-        dragState.startY = e.clientY
-        dragState.pointerId = e.pointerId
-        dragState.pointerType = e.pointerType
-
-        // Start drag immediately when handle is grabbed
-        startDrag(button, e.clientY)
-      }
-
-      button.addEventListener('pointerdown', handler)
-      this._cardPointerDownHandlers.set(button, handler)
+  /**
+   * A song card was dragged to a new place in the overview: move the song, in the
+   * setlist and on the page, and save it.
+   */
+  async moveSong(startIndex, newIndex) {
+    // Reorder songs in the setlist
+    const movedSong = this.currentSetlist.songs.splice(startIndex, 1)[0]
+    this.currentSetlist.songs.splice(newIndex, 0, movedSong)
+
+    // Update order field for each song
+    this.currentSetlist.songs.forEach((song, index) => {
+      song.order = index
     })
 
-    // Global pointer event handlers for smooth dragging
-    this._dragPointerMoveHandler = e => {
-      // Only handle the pointer we're tracking
-      if (e.pointerId !== dragState.pointerId) return
+    // Reorder runtime songs array
+    const movedRuntimeSong = this.songs.splice(startIndex, 1)[0]
+    this.songs.splice(newIndex, 0, movedRuntimeSong)
 
-      if (dragState.active) {
-        e.preventDefault() // Prevent scrolling while dragging
-        updateDrag(e.clientY)
+    // Save to database
+    this.currentSetlist.modifiedDate = new Date().toISOString()
+    await this.db.saveSetlist(this.currentSetlist)
+
+    // Re-order song sections in the DOM to match new order
+    const container = this.root.querySelector('.song-container')
+
+    // Get all song sections in their current DOM order
+    const songSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+
+    // The section that was at startIndex moved to newIndex
+    // We need to physically move that DOM section
+    const sectionToMove = songSections[startIndex]
+
+    if (sectionToMove) {
+      // Remove the section from its current position
+      sectionToMove.remove()
+
+      // Get a fresh list of sections after removal
+      const remainingSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+
+      // Insert at the new position
+      if (newIndex === 0) {
+        // Insert at the beginning (after overview)
+        const overview = this.root.querySelector('#overview')
+        if (overview?.nextSibling) {
+          container.insertBefore(sectionToMove, overview.nextSibling)
+        } else {
+          container.insertBefore(sectionToMove, container.firstChild)
+        }
+      } else if (newIndex >= remainingSections.length) {
+        // Insert at the end
+        container.appendChild(sectionToMove)
+      } else {
+        // Insert before the section that's currently at the target position
+        const targetSection = remainingSections[newIndex]
+        if (targetSection && targetSection.parentNode === container) {
+          container.insertBefore(sectionToMove, targetSection)
+        } else {
+          container.appendChild(sectionToMove)
+        }
       }
+
+      // Now update all section IDs and data-song-index attributes to match new order
+      const updatedSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+      updatedSections.forEach((section, index) => {
+        section.id = `song-${index}`
+
+        // Update data-song-index on all wrappers inside this section
+        section.querySelectorAll('[data-song-index]').forEach(el => {
+          el.dataset.songIndex = index
+        })
+      })
+
+      // Re-apply section states with new indices
+      this.applySectionState()
+
+      // Re-apply font sizes
+      this.songs.forEach((_song, index) => {
+        this.applyFontSize(index)
+      })
     }
 
-    this._dragPointerUpHandler = e => {
-      // Only handle the pointer we're tracking
-      if (e.pointerId !== dragState.pointerId) return
-
-      if (dragState.active) {
-        e.preventDefault() // Prevent click event
-        endDrag()
-      }
-
-      dragState.pointerId = null
-      dragState.button = null
-    }
-
-    this._dragPointerCancelHandler = e => {
-      // Only handle the pointer we're tracking
-      if (e.pointerId !== dragState.pointerId) return
-
-      // For touch/pen, pointercancel fires when global handlers take over - ignore it
-      // For mouse, cancel the drag
-      if (e.pointerType === 'mouse') {
-        cancelDrag()
-      }
-    }
-
-    document.addEventListener('pointermove', this._dragPointerMoveHandler)
-    document.addEventListener('pointerup', this._dragPointerUpHandler)
-    document.addEventListener('pointercancel', this._dragPointerCancelHandler)
+    this._refreshOverviewComponentSongs()
   }
 
   toggleOverviewEditMode() {
@@ -2404,7 +1892,7 @@ export class SetlistPage {
     this.overviewEditMode = enabled
 
     // Update button state (use the header edit toggle button)
-    const appHeader = document.getElementById('app-header')
+    const appHeader = this.root.querySelector('#app-header')
     if (appHeader) {
       appHeader.editMode = this.overviewEditMode
     }
@@ -2412,26 +1900,9 @@ export class SetlistPage {
 
     // Toggle drag-drop: only enable in edit mode
     if (this.overviewEditMode) {
-      this.setupOverviewDragDrop()
+      this._reorder.enable()
     } else {
-      // Clean up drag-drop listeners
-      if (this._dragPointerMoveHandler) {
-        document.removeEventListener('pointermove', this._dragPointerMoveHandler)
-      }
-      if (this._dragPointerUpHandler) {
-        document.removeEventListener('pointerup', this._dragPointerUpHandler)
-      }
-      if (this._dragPointerCancelHandler) {
-        document.removeEventListener('pointercancel', this._dragPointerCancelHandler)
-      }
-
-      // Clean up card-level pointerdown listeners
-      if (this._cardPointerDownHandlers) {
-        this._cardPointerDownHandlers.forEach((handler, button) => {
-          button.removeEventListener('pointerdown', handler)
-        })
-        this._cardPointerDownHandlers.clear()
-      }
+      this._reorder.disable()
     }
 
     this._initializeSongSections()
@@ -2463,7 +1934,7 @@ export class SetlistPage {
     }
 
     // Normalize tempo + signature so media player gets consistent payloads
-    const parsedTempoInfo = this._parseTempoMetadata(parsed.metadata.tempo ?? song.metadata?.tempo)
+    const parsedTempoInfo = parseTempoMetadata(parsed.metadata.tempo ?? song.metadata?.tempo)
     const currentBPM = parsedTempoInfo.bpm ?? song.currentBPM ?? null
     let tempoNote = parsedTempoInfo.tempoNote ?? song.metadata?.tempoNote ?? null
     const timeSignature = parsed.metadata.time || song.metadata?.timeSignature || null
@@ -2492,7 +1963,7 @@ export class SetlistPage {
     this._refreshOverviewComponentSongs()
 
     // Update DOM
-    const songSection = document.getElementById(`song-${songIndex}`)
+    const songSection = this.root.querySelector(`#song-${songIndex}`)
     if (songSection) {
       const songContent = songSection.querySelector('.song-content')
       if (songContent) {
@@ -2530,7 +2001,7 @@ export class SetlistPage {
   _updateSongDisplayCapo(songIndex, capoValue) {
     if (songIndex < 0) return
     const normalized = this._capoEnabled ? this._normalizeCapoValue(capoValue) : 0
-    const songSection = document.getElementById(`song-${songIndex}`)
+    const songSection = this.root.querySelector(`#song-${songIndex}`)
     const songDisplay = songSection?.querySelector('song-display')
     if (songDisplay) {
       songDisplay.capo = normalized
@@ -2575,7 +2046,7 @@ export class SetlistPage {
           const isEditMode = document.body.classList.contains('edit-mode')
           if (isEditMode) {
             e.preventDefault()
-            const appHeader = document.getElementById('app-header')
+            const appHeader = this.root.querySelector('#app-header')
             if (appHeader) {
               // Trigger the edit-mode-toggle event
               appHeader.dispatchEvent(new EditModeToggleEvent())
@@ -2617,8 +2088,8 @@ export class SetlistPage {
             e.preventDefault()
             const currentSectionUp =
               this.currentSongIndex >= 0
-                ? document.getElementById(`song-${this.currentSongIndex}`)
-                : document.getElementById('overview')
+                ? this.root.querySelector(`#song-${this.currentSongIndex}`)
+                : this.root.querySelector('#overview')
             currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
             break
           }
@@ -2626,8 +2097,8 @@ export class SetlistPage {
             e.preventDefault()
             const currentSectionDown =
               this.currentSongIndex >= 0
-                ? document.getElementById(`song-${this.currentSongIndex}`)
-                : document.getElementById('overview')
+                ? this.root.querySelector(`#song-${this.currentSongIndex}`)
+                : this.root.querySelector('#overview')
             currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
             break
           }
@@ -2690,139 +2161,6 @@ export class SetlistPage {
     navMenu.showOverviewLink = this.currentSongIndex >= 0
   }
 
-  async openAddSongModal() {
-    console.log('[Add Song Modal] Opening modal')
-    const modal = document.getElementById('add-song-modal')
-    const searchInput = document.getElementById('add-song-search-input')
-    const resultsContainer = document.getElementById('add-song-results')
-
-    console.log('[Add Song Modal] Elements:', { modal, searchInput, resultsContainer })
-
-    // Load all songs for searching
-    try {
-      this.showStatusMessage(resultsContainer, {
-        message: 'Loading songs...',
-        state: 'loading',
-      })
-
-      // Load songs from per-org database and parse titles
-      const { getSongWithContent } = await import('./song-utils.js')
-      const songRecords = await this.db.getAllSongs()
-      console.log('[Add Song Modal] Loaded song records:', songRecords.length)
-
-      if (songRecords.length === 0) {
-        this.showStatusMessage(resultsContainer, {
-          message: 'No songs in library',
-          detail: 'Import setlists from the Settings page to populate the song library.',
-          state: 'empty',
-        })
-        return
-      }
-
-      // Group songs by deterministic ID to get unique songs (not all variants)
-      const songsById = new Map()
-      for (const song of songRecords) {
-        if (song.isDefault || !songsById.has(song.id)) {
-          songsById.set(song.id, song)
-        }
-      }
-
-      // Parse titles from chordpro
-      const songs = []
-      for (const songRecord of songsById.values()) {
-        try {
-          const fullSong = await getSongWithContent(songRecord.uuid)
-          songs.push(fullSong)
-        } catch (error) {
-          console.error(`Error loading song ${songRecord.uuid}:`, error)
-        }
-      }
-
-      // Sort songs alphabetically by title
-      songs.sort((a, b) => {
-        const titleA = (a.title || '').toLowerCase()
-        const titleB = (b.title || '').toLowerCase()
-        return titleA.localeCompare(titleB)
-      })
-
-      // Store for filtering
-      this.addSongModalSongs = songs
-
-      // Clear search and show all songs initially
-      searchInput.value = ''
-      this.renderAddSongResults(songs, resultsContainer)
-
-      modal.show()
-
-      // Focus search input and wire events when modal opens successfully
-      setTimeout(() => searchInput.focus(), 100)
-
-      const handleSearch = e => {
-        this.filterAddSongResults(e.target.value, resultsContainer)
-      }
-
-      searchInput.addEventListener('input', handleSearch)
-
-      const handleClose = () => {
-        searchInput.removeEventListener('input', handleSearch)
-        this.addSongModalSongs = null
-      }
-
-      modal.addEventListener(ModalCloseEvent.type, handleClose, { once: true })
-    } catch (error) {
-      console.error('[Add Song Modal] Error loading songs:', error)
-      this.showStatusMessage(resultsContainer, {
-        message: 'Error loading songs. Please try again.',
-        state: 'error',
-      })
-      modal.show()
-    }
-  }
-
-  filterAddSongResults(searchTerm, resultsContainer) {
-    if (!this.addSongModalSongs) return
-
-    const term = searchTerm.toLowerCase().trim()
-
-    if (!term) {
-      // Show all songs if search is empty
-      this.renderAddSongResults(this.addSongModalSongs, resultsContainer)
-      return
-    }
-
-    // Filter songs by title, artist, or lyrics - same as song library
-    const filtered = this.addSongModalSongs.filter(song => {
-      const title = (song.title || '').toLowerCase()
-      const artist = (song.artist || '').toLowerCase()
-      const lyricsText = (song.lyricsText || '').toLowerCase()
-
-      return title.includes(term) || artist.includes(term) || lyricsText.includes(term)
-    })
-
-    this.renderAddSongResults(filtered, resultsContainer)
-  }
-
-  renderAddSongResults(songs, resultsContainer) {
-    console.log('[Add Song Modal] renderAddSongResults called with', songs.length, 'songs')
-
-    resultsContainer.textContent = ''
-
-    const songList = document.createElement('song-list')
-    songList.songs = songs
-    songList.variant = 'library'
-    songList.emptyMessage = 'No songs match your search.'
-    songList.dense = true
-    songList.addEventListener(SongSelectEvent.type, event => {
-      const { song } = event
-      if (song) {
-        this.addSongToSetlist(song)
-      }
-    })
-
-    resultsContainer.appendChild(songList)
-    console.log('[Add Song Modal] Finished rendering', songs.length, 'songs')
-  }
-
   async addSongToSetlist(song) {
     try {
       // Get current setlist
@@ -2860,9 +2198,7 @@ export class SetlistPage {
 
       console.log('Added song to setlist:', song.title, 'with current key:', songCurrentKey)
 
-      // Close modal
-      const modal = document.getElementById('add-song-modal')
-      modal.close()
+      this._addSongModal.close()
 
       // Reload the setlist to show the new song
       await this.renderSetlist(setlist.id)
@@ -2873,10 +2209,10 @@ export class SetlistPage {
   }
 
   async showDeleteSongConfirmation(index, song) {
-    document.getElementById('delete-song-title').textContent = song.title
+    this.root.querySelector('#delete-song-title').textContent = song.title
     // ask() settles on confirm, cancel or close, leaving no listener behind: a
     // confirm handler left by a cancelled ask would delete a second song later
-    if (await document.getElementById('delete-song-modal').ask()) {
+    if (await this.root.querySelector('#delete-song-modal').ask()) {
       await this.deleteSongFromSetlist(index)
     }
   }
@@ -2942,7 +2278,7 @@ export class SetlistPage {
   }
 
   _applyCapoPreferenceToDisplays() {
-    const capoSelector = document.getElementById('capo-selector')
+    const capoSelector = this.root.querySelector('#capo-selector')
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     if (capoSelector) {
       if (this._capoEnabled && currentSong) {
@@ -2952,7 +2288,7 @@ export class SetlistPage {
       }
     }
 
-    const songDisplays = document.querySelectorAll('song-display')
+    const songDisplays = this.root.querySelectorAll('song-display')
     songDisplays.forEach(display => {
       const attrIndex = Number(display.getAttribute('song-index'))
       const fallbackIndex =
@@ -2966,28 +2302,5 @@ export class SetlistPage {
         display.capo = 0
       }
     })
-  }
-
-  _parseTempoMetadata(raw) {
-    if (raw === undefined || raw === null || raw === '') {
-      return { bpm: null, tempoNote: null }
-    }
-    if (typeof raw === 'number') {
-      return { bpm: raw, tempoNote: null }
-    }
-    const str = `${raw}`.trim()
-    let tempoNote = null
-    let bpmPart = str
-    const parenMatch = str.match(/\(([^)]+)\)/)
-    if (parenMatch) {
-      tempoNote = parenMatch[1].trim()
-      bpmPart = str.replace(/\([^)]*\)/g, '').trim()
-    }
-    const bpmMatch = bpmPart.match(/-?\d+(?:\.\d+)?/)
-    const bpm = bpmMatch ? Number(bpmMatch[0]) : null
-    return {
-      bpm: Number.isFinite(bpm) ? bpm : null,
-      tempoNote,
-    }
   }
 }

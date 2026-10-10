@@ -6,6 +6,7 @@ import {
   findExistingSong,
   formatArtistNames,
   getDefaultVariant,
+  getLibrarySongs,
   getSongById,
   getSongVariants,
   getSongWithContent,
@@ -166,5 +167,64 @@ describe('hashText', () => {
     expect(hashText('[G]Amazing grace')).to.equal(hashText('[G]Amazing grace'))
     expect(hashText('[G]Amazing grace')).to.not.equal(hashText('[A]Amazing grace'))
     expect(hashText('x')).to.match(/^hash-[0-9a-f]+$/)
+  })
+})
+
+describe('getLibrarySongs', () => {
+  it('gives the songs by title, whatever order they were added in', async () => {
+    const stamp = crypto.randomUUID().slice(0, 8)
+    await createSong(chart(`Zeta ${stamp}`))
+    await createSong(chart(`alpha ${stamp}`))
+    await createSong(chart(`Mu ${stamp}`))
+    const db = await getCurrentDB()
+    const titles = (await getLibrarySongs(db))
+      .map(song => song.title)
+      .filter(t => t.endsWith(stamp))
+    expect(titles).to.deep.equal([`alpha ${stamp}`, `Mu ${stamp}`, `Zeta ${stamp}`])
+  })
+
+  it('has one entry for a song with several variants', async () => {
+    const title = unique('Has variants')
+    const song = await createSong(chart(title))
+    await createVariant(song.uuid, 'Acoustic', chart(title, { key: 'A' }))
+    const db = await getCurrentDB()
+    const matching = (await getLibrarySongs(db)).filter(entry => entry.title === title)
+    expect(matching).to.have.length(1)
+    expect(matching[0].id).to.equal(song.id)
+  })
+
+  it('says when and by whom a song was last played, only when asked', async () => {
+    const title = unique('Last played')
+    const song = await createSong(chart(title))
+    const db = await getCurrentDB()
+    const setlist = songDate => ({
+      id: crypto.randomUUID(),
+      date: songDate,
+      owner: `Leader ${songDate}`,
+      songs: [{ songId: song.id, key: 'C' }],
+    })
+    await db.saveSetlist(setlist('2026-01-04'))
+    await db.saveSetlist(setlist('2026-03-01'))
+
+    const withUsage = (await getLibrarySongs(db, { withLastUsage: true })).find(
+      entry => entry.id === song.id
+    )
+    expect(withUsage.lastUsageInfo).to.deep.equal({
+      date: '2026-03-01',
+      leader: 'Leader 2026-03-01',
+      key: 'C',
+    })
+
+    const without = (await getLibrarySongs(db)).find(entry => entry.id === song.id)
+    expect(without.lastUsageInfo).to.equal(undefined)
+  })
+
+  it('has no usage for a song never played', async () => {
+    const song = await createSong(chart(unique('Never played')))
+    const db = await getCurrentDB()
+    const entry = (await getLibrarySongs(db, { withLastUsage: true })).find(
+      candidate => candidate.id === song.id
+    )
+    expect(entry.lastUsageInfo).to.equal(undefined)
   })
 })

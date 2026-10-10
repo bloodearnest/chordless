@@ -24,23 +24,13 @@ import { goTo } from '../navigation.js'
 import { ChordProParser } from '../parser.js'
 import { buildUrl } from '../router.js'
 import { createLibrarySongModel } from '../song-model-factory.js'
-import { getSongWithContent } from '../song-utils.js'
+import { getLibrarySongs, getSongWithContent } from '../song-utils.js'
 import * as SongViewManager from '../song-view-manager.js'
 import { getAvailableKeys, transposeSong } from '../transpose.js'
+import { filterSongs } from '../utils/song-filter.js'
 import { PageView } from './page-view.js'
 
 const { CONFIG } = SongViewManager
-
-/** Songs whose title, artist or lyrics contain the search term */
-export function filterSongs(songs, searchTerm) {
-  const term = searchTerm.toLowerCase().trim()
-  if (!term) return songs
-  return songs.filter(song =>
-    [song.title, song.artist, song.lyricsText].some(text =>
-      (text || '').toLowerCase().includes(term)
-    )
-  )
-}
 
 export class LibraryView extends PageView {
   static properties = {
@@ -76,38 +66,9 @@ export class LibraryView extends PageView {
   }
 
   /** The library, by title, each song with when it was last used */
+  /** The library, by title, each song with when it was last used */
   #songs = new Task(this, {
-    task: async () => {
-      const db = await getCurrentDB()
-      const records = await db.getAllSongs()
-
-      // One song per deterministic id, not one per variant
-      const byId = new Map()
-      for (const record of records) {
-        if (record.isDefault || !byId.has(record.id)) byId.set(record.id, record)
-      }
-
-      const songs = []
-      for (const record of byId.values()) {
-        try {
-          const song = await getSongWithContent(record.uuid)
-          const usage = await db.getSongUsageFromSetlists(song.id)
-          if (usage?.length > 0) {
-            song.lastUsageInfo = {
-              date: usage[0].setlistDate,
-              leader: usage[0].leader,
-              key: usage[0].playedInKey,
-            }
-          }
-          songs.push(song)
-        } catch (error) {
-          console.error(`Error loading song ${record.uuid}:`, error)
-        }
-      }
-      return songs.sort((a, b) =>
-        (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase())
-      )
-    },
+    task: async () => getLibrarySongs(await getCurrentDB(), { withLastUsage: true }),
     args: () => [],
   })
 

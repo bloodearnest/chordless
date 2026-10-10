@@ -80,6 +80,48 @@ export async function getSongWithContent(songUuid, db = null) {
 }
 
 /**
+ * The library's songs, by title: one entry for each song (its default variant, not
+ * every variant), with its chart parsed. A song that can't be loaded is left out.
+ * @param {object} db the organisation's database
+ * @param {object} [options]
+ * @param {boolean} [options.withLastUsage] also set lastUsageInfo on each song, from
+ *   the setlist it was last played in: {date, leader, key}
+ */
+export async function getLibrarySongs(db, { withLastUsage = false } = {}) {
+  const records = await db.getAllSongs()
+
+  // One song per deterministic id, not one per variant
+  const byId = new Map()
+  for (const record of records) {
+    if (record.isDefault || !byId.has(record.id)) byId.set(record.id, record)
+  }
+
+  const songs = []
+  for (const record of byId.values()) {
+    try {
+      const song = await getSongWithContent(record.uuid, db)
+      if (withLastUsage) {
+        const usage = await db.getSongUsageFromSetlists(song.id)
+        if (usage?.length > 0) {
+          song.lastUsageInfo = {
+            date: usage[0].setlistDate,
+            leader: usage[0].leader,
+            key: usage[0].playedInKey,
+          }
+        }
+      }
+      songs.push(song)
+    } catch (error) {
+      console.error(`Error loading song ${record.uuid}:`, error)
+    }
+  }
+
+  return songs.sort((a, b) =>
+    (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase())
+  )
+}
+
+/**
  * Get all variants of a song
  *
  * @param {string} songId - Deterministic song ID
