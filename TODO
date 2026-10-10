@@ -31,6 +31,15 @@ browser support (parked until the Vite work has landed)
   crypto.randomUUID and dialog use against 15.4; make the service worker classic (not a module)
   for old Android Chrome, if Vite can emit it; update the README line "targets recent browsers
   only" and the browser line in CLAUDE.md
+- Core is setlist navigation (reading and moving through the setlist, offline). The media player
+  is optional and may be off on older devices: it is not loaded when the device has no Web Audio
+  or it is switched off in Preferences (media-player-loader.js), and a player that fails to load
+  is a warning, not an error. Don't make the core depend on it
+- Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often old, often on
+  poor wifi. So: the app must open offline from its cache (needs the full precache from the Vite
+  work), data must survive the weeks between (the install nag, below), and a signed-in session
+  and the Drive link must still work after weeks (test an expired token with no network: local
+  setlists must still show)
 - Already done: no Popover API (menu, song settings, key/capo picker are modal <dialog>s via
   DialogPopup), no CSS nesting, no Navigation API
 - Needs a real old iPad (an iPad 5th gen on iPadOS 16.7 is the best single test) or a device
@@ -167,12 +176,48 @@ player
  - survive pageloads? -maybe migrate to SPA
 
 UI
+- recover when Safari has cleared the storage: the nag is the prevention, this is the cure.
+  The JWE key stays in the worker (JWE_ENCRYPTION_KEY): the worker needs it to decrypt the blob
+  and use the Google refresh token, and the browser must never hold it. What the browser holds
+  is the encrypted blob in IndexedDB (auth-db.js), and that is what an eviction deletes, along
+  with the organisations and their Drive-folder links (organisation-db.js), the songs and
+  setlists (db.js) and the current-org marker (localStorage). So there is nothing on the device
+  to restore from: recovery needs either the user or the server.
+  - Detect it: a marker in localStorage ("this device has data") that is missing while the
+    app is opened fresh. Then say "Safari cleared this device's data" and offer sign-in.
+  - Simple (try first): the user signs in again. google-auth.js already uses
+    access_type: 'offline' with prompt: 'consent', so a new sign-in should be issued a new
+    refresh token, and the existing first-sign-in sync (checkFirstTimeAuth renames the Personal
+    org to the Google name, Sync joins the existing same-named Drive folder) brings the setlists
+    back. Verify with a real wipe. It needs the network and one tap at church.
+  - Automatic (only if the simple way proves too much for people at church): the worker also
+    sets the blob as an HttpOnly, Secure, SameSite=Lax cookie (Path=/session) on /oauth/callback,
+    clears it on /session/revoke, and POST /session/restore returns what /oauth/callback does.
+    WebKit's tracking prevention (webkit.org/tracking-prevention) caps cookies created in
+    JavaScript, not Set-Cookie ones (except under CNAME cloaking to a third party), so it
+    survives the eviction. It is an auth change: review with the user. Needs a same-origin
+    check (Origin / Sec-Fetch-Site) on /session/*, no Access-Control-Allow-Credentials with a
+    reflected origin, the current `Access-Control-Allow-Origin: *` restricted, "Clear Local
+    Data" clearing the cookie too, and chordless.app not being a CNAME to another domain
+  - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
+    often (see the background sync item)
 - autoscaling font
-- install nag ("install to keep your data on this device"): Safari (iOS, and macOS)
-  clears a site's storage after 7 days without a visit unless it's installed,
-  including the sign-in, the org's Drive folder link, unsynced changes, settings and
-  pads. Show it on the home page only (never during a setlist), with "Not now" hiding
-  it for a while. Chromium: an Install button via beforeinstallprompt. iOS: Share ›
+- install nag ("install to keep your data on this device"): MOST IMPORTANT for a dedicated church
+  iPad that is only opened when its owner is on the rota (every 3 to 4 weeks). Safari (iOS, and
+  macOS) deletes a site's script-writable storage (IndexedDB, localStorage, the service worker
+  and its caches) after 7 days of Safari use without the user interacting with the site (days
+  the browser is used, not calendar days: a rarely used iPad is not wiped just by sitting idle,
+  but Safari use on other days counts; WebKit's "Full Third-Party Cookie Blocking and More"
+  post, 2020; not re-checked since) unless the site is added to the Home Screen, which has its
+  own counter. What is lost: the sign-in, the org's Drive folder link, unsynced changes, settings
+  and pads, and at church, with poor wifi, the setlists are gone until signed in and synced.
+  On iOS and iPadOS in a Safari tab (not navigator.standalone) it should INSIST: not a corner
+  banner that "Not now" dismisses for weeks, but a sheet over the home page that explains the
+  risk in one line and walks through Share › Add to Home Screen, back each time the app is
+  opened in Safari until it is installed. Allow "Continue in Safari anyway" for that visit only
+  (people borrow an iPad, or are mid-rota). Never over a setlist (the home page only). Detect
+  iOS with the user agent or, for iPadOS (which reports as a Mac), maxTouchPoints > 1.
+  Chromium: an Install button via beforeinstallprompt. iOS: Share ›
   Add to Home Screen instructions (no API). Mac Safari: File › Add to Dock. Skip when
   already installed (display-mode: standalone / navigator.standalone). On iOS and Mac
   Safari the installed app has its own storage, separate from Safari's, so the user
