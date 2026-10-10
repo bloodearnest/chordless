@@ -7,7 +7,7 @@ Run it before committing.
 | --- | --- | --- | --- |
 | Node | `node --test` | `tests/*.node.test.js` | `just test-node` |
 | Browser unit | Web Test Runner, in Chromium | `tests/*.test.js` (not `*.node.test.js`) | `just test-unit` |
-| End to end | Playwright, against `npm run dev` | `tests/*.playwright.js` | `just test-browser-headless` |
+| End to end | Playwright, against `just serve` | `tests/*.playwright.js` | `just test-browser-headless` |
 
 New test files are picked up by their name; there's no list to add them to.
 
@@ -44,11 +44,11 @@ app's own modules, imported directly: there's no build step to test around.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
   only for tests that fail.
 
-Run one file with `npx web-test-runner tests/db.test.js`.
+Run one file with `just test-unit tests/db.test.js`.
 
 ## End-to-end tests
 
-Playwright drives the app as a user would, served by `npm run dev` (wrangler, at
+Playwright drives the app as a user would, served by `just serve` (at
 `localhost:8787`), with the service worker and real page loads. Tests run fully in
 parallel, each in its own browser context.
 
@@ -80,7 +80,7 @@ are only for things with no role yet, such as the key and capo pickers' options.
 The app does a lot asynchronously, so wait for what a user would see, or for what was
 stored (`expect.poll(() => fromDB(...))`), before the next step. In particular, don't
 reload until a change has been saved. Running tests in parallel makes the machine
-slower, which shows up races like these: `npx playwright test --repeat-each=5` is a
+slower, which shows up races like these: `just test-browser-headless --repeat-each=5` is a
 good check for a new test.
 
 `just test-browser-ui` opens Playwright's UI, to step through a test.

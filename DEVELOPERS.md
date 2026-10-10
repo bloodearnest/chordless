@@ -1,62 +1,89 @@
-# Chordless Development Guide
+# Developing Chordless
 
-Chordless is designed to run exactly the same locally as it does in production: an HTTPS-only, service-worker-driven webapp served by Caddy with HTTP/2/3 enabled. Follow this guide to get your machine ready and to keep certificates in sync.
+There is no build step: the files in `public/` are what gets served. Commands are run
+with [`just`](https://github.com/casey/just); run `just` on its own to list them.
 
-## Prerequisites
+## Setup
 
-- [Caddy](https://caddyserver.com/) installed on your PATH (used by `just serve`).
-- `openssl` for certificate generation.
-- `sudo` access so the local CA can be added to `/usr/local/share/ca-certificates`.
-- Optional but recommended: `certutil` (`libnss3-tools` on Debian/Ubuntu) so Chrome/Chromium trust the CA automatically.
-
-## One-time setup per machine
+You need Node and `just`.
 
 ```bash
-# generate certs/certs/dev.(crt|key) + trust them system-wide and for Chrome
-just setup-dev-https
+just setup   # npm dependencies, and Chromium for the end-to-end tests
 ```
 
-What this does:
+Sign-in needs Google OAuth credentials and a session key, in a `.dev.vars` file in the
+project root (not committed):
 
-1. Generates `certs/dev.crt` and `certs/dev.key` if they do not already exist.
-2. Copies the certificate into `/usr/local/share/ca-certificates/chordless-dev.crt` and runs `update-ca-certificates` (you will be prompted for sudo).
-3. If `certutil` is available, adds/removes the `chordless-dev` CA entry inside Chrome/Chromium’s NSS database at `~/.pki/nssdb`.
-4. Reminds you to restart browsers so they pick up the refreshed trust store.
+```
+JWE_ENCRYPTION_KEY=<base64 symmetric key>
+GOOGLE_CLIENT_ID=<Google OAuth client id>
+GOOGLE_CLIENT_SECRET=<Google OAuth client secret>
+```
 
-To undo the setup (e.g., before rotating the certs or leaving the project), run:
+Without it the app still runs, but you can't sign in or sync with Drive.
+
+## Running it
 
 ```bash
-just remove-dev-https
+just serve    # http://localhost:8787
 ```
 
-This removes the system CA entry, clears the Chrome/Chromium NSS entry, and deletes `certs/dev.*`.
+`just serve` runs the app's Cloudflare Worker locally. It serves `public/` and handles
+the OAuth and session routes. The first visit registers the service worker,
+and the page reloads once it is active. In DevTools, filter the console for `[SW]` to
+see its logs.
 
-## Daily workflow
+Browser data (IndexedDB, sign-in) belongs to the origin, so keep using the same URL.
+`just funnel` exposes the local server over Tailscale at a stable address, for testing
+on a phone or tablet.
+
+## Before you commit
 
 ```bash
-# start Caddy with HTTP/1.1 + 2 + 3 on https://localhost:8443
-just serve
-
-# visit the app
-open https://localhost:8443
+just format lint test
 ```
 
-Notes:
+| Recipe | What it does |
+| --- | --- |
+| `just format` | Formats with Biome |
+| `just lint` | Lints with Biome |
+| `just test` | Runs the three suites below |
+| `just test-node` | Node tests (the worker, event names) |
+| `just test-unit` | Browser unit tests, in Web Test Runner. Takes files: `just test-unit tests/db.test.js` |
+| `just test-browser-headless` | End-to-end tests, in Playwright. Takes files and options: `just test-browser-headless tests/live.playwright.js --repeat-each=5` |
+| `just test-browser-ui` | Playwright's UI, to step through a test |
+| `just test-browser-headed` | Playwright with a visible browser |
+| `just coverage` | Browser unit test coverage, in `coverage/index.html` |
 
-- The first visit registers the service worker; the page reloads automatically once it is active.
-- Use DevTools Console and filter for `[SW]` to inspect service-worker logs.
-- The importer and Google auth flows rely on HTTPS. Do not fall back to Python/Node static servers; they are unsupported.
-- `just format lint test` checks everything before a commit. See [TESTING.md](TESTING.md) for the test suites.
+[docs/TESTING.md](docs/TESTING.md) covers what each suite is for and how to write tests.
+
+## Other recipes
+
+| Recipe | What it does |
+| --- | --- |
+| `just setup` | First-time setup (see above) |
+| `just vendor` | Copies vendored dependencies from `node_modules` into `public/vendor/` |
+| `just deploy` | Deploys the Worker and `public/` to Cloudflare |
+| `just secrets` | Pushes the secrets in `.dev.vars` to Cloudflare |
+
+## Conventions
+
+- Vanilla JavaScript only. Never add a build step; npm is only for managing the
+  versions of vendored libraries, which are served locally as modules.
+- Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
+  native browser features.
+- Components are [Lit](https://lit.dev/) web components in `public/components/`.
 
 ## Dev pages (component playgrounds)
 
-`public/dev/` holds pages for developing components visually, in isolation. With `just serve`
-running, open http://localhost:8787/dev/ for the list.
+`public/dev/` holds pages for developing components visually, in isolation. With
+`just serve` running, open http://localhost:8787/dev/ for the list.
 
-- They are only served locally: `npm run dev` uses the `[env.dev]` environment in
-  `wrangler.toml`, which sets `DEV_PAGES`. The worker returns 404 for `/dev/*` without it, so
-  they never reach production. Put other local-only settings in `[env.dev]` too.
+- They are only served locally: `just serve` uses the `[env.dev]` environment in
+  `wrangler.toml`, which sets `DEV_PAGES`. The worker returns 404 for `/dev/*` without
+  it, so they never reach production. Put other local-only settings in `[env.dev]` too.
 - When adding a page, link it from `public/dev/index.html` and use absolute paths
   (`/js/...`, `/components/...`, `/css/style.css`).
-- `tests/dev-pages.playwright.js` loads every page and fails on JS errors, failed requests or
-  unregistered custom elements, so a broken playground shows up in `just test-browser-headless`.
+- `tests/dev-pages.playwright.js` loads every page and fails on JS errors, failed
+  requests or unregistered custom elements, so a broken playground shows up in
+  `just test-browser-headless`.
