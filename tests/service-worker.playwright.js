@@ -1,4 +1,4 @@
-import { expect, seedSetlist, test } from './fixtures.js'
+import { expect, fromDB, seedSetlist, test } from './fixtures.js'
 
 // Wait for the SW to be installed, activated, and controlling the page.
 // skipWaiting + clients.claim means this happens on first load, but
@@ -76,4 +76,56 @@ test('a setlist opened online can be reloaded while offline', async ({ page, con
   } finally {
     await context.setOffline(false)
   }
+})
+
+// A few actions reload the page on purpose (they replace the database under every view).
+// They must work with no network, which is when a band most needs the app.
+test.describe('Reloads on purpose, while offline', () => {
+  /** Open the storage view, and let the service worker cache what it needs to restart */
+  async function openStorageOnline(page) {
+    await seedSetlist(page, { setlistId: 'offline-reload-setlist' })
+    await page.goto('/storage')
+    await waitForSW(page)
+    await expect(page.locator('storage-view')).toBeVisible()
+    await page.waitForLoadState('networkidle')
+  }
+
+  test('clearing local data, then restarting, with no network', async ({ page, context }) => {
+    await openStorageOnline(page)
+    await context.setOffline(true)
+    try {
+      await page.locator('storage-page').getByRole('button', { name: 'Clear Local Data' }).click()
+      await Promise.all([
+        page.waitForEvent('load'),
+        page
+          .locator('storage-page #clear-data-modal')
+          .getByRole('button', { name: 'Clear Local Data' })
+          .click(),
+      ])
+      // The app came back from the service worker's cache, with its data gone
+      await expect(page.locator('storage-view')).toBeVisible()
+      await expect(page).toHaveTitle('Storage - Chordless')
+      expect(await fromDB(page, 'getSetlist', 'offline-reload-setlist')).toBeFalsy()
+    } finally {
+      await context.setOffline(false)
+    }
+  })
+
+  test('switching organisation, then restarting, with no network', async ({ page, context }) => {
+    await openStorageOnline(page)
+    await context.setOffline(true)
+    try {
+      await Promise.all([
+        page.waitForEvent('load'),
+        page.evaluate(async () => {
+          const { getCurrentOrganisation, switchOrganisation } = await import('/js/organisation.js')
+          await switchOrganisation(getCurrentOrganisation().id)
+        }),
+      ])
+      await expect(page.locator('storage-view')).toBeVisible()
+      await expect(page).toHaveTitle('Storage - Chordless')
+    } finally {
+      await context.setOffline(false)
+    }
+  })
 })
