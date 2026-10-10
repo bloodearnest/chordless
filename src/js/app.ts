@@ -7,7 +7,7 @@ import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
-import { views } from './views/registry.js'
+import { views } from './views/registry.ts'
 
 // Answer the service worker's requests for a Google ID token
 import('./google-auth.ts').then(({ listenForIdTokenRequests }) => listenForIdTokenRequests())
@@ -15,14 +15,17 @@ import('./google-auth.ts').then(({ listenForIdTokenRequests }) => listenForIdTok
 // The first sign-in renames the organisation: before anything shows its name
 await checkFirstTimeAuth()
 
+const outlet = document.getElementById('view-outlet')
+if (!outlet) throw new Error('The page has no #view-outlet')
+
 const router = new AppRouter({
-  outlet: document.getElementById('view-outlet'),
+  outlet,
   announcer: document.getElementById('route-announcer'),
   views,
 })
 setRouter(router)
 document.addEventListener(RouteChangeEvent.type, event => {
-  document.body.dataset.view = event.route.name
+  document.body.dataset.view = (event as RouteChangeEvent).route.name
 })
 
 await router.start()

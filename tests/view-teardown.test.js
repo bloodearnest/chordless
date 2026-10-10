@@ -14,7 +14,7 @@ import '../src/js/views/import-song-view.ts'
 import '../src/js/views/library-view.ts'
 import '../src/js/views/not-found-view.ts'
 import '../src/js/views/preferences-view.ts'
-import '../src/js/views/setlist-view.js'
+import '../src/js/views/setlist-view.ts'
 import '../src/js/views/storage-view.ts'
 import { suppressConsoleLogs } from './test-helpers.js'
 

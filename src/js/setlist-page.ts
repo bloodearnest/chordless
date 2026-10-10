@@ -1,36 +1,56 @@
 import {
+  type AppHeader,
   EditModeToggleEvent,
   HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
 } from '../components/app-header.ts'
-import { CapoChangeEvent } from '../components/capo-selector.ts'
-import { KeyChangeEvent } from '../components/key-selector.ts'
-import { SongSettingsClickEvent } from '../components/musical-metadata-display.ts'
-import { MenuOverviewClickEvent, MenuSongClickEvent } from '../components/nav-menu.ts'
-import { SetlistInfoSaveEvent } from '../components/setlist-info-dialog.ts'
+import type { AppModal } from '../components/app-modal.ts'
+import { CapoChangeEvent, type CapoSelector } from '../components/capo-selector.ts'
+import { KeyChangeEvent, type KeySelector } from '../components/key-selector.ts'
+import {
+  type MusicalMetadataDisplay,
+  SongSettingsClickEvent,
+} from '../components/musical-metadata-display.ts'
+import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
+import { type SetlistInfoDialog, SetlistInfoSaveEvent } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
+  type SetlistOverview,
 } from '../components/setlist-overview.ts'
-import { SectionActionEvent, SectionToggleEvent } from '../components/song-section.ts'
-import { BpmChangeEvent, SongResetClickEvent } from '../components/song-settings-popover.ts'
+import type { SongDisplay } from '../components/song-display.ts'
+import type { SongInfoDialog } from '../components/song-info-dialog.ts'
+import {
+  SectionActionEvent,
+  SectionToggleEvent,
+  type SongSection,
+} from '../components/song-section.ts'
+import {
+  BpmChangeEvent,
+  SongResetClickEvent,
+  type SongSettingsPopover,
+} from '../components/song-settings-popover.ts'
 import { SongChangeEvent } from './app-events.ts'
-import { getCurrentDB } from './db.ts'
+import type { HideMode, LoadedSong, SectionState, Setlist, SongWithContent } from './data-types.ts'
+import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { goTo } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
-import { buildUrl } from './router.ts'
+import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
-import { buildRuntimeSongs, parseTempoMetadata } from './setlist/runtime-songs.ts'
+import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
+import type { SongUserPrefs } from './song-user-prefs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
+import { errorMessage } from './utils/errors.ts'
 import { isInModalDialog, isTypingInField } from './utils/keyboard.ts'
 import { showStatusMessage } from './utils/status-message.ts'
+import type { ViewState } from './views/page-view.ts'
 
 // Configuration constants
 const CONFIG = {
@@ -52,6 +72,25 @@ const CONFIG = {
 
 const SECTION_DEFAULTS_KEY = 'section_defaults'
 
+/** What the page keeps of itself for when the user comes back: how far each section was scrolled */
+export interface SetlistPageState extends ViewState {
+  scrolls?: Record<string, number>
+}
+
+/** What loadState reads: the song models' format, or the older flat one */
+interface SavedState {
+  sectionState?: SectionStates
+  capoValues?: Record<string, unknown>
+  capo?: Record<string, unknown>
+  [songIndex: string]: unknown
+}
+
+/** The sections' states that differ from the defaults, by song index then section index */
+type SectionStates = Record<number, Record<number, SectionState>>
+
+/** Which words of `section_defaults` are saved: a choice per section label, and 'all' */
+type SectionDefaultsConfig = Record<string, string>
+
 /**
  * The setlist page: the overview of a setlist and each of its songs, side by
  * side in a scroll-snap row, with the header, edit mode and the menu's song list.
@@ -64,13 +103,67 @@ const SECTION_DEFAULTS_KEY = 'section_defaults'
  * navigates (navigateTo); the route change then shows the song.
  */
 export class SetlistPage {
+  root: HTMLElement
+  _restoredState: SetlistPageState | undefined
+  _setlistId: string
+  _initialSongIndex: number
+  _abort: AbortController
+  _disposed: boolean
+  db: ChordlessDB | null
+  parser: ChordProParser
+  /** The song being shown, -1 for the overview; NaN until the setlist has been shown */
+  currentSongIndex: number
+  songs: RuntimeSong[]
+  currentSetlistId: string | null
+  currentSetlist: Setlist | undefined
+  sectionState: SectionStates
+  sectionObserver: IntersectionObserver | null
+  overviewEditMode: boolean
+  settingsImportHandler: null
+  storageImportHandler: null
+  globalImportHandler: null
+  _overviewComponent: SetlistOverview | null
+  _sectionDefaultsCache: SectionDefaultsConfig | null
+  _sectionDefaultsRaw: string | null
+  _songUserPrefsCache?: Record<string, SongUserPrefs | null>
+  _capoEnabled: boolean
+  _capoChangeHandler: ((event: Event) => void) | null
+  _keyChangeHandler?: (event: Event) => void
+  _sectionActionHandler?: (event: Event) => void
+  _sectionToggleHandler?: (event: Event) => void
+  _setlistDetailsSaveHandler?: (event: Event) => void
+  _currentKeyForCapo: string
+  _currentSongForInfo?: RuntimeSong | null
+  _editModeSetup?: boolean
+  _appHeaderEventsSetup?: boolean
+  _lastVisibleSection?: string | null
+  _isProgrammaticScroll?: boolean
+  _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
+  _onSectionDefaultsChanged: () => void
+  _onCapoPreferenceChange: () => void
+  _onOverviewSongClick: (event: Event) => void
+  _onOverviewSongDelete: (event: Event) => void
+  _onOverviewAddSong: () => void
+  _onOverviewSongKeyChange: (event: Event) => void
+  _reorder: OverviewReorder
+  _addSongModal: AddSongModal
+
   /**
-   * @param {object} options
-   * @param {HTMLElement} options.root the view this page is in: it looks for its elements there
-   * @param {object} [options.restoredState] what captureViewState() gave when the page was
-   *   left, if it is being come back to
+   * @param options.root the view this page is in: it looks for its elements there
+   * @param options.restoredState what captureViewState() gave when the page was left, if it is
+   *   being come back to
    */
-  constructor({ root, setlistId, songIndex = -1, restoredState = undefined }) {
+  constructor({
+    root,
+    setlistId,
+    songIndex = -1,
+    restoredState = undefined,
+  }: {
+    root: HTMLElement
+    setlistId: string
+    songIndex?: number
+    restoredState?: SetlistPageState
+  }) {
     this.root = root
     this._restoredState = restoredState
     this._setlistId = setlistId
@@ -80,9 +173,10 @@ export class SetlistPage {
     this._disposed = false
     this.db = null // Will be initialized in start()
     this.parser = new ChordProParser()
-    this.currentSongIndex = undefined
+    this.currentSongIndex = Number.NaN
     this.songs = []
     this.currentSetlistId = null
+    this.currentSetlist = undefined
     // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
     this.sectionState = {}
     this.sectionObserver = null
@@ -100,15 +194,15 @@ export class SetlistPage {
     this._onCapoPreferenceChange = this._handleCapoPreferenceChange.bind(this)
 
     // Bind overview component event handlers once
-    this._onOverviewSongClick = event => {
-      const index = event.index
+    this._onOverviewSongClick = (event: Event) => {
+      const index = (event as OverviewSongClickEvent).index
       if (typeof index === 'number') {
         this.navigateTo(index)
       }
     }
 
-    this._onOverviewSongDelete = event => {
-      const index = event.index
+    this._onOverviewSongDelete = (event: Event) => {
+      const index = (event as OverviewSongDeleteEvent).index
       if (typeof index === 'number' && this.songs[index]) {
         this.showDeleteSongConfirmation(index, this.songs[index])
       }
@@ -126,16 +220,22 @@ export class SetlistPage {
 
     this._addSongModal = new AddSongModal({
       root: this.root,
-      getDb: () => this.db,
+      getDb: () => this._database(),
       onPick: song => this.addSongToSetlist(song),
     })
 
-    this._onOverviewSongKeyChange = event => {
-      const { index, key } = event
+    this._onOverviewSongKeyChange = (event: Event) => {
+      const { index, key } = event as OverviewSongKeyChangeEvent
       if (typeof index === 'number' && key) {
         this.changeSongKeyInSetlist(index, key)
       }
     }
+  }
+
+  /** The organisation's database; start() opens it */
+  _database(): ChordlessDB {
+    if (!this.db) throw new Error('The setlist page has not been started')
+    return this.db
   }
 
   async start() {
@@ -157,9 +257,9 @@ export class SetlistPage {
 
   /** The route changed within this setlist: show the song it names */
   /** How far each song (and the overview) is scrolled, to put back if the user returns */
-  captureViewState() {
-    const scrolls = {}
-    for (const section of this.root.querySelectorAll('.section')) {
+  captureViewState(): SetlistPageState | undefined {
+    const scrolls: Record<string, number> = {}
+    for (const section of this.root.querySelectorAll<HTMLElement>('.section')) {
       if (section.scrollTop) scrolls[section.id] = section.scrollTop
     }
     return Object.keys(scrolls).length > 0 ? { scrolls } : undefined
@@ -170,12 +270,12 @@ export class SetlistPage {
     const scrolls = this._restoredState?.scrolls
     this._restoredState = undefined
     for (const [id, top] of Object.entries(scrolls ?? {})) {
-      const section = this.root.querySelector(`#${id}`)
+      const section = this.root.querySelector<HTMLElement>(`#${id}`)
       if (section) section.scrollTop = top
     }
   }
 
-  routeChanged(route) {
+  routeChanged(route: Extract<Route, { name: 'setlist' }>) {
     if (this._disposed || !this.currentSetlist) return
     const index = route.songIndex
     const section = index >= 0 ? `song-${index}` : 'overview'
@@ -191,10 +291,11 @@ export class SetlistPage {
    * Go to a song, or the overview (-1). Moving from the overview into a song adds
    * to the history, and back to the overview undoes it; song to song replaces.
    */
-  navigateTo(index, { replace = false } = {}) {
-    return goTo(buildUrl({ name: 'setlist', setlistId: this.currentSetlistId, songIndex: index }), {
-      replace,
-    })
+  navigateTo(index: number, { replace = false }: { replace?: boolean } = {}) {
+    return goTo(
+      buildUrl({ name: 'setlist', setlistId: this.currentSetlistId ?? '', songIndex: index }),
+      { replace }
+    )
   }
 
   /** Undo what this page did outside its own elements */
@@ -214,7 +315,7 @@ export class SetlistPage {
     document.documentElement.style.setProperty('--header-expanded', '0')
 
     // The menu is the shell's: take the setlist's songs out of it
-    const navMenu = document.getElementById('nav-menu')
+    const navMenu = document.getElementById('nav-menu') as NavMenu | null
     if (navMenu) {
       navMenu.songs = []
       navMenu.setlistTitle = 'Setlist'
@@ -240,15 +341,15 @@ export class SetlistPage {
     })
   }
 
-  async renderSetlist(setlistId, songIndex = -1) {
+  async renderSetlist(setlistId: string, songIndex = -1) {
     console.log('renderSetlist called with:', setlistId)
     try {
       // Load setlist from IndexedDB
-      const setlist = await this.db.getSetlist(setlistId)
+      const setlist = await this._database().getSetlist(setlistId)
 
       if (!setlist) {
         console.error('[ERROR] Setlist not found in IndexedDB:', setlistId)
-        const container = this.root.querySelector('.song-container')
+        const container = this.root.querySelector<HTMLElement>('.song-container')
         showStatusMessage(container, {
           message: 'Setlist not found.',
           state: 'error',
@@ -274,7 +375,7 @@ export class SetlistPage {
         this.setupAppHeaderEvents()
 
         // Clear container (will show Add Song button via overview)
-        const container = this.root.querySelector('.song-container')
+        const container = this._songContainer()
         container.textContent = ''
         container.appendChild(this.renderFullSetlist(setlist, []))
 
@@ -291,7 +392,7 @@ export class SetlistPage {
 
       // Parse each song on-demand
       const songs = await buildRuntimeSongs(setlist, {
-        db: this.db,
+        db: this._database(),
         parser: this.parser,
         fontSize: CONFIG.DEFAULT_FONT_SIZE,
       })
@@ -315,7 +416,7 @@ export class SetlistPage {
       if (songIndex >= 0 && !shouldShowSongDirectly) this.navigateTo(-1, { replace: true })
 
       // Render all songs on one page
-      const container = this.root.querySelector('.song-container')
+      const container = this._songContainer()
       console.log('Rendering full setlist into container:', container)
       // Clear container and append fragment
       container.textContent = ''
@@ -325,7 +426,7 @@ export class SetlistPage {
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
       if (shouldShowSongDirectly) {
-        const targetSection = container.querySelector(`#song-${songIndex}`)
+        const targetSection = container.querySelector<HTMLElement>(`#song-${songIndex}`)
         if (targetSection) {
           // Set scroll position immediately, before browser paints
           // scrollTo, not scrollLeft: the stylesheet's smooth scrolling would animate that
@@ -384,7 +485,7 @@ export class SetlistPage {
       })
     } catch (error) {
       console.error('Error loading setlist:', error)
-      const container = this.root.querySelector('.song-container')
+      const container = this.root.querySelector<HTMLElement>('.song-container')
       showStatusMessage(container, {
         message: 'Error loading songs. Please check the console.',
         state: 'error',
@@ -393,7 +494,13 @@ export class SetlistPage {
     }
   }
 
-  _setOverviewComponent(component) {
+  _songContainer(): HTMLElement {
+    const container = this.root.querySelector<HTMLElement>('.song-container')
+    if (!container) throw new Error('The setlist page has no song container')
+    return container
+  }
+
+  _setOverviewComponent(component: SetlistOverview | null) {
     if (this._overviewComponent) {
       this._overviewComponent.removeEventListener(
         OverviewSongClickEvent.type,
@@ -436,7 +543,7 @@ export class SetlistPage {
   }
 
   /** The URL follows a swipe to another song or the overview (not a new history entry) */
-  _replaceHistoryForSong(index) {
+  _replaceHistoryForSong(index: number) {
     this.navigateTo(index, { replace: true })
   }
 
@@ -444,7 +551,7 @@ export class SetlistPage {
     this.navigateTo(-1, { replace: true })
   }
 
-  renderFullSetlist(_setlist, songs) {
+  renderFullSetlist(_setlist: Setlist, songs: RuntimeSong[]) {
     const fragment = document.createDocumentFragment()
 
     // Create overview section rendered by Lit component
@@ -485,11 +592,11 @@ export class SetlistPage {
     return fragment
   }
 
-  _initializeSongSections(root = this.root) {
+  _initializeSongSections(root: ParentNode = this.root) {
     const isEditMode = document.body.classList.contains('edit-mode')
 
     // Find all song-section elements, including those inside song-display shadow DOMs
-    const sections = []
+    const sections: SongSection[] = []
 
     // First, get any song-sections directly in the root
     sections.push(...root.querySelectorAll('song-section'))
@@ -518,18 +625,18 @@ export class SetlistPage {
     })
   }
 
-  _getSongSectionComponent(songIndex, sectionIndex) {
+  _getSongSectionComponent(songIndex: number, sectionIndex: number): SongSection | null {
     // First try direct query (in case not in shadow DOM)
-    let section = this.root.querySelector(
+    let section: SongSection | null = this.root.querySelector<SongSection>(
       `song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`
     )
     if (section) return section
 
     // Query into song-display shadow roots
-    const songDisplays = this.root.querySelectorAll('song-display')
+    const songDisplays = this.root.querySelectorAll<SongDisplay>('song-display')
     for (const songDisplay of songDisplays) {
       if (songDisplay.shadowRoot) {
-        section = songDisplay.shadowRoot.querySelector(
+        section = songDisplay.shadowRoot.querySelector<SongSection>(
           `song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`
         )
         if (section) return section
@@ -552,7 +659,7 @@ export class SetlistPage {
     this.dispatchSongChange(null)
   }
 
-  showSong(index, instant = false) {
+  showSong(index: number, instant = false) {
     // Update the last visible section to prevent observer from triggering
     this._lastVisibleSection = `song-${index}`
 
@@ -574,9 +681,9 @@ export class SetlistPage {
   async exitEditMode() {
     const isEditMode = document.body.classList.contains('edit-mode')
     if (isEditMode) {
-      const appHeader = this.root.querySelector('#app-header')
-      const keySelector = this.root.querySelector('#key-selector')
-      const capoSelector = this.root.querySelector('#capo-selector')
+      const appHeader = this.root.querySelector<AppHeader>('#app-header')
+      const keySelector = this.root.querySelector<KeySelector>('#key-selector')
+      const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
       document.body.classList.remove('edit-mode')
       document.body.removeAttribute('data-edit-mode')
       if (appHeader) {
@@ -598,21 +705,21 @@ export class SetlistPage {
         this.currentSetlist.modifiedDate = new Date().toISOString()
 
         // Save to database
-        await this.db.saveSetlist(this.currentSetlist)
+        await this._database().saveSetlist(this.currentSetlist)
         console.log('[ExitEditMode] Saved setlist to IndexedDB')
       }
     }
   }
 
-  async updateHeader(song, instant = false) {
-    const appHeader = this.root.querySelector('#app-header')
-    const musicalMetadata = this.root.querySelector('#musical-metadata')
-    const keySelector = this.root.querySelector('#key-selector')
-    const capoSelector = this.root.querySelector('#capo-selector')
-    const fontSizeControls = this.root.querySelector('.font-size-controls')
+  async updateHeader(song: RuntimeSong | null, instant = false) {
+    const appHeader = this.root.querySelector<AppHeader>('#app-header')
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
+    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
+    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
+    const fontSizeControls = this.root.querySelector<HTMLElement>('.font-size-controls')
 
     // Determine new title
-    let newTitle
+    let newTitle: string
     if (song) {
       newTitle = song.title
     } else {
@@ -622,6 +729,8 @@ export class SetlistPage {
         newTitle = 'Setlist'
       }
     }
+
+    if (!appHeader) return
 
     // Check if content is actually changing
     const titleChanged = appHeader.heading !== newTitle
@@ -649,7 +758,13 @@ export class SetlistPage {
     }
   }
 
-  _updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, _fontSizeControls) {
+  _updateHeaderContent(
+    song: RuntimeSong | null,
+    musicalMetadata: MusicalMetadataDisplay | null,
+    keySelector: KeySelector | null,
+    capoSelector: CapoSelector | null,
+    _fontSizeControls: HTMLElement | null
+  ) {
     if (song) {
       // Update key selector
       if (song.currentKey) {
@@ -701,24 +816,25 @@ export class SetlistPage {
     }
   }
 
-  dispatchSongChange(song) {
+  dispatchSongChange(song: RuntimeSong | null) {
     // Dispatch custom event for media player to listen to
     document.dispatchEvent(new SongChangeEvent(song))
     console.log('[SongChange] Dispatched song:', song?.songId, song?.title)
   }
 
-  async showSongInfo(song) {
-    const dialog = this.root.querySelector('#song-info-dialog')
+  async showSongInfo(song: RuntimeSong) {
+    const dialog = this.root.querySelector<SongInfoDialog>('#song-info-dialog')
     if (!dialog) return
-    dialog.db = this.db
+    dialog.db = this._database()
     await dialog.show(song.songId, { title: song.title })
   }
 
   async showSetlistInfo() {
-    const dialog = this.root.querySelector('#setlist-info-dialog')
+    const dialog = this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')
     if (!dialog || !this.currentSetlist) return
     if (!this._setlistDetailsSaveHandler) {
-      this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.changes)
+      this._setlistDetailsSaveHandler = event =>
+        this.saveSetlistDetails((event as SetlistInfoSaveEvent).changes)
       dialog.addEventListener(SetlistInfoSaveEvent.type, this._setlistDetailsSaveHandler)
     }
     dialog.people = (await getOrganisationPeople()).people
@@ -729,17 +845,18 @@ export class SetlistPage {
    * Save edited setlist details (date, time, type, name, leader) from the info
    * dialog. On failure the dialog stays in edit mode with what was typed.
    */
-  async saveSetlistDetails(changes) {
-    const dialog = this.root.querySelector('#setlist-info-dialog')
+  async saveSetlistDetails(changes: SetlistInfoSaveEvent['changes']) {
+    const dialog = this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')
     const setlist = this.currentSetlist
+    if (!setlist) return
     const previous = { ...setlist }
     try {
       Object.assign(setlist, changes, { modifiedDate: new Date().toISOString() })
-      await this.db.saveSetlist(setlist)
+      await this._database().saveSetlist(setlist)
     } catch (error) {
       Object.assign(setlist, previous)
       console.error('[SetlistInfo] Failed to save setlist details:', error)
-      alert(`Couldn't save the setlist details: ${error.message}`)
+      alert(`Couldn't save the setlist details: ${errorMessage(error)}`)
       return
     }
 
@@ -748,9 +865,9 @@ export class SetlistPage {
     await dialog?.show(setlist)
   }
 
-  scrollToSection(sectionId, newIndex, instant = false) {
-    const section = this.root.querySelector(`#${sectionId}`)
-    const container = this.root.querySelector('.song-container')
+  scrollToSection(sectionId: string, newIndex: number, instant = false) {
+    const section = this.root.querySelector<HTMLElement>(`#${sectionId}`)
+    const container = this.root.querySelector<HTMLElement>('.song-container')
 
     console.log('Scrolling to:', sectionId, 'index:', newIndex, 'instant:', instant)
 
@@ -793,7 +910,7 @@ export class SetlistPage {
       this.sectionObserver.disconnect()
     }
 
-    const container = this.root.querySelector('.song-container')
+    const container = this.root.querySelector<HTMLElement>('.song-container')
     if (!container) return
 
     // Track the most recently visible section to avoid duplicate updates
@@ -806,15 +923,15 @@ export class SetlistPage {
         if (this._isProgrammaticScroll) return
 
         // Find the most visible entry
-        let mostVisible = null
+        let mostVisible: IntersectionObserverEntry | null = null
         let maxRatio = 0
 
-        entries.forEach(entry => {
+        for (const entry of entries) {
           if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
             maxRatio = entry.intersectionRatio
             mostVisible = entry
           }
-        })
+        }
 
         // Only update if we found a visible section and it's different from last time
         if (mostVisible && mostVisible.intersectionRatio > CONFIG.VISIBILITY_THRESHOLD) {
@@ -851,8 +968,8 @@ export class SetlistPage {
     )
 
     // Observe all sections (overview + all songs)
-    this.root.querySelectorAll('.section').forEach(section => {
-      this.sectionObserver.observe(section)
+    this.root.querySelectorAll<HTMLElement>('.section').forEach(section => {
+      this.sectionObserver?.observe(section)
     })
   }
 
@@ -864,16 +981,18 @@ export class SetlistPage {
    */
   loadState() {
     const stateKey = `state-${this.currentSetlistId}`
-    let saved = {}
+    let saved: SavedState = {}
     try {
-      saved = JSON.parse(localStorage.getItem(stateKey)) ?? {}
+      saved = JSON.parse(localStorage.getItem(stateKey) ?? 'null') ?? {}
     } catch (e) {
       console.error('Failed to parse saved state:', e)
     }
-    const sections =
+    const sections: SectionStates =
       saved.sectionState ??
-      Object.fromEntries(Object.entries(saved).filter(([key]) => /^\d+$/.test(key)))
-    const capos = saved.capoValues ?? saved.capo ?? {}
+      (Object.fromEntries(
+        Object.entries(saved).filter(([key]) => /^\d+$/.test(key))
+      ) as SectionStates)
+    const capos: Record<string, unknown> = saved.capoValues ?? saved.capo ?? {}
 
     this.sectionState = sections
     if (this._capoEnabled) {
@@ -899,7 +1018,7 @@ export class SetlistPage {
       }
 
       // Get song user prefs
-      const songUserPrefs = getSongUserPrefs(song.songId, this.db.organisationId)
+      const songUserPrefs = getSongUserPrefs(song.songId, this._database().organisationId)
       if (!songUserPrefs || songUserPrefs.capo === undefined) {
         return
       }
@@ -927,7 +1046,7 @@ export class SetlistPage {
 
   /** Save the section states and capos, in the song models' format (see loadState) */
   saveState() {
-    const capoValues = {}
+    const capoValues: Record<number, number> = {}
     if (this._capoEnabled) {
       this.songs.forEach((song, index) => {
         if (song.currentCapo !== undefined && song.currentCapo !== 0) {
@@ -944,7 +1063,7 @@ export class SetlistPage {
   /**
    * Save section states for a specific song using SongModel
    */
-  async _saveSectionStateViaModel(songIndex) {
+  async _saveSectionStateViaModel(songIndex: number) {
     const song = this.songs[songIndex]
     if (!song) return
 
@@ -952,10 +1071,11 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId,
-      this.db,
-      this.db.organisationId
+      // (null for a song with its own edits: the model has never coped with that; see the TODO)
+      song._canonicalSong as LoadedSong,
+      this.currentSetlistId ?? '',
+      this._database(),
+      this._database().organisationId
     )
 
     // Sync all section states for this song
@@ -966,8 +1086,8 @@ export class SetlistPage {
     console.log('[SongModel] Saved section states via model for song:', songIndex)
   }
 
-  _getSectionDefaultsConfig() {
-    let stored = null
+  _getSectionDefaultsConfig(): SectionDefaultsConfig | null {
+    let stored: string | null = null
     try {
       stored = localStorage.getItem(SECTION_DEFAULTS_KEY)
     } catch (error) {
@@ -991,7 +1111,11 @@ export class SetlistPage {
     return this._sectionDefaultsCache
   }
 
-  _resolveSectionState(songIndex, sectionIndex, sectionElement = null) {
+  _resolveSectionState(
+    songIndex: number,
+    sectionIndex: number,
+    sectionElement: SongSection | null = null
+  ): SectionState {
     // Priority 1: Setlist state override (explicit per-setlist override)
     const overridesForSong = this.sectionState[songIndex] || {}
     const override = overridesForSong[sectionIndex] || null
@@ -1019,13 +1143,12 @@ export class SetlistPage {
     }
   }
 
-  _getSongUserPrefsSectionDefaults(songIndex, sectionIndex) {
+  _getSongUserPrefsSectionDefaults(songIndex: number, sectionIndex: number): SectionState | null {
     // Get song user prefs for this song
     const song = this.songs?.[songIndex]
     if (!song) return null
 
-    // Get songId (library songs use .id, setlist songs use .songId)
-    const songId = song.songId || song.id
+    const songId = song.songId
     if (!songId) return null
 
     // Check if we have cached prefs
@@ -1037,7 +1160,7 @@ export class SetlistPage {
     if (!(songId in this._songUserPrefsCache)) {
       try {
         // Synchronous access for performance
-        const key = `song-prefs-${this.db.organisationId}`
+        const key = `song-prefs-${this._database().organisationId}`
         const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
         this._songUserPrefsCache[songId] = allPrefs[songId] || null
       } catch (error) {
@@ -1052,7 +1175,11 @@ export class SetlistPage {
     return prefs.sectionDefaults[sectionIndex.toString()] || null
   }
 
-  _ensureSectionOverride(songIndex, sectionIndex, sectionElement = null) {
+  _ensureSectionOverride(
+    songIndex: number,
+    sectionIndex: number,
+    sectionElement: SongSection | null = null
+  ): SectionState {
     if (!this.sectionState[songIndex]) {
       this.sectionState[songIndex] = {}
     }
@@ -1067,7 +1194,11 @@ export class SetlistPage {
     return this.sectionState[songIndex][sectionIndex]
   }
 
-  _resolveDefaultHideMode(sectionElement, songIndex, sectionIndex) {
+  _resolveDefaultHideMode(
+    sectionElement: SongSection | null,
+    songIndex: number,
+    sectionIndex: number
+  ): HideMode {
     if (!sectionElement) {
       sectionElement = this._getSongSectionComponent(songIndex, sectionIndex)
     }
@@ -1086,7 +1217,7 @@ export class SetlistPage {
         console.error('Failed to persist default section defaults:', error)
       }
     }
-    let hideMode = null
+    let hideMode: HideMode | null = null
     if (defaultsConfig) {
       const label = this._normalizeSectionLabel(sectionElement)
       if (label && Object.hasOwn(defaultsConfig, label)) {
@@ -1113,8 +1244,8 @@ export class SetlistPage {
     return hideMode
   }
 
-  _mapDefaultChoiceToHideMode(choice) {
-    const value = (choice || '').toString().toLowerCase()
+  _mapDefaultChoiceToHideMode(choice: unknown): HideMode {
+    const value = String(choice || '').toLowerCase()
     switch (value) {
       case 'all':
       case 'show-all':
@@ -1135,7 +1266,7 @@ export class SetlistPage {
     }
   }
 
-  _normalizeSectionLabel(sectionElement) {
+  _normalizeSectionLabel(sectionElement: SongSection | null): string {
     if (!sectionElement) {
       return ''
     }
@@ -1143,7 +1274,7 @@ export class SetlistPage {
     return label.trim().toLowerCase()
   }
 
-  async setSectionHideMode(songIndex, sectionIndex, mode) {
+  async setSectionHideMode(songIndex: number, sectionIndex: number, mode: string) {
     const component = this._getSongSectionComponent(songIndex, sectionIndex)
     const state = this._ensureSectionOverride(songIndex, sectionIndex, component)
 
@@ -1155,13 +1286,13 @@ export class SetlistPage {
       return
     }
 
-    const explicitShowMap = {
+    const explicitShowMap: Record<string, HideMode> = {
       'show-all': 'none',
       'show-lyrics': 'chords',
       'show-chords': 'lyrics',
       'show-none': 'hide',
     }
-    const mappedMode = explicitShowMap[mode] || mode
+    const mappedMode = (explicitShowMap[mode] || mode) as HideMode
     const isExplicit = Boolean(explicitShowMap[mode])
 
     if (mappedMode === 'hide') {
@@ -1199,10 +1330,10 @@ export class SetlistPage {
     this.updateSectionDOM(songIndex, sectionIndex)
   }
 
-  async animateSectionToggle(songIndex, sectionIndex, details) {
+  async animateSectionToggle(songIndex: number, sectionIndex: number, details: HTMLDetailsElement) {
     const state = this._ensureSectionOverride(songIndex, sectionIndex)
-    const content = details.querySelector('.section-content')
-    const wrapper = details.closest('.song-section-wrapper') || details
+    const content = details.querySelector<HTMLElement>('.section-content')
+    const wrapper = details.closest<HTMLElement>('.song-section-wrapper') || details
     if (!content) return
 
     const isEditMode = document.body.classList.contains('edit-mode')
@@ -1279,7 +1410,7 @@ export class SetlistPage {
     }
   }
 
-  updateSectionDOM(songIndex, sectionIndex) {
+  updateSectionDOM(songIndex: number, sectionIndex: number) {
     const component = this._getSongSectionComponent(songIndex, sectionIndex)
     if (!component) {
       return
@@ -1301,7 +1432,7 @@ export class SetlistPage {
     if (this._editModeSetup) return
     this._editModeSetup = true
 
-    const appHeader = this.root.querySelector('#app-header')
+    const appHeader = this.root.querySelector<AppHeader>('#app-header')
     if (!appHeader) return
 
     // Listen to the edit-mode-toggle event from app-header
@@ -1323,36 +1454,36 @@ export class SetlistPage {
         appHeader.editMode = true
 
         // Update musical metadata to edit mode (makes it clickable)
-        const musicalMetadata = this.root.querySelector('#musical-metadata')
+        const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
         if (musicalMetadata) {
           musicalMetadata.editMode = true
         }
 
         // Update key selector edit mode
-        const keySelector = this.root.querySelector('#key-selector')
+        const keySelector = this.root.querySelector<KeySelector>('#key-selector')
         if (keySelector) {
           keySelector.editMode = true
         }
-        const capoSelector = this.root.querySelector('#capo-selector')
+        const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
         if (capoSelector && this._capoEnabled) {
           capoSelector.editMode = true
         }
 
         // Clear inline display:none if it was set during previous exit
-        this.root.querySelectorAll('.edit-mode-control').forEach(el => {
+        this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
           el.style.display = ''
         })
 
         // Trigger fade-in for all edit mode controls after a frame
         requestAnimationFrame(() => {
-          this.root.querySelectorAll('.edit-mode-control').forEach(el => {
+          this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
             el.classList.add('fade-in')
           })
         })
 
         // After fade completes, mark normal controls as fade-complete
         setTimeout(() => {
-          this.root.querySelectorAll('.normal-mode-control').forEach(el => {
+          this.root.querySelectorAll<HTMLElement>('.normal-mode-control').forEach(el => {
             el.classList.add('fade-complete')
           })
         }, 250)
@@ -1367,28 +1498,28 @@ export class SetlistPage {
         appHeader.editMode = false
 
         // Update musical metadata to normal mode (not clickable)
-        const musicalMetadata = this.root.querySelector('#musical-metadata')
+        const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
         if (musicalMetadata) {
           musicalMetadata.editMode = false
         }
 
         // Update key selector edit mode
-        const keySelector = this.root.querySelector('#key-selector')
+        const keySelector = this.root.querySelector<KeySelector>('#key-selector')
         if (keySelector) {
           keySelector.editMode = false
         }
-        const capoSelector = this.root.querySelector('#capo-selector')
+        const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
         if (capoSelector) {
           capoSelector.editMode = false
         }
 
         // Remove fade-in classes from edit controls (triggers fade out)
-        this.root.querySelectorAll('.edit-mode-control').forEach(el => {
+        this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
           el.classList.remove('fade-in')
         })
 
         // Remove fade-complete from normal controls (makes them visible again)
-        this.root.querySelectorAll('.normal-mode-control').forEach(el => {
+        this.root.querySelectorAll<HTMLElement>('.normal-mode-control').forEach(el => {
           el.classList.remove('fade-complete')
         })
 
@@ -1398,7 +1529,7 @@ export class SetlistPage {
         // Wait for fade to complete, then save and cleanup
         setTimeout(async () => {
           // Hide edit controls completely now that fade is done
-          this.root.querySelectorAll('.edit-mode-control').forEach(el => {
+          this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
             el.style.display = 'none'
           })
 
@@ -1408,7 +1539,7 @@ export class SetlistPage {
             this.currentSetlist.modifiedDate = new Date().toISOString()
 
             // Save to database
-            await this.db.saveSetlist(this.currentSetlist)
+            await this._database().saveSetlist(this.currentSetlist)
             console.log('[ExitEditMode] Saved setlist to IndexedDB')
           }
         }, 250)
@@ -1420,7 +1551,7 @@ export class SetlistPage {
     if (this._appHeaderEventsSetup) return
     this._appHeaderEventsSetup = true
 
-    const appHeader = this.root.querySelector('#app-header')
+    const appHeader = this.root.querySelector<AppHeader>('#app-header')
     if (!appHeader) return
 
     // Listen to info button clicks
@@ -1434,7 +1565,7 @@ export class SetlistPage {
 
     // Listen for header-expand-toggle event
     appHeader.addEventListener(HeaderExpandToggleEvent.type, e => {
-      const { expanded } = e
+      const { expanded } = e as HeaderExpandToggleEvent
       if (expanded) {
         document.body.classList.add('header-expanded')
         document.documentElement.style.setProperty('--header-expanded', '1')
@@ -1445,8 +1576,9 @@ export class SetlistPage {
     })
 
     // Setup song settings popover
-    const musicalMetadata = this.root.querySelector('#musical-metadata')
-    const songSettingsPopover = this.root.querySelector('#song-settings-popover')
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
+    const songSettingsPopover =
+      this.root.querySelector<SongSettingsPopover>('#song-settings-popover')
     if (musicalMetadata && songSettingsPopover) {
       // Set the trigger button for positioning
       songSettingsPopover.setTriggerButton(musicalMetadata)
@@ -1457,14 +1589,14 @@ export class SetlistPage {
       })
 
       songSettingsPopover.addEventListener(BpmChangeEvent.type, async e => {
-        const newValue = e.value
+        const newValue = (e as BpmChangeEvent).value
         await this.handleBPMChange(newValue)
       })
 
       songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
         // Close the settings first, so the question is the only thing showing
         songSettingsPopover.close()
-        const modal = this.root.querySelector('#reset-confirm-modal')
+        const modal = this.root.querySelector<AppModal>('#reset-confirm-modal')
         if (modal) {
           const confirmed = await modal.ask()
           if (confirmed) {
@@ -1476,12 +1608,12 @@ export class SetlistPage {
   }
 
   setupSectionControls() {
-    const container = this.root.querySelector('.song-container')
+    const container = this.root.querySelector<HTMLElement>('.song-container')
     if (!container) return
 
     if (!this._sectionActionHandler) {
       this._sectionActionHandler = event => {
-        const { songIndex, sectionIndex, action } = event
+        const { songIndex, sectionIndex, action } = event as SectionActionEvent
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number' || !action) {
           return
         }
@@ -1492,7 +1624,7 @@ export class SetlistPage {
 
     if (!this._sectionToggleHandler) {
       this._sectionToggleHandler = event => {
-        const { songIndex, sectionIndex } = event
+        const { songIndex, sectionIndex } = event as SectionToggleEvent
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number') {
           return
         }
@@ -1506,15 +1638,15 @@ export class SetlistPage {
     }
   }
 
-  updateKeySelector(selectedKey) {
-    const keySelector = this.root.querySelector('#key-selector')
+  updateKeySelector(selectedKey: string) {
+    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
     if (!keySelector) return
 
     // Get available keys rotated around the selected key
     const keys = getAvailableKeys(selectedKey)
 
     // Get original key from current song
-    let originalKey = null
+    let originalKey: string | null = null
     if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
       originalKey = this.songs[this.currentSongIndex].originalKey
     }
@@ -1522,13 +1654,13 @@ export class SetlistPage {
     // Update component properties
     keySelector.value = selectedKey
     keySelector.keys = keys
-    keySelector.originalKey = originalKey
+    keySelector.originalKey = originalKey ?? ''
     keySelector.editMode = document.body.classList.contains('edit-mode')
   }
 
-  updateCapoSelector(value, currentKey = null) {
+  updateCapoSelector(value: unknown, currentKey: string | null | undefined = null) {
     if (!this._capoEnabled) return
-    const capoSelector = this.root.querySelector('#capo-selector')
+    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     if (!capoSelector) return
     capoSelector.value = this._normalizeCapoValue(value)
     capoSelector.referenceKey = currentKey || this._currentKeyForCapo || ''
@@ -1537,12 +1669,12 @@ export class SetlistPage {
   }
 
   setupKeySelector() {
-    const keySelector = this.root.querySelector('#key-selector')
+    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
     if (!keySelector) return
 
     if (!this._keyChangeHandler) {
       this._keyChangeHandler = async e => {
-        const newKey = e.value
+        const newKey = (e as KeyChangeEvent).value
         await this.handleKeyChange(newKey)
       }
       keySelector.addEventListener(KeyChangeEvent.type, this._keyChangeHandler)
@@ -1558,7 +1690,7 @@ export class SetlistPage {
   }
 
   setupCapoSelector() {
-    const capoSelector = this.root.querySelector('#capo-selector')
+    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     if (!capoSelector) return
 
     if (!this._capoEnabled) {
@@ -1567,7 +1699,7 @@ export class SetlistPage {
 
     if (!this._capoChangeHandler) {
       this._capoChangeHandler = event => {
-        const newValue = event.value
+        const newValue = (event as CapoChangeEvent).value
         this.handleCapoChange(newValue)
       }
       capoSelector.addEventListener(CapoChangeEvent.type, this._capoChangeHandler)
@@ -1579,7 +1711,8 @@ export class SetlistPage {
   }
 
   updateSongSettingsPopover() {
-    const songSettingsPopover = this.root.querySelector('#song-settings-popover')
+    const songSettingsPopover =
+      this.root.querySelector<SongSettingsPopover>('#song-settings-popover')
     if (!songSettingsPopover) return
 
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
@@ -1589,7 +1722,7 @@ export class SetlistPage {
     songSettingsPopover.bpmValue = song.currentBPM || 120
   }
 
-  async handleBPMChange(newValue) {
+  async handleBPMChange(newValue: number) {
     if (this.currentSongIndex < 0) return
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentBPM === newValue) return
@@ -1603,10 +1736,11 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId,
-      this.db,
-      this.db.organisationId
+      // (null for a song with its own edits: the model has never coped with that; see the TODO)
+      song._canonicalSong as LoadedSong,
+      this.currentSetlistId ?? '',
+      this._database(),
+      this._database().organisationId
     )
     model.setTempo(newValue)
     await model.save()
@@ -1614,7 +1748,7 @@ export class SetlistPage {
     console.log('[SongModel] Saved BPM change via model:', newValue)
 
     // Update the musical metadata display with the new BPM
-    const musicalMetadata = this.root.querySelector('#musical-metadata')
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.bpm = newValue
     }
@@ -1628,7 +1762,7 @@ export class SetlistPage {
     }
   }
 
-  async handleCapoChange(newValue) {
+  async handleCapoChange(newValue: unknown) {
     if (!this._capoEnabled || this.currentSongIndex < 0) return
     const normalized = this._normalizeCapoValue(newValue)
     const song = this.songs[this.currentSongIndex]
@@ -1641,10 +1775,11 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId,
-      this.db,
-      this.db.organisationId
+      // (null for a song with its own edits: the model has never coped with that; see the TODO)
+      song._canonicalSong as LoadedSong,
+      this.currentSetlistId ?? '',
+      this._database(),
+      this._database().organisationId
     )
     model.setCapo(normalized)
     await model.save()
@@ -1655,7 +1790,7 @@ export class SetlistPage {
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
 
     // Update the musical metadata display with the new capo value
-    const musicalMetadata = this.root.querySelector('#musical-metadata')
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.capoValue = normalized
     }
@@ -1664,7 +1799,7 @@ export class SetlistPage {
     this.updateSongSettingsPopover()
   }
 
-  async handleKeyChange(newKey) {
+  async handleKeyChange(newKey: string) {
     if (!newKey || this.currentSongIndex < 0) return
 
     console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`)
@@ -1680,10 +1815,11 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId,
-      this.db,
-      this.db.organisationId
+      // (null for a song with its own edits: the model has never coped with that; see the TODO)
+      song._canonicalSong as LoadedSong,
+      this.currentSetlistId ?? '',
+      this._database(),
+      this._database().organisationId
     )
     model.setKey(newKey)
     await model.save()
@@ -1697,7 +1833,7 @@ export class SetlistPage {
     this.updateKeySelector(newKey)
 
     // Update the musical metadata display with the new key
-    const musicalMetadata = this.root.querySelector('#musical-metadata')
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
     if (musicalMetadata) {
       musicalMetadata.keyValue = newKey
     }
@@ -1714,8 +1850,8 @@ export class SetlistPage {
     preloadPadKey(newKey)
   }
 
-  async _animateSlottedContent(updateCallback) {
-    const controlsSlot = this.root.querySelector('.header-controls-slot')
+  async _animateSlottedContent(updateCallback: () => Promise<void> | void) {
+    const controlsSlot = this.root.querySelector<HTMLElement>('.header-controls-slot')
 
     // Fade out (use the controls slot to fade everything together)
     if (controlsSlot) {
@@ -1737,14 +1873,14 @@ export class SetlistPage {
     }
   }
 
-  applyFontSize(songIndex) {
+  applyFontSize(songIndex: number) {
     if (songIndex < 0 || songIndex >= this.songs.length) return
 
     const song = this.songs[songIndex]
-    const songSection = this.root.querySelector(`#song-${songIndex}`)
+    const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
 
     if (songSection) {
-      const songContainer = songSection.querySelector('.song-content')
+      const songContainer = songSection.querySelector<HTMLElement>('.song-content')
       if (songContainer) {
         songContainer.style.fontSize = `${song.currentFontSize}rem`
       }
@@ -1807,7 +1943,7 @@ export class SetlistPage {
     } else if (originalKey) {
       console.log('[resetCurrentSong] Key already correct, just updating displays')
       // Key is already correct, just update displays
-      const musicalMetadata = this.root.querySelector('#musical-metadata')
+      const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
       if (musicalMetadata) {
         musicalMetadata.keyValue = originalKey
         musicalMetadata.bpm = song.currentBPM || null
@@ -1824,13 +1960,16 @@ export class SetlistPage {
    * A song card was dragged to a new place in the overview: move the song, in the
    * setlist and on the page, and save it.
    */
-  async moveSong(startIndex, newIndex) {
+  async moveSong(startIndex: number, newIndex: number) {
+    const setlist = this.currentSetlist
+    if (!setlist) return
+
     // Reorder songs in the setlist
-    const movedSong = this.currentSetlist.songs.splice(startIndex, 1)[0]
-    this.currentSetlist.songs.splice(newIndex, 0, movedSong)
+    const movedSong = setlist.songs.splice(startIndex, 1)[0]
+    setlist.songs.splice(newIndex, 0, movedSong)
 
     // Update order field for each song
-    this.currentSetlist.songs.forEach((song, index) => {
+    setlist.songs.forEach((song, index) => {
       song.order = index
     })
 
@@ -1839,14 +1978,16 @@ export class SetlistPage {
     this.songs.splice(newIndex, 0, movedRuntimeSong)
 
     // Save to database
-    this.currentSetlist.modifiedDate = new Date().toISOString()
-    await this.db.saveSetlist(this.currentSetlist)
+    setlist.modifiedDate = new Date().toISOString()
+    await this._database().saveSetlist(setlist)
 
     // Re-order song sections in the DOM to match new order
-    const container = this.root.querySelector('.song-container')
+    const container = this._songContainer()
 
     // Get all song sections in their current DOM order
-    const songSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+    const songSections = Array.from(
+      this.root.querySelectorAll<HTMLElement>('.section[id^="song-"]')
+    )
 
     // The section that was at startIndex moved to newIndex
     // We need to physically move that DOM section
@@ -1857,12 +1998,14 @@ export class SetlistPage {
       sectionToMove.remove()
 
       // Get a fresh list of sections after removal
-      const remainingSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+      const remainingSections = Array.from(
+        this.root.querySelectorAll<HTMLElement>('.section[id^="song-"]')
+      )
 
       // Insert at the new position
       if (newIndex === 0) {
         // Insert at the beginning (after overview)
-        const overview = this.root.querySelector('#overview')
+        const overview = this.root.querySelector<HTMLElement>('#overview')
         if (overview?.nextSibling) {
           container.insertBefore(sectionToMove, overview.nextSibling)
         } else {
@@ -1882,13 +2025,15 @@ export class SetlistPage {
       }
 
       // Now update all section IDs and data-song-index attributes to match new order
-      const updatedSections = Array.from(this.root.querySelectorAll('.section[id^="song-"]'))
+      const updatedSections = Array.from(
+        this.root.querySelectorAll<HTMLElement>('.section[id^="song-"]')
+      )
       updatedSections.forEach((section, index) => {
         section.id = `song-${index}`
 
         // Update data-song-index on all wrappers inside this section
-        section.querySelectorAll('[data-song-index]').forEach(el => {
-          el.dataset.songIndex = index
+        section.querySelectorAll<HTMLElement>('[data-song-index]').forEach(el => {
+          el.dataset.songIndex = String(index)
         })
       })
 
@@ -1908,7 +2053,7 @@ export class SetlistPage {
     this.setOverviewEditMode(!this.overviewEditMode)
   }
 
-  setOverviewEditMode(enabled) {
+  setOverviewEditMode(enabled: boolean) {
     if (this.overviewEditMode === enabled) {
       return
     }
@@ -1916,7 +2061,7 @@ export class SetlistPage {
     this.overviewEditMode = enabled
 
     // Update button state (use the header edit toggle button)
-    const appHeader = this.root.querySelector('#app-header')
+    const appHeader = this.root.querySelector<AppHeader>('#app-header')
     if (appHeader) {
       appHeader.editMode = this.overviewEditMode
     }
@@ -1935,11 +2080,12 @@ export class SetlistPage {
   /**
    * Re-render a song after key change or text edits
    */
-  async reRenderSong(songIndex) {
+  async reRenderSong(songIndex: number) {
     if (songIndex < 0 || songIndex >= this.songs.length) return
 
     const song = this.songs[songIndex]
-    const songEntry = this.currentSetlist.songs[songIndex]
+    const songEntry = this.currentSetlist?.songs[songIndex]
+    if (!songEntry) return
 
     // Re-parse from source
     const parsed = this.parser.parse(song.sourceText)
@@ -1987,9 +2133,9 @@ export class SetlistPage {
     this._refreshOverviewComponentSongs()
 
     // Update DOM
-    const songSection = this.root.querySelector(`#song-${songIndex}`)
+    const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
     if (songSection) {
-      const songContent = songSection.querySelector('.song-content')
+      const songContent = songSection.querySelector<HTMLElement>('.song-content')
       if (songContent) {
         songContent.textContent = ''
         const songDisplay = document.createElement('song-display')
@@ -2010,7 +2156,7 @@ export class SetlistPage {
       this._initializeSongSections(songSection)
 
       // Re-apply font size
-      const songContentEl = songSection.querySelector('.song-content')
+      const songContentEl = songSection.querySelector<HTMLElement>('.song-content')
       if (songContentEl) {
         songContentEl.style.fontSize = `${song.currentFontSize}rem`
       }
@@ -2022,17 +2168,17 @@ export class SetlistPage {
     }
   }
 
-  _updateSongDisplayCapo(songIndex, capoValue) {
+  _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {
     if (songIndex < 0) return
     const normalized = this._capoEnabled ? this._normalizeCapoValue(capoValue) : 0
-    const songSection = this.root.querySelector(`#song-${songIndex}`)
+    const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
     const songDisplay = songSection?.querySelector('song-display')
     if (songDisplay) {
       songDisplay.capo = normalized
     }
   }
 
-  _normalizeCapoValue(value) {
+  _normalizeCapoValue(value: unknown): number {
     const num = Number(value)
     if (!Number.isFinite(num)) {
       return 0
@@ -2046,8 +2192,8 @@ export class SetlistPage {
     return Math.round(num)
   }
 
-  escapeHtml(text) {
-    const map = {
+  escapeHtml(text: string) {
+    const map: Record<string, string> = {
       '&': '&amp;',
       '<': '&lt;',
       '>': '&gt;',
@@ -2070,7 +2216,7 @@ export class SetlistPage {
           const isEditMode = document.body.classList.contains('edit-mode')
           if (isEditMode) {
             e.preventDefault()
-            const appHeader = this.root.querySelector('#app-header')
+            const appHeader = this.root.querySelector<AppHeader>('#app-header')
             if (appHeader) {
               // Trigger the edit-mode-toggle event
               appHeader.dispatchEvent(new EditModeToggleEvent())
@@ -2112,8 +2258,8 @@ export class SetlistPage {
             e.preventDefault()
             const currentSectionUp =
               this.currentSongIndex >= 0
-                ? this.root.querySelector(`#song-${this.currentSongIndex}`)
-                : this.root.querySelector('#overview')
+                ? this.root.querySelector<HTMLElement>(`#song-${this.currentSongIndex}`)
+                : this.root.querySelector<HTMLElement>('#overview')
             currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
             break
           }
@@ -2121,8 +2267,8 @@ export class SetlistPage {
             e.preventDefault()
             const currentSectionDown =
               this.currentSongIndex >= 0
-                ? this.root.querySelector(`#song-${this.currentSongIndex}`)
-                : this.root.querySelector('#overview')
+                ? this.root.querySelector<HTMLElement>(`#song-${this.currentSongIndex}`)
+                : this.root.querySelector<HTMLElement>('#overview')
             currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
             break
           }
@@ -2133,7 +2279,7 @@ export class SetlistPage {
   }
 
   setupNavigationMenu() {
-    const navMenu = document.getElementById('nav-menu')
+    const navMenu = document.getElementById('nav-menu') as NavMenu | null
 
     if (!navMenu) return
 
@@ -2144,7 +2290,7 @@ export class SetlistPage {
     navMenu.addEventListener(
       MenuSongClickEvent.type,
       e => {
-        const songIndex = e.index
+        const songIndex = (e as MenuSongClickEvent).index
         if (songIndex !== undefined && songIndex >= 0) {
           this.navigateTo(songIndex)
         }
@@ -2160,7 +2306,7 @@ export class SetlistPage {
 
   /** The menu lists the setlist's songs, and links to the overview from a song */
   updateNavigationMenu() {
-    const navMenu = document.getElementById('nav-menu')
+    const navMenu = document.getElementById('nav-menu') as NavMenu | null
     if (!navMenu) return
 
     if (this.songs?.length > 0) {
@@ -2185,7 +2331,7 @@ export class SetlistPage {
     navMenu.showOverviewLink = this.currentSongIndex >= 0
   }
 
-  async addSongToSetlist(song) {
+  async addSongToSetlist(song: SongWithContent) {
     try {
       // Get current setlist
       const setlist = this.currentSetlist
@@ -2196,16 +2342,17 @@ export class SetlistPage {
 
       // Create new song entry using new schema with explicit snapshot
       // Key and tempo are explicitly set from canonical song (snapshot in time)
-      const songCurrentKey = song?.key || song?.metadata?.key || song?.parsed?.metadata?.key || null
-      const songCurrentTempo = song?.tempo || song?.metadata?.tempo || null
+      // (A library song has no top-level key or tempo: the chart's are in its metadata)
+      const songCurrentKey = song.metadata?.key || song.parsed?.metadata?.key || null
+      const songCurrentTempo = (song.metadata?.tempo || null) as number | null
 
       const newSongEntry = {
         order: setlist.songs.length,
         songId: song.id,
+        songUuid: song.uuid,
         key: songCurrentKey, // Explicit snapshot of canonical key
         tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
         notes: '',
-        chordproEdits: null,
       }
 
       // Preload pads for the song's current key in the background
@@ -2218,7 +2365,7 @@ export class SetlistPage {
       setlist.modifiedDate = new Date().toISOString()
 
       // Save to database
-      await this.db.saveSetlist(setlist)
+      await this._database().saveSetlist(setlist)
 
       console.log('Added song to setlist:', song.title, 'with current key:', songCurrentKey)
 
@@ -2232,27 +2379,28 @@ export class SetlistPage {
     }
   }
 
-  async showDeleteSongConfirmation(index, song) {
-    this.root.querySelector('#delete-song-title').textContent = song.title
+  async showDeleteSongConfirmation(index: number, song: RuntimeSong) {
+    const title = this.root.querySelector<HTMLElement>('#delete-song-title')
+    if (title) title.textContent = song.title
     // ask() settles on confirm, cancel or close, leaving no listener behind: a
     // confirm handler left by a cancelled ask would delete a second song later
-    if (await this.root.querySelector('#delete-song-modal').ask()) {
+    if (await this.root.querySelector<AppModal>('#delete-song-modal')?.ask()) {
       await this.deleteSongFromSetlist(index)
     }
   }
 
-  async changeSongKeyInSetlist(index, newKey) {
+  async changeSongKeyInSetlist(index: number, newKey: string) {
     const setlist = this.currentSetlist
     if (!setlist?.songs?.[index]) return
 
     setlist.songs[index].key = newKey
     setlist.modifiedDate = new Date().toISOString()
-    await this.db.saveSetlist(setlist)
+    await this._database().saveSetlist(setlist)
 
     await this.renderSetlist(setlist.id)
   }
 
-  async deleteSongFromSetlist(index) {
+  async deleteSongFromSetlist(index: number) {
     try {
       const setlist = this.currentSetlist
       if (!setlist) {
@@ -2271,7 +2419,7 @@ export class SetlistPage {
       setlist.modifiedDate = new Date().toISOString()
 
       // Save to database
-      await this.db.saveSetlist(setlist)
+      await this._database().saveSetlist(setlist)
 
       console.log('Deleted song from setlist at index:', index)
 
@@ -2286,7 +2434,7 @@ export class SetlistPage {
   _handleSectionDefaultsChanged() {
     this._sectionDefaultsCache = null
     this._sectionDefaultsRaw = null
-    if (this.currentSongIndex === undefined) {
+    if (Number.isNaN(this.currentSongIndex)) {
       return
     }
     this.applySectionState()
@@ -2302,7 +2450,7 @@ export class SetlistPage {
   }
 
   _applyCapoPreferenceToDisplays() {
-    const capoSelector = this.root.querySelector('#capo-selector')
+    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     if (capoSelector) {
       if (this._capoEnabled && currentSong) {
@@ -2312,7 +2460,7 @@ export class SetlistPage {
       }
     }
 
-    const songDisplays = this.root.querySelectorAll('song-display')
+    const songDisplays = this.root.querySelectorAll<SongDisplay>('song-display')
     songDisplays.forEach(display => {
       const attrIndex = Number(display.getAttribute('song-index'))
       const fallbackIndex =

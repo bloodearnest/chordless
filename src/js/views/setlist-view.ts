@@ -1,4 +1,4 @@
-import { html } from 'lit'
+import { html, type PropertyValues } from 'lit'
 import '../../components/app-header.ts'
 import '../../components/app-modal.ts'
 import '../../components/capo-selector.ts'
@@ -11,7 +11,7 @@ import '../../components/song-display.ts'
 import '../../components/song-info-dialog.ts'
 import '../../components/song-section.ts'
 import '../../components/song-settings-popover.ts'
-import { SetlistPage } from '../setlist-page.js'
+import { SetlistPage } from '../setlist-page.ts'
 import { PageView } from './page-view.ts'
 
 /**
@@ -20,10 +20,17 @@ import { PageView } from './page-view.ts'
  * it is left, so nothing it did to the window, <body> or the menu is left behind.
  */
 export class SetlistView extends PageView {
-  #page = null
+  #page: SetlistPage | null = null
 
-  firstUpdated() {
-    const { setlistId, songIndex } = this.route
+  /** This view is only shown for the setlist route */
+  #setlistRoute() {
+    const route = this.route
+    if (route?.name !== 'setlist') throw new Error('The setlist view has no setlist route')
+    return route
+  }
+
+  override firstUpdated() {
+    const { setlistId, songIndex } = this.#setlistRoute()
     this.#page = new SetlistPage({
       root: this,
       setlistId,
@@ -33,27 +40,27 @@ export class SetlistView extends PageView {
     this.#page
       .start()
       // The route may have moved on while the setlist was loading
-      .then(() => this.#page?.routeChanged(this.route))
+      .then(() => this.#page?.routeChanged(this.#setlistRoute()))
       .catch(error => console.error('[SetlistView] Failed to start:', error))
   }
 
   /** How far each song (and the overview) was scrolled */
-  captureViewState() {
+  override captureViewState() {
     return this.#page?.captureViewState()
   }
 
-  updated(changed) {
+  override updated(changed: PropertyValues<this>) {
     // Moves within this setlist (the first route was given to the page at the start)
-    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.route)
+    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.#setlistRoute())
   }
 
-  disconnectedCallback() {
+  override disconnectedCallback() {
     super.disconnectedCallback()
     this.#page?.dispose()
     this.#page = null
   }
 
-  render() {
+  override render() {
     return html`
       <app-header id="app-header" heading="Loading..." show-edit-toggle show-info-button>
         <div slot="controls" class="header-controls-slot">

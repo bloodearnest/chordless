@@ -3,8 +3,15 @@
  * module only when first shown. There is one for each of ROUTE_NAMES.
  */
 
+import type { ViewEntry } from '../app-router.ts'
+import type { Route } from '../router.ts'
+
 /** A view entry for a custom element defined by `module` */
-function view(tag, module, title) {
+function view(
+  tag: string,
+  module: () => Promise<unknown>,
+  title?: (route: Route) => string
+): ViewEntry {
   return {
     load: async () => {
       await module()
@@ -14,15 +21,18 @@ function view(tag, module, title) {
   }
 }
 
-export const views = {
+export const views: Record<string, ViewEntry> = {
   setlist: {
     ...view(
       'setlist-view',
-      () => import('./setlist-view.js'),
+      () => import('./setlist-view.ts'),
       () => 'Setlist - Chordless'
     ),
     // Moving to another setlist is a new view; moving within one is not
-    sameView: (previous, next) => previous.setlistId === next.setlistId,
+    sameView: (previous, next) =>
+      previous.name === 'setlist' &&
+      next.name === 'setlist' &&
+      previous.setlistId === next.setlistId,
   },
   'not-found': view(
     'not-found-view',

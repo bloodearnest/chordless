@@ -22,6 +22,10 @@ bugs
   and tempo, and a library song's getKey()/getTempo() are undefined until changed (so the
   library view's key comparison always thinks the key changed). Typing it kept the behaviour
   (see the comments); decide what is meant, fix getSongWithContent or the readers, with tests
+- a setlist song with its own edits (chordproEdits) has no canonical song (_canonicalSong is
+  null), but SetlistSong reads _canonical.uuid, .title, .parsed and more, so making its model
+  (to save a key, tempo, capo or section change) would throw. setlist-page.ts casts it to hide
+  this; make the model cope with no canonical song, or give it one, with tests
 - the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
