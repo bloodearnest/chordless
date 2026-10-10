@@ -26,53 +26,14 @@ import {
 import { OrganisationDB } from './organisation-db.js'
 import { ChordProParser } from './parser.js'
 import { hashText } from './song-utils.js'
-
-// Fields describing a setlist's sync state on this device rather than its
-// content. Excluded from content hashes and from the copy uploaded to Drive.
-// (_lastSyncHash is the pre-content-hash field, kept only for old records.)
-const SETLIST_SYNC_FIELDS = [
-  'driveFileId',
-  'driveModifiedTime',
-  'driveChecksum',
-  'lastSyncedAt',
-  'syncedContentHash',
-  '_lastSyncHash',
-]
-
-/** A setlist without this device's sync state: what gets stored in Drive */
-export function setlistContent(setlist) {
-  const content = { ...setlist }
-  for (const field of SETLIST_SYNC_FIELDS) delete content[field]
-  return content
-}
+import { setlistContent, setlistContentHash } from './sync/setlist-hash.js'
 
 /** A setlist's file content in Drive */
 function setlistJson(setlist) {
   return JSON.stringify(setlistContent(setlist), null, 2)
 }
 
-/** JSON with object keys sorted, so equal content always hashes the same */
-function stableStringify(value) {
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
-      .filter(key => value[key] !== undefined)
-      .sort()
-      .map(key => `${JSON.stringify(key)}:${stableStringify(value[key])}`)
-    return `{${entries.join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
-/**
- * Hash of a setlist's content, ignoring sync state and key order. modifiedDate
- * is left out too: it records when it was saved, so a save that changes nothing
- * (or an edit that's undone) doesn't count as a change.
- */
-export function setlistContentHash(setlist) {
-  const { modifiedDate: _modifiedDate, ...content } = setlistContent(setlist)
-  return hashText(stableStringify(content))
-}
+export { setlistContent, setlistContentHash }
 
 /**
  * Thrown by resetLocalFromDrive when local records have changes not in Drive.
