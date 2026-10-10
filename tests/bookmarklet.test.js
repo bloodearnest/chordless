@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
-import '../public/components/bookmarklet-installer.js'
-import { bookmarkletUrl, importFromSongSelect } from '../public/js/songselect-bookmarklet.js'
+import '../src/components/bookmarklet-installer.js'
+import { bookmarkletUrl, importFromSongSelect } from '../src/js/songselect-bookmarklet.js'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window

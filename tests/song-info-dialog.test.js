@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../public/components/song-info-dialog.js'
+import '../src/components/song-info-dialog.js'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window

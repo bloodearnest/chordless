@@ -6,7 +6,7 @@ import {
   matchRoute,
   normalizePath,
   sameRoute,
-} from '../public/js/router.js'
+} from '../src/js/router.js'
 
 const { describe, it } = window
 

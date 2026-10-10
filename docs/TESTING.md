@@ -64,7 +64,7 @@ parallel, each in its own browser context.
 | `songs.playwright.js` | The library, song and setlist info, importing, the bookmarklet page |
 | `song-settings.playwright.js` | A song's settings in a setlist, the media player's settings |
 | `service-worker.playwright.js` | The service worker serving the shell, and reloading offline |
-| `dev-pages.playwright.js` | Every page in `public/dev/` loads without errors |
+| `dev-pages.playwright.js` | Every page in `src/dev/` loads without errors |
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error. It also has:

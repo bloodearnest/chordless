@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai'
-import { ChordlessDB } from '../public/js/db.js'
-import { LibrarySong } from '../public/js/models/library-song.js'
-import { ChordProParser } from '../public/js/parser.js'
+import { ChordlessDB } from '../src/js/db.js'
+import { LibrarySong } from '../src/js/models/library-song.js'
+import { ChordProParser } from '../src/js/parser.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, beforeEach, afterEach } = window

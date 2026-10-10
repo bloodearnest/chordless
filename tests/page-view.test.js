@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { html } from 'lit'
-import { PageView } from '../public/js/views/page-view.js'
+import { PageView } from '../src/js/views/page-view.js'
 
 const { describe, it, afterEach } = window
 

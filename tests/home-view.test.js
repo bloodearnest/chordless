@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai'
-import { ROUTE_NAMES } from '../public/js/router.js'
-import { groupSetlistsByYear } from '../public/js/views/home-view.js'
-import { views } from '../public/js/views/registry.js'
+import { ROUTE_NAMES } from '../src/js/router.js'
+import { groupSetlistsByYear } from '../src/js/views/home-view.js'
+import { views } from '../src/js/views/registry.js'
 
 const { describe, it } = window
 

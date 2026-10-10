@@ -79,7 +79,7 @@ test('worker API: /session/refresh route exists', async () => {
 })
 
 test('worker source is not served as JavaScript', async () => {
-  // Only public/ is served; anything outside it falls through to the SPA fallback (text/html)
+  // Only src/ is served; anything outside it falls through to the SPA fallback (text/html)
   const resp = await worker.fetch('/worker/src/index.js')
   const ct = resp.headers.get('content-type') ?? ''
   assert.ok(
@@ -139,7 +139,7 @@ test('repo root files are not served', async () => {
   }
 })
 
-test('worker-only packages are not vendored into public/', async () => {
+test('worker-only packages are not vendored into src/', async () => {
   for (const path of ['/vendor/jose/package.json', '/vendor/oauth4webapi/package.json']) {
     const resp = await worker.fetch(path)
     const ct = resp.headers.get('content-type') ?? ''

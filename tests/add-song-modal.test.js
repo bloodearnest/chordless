@@ -1,8 +1,8 @@
 import { expect } from '@open-wc/testing'
-import '../public/components/app-modal.js'
-import { getCurrentDB } from '../public/js/db.js'
-import { AddSongModal } from '../public/js/setlist/add-song-modal.js'
-import { createSong } from '../public/js/song-utils.js'
+import '../src/components/app-modal.js'
+import { getCurrentDB } from '../src/js/db.js'
+import { AddSongModal } from '../src/js/setlist/add-song-modal.js'
+import { createSong } from '../src/js/song-utils.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, beforeEach, afterEach } = window

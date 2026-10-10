@@ -6,8 +6,8 @@ export default {
   nodeResolve: true,
   // Used by just coverage (--coverage): the app's own code, not what it vendors
   coverageConfig: {
-    include: ['public/**/*.js'],
-    exclude: ['public/vendor/**', 'node_modules/**'],
+    include: ['src/**/*.js'],
+    exclude: ['src/vendor/**', 'node_modules/**'],
     reportDir: 'coverage',
     reporters: ['html', 'text-summary'],
   },

@@ -125,12 +125,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "public/*.js",
-        "public/components/**/*.js",
-        "public/js/**/*.js",
-        "public/service-worker.js"
-      ],
+      "includes": ["src/*.js", "src/components/**/*.js", "src/js/**/*.js", "src/service-worker.js"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -178,7 +173,7 @@
   "plugins": [
     {
       "path": "lint/no-page-navigation.grit",
-      "includes": ["**/public/components/**", "**/public/js/**"]
+      "includes": ["**/src/components/**", "**/src/js/**"]
     }
   ]
 }

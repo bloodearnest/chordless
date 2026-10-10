@@ -1,5 +1,5 @@
 import { expect, fixture, html } from '@open-wc/testing'
-import '../public/components/app-header.js'
+import '../src/components/app-header.js'
 
 const { describe, it } = window
 

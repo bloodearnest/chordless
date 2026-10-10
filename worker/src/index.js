@@ -54,7 +54,7 @@ export default {
         return await handleSessionRevoke(request, env)
       }
 
-      // Dev-only component playgrounds (public/dev/). DEV_PAGES is set only in [env.dev]
+      // Dev-only component playgrounds (src/dev/). DEV_PAGES is set only in [env.dev]
       // in wrangler.toml (`npm run dev`). Routed here first via run_worker_first.
       if (path === '/dev' || path.startsWith('/dev/')) {
         if (!env.DEV_PAGES) {

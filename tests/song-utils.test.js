@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { getCurrentDB } from '../public/js/db.js'
+import { getCurrentDB } from '../src/js/db.js'
 import {
   createSong,
   createVariant,
@@ -13,7 +13,7 @@ import {
   hashText,
   overwriteSong,
   setDefaultVariant,
-} from '../public/js/song-utils.js'
+} from '../src/js/song-utils.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it } = window

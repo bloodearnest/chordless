@@ -5,17 +5,17 @@
  * app must look as it did before.
  */
 import { expect } from '@open-wc/testing'
-import '../public/components/nav-menu.js'
-import { getCurrentDB } from '../public/js/db.js'
-import { setRouter } from '../public/js/navigation.js'
-import '../public/js/views/bookmarklet-view.js'
-import '../public/js/views/home-view.js'
-import '../public/js/views/import-song-view.js'
-import '../public/js/views/library-view.js'
-import '../public/js/views/not-found-view.js'
-import '../public/js/views/preferences-view.js'
-import '../public/js/views/setlist-view.js'
-import '../public/js/views/storage-view.js'
+import '../src/components/nav-menu.js'
+import { getCurrentDB } from '../src/js/db.js'
+import { setRouter } from '../src/js/navigation.js'
+import '../src/js/views/bookmarklet-view.js'
+import '../src/js/views/home-view.js'
+import '../src/js/views/import-song-view.js'
+import '../src/js/views/library-view.js'
+import '../src/js/views/not-found-view.js'
+import '../src/js/views/preferences-view.js'
+import '../src/js/views/setlist-view.js'
+import '../src/js/views/storage-view.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, before, after, beforeEach, afterEach } = window

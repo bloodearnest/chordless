@@ -174,7 +174,7 @@ in Drive, but it's still encrypted, so it's useless without the full link.
   outward-facing and ends people's access, so it asks for confirmation. Sharing again
   afterwards creates a new key and file, so old links stay dead.
 - **QR code:** browsers have no built-in QR generator, so this needs a small library,
-  vendored into `public/vendor` like Lit.
+  vendored into `src/vendor` like Lit.
 
 ### Sync
 

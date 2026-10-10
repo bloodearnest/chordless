@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { nextDropIndex, OverviewReorder } from '../public/js/setlist/overview-reorder.js'
+import { nextDropIndex, OverviewReorder } from '../src/js/setlist/overview-reorder.js'
 
 const { describe, it, beforeEach, afterEach } = window
 

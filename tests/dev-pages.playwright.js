@@ -1,15 +1,15 @@
-// Smoke tests for the component playgrounds in public/dev/.
+// Smoke tests for the component playgrounds in src/dev/.
 // They aren't exercised by the app, so without this they silently rot.
 import { readdirSync, readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 
-const DEV_DIR = new URL('../public/dev/', import.meta.url)
+const DEV_DIR = new URL('../src/dev/', import.meta.url)
 const pages = readdirSync(DEV_DIR).filter(f => f.endsWith('.html') && f !== 'index.html')
 
 test('dev index links to every dev page', () => {
   const index = readFileSync(new URL('index.html', DEV_DIR), 'utf8')
   for (const page of pages) {
-    expect(index, `public/dev/index.html should link to ${page}`).toContain(`href="/dev/${page}"`)
+    expect(index, `src/dev/index.html should link to ${page}`).toContain(`href="/dev/${page}"`)
   }
 })
 

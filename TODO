@@ -87,7 +87,7 @@ offline
   service-worker.js), missing most modules: the rest are cached only when first fetched,
   so a page that dynamically imports one (first-time-auth.js, song-utils.js, ...) can
   fail offline if it hasn't been loaded online yet. Precache every app module, keeping
-  the list in step with the files (a test that compares it with public/ would do, as
+  the list in step with the files (a test that compares it with src/ would do, as
   there's no build step). Also check CDN_ASSETS still matches what pages load
 
 storage/sync
@@ -110,7 +110,7 @@ storage/sync
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
   then test song import on real devices: file import and paste on Android and iPad, the
   bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
-- user-facing Drive health check / cleanup (idea): turn public/dev/drive-audit.html into an
+- user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an
   app feature that finds duplicate or empty setlists and stray organisation folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
@@ -169,7 +169,7 @@ sharing
 player
  - fix or remove "Built-in Pads": it has never worked. It loads
    /pads/<key> - WARM - CHURCHFRONT PADS.mp3 (pad-audio-controller.js), and there is no
-   public/pads, so every request 404s. Those pads are copyrighted like the songs, so
+   src/pads, so every request 404s. Those pads are copyrighted like the songs, so
    they can't be shipped with the app: users upload pad sets they own. Ideas tried: a
    Web Audio synthesiser, but everything sounded awful. Removing it means: no default
    pad set, pads off until one is uploaded, and the pickers say so.

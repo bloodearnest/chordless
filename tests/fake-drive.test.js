@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { driveRequest } from '../public/js/drive-api.js'
+import { driveRequest } from '../src/js/drive-api.js'
 import { installFakeDrive } from './fake-drive.js'
 
 const { describe, it, beforeEach, afterEach } = window

@@ -374,7 +374,7 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Dev-only component playgrounds (public/dev/) - leave entirely to the browser.
+  // Dev-only component playgrounds (src/dev/) - leave entirely to the browser.
   // Not part of the app: never cached, and not served in production.
   if (url.pathname === '/dev' || url.pathname.startsWith('/dev/')) {
     return

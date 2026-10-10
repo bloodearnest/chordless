@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai'
-import { ChordlessDB } from '../public/js/db.js'
-import { claimSetlistsWithoutOwnerId, mergePeople } from '../public/js/people.js'
+import { ChordlessDB } from '../src/js/db.js'
+import { claimSetlistsWithoutOwnerId, mergePeople } from '../src/js/people.js'
 
 const { describe, it, beforeEach, afterEach } = window
 

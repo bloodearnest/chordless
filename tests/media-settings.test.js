@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { loadMediaSettings, saveMediaSettings } from '../public/js/media-settings.js'
+import { loadMediaSettings, saveMediaSettings } from '../src/js/media-settings.js'
 
 const { describe, it } = window
 

@@ -12,10 +12,10 @@ const EXCLUDE_PATTERNS = [
 ]
 
 // Used only by the Cloudflare Worker (bundled by wrangler from node_modules),
-// never by the browser, so they must not be copied into public/.
+// never by the browser, so they must not be copied into src/.
 const WORKER_ONLY = new Set(['jose', 'oauth4webapi'])
 
-const VENDOR_DIR = 'public/vendor'
+const VENDOR_DIR = 'src/vendor'
 
 const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
 rmSync(VENDOR_DIR, { recursive: true, force: true })

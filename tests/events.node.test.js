@@ -19,7 +19,7 @@ function sourceFiles(dir) {
   })
 }
 
-const files = sourceFiles('public').map(path => ({ path, text: readFileSync(path, 'utf8') }))
+const files = sourceFiles('src').map(path => ({ path, text: readFileSync(path, 'utf8') }))
 
 /** [{name, type, path}] for every `class X extends Event { static type = '...' }` */
 const events = files.flatMap(({ path, text }) =>

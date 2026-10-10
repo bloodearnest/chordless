@@ -1,7 +1,7 @@
 import { expect, fixture, html } from '@open-wc/testing'
-import { SongImportedEvent } from '../public/components/song-import.js'
-import { createSetlist, getCurrentDB } from '../public/js/db.js'
-import { createSong } from '../public/js/song-utils.js'
+import { SongImportedEvent } from '../src/components/song-import.js'
+import { createSetlist, getCurrentDB } from '../src/js/db.js'
+import { createSong } from '../src/js/song-utils.js'
 import { A11Y, suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it } = window

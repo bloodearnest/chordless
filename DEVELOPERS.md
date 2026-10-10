@@ -1,6 +1,6 @@
 # Developing Chordless
 
-There is no build step: the files in `public/` are what gets served. Commands are run
+There is no build step: the files in `src/` are what gets served. Commands are run
 with [`just`](https://github.com/casey/just); run `just` on its own to list them.
 
 ## Setup
@@ -28,7 +28,7 @@ Without it the app still runs, but you can't sign in or sync with Drive.
 just serve    # http://localhost:8787
 ```
 
-`just serve` runs the app's Cloudflare Worker locally. It serves `public/` and handles
+`just serve` runs the app's Cloudflare Worker locally. It serves `src/` and handles
 the OAuth and session routes. The first visit registers the service worker,
 and the page reloads once it is active. In DevTools, filter the console for `[SW]` to
 see its logs.
@@ -62,8 +62,8 @@ just format lint test
 | Recipe | What it does |
 | --- | --- |
 | `just setup` | First-time setup (see above) |
-| `just vendor` | Copies vendored dependencies from `node_modules` into `public/vendor/` |
-| `just deploy` | Deploys the Worker and `public/` to Cloudflare |
+| `just vendor` | Copies vendored dependencies from `node_modules` into `src/vendor/` |
+| `just deploy` | Deploys the Worker and `src/` to Cloudflare |
 | `just secrets` | Pushes the secrets in `.dev.vars` to Cloudflare |
 
 ## Conventions
@@ -72,17 +72,17 @@ just format lint test
   versions of vendored libraries, which are served locally as modules.
 - Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
   native browser features.
-- Components are [Lit](https://lit.dev/) web components in `public/components/`.
+- Components are [Lit](https://lit.dev/) web components in `src/components/`.
 
 ## Dev pages (component playgrounds)
 
-`public/dev/` holds pages for developing components visually, in isolation. With
+`src/dev/` holds pages for developing components visually, in isolation. With
 `just serve` running, open http://localhost:8787/dev/ for the list.
 
 - They are only served locally: `just serve` uses the `[env.dev]` environment in
   `wrangler.toml`, which sets `DEV_PAGES`. The worker returns 404 for `/dev/*` without
   it, so they never reach production. Put other local-only settings in `[env.dev]` too.
-- When adding a page, link it from `public/dev/index.html` and use absolute paths
+- When adding a page, link it from `src/dev/index.html` and use absolute paths
   (`/js/...`, `/components/...`, `/css/style.css`).
 - `tests/dev-pages.playwright.js` loads every page and fails on JS errors, failed
   requests or unregistered custom elements, so a broken playground shows up in

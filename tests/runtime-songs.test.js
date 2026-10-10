@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
-import { getCurrentDB } from '../public/js/db.js'
-import { ChordProParser } from '../public/js/parser.js'
-import { buildRuntimeSongs, parseTempoMetadata } from '../public/js/setlist/runtime-songs.js'
+import { getCurrentDB } from '../src/js/db.js'
+import { ChordProParser } from '../src/js/parser.js'
+import { buildRuntimeSongs, parseTempoMetadata } from '../src/js/setlist/runtime-songs.js'
 import { suppressConsoleLogs } from './test-helpers.js'
 
 const { describe, it, before } = window

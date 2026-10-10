@@ -169,7 +169,7 @@ if any local record has changes not in Drive. Per-setlist device state is kept.
 - Not yet: integration tests against real Drive, using a separate Google test account
   with its refresh token in `.dev.vars`. First things to confirm there: uploads
   return `md5Checksum`, and whether metadata-only updates change `modifiedTime`.
-- `public/dev/drive-audit.html`: read-only audit of the setlist files in Drive, with a
+- `src/dev/drive-audit.html`: read-only audit of the setlist files in Drive, with a
   confirmed move-to-trash cleanup for duplicates.
 
 ---

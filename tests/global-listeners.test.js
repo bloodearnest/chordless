@@ -1,6 +1,6 @@
 import { expect } from '@esm-bundle/chai'
 import { LitElement } from 'lit'
-import { GlobalListeners } from '../public/js/global-listeners.js'
+import { GlobalListeners } from '../src/js/global-listeners.js'
 
 const { describe, it } = window
 

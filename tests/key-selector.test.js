@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import '../public/components/key-selector.js'
+import '../src/components/key-selector.js'
 import { A11Y } from './test-helpers.js'
 
 const { describe, it, afterEach } = window
@@ -85,7 +85,7 @@ describe('capo-selector', () => {
   afterEach(() => selector?.remove())
 
   async function setUp({ value = 0, referenceKey = 'G', top = 10 } = {}) {
-    await import('../public/components/capo-selector.js')
+    await import('../src/components/capo-selector.js')
     selector = document.createElement('capo-selector')
     selector.value = value
     selector.referenceKey = referenceKey
