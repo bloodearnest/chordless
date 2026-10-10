@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import './icon.js'
-import { buttonStyles } from './shared-styles.js'
+import { buttonStyles } from './shared-styles.ts'
 
 /** The confirm button was pressed (type confirm); the modal then closes */
 export class ModalConfirmEvent extends Event {

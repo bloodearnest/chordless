@@ -7,11 +7,15 @@ import { css, html, LitElement } from 'lit'
  * Provides a consistent layout plus optional detail text and slots for actions.
  */
 export class StatusMessage extends LitElement {
-  static properties = {
+  static override properties = {
     message: { type: String },
     detail: { type: String },
     state: { type: String, reflect: true },
   }
+
+  declare message: string
+  declare detail: string
+  declare state: string
 
   constructor() {
     super()
@@ -20,7 +24,7 @@ export class StatusMessage extends LitElement {
     this.state = 'info'
   }
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
       padding: 2rem 1rem;
@@ -95,7 +99,7 @@ export class StatusMessage extends LitElement {
     return html`<div class="spinner" role="presentation" aria-hidden="true"></div>`
   }
 
-  render() {
+  override render() {
     const role = this.state === 'error' ? 'alert' : 'status'
     const ariaLive = this.state === 'loading' ? 'polite' : 'off'
 
@@ -111,3 +115,9 @@ export class StatusMessage extends LitElement {
 }
 
 customElements.define('status-message', StatusMessage)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'status-message': StatusMessage
+  }
+}

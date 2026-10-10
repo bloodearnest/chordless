@@ -9,7 +9,7 @@ import {
 } from '../js/organisation.ts'
 import './app-modal.js'
 import './icon.js'
-import { buttonStyles, fieldStyles } from './shared-styles.js'
+import { buttonStyles, fieldStyles } from './shared-styles.ts'
 
 /**
  * SelectOrganisation Component

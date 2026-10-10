@@ -1,7 +1,9 @@
 /** The theme was applied (sent on window): theme is the choice ('system', 'light', 'dark'), actualTheme what's shown */
 export class ThemeChangeEvent extends Event {
   static type = 'theme:change'
-  constructor(theme, actualTheme) {
+  readonly theme: string
+  readonly actualTheme: string
+  constructor(theme: string, actualTheme: string) {
     super(ThemeChangeEvent.type)
     this.theme = theme
     this.actualTheme = actualTheme
@@ -14,7 +16,14 @@ export class ThemeChangeEvent extends Event {
  * Variables defined here are inherited into shadow DOM components.
  */
 
+/** Called with the theme's name ('light', 'dark' or 'system') when it changes */
+export type ThemeObserver = (themeName: string) => void
+
 export class ThemeManager {
+  root: HTMLElement
+  _currentTheme: string | null
+  _observers: Set<ThemeObserver>
+
   constructor() {
     this.root = document.documentElement
     this._currentTheme = null
@@ -24,7 +33,7 @@ export class ThemeManager {
   /**
    * Theme definitions
    */
-  static themes = {
+  static themes: Record<string, Record<string, string>> = {
     light: {
       // Background colors
       'bg-color': '#ffffff',
@@ -135,27 +144,26 @@ export class ThemeManager {
 
   /**
    * Set a single CSS variable
-   * @param {string} name - Variable name (without --)
-   * @param {string} value - Variable value
+   * @param name - Variable name (without --)
+   * @param value - Variable value
    */
-  setVariable(name, value) {
-    this.root.style.setProperty(`--${name}`, value)
+  setVariable(name: string, value: string | number): void {
+    this.root.style.setProperty(`--${name}`, String(value))
   }
 
   /**
    * Get a CSS variable value
-   * @param {string} name - Variable name (without --)
-   * @returns {string}
+   * @param name - Variable name (without --)
    */
-  getVariable(name) {
+  getVariable(name: string): string {
     return getComputedStyle(this.root).getPropertyValue(`--${name}`).trim()
   }
 
   /**
    * Apply a complete theme
-   * @param {string} themeName - 'light', 'dark', or 'system'
+   * @param themeName - 'light', 'dark', or 'system'
    */
-  setTheme(themeName) {
+  setTheme(themeName: string): void {
     // Handle 'system' theme by detecting actual theme to apply
     let actualTheme = themeName
     if (themeName === 'system') {
@@ -202,11 +210,11 @@ export class ThemeManager {
   /**
    * Update favicon to match the current theme
    * @private
-   * @param {string} theme - 'light' or 'dark'
+   * @param theme - 'light' or 'dark'
    */
-  _updateFavicon(theme) {
+  _updateFavicon(theme: string): void {
     // Find existing favicon link or create one
-    let faviconLink = document.querySelector('link[rel="icon"]')
+    let faviconLink = document.querySelector<HTMLLinkElement>('link[rel="icon"]')
 
     if (!faviconLink) {
       faviconLink = document.createElement('link')
@@ -225,7 +233,7 @@ export class ThemeManager {
   /**
    * Toggle between light and dark themes
    */
-  toggleTheme() {
+  toggleTheme(): void {
     const current = this.getCurrentTheme()
     const newTheme = current === 'light' ? 'dark' : 'light'
     this.setTheme(newTheme)
@@ -233,17 +241,17 @@ export class ThemeManager {
 
   /**
    * Get current theme name
-   * @returns {string} - 'light', 'dark', or 'system'
+   * @returns 'light', 'dark', or 'system'
    */
-  getCurrentTheme() {
+  getCurrentTheme(): string {
     return this._currentTheme || localStorage.getItem('theme') || 'system'
   }
 
   /**
    * Detect system preference for dark mode
-   * @returns {string} - 'light' or 'dark'
+   * @returns 'light' or 'dark'
    */
-  detectSystemPreference() {
+  detectSystemPreference(): 'light' | 'dark' {
     if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
       return 'dark'
     }
@@ -252,18 +260,18 @@ export class ThemeManager {
 
   /**
    * Set font scale dynamically
-   * @param {number} scale - Font scale multiplier (e.g., 1.0, 1.2)
+   * @param scale - Font scale multiplier (e.g., 1.0, 1.2)
    */
-  setFontScale(scale) {
+  setFontScale(scale: number): void {
     this.setVariable('font-scale', scale)
   }
 
   /**
    * Update font scale based on container width (responsive)
-   * @param {number} containerWidth - Width in pixels
-   * @param {number} baseWidth - Base width for scale calculation (default: 1200)
+   * @param containerWidth - Width in pixels
+   * @param baseWidth - Base width for scale calculation (default: 1200)
    */
-  updateResponsiveFontScale(containerWidth, baseWidth = 1200) {
+  updateResponsiveFontScale(containerWidth: number, baseWidth = 1200): void {
     // Calculate scale factor: min 0.65, max 1.2
     const scale = Math.min(Math.max(containerWidth / baseWidth, 0.65), 1.2)
     this.setFontScale(scale)
@@ -271,9 +279,9 @@ export class ThemeManager {
 
   /**
    * Set custom font family
-   * @param {string} fontFamily - Font family CSS value
+   * @param fontFamily - Font family CSS value
    */
-  setFontFamily(fontFamily) {
+  setFontFamily(fontFamily: string): void {
     this.setVariable('font-family-base', fontFamily)
 
     try {
@@ -286,9 +294,9 @@ export class ThemeManager {
   /**
    * Load and apply saved user preferences
    */
-  loadPreferences() {
+  loadPreferences(): void {
     // Load theme preference
-    let savedTheme = null
+    let savedTheme: string | null = null
     try {
       savedTheme = localStorage.getItem('theme')
     } catch (e) {
@@ -327,7 +335,7 @@ export class ThemeManager {
    * Setup listener for system theme preference changes
    * @private
    */
-  _setupSystemThemeListener() {
+  _setupSystemThemeListener(): void {
     if (window.matchMedia) {
       const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
 
@@ -345,17 +353,16 @@ export class ThemeManager {
 
   /**
    * Add an observer to be notified of theme changes
-   * @param {Function} callback - Called with (themeName) when theme changes
+   * @param callback - Called with (themeName) when theme changes
    */
-  addObserver(callback) {
+  addObserver(callback: ThemeObserver): void {
     this._observers.add(callback)
   }
 
   /**
    * Remove a theme change observer
-   * @param {Function} callback
    */
-  removeObserver(callback) {
+  removeObserver(callback: ThemeObserver): void {
     this._observers.delete(callback)
   }
 
@@ -363,7 +370,7 @@ export class ThemeManager {
    * Notify all observers of theme change
    * @private
    */
-  _notifyObservers(themeName) {
+  _notifyObservers(themeName: string): void {
     this._observers.forEach(callback => {
       try {
         callback(themeName)
@@ -375,9 +382,13 @@ export class ThemeManager {
 
   /**
    * Export current theme configuration
-   * @returns {Object}
    */
-  exportTheme() {
+  exportTheme(): {
+    name: string
+    variables: Record<string, string> | undefined
+    fontScale: string
+    fontFamily: string
+  } {
     const theme = this.getCurrentTheme()
     const config = ThemeManager.themes[theme]
 
@@ -393,7 +404,7 @@ export class ThemeManager {
    * Setup keyboard shortcuts for theme switching
    * @private
    */
-  _setupKeyboardShortcuts() {
+  _setupKeyboardShortcuts(): void {
     window.addEventListener('keydown', e => {
       // Ctrl+L for Light mode
       if (e.ctrlKey && e.key === 'l') {

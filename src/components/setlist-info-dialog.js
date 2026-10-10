@@ -4,7 +4,7 @@ import './app-modal.js'
 import './icon.js'
 import './setlist-details-form.js'
 import { setlistTitle } from '../js/utils/date-utils.ts'
-import './setlist-info.js'
+import './setlist-info.ts'
 
 /** The setlist's details were edited and saved: changes is the form's details */
 export class SetlistInfoSaveEvent extends Event {

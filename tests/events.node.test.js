@@ -15,7 +15,7 @@ function sourceFiles(dir) {
     const path = join(dir, entry.name)
     if (entry.isDirectory())
       return entry.name === 'vendor' || entry.name === 'dev' ? [] : sourceFiles(path)
-    return /\.(js|html)$/.test(entry.name) ? [path] : []
+    return /\.(js|ts|html)$/.test(entry.name) ? [path] : []
   })
 }
 

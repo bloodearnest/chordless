@@ -2,7 +2,7 @@ import { html } from 'lit'
 import '../../components/app-header.js'
 import '../../components/select-organisation.js'
 import '../../components/storage-page.js'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /** The Storage page: organisations, Google Drive sync and local data */
 export class StorageView extends PageView {

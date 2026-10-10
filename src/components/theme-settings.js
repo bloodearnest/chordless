@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { themeManager } from '../js/theme-manager.js'
+import { themeManager } from '../js/theme-manager.ts'
 
 /**
  * ThemeSettings Component

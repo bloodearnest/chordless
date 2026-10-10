@@ -1,7 +1,7 @@
 import { html } from 'lit'
 import '../../components/app-header.js'
 import '../../components/app-preferences.js'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /** The Preferences page (the menu also opens the same preferences in a modal) */
 export class PreferencesView extends PageView {

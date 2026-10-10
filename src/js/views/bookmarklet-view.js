@@ -1,7 +1,7 @@
 import { html } from 'lit'
 import '../../components/app-header.js'
 import '../../components/bookmarklet-installer.js'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /** How to install the bookmarklet that imports a song from CCLI SongSelect (styled in style.css) */
 export class BookmarkletView extends PageView {

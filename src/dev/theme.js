@@ -1,4 +1,4 @@
-import { themeManager } from '/js/theme-manager.js'
+import { themeManager } from '/js/theme-manager.ts'
 
 // Update display
 function updateThemeDisplay() {

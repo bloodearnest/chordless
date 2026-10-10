@@ -1,5 +1,5 @@
-import '../../components/status-message.js'
-import type { StatusMessage } from '../../components/status-message.js'
+import '../../components/status-message.ts'
+import type { StatusMessage } from '../../components/status-message.ts'
 
 /**
  * Replace what is in a container with a <status-message>: centred feedback for

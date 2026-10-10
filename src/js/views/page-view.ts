@@ -1,6 +1,13 @@
 import { LitElement } from 'lit'
+import type { Route } from '../router.ts'
 
-const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => resolve()))
+const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+
+/** What a view keeps of itself for when the user comes back to it (JSON-able) */
+export interface ViewState {
+  scroll?: number
+  [key: string]: unknown
+}
 
 /**
  * Base for the views the router shows (see AppRouter): rendered in the light
@@ -17,27 +24,30 @@ const nextFrame = () => new Promise(resolve => requestAnimationFrame(() => resol
  * By default a view keeps its <main>'s scroll position.
  */
 export class PageView extends LitElement {
-  static properties = {
+  static override properties = {
     route: { attribute: false },
     restoredState: { attribute: false },
   }
 
-  connectedCallback() {
+  declare route: Route | undefined
+  declare restoredState: ViewState | undefined
+
+  override connectedCallback() {
     super.connectedCallback()
     this.classList.add('view')
   }
 
-  createRenderRoot() {
+  override createRenderRoot() {
     return this
   }
 
   /** What to show again if the user comes back: see above */
-  captureViewState() {
+  captureViewState(): ViewState | undefined {
     const scroll = this.querySelector('main')?.scrollTop
     return scroll ? { scroll } : undefined
   }
 
-  firstUpdated() {
+  override firstUpdated() {
     this.restoreScroll(this.querySelector('main'), this.restoredState?.scroll)
   }
 
@@ -45,7 +55,7 @@ export class PageView extends LitElement {
    * Scroll an element to `top` once the view has drawn enough to reach it: what it
    * shows may load after it first renders, so wait a little (a third of a second at most).
    */
-  async restoreScroll(element, top) {
+  async restoreScroll(element: HTMLElement | null, top: number | undefined): Promise<void> {
     if (!element || !top) return
     await this.updateComplete
     for (let frame = 0; frame < 20; frame++) {

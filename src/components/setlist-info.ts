@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import type { Setlist } from '../js/data-types.ts'
 
 /**
  * SetlistInfo Component
@@ -11,13 +12,17 @@ import { css, html, LitElement } from 'lit'
  * @property {string} [leader] - Leader name. Defaults to the setlist's owner.
  */
 export class SetlistInfo extends LitElement {
-  static properties = {
+  static override properties = {
     setlist: { type: Object, attribute: false },
     leader: { type: String },
     loading: { type: Boolean },
   }
 
-  static styles = css`
+  declare setlist: (Setlist & { venue?: string }) | null
+  declare leader: string | null
+  declare loading: boolean
+
+  static override styles = css`
     :host {
       display: block;
       font-family: var(
@@ -81,7 +86,7 @@ export class SetlistInfo extends LitElement {
     this.loading = false
   }
 
-  render() {
+  override render() {
     if (this.loading) {
       return html`<div class="loading">Loading setlist information...</div>`
     }
@@ -120,7 +125,7 @@ export class SetlistInfo extends LitElement {
     `
   }
 
-  _renderInfoItem(label, value) {
+  _renderInfoItem(label: string, value: string) {
     if (!value) return ''
 
     return html`
@@ -131,7 +136,7 @@ export class SetlistInfo extends LitElement {
     `
   }
 
-  _formatDateTime(isoString) {
+  _formatDateTime(isoString: string) {
     const date = new Date(isoString)
     return date.toLocaleString()
   }
@@ -139,3 +144,9 @@ export class SetlistInfo extends LitElement {
 
 // Define the custom element
 customElements.define('setlist-info', SetlistInfo)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-info': SetlistInfo
+  }
+}

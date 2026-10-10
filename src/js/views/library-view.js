@@ -18,7 +18,7 @@ import '../../components/song-display.js'
 import '../../components/song-info-dialog.js'
 import '../../components/song-list.js'
 import '../../components/song-section.js'
-import '../../components/status-message.js'
+import '../../components/status-message.ts'
 import { getCurrentDB } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { ChordProParser } from '../parser.ts'
@@ -28,7 +28,7 @@ import { getLibrarySongs, getSongWithContent } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.js'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
 import { filterSongs } from '../utils/song-filter.ts'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 const { CONFIG } = SongViewManager
 

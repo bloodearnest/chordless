@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import './help-tooltip.js'
+import './help-tooltip.ts'
 import './app-modal.js'
 import './icon.js'
 import { SongChangeEvent } from '../js/app-events.ts'

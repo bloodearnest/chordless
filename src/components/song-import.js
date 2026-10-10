@@ -8,7 +8,7 @@ import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import './app-modal.js'
 import './setlist-details-form.js'
 import { goTo } from '../js/navigation.ts'
-import { buttonStyles } from './shared-styles.js'
+import { buttonStyles } from './shared-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {

@@ -1,6 +1,6 @@
 import { html } from 'lit'
 import '../../components/app-header.js'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /** For a URL that is no page of the app */
 export class NotFoundView extends PageView {

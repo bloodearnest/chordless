@@ -6,6 +6,30 @@
  * Where a card lands is worked out by nextDropIndex(), a pure function.
  */
 
+/** A card in the overview: its song index and where it is on screen */
+export interface CardPlace {
+  index: number
+  top: number
+  bottom: number
+}
+
+/** The state of a drag (idle when nothing is being dragged) */
+interface DragState {
+  active: boolean
+  button: HTMLElement | null
+  startIndex: number | null
+  currentIndex: number | null
+  lastAcceptedIndex: number | null
+  startY: number
+  currentY: number
+  buttonHeight: number
+  startTop: number
+  startBottom: number
+  rafId: number | null
+  pointerId: number | null
+  pointerType: string | null
+}
+
 /** px a drag must pass a position before the drop target switches to it */
 const POSITION_THRESHOLD = 20
 
@@ -17,18 +41,19 @@ const INDICATOR_CLASSES = ['drag-over-above', 'drag-over-below', 'will-move-up',
  * position is only taken once the pointer is clearly past it, so the target does
  * not flicker between two cards.
  *
- * @param {{index: number, top: number, bottom: number}[]} cards every card in the
- *   overview in order, with its song index and where it is on screen. For the dragged
- *   card, where it was before the drag: it follows the pointer, so where it is now
- *   says nothing about how far the drag has got.
- * @param {object} drag
- * @param {number} drag.dragged the position in `cards` of the card being dragged
- * @param {number} drag.clientY where the pointer is
- * @param {number} drag.lastAccepted the position accepted so far
- * @returns {number} the position to drop at
+ * @param cards every card in the overview in order, with its song index and where it is on
+ *   screen. For the dragged card, where it was before the drag: it follows the pointer, so
+ *   where it is now says nothing about how far the drag has got.
+ * @param drag.dragged the position in `cards` of the card being dragged
+ * @param drag.clientY where the pointer is
+ * @param drag.lastAccepted the position accepted so far
+ * @returns the position to drop at
  */
-export function nextDropIndex(cards, { dragged, clientY, lastAccepted }) {
-  let proposed = null
+export function nextDropIndex(
+  cards: CardPlace[],
+  { dragged, clientY, lastAccepted }: { dragged: number; clientY: number; lastAccepted: number }
+): number {
+  let proposed: number | null = null
 
   // The card the pointer is over: above its middle inserts before it, below, after
   for (let i = 0; i < cards.length; i++) {
@@ -57,7 +82,7 @@ export function nextDropIndex(cards, { dragged, clientY, lastAccepted }) {
   if (proposed === lastAccepted) return lastAccepted
 
   // Only switch once the pointer has moved past where the accepted position is
-  let acceptedY
+  let acceptedY: number
   if (lastAccepted === 0) acceptedY = cards[0]?.top || 0
   else if (lastAccepted >= cards.length) acceptedY = cards[cards.length - 1]?.bottom || clientY
   else acceptedY = cards[lastAccepted]?.top || clientY
@@ -66,29 +91,36 @@ export function nextDropIndex(cards, { dragged, clientY, lastAccepted }) {
 }
 
 export class OverviewReorder {
-  #root
-  #isEnabled
-  #onMove
+  #root: Element
+  #isEnabled: () => boolean
+  #onMove: (from: number, to: number) => Promise<void> | void
 
-  #drag = OverviewReorder.#idle()
-  #cardHandlers = new Map()
-  #pointerHandlers = null
+  #drag: DragState = OverviewReorder.#idle()
+  #cardHandlers = new Map<HTMLElement, (event: PointerEvent) => void>()
+  #pointerHandlers: Record<string, (event: PointerEvent) => void> | null = null
 
   /**
-   * @param {object} options
-   * @param {Element} options.root where the overview is
-   * @param {() => boolean} options.isEnabled whether the overview is being edited, the
-   *   only time cards can be dragged
-   * @param {(from: number, to: number) => Promise<void> | void} options.onMove a card was
-   *   dropped in a new place: it is now at index `to`, from index `from`
+   * @param options.root where the overview is
+   * @param options.isEnabled whether the overview is being edited, the only time cards can be
+   *   dragged
+   * @param options.onMove a card was dropped in a new place: it is now at index `to`, from
+   *   index `from`
    */
-  constructor({ root, isEnabled, onMove }) {
+  constructor({
+    root,
+    isEnabled,
+    onMove,
+  }: {
+    root: Element
+    isEnabled: () => boolean
+    onMove: (from: number, to: number) => Promise<void> | void
+  }) {
     this.#root = root
     this.#isEnabled = isEnabled
     this.#onMove = onMove
   }
 
-  static #idle() {
+  static #idle(): DragState {
     return {
       active: false,
       button: null,
@@ -108,16 +140,16 @@ export class OverviewReorder {
     }
   }
 
-  get #list() {
+  get #list(): Element | null {
     return this.#root.querySelector('.overview-songs')
   }
 
-  #cards() {
-    return Array.from(this.#root.querySelectorAll('.overview-song-card'))
+  #cards(): HTMLElement[] {
+    return Array.from(this.#root.querySelectorAll<HTMLElement>('.overview-song-card'))
   }
 
   /** Whether a card is being dragged */
-  get isDragging() {
+  get isDragging(): boolean {
     return this.#drag.active
   }
 
@@ -125,7 +157,7 @@ export class OverviewReorder {
    * Listen for drags on the overview's cards as they are now. Safe to call again,
    * e.g. when the overview has been drawn anew.
    */
-  enable() {
+  enable(): void {
     const list = this.#list
     const cards = this.#cards()
     if (!list || cards.length === 0) return
@@ -133,7 +165,7 @@ export class OverviewReorder {
     this.#removeListeners()
 
     for (const card of cards) {
-      const handler = event => this.#onCardPointerDown(event, card)
+      const handler = (event: PointerEvent) => this.#onCardPointerDown(event, card)
       card.addEventListener('pointerdown', handler)
       this.#cardHandlers.set(card, handler)
     }
@@ -165,21 +197,21 @@ export class OverviewReorder {
       },
     }
     for (const [type, handler] of Object.entries(this.#pointerHandlers)) {
-      document.addEventListener(type, handler)
+      document.addEventListener(type, handler as EventListener)
     }
   }
 
   /** Stop listening, and put right a drag in progress */
-  disable() {
+  disable(): void {
     this.#removeListeners()
     if (this.#drag.active) this.#cancelDrag()
     document.body.style.userSelect = ''
   }
 
-  #removeListeners() {
+  #removeListeners(): void {
     if (this.#pointerHandlers) {
       for (const [type, handler] of Object.entries(this.#pointerHandlers)) {
-        document.removeEventListener(type, handler)
+        document.removeEventListener(type, handler as EventListener)
       }
       this.#pointerHandlers = null
     }
@@ -189,7 +221,7 @@ export class OverviewReorder {
     this.#cardHandlers.clear()
   }
 
-  #onCardPointerDown(event, card) {
+  #onCardPointerDown(event: PointerEvent, card: HTMLElement): void {
     // Don't start drag if not in edit mode
     if (!this.#isEnabled()) return
 
@@ -200,7 +232,9 @@ export class OverviewReorder {
     if (!event.isPrimary) return
 
     // Only drag from the handle, which is in the card's shadow DOM
-    const handle = event.composedPath().find(element => element.classList?.contains('drag-handle'))
+    const handle = event
+      .composedPath()
+      .find(element => element instanceof Element && element.classList.contains('drag-handle'))
     if (!handle) return
 
     // Prevent the click from bubbling
@@ -216,11 +250,11 @@ export class OverviewReorder {
     this.#startDrag(card, event.clientY)
   }
 
-  #startDrag(card, clientY) {
+  #startDrag(card: HTMLElement, clientY: number): void {
     const drag = this.#drag
     drag.active = true
     drag.button = card
-    drag.startIndex = Number.parseInt(card.dataset.songIndex, 10)
+    drag.startIndex = Number.parseInt(card.dataset.songIndex ?? '', 10)
     drag.currentIndex = drag.startIndex
     drag.lastAcceptedIndex = drag.startIndex
     drag.startY = clientY
@@ -232,7 +266,7 @@ export class OverviewReorder {
 
     // Add visual feedback
     card.classList.add('dragging')
-    this.#list.classList.add('reordering')
+    this.#list?.classList.add('reordering')
 
     // Prevent text selection during drag
     document.body.style.userSelect = 'none'
@@ -241,14 +275,16 @@ export class OverviewReorder {
     this.#performDragUpdate()
   }
 
-  #updateDrag(clientY) {
+  #updateDrag(clientY: number): void {
     const drag = this.#drag
     if (!drag.active) return
 
     drag.currentY = clientY
 
     // Update dragged button position IMMEDIATELY (no throttling for smooth following)
-    drag.button.style.transform = `scale(1.05) translateY(${clientY - drag.startY}px)`
+    if (drag.button) {
+      drag.button.style.transform = `scale(1.05) translateY(${clientY - drag.startY}px)`
+    }
 
     // Throttle drop target calculations with requestAnimationFrame
     if (drag.rafId) return
@@ -258,22 +294,22 @@ export class OverviewReorder {
     })
   }
 
-  #performDragUpdate() {
+  #performDragUpdate(): void {
     const drag = this.#drag
     if (!drag.active) return
 
     const buttons = this.#cards()
     const target = nextDropIndex(
       buttons.map(card => {
-        const index = Number.parseInt(card.dataset.songIndex, 10)
+        const index = Number.parseInt(card.dataset.songIndex ?? '', 10)
         if (card === drag.button) return { index, top: drag.startTop, bottom: drag.startBottom }
         const { top, bottom } = card.getBoundingClientRect()
         return { index, top, bottom }
       }),
       {
-        dragged: buttons.indexOf(drag.button),
+        dragged: drag.button ? buttons.indexOf(drag.button) : -1,
         clientY: drag.currentY,
-        lastAccepted: drag.lastAcceptedIndex,
+        lastAccepted: drag.lastAcceptedIndex ?? 0,
       }
     )
     drag.lastAcceptedIndex = target
@@ -284,13 +320,13 @@ export class OverviewReorder {
   }
 
   /** Mark where the card will land, and the cards that will move out of its way */
-  #showDropIndicator(buttons, target) {
+  #showDropIndicator(buttons: HTMLElement[], target: number | null): void {
     const drag = this.#drag
-    if (target === null) return
+    if (target === null || drag.startIndex === null) return
 
     // Determine which button to show the indicator on
-    let indicatorButton = null
-    let indicatorClass = null
+    let indicatorButton: HTMLElement | null = null
+    let indicatorClass: string | null = null
 
     if (target === drag.startIndex || target === drag.startIndex + 1) {
       // At (or beside) the original position: show the placeholder where it was,
@@ -313,7 +349,7 @@ export class OverviewReorder {
     }
 
     // Apply the indicator class (never on the dragged button)
-    if (indicatorButton && indicatorButton !== drag.button) {
+    if (indicatorButton && indicatorClass && indicatorButton !== drag.button) {
       indicatorButton.classList.add(indicatorClass)
       // Set the drop indicator height to match the dragged card
       indicatorButton.style.setProperty('--drag-card-height', `${drag.buttonHeight}px`)
@@ -322,7 +358,7 @@ export class OverviewReorder {
     // Apply preview animations only if position actually changes
     if (target !== drag.startIndex && target !== drag.startIndex + 1) {
       for (const button of buttons) {
-        const index = Number.parseInt(button.dataset.songIndex, 10)
+        const index = Number.parseInt(button.dataset.songIndex ?? '', 10)
         if (index === drag.startIndex) continue // Skip dragged item
 
         if (target < drag.startIndex) {
@@ -336,14 +372,14 @@ export class OverviewReorder {
     }
   }
 
-  #clearIndicators(buttons) {
+  #clearIndicators(buttons: HTMLElement[]): void {
     for (const button of buttons) {
       button.classList.remove(...INDICATOR_CLASSES)
       button.style.removeProperty('--drag-card-height')
     }
   }
 
-  async #endDrag() {
+  async #endDrag(): Promise<void> {
     const drag = this.#drag
     if (!drag.active) return
 
@@ -353,14 +389,19 @@ export class OverviewReorder {
     let moved = false
 
     // Clean up visual state
-    button.classList.remove('dragging')
-    button.style.transform = ''
-    this.#list.classList.remove('reordering')
+    button?.classList.remove('dragging')
+    if (button) button.style.transform = ''
+    this.#list?.classList.remove('reordering')
     document.body.style.userSelect = ''
     this.#clearIndicators(this.#cards())
 
     // Reorder if position changed
-    if (targetIndex !== null && targetIndex !== startIndex && targetIndex !== startIndex + 1) {
+    if (
+      startIndex !== null &&
+      targetIndex !== null &&
+      targetIndex !== startIndex &&
+      targetIndex !== startIndex + 1
+    ) {
       // The index it ends up at, once it has left its old place
       const newIndex = targetIndex > startIndex ? targetIndex - 1 : targetIndex
       await this.#onMove(startIndex, newIndex)
@@ -376,7 +417,7 @@ export class OverviewReorder {
     if (moved && this.#isEnabled()) this.enable()
   }
 
-  #cancelDrag() {
+  #cancelDrag(): void {
     const drag = this.#drag
     if (drag.rafId) cancelAnimationFrame(drag.rafId)
 

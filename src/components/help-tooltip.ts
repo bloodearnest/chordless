@@ -1,10 +1,15 @@
 import { css, html, LitElement } from 'lit'
 
 export class HelpTooltip extends LitElement {
-  static properties = {
+  static override properties = {
     message: { type: String },
     _visible: { state: true },
   }
+
+  declare message: string
+  declare _visible: boolean
+
+  _suppressNextClick: boolean
 
   constructor() {
     super()
@@ -13,7 +18,7 @@ export class HelpTooltip extends LitElement {
     this._suppressNextClick = false
   }
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: inline-flex;
       align-items: center;
@@ -87,7 +92,7 @@ export class HelpTooltip extends LitElement {
     }
   `
 
-  render() {
+  override render() {
     return html`
       <span
         class="trigger"
@@ -107,13 +112,13 @@ export class HelpTooltip extends LitElement {
     `
   }
 
-  _handlePointerEnter(event) {
+  _handlePointerEnter(event: PointerEvent) {
     if (event.pointerType === 'mouse' || event.pointerType === '') {
       this._visible = true
     }
   }
 
-  _handlePointerLeave(event) {
+  _handlePointerLeave(event: PointerEvent) {
     if (event.pointerType === 'mouse' || event.pointerType === '') {
       this._visible = false
     }
@@ -127,7 +132,7 @@ export class HelpTooltip extends LitElement {
     this._visible = false
   }
 
-  _handlePointerDown(event) {
+  _handlePointerDown(event: PointerEvent) {
     if (event.pointerType === 'touch' || event.pointerType === 'pen') {
       event.preventDefault()
       this._visible = !this._visible
@@ -135,7 +140,7 @@ export class HelpTooltip extends LitElement {
     }
   }
 
-  _handleClick(event) {
+  _handleClick(event: Event) {
     if (this._suppressNextClick) {
       event.preventDefault()
       event.stopPropagation()
@@ -147,3 +152,9 @@ export class HelpTooltip extends LitElement {
 }
 
 customElements.define('help-tooltip', HelpTooltip)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'help-tooltip': HelpTooltip
+  }
+}

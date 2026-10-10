@@ -1,6 +1,6 @@
 import { css, html, LitElement } from 'lit'
 import './song-card.js'
-import './status-message.js'
+import './status-message.ts'
 
 /** A song was chosen; index is its place in the list */
 export class SongSelectEvent extends Event {

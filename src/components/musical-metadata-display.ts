@@ -26,7 +26,7 @@ export class SongSettingsClickEvent extends Event {
  * @fires SongSettingsClickEvent - When clicked in edit mode
  */
 export class MusicalMetadataDisplay extends LitElement {
-  static properties = {
+  static override properties = {
     keyValue: { type: String, attribute: 'key-value' },
     capoValue: { type: Number, attribute: 'capo-value' },
     bpm: { type: Number },
@@ -34,7 +34,13 @@ export class MusicalMetadataDisplay extends LitElement {
     editMode: { type: Boolean, attribute: 'edit-mode', reflect: true },
   }
 
-  static styles = css`
+  declare keyValue: string
+  declare capoValue: number
+  declare bpm: number | null
+  declare timeSignature: string
+  declare editMode: boolean
+
+  static override styles = css`
     :host {
       display: inline-flex;
     }
@@ -105,14 +111,14 @@ export class MusicalMetadataDisplay extends LitElement {
     }
   }
 
-  _handleKeyDown(e) {
+  _handleKeyDown(e: KeyboardEvent) {
     if (this.editMode && (e.key === 'Enter' || e.key === ' ')) {
       e.preventDefault()
       this._handleClick()
     }
   }
 
-  render() {
+  override render() {
     return html`
       <div
         class="metadata-container"
@@ -168,3 +174,9 @@ export class MusicalMetadataDisplay extends LitElement {
 }
 
 customElements.define('musical-metadata-display', MusicalMetadataDisplay)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'musical-metadata-display': MusicalMetadataDisplay
+  }
+}

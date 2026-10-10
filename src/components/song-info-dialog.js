@@ -3,7 +3,7 @@ import { html, LitElement } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import './app-modal.js'
 import './song-info.js'
-import './status-message.js'
+import './status-message.ts'
 
 /**
  * SongInfoDialog Component

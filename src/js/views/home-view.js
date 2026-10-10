@@ -6,14 +6,14 @@ import '../../components/app-header.js'
 import '../../components/app-modal.js'
 import '../../components/icon.js'
 import '../../components/setlist-details-form.js'
-import '../../components/setlist-group.js'
-import '../../components/status-message.js'
+import '../../components/setlist-group.ts'
+import '../../components/status-message.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { getCurrentOrganisation } from '../organisation.ts'
 import { claimSetlistsOnce, getOrganisationPeople } from '../people.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /**
  * The setlists, grouped by year, newest first, for <setlist-group>s: the

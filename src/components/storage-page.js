@@ -5,7 +5,7 @@ import './drive-sync-panel.js'
 import './storage-summary.js'
 import './pad-set-manager.js'
 import './select-organisation.js'
-import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.js'
+import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
 /**
  * StoragePage Component

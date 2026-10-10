@@ -1,16 +1,30 @@
 import { css, html, LitElement } from 'lit'
 
+/** A setlist as the home page lists it */
+export interface SetlistRow {
+  id: string
+  name?: string
+  displayName?: string
+  url?: string
+  songCount?: number
+  songs?: unknown[]
+}
+
 /**
  * SetlistGroup component
  *
  * Displays a collapsible list of setlists for a specific year.
  */
 export class SetlistGroup extends LitElement {
-  static properties = {
+  static override properties = {
     year: { type: String },
     setlists: { type: Array, attribute: false },
     expanded: { type: Boolean, reflect: true },
   }
+
+  declare year: string
+  declare setlists: SetlistRow[]
+  declare expanded: boolean
 
   constructor() {
     super()
@@ -19,7 +33,7 @@ export class SetlistGroup extends LitElement {
     this.expanded = false
   }
 
-  static styles = css`
+  static override styles = css`
     :host {
       display: block;
     }
@@ -110,7 +124,7 @@ export class SetlistGroup extends LitElement {
     this.expanded = !this.expanded
   }
 
-  _renderSetlistRow(setlist) {
+  _renderSetlistRow(setlist: SetlistRow) {
     const url = setlist.url || `/setlist/${setlist.id}`
     const name = setlist.displayName || setlist.name || ''
     const songCount =
@@ -128,7 +142,7 @@ export class SetlistGroup extends LitElement {
     `
   }
 
-  render() {
+  override render() {
     return html`
       <div class="year-section">
         <button
@@ -145,3 +159,9 @@ export class SetlistGroup extends LitElement {
 }
 
 customElements.define('setlist-group', SetlistGroup)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-group': SetlistGroup
+  }
+}

@@ -3,7 +3,7 @@ import '../../components/app-header.js'
 import '../../components/app-modal.js'
 import '../../components/capo-selector.js'
 import '../../components/key-selector.js'
-import '../../components/musical-metadata-display.js'
+import '../../components/musical-metadata-display.ts'
 import '../../components/setlist-info-dialog.js'
 import '../../components/setlist-overview.js'
 import '../../components/song-card.js'
@@ -12,7 +12,7 @@ import '../../components/song-info-dialog.js'
 import '../../components/song-section.js'
 import '../../components/song-settings-popover.js'
 import { SetlistPage } from '../setlist-page.js'
-import { PageView } from './page-view.js'
+import { PageView } from './page-view.ts'
 
 /**
  * A setlist: its overview, and each of its songs next to it. The page logic is
