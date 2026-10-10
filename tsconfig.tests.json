@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["mocha", "google.accounts"],
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo"
+  },
+  // The browser unit tests (Web Test Runner)
+  "include": ["tests/*.test.*", "tests/fake-drive.*", "tests/test-helpers.*"],
+  "exclude": ["tests/*.node.test.*"]
+}

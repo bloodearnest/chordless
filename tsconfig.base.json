@@ -1,0 +1,30 @@
+{
+  // Shared by the per-environment projects (tsconfig.json lists them; `tsc -b` checks all).
+  // Imports name the real file, with its .ts extension: browsers, Vite and the test runner then
+  // all resolve the same thing.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+
+    // JS and TS live together while files are converted: JS is read for its types
+    // (and its JSDoc), but only TS is checked
+    "allowJs": true,
+    "checkJs": false,
+
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": false,
+    "forceConsistentCasingInFileNames": true,
+
+    // TypeScript here is JavaScript with types: nothing that emits code of its own
+    // (enums, namespaces, constructor parameter properties). Biome and Vite agree
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true
+  }
+}

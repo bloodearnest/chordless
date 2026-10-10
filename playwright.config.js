@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: '*.playwright.js',
+  testMatch: '*.playwright.{js,ts}',
 
   timeout: 30 * 1000,
   fullyParallel: true,
@@ -23,14 +23,14 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
-      testIgnore: 'built.playwright.js',
+      testIgnore: 'built.playwright.{js,ts}',
     },
     {
       // The production build, as `vite preview` serves it: the service worker with its
       // precache, which the dev server does not have
       name: 'built',
       use: { ...devices['Desktop Chrome'], baseURL: 'http://localhost:8788' },
-      testMatch: 'built.playwright.js',
+      testMatch: 'built.playwright.{js,ts}',
     },
   ],
 

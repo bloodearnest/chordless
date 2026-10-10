@@ -16,6 +16,8 @@ test-unit *args:
 lint:
     @echo "Running Biome check..."
     npx @biomejs/biome check .
+    @echo "Running the TypeScript check..."
+    npx tsc -b
 
 # Format project files with Biome
 format:

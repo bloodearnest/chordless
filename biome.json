@@ -72,7 +72,12 @@
         "useValidTypeof": "error",
         "useYield": "error"
       },
+      "style": {
+        "useImportType": "error",
+        "noNonNullAssertion": "error"
+      },
       "suspicious": {
+        "noExplicitAny": "error",
         "noAsyncPromiseExecutor": "error",
         "noCatchAssign": "error",
         "noClassAssign": "error",
@@ -124,7 +129,7 @@
   },
   "overrides": [
     {
-      "includes": ["src/*.js", "src/components/**/*.js", "src/js/**/*.js", "src/service-worker.js"],
+      "includes": ["src/*.{js,ts}", "src/components/**/*.{js,ts}", "src/js/**/*.{js,ts}"],
       "linter": {
         "rules": {
           "suspicious": {
@@ -138,13 +143,13 @@
       }
     },
     {
-      "includes": ["src/service-worker.js"],
+      "includes": ["src/service-worker.{js,ts}"],
       "javascript": {
         "globals": ["google", "__PRECACHE__", "__CACHE_VERSION__"]
       }
     },
     {
-      "includes": ["tests/**/*.js"],
+      "includes": ["tests/**/*.{js,ts}"],
       "linter": {
         "rules": {
           "suspicious": {
