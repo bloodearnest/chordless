@@ -7,6 +7,7 @@ import {
   updatePadSetFolderMetadata,
   uploadPadFile,
 } from './drive-api.js'
+import { wantsPads } from './media-player-loader.js'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.js'
 
 /** A different pad set was chosen (sent on window) */
@@ -233,10 +234,15 @@ function uniqueNormalizedPadKeys(keys = []) {
   return Array.from(new Set(normalized))
 }
 
+/**
+ * Fetch pads for these keys in the background, so they are there to play. Only a Drive pad
+ * set needs it, and only if the player and its pads are on and the device can play them.
+ * @returns {number} how many keys it set about fetching
+ */
 export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
-  if (padSet?.type !== 'drive') return
+  if (padSet?.type !== 'drive' || !wantsPads()) return 0
   const normalizedKeys = uniqueNormalizedPadKeys(keys)
-  if (normalizedKeys.length === 0) return
+  if (normalizedKeys.length === 0) return 0
 
   normalizedKeys.forEach((key, index) => {
     setTimeout(() => {
@@ -245,6 +251,7 @@ export function preloadPadKeys(keys = [], padSet = getActivePadSet()) {
       })
     }, index * PAD_PRELOAD_DELAY_MS)
   })
+  return normalizedKeys.length
 }
 
 export function preloadPadKey(key, padSet = getActivePadSet()) {

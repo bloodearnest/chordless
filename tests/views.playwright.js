@@ -447,3 +447,50 @@ test.describe('Coming back to a view', () => {
     expect(await page.locator('#song-0').evaluate(element => element.scrollTop)).toBe(0)
   })
 })
+
+test.describe('The media player is optional', () => {
+  const playerDefined = page => page.evaluate(() => Boolean(customElements.get('media-player')))
+
+  test('setlists work on a device with no Web Audio, without the player', async ({ page }) => {
+    const url = await seedSetlist(page)
+    // From now on pages load as on a browser that has no AudioContext
+    await page.addInitScript(() => {
+      window.AudioContext = undefined
+      window.webkitAudioContext = undefined
+    })
+    await page.goto(url)
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Alpha')
+    await page.keyboard.press('ArrowRight')
+    await expect(page.locator('#app-header')).toContainText('Bravo')
+    await page.waitForLoadState('networkidle')
+    expect(await playerDefined(page)).toBe(false)
+  })
+
+  test('a player switched off in Preferences is not loaded, and loads when switched on', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await page.evaluate(() => {
+      localStorage.setItem('media-settings', JSON.stringify({ mediaPlayerEnabled: false }))
+    })
+    await page.goto('/preferences')
+    const player = page
+      .locator('media-player-settings')
+      .getByRole('switch', { name: 'Enable Media Player' })
+    await expect(player).toHaveAttribute('aria-checked', 'false')
+    // Give a load that was going to happen time to (the app has loaded when the network is quiet)
+    await page.waitForLoadState('networkidle')
+    expect(await playerDefined(page)).toBe(false)
+
+    await player.click()
+    await expect(player).toHaveAttribute('aria-checked', 'true')
+    await page.waitForFunction(() => customElements.get('media-player'))
+  })
+
+  test('with the player on, it is loaded as before', async ({ page }) => {
+    await openApp(page, '/')
+    await page.waitForFunction(() => customElements.get('media-player'))
+  })
+})

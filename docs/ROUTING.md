@@ -67,6 +67,12 @@ the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-c
 something is playing (`active` attribute, `isActive`). Leaving a setlist sends
 `SongChangeEvent(null)`, which clears the *current* song but not the one playing.
 
+The player is optional: setlist navigation is the core, and the player may be off on an older
+device. `js/media-player-loader.js` loads its code only if the device has Web Audio and the
+player is on in Preferences (and when it is switched on later); a player that fails to load is
+a warning, not an error; and Drive pads are only preloaded when the player and pads are on.
+Don't let the setlists depend on it.
+
 ## Reloads
 
 A few actions reload the page on purpose, because the database underneath every view is

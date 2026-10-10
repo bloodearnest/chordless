@@ -5,6 +5,7 @@
 import '../components/nav-menu.js'
 import { AppRouter, RouteChangeEvent } from './app-router.js'
 import { checkFirstTimeAuth } from './first-time-auth.js'
+import { startMediaPlayer } from './media-player-loader.js'
 import { setRouter } from './navigation.js'
 import { views } from './views/registry.js'
 
@@ -26,5 +27,5 @@ document.addEventListener(RouteChangeEvent.type, event => {
 
 await router.start()
 
-// Not needed to show the first view, so after it
-import('../components/media-player.js')
+// Optional, and not needed to show the first view, so after it
+startMediaPlayer()
