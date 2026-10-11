@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import type { SetlistEntry } from '../src/js/data-types.ts'
+import type { SetlistEntry, TempoInput } from '../src/js/data-types.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { buildRuntimeSongs, parseTempoMetadata } from '../src/js/setlist/runtime-songs.ts'
@@ -9,7 +9,7 @@ import { suppressConsoleLogs } from './test-helpers.ts'
 const { describe, it, before } = window
 
 describe('parseTempoMetadata', () => {
-  const cases = [
+  const cases: [TempoInput, { bpm: number | null; tempoNote: string | null }][] = [
     [120, { bpm: 120, tempoNote: null }],
     ['96', { bpm: 96, tempoNote: null }],
     ['72.5', { bpm: 72.5, tempoNote: null }],
@@ -22,7 +22,7 @@ describe('parseTempoMetadata', () => {
   ]
   for (const [raw, expected] of cases) {
     it(`${JSON.stringify(raw) ?? 'undefined'} is ${JSON.stringify(expected)}`, () => {
-      expect(parseTempoMetadata(raw as any)).to.deep.equal(expected)
+      expect(parseTempoMetadata(raw)).to.deep.equal(expected)
     })
   }
 })
@@ -39,7 +39,7 @@ describe('buildRuntimeSongs', () => {
   })
 
   /** Save a library song with the chart given, and return its id */
-  async function addSong(chart, { tempo }: { tempo?: any } = {}) {
+  async function addSong(chart, { tempo }: { tempo?: TempoInput } = {}) {
     const unique = crypto.randomUUID()
     await db.saveChordPro({
       id: `chordpro-${unique}`,
@@ -126,7 +126,12 @@ describe('buildRuntimeSongs', () => {
 
   describe('tempo, and the note it counts', () => {
     // [what happens, the chart's extra lines, the setlist's tempo, what the song gets]
-    const cases: any[][] = [
+    const cases: [
+      string,
+      string,
+      number | undefined,
+      { bpm: number | null; note: string; time?: string },
+    ][] = [
       ["the setlist's tempo wins over the chart's", '{tempo: 72}', 90, { bpm: 90, note: '1/4' }],
       [
         "the chart's tempo is used when the setlist has none",
@@ -150,7 +155,7 @@ describe('buildRuntimeSongs', () => {
     ]
     for (const [what, extra, tempo, expected] of cases) {
       it(what, async () => {
-        const songId = await addSong(chart(extra as any))
+        const songId = await addSong(chart(extra))
         const [song] = await build([{ songId, tempo, order: 0 }])
         expect(song.currentBPM).to.equal(expected.bpm)
         expect(song.metadata.tempo).to.equal(expected.bpm)

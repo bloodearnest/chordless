@@ -13,8 +13,9 @@ import { suppressConsoleLogs } from './test-helpers.ts'
 const { describe, it, afterEach } = window
 
 /** A Storage with the media settings in it */
-const storageWith = settings => ({
-  getItem: key => (key === 'media-settings' && settings ? JSON.stringify(settings) : null),
+const storageWith = (settings: object | null) => ({
+  getItem: (key: string) =>
+    key === 'media-settings' && settings ? JSON.stringify(settings) : null,
 })
 const withAudio = { AudioContext: class {} }
 const withOldAudio = { webkitAudioContext: class {} }
@@ -30,7 +31,7 @@ describe('canPlayAudio', () => {
 
 describe('wantsMediaPlayer and wantsPads', () => {
   // [what, the device, the saved settings, wants the player, wants pads]
-  const cases: any[][] = [
+  const cases: [string, object, object | null, boolean, boolean][] = [
     ['audio and no settings saved: both on', withAudio, null, true, true],
     ['the player switched off', withAudio, { mediaPlayerEnabled: false }, false, false],
     ['pads switched off, the player on', withAudio, { padsEnabled: false }, true, false],
@@ -40,8 +41,8 @@ describe('wantsMediaPlayer and wantsPads', () => {
   for (const [what, win, settings, player, pads] of cases) {
     it(what, () => {
       const options = { win, storage: storageWith(settings) }
-      expect(wantsMediaPlayer(options as any)).to.equal(player)
-      expect(wantsPads(options as any)).to.equal(pads)
+      expect(wantsMediaPlayer(options)).to.equal(player)
+      expect(wantsPads(options)).to.equal(pads)
     })
   }
 })
@@ -135,7 +136,7 @@ describe('preloading pads', () => {
   function preload(settings, keys = ['C', 'G'], padSet = drive) {
     originalSettings = localStorage.getItem('media-settings')
     originalSetTimeout = window.setTimeout
-    ;(window as any).setTimeout = () => 0
+    ;(window as { setTimeout: unknown }).setTimeout = () => 0
     if (settings) localStorage.setItem('media-settings', JSON.stringify(settings))
     else localStorage.removeItem('media-settings')
     return preloadPadKeys(keys, padSet)

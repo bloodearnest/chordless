@@ -83,7 +83,7 @@ describe('importFromSongSelect', () => {
 
   /** Run the import, with the import page becoming ready after the download */
   async function run(page) {
-    const done = importFromSongSelect(CHORDLESS, page as any)
+    const done = importFromSongSelect(CHORDLESS, page)
     await new Promise(resolve => setTimeout(resolve))
     page.ready()
     await done
@@ -114,13 +114,13 @@ describe('importFromSongSelect', () => {
       page.ready()
       return realFetch(url)
     }
-    await importFromSongSelect(CHORDLESS, page as any)
+    await importFromSongSelect(CHORDLESS, page)
     expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'post'])
   })
 
   it('ignores ready messages from other sites', async () => {
     const page = fakePage()
-    const done = importFromSongSelect(CHORDLESS, page as any)
+    const done = importFromSongSelect(CHORDLESS, page)
     await new Promise(resolve => setTimeout(resolve))
     page.ready('https://evil.example')
     await new Promise(resolve => setTimeout(resolve))
@@ -147,7 +147,7 @@ describe('importFromSongSelect', () => {
 
   it("stops without downloading if the tab can't be opened", async () => {
     const page = fakePage({ popupBlocked: true })
-    await importFromSongSelect(CHORDLESS, page as any)
+    await importFromSongSelect(CHORDLESS, page)
     expect(page.log).to.deep.equal([
       ['open', `${CHORDLESS}/import-song`, 'chordless'],
       ['alert', '⚠️ Popup blocked. Please allow popups.'],

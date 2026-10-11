@@ -131,3 +131,9 @@ export class SetlistView extends PageView {
   }
 }
 customElements.define('setlist-view', SetlistView)
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'setlist-view': SetlistView
+  }
+}

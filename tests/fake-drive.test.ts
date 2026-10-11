@@ -55,11 +55,11 @@ describe('FakeDrive', () => {
 
   it('uses the server clock for modifiedTime', async () => {
     drive.clockOffsetMs = -60 * 60 * 1000
-    const created = await driveRequest('/files?fields=modifiedTime', {
+    const created = await driveRequest<{ modifiedTime: string }>('/files?fields=modifiedTime', {
       method: 'POST',
       body: JSON.stringify({ name: 'a.json' }),
     })
-    const skew = Date.now() - new Date((created as any).modifiedTime).getTime()
+    const skew = Date.now() - new Date(created.modifiedTime).getTime()
     expect(skew).to.be.within(60 * 60 * 1000 - 1000, 60 * 60 * 1000 + 1000)
   })
 })

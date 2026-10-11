@@ -1,9 +1,10 @@
 import { expect } from '@esm-bundle/chai'
+import type { Setlist, SetlistLocalState } from '../src/js/data-types.ts'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { setlistFileMetadata, songFileMetadata } from '../src/js/drive-metadata.ts'
-import { DriveSyncManager } from '../src/js/drive-sync.ts'
+import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
-import { makeSong } from './builders.ts'
+import { makeLocalState, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -30,18 +31,24 @@ describe('Drive sync (against FakeDrive)', () => {
   let devices
 
   /** In-memory stand-in for the organisation's stored Drive folder link */
-  const memoryFolderLink = () => ({
-    value: null,
+  const memoryFolderLink = (): FolderLink & { value: string | null } => ({
+    value: null as string | null,
     async get() {
       return this.value
     },
-    async set(value) {
+    async set(value: string) {
       this.value = value
     },
   })
 
   /** A simulated device: its own local database, syncing the shared org */
-  async function makeDevice(name, { orgName = ORG_NAME, folderLink = memoryFolderLink() } = {}) {
+  async function makeDevice(
+    name,
+    {
+      orgName = ORG_NAME,
+      folderLink = memoryFolderLink(),
+    }: { orgName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
+  ) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
     const memberCache = {
@@ -342,9 +349,9 @@ describe('Drive sync (against FakeDrive)', () => {
       // Detected as a conflict, resolved like any other (Drive wins)
       const onDrive = driveSetlist(setlist.id)
       expect(onDrive.leader).to.equal('Phone changed leader')
-      expect(((await tablet.db.getSetlist(setlist.id)) as any).leader).to.equal(
-        'Phone changed leader'
-      )
+      expect(
+        ((await tablet.db.getSetlist(setlist.id)) as Setlist & { leader?: string }).leader
+      ).to.equal('Phone changed leader')
     })
 
     it('keeps a local edit when the device clock is behind Drive', async () => {
@@ -614,7 +621,7 @@ describe('Drive sync (against FakeDrive)', () => {
       // so renaming its organisation pointed it at a different folder, and
       // everything looked "missing" and was uploaded again (6 October 2026).
       const noLink = { get: async () => null, set: async () => {} }
-      const phone = await makeDevice('phone', { orgName: 'Personal', folderLink: noLink as any })
+      const phone = await makeDevice('phone', { orgName: 'Personal', folderLink: noLink })
       await addSetlist(phone, { name: 'Mine' })
       await syncDevice(phone)
       const tablet = await makeDevice('tablet', { orgName: 'Simon Davy' })
@@ -793,11 +800,14 @@ describe('Drive sync (against FakeDrive)', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone)
       await syncDevice(phone)
-      await phone.db.saveLocalState({ setlistId: setlist.id, marker: 'kept' } as any)
+      await phone.db.saveLocalState(Object.assign(makeLocalState(setlist.id), { marker: 'kept' }))
 
       await phone.sync.resetLocalFromDrive()
 
-      expect(((await phone.db.getLocalState(setlist.id)) as any).marker).to.equal('kept')
+      expect(
+        ((await phone.db.getLocalState(setlist.id)) as SetlistLocalState & { marker?: string })
+          .marker
+      ).to.equal('kept')
     })
   })
 

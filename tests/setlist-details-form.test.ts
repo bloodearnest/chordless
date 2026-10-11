@@ -76,14 +76,14 @@ describe('setlist-details-form', () => {
   /** The value of the leader option showing this name */
   const leaderValue = name => [...field('leader').options].find(o => o.text === name).value
 
-  function nextEvent(name) {
-    return new Promise(resolve => form.addEventListener(name, resolve, { once: true }))
+  function nextEvent<E extends Event = Event>(name: string) {
+    return new Promise<E>(resolve => form.addEventListener(name, resolve, { once: true }))
   }
 
   async function save() {
-    const saved = nextEvent(SetlistDetailsSaveEvent.type)
+    const saved = nextEvent<SetlistDetailsSaveEvent>(SetlistDetailsSaveEvent.type)
     form.shadowRoot.querySelector('.submit').click()
-    return ((await saved) as any).details
+    return (await saved).details
   }
 
   afterEach(() => form?.remove())

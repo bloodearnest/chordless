@@ -10,6 +10,7 @@ import type {
   ParsedChart,
   Setlist,
   SetlistEntry,
+  SetlistLocalState,
   SongInput,
 } from '../src/js/data-types.ts'
 import type { PadSet } from '../src/js/pad-set-service.ts'
@@ -37,6 +38,15 @@ export const makeSetlist = (overrides: Partial<Setlist> = {}): Setlist => ({
   createdDate: NOW,
   modifiedDate: NOW,
   ...overrides,
+})
+
+export const makeLocalState = (setlistId: string): SetlistLocalState => ({
+  setlistId,
+  padsEnabled: true,
+  padSound: null,
+  clickEnabled: true,
+  sectionVisibility: {},
+  lastUsedDate: NOW,
 })
 
 export const makeSong = (overrides: Partial<SongInput> = {}): SongInput => ({

@@ -24,7 +24,7 @@ const sign = ({
   exp = '1h',
   kid = 'k1',
 }: {
-  key?: any
+  key?: jose.CryptoKey | Uint8Array
   alg?: string
   claims?: object
   exp?: string | number
@@ -43,13 +43,13 @@ const sign = ({
 // A jose error (JWSInvalid, JWTExpired, JWTClaimValidationFailed...), not some other failure
 const rejects = (token, why) =>
   assert.rejects(
-    () => verifyIdToken(token, env as any, keys),
-    err => (err as any)?.code?.startsWith('ERR_J'),
+    () => verifyIdToken(token, env, keys),
+    err => (err as { code?: string })?.code?.startsWith('ERR_J'),
     `should reject ${why}`
   )
 
 test('a valid token gives its claims', async () => {
-  const claims = await verifyIdToken(await sign(), env as any, keys)
+  const claims = await verifyIdToken(await sign(), env, keys)
   assert.equal(claims.sub, 'sub-1')
   assert.equal(claims.email, 'a@example.com')
 })
@@ -63,7 +63,7 @@ test('the issuer without the scheme is accepted', async () => {
     .setIssuedAt()
     .setExpirationTime('1h')
     .sign(privateKey)
-  assert.equal((await verifyIdToken(token, env as any, keys)).sub, 's')
+  assert.equal((await verifyIdToken(token, env, keys)).sub, 's')
 })
 
 test('alg none is rejected', async () => {
@@ -81,7 +81,7 @@ test('alg none is rejected', async () => {
 
 test('HS256 signed with the public key is rejected (algorithm confusion)', async () => {
   const secret = new TextEncoder().encode(JSON.stringify(publicJwk))
-  await rejects(await sign({ key: secret as any, alg: 'HS256' }), 'HS256 confusion')
+  await rejects(await sign({ key: secret, alg: 'HS256' }), 'HS256 confusion')
 })
 
 test('a token signed by another key is rejected', async () => {

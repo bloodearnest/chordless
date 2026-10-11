@@ -1,5 +1,7 @@
 // Shared Playwright set-up: import test and expect from here, not @playwright/test.
 import { test as base, expect } from '@playwright/test'
+import type { ChordProRecord, SongInput } from '../src/js/data-types.ts'
+import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 
 export const test = base.extend<{ pageErrors: string[] }>({
   // Every test fails if its page throws an uncaught error
@@ -42,41 +44,37 @@ export async function waitForServiceWorker(page) {
  * song (Info Test Song, in G: [G]Amazing [C]grace), and optionally a setlist
  * containing it.
  */
-export async function seedSong(page, { setlistId = null } = {}) {
+export async function seedSong(page, { setlistId = null }: { setlistId?: string | null } = {}) {
   await openApp(page, '/songs')
-  await page.evaluate(async setlistId => {
-    const { getCurrentDB } = await import('/js/db.ts')
-    const db = await getCurrentDB()
-    const content = '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace'
-    await db.saveChordPro({
-      id: 'chordpro-info-test',
-      content,
-      contentHash: 'test',
-      lastModified: Date.now(),
-    })
-    await db.saveSong({
-      uuid: 'info-test-song',
-      id: 'title-info-test-song',
-      title: 'Info Test Song',
-      titleNormalized: 'infotestsong',
-      isDefault: true,
-      chordproFileId: 'chordpro-info-test',
-      modifiedDate: new Date().toISOString(),
-    } as any)
-    if (setlistId) {
-      await db.saveSetlist({
+  const chordpro = {
+    id: 'chordpro-info-test',
+    content: '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace',
+    contentHash: 'test',
+    lastModified: Date.now(),
+  }
+  const song = makeSong({
+    uuid: 'info-test-song',
+    id: 'title-info-test-song',
+    title: 'Info Test Song',
+    titleNormalized: 'infotestsong',
+    chordproFileId: chordpro.id,
+  })
+  const setlist = setlistId
+    ? makeSetlist({
         id: setlistId,
-        date: '2026-10-11',
-        time: '10:30',
-        type: 'Church Service',
-        name: '',
-        owner: 'Ann',
-        songs: [{ songId: 'title-info-test-song', key: 'A' } as any],
-        createdDate: new Date().toISOString(),
-        modifiedDate: new Date().toISOString(),
+        songs: [makeEntry({ songId: song.id, songUuid: song.uuid, key: 'A' })],
       })
-    }
-  }, setlistId)
+    : null
+  await page.evaluate(
+    async ({ chordpro, song, setlist }) => {
+      const { getCurrentDB } = await import('/js/db.ts')
+      const db = await getCurrentDB()
+      await db.saveChordPro(chordpro)
+      await db.saveSong(song)
+      if (setlist) await db.saveSetlist(setlist)
+    },
+    { chordpro, song, setlist }
+  )
 }
 
 export /** Call a method of the app's database, e.g. fromDB(page, 'getSong', uuid) */
@@ -103,48 +101,44 @@ export const SETLIST_SONGS = [
  */
 export async function seedSetlist(page, { setlistId = 'seeded-setlist' } = {}) {
   await openApp(page, '/songs')
+  const chordpros: ChordProRecord[] = []
+  const songs: SongInput[] = []
+  SETLIST_SONGS.forEach((song, index) => {
+    const slug = song.title.toLowerCase().replace(/\W+/g, '')
+    // Alpha's verse runs on, so its page can scroll
+    const verse = index === 0 ? Array(40).fill(song.verse).join('\n') : song.verse
+    chordpros.push({
+      id: `chordpro-${slug}`,
+      content: `{title: ${song.title}}\n{key: ${song.key}}\n\n{comment: Verse 1}\n${verse}\n\n{comment: Chorus}\n${song.chorus}`,
+      contentHash: slug,
+      lastModified: Date.now(),
+    })
+    songs.push(
+      makeSong({
+        uuid: `song-${slug}`,
+        id: `title-${slug}`,
+        title: song.title,
+        titleNormalized: slug,
+        key: song.key,
+        chordproFileId: `chordpro-${slug}`,
+      })
+    )
+  })
+  const setlist = makeSetlist({
+    id: setlistId,
+    songs: songs.map((song, order) =>
+      makeEntry({ songId: song.id, songUuid: song.uuid, key: song.key, order })
+    ),
+  })
   await page.evaluate(
-    async ({ setlistId, songs }) => {
+    async ({ chordpros, songs, setlist }) => {
       const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
-      const now = new Date().toISOString()
-      const entries = []
-      for (const [index, song] of songs.entries()) {
-        const slug = song.title.toLowerCase().replace(/\W+/g, '')
-        // Alpha's verse runs on, so its page can scroll
-        const verse = index === 0 ? Array(40).fill(song.verse).join('\n') : song.verse
-        const content = `{title: ${song.title}}\n{key: ${song.key}}\n\n{comment: Verse 1}\n${verse}\n\n{comment: Chorus}\n${song.chorus}`
-        await db.saveChordPro({
-          id: `chordpro-${slug}`,
-          content,
-          contentHash: slug,
-          lastModified: Date.now(),
-        })
-        await db.saveSong({
-          uuid: `song-${slug}`,
-          id: `title-${slug}`,
-          title: song.title,
-          titleNormalized: slug,
-          key: song.key,
-          isDefault: true,
-          chordproFileId: `chordpro-${slug}`,
-          modifiedDate: now,
-        } as any)
-        entries.push({ songId: `title-${slug}`, songUuid: `song-${slug}`, key: song.key })
-      }
-      await db.saveSetlist({
-        id: setlistId,
-        date: '2026-10-11',
-        time: '10:30',
-        type: 'Church Service',
-        name: '',
-        owner: 'Ann',
-        songs: entries,
-        createdDate: now,
-        modifiedDate: now,
-      })
+      for (const chordpro of chordpros) await db.saveChordPro(chordpro)
+      for (const song of songs) await db.saveSong(song)
+      await db.saveSetlist(setlist)
     },
-    { setlistId, songs: SETLIST_SONGS }
+    { chordpros, songs, setlist }
   )
   return `/setlist/${setlistId}`
 }

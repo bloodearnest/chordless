@@ -10,6 +10,11 @@ class RouteConsumer extends LitElement {
   consumer = new ContextConsumer(this, { context: routeContext, subscribe: true })
 }
 customElements.define('route-consumer', RouteConsumer)
+declare global {
+  interface HTMLElementTagNameMap {
+    'route-consumer': RouteConsumer
+  }
+}
 
 const startUrl = window.location.pathname + window.location.search
 
@@ -440,7 +445,7 @@ describe('AppRouter', () => {
     it('provides the route to components, and clears it on stop', async () => {
       const host = document.createElement('route-consumer')
       document.body.append(host)
-      const consumer = (host as any).consumer
+      const consumer = host.consumer
       window.history.replaceState(null, '', '/storage')
       await makeRouter().start()
       expect(consumer.value).to.deep.equal({ name: 'storage' })

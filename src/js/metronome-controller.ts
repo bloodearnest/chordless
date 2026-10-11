@@ -6,14 +6,50 @@
  */
 type ClickType = 'heavy' | 'medium' | 'light'
 
+/*
+ * The parts of Web Audio the metronome uses. A real AudioContext and GainNode satisfy these,
+ * and so can a test's fakes, which need nothing else.
+ */
+interface ClickNode {
+  connect(destination: unknown): unknown
+  disconnect(): unknown
+}
+
+export interface ClickOscillator extends ClickNode {
+  frequency: { value: number }
+  start(when?: number): void
+  stop(when?: number): void
+}
+
+export interface ClickEnvelope extends ClickNode {
+  gain: {
+    value: number
+    setValueAtTime(value: number, time: number): unknown
+    exponentialRampToValueAtTime(value: number, time: number): unknown
+  }
+}
+
+export interface ClickAudioContext {
+  state: string
+  currentTime: number
+  resume(): Promise<void>
+  createOscillator(): ClickOscillator
+  createGain(): ClickEnvelope
+}
+
+/** Where the clicks go: a gain node, whose volume the metronome sets */
+export interface ClickOutput {
+  gain: { value: number }
+}
+
 export class MetronomeController {
-  _audioContext: AudioContext | null
-  _clickGain: GainNode | null
+  _audioContext: ClickAudioContext | null
+  _clickGain: ClickOutput | null
   _isRunning: boolean
   _beatInterval: number | null
   _metronomeInterval: ReturnType<typeof setTimeout> | null
   _metronomeBeat: number
-  _activeOscillators: OscillatorNode[]
+  _activeOscillators: ClickOscillator[]
   _timeSignature: string | null
   _beatsPerBar: number
 
@@ -21,7 +57,7 @@ export class MetronomeController {
    * @param audioContext - Web Audio API context
    * @param clickGain - Gain node for click volume control
    */
-  constructor(audioContext: AudioContext, clickGain: GainNode) {
+  constructor(audioContext: ClickAudioContext, clickGain: ClickOutput) {
     if (!audioContext) {
       throw new Error('AudioContext is required')
     }

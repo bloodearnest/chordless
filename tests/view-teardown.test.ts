@@ -8,6 +8,7 @@ import { expect } from '@open-wc/testing'
 import '../src/components/nav-menu.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
+import type { Route } from '../src/js/router.ts'
 import '../src/js/views/bookmarklet-view.ts'
 import '../src/js/views/home-view.ts'
 import '../src/js/views/import-song-view.ts'
@@ -211,11 +212,11 @@ describe('views leave nothing behind', () => {
 
   it('library-view, left in edit mode', async function () {
     this.timeout(15000)
-    const route = { name: 'songs', songUuid: seeded.songUuid }
+    const route = { name: 'songs', songUuid: seeded.songUuid } as const satisfies Route
     await mountAndUnmount('library-view', route, 1)
     const before = pageState()
     const view = document.createElement('library-view')
-    ;(view as any).route = route
+    view.route = route
     outlet.append(view)
     await loaded(view)
     view
@@ -244,7 +245,7 @@ describe('views leave nothing behind', () => {
   it('setlist-view fills the menu with its songs, and empties it when left', async function () {
     this.timeout(15000)
     const view = document.createElement('setlist-view')
-    ;(view as any).route = { name: 'setlist', setlistId: seeded.setlistId, songIndex: -1 }
+    view.route = { name: 'setlist', setlistId: seeded.setlistId, songIndex: -1 }
     outlet.append(view)
     await loaded(view)
     expect(menu.songs.length).to.equal(1)

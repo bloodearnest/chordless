@@ -13,9 +13,30 @@
  * CHORDLESS_IMPORT, or CHORDLESS_IMPORT_FAILED if the download failed. See
  * song-import.js.
  */
+/**
+ * The parts of the SongSelect page's window the bookmarklet uses. The real window satisfies
+ * this, and so can a test's stand-in.
+ */
+export interface SongSelectPage {
+  location: { href: string }
+  document: {
+    querySelector(selector: string): { textContent: string | null } | null
+    body: { textContent: string | null }
+  }
+  alert(message: string): void
+  addEventListener(type: 'message', listener: (event: MessageEvent) => void): void
+  removeEventListener(type: 'message', listener: (event: MessageEvent) => void): void
+  open(url: string, name: string): { postMessage(message: unknown, origin: string): void } | null
+  fetch(
+    url: string,
+    init: RequestInit
+  ): Promise<{ ok: boolean; status: number; json(): Promise<{ payload?: string }> }>
+  setTimeout(handler: () => void, ms: number): unknown
+}
+
 export async function importFromSongSelect(
   chordlessUrl: string,
-  page: typeof window = window
+  page: SongSelectPage = window
 ): Promise<void> {
   if (!page.location.href.includes('songselect.ccli.com')) {
     page.alert('Please navigate to a SongSelect song page first.')

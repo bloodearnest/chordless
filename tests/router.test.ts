@@ -30,14 +30,15 @@ describe('normalizePath', () => {
 })
 
 describe('matchRoute', () => {
-  const pages = ['songs', 'preferences', 'storage', 'import-song', 'bookmarklet']
-  const setlist = (setlistId, songIndex) => ({ name: 'setlist', setlistId, songIndex })
-  const notFound = path => ({ name: 'not-found', path })
+  const pages = ['songs', 'preferences', 'storage', 'import-song', 'bookmarklet'] as const
+  const setlist = (setlistId: string, songIndex: number) =>
+    ({ name: 'setlist', setlistId, songIndex }) as const satisfies Route
+  const notFound = (path: string) => ({ name: 'not-found', path }) as const satisfies Route
 
-  const cases = [
+  const cases: [Parameters<typeof matchRoute>[0], Route][] = [
     // Each page, by its clean path and its variants
     ...pages.flatMap(name =>
-      [`/${name}`, `/${name}/`, `/${name}.html`].map(path => [path, { name }])
+      [`/${name}`, `/${name}/`, `/${name}.html`].map((path): [string, Route] => [path, { name }])
     ),
     ['/', { name: 'home' }],
     ['/index.html', { name: 'home' }],
@@ -83,13 +84,13 @@ describe('matchRoute', () => {
   ]
   for (const [input, expected] of cases) {
     it(`${JSON.stringify(input)} is ${JSON.stringify(expected)}`, () => {
-      expect(matchRoute(input as any)).to.deep.equal(expected)
+      expect(matchRoute(input)).to.deep.equal(expected)
     })
   }
 })
 
 describe('buildUrl', () => {
-  const routes = [
+  const routes: [Route, string][] = [
     [{ name: 'home' }, '/'],
     [{ name: 'songs' }, '/songs'],
     [{ name: 'songs', search: 'amazing grace' }, '/songs?q=amazing%20grace'],
@@ -106,15 +107,15 @@ describe('buildUrl', () => {
   ]
   for (const [route, url] of routes) {
     it(`builds ${url} from ${JSON.stringify(route)}`, () => {
-      expect(buildUrl(route as any)).to.equal(url)
+      expect(buildUrl(route)).to.equal(url)
     })
     it(`${url} matches back to the same route`, () => {
-      expect(matchRoute(buildUrl(route as any))).to.deep.equal(route)
+      expect(matchRoute(buildUrl(route))).to.deep.equal(route)
     })
   }
 
   it('throws for an unknown route name', () => {
-    expect(() => buildUrl({ name: 'mystery' } as any)).to.throw('Unknown route')
+    expect(() => buildUrl({ name: 'mystery' } as unknown as Route)).to.throw('Unknown route')
   })
 })
 
