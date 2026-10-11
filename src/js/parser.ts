@@ -40,6 +40,22 @@ export class ChordProParser {
         continue
       }
 
+      // A section's label may be followed by a note on the same line:
+      // {comment: Chorus} (first time a cappella)
+      const labelWithNote = line.match(/^\{comment:([^}]*)\}\s*(\S.*)$/)
+      if (labelWithNote) {
+        if (currentSection) {
+          sections.push(currentSection)
+        }
+        currentSection = {
+          type: 'section',
+          label: labelWithNote[1].trim(),
+          note: labelWithNote[2].trim(),
+          lines: [],
+        }
+        continue
+      }
+
       // Parse metadata directives
       if (line.startsWith('{') && line.endsWith('}')) {
         const directive = line.slice(1, -1)

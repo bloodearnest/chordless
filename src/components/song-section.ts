@@ -68,6 +68,8 @@ export class SongSection extends LitElement {
     isHidden: { type: Boolean, attribute: false },
     /** @type {string} Section label (e.g., "Verse 1", "Chorus") */
     label: { type: String, attribute: 'label' },
+    /** @type {string} Text shown after the label, e.g. "(first time a cappella)" */
+    note: { type: String, attribute: 'note' },
     /** @type {Array<{segments: Array<{chord: string, lyrics: string}>}>} Parsed chord/lyric lines */
     lines: { attribute: false },
     /** @type {boolean} Display chords as Nashville numbers */
@@ -89,6 +91,7 @@ export class SongSection extends LitElement {
   declare isCollapsed: boolean
   declare isHidden: boolean
   declare label: string
+  declare note: string
   declare displayAsNashville: boolean
   declare unicodeAccidentals: boolean
   declare displayKey: string
@@ -172,6 +175,13 @@ export class SongSection extends LitElement {
       white-space: nowrap;
       margin: 0;
       padding: 0;
+    }
+
+    .song-section-wrapper .section-note {
+      font-size: var(--font-lyrics);
+      color: var(--text-secondary, #5f6b6d);
+      font-style: italic;
+      white-space: nowrap;
     }
 
     .song-section-wrapper .section-collapse-toggle {
@@ -432,6 +442,7 @@ export class SongSection extends LitElement {
     this.isCollapsed = false
     this.isHidden = false
     this.label = ''
+    this.note = ''
     this._lines = undefined // Private storage for lines
     this._contentBlocks = []
     this._hasAnyChords = false
@@ -520,6 +531,7 @@ export class SongSection extends LitElement {
     if (clone instanceof SongSection) {
       clone.lines = this._cloneLines(this.lines)
       clone.label = this.label
+      clone.note = this.note
     }
     return clone
   }
@@ -558,6 +570,7 @@ export class SongSection extends LitElement {
           <div class="section-header">
             <div class="section-title-wrapper">
               <h3 class="section-title">${label}</h3>
+              ${this.note ? html`<span class="section-note">${this.note}</span>` : ''}
               ${this._renderCollapseToggle()}
             </div>
             ${this._renderControls()}

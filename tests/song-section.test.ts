@@ -23,6 +23,22 @@ describe('song-section', () => {
 
   afterEach(() => section?.remove())
 
+  it('shows a note after its label', async () => {
+    await setUp()
+    section.label = 'Chorus'
+    section.note = '(first time a cappella)'
+    await section.updateComplete
+    expect(section.shadowRoot.querySelector('.section-title').textContent.trim()).to.equal('Chorus')
+    expect(section.shadowRoot.querySelector('.section-note').textContent.trim()).to.equal(
+      '(first time a cappella)'
+    )
+  })
+
+  it('shows no note when there is none', async () => {
+    await setUp()
+    expect(section.shadowRoot.querySelector('.section-note')).to.equal(null)
+  })
+
   it('shows its Show options as toggle buttons, pressed for the current one', async () => {
     await setUp({ hideMode: 'chords' })
     const group = section.shadowRoot.querySelector('.section-controls')

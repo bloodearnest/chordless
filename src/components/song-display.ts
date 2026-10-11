@@ -70,6 +70,7 @@ export class SongDisplay extends LitElement {
       <song-section
         .lines=${section.lines}
         .label=${section.label || ''}
+        .note=${section.note || ''}
         .songIndex=${this.songIndex}
         .sectionIndex=${index}
         .displayAsNashville=${this._display.value?.nashville ?? false}

@@ -21,6 +21,8 @@ export interface ChartLine {
 export interface ChartSection {
   type: 'section'
   label: string | null
+  /** Text after the label's directive on the same line: `{comment: Chorus} (first time a cappella)` */
+  note?: string
   lines: ChartLine[]
 }
 
