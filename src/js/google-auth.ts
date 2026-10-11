@@ -164,7 +164,7 @@ export async function getCurrentUserInfo(): Promise<UserInfo | null> {
 
     return formatUserInfoForUI(user)
   } catch (error) {
-    console.error('[Auth] Failed to get user info:', error)
+    logAuthFailure('Failed to get user info', error)
     return null
   }
 }
@@ -317,7 +317,7 @@ export async function isAuthenticated(): Promise<boolean> {
     const response = await sendToServiceWorker('GET_BLOB')
     return response.success && response.data != null
   } catch (error) {
-    console.error('[Auth] Error checking auth status:', error)
+    logAuthFailure('Error checking auth status', error)
     return false
   }
 }
@@ -755,6 +755,26 @@ export async function processQueue(): Promise<void> {
 }
 
 /**
+ * The service worker holds the sign-in, and does not control the page until a later load on
+ * the very first visit (or after a hard reload): then there is nothing to ask, which is
+ * expected and not an error.
+ */
+class NoServiceWorkerControllerError extends Error {
+  constructor() {
+    super('No service worker controller')
+    this.name = 'NoServiceWorkerControllerError'
+  }
+}
+
+function logAuthFailure(what: string, error: unknown): void {
+  if (error instanceof NoServiceWorkerControllerError) {
+    console.info(`[Auth] ${what}: the service worker is not controlling this page yet`)
+  } else {
+    console.error(`[Auth] ${what}:`, error)
+  }
+}
+
+/**
  * Send message to Service Worker and wait for response
  */
 async function sendToServiceWorker(
@@ -763,7 +783,7 @@ async function sendToServiceWorker(
 ): Promise<WorkerReply> {
   const controller = navigator.serviceWorker.controller
   if (!controller) {
-    throw new Error('No service worker controller')
+    throw new NoServiceWorkerControllerError()
   }
 
   return new Promise<WorkerReply>((resolve, reject) => {
