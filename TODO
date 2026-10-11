@@ -32,6 +32,17 @@ bugs
 - noUncheckedIndexedAccess was tried on the app project: 142 errors, mostly false positives
   (regex groups after a match, indexes checked against length just above), so it is off. If it
   is revisited: setlist-page.ts (45) is where `this.songs[i]` is the likeliest real bug
+- Space should stop playback wherever we are in the app, not only on a setlist. Starting is only
+  possible from a song, but stopping is not: with a song playing and the user on the home page,
+  the library or the preferences, Space does nothing (the player's keydown handler returns while
+  the player is hidden, which is its way of leaving Space to a focused button). While something
+  is playing the player is shown, so the same handler could stop it; keep Space for a focused
+  button or switch, and for modals, as now
+- an easy toggle on the player to double the click speed: twice as many clicks per beat (a
+  finer subdivision), not a faster tempo. The downbeat and the BPM stay the same; each beat just
+  gets another click halfway. For slow songs, which need more clicks. Decide how it is shown
+  (the second click quieter than the beats, like a light accent in MetronomeController), and
+  whether it is remembered per device (media-settings) or per song
 - the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
   so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
   add-song search has the same). Build lyricsText when a song is loaded, or search the chart
@@ -47,6 +58,12 @@ browser support
   View transitions are feature-detected. The 2017 iPad (16.7), the Air 2 and the 2019-2020 models
   stuck on iOS 18 or lower are mostly outside the window on purpose. The floor is a claim
   from reading the code, not tested on an old device: do that (Playwright's WebKit is current)
+- A user reported iPadOS 15.8.8 (2026-10-11): so an iPad Air 2 (2014) or iPad mini 4 (2015), the
+  last models on iPadOS 15, which cannot update. Outside the window on purpose, so nothing is
+  done for now. If it is revisited: lower TARGET and .browserslistrc to Safari 15.4, give the 42
+  color-mix() uses fallback colours (Safari 16.2), test on a real device (a module using class
+  static blocks or regex lookbehind, Safari 16.4, would not even parse: unknown). The "update
+  your device" page below is the cheap part either way
 - No fallbacks or polyfills for what 17 has (nesting, dialog, :has, view transitions as an
   enhancement). Look through the code for workarounds the floor makes unnecessary
 - Below the floor the app has no message: a browser older than 17 gets whatever happens when

@@ -22,8 +22,9 @@ export default defineConfig(({ command, isPreview }) => {
       target: TARGET,
     },
     // Port 8787 is the origin the browser's data (IndexedDB, sign-in) belongs to, and the
-    // one the Tailscale funnel points at: keep it
-    server: { port: 8787, strictPort: true },
+    // one the Tailscale funnel points at: keep it. Vite refuses requests whose Host it does not
+    // know (against DNS rebinding), so the machine's Tailscale name is listed.
+    server: { port: 8787, strictPort: true, allowedHosts: ['casey.tail030f3.ts.net'] },
     // Pre-bundle every dependency at start-up: finding one later reloads the page mid-test
     optimizeDeps: {
       entries: ['index.html', 'dev/*.html', 'components/**/*.{js,ts}', 'js/**/*.{js,ts}'],
