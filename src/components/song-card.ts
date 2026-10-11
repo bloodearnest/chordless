@@ -24,7 +24,7 @@ export interface SongCardSong {
 
 /** The card was clicked (not in edit mode) */
 export class SongCardClickEvent extends Event {
-  static type = 'song-card:click'
+  static readonly type = 'song-card:click'
   readonly song: SongCardSong
   constructor(song: SongCardSong) {
     super(SongCardClickEvent.type, { bubbles: true, composed: true })
@@ -34,7 +34,7 @@ export class SongCardClickEvent extends Event {
 
 /** The delete button was pressed */
 export class SongCardDeleteEvent extends Event {
-  static type = 'song-card:delete'
+  static readonly type = 'song-card:delete'
   readonly song: SongCardSong
   constructor(song: SongCardSong) {
     super(SongCardDeleteEvent.type, { bubbles: true, composed: true })
@@ -44,7 +44,7 @@ export class SongCardDeleteEvent extends Event {
 
 /** A new key was chosen */
 export class SongCardKeyChangeEvent extends Event {
-  static type = 'song-card:key-change'
+  static readonly type = 'song-card:key-change'
   readonly key: string
   constructor(key: string) {
     super(SongCardKeyChangeEvent.type, { bubbles: true, composed: true })
@@ -494,5 +494,13 @@ customElements.define('song-card', SongCard)
 declare global {
   interface HTMLElementTagNameMap {
     'song-card': SongCard
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongCardClickEvent.type]: SongCardClickEvent
+    [SongCardDeleteEvent.type]: SongCardDeleteEvent
+    [SongCardKeyChangeEvent.type]: SongCardKeyChangeEvent
   }
 }

@@ -10,7 +10,7 @@ export type SectionDefaults = Record<string, string>
 
 /** The Nashville numbers preference changed (sent on window) */
 export class NashvillePreferenceEvent extends Event {
-  static type = 'preferences:nashville-changed'
+  static readonly type = 'preferences:nashville-changed'
   readonly enabled: boolean
   constructor(enabled: boolean) {
     super(NashvillePreferenceEvent.type)
@@ -20,7 +20,7 @@ export class NashvillePreferenceEvent extends Event {
 
 /** The unicode accidentals preference changed (sent on window) */
 export class AccidentalsPreferenceEvent extends Event {
-  static type = 'preferences:accidentals-changed'
+  static readonly type = 'preferences:accidentals-changed'
   readonly enabled: boolean
   constructor(enabled: boolean) {
     super(AccidentalsPreferenceEvent.type)
@@ -30,7 +30,7 @@ export class AccidentalsPreferenceEvent extends Event {
 
 /** The section display defaults changed (sent on window) */
 export class SectionDefaultsEvent extends Event {
-  static type = 'preferences:section-defaults-changed'
+  static readonly type = 'preferences:section-defaults-changed'
   readonly musicianType: MusicianType
   readonly defaults: SectionDefaults | null
   constructor(musicianType: MusicianType, defaults: SectionDefaults | null) {
@@ -42,7 +42,7 @@ export class SectionDefaultsEvent extends Event {
 
 /** The capo preference changed (sent on window) */
 export class CapoPreferenceEvent extends Event {
-  static type = 'preferences:capo-changed'
+  static readonly type = 'preferences:capo-changed'
   readonly enabled: boolean
   constructor(enabled: boolean) {
     super(CapoPreferenceEvent.type)
@@ -191,5 +191,14 @@ export function setCapoPreference(value: boolean) {
   }
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CapoPreferenceEvent(enabled))
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [NashvillePreferenceEvent.type]: NashvillePreferenceEvent
+    [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
+    [SectionDefaultsEvent.type]: SectionDefaultsEvent
+    [CapoPreferenceEvent.type]: CapoPreferenceEvent
   }
 }

@@ -127,11 +127,11 @@ export class SetlistPage {
   _sectionDefaultsRaw: string | null
   _songUserPrefsCache?: Record<string, SongUserPrefs | null>
   _capoEnabled: boolean
-  _capoChangeHandler: ((event: Event) => void) | null
-  _keyChangeHandler?: (event: Event) => void
-  _sectionActionHandler?: (event: Event) => void
-  _sectionToggleHandler?: (event: Event) => void
-  _setlistDetailsSaveHandler?: (event: Event) => void
+  _capoChangeHandler: ((event: CapoChangeEvent) => void) | null
+  _keyChangeHandler?: (event: KeyChangeEvent) => void
+  _sectionActionHandler?: (event: SectionActionEvent) => void
+  _sectionToggleHandler?: (event: SectionToggleEvent) => void
+  _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
   _editModeSetup?: boolean
@@ -141,10 +141,10 @@ export class SetlistPage {
   _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
   _onSectionDefaultsChanged: () => void
   _onCapoPreferenceChange: () => void
-  _onOverviewSongClick: (event: Event) => void
-  _onOverviewSongDelete: (event: Event) => void
+  _onOverviewSongClick: (event: OverviewSongClickEvent) => void
+  _onOverviewSongDelete: (event: OverviewSongDeleteEvent) => void
   _onOverviewAddSong: () => void
-  _onOverviewSongKeyChange: (event: Event) => void
+  _onOverviewSongKeyChange: (event: OverviewSongKeyChangeEvent) => void
   _reorder: OverviewReorder
   _addSongModal: AddSongModal
 
@@ -194,15 +194,15 @@ export class SetlistPage {
     this._onCapoPreferenceChange = this._handleCapoPreferenceChange.bind(this)
 
     // Bind overview component event handlers once
-    this._onOverviewSongClick = (event: Event) => {
-      const index = (event as OverviewSongClickEvent).index
+    this._onOverviewSongClick = (event: OverviewSongClickEvent) => {
+      const index = event.index
       if (typeof index === 'number') {
         this.navigateTo(index)
       }
     }
 
-    this._onOverviewSongDelete = (event: Event) => {
-      const index = (event as OverviewSongDeleteEvent).index
+    this._onOverviewSongDelete = (event: OverviewSongDeleteEvent) => {
+      const index = event.index
       if (typeof index === 'number' && this.songs[index]) {
         this.showDeleteSongConfirmation(index, this.songs[index])
       }
@@ -224,8 +224,8 @@ export class SetlistPage {
       onPick: song => this.addSongToSetlist(song),
     })
 
-    this._onOverviewSongKeyChange = (event: Event) => {
-      const { index, key } = event as OverviewSongKeyChangeEvent
+    this._onOverviewSongKeyChange = (event: OverviewSongKeyChangeEvent) => {
+      const { index, key } = event
       if (typeof index === 'number' && key) {
         this.changeSongKeyInSetlist(index, key)
       }
@@ -507,7 +507,7 @@ export class SetlistPage {
         this._onOverviewSongClick
       )
       this._overviewComponent.removeEventListener(
-        'overview-song-delete',
+        OverviewSongDeleteEvent.type,
         this._onOverviewSongDelete
       )
       this._overviewComponent.removeEventListener(
@@ -515,7 +515,7 @@ export class SetlistPage {
         this._onOverviewAddSong
       )
       this._overviewComponent.removeEventListener(
-        'overview-song-key-change',
+        OverviewSongKeyChangeEvent.type,
         this._onOverviewSongKeyChange
       )
     }
@@ -833,8 +833,7 @@ export class SetlistPage {
     const dialog = this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')
     if (!dialog || !this.currentSetlist) return
     if (!this._setlistDetailsSaveHandler) {
-      this._setlistDetailsSaveHandler = event =>
-        this.saveSetlistDetails((event as SetlistInfoSaveEvent).changes)
+      this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.changes)
       dialog.addEventListener(SetlistInfoSaveEvent.type, this._setlistDetailsSaveHandler)
     }
     dialog.people = (await getOrganisationPeople()).people
@@ -1565,7 +1564,7 @@ export class SetlistPage {
 
     // Listen for header-expand-toggle event
     appHeader.addEventListener(HeaderExpandToggleEvent.type, e => {
-      const { expanded } = e as HeaderExpandToggleEvent
+      const { expanded } = e
       if (expanded) {
         document.body.classList.add('header-expanded')
         document.documentElement.style.setProperty('--header-expanded', '1')
@@ -1589,7 +1588,7 @@ export class SetlistPage {
       })
 
       songSettingsPopover.addEventListener(BpmChangeEvent.type, async e => {
-        const newValue = (e as BpmChangeEvent).value
+        const newValue = e.value
         await this.handleBPMChange(newValue)
       })
 
@@ -1613,7 +1612,7 @@ export class SetlistPage {
 
     if (!this._sectionActionHandler) {
       this._sectionActionHandler = event => {
-        const { songIndex, sectionIndex, action } = event as SectionActionEvent
+        const { songIndex, sectionIndex, action } = event
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number' || !action) {
           return
         }
@@ -1624,7 +1623,7 @@ export class SetlistPage {
 
     if (!this._sectionToggleHandler) {
       this._sectionToggleHandler = event => {
-        const { songIndex, sectionIndex } = event as SectionToggleEvent
+        const { songIndex, sectionIndex } = event
         if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number') {
           return
         }
@@ -1674,7 +1673,7 @@ export class SetlistPage {
 
     if (!this._keyChangeHandler) {
       this._keyChangeHandler = async e => {
-        const newKey = (e as KeyChangeEvent).value
+        const newKey = e.value
         await this.handleKeyChange(newKey)
       }
       keySelector.addEventListener(KeyChangeEvent.type, this._keyChangeHandler)
@@ -1699,7 +1698,7 @@ export class SetlistPage {
 
     if (!this._capoChangeHandler) {
       this._capoChangeHandler = event => {
-        const newValue = (event as CapoChangeEvent).value
+        const newValue = event.value
         this.handleCapoChange(newValue)
       }
       capoSelector.addEventListener(CapoChangeEvent.type, this._capoChangeHandler)
@@ -2290,7 +2289,7 @@ export class SetlistPage {
     navMenu.addEventListener(
       MenuSongClickEvent.type,
       e => {
-        const songIndex = (e as MenuSongClickEvent).index
+        const songIndex = e.index
         if (songIndex !== undefined && songIndex >= 0) {
           this.navigateTo(songIndex)
         }

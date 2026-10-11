@@ -5,7 +5,7 @@ import './icon.ts'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
 export class HeaderMenuClickEvent extends Event {
-  static type = 'app-header:menu-click'
+  static readonly type = 'app-header:menu-click'
   readonly trigger: HTMLElement
   constructor(trigger: HTMLElement) {
     super(HeaderMenuClickEvent.type, { bubbles: true, composed: true })
@@ -15,7 +15,7 @@ export class HeaderMenuClickEvent extends Event {
 
 /** The edit mode button was pressed */
 export class EditModeToggleEvent extends Event {
-  static type = 'app-header:edit-mode-toggle'
+  static readonly type = 'app-header:edit-mode-toggle'
   constructor() {
     super(EditModeToggleEvent.type, { bubbles: true, composed: true })
   }
@@ -23,7 +23,7 @@ export class EditModeToggleEvent extends Event {
 
 /** The info button was pressed */
 export class HeaderInfoClickEvent extends Event {
-  static type = 'app-header:info-click'
+  static readonly type = 'app-header:info-click'
   constructor() {
     super(HeaderInfoClickEvent.type, { bubbles: true, composed: true })
   }
@@ -31,7 +31,7 @@ export class HeaderInfoClickEvent extends Event {
 
 /** The second row was shown or hidden (on phones) */
 export class HeaderExpandToggleEvent extends Event {
-  static type = 'app-header:expand-toggle'
+  static readonly type = 'app-header:expand-toggle'
   readonly expanded: boolean
   constructor(expanded: boolean) {
     super(HeaderExpandToggleEvent.type, { bubbles: true, composed: true })
@@ -545,5 +545,14 @@ customElements.define('app-header', AppHeader)
 declare global {
   interface HTMLElementTagNameMap {
     'app-header': AppHeader
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [HeaderMenuClickEvent.type]: HeaderMenuClickEvent
+    [EditModeToggleEvent.type]: EditModeToggleEvent
+    [HeaderInfoClickEvent.type]: HeaderInfoClickEvent
+    [HeaderExpandToggleEvent.type]: HeaderExpandToggleEvent
   }
 }

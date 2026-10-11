@@ -23,7 +23,7 @@ export interface LeaderChoice {
 
 /** The form was submitted; details is {date, time, type, name, owner, ownerId} */
 export class SetlistDetailsSaveEvent extends Event {
-  static type = 'setlist-details-form:save'
+  static readonly type = 'setlist-details-form:save'
   readonly details: SetlistDetails
   constructor(details: SetlistDetails) {
     super(SetlistDetailsSaveEvent.type, { bubbles: true, composed: true })
@@ -33,7 +33,7 @@ export class SetlistDetailsSaveEvent extends Event {
 
 /** Cancel was pressed */
 export class SetlistDetailsCancelEvent extends Event {
-  static type = 'setlist-details-form:cancel'
+  static readonly type = 'setlist-details-form:cancel'
   constructor() {
     super(SetlistDetailsCancelEvent.type, { bubbles: true, composed: true })
   }
@@ -348,5 +348,12 @@ customElements.define('setlist-details-form', SetlistDetailsForm)
 declare global {
   interface HTMLElementTagNameMap {
     'setlist-details-form': SetlistDetailsForm
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SetlistDetailsSaveEvent.type]: SetlistDetailsSaveEvent
+    [SetlistDetailsCancelEvent.type]: SetlistDetailsCancelEvent
   }
 }

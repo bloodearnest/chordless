@@ -109,9 +109,9 @@ export class MediaPlayer extends LitElement {
   _clickMerger?: ChannelMergerNode | null
   _clickSplitter?: ChannelSplitterNode | null
   _boundHandleKeydown?: (event: KeyboardEvent) => void
-  _boundHandleSettingsChange?: (event: Event) => void
-  _boundHandleSongChange?: (event: Event) => void
-  _boundHandlePadSetChange?: (event: Event) => void
+  _boundHandleSettingsChange?: (event: MediaSettingsChangeEvent) => void
+  _boundHandleSongChange?: (event: SongChangeEvent) => void
+  _boundHandlePadSetChange?: (event?: PadSetChangedEvent) => void
   _isDragging: boolean
   _dragStartX: number
   _dragStartY: number
@@ -805,8 +805,8 @@ export class MediaPlayer extends LitElement {
     this.style.display = settings.mediaPlayerEnabled === false ? 'none' : ''
   }
 
-  _handleSettingsChange(event: Event): void {
-    const settings = (event as MediaSettingsChangeEvent).settings
+  _handleSettingsChange(event: MediaSettingsChangeEvent): void {
+    const settings = event.settings
     console.log('[MediaPlayer] Settings changed:', settings)
     this._showIfEnabled(settings)
 
@@ -837,8 +837,8 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  _handleSongChange(event: Event): void {
-    const song = (event as SongChangeEvent).song
+  _handleSongChange(event: SongChangeEvent): void {
+    const song = event.song
     console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
@@ -875,8 +875,8 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _handlePadSetChange(event?: Event): void {
-    const padSet = (event as PadSetChangedEvent | undefined)?.padSet || getActivePadSet()
+  _handlePadSetChange(event?: PadSetChangedEvent): void {
+    const padSet = event?.padSet || getActivePadSet()
     this._activePadSet = padSet
     this._padLoadFailed = false
 

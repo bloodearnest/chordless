@@ -11,7 +11,7 @@ import './setlist-info.ts'
 
 /** The setlist's details were edited and saved: changes is the form's details */
 export class SetlistInfoSaveEvent extends Event {
-  static type = 'setlist-info-dialog:save'
+  static readonly type = 'setlist-info-dialog:save'
   readonly setlistId: string
   readonly changes: SetlistDetails
   constructor(setlistId: string, changes: SetlistDetails) {
@@ -145,5 +145,11 @@ customElements.define('setlist-info-dialog', SetlistInfoDialog)
 declare global {
   interface HTMLElementTagNameMap {
     'setlist-info-dialog': SetlistInfoDialog
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SetlistInfoSaveEvent.type]: SetlistInfoSaveEvent
   }
 }

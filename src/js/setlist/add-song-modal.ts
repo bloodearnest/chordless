@@ -110,7 +110,7 @@ export class AddSongModal {
     songList.emptyMessage = 'No songs match your search.'
     songList.dense = true
     songList.addEventListener(SongSelectEvent.type, event => {
-      const { song } = event as SongSelectEvent
+      const { song } = event
       if (song) this.#onPick(song)
     })
     results.appendChild(songList)

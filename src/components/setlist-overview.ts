@@ -4,7 +4,7 @@ import type { SongCardKeyChangeEvent } from './song-card.ts'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {
-  static type = 'setlist-overview:song-click'
+  static readonly type = 'setlist-overview:song-click'
   readonly index: number
   constructor(index: number) {
     super(OverviewSongClickEvent.type, { bubbles: true, composed: true })
@@ -14,7 +14,7 @@ export class OverviewSongClickEvent extends Event {
 
 /** A song's delete button was pressed */
 export class OverviewSongDeleteEvent extends Event {
-  static type = 'setlist-overview:song-delete'
+  static readonly type = 'setlist-overview:song-delete'
   readonly index: number
   constructor(index: number) {
     super(OverviewSongDeleteEvent.type, { bubbles: true, composed: true })
@@ -24,7 +24,7 @@ export class OverviewSongDeleteEvent extends Event {
 
 /** A song's key was changed */
 export class OverviewSongKeyChangeEvent extends Event {
-  static type = 'setlist-overview:song-key-change'
+  static readonly type = 'setlist-overview:song-key-change'
   readonly index: number
   readonly key: string
   constructor(index: number, key: string) {
@@ -36,7 +36,7 @@ export class OverviewSongKeyChangeEvent extends Event {
 
 /** Add Song was pressed */
 export class OverviewAddSongEvent extends Event {
-  static type = 'setlist-overview:add-song'
+  static readonly type = 'setlist-overview:add-song'
   constructor() {
     super(OverviewAddSongEvent.type, { bubbles: true, composed: true })
   }
@@ -128,5 +128,14 @@ customElements.define('setlist-overview', SetlistOverview)
 declare global {
   interface HTMLElementTagNameMap {
     'setlist-overview': SetlistOverview
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [OverviewSongClickEvent.type]: OverviewSongClickEvent
+    [OverviewSongDeleteEvent.type]: OverviewSongDeleteEvent
+    [OverviewSongKeyChangeEvent.type]: OverviewSongKeyChangeEvent
+    [OverviewAddSongEvent.type]: OverviewAddSongEvent
   }
 }

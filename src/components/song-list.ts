@@ -5,7 +5,7 @@ import './status-message.ts'
 
 /** A song was chosen; index is its place in the list */
 export class SongSelectEvent extends Event {
-  static type = 'song-list:select'
+  static readonly type = 'song-list:select'
   readonly song: SongWithContent
   readonly index: number
   readonly originalEvent: Event
@@ -105,5 +105,11 @@ customElements.define('song-list', SongList)
 declare global {
   interface HTMLElementTagNameMap {
     'song-list': SongList
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongSelectEvent.type]: SongSelectEvent
   }
 }

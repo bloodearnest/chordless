@@ -14,7 +14,7 @@ import './chord-display.ts'
 
 /** A Show option or the collapse button was pressed: action is show-all, show-lyrics, show-chords, show-none or collapse */
 export class SectionActionEvent extends Event {
-  static type = 'song-section:action'
+  static readonly type = 'song-section:action'
   readonly songIndex: number
   readonly sectionIndex: number
   readonly action: string
@@ -28,7 +28,7 @@ export class SectionActionEvent extends Event {
 
 /** The section's heading was clicked */
 export class SectionToggleEvent extends Event {
-  static type = 'song-section:toggle'
+  static readonly type = 'song-section:toggle'
   readonly songIndex: number
   readonly sectionIndex: number
   constructor(songIndex: number, sectionIndex: number) {
@@ -948,5 +948,12 @@ customElements.define('song-section', SongSection)
 declare global {
   interface HTMLElementTagNameMap {
     'song-section': SongSection
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SectionActionEvent.type]: SectionActionEvent
+    [SectionToggleEvent.type]: SectionToggleEvent
   }
 }

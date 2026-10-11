@@ -2,7 +2,7 @@ import { css, html, LitElement } from 'lit'
 
 /** The key/BPM box was pressed in edit mode, to open the song settings */
 export class SongSettingsClickEvent extends Event {
-  static type = 'musical-metadata:settings-click'
+  static readonly type = 'musical-metadata:settings-click'
   constructor() {
     super(SongSettingsClickEvent.type, { bubbles: true, composed: true })
   }
@@ -178,5 +178,11 @@ customElements.define('musical-metadata-display', MusicalMetadataDisplay)
 declare global {
   interface HTMLElementTagNameMap {
     'musical-metadata-display': MusicalMetadataDisplay
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongSettingsClickEvent.type]: SongSettingsClickEvent
   }
 }

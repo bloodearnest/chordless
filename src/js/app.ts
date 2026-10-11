@@ -25,7 +25,7 @@ const router = new AppRouter({
 })
 setRouter(router)
 document.addEventListener(RouteChangeEvent.type, event => {
-  document.body.dataset.view = (event as RouteChangeEvent).route.name
+  document.body.dataset.view = event.route.name
 })
 
 await router.start()

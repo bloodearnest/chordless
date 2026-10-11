@@ -1,6 +1,6 @@
 /** The theme was applied (sent on window): theme is the choice ('system', 'light', 'dark'), actualTheme what's shown */
 export class ThemeChangeEvent extends Event {
-  static type = 'theme:change'
+  static readonly type = 'theme:change'
   readonly theme: string
   readonly actualTheme: string
   constructor(theme: string, actualTheme: string) {
@@ -430,3 +430,9 @@ themeManager.loadPreferences()
 
 // Setup keyboard shortcuts for testing
 themeManager._setupKeyboardShortcuts()
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [ThemeChangeEvent.type]: ThemeChangeEvent
+  }
+}

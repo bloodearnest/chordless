@@ -4,7 +4,7 @@ import { DialogPopup } from '../js/dialog-popup.ts'
 
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {
-  static type = 'song-settings:bpm-change'
+  static readonly type = 'song-settings:bpm-change'
   readonly value: number
   constructor(value: number) {
     super(BpmChangeEvent.type, { bubbles: true, composed: true })
@@ -14,7 +14,7 @@ export class BpmChangeEvent extends Event {
 
 /** Reset was pressed */
 export class SongResetClickEvent extends Event {
-  static type = 'song-settings:reset-click'
+  static readonly type = 'song-settings:reset-click'
   constructor() {
     super(SongResetClickEvent.type, { bubbles: true, composed: true })
   }
@@ -256,5 +256,12 @@ customElements.define('song-settings-popover', SongSettingsPopover)
 declare global {
   interface HTMLElementTagNameMap {
     'song-settings-popover': SongSettingsPopover
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [BpmChangeEvent.type]: BpmChangeEvent
+    [SongResetClickEvent.type]: SongResetClickEvent
   }
 }

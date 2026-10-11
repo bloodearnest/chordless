@@ -8,10 +8,16 @@ import type { RuntimeSong } from './setlist/runtime-songs.ts'
 
 /** The setlist page moved to another song (sent on document, for the media player) */
 export class SongChangeEvent extends Event {
-  static type = 'setlist:song-change'
+  static readonly type = 'setlist:song-change'
   readonly song: RuntimeSong | null
   constructor(song: RuntimeSong | null) {
     super(SongChangeEvent.type)
     this.song = song
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongChangeEvent.type]: SongChangeEvent
   }
 }

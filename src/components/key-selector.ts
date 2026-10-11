@@ -2,7 +2,7 @@ import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different key was chosen; value is the key */
 export class KeyChangeEvent extends Event {
-  static type = 'key-selector:change'
+  static readonly type = 'key-selector:change'
   readonly value: string
   constructor(value: string) {
     super(KeyChangeEvent.type, { bubbles: true, composed: true })
@@ -72,5 +72,11 @@ customElements.define('key-selector', KeySelector)
 declare global {
   interface HTMLElementTagNameMap {
     'key-selector': KeySelector
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [KeyChangeEvent.type]: KeyChangeEvent
   }
 }

@@ -6,7 +6,7 @@ import { buttonStyles } from './shared-styles.ts'
 
 /** The confirm button was pressed (type confirm); the modal then closes */
 export class ModalConfirmEvent extends Event {
-  static type = 'app-modal:confirm'
+  static readonly type = 'app-modal:confirm'
   constructor() {
     super(ModalConfirmEvent.type, { bubbles: true, composed: true })
   }
@@ -14,7 +14,7 @@ export class ModalConfirmEvent extends Event {
 
 /** The cancel button was pressed (type confirm); the modal then closes */
 export class ModalCancelEvent extends Event {
-  static type = 'app-modal:cancel'
+  static readonly type = 'app-modal:cancel'
   constructor() {
     super(ModalCancelEvent.type, { bubbles: true, composed: true })
   }
@@ -22,7 +22,7 @@ export class ModalCancelEvent extends Event {
 
 /** The modal closed, however it was closed */
 export class ModalCloseEvent extends Event {
-  static type = 'app-modal:close'
+  static readonly type = 'app-modal:close'
   constructor() {
     super(ModalCloseEvent.type, { bubbles: true, composed: true })
   }
@@ -453,5 +453,13 @@ customElements.define('app-modal', AppModal)
 declare global {
   interface HTMLElementTagNameMap {
     'app-modal': AppModal
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [ModalConfirmEvent.type]: ModalConfirmEvent
+    [ModalCancelEvent.type]: ModalCancelEvent
+    [ModalCloseEvent.type]: ModalCloseEvent
   }
 }

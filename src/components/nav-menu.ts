@@ -11,7 +11,7 @@ import { HeaderMenuClickEvent } from './app-header.ts'
 
 /** The back item was chosen */
 export class MenuBackClickEvent extends Event {
-  static type = 'nav-menu:back-click'
+  static readonly type = 'nav-menu:back-click'
   constructor() {
     super(MenuBackClickEvent.type, { bubbles: true, composed: true })
   }
@@ -19,7 +19,7 @@ export class MenuBackClickEvent extends Event {
 
 /** The setlist overview item was chosen */
 export class MenuOverviewClickEvent extends Event {
-  static type = 'nav-menu:overview-click'
+  static readonly type = 'nav-menu:overview-click'
   constructor() {
     super(MenuOverviewClickEvent.type, { bubbles: true, composed: true })
   }
@@ -27,7 +27,7 @@ export class MenuOverviewClickEvent extends Event {
 
 /** A song in the setlist was chosen; index is its place in the setlist */
 export class MenuSongClickEvent extends Event {
-  static type = 'nav-menu:song-click'
+  static readonly type = 'nav-menu:song-click'
   readonly index: number
   constructor(index: number) {
     super(MenuSongClickEvent.type, { bubbles: true, composed: true })
@@ -428,5 +428,13 @@ customElements.define('nav-menu', NavMenu)
 declare global {
   interface HTMLElementTagNameMap {
     'nav-menu': NavMenu
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [MenuBackClickEvent.type]: MenuBackClickEvent
+    [MenuOverviewClickEvent.type]: MenuOverviewClickEvent
+    [MenuSongClickEvent.type]: MenuSongClickEvent
   }
 }

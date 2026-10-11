@@ -31,7 +31,7 @@ import type { ViewState } from './views/page-view.ts'
 
 /** The route changed (sent on document, after the new view is showing) */
 export class RouteChangeEvent extends Event {
-  static type = 'router:route-change'
+  static readonly type = 'router:route-change'
   readonly route: Route
   readonly previous: Route | null
   constructor(route: Route, previous: Route | null) {
@@ -372,5 +372,11 @@ export class AppRouter {
     } else {
       update()
     }
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [RouteChangeEvent.type]: RouteChangeEvent
   }
 }

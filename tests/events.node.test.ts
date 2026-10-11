@@ -23,11 +23,13 @@ const files = sourceFiles('src').map(path => ({ path, text: readFileSync(path, '
 
 /** [{name, type, path}] for every `class X extends Event { static type = '...' }` */
 const events = files.flatMap(({ path, text }) =>
-  [...text.matchAll(/class (\w+) extends Event \{\s*static type = '([^']+)'/g)].map(m => ({
-    name: m[1],
-    type: m[2],
-    path,
-  }))
+  [...text.matchAll(/class (\w+) extends Event \{\s*static (?:readonly )?type = '([^']+)'/g)].map(
+    m => ({
+      name: m[1],
+      type: m[2],
+      path,
+    })
+  )
 )
 const types = new Set(events.map(e => e.type))
 

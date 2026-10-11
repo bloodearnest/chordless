@@ -3,7 +3,7 @@ import { OptionPicker, type PickerOption } from './option-picker.ts'
 
 /** A different capo was chosen; value is the capo (a number) */
 export class CapoChangeEvent extends Event {
-  static type = 'capo-selector:change'
+  static readonly type = 'capo-selector:change'
   readonly value: number
   constructor(value: number) {
     super(CapoChangeEvent.type, { bubbles: true, composed: true })
@@ -78,5 +78,11 @@ customElements.define('capo-selector', CapoSelector)
 declare global {
   interface HTMLElementTagNameMap {
     'capo-selector': CapoSelector
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [CapoChangeEvent.type]: CapoChangeEvent
   }
 }

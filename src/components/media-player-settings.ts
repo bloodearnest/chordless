@@ -5,7 +5,7 @@ import { fieldStyles, switchStyles } from './shared-styles.ts'
 
 /** The media player settings changed; settings is the new settings */
 export class MediaSettingsChangeEvent extends Event {
-  static type = 'media-player-settings:change'
+  static readonly type = 'media-player-settings:change'
   readonly settings: MediaSettings
   constructor(settings: MediaSettings) {
     super(MediaSettingsChangeEvent.type, { bubbles: true, composed: true })
@@ -309,5 +309,11 @@ customElements.define('media-player-settings', MediaPlayerSettings)
 declare global {
   interface HTMLElementTagNameMap {
     'media-player-settings': MediaPlayerSettings
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [MediaSettingsChangeEvent.type]: MediaSettingsChangeEvent
   }
 }

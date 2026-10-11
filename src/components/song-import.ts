@@ -17,7 +17,7 @@ import { buttonStyles } from './shared-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
 export class SongImportedEvent extends Event {
-  static type = 'song-import:imported'
+  static readonly type = 'song-import:imported'
   readonly url: string
   constructor(url: string) {
     super(SongImportedEvent.type, { bubbles: true, composed: true, cancelable: true })
@@ -769,5 +769,11 @@ customElements.define('song-import', SongImport)
 declare global {
   interface HTMLElementTagNameMap {
     'song-import': SongImport
+  }
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [SongImportedEvent.type]: SongImportedEvent
   }
 }

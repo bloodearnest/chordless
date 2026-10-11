@@ -33,7 +33,7 @@ interface PadSetMetadata {
 
 /** A different pad set was chosen (sent on window) */
 export class PadSetChangedEvent extends Event {
-  static type = 'pad-sets:changed'
+  static readonly type = 'pad-sets:changed'
   readonly padSet: PadSet
   constructor(padSet: PadSet) {
     super(PadSetChangedEvent.type)
@@ -43,7 +43,7 @@ export class PadSetChangedEvent extends Event {
 
 /** The list of pad sets changed (sent on window) */
 export class PadSetListUpdatedEvent extends Event {
-  static type = 'pad-sets:list-updated'
+  static readonly type = 'pad-sets:list-updated'
   constructor() {
     super(PadSetListUpdatedEvent.type)
   }
@@ -564,4 +564,11 @@ function writeLocalStorage(key: string, value: string): void {
     return
   }
   localStorage.setItem(key, value)
+}
+
+declare global {
+  interface GlobalEventHandlersEventMap {
+    [PadSetChangedEvent.type]: PadSetChangedEvent
+    [PadSetListUpdatedEvent.type]: PadSetListUpdatedEvent
+  }
 }
