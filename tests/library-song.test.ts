@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai'
 import { ChordlessDB } from '../src/js/db.ts'
 import { LibrarySong } from '../src/js/models/library-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -302,7 +303,7 @@ describe('LibrarySong', () => {
       await song.save()
 
       const key = `song-prefs-${orgId}`
-      const prefs = JSON.parse(localStorage.getItem(key))
+      const prefs = JSON.parse(must(localStorage.getItem(key)))
       expect(prefs['ccli-12345'].capo).to.equal(2)
     })
 
@@ -392,7 +393,7 @@ describe('LibrarySong', () => {
       await song.save()
 
       const key = `song-prefs-${orgId}`
-      const prefs = JSON.parse(localStorage.getItem(key))
+      const prefs = JSON.parse(must(localStorage.getItem(key)))
       expect(prefs['ccli-12345'].sectionDefaults['0'].hideMode).to.equal('chords')
       expect(prefs['ccli-12345'].sectionDefaults['1'].isCollapsed).to.equal(true)
     })

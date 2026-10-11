@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai'
 import { isInModalDialog, isTypingInField } from '../src/js/utils/keyboard.ts'
+import { must } from './must.ts'
 
 const { describe, it, afterEach } = window
 
@@ -86,7 +87,7 @@ describe('isInModalDialog', () => {
     dialog = host
     const root = host.attachShadow({ mode: 'open' })
     root.innerHTML = '<dialog><button>OK</button></dialog>'
-    root.querySelector('dialog').showModal()
+    must(root.querySelector('dialog')).showModal()
     expect(inModal(root.querySelector('button'))).to.equal(true)
   })
 

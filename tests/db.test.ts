@@ -7,6 +7,7 @@ suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
+import { must } from './must.ts'
 
 const uniqueName = () =>
   crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
@@ -140,17 +141,17 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
 
     const db = new ChordlessDB(orgId)
     await db.init()
-    const song = await db.getSong('uuid-1')
+    const song = must(await db.getSong('uuid-1'))
     expect([song.tempo, song.originalTempo]).to.deep.equal([150, 150])
-    expect((await db.getSong('uuid-2')).tempo).to.equal(96)
+    expect(must(await db.getSong('uuid-2')).tempo).to.equal(96)
 
     const sync = new DriveSyncManager('Test', null, { db })
-    const migratedInSync = await db.getSetlist('in-sync')
+    const migratedInSync = must(await db.getSetlist('in-sync'))
     expect(migratedInSync.songs[0].tempo).to.equal(72)
     expect(sync.setlistHasLocalChanges(migratedInSync)).to.equal(false)
-    const migratedEdited = await db.getSetlist('edited')
+    const migratedEdited = must(await db.getSetlist('edited'))
     expect(migratedEdited.songs[0].tempo).to.equal(80)
     expect(sync.setlistHasLocalChanges(migratedEdited)).to.equal(true)
-    db.db.close()
+    must(db.db).close()
   })
 })

@@ -4,6 +4,7 @@ import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { buildRuntimeSongs, parseTempoMetadata } from '../src/js/setlist/runtime-songs.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before } = window
@@ -174,6 +175,6 @@ describe('buildRuntimeSongs', () => {
       fontSize: 1.6,
     })
     expect(song._setlistEntry).to.equal(entry)
-    expect(song._canonicalSong.id).to.equal(songId)
+    expect(must(song._canonicalSong).id).to.equal(songId)
   })
 })

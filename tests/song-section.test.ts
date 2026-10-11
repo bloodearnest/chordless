@@ -45,7 +45,7 @@ describe('song-section', () => {
 
   it('sends section-action for the option pressed', async () => {
     await setUp()
-    let detail = null
+    let detail: { songIndex: number; sectionIndex: number; action: string } | null = null
     section.addEventListener('song-section:action', event => {
       detail = {
         songIndex: event.songIndex,

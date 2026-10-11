@@ -93,7 +93,7 @@ export class FakeDrive {
   /** Find a file by path of names from the root, e.g. ['Chordless', 'Org', 'setlists'] */
   findByPath(names) {
     let parent = null
-    let found = null
+    let found: any = null
     for (const name of names) {
       found = [...this.files.values()].find(
         f => f.name === name && !f.trashed && (parent ? f.parents.includes(parent) : true)
@@ -344,7 +344,7 @@ export class FakeDrive {
 
 /** Split on top-level " and ", ignoring ones inside { } and quotes */
 function splitAnd(q) {
-  const parts = []
+  const parts: string[] = []
   let depth = 0
   let quoted = false
   let start = 0
@@ -446,7 +446,7 @@ function json(data, status = 200) {
 export function installFakeDrive() {
   const drive = new FakeDrive()
   const realFetch = globalThis.fetch
-  globalThis.fetch = (input, init) => {
+  globalThis.fetch = ((input, init) => {
     const url = typeof input === 'string' ? input : input.url
     if (new URL(url, location.href).hostname === 'www.googleapis.com') {
       return drive.handle(input, init).catch(error => {
@@ -455,7 +455,7 @@ export function installFakeDrive() {
       })
     }
     return realFetch(input, init)
-  }
+  }) as typeof fetch
   setAccessTokenProvider(async () => VALID_TOKEN)
   drive.uninstall = () => {
     globalThis.fetch = realFetch

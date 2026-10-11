@@ -5,7 +5,7 @@ import { GlobalListeners } from '../src/js/global-listeners.ts'
 const { describe, it } = window
 
 class ListeningElement extends LitElement {
-  calls = []
+  calls: string[] = []
   listeners = new GlobalListeners(this)
 
   constructor() {

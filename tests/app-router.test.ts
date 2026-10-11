@@ -3,6 +3,7 @@ import { ContextConsumer } from '@lit/context'
 import { LitElement } from 'lit'
 import { AppRouter, RouteChangeEvent } from '../src/js/app-router.ts'
 import { routeContext } from '../src/js/route-context.ts'
+import { must } from './must.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -572,7 +573,7 @@ describe('AppRouter', () => {
       const back = routeChanged()
       window.history.back()
       await back
-      const left = JSON.parse(storage.getItem(STORAGE_KEY)).find(
+      const left = JSON.parse(must(storage.getItem(STORAGE_KEY))).find(
         ([, state]) => state.name === 'storage'
       )
       expect(left).to.not.equal(undefined)
@@ -588,7 +589,7 @@ describe('AppRouter', () => {
       expect(storage.getItem(STORAGE_KEY)).to.equal(null)
 
       window.dispatchEvent(new Event('pagehide'))
-      const saved = JSON.parse(storage.getItem(STORAGE_KEY))
+      const saved = JSON.parse(must(storage.getItem(STORAGE_KEY)))
       expect(saved).to.have.length(1)
       expect(saved[0][1]).to.include({ name: 'storage' })
 
@@ -608,10 +609,10 @@ describe('AppRouter', () => {
         expect(storage.getItem(STORAGE_KEY)).to.equal(null)
         setVisibility('hidden')
         document.dispatchEvent(new Event('visibilitychange'))
-        expect(JSON.parse(storage.getItem(STORAGE_KEY))).to.have.length(1)
+        expect(JSON.parse(must(storage.getItem(STORAGE_KEY)))).to.have.length(1)
       } finally {
         Reflect.deleteProperty(document, 'visibilityState')
-        Object.defineProperty(Document.prototype, 'visibilityState', visible)
+        Object.defineProperty(Document.prototype, 'visibilityState', must(visible))
       }
     })
 

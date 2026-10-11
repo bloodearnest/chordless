@@ -6,7 +6,7 @@ import { DialogPopup } from '../src/js/dialog-popup.ts'
 const { describe, it, afterEach } = window
 
 class PopupHost extends LitElement {
-  placed = []
+  placed: boolean[] = []
   popup = new DialogPopup(this, { position: dialog => this.placed.push(dialog.open) })
 
   override render() {

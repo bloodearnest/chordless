@@ -287,7 +287,7 @@ export class SongInfo extends LitElement {
   }
 
   _renderAppearanceMeta(appearance: { leader?: string; playedInKey?: string | null }) {
-    const metaParts = []
+    const metaParts: string[] = []
     if (appearance.leader) {
       metaParts.push(appearance.leader)
     }

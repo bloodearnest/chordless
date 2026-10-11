@@ -2,6 +2,7 @@ import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
 import { createSetlist, getCurrentDB } from '../src/js/db.ts'
 import { createSong } from '../src/js/song-utils.ts'
+import { must } from './must.ts'
 import { A11Y, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -89,7 +90,7 @@ describe('song-import', () => {
 
     const url = finished(element)
     $(element, '.library-only').click()
-    const song = await songTitled(title)
+    const song = must(await songTitled(title))
     expect(await url).to.equal(`/songs/${song.uuid}`)
     expect(song.importSource).to.equal('paste')
   })
@@ -109,7 +110,7 @@ describe('song-import', () => {
     expect($(element, '.songs').textContent).to.contain(first)
     expect($(element, '.songs').textContent).to.contain(second)
     expect(text(element)).to.contain('Not imported: photo.png: not a text file')
-    expect((await songTitled(second)).importSource).to.equal('file')
+    expect(must(await songTitled(second)).importSource).to.equal('file')
   })
 
   it('adds a song already in the library to an existing setlist, keeping its chart', async () => {
@@ -130,9 +131,9 @@ describe('song-import', () => {
     $(element, '.add-to-setlist .add').click()
     expect(await url).to.equal(`/setlist/${setlist.id}`)
 
-    const saved = await db.getSetlist(setlist.id)
+    const saved = must(await db.getSetlist(setlist.id))
     expect(saved.songs.map(entry => entry.songUuid)).to.deep.equal([existing.uuid])
-    expect((await db.getChordPro(existing.chordproFileId)).content).to.contain('[G]Original')
+    expect(must(await db.getChordPro(existing.chordproFileId)).content).to.contain('[G]Original')
   })
 
   it('updates a song already in the library with the imported chart', async () => {
@@ -145,8 +146,8 @@ describe('song-import', () => {
     await waitFor(() => !text(element).includes('already exists in your library'))
 
     const db = await getCurrentDB()
-    const song = await db.getSong(existing.uuid)
-    expect((await db.getChordPro(song.chordproFileId)).content).to.contain('[A]Imported')
+    const song = must(await db.getSong(existing.uuid))
+    expect(must(await db.getChordPro(song.chordproFileId)).content).to.contain('[A]Imported')
   })
 
   it('asks about each song already in the library among several, with Update All', async () => {
@@ -168,8 +169,8 @@ describe('song-import', () => {
     expect($(element, '.songs').textContent).to.contain('updated')
 
     const db = await getCurrentDB()
-    const song = await db.getSong(existing.uuid)
-    expect((await db.getChordPro(song.chordproFileId)).content).to.contain('[A]Updated')
+    const song = must(await db.getSong(existing.uuid))
+    expect(must(await db.getChordPro(song.chordproFileId)).content).to.contain('[A]Updated')
   })
 })
 

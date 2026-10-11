@@ -2,7 +2,9 @@
 
 import type { MusicalMetadataDisplay } from '../src/components/musical-metadata-display.ts'
 import type { SongSettingsPopover } from '../src/components/song-settings-popover.ts'
+import type { ChordProRecord } from '../src/js/data-types.ts'
 import { expect, fromDB, seedSong, test } from './fixtures.ts'
+import { must } from './must.ts'
 
 test.describe('Song settings', () => {
   test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
@@ -11,7 +13,7 @@ test.describe('Song settings', () => {
     await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
-      const chart = await db.getChordPro('chordpro-info-test')
+      const chart = (await db.getChordPro('chordpro-info-test')) as ChordProRecord
       await db.saveChordPro({
         ...chart,
         content: chart.content.replace('{key: G}', '{key: G}\n{tempo: 72}'),
@@ -124,7 +126,7 @@ test.describe('Media player settings', () => {
     const padsWere = await pads.getAttribute('aria-checked')
     await pads.focus()
     await page.keyboard.press('Space')
-    await expect(pads).not.toHaveAttribute('aria-checked', padsWere)
+    await expect(pads).not.toHaveAttribute('aria-checked', must(padsWere))
 
     await player.focus()
     await page.keyboard.press('Enter')

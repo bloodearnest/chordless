@@ -16,7 +16,7 @@ test('dev index links to every dev page', () => {
 
 for (const page of pages) {
   test(`dev page loads cleanly: ${page}`, async ({ page: browserPage }) => {
-    const problems = []
+    const problems: string[] = []
     browserPage.on('pageerror', e => problems.push(`page error: ${e.message}`))
     browserPage.on('console', msg => {
       if (msg.type() === 'error') problems.push(`console error: ${msg.text()}`)

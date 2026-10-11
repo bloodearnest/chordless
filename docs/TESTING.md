@@ -11,12 +11,25 @@ Run it before committing.
 
 New test files are picked up by their name; there's no list to add them to.
 
-Tests are TypeScript, type-checked by `tsc -b` (part of `just lint`) with `strict` off
-(`tsconfig.tests.json`, `tsconfig.node.json`): they are held to the app's API, its names,
-arguments and return types, but not to null safety or annotations, because they use partial
-fakes and loosely shaped fixtures on purpose. Cast a fixture with `as any` where it is
-incomplete. Playwright's `page.evaluate` callbacks run in the page: import app modules there
-by their URL (`await import('/js/db.ts')`).
+Tests are TypeScript, type-checked by `tsc -b` (part of `just lint`) with `strict` on, except
+`noImplicitAny` (`tsconfig.tests.json`, `tsconfig.node.json`): helper parameters and `let`s need no
+annotations, but everything the tests call is checked against the app's types, including null
+safety. To keep it that way:
+
+- Build records with `tests/builders.ts` (`makeSetlist({ date })`, `makeSong`, `makeEntry`,
+  `makePadSet`, `makeChart`, `makeLocalState`) rather than partial literals cast with `as any`.
+  A test that needs a record the app would never hold says so with `as unknown as T`.
+- `must(await db.getSong(id)).title` (`tests/must.ts`) asserts a value is there and narrows it.
+  Chai's `expect(x).to.exist` does not narrow. Not inside `page.evaluate`: that code runs in
+  the page, where the helper does not exist.
+- Declare fakes with `implements` of the narrow interface the code under test takes
+  (`ClickAudioContext`, `SongSelectPage`, `Pick<Storage, ...>`), and type empty arrays
+  (`const log: string[] = []`: with `noImplicitAny` off, `[]` is `never[]`).
+- Type table-driven cases (`const cases: [string, Route][] = [...]`) and use
+  `as const satisfies Route` for route literals.
+- Playwright's `page.evaluate` callbacks run in the page: import app modules there by their URL
+  (`await import('/js/db.ts')`), and declare the globals the tests put on `window` in
+  `tests/page-globals.d.ts`.
 
 ## Node tests
 

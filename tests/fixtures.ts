@@ -7,7 +7,7 @@ export const test = base.extend<{ pageErrors: string[] }>({
   // Every test fails if its page throws an uncaught error
   pageErrors: [
     async ({ page }, use) => {
-      const errors = []
+      const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
       await use(errors)
       expect(errors, 'uncaught errors in the page').toEqual([])

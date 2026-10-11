@@ -8,6 +8,7 @@ import {
   listOrganisations,
   setCurrentOrganisation,
 } from '../src/js/organisation.ts'
+import { must } from './must.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -48,11 +49,11 @@ describe('ensureCurrentOrganisation', () => {
 
   it('refuses a name already in use with a ConstraintError, not a bare null', async () => {
     const { name } = await ensureCurrentOrganisation()
-    let error = null
+    let error: Error | null = null
     try {
       await createOrganisation(name)
     } catch (caught) {
-      error = caught
+      error = caught as Error
     }
     expect(error?.name).to.equal('ConstraintError')
   })
@@ -73,7 +74,7 @@ describe('the current organisation', () => {
 
   it('is found by name', async () => {
     const org = await createOrganisation(unique('Named'))
-    expect((await getOrganisationByName(org.name)).id).to.equal(org.id)
+    expect(must(await getOrganisationByName(org.name)).id).to.equal(org.id)
     expect(await getOrganisationByName(unique('Nobody'))).to.equal(undefined)
   })
 

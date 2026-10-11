@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { SetlistSong } from '../src/js/models/setlist-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -273,7 +274,7 @@ describe('SetlistSong', () => {
       await song.save()
 
       const stateKey = `state-${setlist.id}`
-      const state = JSON.parse(localStorage.getItem(stateKey))
+      const state = JSON.parse(must(localStorage.getItem(stateKey)))
       expect(state.capoValues['0']).to.equal(4)
     })
   })
@@ -354,7 +355,7 @@ describe('SetlistSong', () => {
       await song.save()
 
       const stateKey = `state-${setlist.id}`
-      const state = JSON.parse(localStorage.getItem(stateKey))
+      const state = JSON.parse(must(localStorage.getItem(stateKey)))
       expect(state.sectionState['0']['0'].hideMode).to.equal('chords')
       expect(state.sectionState['0']['1'].hideMode).to.equal('lyrics')
       expect(state.sectionState['0']['1'].isCollapsed).to.equal(true)

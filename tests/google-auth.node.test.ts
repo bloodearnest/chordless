@@ -27,7 +27,7 @@ const sign = ({
   key?: jose.CryptoKey | Uint8Array
   alg?: string
   claims?: object
-  exp?: string | number
+  exp?: string | number | null
   kid?: string
 } = {}) => {
   const jwt = new jose.SignJWT({ email: 'a@example.com', ...claims })

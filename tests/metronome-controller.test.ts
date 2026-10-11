@@ -79,8 +79,12 @@ class MockGainNode implements ClickEnvelope {
 
 describe('MetronomeController', () => {
   it('requires an AudioContext and GainNode', () => {
-    expect(() => new MetronomeController(null, new MockGainNode())).to.throw()
-    expect(() => new MetronomeController(new MockAudioContext(), null)).to.throw()
+    expect(
+      () => new MetronomeController(null as unknown as ClickAudioContext, new MockGainNode())
+    ).to.throw()
+    expect(
+      () => new MetronomeController(new MockAudioContext(), null as unknown as ClickEnvelope)
+    ).to.throw()
   })
 
   it('starts and stops the metronome', () => {
@@ -100,8 +104,8 @@ describe('MetronomeController', () => {
 
   it('prevents start when BPM or time signature missing', () => {
     const controller = new MetronomeController(new MockAudioContext(), new MockGainNode())
-    expect(controller.start(null, '4/4', '1/4')).to.be.false
-    expect(controller.start(120, null, '1/4')).to.be.false
+    expect(controller.start(null as unknown as number, '4/4', '1/4')).to.be.false
+    expect(controller.start(120, null as unknown as string, '1/4')).to.be.false
     expect(controller.isRunning).to.be.false
   })
 

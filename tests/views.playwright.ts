@@ -240,7 +240,7 @@ test.describe('The setlist view', () => {
     await expect(page.locator('home-view')).toBeVisible()
 
     const same = await page.evaluate(() => {
-      const element = document.getElementById('media-player')
+      const element = document.getElementById('media-player') as MediaPlayer
       return {
         sameElement: element === window.playerElement,
         sameAudio:
@@ -457,7 +457,7 @@ test.describe('The media player is optional', () => {
     const url = await seedSetlist(page)
     // From now on pages load as on a browser that has no AudioContext
     await page.addInitScript(() => {
-      window.AudioContext = undefined
+      ;(window as { AudioContext?: unknown }).AudioContext = undefined
       window.webkitAudioContext = undefined
     })
     await page.goto(url)

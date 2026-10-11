@@ -6,6 +6,7 @@ import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeLocalState, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -134,7 +135,7 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(file.appProperties.setlistId).to.equal(setlist.id)
       expect(driveSetlist(setlist.id).name).to.equal('Harvest')
 
-      const local = await phone.db.getSetlist(setlist.id)
+      const local = must(await phone.db.getSetlist(setlist.id))
       expect(local.driveFileId).to.equal(file.id)
     })
 
@@ -146,7 +147,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await syncDevice(tablet)
 
-      const onTablet = await tablet.db.getSetlist(setlist.id)
+      const onTablet = must(await tablet.db.getSetlist(setlist.id))
       expect(onTablet.name).to.equal('Harvest')
     })
 
@@ -162,7 +163,7 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(driveSetlist(setlist.id).songs[0].tempo).to.equal('72')
 
       await syncDevice(tablet)
-      const onTablet = await tablet.db.getSetlist(setlist.id)
+      const onTablet = must(await tablet.db.getSetlist(setlist.id))
       expect(onTablet.songs[0].tempo).to.equal(72)
       expect(tablet.sync.setlistHasLocalChanges(onTablet)).to.equal(false)
 
@@ -197,7 +198,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(tablet)
 
       expect(driveSetlist(setlist.id).name).to.equal('Renamed on phone')
-      expect((await tablet.db.getSetlist(setlist.id)).name).to.equal('Renamed on phone')
+      expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Renamed on phone')
     })
 
     it('makes no writes to Drive when nothing changed', async () => {
@@ -222,7 +223,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       expect(driveSetlist(setlist.id).name).to.equal('Keep me')
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Keep me')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Keep me')
       expect(drive.requests.filter(r => r.method === 'DELETE')).to.deep.equal([])
     })
 
@@ -309,7 +310,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(tablet)
 
       expect(driveSetlist(setlist.id).name).to.equal('Phone edit')
-      expect((await tablet.db.getSetlist(setlist.id)).name).to.equal('Phone edit')
+      expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Phone edit')
     })
 
     it("doesn't lose an edit made after a remote change was pulled", async () => {
@@ -327,7 +328,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       expect(driveSetlist(setlist.id).name).to.equal('Tablet edit on top')
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Tablet edit on top')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Tablet edit on top')
     })
 
     it('detects a remote edit when the device clock is ahead of Drive', async () => {
@@ -365,7 +366,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await editSetlist(phone, setlist.id, { name: 'Edited' })
       await syncDevice(phone)
 
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Edited')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Edited')
       expect(driveSetlist(setlist.id).name).to.equal('Edited')
     })
   })
@@ -376,7 +377,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const setlist = await addSetlist(phone, { name: 'Original' })
       await syncDevice(phone)
 
-      const stored = await phone.db.getSetlist(setlist.id)
+      const stored = must(await phone.db.getSetlist(setlist.id))
       await phone.db.saveSetlist({ ...stored, name: 'Edited, same modifiedDate' })
       await syncDevice(phone)
 
@@ -397,7 +398,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       expect(drive.requests.filter(r => r.params.get('alt') === 'media')).to.deep.equal([])
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Original')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Original')
     })
 
     it('does not upload an edit that was undone', async () => {
@@ -437,7 +438,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Old record' })
       await syncDevice(phone)
-      const stored = await phone.db.getSetlist(setlist.id)
+      const stored = must(await phone.db.getSetlist(setlist.id))
       delete stored.syncedContentHash
       delete stored.driveChecksum
       stored.driveModifiedTime = new Date().toISOString()
@@ -447,7 +448,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await syncDevice(phone)
       expect(drive.requests.filter(r => r.method !== 'GET').map(r => r.path)).to.deep.equal([])
-      expect((await phone.db.getSetlist(setlist.id)).syncedContentHash).to.be.a('string')
+      expect(must(await phone.db.getSetlist(setlist.id)).syncedContentHash).to.be.a('string')
 
       await editSetlist(phone, setlist.id, { name: 'Old record, edited' })
       await syncDevice(phone)
@@ -468,8 +469,8 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await syncDevice(phone)
 
-      const fileFor = async id => drive.files.get((await phone.db.getSetlist(id)).driveFileId)
-      expect((await phone.db.getSetlist('setlist-a')).driveFileId).to.equal(undefined)
+      const fileFor = async id => drive.files.get(must(await phone.db.getSetlist(id)).driveFileId)
+      expect(must(await phone.db.getSetlist('setlist-a')).driveFileId).to.equal(undefined)
       expect((await fileFor('setlist-b')).appProperties.setlistId).to.equal('setlist-b')
       expect((await fileFor('setlist-c')).appProperties.setlistId).to.equal('setlist-c')
 
@@ -540,7 +541,7 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(await tablet.db.getSetlist(setlist.id)).to.equal(undefined)
 
       await syncDevice(tablet)
-      expect((await tablet.db.getSetlist(setlist.id)).name).to.equal('Flaky')
+      expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Flaky')
     })
 
     it('fails the sync without pushing when the setlist listing fails', async () => {
@@ -612,7 +613,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await renameOrganisation(phone, 'Simon Davy')
       await syncDevice(phone)
 
-      expect((await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
+      expect(must(await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
       expect(phone.folderLink.value).to.equal(drive.findByPath(['Chordless', 'Simon Davy']).id)
     })
 
@@ -697,11 +698,13 @@ describe('Drive sync (against FakeDrive)', () => {
   })
 
   describe('reset from Drive', () => {
-    async function resetError(device) {
+    async function resetError(
+      device
+    ): Promise<(Error & { unsynced: { id: string; type: string }[] }) | null> {
       try {
         await device.sync.resetLocalFromDrive()
       } catch (error) {
-        return error
+        return error as Error & { unsynced: { id: string; type: string }[] }
       }
       return null
     }
@@ -717,7 +720,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await phone.sync.resetLocalFromDrive()
 
       expect((await phone.db.getAllSetlists()).map(s => s.name)).to.deep.equal(['Keep'])
-      expect((await phone.db.getSetlist(keep.id)).driveFileId).to.be.a('string')
+      expect(must(await phone.db.getSetlist(keep.id)).driveFileId).to.be.a('string')
       // And a normal sync afterwards doesn't bring it back
       await syncDevice(phone)
       expect(driveSetlistFiles().filter(f => !f.trashed)).to.have.length(1)
@@ -731,7 +734,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await phone.sync.resetLocalFromDrive()
 
-      expect((await phone.db.getSetlist(fromTablet.id)).name).to.equal('From tablet')
+      expect(must(await phone.db.getSetlist(fromTablet.id)).name).to.equal('From tablet')
     })
 
     it('changes nothing if a setlist was edited since its last sync', async () => {
@@ -743,8 +746,8 @@ describe('Drive sync (against FakeDrive)', () => {
       const error = await resetError(phone)
 
       expect(error?.name).to.equal('UnsyncedChangesError')
-      expect(error.unsynced.map(u => u.id)).to.deep.equal([setlist.id])
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Unsynced edit')
+      expect(must(error).unsynced.map(u => u.id)).to.deep.equal([setlist.id])
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Unsynced edit')
     })
 
     it('changes nothing if a setlist was never uploaded', async () => {
@@ -754,7 +757,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const error = await resetError(phone)
 
       expect(error?.name).to.equal('UnsyncedChangesError')
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Local only')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Local only')
     })
 
     it('changes nothing if a song chart was edited since its last sync', async () => {
@@ -781,7 +784,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const error = await resetError(phone)
 
       expect(error?.unsynced.map(u => u.type)).to.deep.equal(['song'])
-      expect((await phone.db.getChordPro(chordproFileId)).content).to.equal('v2')
+      expect(must(await phone.db.getChordPro(chordproFileId)).content).to.equal('v2')
     })
 
     it('changes nothing if Drive cannot be listed', async () => {
@@ -793,7 +796,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const error = await resetError(phone)
 
       expect(error?.message).to.match(/nothing was changed/)
-      expect((await phone.db.getSetlist(setlist.id)).name).to.equal('Safe')
+      expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Safe')
     })
 
     it('keeps per-setlist device preferences', async () => {
@@ -917,7 +920,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
 
       for (const uuid of ['song-a', 'song-b']) {
-        const song = await phone.db.getSong(uuid)
+        const song = must(await phone.db.getSong(uuid))
         expect(drive.files.get(song.driveFileId).content).to.equal(await songContent(phone, uuid))
       }
     })
@@ -927,8 +930,8 @@ describe('Drive sync (against FakeDrive)', () => {
       await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: 'v1' })
       await syncDevice(phone)
 
-      const song = await phone.db.getSong('song-1')
-      const chart = await phone.db.getChordPro(song.chordproFileId)
+      const song = must(await phone.db.getSong('song-1'))
+      const chart = must(await phone.db.getChordPro(song.chordproFileId))
       await phone.db.saveChordPro({ ...chart, content: 'v2 without new hash' })
       await syncDevice(phone)
 
@@ -954,14 +957,14 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
       const file = () => drive.listFiles(f => f.appProperties.type === 'chordpro')[0]
       const expected = async () => {
-        const song = await phone.db.getSong('song-1')
+        const song = must(await phone.db.getSong('song-1'))
         const chart = await phone.db.getChordPro(song.chordproFileId)
         return songFileMetadata(song, chart, { organisationId: ORG_ID }).appProperties
       }
       expect(file().appProperties).to.deep.equal(await expected())
 
       // A variant change only shows in appProperties, so updates must send them
-      const song = await phone.db.getSong('song-1')
+      const song = must(await phone.db.getSong('song-1'))
       await phone.db.saveSong({ ...song, isDefault: false, variantOf: 'song-0' })
       await editSongContent(phone, 'song-1', '{title: Amazing}\n[G]edited')
       await syncDevice(phone)

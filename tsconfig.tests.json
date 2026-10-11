@@ -2,9 +2,9 @@
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
-    // Tests are checked for the app's API (names, arguments, return types), not for null safety
-    // or annotations: they use partial fakes and loosely shaped fixtures on purpose
-    "strict": false,
+    // Tests need not annotate every helper parameter and `let`; the rest of strict (null safety,
+    // the app's types where the tests call it) applies. See docs/TESTING.md.
+    "noImplicitAny": false,
     "types": ["mocha", "google.accounts"],
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo"
   },

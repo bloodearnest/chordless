@@ -4,6 +4,7 @@ import { ROUTE_NAMES } from '../src/js/router.ts'
 import { groupSetlistsByYear } from '../src/js/views/home-view.ts'
 import { views } from '../src/js/views/registry.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 
 const { describe, it } = window
 
@@ -42,7 +43,9 @@ describe('groupSetlistsByYear', () => {
   })
 
   it('gives each setlist its link and song count', () => {
-    const item = groupSetlistsByYear(setlists, 2026)[1].setlists.find(entry => entry.id === 'a')
+    const item = must(
+      groupSetlistsByYear(setlists, 2026)[1].setlists.find(entry => entry.id === 'a')
+    )
     expect(item.url).to.equal('/setlist/a')
     expect(item.songCount).to.equal(2)
     expect(item.displayName).to.be.a('string').and.not.equal('')

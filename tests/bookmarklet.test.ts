@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/bookmarklet-installer.ts'
 import { bookmarkletUrl, importFromSongSelect } from '../src/js/songselect-bookmarklet.ts'
+import { must } from './must.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -22,7 +23,7 @@ describe('bookmarkletUrl', () => {
   })
 
   it('runs, and only works on SongSelect', async () => {
-    const alerts = []
+    const alerts: string[] = []
     const realAlert = window.alert
     window.alert = message => alerts.push(message)
     try {
@@ -48,7 +49,7 @@ describe('importFromSongSelect', () => {
     download = { ok: true, payload: '{title: Test}' } as { ok: boolean; payload?: string } | Error,
     popupBlocked = false,
   } = {}) {
-    const log = []
+    const log: any[][] = []
     const listeners = new Set<(event: any) => void>()
     const tab = { postMessage: (message, origin) => log.push(['post', message, origin]) }
     const page = {
@@ -127,13 +128,13 @@ describe('importFromSongSelect', () => {
     expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch'])
     page.ready()
     await done
-    expect(page.log.at(-1)[0]).to.equal('post')
+    expect(must(page.log.at(-1))[0]).to.equal('post')
   })
 
   it('tells Chordless when the download fails', async () => {
     const page = fakePage({ download: { ok: false } })
     await run(page)
-    expect(page.log.at(-1)[1]).to.deep.equal({
+    expect(must(page.log.at(-1))[1]).to.deep.equal({
       type: 'CHORDLESS_IMPORT_FAILED',
       data: { message: 'SongSelect download failed: 403' },
     })
@@ -142,7 +143,7 @@ describe('importFromSongSelect', () => {
   it("tells Chordless when the user can't access the chart", async () => {
     const page = fakePage({ download: { ok: true, payload: '  ' } })
     await run(page)
-    expect(page.log.at(-1)[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
+    expect(must(page.log.at(-1))[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
   })
 
   it("stops without downloading if the tab can't be opened", async () => {
@@ -186,7 +187,7 @@ describe('bookmarklet-installer', () => {
 
   it('copies the code and says so', async () => {
     await makeInstaller()
-    let copied = null
+    let copied: string | null = null
     const realClipboard = Object.getOwnPropertyDescriptor(Navigator.prototype, 'clipboard')
     Object.defineProperty(navigator, 'clipboard', {
       configurable: true,

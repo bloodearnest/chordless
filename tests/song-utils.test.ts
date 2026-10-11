@@ -15,6 +15,7 @@ import {
   setDefaultVariant,
 } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -36,8 +37,8 @@ describe('createSong', () => {
     expect(song.tempo).to.equal(72)
 
     const db = await getCurrentDB()
-    expect((await db.getSong(song.uuid)).title).to.equal(title)
-    expect((await db.getChordPro(song.chordproFileId)).content).to.contain('[G]Amazing')
+    expect(must(await db.getSong(song.uuid)).title).to.equal(title)
+    expect(must(await db.getChordPro(song.chordproFileId)).content).to.contain('[G]Amazing')
   })
 
   it('identifies a song by its CCLI number when it has one, otherwise by its title', async () => {
@@ -60,11 +61,11 @@ describe('createSong', () => {
   it('refuses a song already in the library, unless asked for a new one', async () => {
     const title = unique('Twice')
     await createSong(chart(title))
-    let error = null
+    let error: Error | null = null
     try {
       await createSong(chart(title))
     } catch (caught) {
-      error = caught
+      error = caught as Error
     }
     expect(error?.message).to.contain('Song already exists')
 
@@ -79,8 +80,8 @@ describe('findExistingSong', () => {
     const title = unique('Findable')
     const song = await createSong(chart(title, { extra: `{ccli: ${ccli}}` }))
 
-    expect((await findExistingSong(ccli, 'Some other title')).uuid).to.equal(song.uuid)
-    expect((await findExistingSong(null, `${title.toUpperCase()}!`)).uuid).to.equal(song.uuid)
+    expect(must(await findExistingSong(ccli, 'Some other title')).uuid).to.equal(song.uuid)
+    expect(must(await findExistingSong(null, `${title.toUpperCase()}!`)).uuid).to.equal(song.uuid)
     expect(await findExistingSong(null, unique('Nothing like it'))).to.equal(null)
   })
 
@@ -88,7 +89,7 @@ describe('findExistingSong', () => {
     const title = unique('Variants')
     const original = await createSong(chart(title))
     await createVariant(original.uuid, 'Acoustic', chart(title, { key: 'A' }))
-    expect((await findExistingSong(null, title)).uuid).to.equal(original.uuid)
+    expect(must(await findExistingSong(null, title)).uuid).to.equal(original.uuid)
   })
 })
 
@@ -104,11 +105,11 @@ describe('getSongWithContent', () => {
   })
 
   it('says which song is missing', async () => {
-    let error = null
+    let error: Error | null = null
     try {
       await getSongWithContent('no-such-song')
     } catch (caught) {
-      error = caught
+      error = caught as Error
     }
     expect(error?.message).to.equal('Song not found: no-such-song')
   })
@@ -143,13 +144,13 @@ describe('variants', () => {
 
     const uuids = (await getSongVariants(original.id)).map(song => song.uuid)
     expect(uuids).to.have.members([original.uuid, variant.uuid])
-    expect((await getDefaultVariant(original.id)).uuid).to.equal(original.uuid)
+    expect(must(await getDefaultVariant(original.id)).uuid).to.equal(original.uuid)
 
     await setDefaultVariant(variant.uuid)
-    expect((await getDefaultVariant(original.id)).uuid).to.equal(variant.uuid)
+    expect(must(await getDefaultVariant(original.id)).uuid).to.equal(variant.uuid)
     expect((await getSongById(original.id)).uuid).to.equal(variant.uuid)
     const db = await getCurrentDB()
-    expect((await db.getSong(original.uuid)).isDefault).to.equal(false)
+    expect(must(await db.getSong(original.uuid)).isDefault).to.equal(false)
   })
 })
 
@@ -208,8 +209,8 @@ describe('getLibrarySongs', () => {
     await db.saveSetlist(setlist('2026-01-04'))
     await db.saveSetlist(setlist('2026-03-01'))
 
-    const withUsage = (await getLibrarySongs(db, { withLastUsage: true })).find(
-      entry => entry.id === song.id
+    const withUsage = must(
+      (await getLibrarySongs(db, { withLastUsage: true })).find(entry => entry.id === song.id)
     )
     expect(withUsage.lastUsageInfo).to.deep.equal({
       date: '2026-03-01',
@@ -217,15 +218,17 @@ describe('getLibrarySongs', () => {
       key: 'C',
     })
 
-    const without = (await getLibrarySongs(db)).find(entry => entry.id === song.id)
+    const without = must((await getLibrarySongs(db)).find(entry => entry.id === song.id))
     expect(without.lastUsageInfo).to.equal(undefined)
   })
 
   it('has no usage for a song never played', async () => {
     const song = await createSong(chart(unique('Never played')))
     const db = await getCurrentDB()
-    const entry = (await getLibrarySongs(db, { withLastUsage: true })).find(
-      candidate => candidate.id === song.id
+    const entry = must(
+      (await getLibrarySongs(db, { withLastUsage: true })).find(
+        candidate => candidate.id === song.id
+      )
     )
     expect(entry.lastUsageInfo).to.equal(undefined)
   })

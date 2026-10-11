@@ -1,6 +1,7 @@
 import { expect } from '@esm-bundle/chai'
 import { driveRequest } from '../src/js/drive-api.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { must } from './must.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -37,7 +38,7 @@ describe('FakeDrive', () => {
     const byAppProperties = await list(`appProperties has { key='setlistId' and value='s1' }`)
 
     expect(byProperties.files).to.deep.equal([])
-    expect(byAppProperties.files.map(f => f.name)).to.deep.equal(['app.json'])
+    expect(must(byAppProperties.files).map(f => f.name)).to.deep.equal(['app.json'])
   })
 
   it('rejects query clauses it does not model instead of matching everything', async () => {

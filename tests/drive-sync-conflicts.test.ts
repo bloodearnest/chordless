@@ -1,11 +1,15 @@
 import { expect } from '@esm-bundle/chai'
 import { reconcileRecords, reconcileSetlists, reconcileSongs } from '../src/js/sync/reconciler.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
+import { must } from './must.ts'
 
 /**
  * Advanced conflict resolution tests for Drive sync
  * Tests various scenarios where local and remote have diverged
  */
+
+/** The few fields reconciling songs looks at; a date may be missing or junk */
+type SongStamp = { id: string; modifiedDate: string | null; contentHash: string }
 
 describe('Drive Sync Conflict Resolution', () => {
   const now = Date.now()
@@ -39,8 +43,8 @@ describe('Drive Sync Conflict Resolution', () => {
       const plan = reconcileSongs([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.isDefault).to.equal(false)
-      expect(plan[0].record.contentHash).to.equal('remote-hash-456')
+      expect(must(plan[0].record).isDefault).to.equal(false)
+      expect(must(plan[0].record).contentHash).to.equal('remote-hash-456')
     })
 
     it('should upload local when local is newer', () => {
@@ -66,8 +70,8 @@ describe('Drive Sync Conflict Resolution', () => {
       const plan = reconcileSongs([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('upload')
-      expect(plan[0].record.isDefault).to.equal(true)
-      expect(plan[0].record.contentHash).to.equal('local-hash-789')
+      expect(must(plan[0].record).isDefault).to.equal(true)
+      expect(must(plan[0].record).contentHash).to.equal('local-hash-789')
     })
 
     it('should handle variant hierarchy changes from remote', () => {
@@ -114,11 +118,11 @@ describe('Drive Sync Conflict Resolution', () => {
       expect(plan).to.have.lengthOf(2)
       expect(plan.every(p => p.action === 'download')).to.be.true
 
-      const originalPlan = plan.find(p => p.id === 'original-uuid')
-      const simplifiedPlan = plan.find(p => p.id === 'simplified-uuid')
+      const originalPlan = must(plan.find(p => p.id === 'original-uuid'))
+      const simplifiedPlan = must(plan.find(p => p.id === 'simplified-uuid'))
 
-      expect(originalPlan.record.isDefault).to.equal(false)
-      expect(simplifiedPlan.record.isDefault).to.equal(true)
+      expect(must(originalPlan.record).isDefault).to.equal(false)
+      expect(must(simplifiedPlan.record).isDefault).to.equal(true)
     })
 
     it('should preserve variant relationships during sync', () => {
@@ -144,7 +148,7 @@ describe('Drive Sync Conflict Resolution', () => {
 
       const plan = reconcileSongs([local], [remote])
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.variantOf).to.equal('original-uuid')
+      expect(must(plan[0].record).variantOf).to.equal('original-uuid')
     })
   })
 
@@ -173,8 +177,8 @@ describe('Drive Sync Conflict Resolution', () => {
       const plan = reconcileSetlists([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.songs).to.have.lengthOf(2)
-      expect(plan[0].record.owner).to.equal('Jane')
+      expect(must(plan[0].record).songs).to.have.lengthOf(2)
+      expect(must(plan[0].record).owner).to.equal('Jane')
     })
 
     it('should upload local setlist when local is newer', () => {
@@ -201,8 +205,8 @@ describe('Drive Sync Conflict Resolution', () => {
       const plan = reconcileSetlists([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('upload')
-      expect(plan[0].record.songs).to.have.lengthOf(2)
-      expect(plan[0].record.owner).to.equal('John')
+      expect(must(plan[0].record).songs).to.have.lengthOf(2)
+      expect(must(plan[0].record).owner).to.equal('John')
     })
 
     it('should handle setlist deletion conflicts - remote deleted', () => {
@@ -281,7 +285,7 @@ describe('Drive Sync Conflict Resolution', () => {
 
       const plan = reconcileSongs([local], [remote])
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.contentHash).to.equal('remote-hash')
+      expect(must(plan[0].record).contentHash).to.equal('remote-hash')
     })
 
     it('should allow preferring local on tie with option', () => {
@@ -300,17 +304,17 @@ describe('Drive Sync Conflict Resolution', () => {
 
       const plan = reconcileSongs([local], [remote], { preferRemoteOnConflict: false })
       expect(plan[0].action).to.equal('upload')
-      expect(plan[0].record.contentHash).to.equal('local-hash')
+      expect(must(plan[0].record).contentHash).to.equal('local-hash')
     })
 
     it('should handle missing/invalid timestamps', () => {
-      const local = {
+      const local: SongStamp = {
         id: 'song1',
         modifiedDate: null,
         contentHash: 'local-hash',
       }
 
-      const remote = {
+      const remote: SongStamp = {
         id: 'song1',
         modifiedDate: 'invalid-date',
         contentHash: 'remote-hash',
@@ -322,13 +326,13 @@ describe('Drive Sync Conflict Resolution', () => {
     })
 
     it('should handle one valid timestamp vs missing', () => {
-      const local = {
+      const local: SongStamp = {
         id: 'song1',
         modifiedDate: toISO(oneHourAgo),
         contentHash: 'local-hash',
       }
 
-      const remote = {
+      const remote: SongStamp = {
         id: 'song1',
         modifiedDate: null,
         contentHash: 'remote-hash',
@@ -357,10 +361,10 @@ describe('Drive Sync Conflict Resolution', () => {
       const plan = reconcileSongs(localSongs, remoteSongs)
       expect(plan).to.have.lengthOf(4)
 
-      const song1Plan = plan.find(p => p.id === 'song1')
-      const song2Plan = plan.find(p => p.id === 'song2')
-      const song3Plan = plan.find(p => p.id === 'song3')
-      const song4Plan = plan.find(p => p.id === 'song4')
+      const song1Plan = must(plan.find(p => p.id === 'song1'))
+      const song2Plan = must(plan.find(p => p.id === 'song2'))
+      const song3Plan = must(plan.find(p => p.id === 'song3'))
+      const song4Plan = must(plan.find(p => p.id === 'song4'))
 
       expect(song1Plan.action).to.equal('upload') // Local newer
       expect(song2Plan.action).to.equal('download') // Remote newer
@@ -415,13 +419,13 @@ describe('Drive Sync Conflict Resolution', () => {
       expect(plan).to.have.lengthOf(2)
 
       // When timestamps tie, prefer remote
-      const originalPlan = plan.find(p => p.id === 'original')
-      const simplifiedPlan = plan.find(p => p.id === 'simplified')
+      const originalPlan = must(plan.find(p => p.id === 'original'))
+      const simplifiedPlan = must(plan.find(p => p.id === 'simplified'))
 
       expect(originalPlan.action).to.equal('download')
       expect(simplifiedPlan.action).to.equal('download')
-      expect(originalPlan.record.isDefault).to.equal(false)
-      expect(simplifiedPlan.record.isDefault).to.equal(true)
+      expect(must(originalPlan.record).isDefault).to.equal(false)
+      expect(must(simplifiedPlan.record).isDefault).to.equal(true)
     })
   })
 
@@ -450,8 +454,8 @@ describe('Drive Sync Conflict Resolution', () => {
 
       const plan = reconcileSongs([local], [remote])
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.importUser).to.equal('user@church.org')
-      expect(plan[0].record.importSource).to.equal('songselect')
+      expect(must(plan[0].record).importUser).to.equal('user@church.org')
+      expect(must(plan[0].record).importSource).to.equal('songselect')
     })
 
     it('should handle import metadata changes from collaborators', () => {
@@ -478,8 +482,8 @@ describe('Drive Sync Conflict Resolution', () => {
 
       const plan = reconcileSongs([local], [remote])
       expect(plan[0].action).to.equal('download')
-      expect(plan[0].record.importSource).to.equal('songselect')
-      expect(plan[0].record.sourceUrl).to.equal('https://songselect.ccli.com/songs/12345')
+      expect(must(plan[0].record).importSource).to.equal('songselect')
+      expect(must(plan[0].record).sourceUrl).to.equal('https://songselect.ccli.com/songs/12345')
     })
   })
 

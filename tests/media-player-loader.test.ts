@@ -55,7 +55,7 @@ describe('loadMediaPlayer', () => {
   })
 
   it('carries on if the module cannot be loaded, saying so', async () => {
-    const warnings = []
+    const warnings: unknown[][] = []
     const original = console.warn
     console.warn = (...args) => warnings.push(args)
     try {

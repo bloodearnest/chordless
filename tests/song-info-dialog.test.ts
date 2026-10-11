@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/song-info-dialog.ts'
+import { must } from './must.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -15,7 +16,7 @@ function fakeDb() {
     getDefaultSongVariant: async id => songs[id] ?? null,
     getSong: async uuid => songs[uuid],
     getChordPro: async id => {
-      const song = Object.values(songs).find(each => each.chordproFileId === id)
+      const song = must(Object.values(songs).find(each => each.chordproFileId === id))
       return { content: `{title: ${song.title}}` }
     },
     getSongUsageFromSetlists: async id => {

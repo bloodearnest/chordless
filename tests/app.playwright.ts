@@ -1,6 +1,7 @@
 // App-wide: themes, loading, display preferences, the menu, modals and the
 // storage page
 import { expect, fromDB, openApp, seedSetlist, seedSong, test } from './fixtures.ts'
+import { must } from './must.ts'
 
 test.describe('Themes', () => {
   test('every page follows the system dark mode', async ({ page }) => {
@@ -26,8 +27,7 @@ test.describe('Themes', () => {
       document.body.append(message)
       return getComputedStyle(message).color
     })
-    const lightness = color
-      .match(/\d+/g)
+    const lightness = must(color.match(/\d+/g))
       .slice(0, 3)
       .reduce((sum, n) => sum + Number(n), 0)
     expect(lightness).toBeGreaterThan(600)
@@ -195,7 +195,7 @@ test.describe('Navigation menu', () => {
       await expect(menu.getByText('Song Library'), path).toBeVisible()
       // The page behind the menu is inert, so tapping the button again lands on the
       // backdrop over it, which closes the menu
-      const box = await button.boundingBox()
+      const box = must(await button.boundingBox())
       await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2)
       await expect(menu, path).toBeHidden()
     }
@@ -226,7 +226,7 @@ test.describe('Navigation menu', () => {
 
     test('a tap outside only closes it, without pressing what is under it', async ({ page }) => {
       await openMenu()
-      const card = await page.locator('setlist-overview song-card').first().boundingBox()
+      const card = must(await page.locator('setlist-overview song-card').first().boundingBox())
       await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2)
       await expect(menu).toBeHidden()
       // The song under the tap did not open
@@ -276,7 +276,7 @@ test.describe('Storage page', () => {
   test('organisations: a duplicate name is refused in the form, and switching asks first', async ({
     page,
   }) => {
-    const dialogs = []
+    const dialogs: string[] = []
     page.on('dialog', dialog => {
       dialogs.push(dialog.message())
       dialog.dismiss()

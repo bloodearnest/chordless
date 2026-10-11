@@ -4,6 +4,7 @@ import {
   SetlistDetailsCancelEvent,
   SetlistDetailsSaveEvent,
 } from '../src/components/setlist-details-form.ts'
+import { must } from './must.ts'
 import { A11Y } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -23,25 +24,25 @@ describe('leaderChoices', () => {
       ann,
       ben,
     ])
-    expect(options.find(o => o.value === selected).person).to.equal(ann)
+    expect(must(options.find(o => o.value === selected)).person).to.equal(ann)
   })
 
   it('matches a leader recorded by name only to the person with that name', () => {
     const { options, selected } = leaderChoices({ owner: 'ben jones' }, [ann, ben])
     expect(options).to.have.length(2)
-    expect(options.find(o => o.value === selected).person).to.equal(ben)
+    expect(must(options.find(o => o.value === selected)).person).to.equal(ben)
   })
 
   it('keeps a leader who is not one of the people as an extra choice', () => {
     const byName = leaderChoices({ owner: 'Visiting Leader' }, [ann])
     expect(byName.options).to.have.length(2)
-    expect(byName.options.find(o => o.value === byName.selected).person).to.deep.equal({
+    expect(must(byName.options.find(o => o.value === byName.selected)).person).to.deep.equal({
       id: '',
       name: 'Visiting Leader',
     })
 
     const byId = leaderChoices({ owner: 'Cara', ownerId: 'cara@example.com' }, [ann])
-    expect(byId.options.find(o => o.value === byId.selected).person).to.deep.equal({
+    expect(must(byId.options.find(o => o.value === byId.selected)).person).to.deep.equal({
       id: 'cara@example.com',
       name: 'Cara',
     })

@@ -9,6 +9,7 @@ import {
   seedSong,
   test,
 } from './fixtures.ts'
+import { must } from './must.ts'
 
 const [ALPHA, BRAVO, CHARLIE] = SETLIST_SONGS.map(song => song.title)
 
@@ -98,8 +99,8 @@ test.describe('Sections', () => {
       .poll(() =>
         page.evaluate(
           () =>
-            JSON.parse(localStorage.getItem('state-seeded-setlist'))?.sectionState?.[0]?.[1]
-              ?.hideMode
+            JSON.parse(localStorage.getItem('state-seeded-setlist') as string)
+              ?.sectionState?.[0]?.[1]?.hideMode
         )
       )
       .toBe('hide')
@@ -137,8 +138,8 @@ test.describe('Editing a setlist', () => {
 
     // Drag Alpha by its handle to below Charlie
     const handle = cards.nth(0).locator('.drag-handle')
-    const from = await handle.boundingBox()
-    const to = await cards.nth(2).boundingBox()
+    const from = must(await handle.boundingBox())
+    const to = must(await cards.nth(2).boundingBox())
     await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2)
     await page.mouse.down()
     await page.mouse.move(from.x + from.width / 2, to.y + to.height - 2, { steps: 20 })

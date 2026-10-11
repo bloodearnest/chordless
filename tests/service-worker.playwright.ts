@@ -118,7 +118,7 @@ test.describe('Reloads on purpose, while offline', () => {
         page.waitForEvent('load'),
         page.evaluate(async () => {
           const { getCurrentOrganisation, switchOrganisation } = await import('/js/organisation.ts')
-          await switchOrganisation(getCurrentOrganisation().id)
+          await switchOrganisation(getCurrentOrganisation().id as string)
         }),
       ])
       await expect(page.locator('storage-view')).toBeVisible()

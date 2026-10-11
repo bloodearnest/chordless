@@ -17,7 +17,7 @@ test('the service worker is a classic script, which older browsers can run', asy
   await page.goto('/')
   const type = await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.ready
-    return registration.active.scriptURL
+    return registration.active?.scriptURL
   })
   expect(type).toMatch(/\/service-worker\.js$/)
 })

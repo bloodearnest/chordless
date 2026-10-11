@@ -1,5 +1,6 @@
 // Songs: the library, song info, importing, and the bookmarklet page
 import { expect, fromDB, openApp, seedSong, test } from './fixtures.ts'
+import { must } from './must.ts'
 
 test.describe('Song library', () => {
   test('changing the key transposes the chords, each time from the original', async ({ page }) => {
@@ -208,10 +209,12 @@ test.describe('Song info', () => {
     await dialog.locator('setlist-details-form').getByRole('button', { name: 'Cancel' }).click()
 
     await expect(dialog.locator('setlist-info')).toContainText('Ann')
-    const saved = await page.evaluate(async () => {
-      const { getCurrentDB } = await import('/js/db.ts')
-      return (await getCurrentDB()).getSetlist('cancel-test-setlist')
-    })
+    const saved = must(
+      await page.evaluate(async () => {
+        const { getCurrentDB } = await import('/js/db.ts')
+        return (await getCurrentDB()).getSetlist('cancel-test-setlist')
+      })
+    )
     expect(saved.owner).toBe('Ann')
   })
 })

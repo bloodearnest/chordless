@@ -18,6 +18,7 @@ import '../src/js/views/preferences-view.ts'
 import '../src/js/views/setlist-view.ts'
 import '../src/js/views/storage-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
@@ -46,7 +47,7 @@ function trackListeners(targets) {
   const proto = EventTarget.prototype
   const originalAdd = proto.addEventListener
   const originalRemove = proto.removeEventListener
-  const entries = []
+  const entries: { target: EventTarget; type: string; listener: unknown; capture: boolean }[] = []
   const capture = options => (typeof options === 'boolean' ? options : Boolean(options?.capture))
   const same = (entry, target, type, listener, useCapture) =>
     entry.target === target &&
@@ -219,9 +220,9 @@ describe('views leave nothing behind', () => {
     view.route = route
     outlet.append(view)
     await loaded(view)
-    view
-      .querySelector('#library-app-header')
-      .dispatchEvent(new CustomEvent('app-header:edit-mode-toggle'))
+    must(view.querySelector('#library-app-header')).dispatchEvent(
+      new CustomEvent('app-header:edit-mode-toggle')
+    )
     expect(document.body.classList.contains('edit-mode')).to.equal(true)
     view.remove()
     await wait(50)
