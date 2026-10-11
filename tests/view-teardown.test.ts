@@ -16,6 +16,7 @@ import '../src/js/views/not-found-view.ts'
 import '../src/js/views/preferences-view.ts'
 import '../src/js/views/setlist-view.ts'
 import '../src/js/views/storage-view.ts'
+import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
@@ -130,26 +131,21 @@ describe('views leave nothing behind', () => {
       contentHash: id,
       lastModified: Date.now(),
     })
-    await db.saveSong({
-      uuid: `song-${id}`,
-      id: songId,
-      title: 'Teardown Song',
-      titleNormalized: 'teardownsong',
-      isDefault: true,
-      chordproFileId: `chordpro-${id}`,
-      modifiedDate: new Date().toISOString(),
-    } as any)
-    await db.saveSetlist({
-      id: `setlist-${id}`,
-      date: '2026-10-11',
-      time: '10:30',
-      type: 'Church Service',
-      name: '',
-      owner: 'Ann',
-      songs: [{ songId, songUuid: `song-${id}`, key: 'A', order: 0 } as any],
-      createdDate: new Date().toISOString(),
-      modifiedDate: new Date().toISOString(),
-    })
+    await db.saveSong(
+      makeSong({
+        uuid: `song-${id}`,
+        id: songId,
+        title: 'Teardown Song',
+        titleNormalized: 'teardownsong',
+        chordproFileId: `chordpro-${id}`,
+      })
+    )
+    await db.saveSetlist(
+      makeSetlist({
+        id: `setlist-${id}`,
+        songs: [makeEntry({ songId, songUuid: `song-${id}`, key: 'A' })],
+      })
+    )
     seeded = { setlistId: `setlist-${id}`, songUuid: `song-${id}` }
   })
 

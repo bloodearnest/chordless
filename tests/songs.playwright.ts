@@ -31,7 +31,7 @@ test.describe('Song library navigation', () => {
     await seedSong(page)
     await openApp(page, '/songs')
     await page.evaluate(() => {
-      ;(window as any).sameDocument = true
+      window.sameDocument = true
     })
     const heading = page.locator('#library-app-header')
     await expect(heading).toContainText('Song Library')
@@ -45,7 +45,7 @@ test.describe('Song library navigation', () => {
     await expect(page).toHaveURL(/\/songs$/)
     await expect(heading).toContainText('Song Library')
     await expect(page.locator('#library-key-selector')).toBeHidden()
-    expect(await page.evaluate(() => (window as any).sameDocument)).toBe(true)
+    expect(await page.evaluate(() => window.sameDocument)).toBe(true)
 
     await page.goForward()
     await expect(heading).toContainText('Info Test Song')

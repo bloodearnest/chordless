@@ -1,4 +1,7 @@
 // A setlist's song settings and the media player's settings
+
+import type { MusicalMetadataDisplay } from '../src/components/musical-metadata-display.ts'
+import type { SongSettingsPopover } from '../src/components/song-settings-popover.ts'
 import { expect, fromDB, seedSong, test } from './fixtures.ts'
 
 test.describe('Song settings', () => {
@@ -22,19 +25,25 @@ test.describe('Song settings', () => {
     }
 
     await openSong()
-    await expect.poll(() => metadata.evaluate(element => (element as any).bpm)).toBe(72)
+    await expect
+      .poll(() => metadata.evaluate(element => (element as MusicalMetadataDisplay).bpm))
+      .toBe(72)
     await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
     await expect(metadata).toHaveAttribute('edit-mode')
     await metadata.click()
     const popover = page.locator('song-settings-popover')
     await popover.getByRole('button', { name: 'Increase BPM' }).click()
     await expect(popover.locator('.bpm-value')).toHaveText('73')
-    await expect.poll(() => metadata.evaluate(element => (element as any).bpm)).toBe(73)
+    await expect
+      .poll(() => metadata.evaluate(element => (element as MusicalMetadataDisplay).bpm))
+      .toBe(73)
     const setlist = await fromDB(page, 'getSetlist', 'bpm-test-setlist')
     expect(setlist.songs[0].tempo).toBe(73)
 
     await openSong()
-    await expect.poll(() => metadata.evaluate(element => (element as any).bpm)).toBe(73)
+    await expect
+      .poll(() => metadata.evaluate(element => (element as MusicalMetadataDisplay).bpm))
+      .toBe(73)
   })
 
   test('choosing a capo in the song settings changes it, and keeps it', async ({ page }) => {
@@ -50,7 +59,8 @@ test.describe('Song settings', () => {
     await capo.locator('.picker-button').click()
     await capo.getByRole('button', { name: /^2\b/ }).click()
     await expect(capo.locator('.picker-button')).toHaveText('2')
-    const capoShown = () => page.locator('#musical-metadata').evaluate(m => (m as any).capoValue)
+    const capoShown = () =>
+      page.locator('#musical-metadata').evaluate(m => (m as MusicalMetadataDisplay).capoValue)
     await expect.poll(capoShown).toBe(2)
 
     // ...and after a reload
@@ -70,12 +80,14 @@ test.describe('Song settings', () => {
     await expect(page.locator('#musical-metadata')).toHaveAttribute('edit-mode')
     await page.locator('#musical-metadata').click()
     const popover = page.locator('song-settings-popover')
-    await expect.poll(() => popover.evaluate(element => (element as any).isOpen())).toBe(true)
+    await expect
+      .poll(() => popover.evaluate(element => (element as SongSettingsPopover).isOpen()))
+      .toBe(true)
 
     await popover.getByRole('button', { name: 'Reset song' }).click()
     const modal = page.locator('#reset-confirm-modal')
     await expect(modal).toHaveAttribute('open', '')
-    expect(await popover.evaluate(element => (element as any).isOpen())).toBe(false)
+    expect(await popover.evaluate(element => (element as SongSettingsPopover).isOpen())).toBe(false)
 
     await modal.getByRole('button', { name: 'Cancel' }).click()
     await expect(modal).not.toHaveAttribute('open', '')
@@ -150,7 +162,9 @@ test.describe('Popups in the song settings', () => {
     await expect(page.locator('#musical-metadata')).toHaveAttribute('edit-mode')
     await page.locator('#musical-metadata').click()
     const settings = page.locator('song-settings-popover')
-    await expect.poll(() => settings.evaluate(element => (element as any).isOpen())).toBe(true)
+    await expect
+      .poll(() => settings.evaluate(element => (element as SongSettingsPopover).isOpen()))
+      .toBe(true)
 
     const key = page.locator('#key-selector')
     const options = key.locator('.picker-popover')
@@ -162,16 +176,18 @@ test.describe('Popups in the song settings', () => {
     await page.mouse.click(5, 300)
     await expect(options).toBeHidden()
     await expect(key.locator('.picker-button')).toHaveAttribute('aria-expanded', 'false')
-    expect(await settings.evaluate(element => (element as any).isOpen())).toBe(true)
+    expect(await settings.evaluate(element => (element as SongSettingsPopover).isOpen())).toBe(true)
 
     await key.locator('.picker-button').click()
     await expect(options).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(options).toBeHidden()
-    expect(await settings.evaluate(element => (element as any).isOpen())).toBe(true)
+    expect(await settings.evaluate(element => (element as SongSettingsPopover).isOpen())).toBe(true)
 
     // The next Esc is the settings'
     await page.keyboard.press('Escape')
-    await expect.poll(() => settings.evaluate(element => (element as any).isOpen())).toBe(false)
+    await expect
+      .poll(() => settings.evaluate(element => (element as SongSettingsPopover).isOpen()))
+      .toBe(false)
   })
 })

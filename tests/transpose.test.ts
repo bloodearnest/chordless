@@ -1,4 +1,6 @@
 import { expect } from '@esm-bundle/chai'
+import type { ParsedChart } from '../src/js/data-types.ts'
+import { makeChart } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -914,17 +916,12 @@ describe('transposeKeyName', () => {
 
 describe('transposeSong', () => {
   /** A parsed chart: sections of lines of {chord, lyrics} segments */
-  const parsedSong = (...sections) => ({
-    sections: sections.map(chords => ({
-      lines: [{ segments: chords.map(chord => ({ chord, lyrics: 'la ' })) }],
-    })),
-  })
   const chordsOf = parsed =>
     parsed.sections.map(section => section.lines[0].segments.map(segment => segment.chord))
 
   it('transposes every chord in every section, in place', () => {
-    const parsed = parsedSong(['G', 'C', 'D/F#'], ['Em7', 'Cmaj7'])
-    expect(transposeSong(parsed as any, 'G', 'A')).to.equal(undefined)
+    const parsed = makeChart(['G', 'C', 'D/F#'], ['Em7', 'Cmaj7'])
+    expect(transposeSong(parsed, 'G', 'A')).to.equal(undefined)
     expect(chordsOf(parsed)).to.deep.equal([
       ['A', 'D', 'E/G#'],
       ['F#m7', 'Dmaj7'],
@@ -932,27 +929,28 @@ describe('transposeSong', () => {
   })
 
   it("turns Nashville numbers into chords in the target key, using the song's key", () => {
-    const parsed = parsedSong(['1', '4', '5/7', '6m'])
-    transposeSong(parsed as any, 'D', 'D')
+    const parsed = makeChart(['1', '4', '5/7', '6m'])
+    transposeSong(parsed, 'D', 'D')
     expect(chordsOf(parsed)).to.deep.equal([['D', 'G', 'A/C#', 'Bm']])
   })
 
   it('marks chords it cannot read as not valid, leaving the rest', () => {
-    const parsed = parsedSong(['G', 'H7'])
-    transposeSong(parsed as any, 'G', 'A')
+    const parsed = makeChart(['G', 'H7'])
+    transposeSong(parsed, 'G', 'A')
     const [good, bad] = parsed.sections[0].lines[0].segments
     expect(good).to.include({ chord: 'A', valid: true })
     expect(bad.valid).to.equal(false)
   })
 
   it('leaves lines without chords, and charts without sections, alone', () => {
-    const parsed = { sections: [{ lines: [{ segments: [{ chord: '', lyrics: 'Just words' }] }] }] }
-    transposeSong(parsed as any, 'G', 'A')
+    const parsed = makeChart([''])
+    parsed.sections[0].lines[0].segments[0].lyrics = 'Just words'
+    transposeSong(parsed, 'G', 'A')
     expect(parsed.sections[0].lines[0].segments[0]).to.deep.equal({
       chord: '',
       lyrics: 'Just words',
     })
-    expect(() => transposeSong({} as any, 'G', 'A')).to.not.throw()
+    expect(() => transposeSong({} as unknown as ParsedChart, 'G', 'A')).to.not.throw()
     expect(() => transposeSong(null, 'G', 'A')).to.not.throw()
   })
 })

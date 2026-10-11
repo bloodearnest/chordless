@@ -1,11 +1,19 @@
 import { expect } from '@esm-bundle/chai'
+import type { Setlist } from '../src/js/data-types.ts'
 import { ROUTE_NAMES } from '../src/js/router.ts'
 import { groupSetlistsByYear } from '../src/js/views/home-view.ts'
 import { views } from '../src/js/views/registry.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 
 const { describe, it } = window
 
-const setlist = (id, date, songs = []) => ({ id, date, time: '10:30', type: 'sunday-am', songs })
+const setlist = (id: string, date: string, songs: string[] = []) =>
+  makeSetlist({
+    id,
+    date,
+    type: 'sunday-am',
+    songs: songs.map((songId, order) => makeEntry({ songId, order })),
+  })
 
 describe('groupSetlistsByYear', () => {
   const setlists = [
@@ -16,39 +24,38 @@ describe('groupSetlistsByYear', () => {
   ]
 
   it('groups by year, newest year first', () => {
-    expect(groupSetlistsByYear(setlists as any, 2026).map(group => group.year)).to.deep.equal([
+    expect(groupSetlistsByYear(setlists, 2026).map(group => group.year)).to.deep.equal([
       '2026',
       '2025',
     ])
   })
 
   it('lists the newest setlist first within a year', () => {
-    const [group2026, group2025] = groupSetlistsByYear(setlists as any, 2026)
+    const [group2026, group2025] = groupSetlistsByYear(setlists, 2026)
     expect(group2026.setlists.map(item => item.id)).to.deep.equal(['c', 'b'])
     expect(group2025.setlists.map(item => item.id)).to.deep.equal(['d', 'a'])
   })
 
   it('expands only the current year', () => {
-    const groups = groupSetlistsByYear(setlists as any, 2026)
+    const groups = groupSetlistsByYear(setlists, 2026)
     expect(groups.map(group => group.expanded)).to.deep.equal([true, false])
   })
 
   it('gives each setlist its link and song count', () => {
-    const item = groupSetlistsByYear(setlists as any, 2026)[1].setlists.find(
-      entry => entry.id === 'a'
-    )
+    const item = groupSetlistsByYear(setlists, 2026)[1].setlists.find(entry => entry.id === 'a')
     expect(item.url).to.equal('/setlist/a')
     expect(item.songCount).to.equal(2)
     expect(item.displayName).to.be.a('string').and.not.equal('')
   })
 
   it('counts no songs for a setlist without a song list', () => {
-    const noSongs = { ...setlist('e', '2026-02-01'), songs: undefined }
-    expect(groupSetlistsByYear([noSongs as any], 2026)[0].setlists[0].songCount).to.equal(0)
+    // (an old or damaged record: the type says there is always a list)
+    const noSongs = { ...setlist('e', '2026-02-01'), songs: undefined } as unknown as Setlist
+    expect(groupSetlistsByYear([noSongs], 2026)[0].setlists[0].songCount).to.equal(0)
   })
 
   it('files a setlist with no usable date under Unknown', () => {
-    const groups = groupSetlistsByYear([setlist('f', 'someday') as any], 2026)
+    const groups = groupSetlistsByYear([setlist('f', 'someday')], 2026)
     expect(groups.map(group => group.year)).to.deep.equal(['Unknown'])
   })
 

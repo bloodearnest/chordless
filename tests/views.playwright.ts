@@ -1,3 +1,4 @@
+import type { MediaPlayer } from '../src/components/media-player.ts'
 import { enterEditMode, expect, openApp, seedSetlist, seedSong, test } from './fixtures.ts'
 
 // The pages that are views of the app shell change in place: the document, and
@@ -6,9 +7,9 @@ import { enterEditMode, expect, openApp, seedSetlist, seedSong, test } from './f
 /** Mark the document, to tell later whether it was replaced */
 const markDocument = page =>
   page.evaluate(() => {
-    ;(window as any).sameDocument = true
+    window.sameDocument = true
   })
-const isSameDocument = page => page.evaluate(() => (window as any).sameDocument === true)
+const isSameDocument = page => page.evaluate(() => window.sameDocument === true)
 
 async function chooseFromMenu(page, name) {
   await page.getByRole('button', { name: 'Navigation menu' }).click()
@@ -123,7 +124,7 @@ test.describe('Moving between views', () => {
 
     // Playing shows it wherever you are, and it's the same player throughout
     await player.evaluate(element => {
-      ;(element as any)._activeSongId = 'a-song'
+      ;(element as MediaPlayer)._activeSongId = 'a-song'
     })
     await expect(player).toBeVisible()
     await expect(player).toHaveAttribute('active', '')
@@ -133,7 +134,7 @@ test.describe('Moving between views', () => {
     expect(await isSameDocument(page)).toBe(true)
 
     await player.evaluate(element => {
-      ;(element as any)._activeSongId = null
+      ;(element as MediaPlayer)._activeSongId = null
     })
     await expect(player).toBeHidden()
   })
@@ -228,9 +229,9 @@ test.describe('The setlist view', () => {
 
     // Keep hold of the player's audio, and pretend a song is playing
     await player.evaluate(element => {
-      ;(window as any).playerElement = element
-      ;(window as any).audioContext = (element as any)._audioContext
-      ;(element as any)._activeSongId = 'a-song'
+      window.playerElement = element
+      window.audioContext = (element as MediaPlayer)._audioContext
+      ;(element as MediaPlayer)._activeSongId = 'a-song'
     })
 
     await chooseFromMenu(page, 'Song Library')
@@ -241,10 +242,10 @@ test.describe('The setlist view', () => {
     const same = await page.evaluate(() => {
       const element = document.getElementById('media-player')
       return {
-        sameElement: element === (window as any).playerElement,
+        sameElement: element === window.playerElement,
         sameAudio:
-          (element as any)._audioContext === (window as any).audioContext &&
-          (window as any).audioContext !== undefined,
+          (element as MediaPlayer)._audioContext === window.audioContext &&
+          window.audioContext !== undefined,
         stillActive: element.hasAttribute('active'),
       }
     })
@@ -456,8 +457,8 @@ test.describe('The media player is optional', () => {
     const url = await seedSetlist(page)
     // From now on pages load as on a browser that has no AudioContext
     await page.addInitScript(() => {
-      ;(window as any).AudioContext = undefined
-      ;(window as any).webkitAudioContext = undefined
+      window.AudioContext = undefined
+      window.webkitAudioContext = undefined
     })
     await page.goto(url)
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)

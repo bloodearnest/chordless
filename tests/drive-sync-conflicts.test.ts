@@ -1,5 +1,6 @@
 import { expect } from '@esm-bundle/chai'
 import { reconcileRecords, reconcileSetlists, reconcileSongs } from '../src/js/sync/reconciler.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 
 /**
  * Advanced conflict resolution tests for Drive sync
@@ -205,41 +206,41 @@ describe('Drive Sync Conflict Resolution', () => {
     })
 
     it('should handle setlist deletion conflicts - remote deleted', () => {
-      const local = {
+      const local = makeSetlist({
         id: 'setlist-2024-01-01',
         date: '2024-01-01',
         modifiedDate: toISO(yesterday),
-        songs: [{ songId: 'song1', order: 0 }],
-      }
+        songs: [makeEntry({ songId: 'song1' })],
+      })
 
-      const remote = {
+      const remote = makeSetlist({
         id: 'setlist-2024-01-01',
         date: '2024-01-01',
         modifiedDate: toISO(oneHourAgo),
         deletedAt: toISO(oneHourAgo),
-      }
+      })
 
-      const plan = reconcileSetlists([local], [remote as any])
+      const plan = reconcileSetlists([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('deleteLocal')
     })
 
     it('should handle setlist deletion conflicts - local deleted', () => {
-      const local = {
+      const local = makeSetlist({
         id: 'setlist-2024-01-01',
         date: '2024-01-01',
         modifiedDate: toISO(oneHourAgo),
         deletedAt: toISO(oneHourAgo),
-      }
+      })
 
-      const remote = {
+      const remote = makeSetlist({
         id: 'setlist-2024-01-01',
         date: '2024-01-01',
         modifiedDate: toISO(yesterday),
-        songs: [{ songId: 'song1', order: 0 }],
-      }
+        songs: [makeEntry({ songId: 'song1' })],
+      })
 
-      const plan = reconcileSetlists([local], [remote as any])
+      const plan = reconcileSetlists([local], [remote])
       expect(plan).to.have.lengthOf(1)
       expect(plan[0].action).to.equal('deleteRemote')
     })

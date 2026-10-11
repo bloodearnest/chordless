@@ -5,6 +5,7 @@ import {
   isDescent,
   matchRoute,
   normalizePath,
+  type Route,
   sameRoute,
 } from '../src/js/router.ts'
 
@@ -119,89 +120,85 @@ describe('buildUrl', () => {
 
 describe('sameRoute', () => {
   it('compares the place', () => {
-    const overview = { name: 'setlist', setlistId: 'a', songIndex: -1 }
-    expect(sameRoute(overview as any, { ...overview } as any)).to.equal(true)
-    expect(sameRoute(overview as any, { ...overview, songIndex: 0 } as any)).to.equal(false)
+    const overview = { name: 'setlist', setlistId: 'a', songIndex: -1 } as const satisfies Route
+    expect(sameRoute(overview, { ...overview })).to.equal(true)
+    expect(sameRoute(overview, { ...overview, songIndex: 0 })).to.equal(false)
     expect(sameRoute({ name: 'home' }, { name: 'storage' })).to.equal(false)
   })
 })
 
 describe('historyAction', () => {
-  const overview = { name: 'setlist', setlistId: 'a', songIndex: -1 }
-  const song = index => ({ name: 'setlist', setlistId: 'a', songIndex: index })
+  const overview = { name: 'setlist', setlistId: 'a', songIndex: -1 } as const satisfies Route
+  const song = (index: number) =>
+    ({ name: 'setlist', setlistId: 'a', songIndex: index }) as const satisfies Route
 
   it('pushes when going from the overview into a song', () => {
-    expect(historyAction(overview as any, song(0) as any)).to.equal('push')
+    expect(historyAction(overview, song(0))).to.equal('push')
   })
 
   it('replaces when moving from song to song', () => {
-    expect(historyAction(song(0) as any, song(1) as any)).to.equal('replace')
+    expect(historyAction(song(0), song(1))).to.equal('replace')
   })
 
   it('goes back from a song to the overview it was opened from', () => {
-    expect(historyAction(song(2) as any, overview as any, { fromParent: true })).to.equal('back')
+    expect(historyAction(song(2), overview, { fromParent: true })).to.equal('back')
   })
 
   it('replaces from a song to the overview when it was a direct link', () => {
-    expect(historyAction(song(2) as any, overview as any)).to.equal('replace')
-    expect(historyAction(song(2) as any, overview as any, { fromParent: false })).to.equal(
-      'replace'
-    )
+    expect(historyAction(song(2), overview)).to.equal('replace')
+    expect(historyAction(song(2), overview, { fromParent: false })).to.equal('replace')
   })
 
   it('copes with a history entry that has no state', () => {
-    expect(historyAction(song(2) as any, overview as any, null)).to.equal('replace')
-    expect(historyAction(overview as any, song(2) as any, null)).to.equal('push')
+    expect(historyAction(song(2), overview, null)).to.equal('replace')
+    expect(historyAction(overview, song(2), null)).to.equal('push')
   })
 
   it('replaces when the target is where we already are', () => {
-    expect(historyAction(overview as any, overview as any)).to.equal('replace')
+    expect(historyAction(overview, overview)).to.equal('replace')
     expect(historyAction({ name: 'home' }, { name: 'home' })).to.equal('replace')
   })
 
   it('pushes when moving between pages', () => {
     expect(historyAction({ name: 'home' }, { name: 'songs' })).to.equal('push')
-    expect(historyAction(song(1) as any, { name: 'storage' })).to.equal('push')
+    expect(historyAction(song(1), { name: 'storage' })).to.equal('push')
   })
 
   describe('in the library', () => {
-    const list = { name: 'songs' }
-    const librarySong = uuid => ({ name: 'songs', songUuid: uuid })
+    const list = { name: 'songs' } as const satisfies Route
+    const librarySong = (uuid: string) =>
+      ({ name: 'songs', songUuid: uuid }) as const satisfies Route
 
     it('pushes from the list into a song, and replaces from song to song', () => {
-      expect(historyAction(list as any, librarySong('a') as any)).to.equal('push')
-      expect(historyAction(librarySong('a') as any, librarySong('b') as any)).to.equal('replace')
+      expect(historyAction(list, librarySong('a'))).to.equal('push')
+      expect(historyAction(librarySong('a'), librarySong('b'))).to.equal('replace')
     })
 
     it('goes back from a song to the list it was opened from', () => {
-      expect(historyAction(librarySong('a') as any, list as any, { fromParent: true })).to.equal(
-        'back'
-      )
-      expect(historyAction(librarySong('a') as any, list as any)).to.equal('replace')
+      expect(historyAction(librarySong('a'), list, { fromParent: true })).to.equal('back')
+      expect(historyAction(librarySong('a'), list)).to.equal('replace')
     })
 
     it('pushes between the library and other pages', () => {
-      expect(historyAction({ name: 'home' }, list as any)).to.equal('push')
-      expect(historyAction(librarySong('a') as any, { name: 'storage' })).to.equal('push')
+      expect(historyAction({ name: 'home' }, list)).to.equal('push')
+      expect(historyAction(librarySong('a'), { name: 'storage' })).to.equal('push')
     })
   })
 
   describe('isDescent', () => {
     it('is true from a list or overview into one of its own songs only', () => {
       expect(isDescent({ name: 'songs' }, { name: 'songs', songUuid: 'a' })).to.equal(true)
-      expect(isDescent(overview as any, song(0) as any)).to.equal(true)
-      expect(isDescent(song(0) as any, song(1) as any)).to.equal(false)
-      expect(isDescent(song(0) as any, overview as any)).to.equal(false)
+      expect(isDescent(overview, song(0))).to.equal(true)
+      expect(isDescent(song(0), song(1))).to.equal(false)
+      expect(isDescent(song(0), overview)).to.equal(false)
       expect(isDescent({ name: 'home' }, { name: 'songs', songUuid: 'a' })).to.equal(false)
-      expect(
-        isDescent(overview as any, { name: 'setlist', setlistId: 'b', songIndex: 0 })
-      ).to.equal(false)
+      expect(isDescent(overview, { name: 'setlist', setlistId: 'b', songIndex: 0 })).to.equal(false)
     })
   })
 
   it('pushes when moving to a different setlist', () => {
-    expect(
-      historyAction(song(1) as any, { name: 'setlist', setlistId: 'b', songIndex: 1 })
-    ).to.equal('push')
+    expect(historyAction(song(1), { name: 'setlist', setlistId: 'b', songIndex: 1 })).to.equal(
+      'push'
+    )
   })
 })

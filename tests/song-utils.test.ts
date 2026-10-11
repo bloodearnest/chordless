@@ -14,6 +14,7 @@ import {
   overwriteSong,
   setDefaultVariant,
 } from '../src/js/song-utils.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -197,14 +198,15 @@ describe('getLibrarySongs', () => {
     const title = unique('Last played')
     const song = await createSong(chart(title))
     const db = await getCurrentDB()
-    const setlist = songDate => ({
-      id: crypto.randomUUID(),
-      date: songDate,
-      owner: `Leader ${songDate}`,
-      songs: [{ songId: song.id, key: 'C' }],
-    })
-    await db.saveSetlist(setlist('2026-01-04') as any)
-    await db.saveSetlist(setlist('2026-03-01') as any)
+    const setlist = (songDate: string) =>
+      makeSetlist({
+        id: crypto.randomUUID(),
+        date: songDate,
+        owner: `Leader ${songDate}`,
+        songs: [makeEntry({ songId: song.id, key: 'C' })],
+      })
+    await db.saveSetlist(setlist('2026-01-04'))
+    await db.saveSetlist(setlist('2026-03-01'))
 
     const withUsage = (await getLibrarySongs(db, { withLastUsage: true })).find(
       entry => entry.id === song.id

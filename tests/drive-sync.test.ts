@@ -3,6 +3,7 @@ import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { setlistFileMetadata, songFileMetadata } from '../src/js/drive-metadata.ts'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
+import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -758,14 +759,9 @@ describe('Drive sync (against FakeDrive)', () => {
         contentHash: hashText('v1'),
         lastModified: Date.now(),
       })
-      await phone.db.saveSong({
-        uuid: 'song-1',
-        id: 'title-a',
-        title: 'A',
-        isDefault: true,
-        chordproFileId,
-        modifiedDate: new Date().toISOString(),
-      } as any)
+      await phone.db.saveSong(
+        makeSong({ uuid: 'song-1', id: 'title-a', title: 'A', chordproFileId })
+      )
       await tick()
       await syncDevice(phone)
       await phone.db.saveChordPro({

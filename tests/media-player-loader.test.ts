@@ -7,6 +7,7 @@ import {
   wantsPads,
 } from '../src/js/media-player-loader.ts'
 import { preloadPadKeys } from '../src/js/pad-set-service.ts'
+import { makePadSet } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
@@ -119,7 +120,7 @@ describe('startMediaPlayer', () => {
 })
 
 describe('preloading pads', () => {
-  const drive = { id: 'a-pad-set', type: 'drive' }
+  const drive = makePadSet({ id: 'a-pad-set' })
   let originalSetTimeout
   let originalSettings
 
@@ -137,7 +138,7 @@ describe('preloading pads', () => {
     ;(window as any).setTimeout = () => 0
     if (settings) localStorage.setItem('media-settings', JSON.stringify(settings))
     else localStorage.removeItem('media-settings')
-    return preloadPadKeys(keys, padSet as any)
+    return preloadPadKeys(keys, padSet)
   }
 
   it('sets about fetching each key of a Drive pad set when the player and pads are on', () => {
@@ -153,7 +154,7 @@ describe('preloading pads', () => {
   })
 
   it('does nothing for a pad set that is not on Drive', () => {
-    expect(preload(null, ['C'], { id: 'built-in', type: 'builtin' })).to.equal(0)
+    expect(preload(null, ['C'], makePadSet({ id: 'built-in', type: 'builtin' }))).to.equal(0)
   })
 
   it('does nothing without keys', () => {

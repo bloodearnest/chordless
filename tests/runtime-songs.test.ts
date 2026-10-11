@@ -1,7 +1,9 @@
 import { expect } from '@open-wc/testing'
+import type { SetlistEntry } from '../src/js/data-types.ts'
 import { getCurrentDB } from '../src/js/db.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { buildRuntimeSongs, parseTempoMetadata } from '../src/js/setlist/runtime-songs.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before } = window
@@ -58,7 +60,12 @@ describe('buildRuntimeSongs', () => {
     return `title-${unique}`
   }
 
-  const build = songs => buildRuntimeSongs({ songs } as any, { db, parser, fontSize: 1.6 })
+  const build = (entries: Partial<SetlistEntry>[]) =>
+    buildRuntimeSongs(makeSetlist({ songs: entries.map(entry => makeEntry(entry)) }), {
+      db,
+      parser,
+      fontSize: 1.6,
+    })
   const chart = (extra = '') =>
     `{title: Grace}\n{key: G}\n${extra}\n\n{comment: Verse 1}\n[G]Amazing [C]grace`
 
@@ -155,8 +162,12 @@ describe('buildRuntimeSongs', () => {
 
   it('keeps the setlist entry, and the library song, for the models', async () => {
     const songId = await addSong(chart())
-    const entry = { songId, order: 0 }
-    const [song] = await build([entry])
+    const entry = makeEntry({ songId })
+    const [song] = await buildRuntimeSongs(makeSetlist({ songs: [entry] }), {
+      db,
+      parser,
+      fontSize: 1.6,
+    })
     expect(song._setlistEntry).to.equal(entry)
     expect(song._canonicalSong.id).to.equal(songId)
   })

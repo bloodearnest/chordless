@@ -2,6 +2,7 @@ import { expect } from '@esm-bundle/chai'
 import { LitElement } from 'lit'
 import { PadSetChangedEvent, PadSetListUpdatedEvent } from '../src/js/pad-set-service.ts'
 import { PadSetsController } from '../src/js/pad-sets-controller.ts'
+import { makePadSet } from './builders.ts'
 
 const { describe, it, afterEach } = window
 
@@ -46,7 +47,9 @@ describe('PadSetsController', () => {
   it('follows the active pad set when it changes elsewhere, updating its host', async () => {
     const padSets = await setUp()
     const renders = host.renders
-    window.dispatchEvent(new PadSetChangedEvent({ id: 'drive-warm', name: 'Warm Pads' } as any))
+    window.dispatchEvent(
+      new PadSetChangedEvent(makePadSet({ id: 'drive-warm', name: 'Warm Pads' }))
+    )
     await host.updateComplete
     expect(padSets.activeId).to.equal('drive-warm')
     expect(host.renders).to.be.above(renders)
@@ -64,7 +67,7 @@ describe('PadSetsController', () => {
     const padSets = await setUp()
     const before = padSets.activeId
     host.remove()
-    window.dispatchEvent(new PadSetChangedEvent({ id: 'drive-other', name: 'Other' } as any))
+    window.dispatchEvent(new PadSetChangedEvent(makePadSet({ id: 'drive-other', name: 'Other' })))
     expect(padSets.activeId).to.equal(before)
   })
 })

@@ -6,6 +6,7 @@ import {
   setlistFilename,
   songFileMetadata,
 } from '../src/js/drive-metadata.ts'
+import { makeSetlist } from './builders.ts'
 
 const { describe, it } = window
 
@@ -23,7 +24,9 @@ describe('Drive file metadata', () => {
       '2026-06-22-simon-davy-event-devoted-leaders---tue-am.json'
     )
     expect(
-      setlistFilename({ id: 'x', date: '2026-09-27', type: 'Church Service' } as any)
+      setlistFilename(
+        makeSetlist({ id: 'x', date: '2026-09-27', type: 'Church Service', owner: '', name: '' })
+      )
     ).to.equal('2026-09-27-church-service.json')
   })
 
