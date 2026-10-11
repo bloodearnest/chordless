@@ -92,6 +92,8 @@ export class AppHeader extends LitElement {
   _title: Ref<HTMLElement>
   _previousTitle: string
   _animating: boolean
+  /** Set by setTitleInstant for the one update it causes; not reactive, so it causes no other */
+  _instant: boolean
   _displayTitle: string
 
   static override styles = css`
@@ -363,6 +365,7 @@ export class AppHeader extends LitElement {
     this._slottedControls = false
     this._previousTitle = ''
     this._animating = false
+    this._instant = false
     this._displayTitle = '' // The title actually shown in the UI
   }
 
@@ -378,20 +381,28 @@ export class AppHeader extends LitElement {
     })
   }
 
+  override willUpdate(changedProperties: PropertyValues<this>): void {
+    // Without animation the new heading is shown by this very update
+    if (
+      changedProperties.has('heading') &&
+      this.heading !== this._previousTitle &&
+      (this.disableAnimation || this._instant)
+    ) {
+      this._displayTitle = this.heading
+      this._previousTitle = this.heading
+    }
+  }
+
   override updated(changedProperties: PropertyValues<this>): void {
     super.updated(changedProperties)
 
-    // Handle title changes
-    if (changedProperties.has('heading') && this.heading !== this._previousTitle) {
-      if (this.disableAnimation) {
-        // No animation - update immediately
-        this._displayTitle = this.heading
-        this._previousTitle = this.heading
-        this.requestUpdate()
-      } else if (!this._animating) {
-        // Animate the transition (one already running shows the latest heading when done)
-        this._animateTransition()
-      }
+    // Animate a title change (one already running shows the latest heading when done)
+    if (
+      changedProperties.has('heading') &&
+      this.heading !== this._previousTitle &&
+      !this._animating
+    ) {
+      this._animateTransition()
     }
   }
 
@@ -430,12 +441,11 @@ export class AppHeader extends LitElement {
 
   // Public method to update without animation
   setTitleInstant(newTitle: string): void {
-    this.disableAnimation = true
+    this._instant = true
     this.heading = newTitle
-    // Re-enable after a tick
-    setTimeout(() => {
-      this.disableAnimation = false
-    }, 0)
+    this.updateComplete.then(() => {
+      this._instant = false
+    })
   }
 
   /** Whether there's anything for the second row (controls, edit, info) */
