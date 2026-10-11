@@ -178,7 +178,18 @@ if any local record has changes not in Drive. Per-setlist device state is kept.
 
 ### Deleting setlists
 
-Status: **designed, not built.** Goal: remove a setlist (e.g. added in error),
+**Built: setlists that are not in Drive.** The setlist info dialog's edit view (the pencil)
+has a **Delete setlist** button when the setlist has no `driveFileId`, i.e. it has never been
+synced (or sync is not set up). It asks first (`#delete-setlist-modal`), then
+`ChordlessDB.deleteUnsyncedSetlist()` removes the setlist and this device's `setlist_local`
+state, and the page goes home. The database refuses a setlist with a `driveFileId`, so the rule
+does not depend on the button. For a setlist that is in Drive the edit view says why it cannot
+be deleted. Because the rule is the local `driveFileId`, a setlist another device has already
+uploaded, but this device has not yet synced, can be deleted here and will come back at the
+next sync (nothing in Drive is touched). The rest of this section is the design for setlists
+that are in Drive.
+
+Status of the rest: **designed, not built.** Goal: remove a setlist (e.g. added in error),
 restricted to setlists you own, with the deletion reaching Drive and other devices.
 
 **Why it needs sync changes:** today sync undoes deletions in both directions. A

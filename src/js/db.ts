@@ -272,6 +272,22 @@ export class ChordlessDB {
     })
   }
 
+  /**
+   * Delete a setlist that is not in Google Drive (it has never been synced), with this
+   * device's state for it. A setlist that is in Drive cannot be deleted yet: sync would
+   * put it back from either side (see docs/SYNC_ARCHITECTURE.md, "Deleting setlists").
+   * @throws if the setlist is in Drive
+   */
+  async deleteUnsyncedSetlist(id: string): Promise<void> {
+    const setlist = await this.getSetlist(id)
+    if (!setlist) return
+    if (setlist.driveFileId) {
+      throw new Error('This setlist is in Google Drive, so it cannot be deleted here')
+    }
+    await this.deleteSetlist(id)
+    await this.deleteLocalState(id)
+  }
+
   // Song operations (per-organisation)
   /** Save a song (its tempos as numbers); resolves with what was stored */
   async saveSong(song: SongInput): Promise<SongRecord> {

@@ -12,7 +12,11 @@ import {
   SongSettingsClickEvent,
 } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
-import { type SetlistInfoDialog, SetlistInfoSaveEvent } from '../components/setlist-info-dialog.ts'
+import {
+  SetlistInfoDeleteEvent,
+  type SetlistInfoDialog,
+  SetlistInfoSaveEvent,
+} from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
   OverviewSongClickEvent,
@@ -132,6 +136,7 @@ export class SetlistPage {
   _sectionActionHandler?: (event: SectionActionEvent) => void
   _sectionToggleHandler?: (event: SectionToggleEvent) => void
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
+  _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
   _editModeSetup?: boolean
@@ -836,8 +841,38 @@ export class SetlistPage {
       this._setlistDetailsSaveHandler = event => this.saveSetlistDetails(event.changes)
       dialog.addEventListener(SetlistInfoSaveEvent.type, this._setlistDetailsSaveHandler)
     }
+    if (!this._setlistDeleteHandler) {
+      this._setlistDeleteHandler = () => this.deleteSetlist()
+      dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
+    }
     dialog.people = (await getOrganisationPeople()).people
     await dialog.show(this.currentSetlist)
+  }
+
+  /**
+   * Delete this setlist, after asking, and go home. Only for a setlist that is not in
+   * Google Drive: the dialog only offers it then, and the database refuses otherwise.
+   */
+  async deleteSetlist() {
+    const setlist = this.currentSetlist
+    if (!setlist) return
+    const modal = this.root.querySelector<AppModal>('#delete-setlist-modal')
+    if (!(await modal?.ask())) return
+    try {
+      await this._database().deleteUnsyncedSetlist(setlist.id)
+    } catch (error) {
+      console.error('[SetlistInfo] Failed to delete the setlist:', error)
+      alert(`Couldn't delete the setlist: ${errorMessage(error)}`)
+      return
+    }
+    // The section states and capos this device kept for it
+    try {
+      localStorage.removeItem(`state-${setlist.id}`)
+    } catch {
+      // Storage may be unavailable; nothing else refers to it
+    }
+    this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')?.close()
+    await goTo(buildUrl({ name: 'home' }))
   }
 
   /**

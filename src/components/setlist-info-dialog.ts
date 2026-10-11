@@ -1,4 +1,4 @@
-import { html, LitElement } from 'lit'
+import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
 import type { AppModal } from './app-modal.ts'
@@ -7,6 +7,7 @@ import './icon.ts'
 import type { SetlistDetails, SetlistDetailsSaveEvent } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
 import { setlistTitle } from '../js/utils/date-utils.ts'
+import { buttonStyles } from './shared-styles.ts'
 import './setlist-info.ts'
 
 /** The setlist's details were edited and saved: changes is the form's details */
@@ -18,6 +19,16 @@ export class SetlistInfoSaveEvent extends Event {
     super(SetlistInfoSaveEvent.type, { bubbles: true, composed: true })
     this.setlistId = setlistId
     this.changes = changes
+  }
+}
+
+/** Delete was pressed on a setlist that can be deleted: the page asks, then deletes */
+export class SetlistInfoDeleteEvent extends Event {
+  static readonly type = 'setlist-info-dialog:delete'
+  readonly setlistId: string
+  constructor(setlistId: string) {
+    super(SetlistInfoDeleteEvent.type, { bubbles: true, composed: true })
+    this.setlistId = setlistId
   }
 }
 
@@ -37,6 +48,8 @@ export class SetlistInfoSaveEvent extends Event {
  *
  * Events:
  * @fires SetlistInfoSaveEvent - setlistId, and changes: {date, time, type, name, owner}
+ * @fires SetlistInfoDeleteEvent - setlistId; only offered, while editing, for a setlist that is
+ *   not in Google Drive
  */
 export class SetlistInfoDialog extends LitElement {
   static override properties = {
@@ -45,6 +58,24 @@ export class SetlistInfoDialog extends LitElement {
     _setlist: { state: true },
     _editing: { state: true },
   }
+
+  static override styles = [
+    buttonStyles,
+    css`
+      .delete-setlist {
+        margin: 1.5rem 1rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .delete-setlist p {
+        margin: 0;
+        font-size: var(--font-ui-small);
+        opacity: 0.7;
+      }
+    `,
+  ]
 
   declare people: Person[]
   declare _setlist: Setlist | null
@@ -90,6 +121,17 @@ export class SetlistInfoDialog extends LitElement {
     }
   }
 
+  /** Only a setlist that is not in Google Drive can be deleted (see Database.deleteUnsyncedSetlist) */
+  _deletable(): boolean {
+    return Boolean(this._setlist && !this._setlist.driveFileId)
+  }
+
+  _delete(): void {
+    if (this._setlist && this._deletable()) {
+      this.dispatchEvent(new SetlistInfoDeleteEvent(this._setlist.id))
+    }
+  }
+
   _cancel(event: Event): void {
     event.stopPropagation()
     this._editing = false
@@ -132,6 +174,13 @@ export class SetlistInfoDialog extends LitElement {
                 @setlist-details-form:save=${this._save}
                 @setlist-details-form:cancel=${this._cancel}
               ></setlist-details-form>
+              <div class="delete-setlist">
+                ${
+                  this._deletable()
+                    ? html`<button class="btn danger" @click=${this._delete}>Delete setlist</button>`
+                    : html`<p>This setlist is in Google Drive, so it can't be deleted here.</p>`
+                }
+              </div>
             `
             : html`<setlist-info .setlist=${this._setlist}></setlist-info>`
         }
@@ -151,5 +200,6 @@ declare global {
 declare global {
   interface GlobalEventHandlersEventMap {
     [SetlistInfoSaveEvent.type]: SetlistInfoSaveEvent
+    [SetlistInfoDeleteEvent.type]: SetlistInfoDeleteEvent
   }
 }

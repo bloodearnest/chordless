@@ -116,6 +116,19 @@ export class SetlistView extends PageView {
       </app-modal>
 
       <app-modal
+        id="delete-setlist-modal"
+        type="confirm"
+        heading="Delete Setlist?"
+        confirm-label="Delete"
+        cancel-label="Cancel"
+      >
+        <p>
+          This deletes the setlist from this device. It was never saved to Google Drive, so it
+          cannot be brought back.
+        </p>
+      </app-modal>
+
+      <app-modal
         id="delete-song-modal"
         type="confirm"
         heading="Remove Song from Setlist?"

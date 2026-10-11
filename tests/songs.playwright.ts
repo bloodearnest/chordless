@@ -196,6 +196,50 @@ test.describe('Song info', () => {
     })
   })
 
+  test('a setlist that is not in Drive can be deleted from its info dialog', async ({ page }) => {
+    await seedSong(page, { setlistId: 'delete-test-setlist' })
+    await page.goto('/setlist/delete-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+
+    // Behind the pencil, not on the read-only view
+    await page.locator('#app-header').getByRole('button', { name: 'Information' }).click()
+    const dialog = page.locator('#setlist-info-dialog')
+    await expect(dialog.getByRole('button', { name: 'Delete setlist' })).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Edit setlist details' }).click()
+
+    // Asked first: cancelling keeps it
+    await dialog.getByRole('button', { name: 'Delete setlist' }).click()
+    const confirm = page.locator('#delete-setlist-modal')
+    await expect(confirm).toHaveAttribute('open', '')
+    await confirm.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page).toHaveURL(/\/setlist\/delete-test-setlist$/)
+
+    await dialog.getByRole('button', { name: 'Delete setlist' }).click()
+    await confirm.getByRole('button', { name: 'Delete' }).click()
+
+    await expect(page).toHaveURL(/\/$/)
+    const left = await fromDB(page, 'getSetlist', 'delete-test-setlist')
+    expect(left).toBeUndefined()
+  })
+
+  test('a setlist that is in Drive cannot be deleted', async ({ page }) => {
+    await seedSong(page, { setlistId: 'drive-test-setlist' })
+    await page.evaluate(async () => {
+      const { getCurrentDB } = await import('/js/db.ts')
+      const db = await getCurrentDB()
+      const setlist = await db.getSetlist('drive-test-setlist')
+      if (setlist) await db.saveSetlist({ ...setlist, driveFileId: 'drive-file-1' })
+    })
+    await page.goto('/setlist/drive-test-setlist')
+    await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
+
+    await page.locator('#app-header').getByRole('button', { name: 'Information' }).click()
+    const dialog = page.locator('#setlist-info-dialog')
+    await dialog.getByRole('button', { name: 'Edit setlist details' }).click()
+    await expect(dialog).toContainText("in Google Drive, so it can't be deleted here")
+    await expect(dialog.getByRole('button', { name: 'Delete setlist' })).toHaveCount(0)
+  })
+
   test('cancelling a setlist details edit changes nothing', async ({ page }) => {
     await seedSong(page, { setlistId: 'cancel-test-setlist' })
     await page.goto('/setlist/cancel-test-setlist')
