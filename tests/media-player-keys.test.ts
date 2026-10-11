@@ -50,6 +50,41 @@ describe('the media player and the keyboard', () => {
     }
   }
 
+  describe('Space', () => {
+    let started
+    let stopped
+
+    beforeEach(() => {
+      started = 0
+      stopped = 0
+      player._startSong = async () => {
+        started++
+      }
+      player._stop = async () => {
+        stopped++
+      }
+    })
+
+    it('starts the song being viewed when nothing is playing', () => {
+      press('Space')
+      expect([started, stopped]).to.deep.equal([1, 0])
+    })
+
+    it('stops it while it plays', () => {
+      player._isCurrentSongActive = () => true
+      player._metronomeRunning = true
+      press('Space')
+      expect([started, stopped]).to.deep.equal([0, 1])
+    })
+
+    it('starts the song being viewed, rather than stopping, while another one plays', () => {
+      player._isCurrentSongActive = () => false
+      player._metronomeRunning = true
+      press('Space')
+      expect([started, stopped]).to.deep.equal([1, 0])
+    })
+  })
+
   it('has an active attribute only while a song is started', async () => {
     expect(player.isActive).to.equal(false)
     expect(player.hasAttribute('active')).to.equal(false)
@@ -60,5 +95,41 @@ describe('the media player and the keyboard', () => {
     player._activeSongId = null
     await player.updateComplete
     expect(player.hasAttribute('active')).to.equal(false)
+  })
+
+  describe('the page under it', () => {
+    let page
+
+    // (Chai would try to print a DOM element that did not match, which is very slow)
+    const describeHit = (element: Element | null) => element?.localName ?? 'nothing'
+
+    afterEach(() => page?.remove())
+
+    // The player is moved with a transform, which leaves its box where it was by default
+    it('can be clicked where the player is by default, once it has been dragged away', async () => {
+      page = document.createElement('button')
+      page.textContent = 'Page'
+      page.style.cssText = 'position: fixed; inset: 0; width: 100%; height: 100%; z-index: 1'
+      document.body.append(page)
+      player.style.cssText = 'position: fixed; bottom: 1rem; right: 1rem; z-index: 1000'
+      player._collapsed = false
+      await player.updateComplete
+      const box = player.getBoundingClientRect()
+      const x = box.left + box.width / 2
+      const y = box.top + box.height / 2
+
+      // Where it is, it is what is hit
+      expect(describeHit(document.elementFromPoint(x, y))).to.equal('media-player')
+
+      player._dragOffsetX = -Math.round(box.width + 40)
+      player._dragOffsetY = -Math.round(box.height + 40)
+      await player.updateComplete
+      expect(describeHit(document.elementFromPoint(x, y))).to.equal('button')
+
+      // And the player is still there to be used, where it was dragged to
+      const moved = player.shadowRoot.querySelector('.player').getBoundingClientRect()
+      const hit = document.elementFromPoint(moved.left + moved.width / 2, moved.top + 5)
+      expect(describeHit(hit)).to.equal('media-player')
+    })
   })
 })

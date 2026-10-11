@@ -126,6 +126,18 @@ export class MediaPlayer extends LitElement {
   static override styles = css`
     :host {
       display: inline-block;
+      /*
+       * The host keeps its box where the player is by default: dragging moves the player
+       * with a transform, which moves nothing of the layout. Left to take pointer events, that
+       * empty box would sit over the page. Only the player itself (and the settings modal) do.
+       */
+      pointer-events: none;
+    }
+
+    .player,
+    .collapsed-button,
+    app-modal {
+      pointer-events: auto;
     }
 
     .player {
@@ -1004,16 +1016,25 @@ export class MediaPlayer extends LitElement {
     if (this.getClientRects().length === 0) return
     // A modal handles its own keys: Esc closes it, Space presses its buttons
     if (isInModalDialog(event)) return
-    // Start song on spacebar
+    // Space toggles: it starts the song being viewed, and stops it while it plays
     if (event.code === 'Space' && !isTypingInField(event)) {
       event.preventDefault()
-      this._startSong()
+      if (this._isCurrentSongActive() && this._isPlaying()) {
+        this._stop()
+      } else {
+        this._startSong()
+      }
     }
     // Stop button on Escape - fade out and stop
     if (event.code === 'Escape') {
       event.preventDefault()
       this._stop()
     }
+  }
+
+  /** Whether anything is sounding: the pads, or the click */
+  _isPlaying(): boolean {
+    return Boolean(this._padController?.isPlaying || this._metronomeRunning)
   }
 
   async _stop(): Promise<void> {
@@ -1545,9 +1566,7 @@ export class MediaPlayer extends LitElement {
   }
 
   override render() {
-    const padsPlaying = this._padController?.isPlaying
-    const clickPlaying = this._metronomeRunning
-    const isPlaying = padsPlaying || clickPlaying
+    const isPlaying = this._isPlaying()
     const isDownloading = this._isPadLoading
     const statusText = isDownloading ? 'DOWNLOAD' : isPlaying ? 'PLAYING' : 'STOPPED'
     const statusClass = isDownloading ? 'status-downloading' : ''
