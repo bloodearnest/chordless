@@ -4,6 +4,7 @@ import {
   getMusicianType,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
+  type MusicianType,
   setCapoPreference,
   setMusicianType,
   setUseNashvilleNumbers,
@@ -28,7 +29,7 @@ export class AppPreferences extends LitElement {
 
   declare useNashville: boolean
   declare useUnicodeAccidentals: boolean
-  declare musicianType: string
+  declare musicianType: MusicianType
   declare capoEnabled: boolean
 
   static override styles = [
@@ -206,7 +207,7 @@ export class AppPreferences extends LitElement {
   }
 
   _onMusicianTypeChange(event: Event): void {
-    const value = (event.currentTarget as HTMLInputElement).value
+    const value = (event.currentTarget as HTMLInputElement).value as MusicianType
     this.musicianType = value
     setMusicianType(value)
   }
