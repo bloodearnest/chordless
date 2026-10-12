@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="What Chordless does with your data" />
+    <meta name="theme-color" content="#2c3e50" />
+    <link rel="icon" type="image/svg+xml" href="/icons/favicon-light.svg" />
+    <title>Chordless privacy policy</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --text: #1a1a1a;
+        --muted: #5f6b6d;
+        --link: #2477ad;
+        --header: #2c3e50;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1a1d21;
+          --text: #e6e8ea;
+          --muted: #a3acb0;
+          --link: #6cb6ee;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 1rem/1.6 system-ui, sans-serif;
+      }
+      header {
+        background: var(--header);
+        padding: 1rem;
+      }
+      header a {
+        color: #ecf0f1;
+        font-weight: 600;
+        text-decoration: none;
+      }
+      main {
+        max-width: 42rem;
+        margin: 0 auto;
+        padding: 1rem 1rem 3rem;
+      }
+      a {
+        color: var(--link);
+      }
+      h1 {
+        margin-bottom: 0.25rem;
+      }
+      h2 {
+        margin-top: 2rem;
+      }
+      .updated {
+        color: var(--muted);
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header><a href="/">Chordless</a></header>
+    <main>
+      <h1>Privacy policy</h1>
+      <p class="updated">Last updated 12 October 2026</p>
+
+      <p>
+        Chordless (<a href="https://chordless.app/">chordless.app</a>) is a web app for arranging
+        setlists of worship songs, with their lyrics and chords. This page explains what it does
+        with your information.
+      </p>
+
+      <h2>In short</h2>
+      <ul>
+        <li>Your songs and setlists live on your device, and in your own Google Drive if you sign in.</li>
+        <li>Chordless has no database of its own. We do not keep your songs, setlists or Google data on any server.</li>
+        <li>We do not sell, share or use your data for advertising. There are no ads, analytics or tracking.</li>
+      </ul>
+
+      <h2>What Chordless accesses</h2>
+      <p>You can use Chordless without signing in. If you sign in with Google, it asks for:</p>
+      <ul>
+        <li>
+          <strong>Your name, email address and profile picture</strong> (the <code>openid</code>,
+          <code>email</code> and <code>profile</code> scopes). They show who is signed in, and the
+          email address names the leader of a setlist.
+        </li>
+        <li>
+          <strong>Google Drive access limited to files Chordless creates or you open with it</strong>
+          (the <code>drive.file</code> scope). Chordless creates a "Chordless" folder in your Drive
+          and keeps your songs and setlists there, so they sync between your devices and are backed up.
+          It cannot see any other file in your Drive. If you share that folder with other people, it
+          can also list who has access, so you can pick a setlist leader from them.
+        </li>
+      </ul>
+
+      <h2>Where your data is kept</h2>
+      <ul>
+        <li>
+          <strong>On your device:</strong> your songs, setlists, settings, and the sign-in details
+          below are stored in your browser (IndexedDB and local storage) so that Chordless works
+          offline. Clearing the site's data in your browser, or "Clear Local Data" in Chordless,
+          removes them.
+        </li>
+        <li>
+          <strong>In your Google Drive:</strong> the files in the "Chordless" folder. They belong to
+          you and are governed by Google's terms and privacy policy.
+        </li>
+        <li>
+          <strong>Sign-in:</strong> when you sign in, a small server component of Chordless, running
+          on Cloudflare Workers, exchanges Google's sign-in code for tokens. It encrypts Google's
+          refresh token into a blob with a key only the server holds, and gives the blob back to
+          your browser to keep. It stores nothing itself. Later it decrypts the blob only to get a
+          new short-lived Google access token for you, or to change who can open your Chordless
+          folder, when you ask it to.
+        </li>
+      </ul>
+      <p>
+        Cloudflare, which hosts the app, handles the web requests and may keep standard server logs,
+        such as your IP address, under <a href="https://www.cloudflare.com/privacypolicy/">its own
+        privacy policy</a>. Chordless does not use cookies.
+      </p>
+
+      <h2>Sharing</h2>
+      <p>
+        We do not sell your data or give it to anyone. Information from Google is used only to
+        provide Chordless's features described above. Chordless's use and transfer of information
+        received from Google APIs adheres to the
+        <a href="https://developers.google.com/terms/api-services-user-data-policy">Google API
+        Services User Data Policy</a>, including its Limited Use requirements. It is not used to
+        serve ads, and nobody reads it for any other purpose.
+      </p>
+
+      <h2>Your choices</h2>
+      <ul>
+        <li>Sign out of Chordless, or clear its data, in the app.</li>
+        <li>
+          Revoke Chordless's access to your Google account at
+          <a href="https://myaccount.google.com/permissions">myaccount.google.com/permissions</a>.
+        </li>
+        <li>Delete the "Chordless" folder in Google Drive to delete the data it holds there.</li>
+      </ul>
+
+      <h2>Children</h2>
+      <p>Chordless is not directed at children under 13, and we do not knowingly collect their information.</p>
+
+      <h2>Changes and contact</h2>
+      <p>
+        If this policy changes, the date above changes with it. Questions, or a request to delete
+        something, to
+        <a href="mailto:bloodearnest@gmail.com">bloodearnest@gmail.com</a>.
+      </p>
+      <p><a href="/terms.html">Terms of service</a></p>
+    </main>
+  </body>
+</html>

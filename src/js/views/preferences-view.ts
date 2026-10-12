@@ -11,6 +11,10 @@ export class PreferencesView extends PageView {
       <main class="home-content">
         <h2 style="margin: 2rem 1rem 1rem 1rem">Preferences</h2>
         <app-preferences id="app-preferences"></app-preferences>
+        <p style="margin: 2rem 1rem">
+          <a href="/privacy.html" rel="external">Privacy policy</a> ·
+          <a href="/terms.html" rel="external">Terms of service</a>
+        </p>
       </main>
     `
   }

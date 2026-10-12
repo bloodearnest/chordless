@@ -254,6 +254,9 @@ UI
       same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
       to asking the user to sign in again: google-auth.js uses access_type: 'offline' with
       prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
+    - update public/privacy.html in the same change: it says Chordless uses no cookies and the
+      worker stores nothing. Say it sets one sign-in cookie (the encrypted token, HttpOnly, how
+      long it lasts, removed on sign-out and Clear Local Data)
     - needs the network, so say so plainly at church
     - it is an auth change: review it with the user before building
     - security: a same-origin check (Origin / Sec-Fetch-Site) on /session/*; no
