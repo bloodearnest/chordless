@@ -214,16 +214,15 @@ export class SelectOrganisation extends LitElement {
   }
 
   _renderOrganisations(organisations: Organisation[], current: string) {
-    if (organisations.length === 0) {
-      return html`
-        <div class="empty-state">
-          <p>No organisations found. Create your first organisation to get started.</p>
-        </div>
-      `
-    }
-
     return html`
       <div class="organisation-selector">
+        ${
+          organisations.length === 0
+            ? html`<div class="empty-state">
+                <p>No organisations found. Create your first organisation to get started.</p>
+              </div>`
+            : ''
+        }
         <div class="organisations-list">
           ${organisations.map(
             org => html`
