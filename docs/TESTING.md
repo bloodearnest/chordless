@@ -77,8 +77,8 @@ Run one file with `just test-unit tests/db.test.ts`.
 
 ## End-to-end tests
 
-Playwright drives the app as a user would, served by `just serve` (at
-`localhost:8787`), with the service worker and real page loads. Tests run fully in
+Playwright drives the app as a user would, served by a dev server of their own
+(`localhost:8791`, so they never meet `just serve` on 8787), with the service worker and real page loads. Tests run fully in
 parallel, each in its own browser context.
 
 | File | Covers |

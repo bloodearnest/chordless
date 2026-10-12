@@ -205,11 +205,9 @@ async function processOperation(operation: AuthDB.QueuedOperation) {
     throw new Error('No ID token available - user needs to refresh session')
   }
 
-  const AUTH_PROXY_URL = self.location.hostname === 'localhost' ? 'http://localhost:8787' : ''
-
   if (operation.type === 'invite') {
     // Call /session/invite
-    const response = await fetch(`${AUTH_PROXY_URL}/session/invite`, {
+    const response = await fetch(`/session/invite`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -228,7 +226,7 @@ async function processOperation(operation: AuthDB.QueuedOperation) {
     return await response.json()
   } else if (operation.type === 'revoke') {
     // Call /session/revoke
-    const response = await fetch(`${AUTH_PROXY_URL}/session/revoke`, {
+    const response = await fetch(`/session/revoke`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
