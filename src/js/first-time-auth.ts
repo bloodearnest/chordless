@@ -5,7 +5,6 @@
  * rename the "Personal" organisation to their name and switch to it.
  */
 
-import { getCurrentUserInfo } from './google-auth.ts'
 import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.ts'
 
 const FIRST_AUTH_KEY = 'first-auth-done'
@@ -38,7 +37,8 @@ export async function handleFirstTimeAuth(): Promise<boolean> {
   }
 
   try {
-    // Get user info
+    // Get user info (Google auth loads here, not at start-up, when the user is already set up)
+    const { getCurrentUserInfo } = await import('./google-auth.ts')
     const userInfo = await getCurrentUserInfo()
     if (!userInfo?.name) {
       console.log('[FirstAuth] No user info available, skipping org rename')
@@ -99,6 +99,7 @@ export async function nameOrganisationBeforeSync(): Promise<boolean> {
     return false
   }
 
+  const { getCurrentUserInfo } = await import('./google-auth.ts')
   const userInfo = await getCurrentUserInfo()
   if (!userInfo?.name) {
     return false
@@ -120,6 +121,7 @@ export async function checkFirstTimeAuth(): Promise<boolean> {
   }
 
   // Check if user is authenticated (will return null if not)
+  const { getCurrentUserInfo } = await import('./google-auth.ts')
   const userInfo = await getCurrentUserInfo()
 
   // If user is authenticated, handle the rename

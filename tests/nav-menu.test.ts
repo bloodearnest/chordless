@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/app-header.ts'
 import '../src/components/nav-menu.ts'
 import { provideRoute } from '../src/js/route-context.ts'
@@ -107,9 +107,10 @@ describe('nav-menu', () => {
     const menu = await setUp('<nav-menu></nav-menu>')
     expect(menu.shadowRoot.querySelector('app-preferences')).to.equal(null)
 
+    // Its code is loaded when first asked for, so it appears a moment after the click
     menu.shadowRoot.querySelector('.nav-menu-item:not(a)').click()
-    await menu.updateComplete
-    expect(menu.shadowRoot.querySelector('app-preferences')).to.not.equal(null)
+    await waitUntil(() => menu.shadowRoot.querySelector('app-preferences'))
+    expect(customElements.get('app-preferences')).to.not.equal(undefined)
   })
 
   it("opens from an app-header's menu button, positioned under it", async () => {

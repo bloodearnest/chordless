@@ -146,6 +146,26 @@ body {
   display: contents;
 }
 
+/* What the page shows until the first view is made: the header's colours and height, with the
+   title where it goes (after the menu button), so there is something to paint straight away
+   and the first view does not jump */
+.boot-shell {
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  min-height: calc(44px + 1rem);
+  padding: 0.5rem 0.5rem 0.5rem calc(44px + 1rem);
+  background-color: var(--header-bg);
+  color: var(--header-text);
+  font-size: var(--font-ui);
+  font-weight: 600;
+}
+@media (min-width: 48rem) {
+  .boot-shell {
+    padding-inline: calc(44px + 2.5rem) 1.5rem;
+  }
+}
+
 /* The media player is for setlists; elsewhere it shows only while something is playing */
 body:not([data-view='setlist']) media-player:not([active]) {
   display: none;

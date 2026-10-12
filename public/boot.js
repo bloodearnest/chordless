@@ -5,27 +5,44 @@ window.name = 'chordless'
 
 // Register service worker
 if ('serviceWorker' in navigator) {
-  // A page that loads before the service worker controls it runs without it (the
-  // auth blob lives behind it), so on the very first visit reload once it is active.
-  // The flag is set from the start until the page is controlled, so the page is
-  // known to be settling (tests wait for it to go) and a failure cannot loop.
+  // The page should be controlled by the service worker (the auth blob lives behind it). On
+  // the first visit the worker takes control of the open page itself (clients.claim()), which
+  // is quick where it works. Where it does not reach a page that began loading before the
+  // worker was active (some browsers), reload once instead, so the page is controlled.
+  // The flag is set from the start until the page is controlled, so the page is known to be
+  // settling (tests wait for it to go) and a failure cannot loop.
+  const CLAIM_WAIT_MS = 2000
   const firstInstall =
     !navigator.serviceWorker.controller && !sessionStorage.getItem('sw-first-load')
   if (firstInstall) sessionStorage.setItem('sw-first-load', '1')
 
+  /** Resolve true when the page is controlled, or false after waiting for the worker to claim it */
+  const controlled = () =>
+    new Promise(resolve => {
+      if (navigator.serviceWorker.controller) return resolve(true)
+      const timer = setTimeout(() => resolve(false), CLAIM_WAIT_MS)
+      navigator.serviceWorker.addEventListener(
+        'controllerchange',
+        () => {
+          clearTimeout(timer)
+          resolve(true)
+        },
+        { once: true }
+      )
+    })
+
   navigator.serviceWorker
     .register('/service-worker.js')
-    // Wait until it is active: a page that starts loading before then is not
-    // controlled, and clients.claim() does not reach a page still being made
+    // Wait until it is active: only an active worker can claim the page
     .then(() => navigator.serviceWorker.ready)
-    .then(registration => {
+    .then(async registration => {
       console.log('Service Worker registered:', registration)
-      if (firstInstall) {
-        console.log('First install - reloading page to activate Service Worker')
-        window.location.reload()
-      } else if (navigator.serviceWorker.controller) {
+      if (await controlled()) {
         console.log('Service Worker is active and controlling page')
         sessionStorage.removeItem('sw-first-load')
+      } else if (firstInstall) {
+        console.log('First install - reloading page to activate Service Worker')
+        window.location.reload()
       }
     })
     .catch(error => {

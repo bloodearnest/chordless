@@ -3,7 +3,6 @@ import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
-import './app-preferences.ts'
 import './icon.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
 import { routeContext } from '../js/route-context.ts'
@@ -389,8 +388,11 @@ export class NavMenu extends LitElement {
     this.close()
   }
 
-  _handlePreferencesClick(): void {
+  async _handlePreferencesClick(): Promise<void> {
     this.close()
+    // The preferences panel (and the pad sets and media settings it brings) is not needed to
+    // show the first view: load it when first asked for
+    await import('./app-preferences.ts')
     this._preferencesOpened = true
     // Wait for next frame to ensure the menu is closed before showing the modal
     requestAnimationFrame(() => {

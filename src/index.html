@@ -17,7 +17,10 @@
   <body>
     <div class="app-container">
       <!-- The router shows the view for the URL here -->
-      <div id="view-outlet"></div>
+      <div id="view-outlet">
+        <!-- Painted before any script runs; the first view replaces it -->
+        <div class="boot-shell" aria-hidden="true">Chordless</div>
+      </div>
 
       <!-- Navigation menu component: stays while views come and go -->
       <nav-menu id="nav-menu"></nav-menu>

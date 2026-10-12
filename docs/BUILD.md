@@ -47,11 +47,19 @@ Playwright project) tests the build, served by `vite preview` on port 8788.
 
 ## First visit
 
-A page that starts loading before the service worker is active is never controlled by it (and
-`clients.claim()` doesn't reach a page still being made), so on the very first visit
-`index.html` reloads once, after `navigator.serviceWorker.ready`. `sessionStorage`
-`sw-first-load` is set from the start and cleared when the page is controlled: tests wait for
-it to go (`waitForServiceWorker` in `tests/fixtures.js`; `openApp` does).
+A page that starts loading before the service worker is active is not controlled by it, and
+the auth blob lives behind the worker. Where the worker's `clients.claim()` reaches the page (Chromium)
+the page becomes controlled when the worker activates, with no reload. Where it does not (a
+browser that ignores a page still loading), `public/boot.js` waits two seconds for the
+`controllerchange` and then reloads once. `sessionStorage` `sw-first-load` is set from the start
+and cleared when the page is controlled: tests wait for it to go (`waitForServiceWorker` in
+`tests/fixtures.ts`; `openApp` does). Safari has not been tried without the reload: check it on a
+device.
+
+`index.html` has a `.boot-shell` in `#view-outlet`: the header's colours and the title, painted
+before any script runs, so the first paint is not behind the JavaScript. The router replaces it
+with the first view. What the first view needs is small (`index.html` lists it as `modulepreload`);
+the preferences panel and Google auth are loaded when first used.
 
 ## Deploying
 

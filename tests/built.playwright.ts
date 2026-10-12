@@ -1,5 +1,6 @@
 // The production build (npm run build, served by vite preview): what the dev server can't show.
 import { expect, test, waitForServiceWorker } from './fixtures.ts'
+import { must } from './must.ts'
 
 // Every view the router has, by the URL that shows it
 const VIEWS = [
@@ -81,6 +82,34 @@ async function collectViolations(page) {
   })
   return violations
 }
+
+test('the page has something to paint before any script runs', async ({ request }) => {
+  const html = await (await request.get('/')).text()
+  expect(html).toContain('class="boot-shell"')
+})
+
+test('the first visit is controlled by the service worker without a reload, where it can be', async ({
+  page,
+}) => {
+  let loads = 0
+  page.on('load', () => loads++)
+  await page.goto('/')
+  await waitForServiceWorker(page)
+  // A reload would come after the worker is active: give it time to happen
+  await page.waitForTimeout(500)
+  expect(loads).toBe(1)
+})
+
+test('hashed files can be cached for good, the page and the worker are revalidated', async ({
+  request,
+}) => {
+  const html = await (await request.get('/')).text()
+  const asset = must(html.match(/\/assets\/index-[\w-]+\.js/))[0]
+  expect((await request.get(asset)).headers()['cache-control']).toContain('immutable')
+  expect((await request.get('/service-worker.js')).headers()['cache-control']).not.toContain(
+    'immutable'
+  )
+})
 
 test('robots.txt is a text file, not the app shell', async ({ request }) => {
   const response = await request.get('/robots.txt')

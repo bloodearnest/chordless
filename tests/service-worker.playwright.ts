@@ -45,8 +45,9 @@ test('page reloads successfully while offline', async ({ page, context }) => {
   // Load the page so the SW installs and populates the cache
   await page.goto('/')
   await waitForSW(page)
-  // Modules outside the precache list are cached as they're fetched, so let
-  // the first load finish (precaching them all is in the TODO)
+  // The dev server has no precache: modules are cached as the worker fetches them, and the
+  // first load was not controlled by it, so load again with it in control and let that finish
+  await page.reload()
   await page.waitForLoadState('networkidle')
 
   await context.setOffline(true)
