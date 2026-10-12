@@ -104,6 +104,19 @@ describe('getSongWithContent', () => {
     expect(full.chordpro).to.contain('[G]Amazing')
   })
 
+  it("gives the chart's CCLI number and trailer in the metadata", async () => {
+    const trailer = 'CCLI Song # 7654321\nA. Writer\n© 2020 A Publisher'
+    const song = await createSong(chart(unique('With trailer'), { body: `[G]Amazing\n${trailer}` }))
+    const full = await getSongWithContent(song.uuid)
+    expect(full.metadata.ccliSongNumber).to.equal('7654321')
+    expect(full.metadata.ccliTrailer).to.equal(trailer)
+
+    const directive = await createSong(
+      chart(unique('With directive'), { extra: '{ccli: 1234567}' })
+    )
+    expect((await getSongWithContent(directive.uuid)).metadata.ccli).to.equal('1234567')
+  })
+
   it('says which song is missing', async () => {
     let error: Error | null = null
     try {

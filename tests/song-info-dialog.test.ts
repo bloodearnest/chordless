@@ -8,16 +8,27 @@ const { describe, it, afterEach } = window
 /** A database with two songs; loading 'slow' takes a while */
 function fakeDb() {
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
-  const songs = {
+  const songs: Record<
+    string,
+    { uuid: string; id: string; title: string; chordproFileId: string; chordpro?: string }
+  > = {
     slow: { uuid: 'slow', id: 'slow', title: 'Slow Song', chordproFileId: 'c-slow' },
     fast: { uuid: 'fast', id: 'fast', title: 'Fast Song', chordproFileId: 'c-fast' },
+    credited: {
+      uuid: 'credited',
+      id: 'credited',
+      title: 'Credited Song',
+      chordproFileId: 'c-credited',
+      chordpro:
+        '{title: Credited Song}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020 A Publisher',
+    },
   }
   return {
     getDefaultSongVariant: async id => songs[id] ?? null,
     getSong: async uuid => songs[uuid],
     getChordPro: async id => {
       const song = must(Object.values(songs).find(each => each.chordproFileId === id))
-      return { content: `{title: ${song.title}}` }
+      return { content: song.chordpro ?? `{title: ${song.title}}` }
     },
     getSongUsageFromSetlists: async id => {
       if (id === 'slow') await wait(100)
@@ -49,6 +60,15 @@ describe('song-info-dialog', () => {
     await wait(200)
     expect(modal().heading).to.equal('Fast Song')
     expect(dialog.shadowRoot.querySelector('song-info').song.title).to.equal('Fast Song')
+  })
+
+  it("shows the chart's CCLI number and trailer", async () => {
+    await setUp()
+    await dialog.show('credited')
+    await wait(100)
+    const info = dialog.shadowRoot.querySelector('song-info').shadowRoot
+    expect(info.querySelector('.modal-ccli').textContent).to.contain('7654321')
+    expect(info.querySelector('.ccli-trailer').textContent).to.contain('A. Writer')
   })
 
   it("says so when the song can't be loaded", async () => {

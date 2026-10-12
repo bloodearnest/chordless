@@ -11,10 +11,6 @@ song edit UI
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
-- the song info dialog never shows a song's CCLI trailer, and takes its CCLI number only from the
-  record: SongInfo reads song.metadata.ccli, .ccliSongNumber and .ccliTrailer, but
-  getSongWithContent's metadata has only key, tempo and timeSignature (the chart's own metadata
-  is in song.parsed.metadata). Probably meant to read that; decide, and fix with a test
 - the fallbacks to a song's own key and tempo never work: buildRuntimeSongs (for old setlists
   with no key or tempo of their own) reads canonicalSong.key and .tempo, and LibrarySong reads
   _song.key, .originalKey, .tempo and .originalTempo, but getSongWithContent returns none of
@@ -165,8 +161,7 @@ storage/sync
   Song popularity: one event when a song is added to a setlist, with its CCLI song number as a
   property (a public catalogue id, not user data), only when it is all digits (4 to 9 long), so
   free text can never leak. Never fall back to the title (it may be a private song). Songs with no
-  CCLI number are not counted. Needs the CCLI metadata bug in "bugs" fixed first (the number is in
-  song.parsed.metadata). Plausible custom props: check which plan; GoatCounter can use an event
+  CCLI number are not counted. The chart's number is in song.metadata.ccliSongNumber or .ccli (getSongWithContent). Plausible custom props: check which plan; GoatCounter can use an event
   name like song-added/<number>; Cloudflare Web Analytics has no events. Say it in the policy too
 - security headers once chordless.app is live: a Content-Security-Policy (start as
   Content-Security-Policy-Report-Only, enforce once clean), set on the pages and on the service

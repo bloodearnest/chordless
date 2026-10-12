@@ -241,7 +241,7 @@ export interface SongWithContent {
     tempo: string | number | null
     timeSignature: string | null
     tempoNote?: string
-    /** From the chart's CCLI lines. getSongWithContent does not set these (see the TODO) */
+    /** From the chart's CCLI lines: the {ccli} directive, and the CCLI Song # trailer */
     ccli?: string
     ccliSongNumber?: string
     ccliTrailer?: string

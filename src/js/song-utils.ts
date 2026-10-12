@@ -77,6 +77,10 @@ export async function getSongWithContent(
       key: parsed.metadata.key || song.key,
       tempo: parsed.metadata.tempo || song.tempo,
       timeSignature: parsed.metadata.time || song.time,
+      // The chart's CCLI lines, for the song info dialog
+      ccli: parsed.metadata.ccli,
+      ccliSongNumber: parsed.metadata.ccliSongNumber,
+      ccliTrailer: parsed.metadata.ccliTrailer,
     },
 
     // ChordPro content
