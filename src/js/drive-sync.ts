@@ -129,6 +129,10 @@ export class OrganisationFolderMismatchError extends Error {
   }
 }
 
+/** What makes two setlist records the same setlist, whatever their ids */
+const setlistKey = (setlist: Setlist) =>
+  [setlist.date, setlist.time, setlist.owner, setlist.type, setlist.name].join('|')
+
 /**
  * Where an organisation's link to its Drive folder is stored: its record in the
  * organisations database. Tests pass their own { get, set }.
@@ -187,6 +191,10 @@ export class DriveSyncManager {
   CONCURRENT_LIMIT: number
   /** The ids of the files in the organisation's Drive folder, once listed */
   _driveFileIds: Set<string> | null
+  /** The setlist files in Drive, as listed by the last pull */
+  _liveSetlistFiles: DriveFile[] | null
+  /** Whether the last pull of setlists failed to read some file, so it may not know them all */
+  _pullIncomplete: boolean
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -215,6 +223,8 @@ export class DriveSyncManager {
 
     // Drive file inventory (for existence checks)
     this._driveFileIds = null // Set of file IDs that exist in Drive
+    this._liveSetlistFiles = null
+    this._pullIncomplete = false
   }
 
   /** The database, once init() has set it */
@@ -405,6 +415,8 @@ export class DriveSyncManager {
       // Clear caches after sync
       this._folderCache.clear()
       this._driveFileIds = null
+      this._liveSetlistFiles = null
+      this._pullIncomplete = false
     }
   }
 
@@ -510,6 +522,7 @@ export class DriveSyncManager {
     let removed = 0
     for (const setlist of await this.#db.getAllSetlists()) {
       if (!setlist.driveFileId || this.fileExistsInDrive(setlist.driveFileId)) continue
+      if (this.hasLiveFileOfItsOwn(setlist)) continue
       if (this.setlistHasLocalChanges(setlist)) continue
       console.log(
         `[DriveSync] Removing setlist ${setlist.id}: its Drive file ${setlist.driveFileId} is gone`
@@ -561,18 +574,29 @@ export class DriveSyncManager {
   }
 
   /**
-   * Another setlist, with a live Drive file, for the same date, leader, type and name
+   * Whether the last pull saw a live Drive file for this setlist id. When this device's record
+   * has no file of its own that is still there, that file is the setlist's: the pull should have
+   * adopted it, and did not if its download failed. Uploading the record then would store the
+   * setlist twice, so the push and the removal leave it until a pull succeeds.
+   */
+  hasLiveFileOfItsOwn(setlist: Setlist): boolean {
+    return (this._liveSetlistFiles ?? []).some(
+      file =>
+        (file.appProperties?.setlistId || (file.name ?? '').replace('.json', '')) === setlist.id
+    )
+  }
+
+  /**
+   * Another setlist, with a live Drive file, for the same date, time, leader, type and name
    */
   syncedTwinOf(setlist: Setlist, setlists: Setlist[]): Setlist | undefined {
+    const key = setlistKey(setlist)
     return setlists.find(
       other =>
         other.id !== setlist.id &&
-        other.driveFileId &&
-        this.fileExistsInDrive(other.driveFileId) &&
-        other.date === setlist.date &&
-        other.owner === setlist.owner &&
-        other.type === setlist.type &&
-        other.name === setlist.name
+        setlistKey(other) === key &&
+        ((other.driveFileId && this.fileExistsInDrive(other.driveFileId)) ||
+          this.hasLiveFileOfItsOwn(other))
     )
   }
 
@@ -722,6 +746,8 @@ export class DriveSyncManager {
     // Get all setlists from Drive
     const driveSetlists = await DriveAPI.listSetlists(this.#folderId)
     console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`)
+    this._liveSetlistFiles = driveSetlists
+    this._pullIncomplete = false
 
     const downloadQueue: {
       driveFile: DriveFile
@@ -759,6 +785,7 @@ export class DriveSyncManager {
           downloadQueue.push({ driveFile, setlistId, localSetlist, adopt: true })
         }
       } catch (error) {
+        this._pullIncomplete = true
         console.error(`[DriveSync] Failed to pull setlist ${driveFile.name}:`, error)
       }
     }
@@ -864,6 +891,7 @@ export class DriveSyncManager {
             })
           }
         } else {
+          this._pullIncomplete = true
           console.error('[DriveSync] Failed to download setlist:', result.reason)
         }
       })
@@ -1228,16 +1256,45 @@ export class DriveSyncManager {
       }
     }
 
-    // A setlist with no live file of its own, while another setlist that has one is for the
-    // same date, leader, type and name, is that setlist stored twice, e.g. two devices each
-    // made their own record of it. Uploading it would duplicate it, so leave it here. (The
-    // pull has just made a local record of every file in Drive, so this needs no downloads.)
+    // After a pull that could not read every file, this device may not know a twin of a setlist
+    // it would create a file for. Create nothing until a pull succeeds; updates go ahead.
+    if (this._pullIncomplete && newSetlists.length > 0) {
+      console.warn(
+        `[DriveSync] Not uploading ${newSetlists.length} new setlists: the pull could not read every file. They are retried next sync.`
+      )
+      newSetlists.length = 0
+    }
+
+    // A record with no file of its own that is still there, while Drive has a live file for its
+    // id, waits for a pull to adopt that file (see hasLiveFileOfItsOwn)
+    newSetlists.splice(
+      0,
+      newSetlists.length,
+      ...newSetlists.filter(setlist => {
+        if (!this.hasLiveFileOfItsOwn(setlist)) return true
+        console.warn(
+          `[DriveSync] Not uploading setlist ${setlist.id}: Drive has a file for it that this sync could not read. It is retried next sync.`
+        )
+        return false
+      })
+    )
+
+    // A setlist never uploaded, while another setlist that has been synced is for the same date,
+    // time, leader, type and name, is that setlist stored twice, e.g. two devices each made their
+    // own record of it. Uploading it would duplicate it, so leave it here. The other is one with
+    // a live file (the pull has just made a local record of every file in Drive, so this needs no
+    // downloads) or one about to be uploaded again because its file is gone. Two records made
+    // here and never uploaded are the user's own doing and are both uploaded.
+    const reuploading = new Set(
+      newSetlists.filter(setlist => setlist.lastSyncedAt).map(setlist => setlistKey(setlist))
+    )
     const toUpload = newSetlists.filter(setlist => {
       const twin = this.syncedTwinOf(setlist, localSetlists)
-      if (!twin) return true
+      if (!twin && (setlist.lastSyncedAt || !reuploading.has(setlistKey(setlist)))) return true
       console.warn(
-        `[DriveSync] Not uploading setlist ${setlist.id}: Drive already has setlist ${twin.id} ` +
-          `for the same ${setlist.date} ${setlist.type}. Reset this device from Google Drive to fix it.`
+        `[DriveSync] Not uploading setlist ${setlist.id}: it is the same setlist as ` +
+          `${twin ? `${twin.id}, which Drive has` : 'one being uploaded again'} ` +
+          `(${setlist.date} ${setlist.type}). Reset this device from Google Drive to fix it.`
       )
       return false
     })

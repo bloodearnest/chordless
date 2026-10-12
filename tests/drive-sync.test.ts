@@ -584,6 +584,49 @@ describe('Drive sync (against FakeDrive)', () => {
       })
     })
 
+    it("doesn't upload a copy of an edited setlist whose live file it could not read", async () => {
+      // Found by the random histories: the pull's adopt download failed, then the push saw an
+      // edited record with no file of its own and uploaded it as new
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Original' })
+      await syncDevice(phone)
+      replaceDriveFile(must(await phone.db.getSetlist(setlist.id)).driveFileId as string, 'moved')
+      await editSetlist(phone, setlist.id, { name: 'Edited' })
+      drive.failRequests({ method: 'GET', path: /alt=media/, times: 1 })
+
+      await syncDevice(phone)
+
+      expect(driveSetlistFiles()).to.have.length(1)
+
+      await syncDevice(phone)
+
+      expect(driveSetlistFiles()).to.have.length(1)
+      expect(driveSetlist(setlist.id).name).to.equal('Edited')
+    })
+
+    it('uploads two identical setlists made on one device', async () => {
+      // The user made both; refusing one would leave their work unsynced
+      const phone = await makeDevice('phone')
+      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service', name: '' }
+      await addSetlist(phone, same)
+      await addSetlist(phone, same)
+
+      await syncDevice(phone)
+
+      expect(driveSetlistFiles()).to.have.length(2)
+    })
+
+    it('uploads two setlists for the same day at different times', async () => {
+      const phone = await makeDevice('phone')
+      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service', name: '' }
+      await addSetlist(phone, { ...same, time: '09:00' })
+      await addSetlist(phone, { ...same, time: '18:00' })
+
+      await syncDevice(phone)
+
+      expect(driveSetlistFiles()).to.have.length(2)
+    })
+
     describe('when the Drive file a device knew is gone but another holds the setlist', () => {
       // Duplicates were cleaned up in Drive (the audit page trashes all but one), so a device
       // that knew a removed file points at nothing, while a live file for the setlist exists

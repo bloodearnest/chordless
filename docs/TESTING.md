@@ -59,6 +59,11 @@ app's own modules, imported directly: there's no build step to test around.
   It throws on anything it doesn't model rather than guessing, and has its own tests
   (`fake-drive.test.ts`). `drive-sync.test.ts` sets up two devices syncing through one
   fake Drive, which is how cross-device behaviour is tested.
+  `drive-sync-random.test.ts` runs random histories of several devices (creating and editing
+  setlists, syncing, files trashed, restored or re-id'd in Drive, resets, failing requests) and
+  checks that Drive never holds a setlist twice, that devices end up matching Drive, and that
+  no edit is lost. A failure names its seed, which replays the history; raise the constants at
+  the top of the file for a long hunt.
 - **Routing** has pure functions (`router.test.ts`: URL to route and back, and how a move
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`

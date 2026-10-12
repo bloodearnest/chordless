@@ -81,12 +81,20 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
    comes back as it was. Without this, trashing or cleaning up files made devices upload
    their setlists again: three times in June–October 2026. Songs are not removed this way
    (setlists refer to them); a song whose file is gone is still uploaded again.
-6. **Push** setlists then songs: upload what's new or changed locally.
-   A setlist with no live file, while another setlist that has one has the same date, leader,
-   type and name, is not uploaded: it is the same setlist stored twice (e.g. two devices each
-   made their own record of it, under different ids). The pull has already made a local record
-   of every file in Drive, so this compares local records. The push logs a warning; resetting
-   the device from Drive replaces its record with the one in Drive.
+6. **Push** setlists then songs: upload what's new or changed locally. Creating a file is
+   the step that can duplicate a setlist, so for setlists it holds back in three cases, each
+   logged and retried next sync:
+   - **The pull could not read every file** (a download failed): nothing new is created, because
+     this device may not know a twin. Updates to known files go ahead.
+   - **Drive has a live file for the record's id** that the pull did not adopt (its download
+     failed): the record waits for a pull to adopt it.
+   - **The same setlist under another id.** A never-uploaded record is not uploaded while
+     another record for the same date, time, leader, type and name holds a live file (or is
+     being uploaded again because its file is gone): it is that setlist stored twice, e.g. two
+     devices each made their own record of it. The pull has already made a local record of every
+     file in Drive, so this compares local records. Resetting the device from Drive replaces the
+     held-back record with the one in Drive. Two never-uploaded records made on one device are
+     the user's own doing and are both uploaded.
 
 ### Finding the organisation folder
 

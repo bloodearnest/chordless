@@ -31,9 +31,11 @@ const children = (parentId, extra = '') =>
   )
 
 // The same setlist stored under different ids (e.g. two devices each uploaded their own record
-// of it): the same date, leader, type and name. Song count is deliberately not part of it.
+// of it): the same date, time, leader, type and name. Song count is deliberately not part of it.
 const sameSetlistKey = f =>
-  f.date ? [f.date, f.owner ?? '', f.setlistType ?? '', f.setlistName ?? ''].join('|') : null
+  f.date
+    ? [f.date, f.time ?? '', f.owner ?? '', f.setlistType ?? '', f.setlistName ?? ''].join('|')
+    : null
 
 async function auditOrg(org) {
   const subfolders = await children(org.id, ` and mimeType='${FOLDER}'`)
@@ -67,6 +69,7 @@ async function auditOrg(org) {
           setlistName: content?.name ?? null,
           owner: content?.owner ?? null,
           setlistType: content?.type ?? null,
+          time: content?.time ?? null,
           songCount: content?.songs?.length ?? null,
           error,
         })
@@ -191,7 +194,7 @@ function render(orgs) {
     ${renderList('files whose contents are a different setlist than their setlistId', o.mismatched)}
     ${renderList('files without a setlistId', o.missingSetlistId)}
     ${renderList('download errors', o.downloadErrors)}
-    ${renderGroup('setlists with the same date, leader, type and name in more than one file', o.sameSetlist)}
+    ${renderGroup('setlists with the same date, time, leader, type and name in more than one file', o.sameSetlist)}
     <details><summary>All files</summary><table>
       <tr><th>date</th><th>name</th><th>songs</th><th>file</th><th>created</th><th>modified</th><th>setlistId</th><th>contents id</th></tr>
       ${o.files
