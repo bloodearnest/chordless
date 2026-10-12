@@ -9,6 +9,8 @@ import './setlist-details-form.ts'
 import { setlistTitle } from '../js/utils/date-utils.ts'
 import { buttonStyles } from './shared-styles.ts'
 import './setlist-info.ts'
+import './setlist-share.ts'
+import type { ChordlessDB } from '../js/db.ts'
 
 /** The setlist's details were edited and saved: changes is the form's details */
 export class SetlistInfoSaveEvent extends Event {
@@ -55,6 +57,8 @@ export class SetlistInfoDialog extends LitElement {
   static override properties = {
     /** Who can be chosen as leader when editing: [{id, name}] (see people.js) */
     people: { attribute: false },
+    /** The organisation's database, for sharing the setlist */
+    db: { attribute: false },
     _setlist: { state: true },
     _editing: { state: true },
   }
@@ -62,6 +66,10 @@ export class SetlistInfoDialog extends LitElement {
   static override styles = [
     buttonStyles,
     css`
+      .share {
+        margin: 2rem 0 1rem;
+      }
+
       .delete-setlist {
         margin: 1.5rem 1rem 1rem;
         display: flex;
@@ -78,6 +86,7 @@ export class SetlistInfoDialog extends LitElement {
   ]
 
   declare people: Person[]
+  declare db: ChordlessDB | null
   declare _setlist: Setlist | null
   declare _editing: boolean
 
@@ -87,6 +96,7 @@ export class SetlistInfoDialog extends LitElement {
     super()
     this._modalRef = createRef()
     this.people = []
+    this.db = null
     this._setlist = null
     this._editing = false
   }
@@ -182,7 +192,12 @@ export class SetlistInfoDialog extends LitElement {
                 }
               </div>
             `
-            : html`<setlist-info .setlist=${this._setlist}></setlist-info>`
+            : html`
+              <setlist-info .setlist=${this._setlist}></setlist-info>
+              <div class="share">
+                <setlist-share .setlist=${this._setlist} .db=${this.db}></setlist-share>
+              </div>
+            `
         }
       </app-modal>
     `

@@ -846,6 +846,7 @@ export class SetlistPage {
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
     dialog.people = (await getOrganisationPeople()).people
+    dialog.db = this._database()
     await dialog.show(this.currentSetlist)
   }
 

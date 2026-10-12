@@ -23,7 +23,8 @@
     "lit": "^3.3.3",
     "lit-element": "^4.2.2",
     "lit-html": "^3.3.3",
-    "oauth4webapi": "^3.8.8"
+    "oauth4webapi": "^3.8.8",
+    "qrcode-generator": "^2.0.4"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
