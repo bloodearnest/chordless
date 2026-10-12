@@ -289,35 +289,7 @@ self.addEventListener('fetch', event => {
     return
   }
 
-  // Handle CDN requests (Lit.js from jsdelivr)
-  if (url.origin === 'https://cdn.jsdelivr.net' && url.pathname.includes('/npm/lit')) {
-    event.respondWith(
-      caches.match(event.request).then(cached => {
-        // Return cached version if available, otherwise fetch and cache
-        if (cached) {
-          return cached
-        }
-        return fetch(event.request, { mode: 'cors' })
-          .then(response => {
-            if (response.ok) {
-              const responseToCache = response.clone()
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put(event.request, responseToCache)
-              })
-            }
-            return response
-          })
-          .catch(() => {
-            console.log('[SW] Failed to fetch CDN asset:', url.href)
-            // Return a fallback or throw to let the browser handle it
-            return new Response('CDN asset not available', { status: 503 })
-          })
-      })
-    )
-    return
-  }
-
-  // Only handle same-origin requests after CDN check
+  // Only handle same-origin requests
   if (url.origin !== location.origin) {
     return
   }
