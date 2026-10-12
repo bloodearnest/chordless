@@ -9,6 +9,7 @@ import type {
 } from './data-types.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
+import { transactionError } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 // IndexedDB wrapper for database operations
@@ -218,7 +219,7 @@ export class ChordlessDB {
     store.put(stored)
     return new Promise<Setlist>((resolve, reject) => {
       tx.oncomplete = () => resolve(stored)
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -238,7 +239,7 @@ export class ChordlessDB {
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -268,7 +269,7 @@ export class ChordlessDB {
     await store.delete(id)
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -297,7 +298,7 @@ export class ChordlessDB {
     store.put(stored)
     return new Promise<SongRecord>((resolve, reject) => {
       tx.oncomplete = () => resolve(stored)
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -313,7 +314,7 @@ export class ChordlessDB {
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -381,7 +382,7 @@ export class ChordlessDB {
     await store.delete(uuid)
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -392,7 +393,7 @@ export class ChordlessDB {
     await store.put(chordpro)
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -412,7 +413,7 @@ export class ChordlessDB {
     await store.delete(id)
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -456,7 +457,7 @@ export class ChordlessDB {
     await store.put(localState)
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -472,7 +473,7 @@ export class ChordlessDB {
     await store.delete(setlistId)
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -588,7 +589,7 @@ export class ChordlessDB {
     }
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -608,7 +609,7 @@ export class ChordlessDB {
 
     return new Promise((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 }

@@ -3,6 +3,7 @@
 // Each organisation then has its own ChordlessDB with songs, setlists, etc.
 
 import type { Organisation } from './data-types.ts'
+import { transactionError } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 /**
@@ -80,11 +81,10 @@ export class OrganisationDB {
 
     return new Promise<Organisation>((resolve, reject) => {
       const tx = this.#transaction('readwrite')
-      const request = tx.objectStore('organisations').put(organisation)
+      tx.objectStore('organisations').put(organisation)
       tx.oncomplete = () => resolve(organisation)
-      // The failure is the request's (e.g. ConstraintError for a name in use):
-      // tx.error is still null while it's being reported
-      tx.onerror = () => reject(request.error ?? tx.error)
+      // The failure is the request's (e.g. ConstraintError for a name in use)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -156,7 +156,7 @@ export class OrganisationDB {
 
     return new Promise<Organisation>((resolve, reject) => {
       tx.oncomplete = () => resolve(updated)
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 
@@ -170,7 +170,7 @@ export class OrganisationDB {
 
     return new Promise<void>((resolve, reject) => {
       tx.oncomplete = () => resolve()
-      tx.onerror = () => reject(tx.error)
+      tx.onerror = event => reject(transactionError(event, tx))
     })
   }
 }
