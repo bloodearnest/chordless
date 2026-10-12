@@ -104,8 +104,8 @@ export class ThemeManager {
       'header-text': '#ecf0f1',
 
       // Button colors
-      'button-bg': '#4da6ff',
-      'button-hover': '#3498db',
+      'button-bg': '#2477ad',
+      'button-hover': '#1f6a9a',
       'button-text': '#ffffff',
 
       // Accent colors
