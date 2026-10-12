@@ -125,11 +125,9 @@ export class HomeView extends PageView {
 
   #renderGroups(groups: SetlistYear[]) {
     if (groups.length === 0) {
-      return html`<status-message
-        state="empty"
-        message="No setlists found in database."
-        detail="Go to Settings to import setlists."
-      ></status-message>`
+      // A new user's first sight: loaded only now, as most visits have setlists
+      void import('../../components/welcome-card.ts')
+      return html`<welcome-card></welcome-card>`
     }
     return repeat(
       groups,

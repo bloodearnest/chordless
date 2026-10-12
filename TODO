@@ -277,7 +277,10 @@ UI
   - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
     often (see the background sync item)
 - autoscaling font
-- install nag ("install to keep your data on this device"): MOST IMPORTANT for a dedicated church
+- install nag ("install to keep your data on this device"). The welcome card (a new user's home
+  page) already has an "Install it" step with the reason and the per-platform instructions
+  (src/js/install.ts has the detection and the Chromium prompt): this is the nag that keeps asking
+  after that, below. MOST IMPORTANT for a dedicated church
   iPad that is only opened when its owner is on the rota (every 3 to 4 weeks). Safari (iOS, and
   macOS) deletes a site's script-writable storage (IndexedDB, localStorage, the service worker
   and its caches) after 7 days of Safari use without the user interacting with the site (days

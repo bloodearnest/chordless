@@ -5,6 +5,7 @@
 import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
+import './install.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
 import { views } from './views/registry.ts'
