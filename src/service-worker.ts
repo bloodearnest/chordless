@@ -2,6 +2,7 @@
 // Built as a classic script by vite-plugins/service-worker.js, which defines the two
 // constants below: the files to precache, and a version (a hash of them)
 import * as AuthDB from './js/auth-db.ts'
+import { SHARED_CACHE_NAME, storeShared } from './js/shared-incoming.ts'
 import { errorMessage } from './js/utils/errors.ts'
 
 declare const self: ServiceWorkerGlobalScope
@@ -37,7 +38,8 @@ self.addEventListener('activate', event => {
           if (
             cacheName !== CACHE_NAME &&
             cacheName !== PAD_CACHE_NAME &&
-            cacheName !== RUNTIME_CACHE_NAME
+            cacheName !== RUNTIME_CACHE_NAME &&
+            cacheName !== SHARED_CACHE_NAME
           ) {
             return caches.delete(cacheName)
           }
@@ -307,6 +309,24 @@ self.addEventListener('fetch', event => {
   // Dev-only component playgrounds (src/dev/) - leave entirely to the browser.
   // Not part of the app: never cached, and not served in production.
   if (url.pathname === '/dev' || url.pathname.startsWith('/dev/')) {
+    return
+  }
+
+  // Something shared to the app from another app (the manifest's share_target): keep it for the
+  // import page, which takes it from the cache, and go there
+  if (url.pathname === '/share-target') {
+    event.respondWith(
+      (async () => {
+        if (event.request.method === 'POST') {
+          try {
+            await storeShared(await event.request.formData())
+          } catch (error) {
+            console.error('[SW] Could not keep what was shared:', error)
+          }
+        }
+        return Response.redirect(new URL('/import-song', location.origin).href, 303)
+      })()
+    )
     return
   }
 

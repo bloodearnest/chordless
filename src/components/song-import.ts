@@ -3,6 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist, SongRecord } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.ts'
+import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getOrganisationPeople } from '../js/people.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
@@ -347,12 +348,30 @@ export class SongImport extends LitElement {
   override connectedCallback() {
     super.connectedCallback()
     window.addEventListener('message', this._onMessage)
+    window.addEventListener(IncomingSongsEvent.type, this._onIncoming)
     this._signalReady()
+    // Files the system opened with Chordless, or something another app shared to it
+    void this._takeIncoming()
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback()
     window.removeEventListener('message', this._onMessage)
+    window.removeEventListener(IncomingSongsEvent.type, this._onIncoming)
+  }
+
+  _onIncoming = (): void => {
+    void this._takeIncoming()
+  }
+
+  async _takeIncoming(): Promise<void> {
+    const incoming = await takeIncoming()
+    if (!incoming) return
+    const songs = await this._songsFromFiles(incoming.files)
+    if (incoming.text.trim()) {
+      songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
+    }
+    await this.receiveAll(songs)
   }
 
   _onMessage(event: MessageEvent): void {
@@ -385,6 +404,11 @@ export class SongImport extends LitElement {
 
   /** Import songs from ChordPro files */
   async importFiles(files: File[]): Promise<void> {
+    await this.receiveAll(await this._songsFromFiles(files))
+  }
+
+  /** The songs in ChordPro files (one that is not text is listed as skipped) */
+  async _songsFromFiles(files: File[]): Promise<IncomingSong[]> {
     const songs: IncomingSong[] = []
     for (const file of files) {
       // ChordPro has no registered type, so .cho files come as '' or
@@ -401,7 +425,7 @@ export class SongImport extends LitElement {
         source: 'file',
       })
     }
-    await this.receiveAll(songs)
+    return songs
   }
 
   async _onFilesChosen(event: Event): Promise<void> {

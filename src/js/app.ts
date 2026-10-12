@@ -7,6 +7,7 @@ import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { appUpdate } from './app-update.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import './install.ts'
+import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
 import { views } from './views/registry.ts'
@@ -37,3 +38,5 @@ await router.start()
 // Optional, and not needed to show the first view, so after it
 startMediaPlayer()
 void appUpdate.start()
+// Files the system opens with the installed app, and links for its open window
+listenForLaunches()
