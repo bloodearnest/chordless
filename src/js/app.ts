@@ -4,6 +4,7 @@
  */
 import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
+import { appUpdate } from './app-update.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import './install.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
@@ -35,3 +36,4 @@ await router.start()
 
 // Optional, and not needed to show the first view, so after it
 startMediaPlayer()
+void appUpdate.start()

@@ -1,6 +1,7 @@
 import { ContextConsumer } from '@lit/context'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -77,6 +78,7 @@ export class NavMenu extends LitElement {
     setlistTitle: { type: String, attribute: 'setlist-title' },
     // Preferences are only rendered once first opened: they load pad sets from Drive
     _preferencesOpened: { state: true },
+    _updateReady: { state: true }, // whether a new version of the app is waiting
   }
 
   declare triggerId: string
@@ -87,6 +89,7 @@ export class NavMenu extends LitElement {
   declare showOverviewLink: boolean
   declare setlistTitle: string
   declare _preferencesOpened: boolean
+  declare _updateReady: boolean
 
   _popup: DialogPopup
   _preferencesModal: Ref<AppModal>
@@ -150,6 +153,13 @@ export class NavMenu extends LitElement {
       box-sizing: border-box;
     }
 
+    /* A new version is ready: the first item, picked out */
+    .nav-menu-item.update-item {
+      font-weight: 600;
+      border-bottom: 1px solid var(--border-color, #ecf0f1);
+      background: color-mix(in srgb, var(--update-dot, #f39c12) 18%, transparent);
+    }
+
     .nav-menu-item:hover {
       background-color: var(--bg-tertiary, #ecf0f1);
     }
@@ -202,6 +212,7 @@ export class NavMenu extends LitElement {
     this.popoverId = 'nav-menu-popover'
     this.triggerButton = null
     this.songs = []
+    this._updateReady = appUpdate.ready
     this.showOverviewLink = false
     this.setlistTitle = 'Setlist'
     // The menu outlives the views: close it when the view changes. (Not for a move within
@@ -225,6 +236,8 @@ export class NavMenu extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback()
+    window.addEventListener(AppUpdateChangeEvent.type, this._onUpdateChange)
+    this._updateReady = appUpdate.ready
     // Open from the trigger button, or from an app-header's menu button
     this._onRootClick = this._onRootClick.bind(this)
     this._onNavMenuClick = this._onNavMenuClick.bind(this)
@@ -233,7 +246,12 @@ export class NavMenu extends LitElement {
     this._root.addEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
   }
 
+  _onUpdateChange = (event: AppUpdateChangeEvent): void => {
+    this._updateReady = event.ready
+  }
+
   override disconnectedCallback() {
+    window.removeEventListener(AppUpdateChangeEvent.type, this._onUpdateChange)
     super.disconnectedCallback()
     this._root?.removeEventListener('click', this._onRootClick)
     this._root?.removeEventListener(HeaderMenuClickEvent.type, this._onNavMenuClick)
@@ -272,6 +290,20 @@ export class NavMenu extends LitElement {
         @close=${this._popup.onClose}
       >
         <nav class="nav-menu" part="nav">
+          ${
+            this._updateReady
+              ? html`
+                <button
+                  class="nav-menu-item update-item"
+                  part="nav-item update-item"
+                  @click=${() => appUpdate.apply()}
+                >
+                  <app-icon name="refresh" size="20" class="nav-icon"></app-icon>
+                  <span>Update ready: reload</span>
+                </button>
+              `
+              : ''
+          }
           ${
             this.showOverviewLink || this.songs?.length > 0
               ? html`

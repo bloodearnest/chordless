@@ -1,6 +1,7 @@
 import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
 import './icon.ts'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
@@ -78,6 +79,7 @@ export class AppHeader extends LitElement {
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
     expanded: { type: Boolean, reflect: true },
     _slottedControls: { state: true }, // whether anything is in the controls slot
+    _updateReady: { state: true }, // whether a new version of the app is waiting
   }
 
   declare heading: string
@@ -88,6 +90,7 @@ export class AppHeader extends LitElement {
   declare disableAnimation: boolean
   declare expanded: boolean
   declare _slottedControls: boolean
+  declare _updateReady: boolean
 
   _title: Ref<HTMLElement>
   _previousTitle: string
@@ -149,6 +152,7 @@ export class AppHeader extends LitElement {
       cursor: pointer;
       padding: 0.5rem;
       margin-right: 0.5rem;
+      position: relative;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -158,6 +162,19 @@ export class AppHeader extends LitElement {
       border-radius: 4px;
       min-width: 44px;
       min-height: 44px;
+    }
+
+    /* A new version of the app is ready: a dot on the menu button's corner, which takes no room */
+    .update-dot {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--update-dot, #f39c12);
+      border: 2px solid var(--header-bg, #2c3e50);
+      box-sizing: content-box;
     }
 
     .nav-menu-button:hover {
@@ -363,6 +380,7 @@ export class AppHeader extends LitElement {
     this.disableAnimation = false
     this.expanded = false
     this._slottedControls = false
+    this._updateReady = appUpdate.ready
     this._previousTitle = ''
     this._animating = false
     this._instant = false
@@ -371,6 +389,8 @@ export class AppHeader extends LitElement {
 
   override connectedCallback() {
     super.connectedCallback()
+    window.addEventListener(AppUpdateChangeEvent.type, this._onUpdateChange)
+    this._updateReady = appUpdate.ready
     // Initialize display title
     this._displayTitle = this.heading
     this._previousTitle = this.heading
@@ -379,6 +399,15 @@ export class AppHeader extends LitElement {
       showInfoButton: this.showInfoButton,
       editMode: this.editMode,
     })
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener(AppUpdateChangeEvent.type, this._onUpdateChange)
+    super.disconnectedCallback()
+  }
+
+  _onUpdateChange = (event: AppUpdateChangeEvent): void => {
+    this._updateReady = event.ready
   }
 
   override willUpdate(changedProperties: PropertyValues<this>): void {
@@ -467,9 +496,10 @@ export class AppHeader extends LitElement {
             class="nav-menu-button"
             part="nav-button"
             @click=${this._handleNavMenuClick}
-            aria-label="Navigation menu"
+            aria-label=${this._updateReady ? 'Navigation menu, update ready' : 'Navigation menu'}
           >
             <app-icon name="menu" size="24"></app-icon>
+            ${this._updateReady ? html`<span class="update-dot" aria-hidden="true"></span>` : ''}
           </button>
           <div class="title" part="title" ${ref(this._title)}>
             ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}

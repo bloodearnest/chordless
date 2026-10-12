@@ -22,7 +22,10 @@ self.addEventListener('install', event => {
       // Bypass the HTTP cache: a file with no hash in its name must be this version's
       .then(cache => cache.addAll(PRECACHE.map(url => new Request(url, { cache: 'reload' }))))
   )
-  self.skipWaiting()
+  // A first install takes over at once. An update waits, with its own copy of the files, until
+  // the page asks for it (a SKIP_WAITING message: see app-update.ts) or the app is closed and
+  // opened again, so a page that is open and playing is never changed under the user.
+  if (!self.registration.active) self.skipWaiting()
 })
 
 // Activate and clean up old caches

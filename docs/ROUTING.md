@@ -76,7 +76,8 @@ Don't let the setlists depend on it.
 ## Reloads
 
 A few actions reload the page on purpose, because the database underneath every view is
-replaced: resetting from Drive, clearing local data, and switching organisation. Each
+replaced (resetting from Drive, clearing local data, and switching organisation) and to
+take a new version of the app (the menu's "Update ready" item). Each
 has a `biome-ignore lint/plugin` saying why. Anything else that needs to leave the page
 is a bug: use `goTo()`.
 

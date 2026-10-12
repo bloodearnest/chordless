@@ -97,10 +97,12 @@ preferences
     poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 offline
-- the new precache is atomic per version, but nothing tells the user an update is ready: a
-  new service worker takes over on the next visit (skipWaiting + claim) and an open page keeps
-  its old files until it reloads. Decide whether to say "update available" (or reload at a safe
-  moment: never mid-song)
+- an update shows as a dot on the menu button and a first item in the menu (src/js/app-update.ts:
+  a new worker waits, the page reloads only when the user chooses). Left: a slim "A new version
+  is ready: Reload / Later" bar on pages that are not a setlist, and an App page (/about) with
+  the version, "Check for updates" and when it last checked, install status, offline readiness
+  and whether storage is persistent. Another window of the app that a new worker takes over
+  keeps its old code until reloaded: not handled.
 
 storage/sync
 - setlist-page.js and views/home-view.js still report save/add/delete failures with alert():
