@@ -9,6 +9,7 @@ const VIEWS = [
   ['/preferences', 'preferences-view'],
   ['/import-song', 'import-song-view'],
   ['/bookmarklet', 'bookmarklet-view'],
+  ['/about', 'about-view'],
   ['/no/such/page', 'not-found-view'],
 ]
 

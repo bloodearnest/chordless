@@ -9,14 +9,14 @@
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'storage' | 'import-song' | 'bookmarklet' }
+ *   { name: 'preferences' | 'storage' | 'import-song' | 'bookmarklet' | 'about' }
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
  *                                             /setlist/<id>/song/<n>
  *   { name: 'not-found', path }
  */
 
 /** Routes that are a path of their own and nothing else (and the library's list) */
-export type PageName = 'home' | 'preferences' | 'storage' | 'import-song' | 'bookmarklet'
+export type PageName = 'home' | 'preferences' | 'storage' | 'import-song' | 'bookmarklet' | 'about'
 
 export type Route =
   | { name: PageName }
@@ -32,6 +32,7 @@ const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/storage': 'storage',
   '/import-song': 'import-song',
   '/bookmarklet': 'bookmarklet',
+  '/about': 'about',
 }
 
 const PAGE_PATHS: Record<string, string> = Object.fromEntries(

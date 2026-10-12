@@ -41,6 +41,10 @@ export class AppUpdate {
   #ready = false
   #applying = false
   #lastCheck = 0
+  #checking = false
+  #installing = false
+  #failed = false
+  #lastChecked: number | null = null
   #timer: ReturnType<typeof setInterval> | undefined
 
   constructor(
@@ -59,6 +63,48 @@ export class AppUpdate {
     return this.#ready
   }
 
+  /** Whether a check is under way */
+  get checking(): boolean {
+    return this.#checking
+  }
+
+  /** Whether a new version has been found and is being saved */
+  get installing(): boolean {
+    return this.#installing
+  }
+
+  /** Whether the last check could not reach the server */
+  get failed(): boolean {
+    return this.#failed
+  }
+
+  /** When it last looked (ms), or null if it has not yet */
+  get lastChecked(): number | null {
+    return this.#lastChecked
+  }
+
+  /** Whether there is a service worker to ask (not where the browser has none, or it is not installed yet) */
+  get available(): boolean {
+    return this.#registration !== undefined
+  }
+
+  /** Which version of the app is running, asked of the worker that serves it (null if it can't say) */
+  async runningVersion(): Promise<string | null> {
+    const controller = this.#container?.controller
+    if (!controller) return null
+    return new Promise(resolve => {
+      const channel = new MessageChannel()
+      const timer = setTimeout(() => resolve(null), 3000)
+      channel.port1.onmessage = (event: MessageEvent<{ version?: string }>) => {
+        clearTimeout(timer)
+        resolve(event.data.version ?? null)
+      }
+      controller.postMessage({ type: 'GET_VERSION', messageId: crypto.randomUUID() }, [
+        channel.port2,
+      ])
+    })
+  }
+
   async start(): Promise<void> {
     const container = this.#container
     if (!container) return
@@ -70,9 +116,13 @@ export class AppUpdate {
     if (registration.waiting && container.controller) this.#set(true)
     registration.addEventListener('updatefound', () => {
       const worker = registration.installing
+      if (container.controller) this.#setInstalling(true)
       worker?.addEventListener('statechange', () => {
         // With no controller this is the first install, which is not an update
         if (worker.state === 'installed' && container.controller) this.#set(true)
+        if (worker.state === 'installed' || worker.state === 'redundant') {
+          this.#setInstalling(false)
+        }
       })
     })
 
@@ -89,14 +139,21 @@ export class AppUpdate {
   /** Look for a new version now (not again within ten minutes, unless forced) */
   async check({ force = false } = {}): Promise<void> {
     const registration = this.#registration
-    if (!registration || this.#ready) return
+    if (!registration || this.#ready || this.#checking) return
     if (!force && this.#now() - this.#lastCheck < MIN_CHECK_GAP_MS) return
     this.#lastCheck = this.#now()
+    this.#checking = true
+    this.#changed()
     try {
       await registration.update()
+      this.#failed = false
     } catch {
       // Offline, or the server is not answering: try again later
+      this.#failed = true
     }
+    this.#checking = false
+    this.#lastChecked = this.#now()
+    this.#changed()
   }
 
   /** Take the new version: the waiting worker takes over, and the page reloads under it */
@@ -115,7 +172,18 @@ export class AppUpdate {
   #set(ready: boolean): void {
     if (ready === this.#ready) return
     this.#ready = ready
-    window.dispatchEvent(new AppUpdateChangeEvent(ready))
+    this.#changed()
+  }
+
+  #setInstalling(installing: boolean): void {
+    if (installing === this.#installing) return
+    this.#installing = installing
+    this.#changed()
+  }
+
+  /** Anything shown of this changed (the dot and the menu item read `ready`) */
+  #changed(): void {
+    window.dispatchEvent(new AppUpdateChangeEvent(this.#ready))
   }
 }
 

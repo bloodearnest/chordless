@@ -60,6 +60,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./library-view.ts'),
     () => 'Song Library - Chordless'
   ),
+  about: view(
+    'about-view',
+    () => import('./about-view.ts'),
+    () => 'About - Chordless'
+  ),
   bookmarklet: view(
     'bookmarklet-view',
     () => import('./bookmarklet-view.ts'),

@@ -384,6 +384,11 @@ export class NavMenu extends LitElement {
             <app-icon name="layers" size="20" class="nav-icon"></app-icon>
             <span>Storage</span>
           </a>
+
+          <a href="/about" class="nav-menu-item" part="nav-item">
+            <app-icon name="info" size="20" class="nav-icon"></app-icon>
+            <span>About</span>
+          </a>
         </nav>
       </dialog>
 

@@ -21,7 +21,8 @@ import {
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
 import './media-player-settings.ts'
-import { buttonStyles, panelStyles } from './shared-styles.ts'
+import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
+import { renderStatus } from './status-view.ts'
 
 /**
  * AppPreferences Component
@@ -51,6 +52,7 @@ export class AppPreferences extends LitElement {
   static override styles = [
     panelStyles,
     buttonStyles,
+    statusStyles,
     css`
     :host {
       display: block;
@@ -73,61 +75,6 @@ export class AppPreferences extends LitElement {
     .toggle input[type='checkbox'] {
       width: 1.25rem;
       height: 1.25rem;
-    }
-
-    /* The wake lock's state: a badge whose icon and colour show it, with a word and the why */
-    .wake-status {
-      --look: var(--text-tertiary, #95a5a6);
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-      margin: 0.75rem 0;
-    }
-
-    .wake-status[data-look='good'] {
-      --look: var(--color-success, #27ae60);
-    }
-
-    .wake-status[data-look='warn'] {
-      --look: var(--color-warning, #f39c12);
-    }
-
-    .wake-status[data-look='bad'] {
-      --look: var(--color-danger, #e74c3c);
-    }
-
-    .wake-badge {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      width: 3.5rem;
-      height: 3.5rem;
-      border-radius: 50%;
-      border: 3px solid var(--look);
-      background: color-mix(in srgb, var(--look) 18%, transparent);
-    }
-
-    /* A lit screen has a glow around it */
-    .wake-status[data-look='good'] .wake-badge {
-      box-shadow: 0 0 0.75rem color-mix(in srgb, var(--look) 70%, transparent);
-    }
-
-    .wake-text {
-      display: flex;
-      flex-direction: column;
-      gap: 0.15rem;
-    }
-
-    .wake-label {
-      font-weight: 700;
-      font-size: var(--font-ui);
-    }
-
-    .wake-detail {
-      font-size: var(--font-ui-small);
-      opacity: 0.75;
-      line-height: 1.3;
     }
 
     .field {
@@ -325,21 +272,10 @@ export class AppPreferences extends LitElement {
 
   _renderWakeLockStatus() {
     const { look, icon, label, detail } = this._wakeLockDisplay()
-    return html`
-      <div
-        class="wake-status"
-        id="wake-lock-status"
-        role="status"
-        data-state=${wakeLock.state}
-        data-look=${look}
-      >
-        <span class="wake-badge"><app-icon name=${icon} size="28"></app-icon></span>
-        <span class="wake-text">
-          <span class="wake-label">${label}</span>
-          <span class="wake-detail">${detail}</span>
-        </span>
-      </div>
-    `
+    return renderStatus(
+      { look: look === 'idle' ? 'none' : look, icon, label, detail },
+      { id: 'wake-lock-status', state: wakeLock.state }
+    )
   }
 
   /** What the button does: ask again after a drop or a refusal, else start or stop keeping awake */

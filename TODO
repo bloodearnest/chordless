@@ -97,12 +97,13 @@ preferences
     poor UX), sized for touch (a large box and a big tap target on the whole row).
 
 offline
-- an update shows as a dot on the menu button and a first item in the menu (src/js/app-update.ts:
-  a new worker waits, the page reloads only when the user chooses). Left: a slim "A new version
-  is ready: Reload / Later" bar on pages that are not a setlist, and an App page (/about) with
-  the version, "Check for updates" and when it last checked, install status, offline readiness
-  and whether storage is persistent. Another window of the app that a new worker takes over
-  keeps its old code until reloaded: not handled.
+- an update shows as a dot on the menu button and a first item in the menu, and on the About
+  page (/about: version, check for updates, install, offline, storage) (src/js/app-update.ts: a
+  new worker waits, the page reloads only when the user chooses). Left: a slim "A new version is
+  ready: Reload / Later" bar on pages that are not a setlist. Another window of the app that a
+  new worker takes over keeps its old code until reloaded: not handled. Idea for About: a list
+  of the errors and CSP violations seen on this device, with a Copy button, for a device whose
+  DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
 - setlist-page.js and views/home-view.js still report save/add/delete failures with alert():

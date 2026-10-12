@@ -57,6 +57,11 @@ self.addEventListener('message', async event => {
 
   try {
     switch (type) {
+      case 'GET_VERSION':
+        // Which version of the app this worker (and the files it serves) is
+        respondToClient(event, messageId, { success: true, version: __CACHE_VERSION__ })
+        break
+
       case 'SKIP_WAITING':
         console.log('[SW] Received SKIP_WAITING message')
         self.skipWaiting()

@@ -140,6 +140,61 @@ describe('AppUpdate', () => {
     expect(update.ready).to.equal(false)
   })
 
+  it('notes when it last looked, and whether it could reach the server', async () => {
+    await start()
+    expect(update.lastChecked).to.equal(null)
+    expect(update.available).to.equal(true)
+
+    await update.check({ force: true })
+    expect(update.lastChecked).to.equal(clock)
+    expect(update.failed).to.equal(false)
+
+    clock += 5_000
+    must(container.registration).failUpdate = true
+    await update.check({ force: true })
+    expect(update.failed).to.equal(true)
+    expect(update.lastChecked).to.equal(clock)
+    expect(update.checking).to.equal(false)
+  })
+
+  it('says a check is under way while it is', async () => {
+    await start()
+    const seen: boolean[] = []
+    const watch = () => seen.push(update.checking)
+    window.addEventListener(AppUpdateChangeEvent.type, watch)
+    await update.check({ force: true })
+    window.removeEventListener(AppUpdateChangeEvent.type, watch)
+    expect(seen).to.deep.equal([true, false])
+  })
+
+  it('says a new version is being saved from when it is found until it is installed', async () => {
+    await start()
+    const worker = new FakeWorker()
+    must(container.registration).installing = worker
+    must(container.registration).dispatchEvent(new Event('updatefound'))
+    expect(update.installing).to.equal(true)
+    expect(update.ready).to.equal(false)
+    worker.state = 'installed'
+    worker.dispatchEvent(new Event('statechange'))
+    expect(update.installing).to.equal(false)
+    expect(update.ready).to.equal(true)
+  })
+
+  it('asks the worker which version is running', async () => {
+    const answers = new FakeWorker()
+    answers.postMessage = (message: unknown, transfer?: Transferable[]) => {
+      const port = transfer?.[0] as MessagePort
+      expect((message as { type: string }).type).to.equal('GET_VERSION')
+      port.postMessage({ version: 'abc123def456' })
+    }
+    container.controller = answers
+    await start()
+    expect(await update.runningVersion()).to.equal('abc123def456')
+
+    container.controller = null
+    expect(await update.runningVersion()).to.equal(null)
+  })
+
   it('asks the waiting worker to take over, and reloads once it has', async () => {
     const waiting = new FakeWorker()
     must(container.registration).waiting = waiting

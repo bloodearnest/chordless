@@ -195,3 +195,64 @@ export const spinnerStyles = css`
     }
   }
 `
+
+/**
+ * A status: a round badge whose icon and colour show how things are, with a word and the why
+ * (see renderStatus in status-view.ts, which makes the markup). data-look is the colour:
+ * good, warn, bad, or none (grey).
+ */
+export const statusStyles = css`
+  .status {
+    --look: var(--text-tertiary, #95a5a6);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.75rem 0;
+  }
+
+  .status[data-look='good'] {
+    --look: var(--color-success, #27ae60);
+  }
+
+  .status[data-look='warn'] {
+    --look: var(--color-warning, #f39c12);
+  }
+
+  .status[data-look='bad'] {
+    --look: var(--color-danger, #e74c3c);
+  }
+
+  .status-badge {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    border-radius: 50%;
+    border: 3px solid var(--look);
+    background: color-mix(in srgb, var(--look) 18%, transparent);
+  }
+
+  /* Something that is on has a glow around it */
+  .status[data-look='good'] .status-badge {
+    box-shadow: 0 0 0.75rem color-mix(in srgb, var(--look) 70%, transparent);
+  }
+
+  .status-text {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  .status-label {
+    font-weight: 700;
+    font-size: var(--font-ui);
+  }
+
+  .status-detail {
+    font-size: var(--font-ui-small);
+    opacity: 0.75;
+    line-height: 1.3;
+  }
+`
