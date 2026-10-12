@@ -128,3 +128,10 @@ test('every view runs with no Content-Security-Policy violations', async ({ page
   }
   expect(violations).toEqual([])
 })
+
+test('the real app is named Chordless, not the dev name', async ({ request }) => {
+  const manifest = await (await request.get('/manifest.webmanifest')).json()
+  expect(manifest.name).toBe('Chordless')
+  expect(manifest.short_name).toBe('Chordless')
+  expect(manifest.theme_color).toBe('#2c3e50')
+})

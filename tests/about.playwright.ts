@@ -141,3 +141,12 @@ test('the install panel says why installing is worth it', async ({ page }) => {
   await expect(about.getByRole('dialog', { name: 'Why install Chordless?' })).toBeVisible()
   await expect(about.locator('why-install .why')).toContainText('Your songs stay put')
 })
+
+test('the dev server names the app so it is not mistaken for the real one', async ({ request }) => {
+  const manifest = await (await request.get('/manifest.webmanifest')).json()
+  expect(manifest.name).toBe('Chordless (dev)')
+  expect(manifest.theme_color).not.toBe('#2c3e50')
+  // The rest is the real manifest's: the features that are tried out on the dev install
+  expect(manifest.share_target.action).toBe('/share-target')
+  expect(manifest.file_handlers).toHaveLength(1)
+})
