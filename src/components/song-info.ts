@@ -246,6 +246,16 @@ export class SongInfo extends LitElement {
                 : ''
             }
             ${
+              this.song.metadata?.copyright
+                ? html`
+                  <div class="modal-info-item">
+                    <div class="modal-info-label">Copyright</div>
+                    <div class="modal-info-value">${this.song.metadata.copyright}</div>
+                  </div>
+                `
+                : ''
+            }
+            ${
               stats.totalAppearances > 0
                 ? html`
                   <div class="modal-info-item">

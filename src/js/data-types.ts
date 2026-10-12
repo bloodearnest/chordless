@@ -241,6 +241,8 @@ export interface SongWithContent {
     tempo: string | number | null
     timeSignature: string | null
     tempoNote?: string
+    /** The chart's {copyright}, else the record's */
+    copyright?: string
     /** From the chart's CCLI lines: the {ccli} directive, and the CCLI Song # trailer */
     ccli?: string
     ccliSongNumber?: string

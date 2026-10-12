@@ -20,7 +20,7 @@ function fakeDb() {
       title: 'Credited Song',
       chordproFileId: 'c-credited',
       chordpro:
-        '{title: Credited Song}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020 A Publisher',
+        '{title: Credited Song}\n{copyright: Words PD. Chords © 2026 A. Person}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020 A Publisher',
     },
   }
   return {
@@ -69,6 +69,19 @@ describe('song-info-dialog', () => {
     const info = dialog.shadowRoot.querySelector('song-info').shadowRoot
     expect(info.querySelector('.modal-ccli').textContent).to.contain('7654321')
     expect(info.querySelector('.ccli-trailer').textContent).to.contain('A. Writer')
+  })
+
+  it("shows the chart's copyright, and no copyright line for a chart without one", async () => {
+    await setUp()
+    await dialog.show('credited')
+    await wait(100)
+    const info = () => dialog.shadowRoot.querySelector('song-info').shadowRoot
+    expect(info().textContent).to.contain('Copyright')
+    expect(info().textContent).to.contain('Chords © 2026 A. Person')
+
+    await dialog.show('fast')
+    await wait(100)
+    expect(info().textContent).to.not.contain('Copyright')
   })
 
   it("says so when the song can't be loaded", async () => {

@@ -117,6 +117,18 @@ describe('getSongWithContent', () => {
     expect((await getSongWithContent(directive.uuid)).metadata.ccli).to.equal('1234567')
   })
 
+  it("gives the chart's copyright in the metadata", async () => {
+    const song = await createSong(
+      chart(unique('Copyrighted'), { extra: '{copyright: Words PD. Chords © 2026 A. Person}' })
+    )
+    expect((await getSongWithContent(song.uuid)).metadata.copyright).to.equal(
+      'Words PD. Chords © 2026 A. Person'
+    )
+
+    const plain = await createSong(chart(unique('Uncredited')))
+    expect((await getSongWithContent(plain.uuid)).metadata.copyright).to.equal(undefined)
+  })
+
   it('says which song is missing', async () => {
     let error: Error | null = null
     try {
