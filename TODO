@@ -154,6 +154,20 @@ storage/sync
   public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
   or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain
   hymn (no copyrighted lyrics), and keep them out of the precache if they are large
+- privacy-preserving analytics (cookieless, like Plausible; GoatCounter, Umami and Cloudflare Web
+  Analytics are the alternatives). Proxy the script and its event endpoint through the worker so
+  the CSP stays 'self' and ad blockers don't drop it. Constraints: events are lost while the
+  device is offline (the iPad often is), so counts undercount; never send song titles, lyrics,
+  setlist names or the ids in /setlist/<id> and /songs/<id> (count the page type only); never send
+  Google sign-in data (email, name, id): the OAuth verification is for Limited Use; no events in
+  dev or the Playwright tests; update public/privacy.html (it says no analytics) in the same
+  change.
+  Song popularity: one event when a song is added to a setlist, with its CCLI song number as a
+  property (a public catalogue id, not user data), only when it is all digits (4 to 9 long), so
+  free text can never leak. Never fall back to the title (it may be a private song). Songs with no
+  CCLI number are not counted. Needs the CCLI metadata bug in "bugs" fixed first (the number is in
+  song.parsed.metadata). Plausible custom props: check which plan; GoatCounter can use an event
+  name like song-added/<number>; Cloudflare Web Analytics has no events. Say it in the policy too
 - security headers once chordless.app is live: a Content-Security-Policy (start as
   Content-Security-Policy-Report-Only, enforce once clean), set on the pages and on the service
   worker script. Needs: the inline <script> in index.html (move it or hash it), connect-src for
