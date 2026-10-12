@@ -80,6 +80,18 @@ const newKey = () => crypto.randomUUID()
 
 const STORAGE_KEY = 'chordless:view-states'
 
+/**
+ * The title of a page, as the document is given it. In an installed app's window the browser
+ * writes "<app name> - <title>", so a title that ends "- Chordless" would say it twice: it is
+ * dropped there, and the home page, which is just "Chordless", is "Setlists". A browser tab,
+ * which has no app name in front, keeps the full title.
+ */
+export function pageTitle(title: string, standalone: boolean): string {
+  if (!standalone) return title
+  const bare = title.replace(/ - Chordless$/, '')
+  return bare === 'Chordless' ? 'Setlists' : bare
+}
+
 /** sessionStorage, if the browser lets this page have it */
 function sessionStorageIfAvailable(): Storage | null {
   try {
@@ -305,7 +317,10 @@ export class AppRouter {
     this.#shownKey = window.history.state?.key ?? null
     this.#route = route
 
-    document.title = entry.title?.(route) ?? this.#defaultTitle
+    document.title = pageTitle(
+      entry.title?.(route) ?? this.#defaultTitle,
+      window.matchMedia('(display-mode: standalone)').matches
+    )
     if (!keep) this.#announceView(view, previous)
     provideRoute(route)
     document.dispatchEvent(new RouteChangeEvent(route, previous))

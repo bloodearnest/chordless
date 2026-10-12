@@ -1,7 +1,7 @@
 import { expect } from '@esm-bundle/chai'
 import { ContextConsumer } from '@lit/context'
 import { LitElement } from 'lit'
-import { AppRouter, RouteChangeEvent } from '../src/js/app-router.ts'
+import { AppRouter, pageTitle, RouteChangeEvent } from '../src/js/app-router.ts'
 import { routeContext } from '../src/js/route-context.ts'
 import { must } from './must.ts'
 
@@ -653,5 +653,21 @@ describe('AppRouter', () => {
       expect(view.isConnected).to.equal(false)
       expect(router.route).to.equal(null)
     })
+  })
+})
+
+describe('pageTitle', () => {
+  it('keeps the full title in a browser tab', () => {
+    expect(pageTitle('Preferences - Chordless', false)).to.equal('Preferences - Chordless')
+    expect(pageTitle('Chordless', false)).to.equal('Chordless')
+  })
+
+  it("leaves the app's name off in an installed app's window, which has it in front", () => {
+    expect(pageTitle('Preferences - Chordless', true)).to.equal('Preferences')
+    expect(pageTitle('Song Library - Chordless', true)).to.equal('Song Library')
+    // The home page is just the app's name, which would say it twice
+    expect(pageTitle('Chordless', true)).to.equal('Setlists')
+    // A title that only mentions the name keeps it
+    expect(pageTitle('About Chordless', true)).to.equal('About Chordless')
   })
 })
