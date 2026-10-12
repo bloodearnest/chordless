@@ -244,18 +244,6 @@ UI
   - either way, unsynced changes and device settings (theme, pad set) are lost: sync early and
     often (see the background sync item)
 - autoscaling font
-- first-use setup questions: ask a new user what they play, to set the defaults they would
-  otherwise find in Preferences. "Are you mainly a vocalist (lyrics only by default) or an
-  instrumentalist (lyrics and chords)? Are you a guitarist (turn on the capo)?" Either a few
-  questions on the welcome card on the home page, or a short modal wizard. Nothing new is
-  needed underneath: Preferences already has the musician type (setMusicianType in
-  preferences.ts: singer/drummer -> lyrics only, general/guitarist -> all; it also writes the
-  section defaults) and setCapoPreference. Open points: the musician type has four values
-  and the question has two (vocalist, instrumentalist), so decide whether guitarist is
-  asked separately and how drummer fits; whether it is asked once per device (the settings
-  are in localStorage, so a wiped Safari asks again, see the recover item); a "skip" that
-  leaves today's defaults; and that it can be redone from Preferences. Card or modal: the
-  card is less intrusive and sits with the install step, but a modal is not missed
 - install nag ("install to keep your data on this device"). The welcome card (a new user's home
   page) already has an "Install it" step with the reason and the per-platform instructions
   (src/js/install.ts has the detection and the Chromium prompt): this is the nag that keeps asking
