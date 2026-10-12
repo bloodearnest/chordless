@@ -1,18 +1,22 @@
 import { css, html, LitElement } from 'lit'
 import {
   getCapoPreference,
+  getKeepAwakePreference,
   getMusicianType,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
+  KeepAwakePreferenceEvent,
   type MusicianType,
   setCapoPreference,
+  setKeepAwakePreference,
   setMusicianType,
   setUseNashvilleNumbers,
   setUseUnicodeAccidentals,
 } from '../js/preferences.ts'
+import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
 import './media-player-settings.ts'
-import { panelStyles } from './shared-styles.ts'
+import { buttonStyles, panelStyles } from './shared-styles.ts'
 
 /**
  * AppPreferences Component
@@ -25,15 +29,20 @@ export class AppPreferences extends LitElement {
     useUnicodeAccidentals: { type: Boolean, attribute: false },
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
+    keepAwake: { type: Boolean, attribute: false },
+    _checking: { state: true },
   }
 
   declare useNashville: boolean
   declare useUnicodeAccidentals: boolean
   declare musicianType: MusicianType
   declare capoEnabled: boolean
+  declare keepAwake: boolean
+  declare _checking: boolean
 
   static override styles = [
     panelStyles,
+    buttonStyles,
     css`
     :host {
       display: block;
@@ -105,6 +114,61 @@ export class AppPreferences extends LitElement {
     this.useUnicodeAccidentals = getUseUnicodeAccidentals()
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
+    this.keepAwake = getKeepAwakePreference()
+    this._checking = false
+  }
+
+  override connectedCallback() {
+    super.connectedCallback()
+    window.addEventListener(WakeLockStateEvent.type, this._onWakeLockState)
+    // The menu's modal outlives each visit, and the setting can change elsewhere meanwhile
+    window.addEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
+    this.keepAwake = getKeepAwakePreference()
+  }
+
+  override disconnectedCallback() {
+    window.removeEventListener(WakeLockStateEvent.type, this._onWakeLockState)
+    window.removeEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
+    super.disconnectedCallback()
+  }
+
+  _onWakeLockState = (): void => this.requestUpdate()
+
+  _onKeepAwakeChanged = (event: KeepAwakePreferenceEvent): void => {
+    this.keepAwake = event.enabled
+  }
+
+  /** What the wake lock is doing, in words */
+  _wakeLockStatus(): string {
+    const refused = (error: string) =>
+      `The device refused it (${error}). Battery Saver can cause this.`
+    switch (wakeLock.state) {
+      case 'unsupported':
+        return "This browser can't keep the screen awake."
+      case 'off':
+        return 'Off: the screen may turn off while you play.'
+      case 'active':
+        return 'Active: the screen is being kept awake.'
+      case 'released':
+        return 'Let go by the device (another app, the screen off, or a low battery). It is taken again when you come back.'
+      case 'failed':
+        return refused(wakeLock.error)
+      default: {
+        const test = wakeLock.lastTest
+        if (test?.ok) return 'Ready: checked just now, and the device gives it.'
+        if (test) return refused(test.error ?? 'unknown error')
+        return 'Ready: the screen is kept awake while a setlist is open.'
+      }
+    }
+  }
+
+  async _checkWakeLock(): Promise<void> {
+    this._checking = true
+    try {
+      await wakeLock.check()
+    } finally {
+      this._checking = false
+    }
   }
 
   override render() {
@@ -168,6 +232,35 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
+          <h3>Screen</h3>
+          <p>Keep the screen from turning off while a setlist is open, so you needn't touch it.</p>
+          <label class="toggle" for="toggle-keep-awake">
+            <input
+              type="checkbox"
+              id="toggle-keep-awake"
+              name="keep-screen-awake"
+              ?checked=${this.keepAwake}
+              ?disabled=${!WakeLockController.supported}
+              @change=${this._onKeepAwakeToggle}
+            />
+            <span>Keep the screen awake</span>
+          </label>
+          <p id="wake-lock-status" role="status">${this._wakeLockStatus()}</p>
+          ${
+            WakeLockController.supported && this.keepAwake
+              ? html`<button
+                class="btn"
+                type="button"
+                ?disabled=${this._checking || wakeLock.state === 'active'}
+                @click=${this._checkWakeLock}
+              >
+                ${wakeLock.state === 'released' || wakeLock.state === 'failed' ? 'Ask again' : 'Check now'}
+              </button>`
+              : ''
+          }
+        </div>
+
+        <div class="panel">
           <h3>Chords</h3>
           <p>Display chord charts using relative Nashville numbers instead of letter names.</p>
           <label class="toggle" for="toggle-use-nashville">
@@ -222,6 +315,12 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.useUnicodeAccidentals = value
     setUseUnicodeAccidentals(value)
+  }
+
+  _onKeepAwakeToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.keepAwake = value
+    setKeepAwakePreference(value)
   }
 
   _onCapoToggle(event: Event): void {

@@ -12,6 +12,7 @@ import '../../components/song-info-dialog.ts'
 import '../../components/song-section.ts'
 import '../../components/song-settings-popover.ts'
 import { SetlistPage } from '../setlist-page.ts'
+import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
 
 /**
@@ -30,6 +31,7 @@ export class SetlistView extends PageView {
   }
 
   override firstUpdated() {
+    wakeLock.hold()
     const { setlistId, songIndex } = this.#setlistRoute()
     this.#page = new SetlistPage({
       root: this,
@@ -56,6 +58,7 @@ export class SetlistView extends PageView {
 
   override disconnectedCallback() {
     super.disconnectedCallback()
+    wakeLock.letGo()
     this.#page?.dispose()
     this.#page = null
   }

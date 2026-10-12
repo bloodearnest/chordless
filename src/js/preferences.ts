@@ -49,12 +49,22 @@ export class CapoPreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** The keep-the-screen-awake preference changed (sent on window) */
+export class KeepAwakePreferenceEvent extends Event {
+  static readonly type = 'preferences:keep-awake-changed'
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
+    super(KeepAwakePreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
 const NASHVILLE_PREF_KEY = 'use-nashville'
 const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
 const MUSICIAN_TYPE_KEY = 'musician_type'
 const SECTION_DEFAULTS_KEY = 'section_defaults'
 const ENABLE_CAPO_KEY = 'enable_capo'
 const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
+const KEEP_AWAKE_KEY = 'keep_screen_awake'
 
 let cachedUseNashville: boolean | null = null
 let cachedUseUnicodeAccidentals: boolean | null = null
@@ -194,8 +204,28 @@ export function setCapoPreference(value: boolean) {
   }
 }
 
+/** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */
+export function getKeepAwakePreference(): boolean {
+  try {
+    return localStorage.getItem(KEEP_AWAKE_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+export function setKeepAwakePreference(value: boolean) {
+  const enabled = !!value
+  try {
+    localStorage.setItem(KEEP_AWAKE_KEY, enabled ? 'true' : 'false')
+  } catch (error) {
+    console.error('Failed to save keep-awake preference', error)
+  }
+  window.dispatchEvent(new KeepAwakePreferenceEvent(enabled))
+}
+
 declare global {
   interface GlobalEventHandlersEventMap {
+    [KeepAwakePreferenceEvent.type]: KeepAwakePreferenceEvent
     [NashvillePreferenceEvent.type]: NashvillePreferenceEvent
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent

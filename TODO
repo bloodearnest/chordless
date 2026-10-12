@@ -162,7 +162,6 @@ live mode
    section and reloading straight away can lose it
  - button on setlist
  - fullscreen
- - keep screen alive
  - webrtc sync (live session: following the leader's song/section)
 
 tests
