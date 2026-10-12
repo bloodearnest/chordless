@@ -100,6 +100,66 @@ async function auditOrg(org) {
   }
 }
 
+// Setlist files in the Drive trash: what earlier cleanups removed. A device that was syncing
+// with a file that was later trashed re-uploads its setlist, so the trashed files' setlistIds
+// show where a duplicate's id came from.
+async function auditTrash() {
+  const files = await listAll(
+    "trashed=true and mimeType='application/json'",
+    'id,name,createdTime,modifiedTime,trashedTime,appProperties'
+  )
+  const setlists = files
+    .filter(f => f.appProperties?.setlistId)
+    .map(f => ({
+      fileId: f.id,
+      name: f.name,
+      createdTime: f.createdTime,
+      trashedTime: f.trashedTime ?? null,
+      setlistId: f.appProperties.setlistId,
+    }))
+    .sort((a, b) => (a.trashedTime ?? '').localeCompare(b.trashedTime ?? ''))
+  const byDay = {}
+  for (const f of setlists) {
+    const day = (f.trashedTime ?? 'unknown').slice(0, 10)
+    byDay[day] = (byDay[day] ?? 0) + 1
+  }
+  return { count: setlists.length, byDay, files: setlists }
+}
+
+function renderTrash(trash, orgs) {
+  const liveIds = new Set(orgs.flatMap(o => o.files.map(f => f.setlistId)))
+  const matching = trash.files.filter(f => liveIds.has(f.setlistId))
+  const byId = new Map()
+  for (const f of trash.files) byId.set(f.setlistId, [...(byId.get(f.setlistId) ?? []), f])
+  const repeated = [...byId.values()].filter(group => group.length > 1)
+  return `
+    <h2>Trashed setlist files: ${trash.count}</h2>
+    <p>Trashed per day: ${
+      Object.entries(trash.byDay)
+        .map(([day, n]) => `${esc(day)}: ${n}`)
+        .join(', ') || 'none'
+    }</p>
+    <p>${matching.length} have a setlistId that a live file also has.</p>
+    <p>${repeated.length} setlistIds are on more than one trashed file (trashed at different times
+      means a file was trashed, then its setlist uploaded again under the same id):</p>
+    <ul>${repeated
+      .slice(0, 100)
+      .map(
+        group =>
+          `<li><code>${esc(group[0].setlistId)}</code>: ${group.map(f => esc(f.trashedTime)).join(', ')}</li>`
+      )
+      .join('')}</ul>
+    <details><summary>Trashed files</summary><table>
+      <tr><th>trashed</th><th>created</th><th>file</th><th>setlistId</th></tr>
+      ${trash.files
+        .map(
+          f =>
+            `<tr><td>${esc(f.trashedTime)}</td><td>${esc(f.createdTime)}</td><td>${esc(f.name)}</td><td>${esc(f.setlistId)}</td></tr>`
+        )
+        .join('')}
+    </table></details>`
+}
+
 function renderGroup(title, groups) {
   if (!groups.length) return `<p class="ok">✓ No ${esc(title)}</p>`
   return `<p class="problem">✗ ${groups.length} ${esc(title)}</p><ul>${groups
@@ -262,8 +322,11 @@ document.getElementById('run').addEventListener('click', async () => {
         orgs.push(await auditOrg(org))
       }
     }
-    report = { generatedAt: new Date().toISOString(), chordlessFolders: roots.length, orgs }
+    status.textContent = 'Listing the trash...'
+    const trash = await auditTrash()
+    report = { generatedAt: new Date().toISOString(), chordlessFolders: roots.length, orgs, trash }
     render(orgs)
+    output.insertAdjacentHTML('beforeend', renderTrash(trash, orgs))
     showCleanup()
     status.textContent += 'Done.'
     document.getElementById('copy').disabled = false
