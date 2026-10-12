@@ -37,7 +37,7 @@ import {
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
 import { SongChangeEvent } from './app-events.ts'
-import type { HideMode, LoadedSong, SectionState, Setlist, SongWithContent } from './data-types.ts'
+import type { HideMode, SectionState, Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { goTo } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
@@ -1105,8 +1105,7 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      // (null for a song with its own edits: the model has never coped with that; see the TODO)
-      song._canonicalSong as LoadedSong,
+      song._canonicalSong,
       this.currentSetlistId ?? '',
       this._database(),
       this._database().organisationId
@@ -1770,8 +1769,7 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      // (null for a song with its own edits: the model has never coped with that; see the TODO)
-      song._canonicalSong as LoadedSong,
+      song._canonicalSong,
       this.currentSetlistId ?? '',
       this._database(),
       this._database().organisationId
@@ -1809,8 +1807,7 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      // (null for a song with its own edits: the model has never coped with that; see the TODO)
-      song._canonicalSong as LoadedSong,
+      song._canonicalSong,
       this.currentSetlistId ?? '',
       this._database(),
       this._database().organisationId
@@ -1849,8 +1846,7 @@ export class SetlistPage {
     const model = createSetlistSongModel(
       song,
       song._setlistEntry,
-      // (null for a song with its own edits: the model has never coped with that; see the TODO)
-      song._canonicalSong as LoadedSong,
+      song._canonicalSong,
       this.currentSetlistId ?? '',
       this._database(),
       this._database().organisationId

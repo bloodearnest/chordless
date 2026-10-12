@@ -12,12 +12,24 @@ import type { RuntimeSong } from './setlist/runtime-songs.ts'
  * and the new SongModel abstraction for persistence.
  */
 
+/** What a song with its own edits stands in for its canonical song: the edited chart */
+function editedSongStandIn(runtimeSong: RuntimeSong, setlistEntry: SetlistEntry): LoadedSong {
+  return {
+    id: setlistEntry.songId,
+    uuid: setlistEntry.songUuid,
+    title: runtimeSong.title,
+    parsed: runtimeSong.parsed,
+    originalKey: runtimeSong.originalKey,
+  }
+}
+
 /**
  * Create a SetlistSong model for a song in a setlist
  *
  * @param runtimeSong - Runtime song object from this.songs[]
  * @param setlistEntry - Entry from setlist.songs[]
- * @param canonicalSong - Full canonical song with parsed content
+ * @param canonicalSong - Full canonical song with parsed content; null for a song with its own
+ *   edits (chordproEdits), which has none: the model then gets one made from the runtime song
  * @param setlistId - Setlist ID
  * @param db - Database instance
  * @param orgId - Organisation ID
@@ -25,7 +37,7 @@ import type { RuntimeSong } from './setlist/runtime-songs.ts'
 export function createSetlistSongModel(
   runtimeSong: RuntimeSong,
   setlistEntry: SetlistEntry,
-  canonicalSong: LoadedSong,
+  canonicalSong: LoadedSong | null,
   setlistId: string,
   db: ChordlessDB,
   orgId: string
@@ -33,7 +45,14 @@ export function createSetlistSongModel(
   const songIndex = runtimeSong.songIndex
 
   // Create SetlistSong model
-  const model = new SetlistSong(setlistEntry, canonicalSong, setlistId, db, orgId, songIndex)
+  const model = new SetlistSong(
+    setlistEntry,
+    canonicalSong ?? editedSongStandIn(runtimeSong, setlistEntry),
+    setlistId,
+    db,
+    orgId,
+    songIndex
+  )
 
   // Sync current runtime state into model (if changed from defaults)
   if (runtimeSong.currentKey && runtimeSong.currentKey !== setlistEntry.key) {
