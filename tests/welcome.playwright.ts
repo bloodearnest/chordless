@@ -9,6 +9,37 @@ test('a new user sees the welcome card, not an empty list', async ({ page }) => 
   await expect(page.getByText('No setlists found')).toHaveCount(0)
 })
 
+test('the setup questions save the preferences as they are answered', async ({ page }) => {
+  await openApp(page, '/')
+  const card = page.locator('welcome-card')
+  const stored = () =>
+    page.evaluate(() => ({
+      type: localStorage.getItem('musician_type'),
+      defaults: localStorage.getItem('section_defaults'),
+      capo: localStorage.getItem('enable_capo'),
+    }))
+
+  // Chords and lyrics, and no capo, until they say otherwise
+  await expect(card.getByRole('radio', { name: /^Chords and lyrics/ })).toBeChecked()
+  await expect(card.getByRole('checkbox', { name: /guitar/ })).not.toBeChecked()
+
+  await card.getByRole('radio', { name: /^Lyrics only/ }).check()
+  await card.getByRole('checkbox', { name: /guitar/ }).check()
+  expect(await stored()).toEqual({
+    type: 'singer',
+    defaults: JSON.stringify({ all: 'lyrics' }),
+    capo: 'true',
+  })
+
+  await card.getByRole('radio', { name: /^Chords and lyrics/ }).check()
+  await card.getByRole('checkbox', { name: /guitar/ }).uncheck()
+  expect(await stored()).toEqual({
+    type: 'general',
+    defaults: JSON.stringify({ all: 'all' }),
+    capo: 'false',
+  })
+})
+
 test('the sample setlist has the four hymns, and the card goes once there is a setlist', async ({
   page,
 }) => {

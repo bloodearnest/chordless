@@ -6,6 +6,12 @@ import {
   promptInstall,
 } from '../js/install.ts'
 import { goTo } from '../js/navigation.ts'
+import {
+  getCapoPreference,
+  getMusicianType,
+  setCapoPreference,
+  setMusicianType,
+} from '../js/preferences.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -13,23 +19,32 @@ import { buttonStyles } from './shared-styles.ts'
  * WelcomeCard
  *
  * What a new user sees on the home page instead of an empty list: what Chordless is, and the
- * next steps (try the samples, add songs, sign in, install it). The home page shows it only
- * while there are no setlists.
+ * next steps (set it up for how they play, try the samples, add songs, sign in, install it).
+ * The home page shows it only while there are no setlists.
+ *
+ * The setup choices are the ones in Preferences, saved as soon as they are made.
  */
 export class WelcomeCard extends LitElement {
   static override properties = {
     _installMode: { state: true },
+    _lyricsOnly: { state: true },
+    _capo: { state: true },
     _busy: { state: true },
     _error: { state: true },
   }
 
   declare _installMode: InstallMode
+  declare _lyricsOnly: boolean
+  declare _capo: boolean
   declare _busy: boolean
   declare _error: string
 
   constructor() {
     super()
     this._installMode = currentInstallMode()
+    const musicianType = getMusicianType()
+    this._lyricsOnly = musicianType === 'singer' || musicianType === 'drummer'
+    this._capo = getCapoPreference()
     this._busy = false
     this._error = ''
   }
@@ -93,6 +108,37 @@ export class WelcomeCard extends LitElement {
         text-decoration: none;
       }
 
+      fieldset {
+        border: none;
+        margin: 0 0 0.75rem;
+        padding: 0;
+      }
+
+      legend {
+        font-size: var(--font-ui-small);
+        font-weight: 600;
+        padding: 0;
+        margin: 0 0 0.25rem;
+      }
+
+      /* The whole row is the tap target */
+      .choice {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        font-size: var(--font-ui-small);
+        cursor: pointer;
+      }
+
+      .choice input {
+        width: 1.5rem;
+        height: 1.5rem;
+        flex-shrink: 0;
+        margin: 0;
+        cursor: pointer;
+      }
+
       .why {
         opacity: 0.8;
       }
@@ -115,6 +161,16 @@ export class WelcomeCard extends LitElement {
 
   _refreshInstallMode = (): void => {
     this._installMode = currentInstallMode()
+  }
+
+  _chooseDisplay(lyricsOnly: boolean): void {
+    this._lyricsOnly = lyricsOnly
+    setMusicianType(lyricsOnly ? 'singer' : 'general')
+  }
+
+  _chooseCapo(event: Event): void {
+    this._capo = (event.currentTarget as HTMLInputElement).checked
+    setCapoPreference(this._capo)
   }
 
   async _addSamples(): Promise<void> {
@@ -179,6 +235,35 @@ export class WelcomeCard extends LitElement {
           each service. It works offline, so it is ready even when the wifi is not.
         </p>
         <ol>
+          <li id="welcome-setup">
+            <h3>Set it up for you</h3>
+            <p>Chordless starts each song the way you read it. You can change this later in Preferences.</p>
+            <fieldset>
+              <legend>What do you read?</legend>
+              <label class="choice">
+                <input
+                  type="radio"
+                  name="display"
+                  .checked=${!this._lyricsOnly}
+                  @change=${() => this._chooseDisplay(false)}
+                />
+                <span>Chords and lyrics: I play an instrument</span>
+              </label>
+              <label class="choice">
+                <input
+                  type="radio"
+                  name="display"
+                  .checked=${this._lyricsOnly}
+                  @change=${() => this._chooseDisplay(true)}
+                />
+                <span>Lyrics only: I sing, or don't need chords</span>
+              </label>
+            </fieldset>
+            <label class="choice">
+              <input type="checkbox" .checked=${this._capo} @change=${this._chooseCapo} />
+              <span>I play guitar: show a capo control</span>
+            </label>
+          </li>
           <li id="welcome-samples">
             <h3>Try it</h3>
             <p>Add a sample setlist of four public-domain hymns, to see how it works.</p>
