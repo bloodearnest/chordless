@@ -15,9 +15,9 @@
  *   returned when `fields` requests it.
  * - modifiedTime comes from the server clock (Date.now() + clockOffsetMs), not
  *   the client's, and changes on content updates.
- * - md5Checksum is derived from the content (a stand-in hash, not real MD5: code
- *   only compares checksums), changes only when content does, and folders have
- *   none.
+ * - md5Checksum is the real MD5 of the content, changes only when content does, and folders
+ *   have none. corruptUploads = n makes the next n uploads report a wrong one, as if Drive
+ *   had stored other bytes.
  * - Metadata-only PATCHes don't change modifiedTime. ASSUMPTION: verify against
  *   real Drive in the integration tests.
  *
@@ -26,6 +26,7 @@
  */
 
 import { setAccessTokenProvider } from '../src/js/drive-api.ts'
+import { md5Hex } from '../src/js/utils/md5.ts'
 
 const FOLDER_MIME = 'application/vnd.google-apps.folder'
 const DEFAULT_FILE_FIELDS = ['kind', 'id', 'name', 'mimeType']
@@ -44,6 +45,8 @@ export class FakeDrive {
 
   _nextId: any
 
+  corruptUploads: number
+
   _failures: any
 
   errors: any
@@ -59,6 +62,7 @@ export class FakeDrive {
     /** Largest page a list request returns (real Drive: 1000) */
     this.maxPageSize = 1000
     this._nextId = 1
+    this.corruptUploads = 0
     this._failures = []
     /** FakeDriveErrors raised while handling requests. The app may swallow
      * fetch errors (e.g. batchUploadFiles), so tests assert this stays empty. */
@@ -116,9 +120,18 @@ export class FakeDrive {
     this._setContent(file, content)
   }
 
+  /** The checksum Drive reports for an upload: wrong while corruptUploads is counting down */
+  _checksum(content) {
+    if (this.corruptUploads > 0) {
+      this.corruptUploads--
+      return fakeChecksum(`${content} (corrupted)`)
+    }
+    return fakeChecksum(content)
+  }
+
   _setContent(file, content) {
     file.content = content
-    file.md5Checksum = fakeChecksum(content)
+    file.md5Checksum = this._checksum(content)
     file.modifiedTime = this.now()
     file.version++
   }
@@ -256,7 +269,7 @@ export class FakeDrive {
       version: 1,
       permissions: [],
       content,
-      md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : fakeChecksum(content),
+      md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : this._checksum(content),
     }
     this.files.set(file.id, file)
     return json(this._project(file, params.get('fields')))
@@ -421,13 +434,9 @@ function parseMultipart(contentType, body) {
   return { metadata: JSON.parse(parts[0].body), content: parts[1].body }
 }
 
-/** Deterministic content hash standing in for Drive's md5Checksum */
+/** Drive's md5Checksum of a file's content: the MD5 of its UTF-8 bytes */
 function fakeChecksum(content) {
-  let hash = 0x811c9dc5
-  for (let i = 0; i < content.length; i++) {
-    hash = Math.imul(hash ^ content.charCodeAt(i), 0x01000193)
-  }
-  return `fake-md5-${(hash >>> 0).toString(16)}-${content.length}`
+  return md5Hex(content)
 }
 
 function json(data, status = 200) {

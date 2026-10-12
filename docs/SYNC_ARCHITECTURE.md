@@ -126,6 +126,12 @@ Each synced record stores, from its last sync:
   undone edit isn't a change); for songs it's the chart text.
 - **Changed in Drive:** Drive's listed `md5Checksum` differs from `driveChecksum`.
   Both come from Drive, so device clocks never matter.
+- **Upload check:** after every upload or update, the `md5Checksum` Drive reports must be the
+  MD5 of the bytes we sent (`utils/md5.ts`: WebCrypto has no MD5). If it is not, Drive stored
+  something else: the record is kept as changed here, and the next push uploads it again over
+  the same file. (Local change detection does not use MD5: setlists are compared by a hash of
+  their content without `modifiedDate`, key order or sync fields, which the uploaded bytes
+  include.)
 - **Both:** a conflict. Currently **Drive wins** and the local edit is dropped (with
   a console warning).
 - Records synced before these fields existed fall back to timestamp checks (device

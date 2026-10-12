@@ -42,6 +42,7 @@ import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
 import { chartFields, hashText } from './song-utils.ts'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
+import { md5Hex } from './utils/md5.ts'
 
 /** A setlist's file content in Drive */
 function setlistJson(setlist: Setlist): string {
@@ -1333,8 +1334,10 @@ export class DriveSyncManager {
               setlist.driveFileId = driveFile.id
               setlist.driveModifiedTime = driveFile.modifiedTime ?? null
               setlist.driveChecksum = driveFile.md5Checksum ?? null
-              setlist.lastSyncedAt = new Date().toISOString()
-              setlist.syncedContentHash = setlistContentHash(setlist)
+              if (this.driveHolds(driveFile, files[j].content, `setlist ${setlist.id}`)) {
+                setlist.lastSyncedAt = new Date().toISOString()
+                setlist.syncedContentHash = setlistContentHash(setlist)
+              }
               savedSetlists.push(setlist)
               processed++
             }
@@ -1405,9 +1408,10 @@ export class DriveSyncManager {
         // New setlist, upload it
         console.log(`[DriveSync] Uploading new setlist: ${setlist.id}`)
 
+        const content = setlistJson(setlist)
         const driveFile = await DriveAPI.createFile(
           { ...this.setlistMetadata(setlist), parents: [await this.getCachedSetlistsFolder()] },
-          setlistJson(setlist),
+          content,
           'application/json'
         )
 
@@ -1415,8 +1419,10 @@ export class DriveSyncManager {
         setlist.driveFileId = driveFile.id
         setlist.driveModifiedTime = driveFile.modifiedTime ?? null
         setlist.driveChecksum = driveFile.md5Checksum ?? null
-        setlist.lastSyncedAt = new Date().toISOString()
-        setlist.syncedContentHash = setlistContentHash(setlist)
+        if (this.driveHolds(driveFile, content, `setlist ${setlist.id}`)) {
+          setlist.lastSyncedAt = new Date().toISOString()
+          setlist.syncedContentHash = setlistContentHash(setlist)
+        }
         await this.#db.saveSetlist(setlist)
 
         console.log(`[DriveSync] ✅ Uploaded setlist: ${setlist.id}`)
@@ -1425,18 +1431,21 @@ export class DriveSyncManager {
         console.log(`[DriveSync] Updating setlist: ${setlist.id}`)
 
         // Metadata too, so the file name follows e.g. a changed date or leader
+        const content = setlistJson(setlist)
         const driveFile = await DriveAPI.updateFile(
           setlist.driveFileId,
           forUpdate(this.setlistMetadata(setlist), 'setlist'),
-          setlistJson(setlist),
+          content,
           'application/json'
         )
 
         // Update sync metadata
         setlist.driveModifiedTime = driveFile?.modifiedTime ?? null
         setlist.driveChecksum = driveFile?.md5Checksum ?? null
-        setlist.lastSyncedAt = new Date().toISOString()
-        setlist.syncedContentHash = setlistContentHash(setlist)
+        if (this.driveHolds(driveFile, content, `setlist ${setlist.id}`)) {
+          setlist.lastSyncedAt = new Date().toISOString()
+          setlist.syncedContentHash = setlistContentHash(setlist)
+        }
         await this.#db.saveSetlist(setlist)
 
         console.log(`[DriveSync] ✅ Updated setlist: ${setlist.id}`)
@@ -1536,11 +1545,15 @@ export class DriveSyncManager {
             tracking.song,
             tracking.chordproFile
           )
-          tracking.song.lastSyncedAt = new Date().toISOString()
           tracking.song.driveModifiedTime = driveFile.modifiedTime ?? null
           tracking.song.driveChecksum = driveFile.md5Checksum ?? null
-          tracking.song.syncedContentHash = hashText(tracking.chordproFile.content)
-          tracking.song.contentHash = tracking.chordproFile.contentHash
+          if (
+            this.driveHolds(driveFile, tracking.chordproFile.content, `song ${tracking.song.id}`)
+          ) {
+            tracking.song.lastSyncedAt = new Date().toISOString()
+            tracking.song.syncedContentHash = hashText(tracking.chordproFile.content)
+            tracking.song.contentHash = tracking.chordproFile.contentHash
+          }
           updatedSongs.push(tracking.song)
           processed++
         }
@@ -1637,11 +1650,13 @@ export class DriveSyncManager {
       }
 
       song.driveProperties = this.songDriveProperties(song, chordproFile)
-      song.lastSyncedAt = new Date().toISOString()
       song.driveModifiedTime = driveFile?.modifiedTime ?? null
       song.driveChecksum = driveFile?.md5Checksum ?? null
-      song.syncedContentHash = contentHash
-      song.contentHash = chordproFile.contentHash
+      if (this.driveHolds(driveFile, chordproFile.content, `song ${song.id}`)) {
+        song.lastSyncedAt = new Date().toISOString()
+        song.syncedContentHash = contentHash
+        song.contentHash = chordproFile.contentHash
+      }
 
       await this.#db.saveSong(song)
 
@@ -1650,6 +1665,19 @@ export class DriveSyncManager {
       console.error(`[DriveSync] Failed to push song ${song.id}/${songUuid}:`, error)
       throw error
     }
+  }
+
+  /**
+   * Whether Drive stored exactly the bytes we sent: the md5Checksum it reports for the upload
+   * is the MD5 of the content. If not, the record is kept as changed here (its synced markers
+   * are not set), so the next push uploads it again, over the same file.
+   */
+  driveHolds(driveFile: DriveFile | null | undefined, content: string, what: string): boolean {
+    if (!driveFile?.md5Checksum || md5Hex(content) === driveFile.md5Checksum) return true
+    console.error(
+      `[DriveSync] Drive stored other content for ${what} than was sent: uploading it again next sync`
+    )
+    return false
   }
 
   /** Drive file metadata for a setlist (see drive-metadata.js) */

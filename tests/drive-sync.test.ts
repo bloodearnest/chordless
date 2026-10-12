@@ -604,6 +604,58 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(driveSetlist(setlist.id).name).to.equal('Edited')
     })
 
+    describe('when Drive reports other content than was sent', () => {
+      it('keeps the setlist as changed, and uploads it again over the same file', async () => {
+        const phone = await makeDevice('phone')
+        const setlist = await addSetlist(phone, { name: 'Intact' })
+        drive.corruptUploads = 1
+
+        await syncDevice(phone)
+
+        const afterFirst = must(await phone.db.getSetlist(setlist.id))
+        expect(afterFirst.driveFileId).to.be.a('string')
+        expect(phone.sync.setlistHasLocalChanges(afterFirst)).to.equal(true)
+
+        await syncDevice(phone)
+
+        expect(driveSetlistFiles()).to.have.length(1)
+        const settled = must(await phone.db.getSetlist(setlist.id))
+        expect(settled.driveFileId).to.equal(afterFirst.driveFileId)
+        expect(phone.sync.setlistHasLocalChanges(settled)).to.equal(false)
+      })
+
+      it('does the same for a setlist update', async () => {
+        const phone = await makeDevice('phone')
+        const setlist = await addSetlist(phone, { name: 'Original' })
+        await syncDevice(phone)
+        await editSetlist(phone, setlist.id, { name: 'Edited' })
+        drive.corruptUploads = 1
+
+        await syncDevice(phone)
+        expect(
+          phone.sync.setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))
+        ).to.equal(true)
+
+        await syncDevice(phone)
+
+        expect(driveSetlist(setlist.id).name).to.equal('Edited')
+        expect(
+          phone.sync.setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))
+        ).to.equal(false)
+      })
+
+      it('records a good upload as synced', async () => {
+        const phone = await makeDevice('phone')
+        const setlist = await addSetlist(phone, { name: 'Fine' })
+
+        await syncDevice(phone)
+
+        const local = must(await phone.db.getSetlist(setlist.id))
+        expect(phone.sync.setlistHasLocalChanges(local)).to.equal(false)
+        expect(local.driveChecksum).to.equal(drive.listFiles()[0].md5Checksum)
+      })
+    })
+
     it('uploads two identical setlists made on one device', async () => {
       // The user made both; refusing one would leave their work unsynced
       const phone = await makeDevice('phone')
