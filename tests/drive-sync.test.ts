@@ -604,6 +604,34 @@ describe('Drive sync (against FakeDrive)', () => {
       )
     })
 
+    it("doesn't upload a second record of a setlist that Drive already holds", async () => {
+      // e.g. a device with its own record of the same service, under another id
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const same = { date: '2026-10-11', owner: 'Sam', type: 'Church Service' }
+      await addSetlist(phone, { ...same, name: '' })
+      await syncDevice(phone)
+      const own = await addSetlist(tablet, { ...same, name: '' })
+
+      await syncDevice(tablet)
+
+      expect(driveSetlistFiles()).to.have.length(1)
+      expect(must(await tablet.db.getSetlist(own.id)).driveFileId).to.not.be.ok
+    })
+
+    it('still uploads a setlist that differs in its name', async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const same = { date: '2026-10-11', owner: 'Sam', type: 'Event' }
+      await addSetlist(phone, { ...same, name: 'Morning' })
+      await syncDevice(phone)
+      await addSetlist(tablet, { ...same, name: 'Evening' })
+
+      await syncDevice(tablet)
+
+      expect(driveSetlistFiles()).to.have.length(2)
+    })
+
     it("doesn't duplicate setlists when the inventory spans several pages", async () => {
       // Regression: the inventory only read the first page of each folder, so
       // files on later pages looked missing and were re-uploaded.

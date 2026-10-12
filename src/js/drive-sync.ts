@@ -35,6 +35,7 @@ import {
 import {
   forUpdate,
   setlistFileMetadata,
+  setlistFilename,
   songFileDetails,
   songFileMetadata,
 } from './drive-metadata.ts'
@@ -187,6 +188,8 @@ export class DriveSyncManager {
   CONCURRENT_LIMIT: number
   /** The ids of the files in the organisation's Drive folder, once listed */
   _driveFileIds: Set<string> | null
+  /** The setlist files in Drive, as listed by the last pull */
+  _liveSetlistFiles: DriveFile[] | null
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -215,6 +218,7 @@ export class DriveSyncManager {
 
     // Drive file inventory (for existence checks)
     this._driveFileIds = null // Set of file IDs that exist in Drive
+    this._liveSetlistFiles = null
   }
 
   /** The database, once init() has set it */
@@ -395,6 +399,7 @@ export class DriveSyncManager {
       // Clear caches after sync
       this._folderCache.clear()
       this._driveFileIds = null
+      this._liveSetlistFiles = null
     }
   }
 
@@ -524,6 +529,17 @@ export class DriveSyncManager {
    */
   isOrphaned(record: { driveFileId?: string | null }): boolean {
     return !record.driveFileId || !this.fileExistsInDrive(record.driveFileId)
+  }
+
+  /**
+   * The live Drive file for the same setlist (same file name: date, leader, type and name)
+   * under another setlist id, if the last pull saw one
+   */
+  liveFileOfAnotherSetlist(setlist: Setlist): DriveFile | undefined {
+    const name = setlistFilename(setlist)
+    return this._liveSetlistFiles?.find(
+      file => file.name === name && file.appProperties?.setlistId !== setlist.id
+    )
   }
 
   /**
@@ -672,6 +688,7 @@ export class DriveSyncManager {
     // Get all setlists from Drive
     const driveSetlists = await DriveAPI.listSetlists(this.#folderId)
     console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`)
+    this._liveSetlistFiles = driveSetlists
 
     const downloadQueue: {
       driveFile: DriveFile
@@ -1177,6 +1194,20 @@ export class DriveSyncManager {
         newSetlists.push(setlist)
       }
     }
+
+    // A setlist with no live file of its own that Drive already holds under another id (the
+    // same date, leader, type and name) is that setlist stored twice, e.g. two devices each
+    // made their own record of it. Uploading it would duplicate it, so leave it here.
+    const toUpload = newSetlists.filter(setlist => {
+      const twin = this.liveFileOfAnotherSetlist(setlist)
+      if (!twin) return true
+      console.warn(
+        `[DriveSync] Not uploading setlist ${setlist.id}: Drive already has ${twin.name} ` +
+          `(${twin.id}) for another setlist. Reset this device from Google Drive to fix it.`
+      )
+      return false
+    })
+    newSetlists.splice(0, newSetlists.length, ...toUpload)
 
     console.log(`[DriveSync] ${newSetlists.length} new, ${updatedSetlists.length} updates`)
 

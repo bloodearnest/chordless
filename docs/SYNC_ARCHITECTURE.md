@@ -74,6 +74,10 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
    here, it keeps its edits and the push updates the live file; unchanged here but newer in
    Drive, Drive's content is taken. Without this, every such setlist was uploaded as a copy.
 5. **Push** setlists then songs: upload what's new or changed locally.
+   A setlist with no live file that Drive already holds under another id (a file with the
+   same name: date, leader, type and name) is not uploaded: it is the same setlist stored
+   twice, e.g. two devices each made their own record of it. The push logs a warning; resetting
+   the device from Drive replaces its record with the one in Drive.
 
 ### Finding the organisation folder
 
