@@ -13,7 +13,6 @@ import { renderStatus, type StatusShown } from './status-view.ts'
 interface StorageInfo {
   persisted: boolean | null
   usage: number | null
-  quota: number | null
 }
 
 /**
@@ -26,14 +25,14 @@ interface StorageInfo {
 export class AppAbout extends LitElement {
   static override properties = {
     _installMode: { state: true },
-    _version: { state: true },
+    _running: { state: true },
     _offline: { state: true },
     _storage: { state: true },
     _now: { state: true },
   }
 
   declare _installMode: InstallMode
-  declare _version: string | null
+  declare _running: { version: string; released: string } | null
   declare _offline: boolean | null
   declare _storage: StorageInfo | null
   declare _now: number
@@ -71,7 +70,7 @@ export class AppAbout extends LitElement {
   constructor() {
     super()
     this._installMode = currentInstallMode()
-    this._version = null
+    this._running = null
     this._offline = null
     this._storage = null
     this._now = Date.now()
@@ -101,10 +100,10 @@ export class AppAbout extends LitElement {
   }
 
   async _load(): Promise<void> {
-    this._version = await appUpdate.runningVersion()
+    this._running = await appUpdate.runningVersion()
     // Offline use needs this version's files saved: the worker's own copy of them
     try {
-      this._offline = this._version ? await caches.has(`cache-${this._version}`) : false
+      this._offline = this._running ? await caches.has(`cache-${this._running.version}`) : false
     } catch {
       this._offline = null
     }
@@ -114,7 +113,7 @@ export class AppAbout extends LitElement {
   async _loadStorage(): Promise<void> {
     const storage = navigator.storage
     if (!storage) {
-      this._storage = { persisted: null, usage: null, quota: null }
+      this._storage = { persisted: null, usage: null }
       return
     }
     const [persisted, estimate] = await Promise.all([
@@ -124,7 +123,6 @@ export class AppAbout extends LitElement {
     this._storage = {
       persisted,
       usage: estimate?.usage ?? null,
-      quota: estimate?.quota ?? null,
     }
   }
 
@@ -272,10 +270,9 @@ export class AppAbout extends LitElement {
 
   _storageStatus(): StatusShown & { state: string } {
     const info = this._storage
-    const usage =
-      info?.usage != null && info.quota != null
-        ? ` Using ${this._size(info.usage)} of ${this._size(info.quota)}.`
-        : ''
+    // Only what is used: the quota a browser reports is not the real limit (Chrome says 10 GB
+    // more than is used, whatever the disk), and this app uses megabytes
+    const usage = info?.usage != null ? ` Using ${this._size(info.usage)}.` : ''
     if (info?.persisted) {
       return {
         state: 'persistent',
@@ -301,6 +298,18 @@ export class AppAbout extends LitElement {
       label: 'Unknown',
       detail: "This browser can't say whether it will keep this app's data.",
     }
+  }
+
+  /** "Version abc123, released 12 October 2026" */
+  _versionLine(): string {
+    const running = this._running
+    if (!running) return 'Version unknown'
+    const date = running.released ? new Date(running.released) : null
+    const released =
+      date && !Number.isNaN(date.getTime())
+        ? `, released ${date.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}`
+        : ''
+    return `Version ${running.version}${released}`
   }
 
   /** A size in words: "3.2 MB", "24 GB" */
@@ -348,7 +357,7 @@ export class AppAbout extends LitElement {
         <div class="panel">
           <h3>Version</h3>
           <p class="version-line" id="app-version">
-            ${this._version ? `Version ${this._version}` : 'Version unknown'}
+            ${this._versionLine()}
           </p>
           ${renderStatus(update, { id: 'update-status', state: update.state })}
           <div class="actions">

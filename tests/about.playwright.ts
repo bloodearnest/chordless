@@ -46,6 +46,8 @@ test('the About page has its four panels, and the version that is running', asyn
   }
   await expect(about.locator('#app-version')).toContainText(/Version [0-9a-z]+/)
   await expect(about.locator('#app-version')).not.toContainText('unknown')
+  // And when its files last changed (the date of the last commit to the app)
+  await expect(about.locator('#app-version')).toContainText(/released \d{1,2} \w+ \d{4}/)
 })
 
 test('checking for updates, and an update that arrives', async ({ page }) => {
@@ -114,7 +116,9 @@ test('the storage panel says whether the browser will keep the data, and can ask
   const about = page.locator('app-about')
   const status = about.locator('#storage-status')
   await expect(status).toHaveAttribute('data-state', 'best-effort')
-  await expect(status).toContainText('Using 3.2 MB of 24 GB')
+  await expect(status).toContainText('Using 3.2 MB')
+  // Not the quota, which a browser reports as it likes
+  await expect(status).not.toContainText('24 GB')
 
   await about.getByRole('button', { name: 'Ask the browser to keep it' }).click()
   await expect(status).toHaveAttribute('data-state', 'persistent')
