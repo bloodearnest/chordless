@@ -15,10 +15,13 @@ import { join, relative, sep } from 'node:path'
 import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
-// Never precached: the worker itself, Cloudflare's asset filter, source maps, and the
-// icon tooling that sits in public/icons
+// Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
+// reads and does not serve), source maps, and the icon tooling that sits in public/icons
 const NOT_PRECACHED = (path: string) =>
-  path === FILE || path === '.assetsignore' || /\.(map|sh)$|(^|\/)justfile$/.test(path)
+  path === FILE ||
+  path === '.assetsignore' ||
+  path === '_headers' ||
+  /\.(map|sh)$|(^|\/)justfile$/.test(path)
 
 async function bundle(
   root: string,

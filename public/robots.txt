@@ -1,0 +1,10 @@
+# Keep the app out of search results; the public pages are for people to find.
+# The longest matching rule wins, so each Allow beats the Disallow. A prefix covers
+# /privacy.html and /privacy, and everything under /docs.
+User-agent: *
+Disallow: /
+Allow: /$
+Allow: /privacy
+Allow: /terms
+Allow: /about
+Allow: /docs

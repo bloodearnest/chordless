@@ -59,6 +59,23 @@ it to go (`waitForServiceWorker` in `tests/fixtures.js`; `openApp` does).
 dist/chordless/wrangler.json`. The plugin writes a redirect file for Wrangler under
 `src/.wrangler`, where a deploy run from the repo root doesn't look, hence `--config`.
 
+## Security headers
+
+`public/_headers` is read by Cloudflare's static assets (and by `vite preview`, so the `built`
+tests see it) and puts a Content-Security-Policy, `nosniff`, a referrer policy and a permissions
+policy on every file. The dev server does not send them. It is not in the precache, and it is not
+served.
+
+The policy is sent as `Content-Security-Policy-Report-Only`: the browser reports what it would
+block in the console and blocks nothing. The `built` test opens every view and fails on a report.
+Rename the header to `Content-Security-Policy` once real use (Google sign-in, sync, the player,
+import) shows no reports. What the policy allows, and why, is in the comment at the top of the
+file. When the app starts using a new host, add it there; the service worker script gets the same
+header, so its `connect-src` must cover what it fetches.
+
+The page has no inline script (`public/boot.js` is the one classic script), so scripts need no
+`'unsafe-inline'`. Style attributes are allowed (`style-src-attr`), `<style>` elements are not.
+
 ## Gotchas
 
 - `wrangler.toml` has `html_handling = "none"`. With the default, `/dev/x.html` redirects to

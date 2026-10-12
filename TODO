@@ -163,12 +163,14 @@ storage/sync
   free text can never leak. Never fall back to the title (it may be a private song). Songs with no
   CCLI number are not counted. The chart's number is in song.metadata.ccliSongNumber or .ccli (getSongWithContent). Plausible custom props: check which plan; GoatCounter can use an event
   name like song-added/<number>; Cloudflare Web Analytics has no events. Say it in the policy too
-- security headers once chordless.app is live: a Content-Security-Policy (start as
-  Content-Security-Policy-Report-Only, enforce once clean), set on the pages and on the service
-  worker script. Needs: the inline <script> in index.html (move it or hash it), connect-src for
-  googleapis.com, whatever accounts.google.com needs, blob:/data: for media, any inline style=
-  attributes. Also nosniff, Referrer-Policy, frame-ancestors 'none', object-src 'none'. A
-  public/_headers file (Workers static assets) is the simple way
+- enforce the Content-Security-Policy: it is deployed as Content-Security-Policy-Report-Only
+  (public/_headers, docs/BUILD.md). Use the live app (Google sign-in, sync, the player and a pad
+  set, import and the SongSelect bookmarklet, the song info dialog) with the console open, fix or
+  allow what it reports, then rename the header to Content-Security-Policy. Check the service
+  worker's own fetches too (its violations are not in the page console: chrome://serviceworker-internals
+  or the worker's DevTools). Also consider HSTS (a Cloudflare zone setting)
+- service-worker.ts still has a branch for Lit from cdn.jsdelivr.net, which the app no longer
+  loads (Lit is bundled): remove it
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
   then test song import on real devices: file import and paste on Android and iPad, the
   bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
