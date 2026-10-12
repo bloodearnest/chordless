@@ -140,7 +140,11 @@ storage/sync
   Create button (select-organisation's empty state)
 - edit chordpro/variants
 - background syncing (periodic, and fallbacks)
-- conflict resolution (currently Drive wins when edited on two devices)
+- conflict resolution (currently Drive wins when edited on two devices, and the local edit is
+  silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
+  Left for now: with immediate sync of the changed record (below) two devices rarely edit the
+  same setlist from the same base, so it matters much less. The random sync tests (`conflicts`
+  mode, tests/drive-sync-random.test.ts) already check convergence, a safety net for this change
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
   designed in docs/SYNC_ARCHITECTURE.md, not built
 - immediate background sync of just the changed record (setlist/song), in the
