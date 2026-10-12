@@ -4,7 +4,7 @@
  * Stateless OAuth proxy for Google Drive integration.
  * - Exchanges auth codes for tokens, encrypts refresh tokens as JWE blobs
  * - Refreshes access tokens on-demand
- * - Stores/retrieves shared setlists in KV storage
+ * - Serves share links: the encrypted download from Drive, and the page's preview tags
  * - Performs Drive API operations (invite/revoke) on-demand with decrypted blobs
  */
 

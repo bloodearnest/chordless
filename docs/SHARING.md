@@ -6,7 +6,7 @@ Chordless has two kinds of sharing:
    with the people in the worship team, so their devices sync the same setlists and
    songs. Exists today, set up by hand in Google Drive.
 2. **Share links** (temporary): one setlist, with its charts, sent as a link to
-   people who may have no account. Designed below, not built. Replaces the earlier
+   people who may have no account. Built (see "Status" in Part 2). Replaces the earlier
    link sharing (`share.html`, `share-setlist.js` and the worker's `/api/share`),
    which only sent song ids and never worked.
 
@@ -52,6 +52,18 @@ a crawler finding a link and a copyright takedown notice following. Two defences
 ---
 
 ## Part 2: Share links
+
+### Status
+
+Built: the bundle and encryption (`share-bundle.ts`, `share-crypto.ts`), making, updating and
+ending a share (`share-manager.ts`, called by a sync step in `DriveSyncManager.sync()`), the
+share button in the setlist info dialog (`setlist-share.ts`, with a QR code), the worker's
+download and preview (`worker/src/share.ts`, `share-page.ts`), and opening a link
+(`share-receiver.ts`, `views/share-view.ts`, route `/s/<id>`). Not done:
+
+- Importing a received set's songs into a library (the TODO).
+- Per-device view settings on a received set (a key change there is lost when the set updates).
+- Trying it on a Workspace account, and a real run with several people (see "Still to check").
 
 ### Goals
 
@@ -214,12 +226,14 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
 3. Check the format. If it's past `expires`, show "This share has ended" and keep
    nothing.
 4. Store it in its own IndexedDB, `chordless-share-<fileId>`, apart from any
-   organisation. Store the key and `ETag` there too, so `/s/<fileId>` works again
-   on that device without the fragment.
-5. Show it **read-only**, using the setlist page's components:
-   - no edit mode, sync, library or organisation
-   - transposing and hiding chords are fine, kept as per-device view settings that a
-     refresh doesn't overwrite
+   organisation: a `ChordlessDB` holding the setlist and its songs, as an organisation's
+   does, so the setlist page can show it. The setlist's `received` field holds the key,
+   `ETag` and `expires`, so `/s/<fileId>` works again on that device without the fragment.
+5. Show it **read-only**, with the setlist page itself (given that database and
+   `readOnly`):
+   - no edit mode, and the info dialog has no edit, delete or share
+   - the overview says who sent it, with a link to what Chordless is
+   - transposing and hiding chords work, as in any setlist
 
 **Opening it again:**
 - **Online:** ask the worker with the stored `ETag`. A 200 means it changed: decrypt and
@@ -296,8 +310,9 @@ Still to check:
   - encrypting and decrypting round trip, and tampering failing
   - the expiry calculation
   - the bundle hash changing only when the content does
-- **`fake-drive`:** add `anyone` permissions, unauthenticated API-key downloads and
-  404s for trashed files.
+- **`fake-drive`:** binary uploads, `anyone` permissions (and their removal), and
+  `anonymousDownload()`, which stands in for the worker: 200 while the permission is there
+  (trashed or not), 404 once it is revoked.
 - **Sync tests:**
   - update shares only when the bundle changed, keeping the same file id
   - clean up expired and orphaned shares, using trash only
@@ -307,6 +322,11 @@ Still to check:
   - change a key, sync, reopen: the recipient sees it
   - stop sharing: the recipient sees "ended" and the local copy is gone
   - a past `expires` deletes the local copy on start
+
+Where the tests are: `share-bundle.node.test.ts`, `share-proxy.node.test.ts`,
+`share-page.node.test.ts`, `share-drive.test.ts`, `share-sync.test.ts`,
+`share-receiver.test.ts`, `setlist-share.test.ts` and `share.playwright.ts` (which stubs the
+worker's download and blocks service workers; the offline path is in `share-receiver.test.ts`).
 
 ### Removing the old link sharing
 
