@@ -532,6 +532,40 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
     })
 
+    describe("when many of a device's files are gone from Drive", () => {
+      const trashAll = () => {
+        for (const file of driveSetlistFiles()) drive.files.get(file.id).trashed = true
+      }
+
+      it('stops instead of uploading them all again', async () => {
+        const phone = await makeDevice('phone')
+        for (let i = 0; i < 8; i++) await addSetlist(phone, { date: `2026-09-0${i + 1}` })
+        await syncDevice(phone)
+        trashAll()
+        drive.requests = []
+
+        const error = await phone.sync.sync().then(
+          () => null,
+          e => e as Error
+        )
+
+        expect(error?.name).to.equal('MissingFilesError')
+        expect(drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+        expect(await phone.db.getAllSetlists()).to.have.length(8)
+      })
+
+      it('still re-uploads a few', async () => {
+        const phone = await makeDevice('phone')
+        for (let i = 0; i < 3; i++) await addSetlist(phone, { date: `2026-09-0${i + 1}` })
+        await syncDevice(phone)
+        trashAll()
+
+        await syncDevice(phone)
+
+        expect(driveSetlistFiles().filter(f => !f.trashed)).to.have.length(3)
+      })
+    })
+
     describe('when the Drive file a device knew is gone but another holds the setlist', () => {
       // Duplicates were cleaned up in Drive (the audit page trashes all but one), so a device
       // that knew a removed file points at nothing, while a live file for the setlist exists

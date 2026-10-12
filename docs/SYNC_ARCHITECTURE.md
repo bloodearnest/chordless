@@ -73,7 +73,13 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
    instead of being uploaded again: same content, it just points at the live file; edited
    here, it keeps its edits and the push updates the live file; unchanged here but newer in
    Drive, Drive's content is taken. Without this, every such setlist was uploaded as a copy.
-5. **Push** setlists then songs: upload what's new or changed locally.
+5. **Missing-files check:** if more than 5 setlists/songs still point at Drive files that are
+   gone after the pull (it adopts live files where it can), sync stops with
+   `MissingFilesError` before uploading anything. That many is a cleanup, a trashed folder or
+   a stale device, not a few deletions, and uploading them again duplicates them (it happened
+   three times in June–October 2026). Restore the files from the Drive trash, or reset the
+   device from Drive. A few missing files are still uploaded again.
+6. **Push** setlists then songs: upload what's new or changed locally.
    A setlist with no live file, while another setlist that has one has the same date, leader,
    type and name, is not uploaded: it is the same setlist stored twice (e.g. two devices each
    made their own record of it, under different ids). The pull has already made a local record
@@ -125,7 +131,7 @@ Each synced record stores, from its last sync:
 | Local and changed, not changed in Drive | uploaded (file updated in place) |
 | Changed in Drive only | downloaded |
 | Changed both | conflict: Drive wins |
-| Synced before, **file now missing from Drive** | **uploaded again**: deletions don't stick (see [Deleting setlists](#deleting-setlists)) |
+| Synced before, **file now missing from Drive** | **uploaded again** if no more than 5 are missing (deletions don't stick, see [Deleting setlists](#deleting-setlists)); more than that stops the sync |
 
 Uploads of new files are batched (50 setlists / 25 songs at a time, up to 30
 concurrent requests); one failed upload leaves just that record unsynced for next
