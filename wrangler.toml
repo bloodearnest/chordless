@@ -16,7 +16,7 @@ binding = "ASSETS"
 # Paths the worker handles before static assets. API routes must be listed:
 # otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.
 # /dev is listed so the worker can hide the dev-only pages in production.
-run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/dev", "/dev/*"]
+run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/s/*", "/dev", "/dev/*"]
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)

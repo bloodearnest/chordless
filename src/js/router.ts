@@ -12,6 +12,9 @@
  *   { name: 'preferences' | 'storage' | 'import-song' | 'bookmarklet' | 'about' }
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
  *                                             /setlist/<id>/song/<n>
+ *   { name: 'share', fileId, songIndex }     /s/<id> (a setlist shared by link, songIndex -1 for
+ *                                             its overview) and /s/<id>/song/<n>. The key is in the
+ *                                             URL's #fragment, which routes ignore.
  *   { name: 'not-found', path }
  */
 
@@ -22,6 +25,7 @@ export type Route =
   | { name: PageName }
   | { name: 'songs'; songUuid?: string; search?: string }
   | { name: 'setlist'; setlistId: string; songIndex: number }
+  | { name: 'share'; fileId: string; songIndex: number }
   | { name: 'not-found'; path: string }
 
 /** Pages that are a path of their own and nothing else. */
@@ -43,11 +47,18 @@ const PAGE_PATHS: Record<string, string> = Object.fromEntries(
  * Every route name. Each is a view of the app shell (see views/registry.js),
  * which the service worker serves for every URL.
  */
-export const ROUTE_NAMES: Route['name'][] = [...Object.values(PAGES), 'setlist', 'not-found']
+export const ROUTE_NAMES: Route['name'][] = [
+  ...Object.values(PAGES),
+  'setlist',
+  'share',
+  'not-found',
+]
 
 const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
 const SETLIST_PATH = /^\/setlist\/([^/]+)$/
 const SETLIST_SONG_PATH = /^\/setlist\/([^/]+)\/song\/(\d+)$/
+const SHARE_PATH = /^\/s\/([^/]+)$/
+const SHARE_SONG_PATH = /^\/s\/([^/]+)\/song\/(\d+)$/
 
 /**
  * The clean path for a URL path: no trailing slash, no .html. (Wrangler serves
@@ -108,6 +119,14 @@ export function matchRoute(location: string | { pathname: string; search?: strin
     return { name: 'setlist', setlistId: decode(setlist[1]), songIndex: -1 }
   }
 
+  const shareSong = path.match(SHARE_SONG_PATH)
+  if (shareSong) {
+    return { name: 'share', fileId: decode(shareSong[1]), songIndex: Number(shareSong[2]) }
+  }
+
+  const share = path.match(SHARE_PATH)
+  if (share) return { name: 'share', fileId: decode(share[1]), songIndex: -1 }
+
   return { name: 'not-found', path }
 }
 
@@ -119,6 +138,10 @@ export function buildUrl(route: Route): string {
       return route.search ? `/songs?q=${encodeURIComponent(route.search)}` : '/songs'
     case 'setlist': {
       const base = `/setlist/${encodeURIComponent(route.setlistId)}`
+      return route.songIndex >= 0 ? `${base}/song/${route.songIndex}` : base
+    }
+    case 'share': {
+      const base = `/s/${encodeURIComponent(route.fileId)}`
       return route.songIndex >= 0 ? `${base}/song/${route.songIndex}` : base
     }
     case 'not-found':
@@ -145,6 +168,9 @@ function placeOf(route: Route): { section: string; depth: number } | null {
   if (route.name === 'songs') return { section: 'songs', depth: route.songUuid ? 1 : 0 }
   if (route.name === 'setlist') {
     return { section: `setlist:${route.setlistId}`, depth: route.songIndex >= 0 ? 1 : 0 }
+  }
+  if (route.name === 'share') {
+    return { section: `share:${route.fileId}`, depth: route.songIndex >= 0 ? 1 : 0 }
   }
   return null
 }

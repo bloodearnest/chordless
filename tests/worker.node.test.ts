@@ -185,3 +185,13 @@ test('worker API: /api/share/ is handled by the worker, not the SPA fallback', a
   assert.equal(resp.status, 404)
   assert.ok(!resp.headers.get('content-type')?.includes('text/html'))
 })
+
+test('a share link is the app with a preview, and not for indexing', async () => {
+  const resp = await worker.fetch('/s/abcdefghijklmnop1234')
+  assert.equal(resp.status, 200)
+  assert.ok(resp.headers.get('content-type')?.includes('text/html'))
+  assert.equal(resp.headers.get('x-robots-tag'), 'noindex, nofollow')
+  const html = await resp.text()
+  assert.ok(html.includes('property="og:title" content="A setlist shared with you"'))
+  assert.ok(html.includes('id="view-outlet"'), 'it is still the app shell')
+})

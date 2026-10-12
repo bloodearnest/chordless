@@ -65,6 +65,14 @@ describe('matchRoute', () => {
     ['/setlist/abc/song/12/', setlist('abc', 12)],
     ['/setlist/a%20b', setlist('a b', -1)], // an encoded id is decoded
 
+    // A setlist shared by link (the key is in the #fragment, which says nothing to a route)
+    ['/s/abc-DEF_1', { name: 'share', fileId: 'abc-DEF_1', songIndex: -1 }],
+    ['/s/abc/song/2', { name: 'share', fileId: 'abc', songIndex: 2 }],
+    [
+      '/s/abc#PhITmY2tJePxICFKERCvI1wbrue6f9CEz1ivuw9kMhU',
+      { name: 'share', fileId: 'abc', songIndex: -1 },
+    ],
+
     // Also accepted: a Location-like object
     [{ pathname: '/setlist/abc/song/3' }, setlist('abc', 3)],
     [{ pathname: '/storage' }, { name: 'storage' }],
@@ -81,6 +89,8 @@ describe('matchRoute', () => {
     ['/setlist/abc/song/x', notFound('/setlist/abc/song/x')],
     ['/setlist/abc/song/-1', notFound('/setlist/abc/song/-1')],
     ['/setlist/abc/other/1', notFound('/setlist/abc/other/1')],
+    ['/s', notFound('/s')],
+    ['/s/abc/def', notFound('/s/abc/def')],
   ]
   for (const [input, expected] of cases) {
     it(`${JSON.stringify(input)} is ${JSON.stringify(expected)}`, () => {
@@ -103,6 +113,8 @@ describe('buildUrl', () => {
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
     [{ name: 'setlist', setlistId: 'a b', songIndex: -1 }, '/setlist/a%20b'], // ids are encoded
     [{ name: 'setlist', setlistId: 'a b', songIndex: 7 }, '/setlist/a%20b/song/7'],
+    [{ name: 'share', fileId: 'abc', songIndex: -1 }, '/s/abc'],
+    [{ name: 'share', fileId: 'abc', songIndex: 3 }, '/s/abc/song/3'],
     [{ name: 'not-found', path: '/nope' }, '/nope'],
   ]
   for (const [route, url] of routes) {
@@ -148,6 +160,16 @@ describe('historyAction', () => {
   it('replaces from a song to the overview when it was a direct link', () => {
     expect(historyAction(song(2), overview)).to.equal('replace')
     expect(historyAction(song(2), overview, { fromParent: false })).to.equal('replace')
+  })
+
+  it('treats a shared setlist like a setlist, and never as the same one', () => {
+    const share = (fileId: string, songIndex: number) =>
+      ({ name: 'share', fileId, songIndex }) as const satisfies Route
+    expect(historyAction(share('f', -1), share('f', 0))).to.equal('push')
+    expect(historyAction(share('f', 0), share('f', 1))).to.equal('replace')
+    expect(historyAction(share('f', 2), share('f', -1), { fromParent: true })).to.equal('back')
+    expect(historyAction(share('f', -1), share('g', 0))).to.equal('push')
+    expect(historyAction(share('a', -1), overview)).to.equal('push')
   })
 
   it('copes with a history entry that has no state', () => {

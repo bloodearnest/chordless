@@ -11,6 +11,7 @@
 import * as jose from 'jose'
 import { exchangeCode, type GoogleEnv, refreshAccessToken, verifyIdToken } from './google-auth.ts'
 import { handleShareDownload, type ShareCache, type ShareEnv, shareFileId } from './share.ts'
+import { withSharePreview } from './share-page.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
 interface Env extends GoogleEnv, ShareEnv {
@@ -93,6 +94,19 @@ export default {
         return await handleShareDownload(request, shareId, env, {
           cache: (caches as unknown as { default: ShareCache }).default,
           waitUntil: promise => ctx.waitUntil(promise),
+        })
+      }
+
+      // A share link opened as a page: the app, with a preview for whatever fetched it
+      if (path.startsWith('/s/') && request.method === 'GET') {
+        const page = await env.ASSETS.fetch(request)
+        if (!page.headers.get('Content-Type')?.includes('text/html')) return page
+        const headers = new Headers(page.headers)
+        headers.set('X-Robots-Tag', 'noindex, nofollow')
+        headers.delete('Content-Length')
+        return new Response(withSharePreview(await page.text(), url.origin), {
+          status: page.status,
+          headers,
         })
       }
 

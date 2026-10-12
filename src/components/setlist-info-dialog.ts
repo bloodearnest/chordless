@@ -59,6 +59,8 @@ export class SetlistInfoDialog extends LitElement {
     people: { attribute: false },
     /** The organisation's database, for sharing the setlist */
     db: { attribute: false },
+    /** A setlist received by link: no editing, deleting or sharing */
+    readonly: { type: Boolean },
     _setlist: { state: true },
     _editing: { state: true },
   }
@@ -87,6 +89,7 @@ export class SetlistInfoDialog extends LitElement {
 
   declare people: Person[]
   declare db: ChordlessDB | null
+  declare readonly: boolean
   declare _setlist: Setlist | null
   declare _editing: boolean
 
@@ -97,6 +100,7 @@ export class SetlistInfoDialog extends LitElement {
     this._modalRef = createRef()
     this.people = []
     this.db = null
+    this.readonly = false
     this._setlist = null
     this._editing = false
   }
@@ -159,7 +163,7 @@ export class SetlistInfoDialog extends LitElement {
         }}
       >
         ${
-          this._editing
+          this._editing || this.readonly
             ? ''
             : html`
               <button
@@ -194,9 +198,13 @@ export class SetlistInfoDialog extends LitElement {
             `
             : html`
               <setlist-info .setlist=${this._setlist}></setlist-info>
-              <div class="share">
-                <setlist-share .setlist=${this._setlist} .db=${this.db}></setlist-share>
-              </div>
+              ${
+                this.readonly
+                  ? ''
+                  : html`<div class="share">
+                    <setlist-share .setlist=${this._setlist} .db=${this.db}></setlist-share>
+                  </div>`
+              }
             `
         }
       </app-modal>

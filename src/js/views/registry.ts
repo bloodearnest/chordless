@@ -34,6 +34,15 @@ export const views: Record<string, ViewEntry> = {
       next.name === 'setlist' &&
       previous.setlistId === next.setlistId,
   },
+  share: {
+    ...view(
+      'share-view',
+      () => import('./share-view.ts'),
+      () => 'Shared setlist - Chordless'
+    ),
+    sameView: (previous, next) =>
+      previous.name === 'share' && next.name === 'share' && previous.fileId === next.fileId,
+  },
   'not-found': view(
     'not-found-view',
     () => import('./not-found-view.ts'),

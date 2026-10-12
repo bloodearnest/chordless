@@ -37,6 +37,8 @@ await router.start()
 
 // Optional, and not needed to show the first view, so after it
 startMediaPlayer()
+// Setlists shared by link are kept only until they end
+import('./share-receiver.ts').then(({ deleteExpiredShares }) => deleteExpiredShares())
 void appUpdate.start()
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()

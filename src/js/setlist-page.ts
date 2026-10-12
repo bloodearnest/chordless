@@ -109,6 +109,10 @@ type SectionDefaultsConfig = Record<string, string>
 export class SetlistPage {
   root: HTMLElement
   _restoredState: SetlistPageState | undefined
+  /** Where a song of this setlist is: the setlist's own route, or a share's */
+  _routeFor: (songIndex: number) => Route
+  /** A setlist received by link: nothing to edit, and nothing of an organisation's */
+  _readOnly: boolean
   _setlistId: string
   _initialSongIndex: number
   _abort: AbortController
@@ -157,26 +161,41 @@ export class SetlistPage {
    * @param options.root the view this page is in: it looks for its elements there
    * @param options.restoredState what captureViewState() gave when the page was left, if it is
    *   being come back to
+   * @param options.db the database holding the setlist, if it isn't the organisation's (a
+   *   setlist received by link has a database of its own)
+   * @param options.routeFor the route of a song (or the overview, -1) of this setlist; defaults
+   *   to the setlist's own
+   * @param options.readOnly for a setlist received by link
    */
   constructor({
     root,
     setlistId,
     songIndex = -1,
     restoredState = undefined,
+    db = null,
+    routeFor = undefined,
+    readOnly = false,
   }: {
     root: HTMLElement
     setlistId: string
     songIndex?: number
     restoredState?: SetlistPageState
+    db?: ChordlessDB | null
+    routeFor?: (songIndex: number) => Route
+    readOnly?: boolean
   }) {
     this.root = root
+    this._routeFor =
+      routeFor ??
+      (index => ({ name: 'setlist', setlistId: this.currentSetlistId ?? '', songIndex: index }))
+    this._readOnly = readOnly
     this._restoredState = restoredState
     this._setlistId = setlistId
     this._initialSongIndex = songIndex
     // Aborted by dispose(): the listeners that outlive the view are added with its signal
     this._abort = new AbortController()
     this._disposed = false
-    this.db = null // Will be initialized in start()
+    this.db = db // Opened in start() unless given
     this.parser = new ChordProParser()
     this.currentSongIndex = Number.NaN
     this.songs = []
@@ -245,7 +264,7 @@ export class SetlistPage {
 
   async start() {
     // Initialize IndexedDB with current organisation
-    this.db = await getCurrentDB()
+    this.db ??= await getCurrentDB()
 
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
     if (this._disposed) return
@@ -280,7 +299,7 @@ export class SetlistPage {
     }
   }
 
-  routeChanged(route: Extract<Route, { name: 'setlist' }>) {
+  routeChanged(route: { songIndex: number }) {
     if (this._disposed || !this.currentSetlist) return
     const index = route.songIndex
     const section = index >= 0 ? `song-${index}` : 'overview'
@@ -297,10 +316,7 @@ export class SetlistPage {
    * to the history, and back to the overview undoes it; song to song replaces.
    */
   navigateTo(index: number, { replace = false }: { replace?: boolean } = {}) {
-    return goTo(
-      buildUrl({ name: 'setlist', setlistId: this.currentSetlistId ?? '', songIndex: index }),
-      { replace }
-    )
+    return goTo(buildUrl(this._routeFor(index)), { replace })
   }
 
   /** Undo what this page did outside its own elements */
@@ -845,7 +861,8 @@ export class SetlistPage {
       this._setlistDeleteHandler = () => this.deleteSetlist()
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
-    dialog.people = (await getOrganisationPeople()).people
+    dialog.readonly = this._readOnly
+    dialog.people = this._readOnly ? [] : (await getOrganisationPeople()).people
     dialog.db = this._database()
     await dialog.show(this.currentSetlist)
   }

@@ -207,6 +207,18 @@ body:not([data-view='setlist']) media-player:not([active]) {
   width: 100%;
 }
 
+/* A setlist received by link: who sent it, and what Chordless is */
+.share-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  padding: 0.5rem 1rem;
+  background: var(--tint);
+  font-size: var(--font-ui-small);
+}
+
 /* Home view styles */
 .home-content {
   flex: 1;

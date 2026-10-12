@@ -1,4 +1,4 @@
-import { html, type PropertyValues } from 'lit'
+import { html, nothing, type PropertyValues } from 'lit'
 import '../../components/app-header.ts'
 import '../../components/app-modal.ts'
 import '../../components/capo-selector.ts'
@@ -16,56 +16,24 @@ import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
 
 /**
- * A setlist: its overview, and each of its songs next to it. The page logic is
- * SetlistPage, which this starts when the view is shown and disposes of when
- * it is left, so nothing it did to the window, <body> or the menu is left behind.
+ * The elements the setlist page works with, for a setlist view and for a share's (which can't
+ * be edited, so its header has no edit toggle).
  */
-export class SetlistView extends PageView {
-  #page: SetlistPage | null = null
-
-  /** This view is only shown for the setlist route */
-  #setlistRoute() {
-    const route = this.route
-    if (route?.name !== 'setlist') throw new Error('The setlist view has no setlist route')
-    return route
-  }
-
-  override firstUpdated() {
-    wakeLock.hold()
-    const { setlistId, songIndex } = this.#setlistRoute()
-    this.#page = new SetlistPage({
-      root: this,
-      setlistId,
-      songIndex,
-      restoredState: this.restoredState,
-    })
-    this.#page
-      .start()
-      // The route may have moved on while the setlist was loading
-      .then(() => this.#page?.routeChanged(this.#setlistRoute()))
-      .catch(error => console.error('[SetlistView] Failed to start:', error))
-  }
-
-  /** How far each song (and the overview) was scrolled */
-  override captureViewState() {
-    return this.#page?.captureViewState()
-  }
-
-  override updated(changed: PropertyValues<this>) {
-    // Moves within this setlist (the first route was given to the page at the start)
-    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.#setlistRoute())
-  }
-
-  override disconnectedCallback() {
-    super.disconnectedCallback()
-    wakeLock.letGo()
-    this.#page?.dispose()
-    this.#page = null
-  }
-
-  override render() {
-    return html`
-      <app-header id="app-header" heading="Loading..." show-edit-toggle show-info-button>
+export function setlistTemplate({
+  editable,
+  belowHeader = nothing,
+}: {
+  editable: boolean
+  /** Something to show under the header, e.g. a share's banner */
+  belowHeader?: unknown
+}) {
+  return html`
+      <app-header
+        id="app-header"
+        heading="Loading..."
+        ?show-edit-toggle=${editable}
+        show-info-button
+      >
         <div slot="controls" class="header-controls-slot">
           <!-- Musical metadata display / settings trigger -->
           <musical-metadata-display
@@ -83,6 +51,7 @@ export class SetlistView extends PageView {
           </song-settings-popover>
         </div>
       </app-header>
+      ${belowHeader}
 
       <main id="main-content">
         <div class="song-container">
@@ -144,6 +113,58 @@ export class SetlistView extends PageView {
         </p>
       </app-modal>
     `
+}
+
+/**
+ * A setlist: its overview, and each of its songs next to it. The page logic is
+ * SetlistPage, which this starts when the view is shown and disposes of when
+ * it is left, so nothing it did to the window, <body> or the menu is left behind.
+ */
+export class SetlistView extends PageView {
+  #page: SetlistPage | null = null
+
+  /** This view is only shown for the setlist route */
+  #setlistRoute() {
+    const route = this.route
+    if (route?.name !== 'setlist') throw new Error('The setlist view has no setlist route')
+    return route
+  }
+
+  override firstUpdated() {
+    wakeLock.hold()
+    const { setlistId, songIndex } = this.#setlistRoute()
+    this.#page = new SetlistPage({
+      root: this,
+      setlistId,
+      songIndex,
+      restoredState: this.restoredState,
+    })
+    this.#page
+      .start()
+      // The route may have moved on while the setlist was loading
+      .then(() => this.#page?.routeChanged(this.#setlistRoute()))
+      .catch(error => console.error('[SetlistView] Failed to start:', error))
+  }
+
+  /** How far each song (and the overview) was scrolled */
+  override captureViewState() {
+    return this.#page?.captureViewState()
+  }
+
+  override updated(changed: PropertyValues<this>) {
+    // Moves within this setlist (the first route was given to the page at the start)
+    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.#setlistRoute())
+  }
+
+  override disconnectedCallback() {
+    super.disconnectedCallback()
+    wakeLock.letGo()
+    this.#page?.dispose()
+    this.#page = null
+  }
+
+  override render() {
+    return setlistTemplate({ editable: true })
   }
 }
 customElements.define('setlist-view', SetlistView)

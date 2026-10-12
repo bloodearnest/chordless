@@ -173,6 +173,17 @@ export interface SetlistShare {
   bundleHash: string
 }
 
+/** What a device keeps about a share link it opened, with the setlist it received */
+export interface ReceivedShare {
+  fileId: string
+  /** From the link's #: kept so the link works again without it */
+  key: string
+  /** The worker's ETag for the file last downloaded, to ask whether it changed */
+  etag: string
+  /** YYYY-MM-DD */
+  expires: string
+}
+
 export interface Setlist {
   id: string
   /** YYYY-MM-DD */
@@ -187,6 +198,8 @@ export interface Setlist {
   songs: SetlistEntry[]
   /** Set while the setlist is shared by link */
   share?: SetlistShare | null
+  /** Only on the copy of a setlist received by link (see share-receiver.ts) */
+  received?: ReceivedShare
   createdDate: string
   modifiedDate: string
 
