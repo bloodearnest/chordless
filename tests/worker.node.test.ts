@@ -178,3 +178,10 @@ test('dev pages are served in the dev environment (npm run dev)', async () => {
     await devWorker.stop()
   }
 })
+
+test('worker API: /api/share/ is handled by the worker, not the SPA fallback', async () => {
+  // A malformed id is refused before Drive is asked: 404 from the worker, not the app shell
+  const resp = await worker.fetch('/api/share/bad')
+  assert.equal(resp.status, 404)
+  assert.ok(!resp.headers.get('content-type')?.includes('text/html'))
+})

@@ -156,6 +156,23 @@ export interface SetlistEntry {
   chordproEdits?: string
 }
 
+/**
+ * A setlist's share link (docs/SHARING.md). Lives in the setlist's own file, which only the
+ * organisation can read: the key is what makes the public share file readable.
+ */
+export interface SetlistShare {
+  /** The public, encrypted file in the organisation's shares/ folder */
+  fileId: string
+  /** The AES key, base64url (43 characters); only ever in the link's # and here */
+  key: string
+  /** YYYY-MM-DD the share was first made, which can push `expires` out for a late share */
+  created: string
+  /** YYYY-MM-DD after which the share is revoked and recipients delete their copy */
+  expires: string
+  /** Hash of the bundle last uploaded: a different one means the share needs updating */
+  bundleHash: string
+}
+
 export interface Setlist {
   id: string
   /** YYYY-MM-DD */
@@ -168,6 +185,8 @@ export interface Setlist {
   /** The leader's Google account email (empty for a leader known only by name) */
   ownerId?: string
   songs: SetlistEntry[]
+  /** Set while the setlist is shared by link */
+  share?: SetlistShare | null
   createdDate: string
   modifiedDate: string
 

@@ -291,6 +291,32 @@ export async function createFile(
   contentType = 'text/plain'
 ): Promise<DriveFile> {
   const token = await getAccessToken()
+  const { body, boundary } = multipartBody(metadata, content, contentType)
+
+  const response = await fetch(
+    `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body,
+    }
+  )
+
+  if (!response.ok) {
+    const error: DriveErrorBody = await response
+      .json()
+      .catch(() => ({ error: { message: response.statusText } }))
+    throw new Error(`Drive upload error: ${error.error?.message || response.statusText}`)
+  }
+
+  return response.json()
+}
+
+/** A multipart/related upload body: the metadata as JSON, then the content as it is */
+function multipartBody(metadata: DriveFileWrite, content: DriveContent, contentType: string) {
   const boundary = '-------314159265358979323846'
   const encoder = new TextEncoder()
 
@@ -322,27 +348,7 @@ export async function createFile(
   const body = new Blob([headerJson, metadataBytes, headerContent, contentBlob, closing], {
     type: `multipart/related; boundary=${boundary}`,
   })
-
-  const response = await fetch(
-    `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': `multipart/related; boundary=${boundary}`,
-      },
-      body,
-    }
-  )
-
-  if (!response.ok) {
-    const error: DriveErrorBody = await response
-      .json()
-      .catch(() => ({ error: { message: response.statusText } }))
-    throw new Error(`Drive upload error: ${error.error?.message || response.statusText}`)
-  }
-
-  return response.json()
+  return { body, boundary }
 }
 
 /**
@@ -353,17 +359,11 @@ export async function createFile(
 export async function updateFile(
   fileId: string,
   metadata: DriveFileWrite,
-  content: string,
+  content: DriveContent,
   contentType = 'text/plain'
 ): Promise<DriveFile> {
   const token = await getAccessToken()
-  const boundary = '-------314159265358979323846'
-  const body =
-    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
-    JSON.stringify(metadata) +
-    `\r\n--${boundary}\r\nContent-Type: ${contentType}\r\n\r\n` +
-    content +
-    `\r\n--${boundary}--`
+  const { body, boundary } = multipartBody(metadata, content, contentType)
 
   const response = await fetch(
     `${UPLOAD_API_BASE}/files/${fileId}?uploadType=multipart&fields=${WRITE_FIELDS}`,
@@ -680,6 +680,96 @@ export async function getSetlistsFolder(orgFolderId: string): Promise<string> {
     folderId = await createSubfolder(orgFolderId, 'setlists')
   }
   return folderId
+}
+
+/**
+ * Share links (docs/SHARING.md). A share is one encrypted file in the organisation's shares/
+ * folder, readable by anyone with its id, though not discoverable. Only that file is public.
+ */
+
+const SHARE_CONTENT_TYPE = 'application/octet-stream'
+
+/** Get or create the shares folder within an organisation (it stays private) */
+export async function getSharesFolder(orgFolderId: string): Promise<string> {
+  let folderId = await findSubfolder(orgFolderId, 'shares')
+  if (!folderId) {
+    folderId = await createSubfolder(orgFolderId, 'shares')
+  }
+  return folderId
+}
+
+/**
+ * Upload a share file and make it readable by anyone with the link. If it can't be made
+ * public (a Workspace admin may block that) the file is trashed again and the error thrown.
+ */
+export async function createShareFile(
+  sharesFolderId: string,
+  metadata: DriveFileWrite,
+  encrypted: Uint8Array
+): Promise<DriveFile> {
+  const file = await createFile(
+    { ...metadata, parents: [sharesFolderId] },
+    encrypted,
+    SHARE_CONTENT_TYPE
+  )
+  try {
+    await driveRequest(`/files/${file.id}/permissions`, {
+      method: 'POST',
+      body: JSON.stringify({ type: 'anyone', role: 'reader', allowFileDiscovery: false }),
+    })
+  } catch (error) {
+    // Best effort: a private leftover is harmless, and the error that matters is the original
+    await trashFile(file.id).catch(e => console.warn('[DriveAPI] Could not trash share file:', e))
+    throw error
+  }
+  return file
+}
+
+/** Replace a share file's content in place: the id, and so the link, stay the same */
+export async function updateShareFile(
+  fileId: string,
+  metadata: DriveFileWrite,
+  encrypted: Uint8Array
+): Promise<DriveFile> {
+  return updateFile(fileId, metadata, encrypted, SHARE_CONTENT_TYPE)
+}
+
+/** Move a file to the Drive trash (recoverable). Trashing alone leaves a public file readable. */
+export async function trashFile(fileId: string): Promise<void> {
+  await driveRequest(`/files/${fileId}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ trashed: true }),
+  })
+}
+
+/**
+ * End a share: remove the public permission, which is what stops anonymous downloads (a
+ * trashed file can still be read by anyone with the link), then trash the file. A file that
+ * is already gone is fine.
+ */
+export async function endShareFile(fileId: string): Promise<void> {
+  try {
+    await driveRequest(`/files/${fileId}/permissions/anyoneWithLink`, { method: 'DELETE' })
+    await trashFile(fileId)
+  } catch (error) {
+    if ((error as Partial<DriveError>).status === 404) return
+    throw error
+  }
+}
+
+/** The organisation's live share files, with the appProperties that say whose they are and when they end */
+export async function listShareFiles(sharesFolderId: string): Promise<DriveFile[]> {
+  const files: DriveFile[] = []
+  let pageToken: string | undefined
+  do {
+    const query = `'${sharesFolderId}' in parents and trashed=false`
+    const page = await driveRequest(
+      `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=1000&fields=nextPageToken,files(id,name,appProperties,modifiedTime)${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
+    )
+    files.push(...(page.files ?? []))
+    pageToken = page.nextPageToken
+  } while (pageToken)
+  return files
 }
 
 /**

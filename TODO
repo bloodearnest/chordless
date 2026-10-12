@@ -187,7 +187,12 @@ sharing
 - share links: one setlist with its charts, encrypted in the org's Drive, key in the
   link, updated in place, expiring 2 weeks after the setlist date, read-only and
   isolated on the recipient's device, QR code for in-room sharing. Designed in
-  docs/SHARING.md Part 2, not built; verify the Drive questions listed there first.
+  docs/SHARING.md Part 2, not built. The Drive assumptions are verified (see there); it needs a
+  public Drive API key in the client first.
+- share links, later: an "Add songs to my library" action on the share page (and for the
+  whole setlist), importing through incoming-songs.ts. It's the sharer's job to hold the
+  rights. This breaks the "never mixed into a library" rule in docs/SHARING.md, so update
+  that when it's built. Not part of the first version.
 - email media team
 - invite people to an organisation: a dialog to share the org's Drive folder with an
   email address, as read (musicians) or write (leaders) access. The leader dropdown

@@ -124,7 +124,7 @@ All browser-native: `CompressionStream` and Web Crypto.
 3. The file is the IV followed by the ciphertext.
 
 The key is created when a setlist is first shared, and kept for the life of that
-share. It's written into the link as base64url (43 characters).
+share. It's written into the link as base64url, without padding (43 characters).
 
 ### Where things are stored
 
@@ -153,7 +153,7 @@ that's later (a set shared after its date). It's recalculated if the setlist's d
 changes.
 
 It's enforced in three places:
-1. **Sync** trashes expired share files (see Sync below).
+1. **Sync** revokes the public permission of expired share files and trashes them (see Sync below).
 2. **Recipients** delete their local copy once it's past `expires`.
 3. **Recipients** delete their local copy if the file is gone, so the fetch returns
    404.
@@ -170,7 +170,8 @@ in Drive, but it's still encrypted, so it's useless without the full link.
   online.
 - **Already shared:** shows the link, a **QR code** for sharing in the room, Copy,
   native share (`navigator.share`), the expiry date and "Stop sharing".
-- **"Stop sharing"** trashes the file and clears `setlist.share`. It's
+- **"Stop sharing"** revokes the public permission (that is what ends access: trashing alone
+  does not), trashes the file and clears `setlist.share`. It's
   outward-facing and ends people's access, so it asks for confirmation. Sharing again
   afterwards creates a new key and file, so old links stay dead.
 - **QR code:** browsers have no built-in QR generator, so this needs a small library,
@@ -188,7 +189,7 @@ Two new steps in `DriveSyncManager.sync()`, after setlists and songs are pushed:
 
    The bundle changes when songs are added, removed or reordered, when a key or note
    changes, and when one of its charts is edited.
-2. **Clean up shares.** List `shares/`, and move to the Drive trash every file whose
+2. **Clean up shares.** List `shares/`, and revoke the public permission of, and then move to the Drive trash, every file whose
    `expires` has passed, or whose setlist doesn't exist or has no `share` pointing at
    it. Clear `share` on setlists whose share expired.
    - Trash, never permanent deletion, as for everything the app removes.
@@ -206,14 +207,14 @@ Later:
 The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
 `/s/*` to the share page.
 
-1. Download the file:
-   `GET https://www.googleapis.com/drive/v3/files/<fileId>?alt=media&key=<API key>`.
-   No sign-in needed. Also fetch `md5Checksum` (`fields=md5Checksum`).
+1. Download the file from the worker: `GET /api/share/<fileId>`. No sign-in needed. It returns
+   the ciphertext and an `ETag`; send it back as `If-None-Match` to learn cheaply whether
+   anything changed (304). See "The download proxy".
 2. Decrypt with the key from the link and decompress.
 3. Check the format. If it's past `expires`, show "This share has ended" and keep
    nothing.
 4. Store it in its own IndexedDB, `chordless-share-<fileId>`, apart from any
-   organisation. Store the key and checksum there too, so `/s/<fileId>` works again
+   organisation. Store the key and `ETag` there too, so `/s/<fileId>` works again
    on that device without the fragment.
 5. Show it **read-only**, using the setlist page's components:
    - no edit mode, sync, library or organisation
@@ -221,36 +222,72 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
      refresh doesn't overwrite
 
 **Opening it again:**
-- **Online:** fetch `md5Checksum`. If it changed, download, decrypt and replace the
-  local copy. A 404 means sharing stopped or expired: show "This share has ended" and
+- **Online:** ask the worker with the stored `ETag`. A 200 means it changed: decrypt and
+  replace the local copy. A 304 means nothing did. A 404 means sharing stopped or expired: show "This share has ended" and
   delete the local copy.
 - **Offline:** show the local copy.
 
 **Local expiry:** on every app start, delete `chordless-share-*` databases past their
 `expires`.
 
+### The download proxy
+
+Recipients don't fetch from Google. Google needs an API key for anonymous downloads, and
+rate-limits them per IP: repeated bursts of downloads from one address got ours served a
+"Sorry... automated queries" page (which has no CORS headers, so it shows up in a browser as
+a CORS error). A room of people on one wifi opening a link looks the same. So
+`worker/src/share.ts` serves `GET /api/share/<fileId>`:
+
+- It fetches the file from Drive with the API key, which is a Worker secret
+  (`GOOGLE_API_KEY`, in `.dev.vars` and `push-secrets.sh`) and never reaches a browser.
+- It caches each answer at the edge for 60 seconds, so Drive sees about one request per file
+  a minute however many people open the link. The cache is deliberately short, not matched to
+  `expires`: updates must reach recipients, and a stopped or expired share must start giving
+  404 (Drive does that once its public permission is revoked) within a minute.
+- `ETag` is a hash of the ciphertext; `If-None-Match` gets a 304.
+- **Only Drive's 404 means "ended".** Rate limits, error pages and unreachable Drive are 502,
+  so a recipient keeps their local copy. Bad ids never reach Drive, and anything over 1 MB
+  isn't relayed.
+- It only ever sees ciphertext: the key is in the link's `#`.
+
 ### Security notes
 
 - The key travels only in the link fragment and in the private setlist file. Google
   and Chordless's servers only ever see ciphertext.
 - AES-GCM also detects tampering: a modified file fails to decrypt.
-- The API key is public by nature. Restrict it in Google Cloud to the Drive API and
-  to chordless.app (HTTP referrer).
+- The API key is created once, in the same Google Cloud project as the OAuth client, restricted
+  to the Drive API. It only lets Google attribute quota to the project. It lives in the
+  worker, not the client. Users never create one. Its HTTP referrer restriction is moot (the
+  worker sends none): the Drive API restriction is the one that counts, and the key can be
+  rotated.
 - Anyone holding a full link can read the set until it expires or sharing stops.
   "Stop sharing" is the way to cut it off early.
 - Recipients can keep what they've seen (screenshots, saved pages). Expiry is about
   links found later, not about trusting recipients.
 
-### To verify against real Drive before building
+### Verified against real Drive
 
-- **Public permissions under `drive.file`:** that the app can create an `anyone`
-  permission, with `allowFileDiscovery: false`, on a file it created.
-- **Downloading without sign-in:** that `files.get?alt=media&key=…` works for that
-  file from the browser, CORS included.
-- **Workspace accounts:** an admin can block sharing outside the domain. The share
-  dialog then needs a clear error. Personal Google accounts are unaffected.
-- **Rate limits** for unauthenticated, API-key downloads with a whole team opening a
-  link at once.
+Checked with `/dev/share-spike.html` (a personal Google account, a file in My Drive root):
+
+- **Public permissions under `drive.file`:** the app can create `anyone`/`reader` with
+  `allowFileDiscovery: false` on a file it created.
+- **Downloading without sign-in:** `files.get?alt=media` needs an **API key**: with none,
+  Google answers 403 "The request is missing a valid API key". With one it works from a
+  browser, CORS included.
+- **Updating in place:** the file id stays, `md5Checksum` changes, and anonymous readers see
+  the new content immediately.
+- **Burst:** 40 parallel anonymous downloads all returned 200, but repeated bursts then got the
+  IP blocked for downloads (see "The download proxy"). Hence the proxy.
+- **Trashing does not revoke access.** A trashed file is still downloadable by anyone with the
+  link. To end access, **delete the `anyoneWithLink` permission, then trash the file**; after
+  that an anonymous download is a 404. Stop sharing and expiry cleanup both do both steps.
+
+Still to check:
+
+- **Workspace accounts:** an admin can block sharing outside the domain. The share dialog
+  then needs a clear error. Personal Google accounts are unaffected.
+- **Creating the file in the organisation's `shares/` folder** (the spike used My Drive).
+- **The proxy in production:** the Cache API behaves differently in `wrangler dev`.
 
 ### Tests
 

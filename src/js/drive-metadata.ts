@@ -98,6 +98,27 @@ export function setlistFileMetadata(
   }
 }
 
+/**
+ * Metadata for a setlist's share file. appProperties are readable by anyone with the file's
+ * id, so they hold nothing secret: never the key, and no names.
+ */
+export function shareFileMetadata(
+  setlist: Pick<Setlist, 'id'>,
+  { organisationId, expires }: FileMetadataOptions & { expires: string }
+): DriveFileMetadata {
+  return {
+    name: `${setlist.id}.share`,
+    mimeType: 'application/octet-stream',
+    appProperties: {
+      type: 'share',
+      organisationId: organisationId || '',
+      setlistId: setlist.id,
+      expires,
+      appVersion: APP_VERSION,
+    },
+  }
+}
+
 /** The title, CCLI number and variant label a song's file is named and labelled by */
 export function songFileDetails(
   song: Partial<SongRecord>,
@@ -148,9 +169,10 @@ export function songFileMetadata(
  */
 export function forUpdate(
   { name, appProperties }: Pick<DriveFileMetadata, 'name' | 'appProperties'>,
-  kind: 'setlist' | 'song'
+  kind: 'setlist' | 'song' | 'share'
 ): { name: string; appProperties: Record<string, string | null> } {
-  const retired = kind === 'setlist' ? RETIRED_SETLIST_PROPERTIES : RETIRED_SONG_PROPERTIES
+  const retired =
+    kind === 'setlist' ? RETIRED_SETLIST_PROPERTIES : kind === 'song' ? RETIRED_SONG_PROPERTIES : []
   return {
     name,
     appProperties: {

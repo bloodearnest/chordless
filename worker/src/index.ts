@@ -10,9 +10,10 @@
 
 import * as jose from 'jose'
 import { exchangeCode, type GoogleEnv, refreshAccessToken, verifyIdToken } from './google-auth.ts'
+import { handleShareDownload, type ShareCache, type ShareEnv, shareFileId } from './share.ts'
 
 /** The worker's bindings, variables and secrets (see wrangler.toml) */
-interface Env extends GoogleEnv {
+interface Env extends GoogleEnv, ShareEnv {
   ASSETS: { fetch(request: Request): Promise<Response> }
   /** Set only in [env.dev]: serve the component playgrounds */
   DEV_PAGES?: string
@@ -53,12 +54,14 @@ function isCrossOrigin(request: Request, url: URL) {
  * Router - handles incoming requests
  */
 export default {
-  async fetch(request: Request, env: Env, _ctx: unknown) {
+  async fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }) {
     const url = new URL(request.url)
     const path = url.pathname
 
     if (
-      (path.startsWith('/oauth/') || path.startsWith('/session/')) &&
+      (path.startsWith('/oauth/') ||
+        path.startsWith('/session/') ||
+        path.startsWith('/api/share/')) &&
       isCrossOrigin(request, url)
     ) {
       return jsonResponse({ error: 'Cross-origin requests are not allowed' }, 403)
@@ -82,6 +85,15 @@ export default {
 
       if (path === '/session/revoke' && request.method === 'POST') {
         return await handleSessionRevoke(request, env)
+      }
+
+      // A share link's download (public, encrypted; see docs/SHARING.md)
+      const shareId = shareFileId(path)
+      if (shareId !== null) {
+        return await handleShareDownload(request, shareId, env, {
+          cache: (caches as unknown as { default: ShareCache }).default,
+          waitUntil: promise => ctx.waitUntil(promise),
+        })
       }
 
       // Dev-only component playgrounds (src/dev/). DEV_PAGES is set only in [env.dev]

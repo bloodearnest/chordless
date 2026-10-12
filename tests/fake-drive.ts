@@ -114,6 +114,22 @@ export class FakeDrive {
     file.permissions.push({ id: `perm-${this._nextId++}`, type: 'user', ...permission })
   }
 
+  /**
+   * What the worker's /api/share/<id> gives a recipient: the file's bytes if it has a public
+   * permission, otherwise 404. As in real Drive (checked), trashing a public file does not
+   * stop this; revoking the permission does.
+   */
+  anonymousDownload(fileId): { status: number; bytes?: Uint8Array } {
+    const file = this.files.get(fileId)
+    if (!file?.permissions.some(p => p.type === 'anyone')) return { status: 404 }
+    return {
+      status: 200,
+      bytes: file.binary
+        ? binaryStringToBytes(file.content)
+        : new TextEncoder().encode(file.content),
+    }
+  }
+
   /** Simulate an edit made elsewhere (another device, or the Drive UI) */
   editContent(fileId, content) {
     const file = this._get(fileId)
@@ -129,8 +145,9 @@ export class FakeDrive {
     return fakeChecksum(content)
   }
 
-  _setContent(file, content) {
+  _setContent(file, content, binary = false) {
     file.content = content
+    file.binary = binary
     file.md5Checksum = this._checksum(content)
     file.modifiedTime = this.now()
     file.version++
@@ -162,11 +179,18 @@ export class FakeDrive {
       return json({ error: { code: 401, message: 'Invalid Credentials' } }, 401)
     }
 
-    const body = method === 'GET' || method === 'HEAD' ? '' : await request.text()
+    const bytes =
+      method === 'GET' || method === 'HEAD'
+        ? new Uint8Array()
+        : new Uint8Array(await request.arrayBuffer())
+    const body = new TextDecoder().decode(bytes)
+    // Multipart bodies can hold binary content (a share file), so they are parsed as bytes
+    const rawBody = bytesToBinaryString(bytes)
     this.requests.push({ method, path, params, body })
 
     const fileMatch = path.match(/^\/drive\/v3\/files\/([^/]+)$/)
     const permissionsMatch = path.match(/^\/drive\/v3\/files\/([^/]+)\/permissions$/)
+    const permissionMatch = path.match(/^\/drive\/v3\/files\/([^/]+)\/permissions\/([^/]+)$/)
     const uploadMatch = path.match(/^\/upload\/drive\/v3\/files\/([^/]+)$/)
 
     if (path === '/drive/v3/about' && method === 'GET') {
@@ -184,6 +208,29 @@ export class FakeDrive {
       )
       return json({ kind: 'drive#permissionList', permissions })
     }
+    if (permissionsMatch && method === 'POST') {
+      const file = this._getOr404(permissionsMatch[1])
+      if (file instanceof Response) return file
+      const permission = JSON.parse(body || '{}')
+      if (permission.type === 'anyone') {
+        // Drive gives the public permission a fixed id
+        file.permissions = file.permissions.filter(p => p.type !== 'anyone')
+        const created = { id: 'anyoneWithLink', ...permission }
+        file.permissions.push(created)
+        return json({ kind: 'drive#permission', ...created })
+      }
+      this._unsupported(`creating a ${permission.type} permission`)
+    }
+    if (permissionMatch && method === 'DELETE') {
+      const file = this._getOr404(permissionMatch[1])
+      if (file instanceof Response) return file
+      const before = file.permissions.length
+      file.permissions = file.permissions.filter(p => p.id !== permissionMatch[2])
+      if (file.permissions.length === before) {
+        return json({ error: { code: 404, message: 'Permission not found' } }, 404)
+      }
+      return new Response(null, { status: 204 })
+    }
     if (path === '/drive/v3/files' && method === 'GET') {
       return this._list(params)
     }
@@ -194,7 +241,9 @@ export class FakeDrive {
       const file = this._getOr404(fileMatch[1])
       if (file instanceof Response) return file
       if (params.get('alt') === 'media') {
-        return new Response(file.content, { headers: { 'Content-Type': file.mimeType } })
+        return new Response(file.binary ? binaryStringToBytes(file.content) : file.content, {
+          headers: { 'Content-Type': file.mimeType },
+        })
       }
       return json(this._project(file, params.get('fields')))
     }
@@ -213,8 +262,11 @@ export class FakeDrive {
     if (path === '/upload/drive/v3/files' && method === 'POST') {
       if (params.get('uploadType') !== 'multipart')
         this._unsupported(`uploadType=${params.get('uploadType')}`)
-      const { metadata, content } = parseMultipart(request.headers.get('Content-Type'), body)
-      return this._create(metadata, content, params)
+      const { metadata, content, binary } = parseMultipart(
+        request.headers.get('Content-Type'),
+        rawBody
+      )
+      return this._create(metadata, content, params, binary)
     }
     if (uploadMatch && method === 'PATCH') {
       const uploadType = params.get('uploadType')
@@ -224,10 +276,13 @@ export class FakeDrive {
       const file = this._getOr404(uploadMatch[1])
       if (file instanceof Response) return file
       if (uploadType === 'multipart') {
-        const { metadata, content } = parseMultipart(request.headers.get('Content-Type'), body)
+        const { metadata, content, binary } = parseMultipart(
+          request.headers.get('Content-Type'),
+          rawBody
+        )
         if ('parents' in metadata) this._unsupported('changing parents in an update')
         this._applyMetadata(file, metadata)
-        this._setContent(file, content)
+        this._setContent(file, content, binary)
       } else {
         this._setContent(file, body)
       }
@@ -252,7 +307,7 @@ export class FakeDrive {
     return null
   }
 
-  _create(metadata, content, params) {
+  _create(metadata, content, params, binary = false) {
     const now = this.now()
     const file = {
       kind: 'drive#file',
@@ -268,6 +323,7 @@ export class FakeDrive {
       modifiedTime: now,
       version: 1,
       permissions: [],
+      binary,
       content,
       md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : this._checksum(content),
     }
@@ -431,7 +487,29 @@ function parseMultipart(contentType, body) {
     })
   if (parts.length !== 2)
     throw new FakeDriveError(`Expected 2 multipart parts, got ${parts.length}`)
-  return { metadata: JSON.parse(parts[0].body), content: parts[1].body }
+  const binary = /application\/octet-stream/.test(parts[1].headers)
+  return {
+    metadata: JSON.parse(binaryStringToText(parts[0].body)),
+    content: binary ? parts[1].body : binaryStringToText(parts[1].body),
+    binary,
+  }
+}
+
+/** Bytes as a string with one character per byte, to be split on text without losing any */
+function bytesToBinaryString(bytes: Uint8Array) {
+  let out = ''
+  for (let i = 0; i < bytes.length; i += 8192) {
+    out += String.fromCharCode(...bytes.subarray(i, i + 8192))
+  }
+  return out
+}
+
+function binaryStringToBytes(text: string) {
+  return Uint8Array.from(text, c => c.charCodeAt(0))
+}
+
+function binaryStringToText(text: string) {
+  return new TextDecoder().decode(binaryStringToBytes(text))
 }
 
 /** Drive's md5Checksum of a file's content: the MD5 of its UTF-8 bytes */
