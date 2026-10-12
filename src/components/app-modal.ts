@@ -108,7 +108,7 @@ export class AppModal extends LitElement {
       border: 1px solid var(--modal-border, transparent);
       border-radius: 8px;
       padding: 0;
-      max-width: 90%;
+      max-width: min(90%, calc(var(--app-width) - 2rem));
       max-height: 90vh;
       box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
       overflow: hidden;
@@ -133,13 +133,13 @@ export class AppModal extends LitElement {
     }
 
     :host([size='large']) .modal-content {
-      max-width: 900px;
+      max-width: min(900px, calc(var(--app-width) - 2rem));
     }
 
     :host([size='fullscreen']) .modal-content {
-      max-width: 95vw;
+      max-width: min(95vw, calc(var(--app-width) - 2rem));
       max-height: 95vh;
-      width: 95vw;
+      width: min(95vw, calc(var(--app-width) - 2rem));
       height: 95vh;
     }
 

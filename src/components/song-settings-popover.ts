@@ -1,6 +1,7 @@
 import { css, html, LitElement } from 'lit'
 import { ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { frameBounds } from '../js/utils/frame.ts'
 
 /** The BPM was changed with - or + */
 export class BpmChangeEvent extends Event {
@@ -168,9 +169,10 @@ export class SongSettingsPopover extends LitElement {
   _positionPopover(dialog: HTMLDialogElement): void {
     if (!this.triggerButton) return
     const buttonRect = this.triggerButton.getBoundingClientRect()
-    const left = Math.min(buttonRect.left, window.innerWidth - dialog.offsetWidth - 8)
+    const frame = frameBounds()
+    const left = Math.min(buttonRect.left, frame.right - dialog.offsetWidth - 8)
     dialog.style.top = `${buttonRect.bottom + 4}px`
-    dialog.style.left = `${Math.max(8, left)}px`
+    dialog.style.left = `${Math.max(frame.left + 8, left)}px`
   }
 
   show(): void {

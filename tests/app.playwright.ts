@@ -224,8 +224,13 @@ test.describe('Navigation menu', () => {
 
     test('a tap outside only closes it, without pressing what is under it', async ({ page }) => {
       await openMenu()
+      // A point on the first song's card, clear of the menu, which is under the header's menu
+      // button (and on a wide screen the card's middle is under the menu)
       const card = must(await page.locator('setlist-overview song-card').first().boundingBox())
-      await page.mouse.click(card.x + card.width / 2, card.y + card.height / 2)
+      const popover = must(await menu.boundingBox())
+      const x = Math.max(card.x + card.width / 2, popover.x + popover.width + 10)
+      expect(x).toBeLessThan(card.x + card.width)
+      await page.mouse.click(x, card.y + card.height / 2)
       await expect(menu).toBeHidden()
       // The song under the tap did not open
       await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)

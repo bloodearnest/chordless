@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { frameBounds } from '../js/utils/frame.ts'
 
 /**
  * OptionPicker: a label and a value which, in edit mode, is a button opening
@@ -169,9 +170,10 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
     const above = button.top - margin
     let top = below >= height || below >= above ? button.bottom + 4 : button.top - height - 4
     top = Math.max(margin, Math.min(top, window.innerHeight - height - margin))
+    const frame = frameBounds()
     const left = Math.max(
-      margin,
-      Math.min(button.left, window.innerWidth - popover.offsetWidth - margin)
+      frame.left + margin,
+      Math.min(button.left, frame.right - popover.offsetWidth - margin)
     )
     popover.style.top = `${top}px`
     popover.style.left = `${left}px`
