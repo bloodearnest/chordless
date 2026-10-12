@@ -40,7 +40,7 @@ describe('buildRuntimeSongs', () => {
   })
 
   /** Save a library song with the chart given, and return its id */
-  async function addSong(chart, { tempo }: { tempo?: TempoInput } = {}) {
+  async function addSong(chart, { tempo, key }: { tempo?: TempoInput; key?: string } = {}) {
     const unique = crypto.randomUUID()
     await db.saveChordPro({
       id: `chordpro-${unique}`,
@@ -54,6 +54,7 @@ describe('buildRuntimeSongs', () => {
       title: 'A song',
       titleNormalized: unique,
       tempo,
+      key,
       isDefault: true,
       chordproFileId: `chordpro-${unique}`,
       modifiedDate: new Date().toISOString(),
@@ -94,6 +95,21 @@ describe('buildRuntimeSongs', () => {
     const chords = JSON.stringify(song.parsed)
     expect(chords).to.include('"A"')
     expect(chords).to.include('"D"')
+  })
+
+  it("falls back to the library song's key and tempo for an old setlist", async () => {
+    const songId = await addSong(chart(), { key: 'A', tempo: 80 })
+    const [song] = await build([{ songId, key: null, tempo: null, order: 0 }])
+    expect(song.originalKey).to.equal('G')
+    expect(song.currentKey).to.equal('A')
+    expect(song.currentBPM).to.equal(80)
+  })
+
+  it("prefers the setlist's own key and tempo to the library song's", async () => {
+    const songId = await addSong(chart(), { key: 'A', tempo: 80 })
+    const [song] = await build([{ songId, key: 'C', tempo: 100, order: 0 }])
+    expect(song.currentKey).to.equal('C')
+    expect(song.currentBPM).to.equal(100)
   })
 
   it("uses the setlist's own edited chart, without looking the song up", async () => {

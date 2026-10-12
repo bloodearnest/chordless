@@ -44,9 +44,6 @@ import { PageView, type ViewState } from './page-view.ts'
 
 const { CONFIG } = SongViewManager
 
-/** The song that is open: its details, which gain the key once it has been changed and saved */
-type OpenSong = SongWithContent & { key?: string | null; originalKey?: string | null }
-
 export class LibraryView extends PageView {
   static override properties = {
     ...PageView.properties,
@@ -70,7 +67,7 @@ export class LibraryView extends PageView {
 
   // The open song
   #openUuid: string | null = null
-  #song: OpenSong | null = null
+  #song: SongWithContent | null = null
   #parsed: ParsedChart | null = null
   #key: string | undefined = undefined
   #fontSize = CONFIG.DEFAULT_FONT_SIZE
@@ -241,7 +238,7 @@ export class LibraryView extends PageView {
 
   // ==================== Single song ====================
 
-  async #viewSong(song: OpenSong): Promise<void> {
+  async #viewSong(song: SongWithContent): Promise<void> {
     this.#song = song
     if (!song.chordpro) {
       console.error('Song has no ChordPro content!', song)

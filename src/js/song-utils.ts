@@ -72,6 +72,12 @@ export async function getSongWithContent(
     artist: parsed.metadata.artist || song.author,
     author: song.author,
 
+    // The record's own key and tempo (what the library saved), and the ones it was imported with
+    key: song.key,
+    originalKey: song.originalKey,
+    tempo: song.tempo,
+    originalTempo: song.originalTempo,
+
     // Metadata object (for UI components)
     metadata: {
       key: parsed.metadata.key || song.key,

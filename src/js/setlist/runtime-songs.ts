@@ -118,10 +118,9 @@ export async function buildRuntimeSongs(
     // Capture original key from ChordPro file (for transposition reference)
     const originalKey = parsed.metadata.key || null
 
-    // Get target key from setlist (explicit snapshot)
-    // (The intended fallback for old setlists, the canonical song's key, has never worked:
-    // getSongWithContent gives no top-level key. Kept as it behaves; see the TODO.)
-    const targetKey = songEntry.key ?? null
+    // Get target key from setlist (explicit snapshot); an old setlist with none uses the
+    // library song's key
+    const targetKey = songEntry.key ?? canonicalSong?.key ?? null
 
     // Apply transposition if requested and we have a reference key
     if (targetKey && originalKey && targetKey !== originalKey) {
@@ -132,8 +131,8 @@ export async function buildRuntimeSongs(
       parsed.metadata.key = targetKey
     }
 
-    // Get target tempo from setlist (explicit snapshot); same fallback story as the key
-    const targetTempo = songEntry.tempo ?? null
+    // Get target tempo from setlist (explicit snapshot); same fallback as the key
+    const targetTempo = songEntry.tempo ?? canonicalSong?.tempo ?? null
 
     // Apply tempo override
     if (targetTempo) {
@@ -148,7 +147,7 @@ export async function buildRuntimeSongs(
     if (canonicalSong?.metadata) {
       const canonicalTempoInfo = parseTempoMetadata(canonicalSong.metadata.tempo)
       // The setlist's own tempo, if it has one, wins over the library song's
-      if (canonicalTempoInfo.bpm !== null && !songEntry.tempo) {
+      if (canonicalTempoInfo.bpm !== null && !targetTempo) {
         currentBPM = canonicalTempoInfo.bpm
       }
       timeSignature = canonicalSong.metadata.timeSignature || parsed.metadata.time

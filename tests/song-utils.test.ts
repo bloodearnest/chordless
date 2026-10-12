@@ -104,6 +104,15 @@ describe('getSongWithContent', () => {
     expect(full.chordpro).to.contain('[G]Amazing')
   })
 
+  it("gives the record's key and tempo at the top level", async () => {
+    const song = await createSong(chart(unique('Top level'), { key: 'D', extra: '{tempo: 90}' }))
+    const full = await getSongWithContent(song.uuid)
+    expect(full.key).to.equal('D')
+    expect(full.originalKey).to.equal('D')
+    expect(full.tempo).to.equal(90)
+    expect(full.originalTempo).to.equal(90)
+  })
+
   it("gives the chart's CCLI number and trailer in the metadata", async () => {
     const trailer = 'CCLI Song # 7654321\nA. Writer\n© 2020 A Publisher'
     const song = await createSong(chart(unique('With trailer'), { body: `[G]Amazing\n${trailer}` }))

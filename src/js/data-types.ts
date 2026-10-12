@@ -235,6 +235,11 @@ export interface SongWithContent {
   title: string
   artist: string | null | undefined
   author: string | null
+  /** The record's key and tempo: what the library saved, and what the song was imported with */
+  key: string | null
+  originalKey: string | null
+  tempo: number | null
+  originalTempo: number | null
   /** For the UI: what the chart says, else what the record says */
   metadata: {
     key: string | null | undefined
