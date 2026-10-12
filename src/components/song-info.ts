@@ -246,7 +246,7 @@ export class SongInfo extends LitElement {
                 : ''
             }
             ${
-              this.song.metadata?.copyright
+              this.song.metadata?.copyright && !this._copyrightIsInTrailer()
                 ? html`
                   <div class="modal-info-item">
                     <div class="modal-info-label">Copyright</div>
@@ -310,6 +310,18 @@ export class SongInfo extends LitElement {
       return html`<span class="appearance-meta">${metaParts.join(' • ')}</span>`
     }
     return ''
+  }
+
+  /** Whether the CCLI trailer already says the copyright, so the Copyright line would repeat it */
+  _copyrightIsInTrailer(): boolean {
+    const plain = (text: string) =>
+      text
+        .replace(/©|\(c\)/gi, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase()
+    const copyright = plain(this.song?.metadata?.copyright ?? '')
+    return Boolean(copyright) && plain(this.song?.metadata?.ccliTrailer ?? '').includes(copyright)
   }
 
   _renderCCLI() {

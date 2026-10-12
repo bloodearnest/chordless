@@ -22,6 +22,14 @@ function fakeDb() {
       chordpro:
         '{title: Credited Song}\n{copyright: Words PD. Chords © 2026 A. Person}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020 A Publisher',
     },
+    repeated: {
+      uuid: 'repeated',
+      id: 'repeated',
+      title: 'Repeated Song',
+      chordproFileId: 'c-repeated',
+      chordpro:
+        '{title: Repeated Song}\n{copyright: 2020 A Publisher}\n[G]Words\nCCLI Song # 7654321\nA. Writer\n© 2020  A Publisher',
+    },
   }
   return {
     getDefaultSongVariant: async id => songs[id] ?? null,
@@ -82,6 +90,15 @@ describe('song-info-dialog', () => {
     await dialog.show('fast')
     await wait(100)
     expect(info().textContent).to.not.contain('Copyright')
+  })
+
+  it('shows no copyright line when the CCLI trailer says the same', async () => {
+    await setUp()
+    await dialog.show('repeated')
+    await wait(100)
+    const info = dialog.shadowRoot.querySelector('song-info').shadowRoot
+    expect(info.querySelector('.ccli-trailer').textContent).to.contain('A Publisher')
+    expect(info.textContent).to.not.contain('Copyright')
   })
 
   it("says so when the song can't be loaded", async () => {
