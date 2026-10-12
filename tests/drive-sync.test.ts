@@ -235,18 +235,17 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(drive.requests.filter(r => r.method === 'DELETE')).to.deep.equal([])
     })
 
-    it('re-uploads a setlist whose Drive file was deleted elsewhere', async () => {
-      // Current behaviour: deleting a file in the Drive UI doesn't stick while
-      // any device still has a local copy.
+    it('removes a setlist whose Drive file was deleted elsewhere', async () => {
+      // Deleting a file in the Drive UI sticks: a device with an unedited copy drops it
       const phone = await makeDevice('phone')
-      const setlist = await addSetlist(phone, { name: 'Resurrected' })
+      const setlist = await addSetlist(phone, { name: 'Deleted' })
       await syncDevice(phone)
 
       drive.files.delete(driveSetlistFiles()[0].id)
-      await editSetlist(phone, setlist.id, { name: 'Resurrected' })
       await syncDevice(phone)
 
-      expect(driveSetlist(setlist.id).name).to.equal('Resurrected')
+      expect(await phone.db.getSetlist(setlist.id)).to.not.be.ok
+      expect(driveSetlistFiles()).to.have.length(0)
     })
   })
 
@@ -532,37 +531,56 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
     })
 
-    describe("when many of a device's files are gone from Drive", () => {
+    describe("when a device's Drive file is gone and no other file holds the setlist", () => {
       const trashAll = () => {
         for (const file of driveSetlistFiles()) drive.files.get(file.id).trashed = true
       }
 
-      it('stops instead of uploading them all again', async () => {
+      it('removes the setlists that were not edited here, without uploading anything', async () => {
         const phone = await makeDevice('phone')
         for (let i = 0; i < 8; i++) await addSetlist(phone, { date: `2026-09-0${i + 1}` })
         await syncDevice(phone)
         trashAll()
         drive.requests = []
 
-        const error = await phone.sync.sync().then(
-          () => null,
-          e => e as Error
-        )
+        await syncDevice(phone)
 
-        expect(error?.name).to.equal('MissingFilesError')
+        expect(await phone.db.getAllSetlists()).to.have.length(0)
         expect(drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
-        expect(await phone.db.getAllSetlists()).to.have.length(8)
       })
 
-      it('still re-uploads a few', async () => {
+      it('keeps and uploads again a setlist edited here', async () => {
         const phone = await makeDevice('phone')
-        for (let i = 0; i < 3; i++) await addSetlist(phone, { date: `2026-09-0${i + 1}` })
+        const edited = await addSetlist(phone, { name: 'Edited' })
+        const untouched = await addSetlist(phone, { name: 'Untouched' })
         await syncDevice(phone)
         trashAll()
+        await editSetlist(phone, edited.id, { name: 'Edited again' })
 
         await syncDevice(phone)
 
-        expect(driveSetlistFiles().filter(f => !f.trashed)).to.have.length(3)
+        expect((await phone.db.getAllSetlists()).map(s => s.id)).to.deep.equal([edited.id])
+        expect(await phone.db.getSetlist(untouched.id)).to.not.be.ok
+        const live = drive.listFiles(f => f.appProperties.setlistId === edited.id && !f.trashed)
+        expect(live.map(f => JSON.parse(f.content).name)).to.deep.equal(['Edited again'])
+      })
+
+      it('brings a restored file back, keeping the device state for it', async () => {
+        const phone = await makeDevice('phone')
+        const setlist = await addSetlist(phone, { name: 'Restorable' })
+        await phone.db.saveLocalState(Object.assign(makeLocalState(setlist.id), { marker: 'kept' }))
+        await syncDevice(phone)
+        trashAll()
+        await syncDevice(phone)
+        for (const file of driveSetlistFiles()) drive.files.get(file.id).trashed = false
+
+        await syncDevice(phone)
+
+        expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Restorable')
+        expect(
+          ((await phone.db.getLocalState(setlist.id)) as SetlistLocalState & { marker?: string })
+            .marker
+        ).to.equal('kept')
       })
     })
 

@@ -129,28 +129,6 @@ export class OrganisationFolderMismatchError extends Error {
   }
 }
 
-/** More setlists/songs than this missing from Drive at once is not a few deleted files */
-const MAX_MISSING_FILES = 5
-
-/**
- * Thrown when many of this device's setlists/songs point at Drive files that are gone. Sync
- * uploads those again, which duplicates them if the files were trashed or moved (or cleaned up
- * as duplicates) rather than deleted for good, so it stops and asks instead of doing it.
- */
-export class MissingFilesError extends Error {
-  count: number
-
-  constructor(count: number, examples: string[]) {
-    super(
-      `${count} setlists/songs on this device have lost their file in Google Drive (${examples.join(', ')}...). ` +
-        `Nothing was uploaded, to avoid duplicating them. If the files are in the Drive trash, ` +
-        `restore them; if they were removed on purpose, reset this device from Google Drive.`
-    )
-    this.name = 'MissingFilesError'
-    this.count = count
-  }
-}
-
 /**
  * Where an organisation's link to its Drive folder is stored: its record in the
  * organisations database. Tests pass their own { get, set }.
@@ -396,8 +374,15 @@ export class DriveSyncManager {
         progressCallback({ stage: 'pulling', message: 'Downloading from Drive...' })
       await this.pullFromDrive(progressCallback)
 
-      // The pull has adopted the live files it could; what is still missing would be uploaded
-      await this.assertFewFilesMissing()
+      // The pull has adopted the live files it could. A setlist whose file is still gone and
+      // that wasn't edited here was removed from Drive: remove it here too
+      const removed = await this.removeSetlistsDeletedInDrive()
+      if (removed > 0 && progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: `Removed ${removed} setlists that were deleted in Drive`,
+        })
+      }
 
       // Then, push local changes
       if (progressCallback) progressCallback({ stage: 'pushing', message: 'Uploading to Drive...' })
@@ -512,29 +497,27 @@ export class DriveSyncManager {
   }
 
   /**
-   * Throw MissingFilesError if more than a few setlists/songs point at Drive files that are
-   * gone. Needs the inventory; skipped if it couldn't be built.
+   * Remove the setlists whose Drive file is gone and that haven't been edited since they were
+   * synced: their content is what Drive had, so Drive's removal wins (as in a reset). One
+   * edited here is kept, and the push uploads it again, so no edit is lost. This device's
+   * state for a removed setlist is kept, so a file restored from the Drive trash comes back
+   * as it was. Needs the inventory; skipped if it couldn't be built.
+   * @returns how many setlists were removed
    */
-  async assertFewFilesMissing(): Promise<void> {
-    if (!this._driveFileIds) return
+  async removeSetlistsDeletedInDrive(): Promise<number> {
+    if (!this._driveFileIds) return 0
 
-    const missing = [
-      ...(await this.#db.getAllSetlists()).map(setlist => ({
-        driveFileId: setlist.driveFileId,
-        label: [setlist.date, setlist.name].filter(Boolean).join(' '),
-      })),
-      ...(await this.#db.getAllSongs()).map(song => ({
-        driveFileId: song.driveFileId,
-        label: song.title || '',
-      })),
-    ].filter(record => record.driveFileId && !this.fileExistsInDrive(record.driveFileId))
-
-    if (missing.length > MAX_MISSING_FILES) {
-      throw new MissingFilesError(
-        missing.length,
-        missing.slice(0, 3).map(record => record.label)
+    let removed = 0
+    for (const setlist of await this.#db.getAllSetlists()) {
+      if (!setlist.driveFileId || this.fileExistsInDrive(setlist.driveFileId)) continue
+      if (this.setlistHasLocalChanges(setlist)) continue
+      console.log(
+        `[DriveSync] Removing setlist ${setlist.id}: its Drive file ${setlist.driveFileId} is gone`
       )
+      await this.#db.deleteSetlist(setlist.id)
+      removed++
     }
+    return removed
   }
 
   /**

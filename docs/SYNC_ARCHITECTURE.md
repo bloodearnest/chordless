@@ -73,12 +73,14 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
    instead of being uploaded again: same content, it just points at the live file; edited
    here, it keeps its edits and the push updates the live file; unchanged here but newer in
    Drive, Drive's content is taken. Without this, every such setlist was uploaded as a copy.
-5. **Missing-files check:** if more than 5 setlists/songs still point at Drive files that are
-   gone after the pull (it adopts live files where it can), sync stops with
-   `MissingFilesError` before uploading anything. That many is a cleanup, a trashed folder or
-   a stale device, not a few deletions, and uploading them again duplicates them (it happened
-   three times in June–October 2026). Restore the files from the Drive trash, or reset the
-   device from Drive. A few missing files are still uploaded again.
+5. **Removal of setlists deleted in Drive:** a setlist whose Drive file is still gone after
+   the pull (which adopts live files where it can) and that hasn't been edited here since its
+   last sync is removed locally: its content is what Drive had, so Drive's removal wins, as in
+   a reset. One edited here is kept and uploaded again, so no edit is lost. This device's state
+   for a removed setlist (`setlist_local`) is kept, and a file restored from the Drive trash
+   comes back as it was. Without this, trashing or cleaning up files made devices upload
+   their setlists again: three times in June–October 2026. Songs are not removed this way
+   (setlists refer to them); a song whose file is gone is still uploaded again.
 6. **Push** setlists then songs: upload what's new or changed locally.
    A setlist with no live file, while another setlist that has one has the same date, leader,
    type and name, is not uploaded: it is the same setlist stored twice (e.g. two devices each
@@ -131,7 +133,7 @@ Each synced record stores, from its last sync:
 | Local and changed, not changed in Drive | uploaded (file updated in place) |
 | Changed in Drive only | downloaded |
 | Changed both | conflict: Drive wins |
-| Synced before, **file now missing from Drive** | **uploaded again** if no more than 5 are missing (deletions don't stick, see [Deleting setlists](#deleting-setlists)); more than that stops the sync |
+| Synced before, **file now missing from Drive** | setlist: **removed here** if unedited since its last sync, **uploaded again** if edited; song: uploaded again |
 
 Uploads of new files are batched (50 setlists / 25 songs at a time, up to 30
 concurrent requests); one failed upload leaves just that record unsynced for next
@@ -208,10 +210,9 @@ that are in Drive.
 Status of the rest: **designed, not built.** Goal: remove a setlist (e.g. added in error),
 restricted to setlists you own, with the deletion reaching Drive and other devices.
 
-**Why it needs sync changes:** today sync undoes deletions in both directions. A
-setlist missing from Drive but present locally is re-uploaded (`pushSetlists`, the
-"Clearing stale Drive ID for setlist" path), and one in Drive but missing locally is
-downloaded (`pullSetlists`).
+**Why it needs sync changes:** a deletion made here is undone by the next sync, because a
+setlist in Drive but missing locally is downloaded (`pullSetlists`). (A setlist removed in
+Drive is already removed from devices that haven't edited it; see step 5 of a full sync.)
 
 #### Deleting (UI)
 
