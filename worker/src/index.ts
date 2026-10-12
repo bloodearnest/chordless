@@ -37,13 +37,16 @@ interface BlobData {
 const message = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
- * CORS headers for browser requests
+ * The API is only for the app itself, served from the same origin, so there are no CORS
+ * headers: browsers block cross-origin reads. Browsers also send some cross-origin requests
+ * without a preflight (a POST with a text/plain body), so refuse those here by Origin and
+ * Sec-Fetch-Site. Requests with neither header (curl, tests) are not browsers acting for a page.
  */
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*', // TODO: Restrict to your domain in production
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Access-Control-Max-Age': '86400',
+function isCrossOrigin(request: Request, url: URL) {
+  const origin = request.headers.get('Origin')
+  if (origin && origin !== url.origin) return true
+  const site = request.headers.get('Sec-Fetch-Site')
+  return site !== null && site !== 'same-origin' && site !== 'none'
 }
 
 /**
@@ -51,13 +54,15 @@ const CORS_HEADERS = {
  */
 export default {
   async fetch(request: Request, env: Env, _ctx: unknown) {
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: CORS_HEADERS })
-    }
-
     const url = new URL(request.url)
     const path = url.pathname
+
+    if (
+      (path.startsWith('/oauth/') || path.startsWith('/session/')) &&
+      isCrossOrigin(request, url)
+    ) {
+      return jsonResponse({ error: 'Cross-origin requests are not allowed' }, 403)
+    }
 
     try {
       // OAuth endpoints
@@ -407,14 +412,13 @@ async function importEncryptionKey(base64Key: string) {
 }
 
 /**
- * Helper to return JSON responses with CORS
+ * Helper to return JSON responses
  */
 function jsonResponse(data: unknown, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      ...CORS_HEADERS,
     },
   })
 }

@@ -90,14 +90,29 @@ test('worker source is not served as JavaScript', async () => {
   )
 })
 
-test('CORS preflight returns correct headers', async () => {
-  const resp = await worker.fetch('/oauth/callback', { method: 'OPTIONS' })
-  assert.equal(resp.status, 200)
-  assert.ok(resp.headers.get('access-control-allow-origin'), 'missing Access-Control-Allow-Origin')
-  assert.ok(
-    resp.headers.get('access-control-allow-methods')?.includes('POST'),
-    'POST should be in allowed methods'
-  )
+test('the API sends no CORS headers', async () => {
+  const resp = await worker.fetch('/session/refresh', { method: 'POST', body: '{}' })
+  assert.equal(resp.headers.get('access-control-allow-origin'), null)
+})
+
+test('the API refuses cross-origin requests', async () => {
+  for (const headers of [
+    { Origin: 'https://evil.example' },
+    { 'Sec-Fetch-Site': 'cross-site' },
+    { 'Sec-Fetch-Site': 'same-site' },
+  ]) {
+    const resp = await worker.fetch('/oauth/callback', { method: 'POST', body: '{}', headers })
+    assert.equal(resp.status, 403, JSON.stringify(headers))
+  }
+})
+
+test('the API accepts same-origin requests', async () => {
+  const resp = await worker.fetch('/oauth/callback', {
+    method: 'POST',
+    body: '{}',
+    headers: { 'Sec-Fetch-Site': 'same-origin' },
+  })
+  assert.equal(resp.status, 400, 'reaches the handler (missing code)')
 })
 
 test('JWE blob round-trips: encrypt then decrypt returns original data', async () => {
