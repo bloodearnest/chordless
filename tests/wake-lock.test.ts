@@ -244,17 +244,17 @@ describe('WakeLockController', () => {
       unlimited.dispose()
     })
 
-    describe('on a charger', () => {
+    describe('on mains power', () => {
       it('has no limit while charging, and starts the clock when unplugged', async () => {
         plug(true)
         idler.hold()
         await settle()
         await wait(160)
-        expect(idler.charging).to.equal(true)
+        expect(idler.onMains).to.equal(true)
         expect(idler.state).to.equal('active')
 
         plug(false)
-        expect(idler.charging).to.equal(false)
+        expect(idler.onMains).to.equal(false)
         await wait(40)
         expect(idler.state).to.equal('active')
         await wait(100)
@@ -277,7 +277,7 @@ describe('WakeLockController', () => {
         Object.defineProperty(navigator, 'getBattery', { configurable: true, value: undefined })
         const unknown = new WakeLockController(80)
         await settle()
-        expect(unknown.charging).to.equal(null)
+        expect(unknown.onMains).to.equal(null)
         unknown.hold()
         await settle()
         await wait(160)

@@ -138,6 +138,12 @@ export class AppPreferences extends LitElement {
       font-size: var(--font-ui-small);
     }
 
+    .wake-power {
+      margin: 0 0 0.75rem;
+      font-size: var(--font-ui-small);
+      opacity: 0.75;
+    }
+
     .field select {
       font: inherit;
       padding: 0.5rem;
@@ -266,10 +272,9 @@ export class AppPreferences extends LitElement {
             (wakeLock.manual
               ? 'The screen is being kept awake, on any page, until you stop it'
               : 'The screen is being kept awake') +
-            (this.keepAwakeMinutes === 0 || wakeLock.charging
+            (this.keepAwakeMinutes === 0 || wakeLock.onMains
               ? '.'
-              : `${wakeLock.manual ? ', or' : ','} until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`) +
-            (wakeLock.charging ? ' There is no time limit while it is charging.' : ''),
+              : `${wakeLock.manual ? ', or' : ','} until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`),
         }
       case 'released':
         return {
@@ -296,6 +301,18 @@ export class AppPreferences extends LitElement {
           detail: 'The screen is kept awake while a setlist is open, or when you ask for it here.',
         }
       }
+    }
+  }
+
+  /** Whether the device is on mains power, and so whether the idle limit applies */
+  _powerStatus(): string {
+    switch (wakeLock.onMains) {
+      case true:
+        return 'On mains power: there is no time limit.'
+      case false:
+        return 'On battery: the time limit applies.'
+      default:
+        return "This device can't say whether it is on mains power, so the time limit always applies."
     }
   }
 
@@ -432,6 +449,9 @@ export class AppPreferences extends LitElement {
               )}
             </select>
           </label>
+          <p class="wake-power" id="wake-power" data-mains=${String(wakeLock.onMains)}>
+            ${this._powerStatus()}
+          </p>
           ${this._renderWakeLockAction()}
         </div>
 

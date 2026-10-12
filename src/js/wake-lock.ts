@@ -17,8 +17,8 @@ import {
  *
  * It is also let go after a time with no touch, key press or scroll (an hour unless the user
  * chose another: see keepAwakeLimitMs), so a tablet left on a stand overnight does not stay
- * lit: the next touch takes it again. On a charger there is no limit: the Battery Status API
- * (Chromium only) says when the device is charging, and where it is not available the limit
+ * lit: the next touch takes it again. On mains power there is no limit: the Battery Status API
+ * (Chromium only) says when the device is charging, which a device with no battery always is, and where it is not available the limit
  * applies, as the safe guess.
  *
  * Nothing depends on it: a browser without the API gets the 'unsupported' state.
@@ -69,8 +69,8 @@ export class WakeLockController {
   /** Kept awake from Preferences, whatever page this is, until it is turned off */
   #manual = false
 
-  /** Whether the device is on a charger: unknown (null) where there is no Battery Status API */
-  #charging: boolean | null = null
+  /** Whether the device is on mains power: unknown (null) where there is no Battery Status API */
+  #onMains: boolean | null = null
   #battery: BatteryManager | null = null
   /** A test's own limit, in ms; else the user's setting */
   #idleLimitOverride: number | undefined
@@ -90,9 +90,9 @@ export class WakeLockController {
     void this.#watchBattery()
   }
 
-  /** Whether the device is charging, when it can tell: there is no idle limit then */
-  get charging(): boolean | null {
-    return this.#charging
+  /** Whether the device is on mains power, when it can tell: there is no idle limit then */
+  get onMains(): boolean | null {
+    return this.#onMains
   }
 
   async #watchBattery(): Promise<void> {
@@ -102,7 +102,7 @@ export class WakeLockController {
       ).getBattery?.()
       if (!battery) return
       this.#battery = battery
-      this.#charging = battery.charging
+      this.#onMains = battery.charging
       battery.addEventListener('chargingchange', this.#onChargingChange)
       this.#onChargingChange()
     } catch {
@@ -112,8 +112,8 @@ export class WakeLockController {
 
   #onChargingChange = (): void => {
     const charging = this.#battery?.charging ?? null
-    const changed = charging !== this.#charging
-    this.#charging = charging
+    const changed = charging !== this.#onMains
+    this.#onMains = charging
     // Unplugging is someone being there: the limit counts from now
     if (changed && charging === false) this.#lastActivity = Date.now()
     this.#emit()
@@ -217,7 +217,7 @@ export class WakeLockController {
   }
 
   get #idleLimit(): number {
-    if (this.#charging) return Number.POSITIVE_INFINITY
+    if (this.#onMains) return Number.POSITIVE_INFINITY
     return this.#idleLimitOverride ?? keepAwakeLimitMs()
   }
 

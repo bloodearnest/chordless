@@ -114,10 +114,11 @@ test('the longest time with no touch is chosen in Preferences, and is an hour at
   await expect(panel.locator('#wake-lock-status')).not.toContainText('no touch for')
 })
 
-test('there is no time limit while charging', async ({ page }) => {
+test('there is no time limit on mains power', async ({ page }) => {
   await openApp(page, '/preferences')
   const panel = page.locator('app-preferences')
   const status = panel.locator('#wake-lock-status')
+  await expect(panel.locator('#wake-power')).toContainText('On battery')
   await panel.getByRole('button', { name: 'Keep awake now' }).click()
   await expect(status).toContainText('until there is no touch for 1 hour')
 
@@ -126,7 +127,9 @@ test('there is no time limit while charging', async ({ page }) => {
     battery.charging = true
     battery.dispatchEvent(new Event('chargingchange'))
   })
-  await expect(status).toContainText('no time limit while it is charging')
+  // Said once, under the setting, not in the status as well
+  await expect(status).not.toContainText('mains power')
+  await expect(panel.locator('#wake-power')).toContainText('On mains power')
   await expect(status).not.toContainText('no touch for')
 })
 
