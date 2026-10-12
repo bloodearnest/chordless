@@ -11,17 +11,6 @@ song edit UI
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
-- the fallbacks to a song's own key and tempo never work: buildRuntimeSongs (for old setlists
-  with no key or tempo of their own) reads canonicalSong.key and .tempo, and LibrarySong reads
-  _song.key, .originalKey, .tempo and .originalTempo, but getSongWithContent returns none of
-  them at the top level (only in .metadata). So an old setlist is shown in the chart's own key
-  and tempo, and a library song's getKey()/getTempo() are undefined until changed (so the
-  library view's key comparison always thinks the key changed). Typing it kept the behaviour
-  (see the comments); decide what is meant, fix getSongWithContent or the readers, with tests
-- a setlist song with its own edits (chordproEdits) has no canonical song (_canonicalSong is
-  null), but SetlistSong reads _canonical.uuid, .title, .parsed and more, so making its model
-  (to save a key, tempo, capo or section change) would throw. setlist-page.ts casts it to hide
-  this; make the model cope with no canonical song, or give it one, with tests
 - tests are checked with strict on except noImplicitAny (tsconfig.tests.json, tsconfig.node.json):
   about 1,000 untyped helper parameters and `let`s remain. Turn it on file by file (it was 721
   errors in 50 files when tried); typed builders (tests/builders.ts) and must() are in place
@@ -87,19 +76,7 @@ navigation
   @virtualstate/navigation is still alpha (last release Oct 2025), doesn't intercept link clicks
   (so we'd keep that code), and passes 139 of 306 web-platform tests
 
-build
-- public/icons holds the icon tooling too (justfile, generate-favicons.sh, favicon-base.svg
-  as the source), so they are published with the site. Move the tooling out of public/ (the
-  service worker's precache already skips the two scripts)
-
-dead code
-- song-view-manager.js setupCapoSelector() is never called (setlist-page has its own; the
-  library has no capo picker). Remove it, after checking the rest of song-view-manager for the same
-
 accessibility (found by the axe checks in the unit tests)
-- dark theme buttons: white on #4da6ff is 2.6:1 (hover #3498db 3.2:1), below WCAG AA's
-  4.5:1. Either a deeper blue (#2477ad, as light now uses) or dark text on the light blue.
-  The unit tests only check the light theme's colours
 - song-section's heading is a <summary> containing the collapse and Show buttons
   (nested-interactive): move the controls out of the summary, or replace details/summary
   with a heading and a toggle button
@@ -126,14 +103,9 @@ offline
   moment: never mid-song)
 
 storage/sync
-- db.js and organisation-db.js reject failed writes with tx.error (14 places), which is
-  still null while a request's error is reported: a failure becomes a bare null
-  rejection. Reject with the request's error, as organisation-db's createOrganisation now does
 - setlist-page.js and views/home-view.js still report save/add/delete failures with alert():
   give pages a non-blocking message (toast) instead. (The bookmarklet's alerts stay: they
   show on SongSelect, where Chordless has no UI.)
-- storage page with no organisations says "Create your first organisation" but shows no
-  Create button (select-organisation's empty state)
 - edit chordpro/variants
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
@@ -170,15 +142,11 @@ storage/sync
 - first-load speed: a cold first visit's LCP waits on one more request wave (the home view's
   chunks load after the entry runs). If it feels slow on a real device, preload the landing view
   with the entry (about 15 KB gzipped more for every route). Measure on the live site first
-- the song info dialog may show a SongSelect song's copyright twice (the {copyright} line and the
-  CCLI trailer): hide the line when the trailer holds the same text, if it looks redundant
 - Lighthouse leftovers: pinch zoom is off on purpose (accessibility flags it); the llms.txt and
   ai-catalog audits are ignored
 - the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
   own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
   worker's DevTools), and Safari. Also consider HSTS (a Cloudflare zone setting)
-- service-worker.ts still has a branch for Lit from cdn.jsdelivr.net, which the app no longer
-  loads (Lit is bundled): remove it
 - test song import on real devices, on the live site: file import and paste on Android and iPad,
   the bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an
@@ -198,14 +166,6 @@ live mode
  - webrtc sync (live session: following the leader's song/section)
 
 tests
- - the Playwright tests run against port 8787, the same as `npm run dev`, so they collide
-   with a dev server (or anything else) already on it: with reuseExistingServer they test
-   whatever is there (a different checkout's server, say). Give the tests their own port (playwright.config.js baseURL and webServer, and the
-   `dev` script taking the port), keeping 8787 for development: the IndexedDB origin and
-   the Tailscale funnel depend on it
- - the key and capo pickers (option-picker) have no roles: give the button and its options
-   listbox/option semantics, then find them by role in the Playwright tests, which use
-   .picker-button and .picker-option now
  - coverage: just coverage covers the browser unit tests only, and counts only the files
    they load. Playwright coverage (page.coverage, Chromium) would show what the
    end-to-end tests reach
