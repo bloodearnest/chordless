@@ -5,7 +5,7 @@ Development and production are one codebase with two shapes.
 | | Dev (`just serve`) | Production (`just build`, `just deploy`) |
 | --- | --- | --- |
 | App | `src/` served by Vite as written, modules on demand | Bundled and hashed into `dist/client/` |
-| Worker | `worker/src` in workerd, through `@cloudflare/vite-plugin` | Bundled into `dist/chordless_auth_proxy/` |
+| Worker | `worker/src` in workerd, through `@cloudflare/vite-plugin` | Bundled into `dist/chordless/` |
 | Service worker | Bundled per request, **empty precache** | Built once, with the **whole app precached** |
 | Environment | `[env.dev]` in `wrangler.toml` (the dev pages) | The top level |
 
@@ -18,7 +18,7 @@ browser's data (IndexedDB, sign-in) belongs to the origin and the Tailscale funn
   `css/`, `service-worker.js`, and `dev/` (the playgrounds, not built).
 - `public/` is copied as it is: the icons and the manifest.
 - `dist/` is the output, and is not committed. `dist/client` is what is served, and
-  `dist/chordless_auth_proxy` the Worker with a generated `wrangler.json`.
+  `dist/chordless` the Worker with a generated `wrangler.json`.
 
 ## The service worker
 
@@ -56,7 +56,7 @@ it to go (`waitForServiceWorker` in `tests/fixtures.js`; `openApp` does).
 ## Deploying
 
 `just deploy` runs `vite build` then `wrangler deploy --config
-dist/chordless_auth_proxy/wrangler.json`. The plugin writes a redirect file for Wrangler under
+dist/chordless/wrangler.json`. The plugin writes a redirect file for Wrangler under
 `src/.wrangler`, where a deploy run from the repo root doesn't look, hence `--config`.
 
 ## Gotchas

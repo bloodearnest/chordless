@@ -1,5 +1,5 @@
 #!/bin/bash
-# Push secrets from .dev.vars to Cloudflare Workers
+# Push secrets from .dev.vars to the production Worker (the top-level environment)
 # Usage: ./push-secrets.sh
 
 set -e
@@ -17,8 +17,8 @@ if [ -z "$JWE_ENCRYPTION_KEY" ] || [ -z "$GOOGLE_CLIENT_ID" ] || [ -z "$GOOGLE_C
 fi
 
 echo "Pushing secrets to Cloudflare Workers..."
-echo "$JWE_ENCRYPTION_KEY"   | npx wrangler secret put JWE_ENCRYPTION_KEY
-echo "$GOOGLE_CLIENT_ID"     | npx wrangler secret put GOOGLE_CLIENT_ID
-echo "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET
+echo "$JWE_ENCRYPTION_KEY"   | npx wrangler secret put JWE_ENCRYPTION_KEY --env=""
+echo "$GOOGLE_CLIENT_ID"     | npx wrangler secret put GOOGLE_CLIENT_ID --env=""
+echo "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET --env=""
 
 echo "Done."

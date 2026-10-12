@@ -29,3 +29,4 @@ coverage/
 
 # Vite build output
 dist/
+.cloudflare-token

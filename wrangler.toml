@@ -1,7 +1,11 @@
-name = "chordless-auth-proxy"
+name = "chordless"
 main = "worker/src/index.ts"
 compatibility_date = "2024-09-23"
 compatibility_flags = ["nodejs_compat"]
+
+# Production: serve chordless.app from this worker. The route creates the DNS record, so the
+# domain must not be attached to another Pages project or worker first.
+routes = [{ pattern = "chordless.app", custom_domain = true }]
 
 [assets]
 directory = "src"

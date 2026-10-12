@@ -150,6 +150,12 @@ storage/sync
 - immediate background sync of just the changed record (setlist/song), in the
   service worker, with full sync as the backstop: designed in docs/SYNC_ARCHITECTURE.md,
   not built. Later: durable offline write queue.
+- security headers once chordless.app is live: a Content-Security-Policy (start as
+  Content-Security-Policy-Report-Only, enforce once clean), set on the pages and on the service
+  worker script. Needs: the inline <script> in index.html (move it or hash it), connect-src for
+  googleapis.com, whatever accounts.google.com needs, blob:/data: for media, any inline style=
+  attributes. Also nosniff, Referrer-Policy, frame-ancestors 'none', object-src 'none'. A
+  public/_headers file (Workers static assets) is the simple way
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
   then test song import on real devices: file import and paste on Android and iPad, the
   bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
