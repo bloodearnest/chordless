@@ -30,6 +30,11 @@ const children = (parentId, extra = '') =>
     'id,name,mimeType,createdTime,modifiedTime,appProperties'
   )
 
+// The same setlist stored under different ids (e.g. two devices each uploaded their own record
+// of it): the same date, leader, type and name. Song count is deliberately not part of it.
+const sameSetlistKey = f =>
+  f.date ? [f.date, f.owner ?? '', f.setlistType ?? '', f.setlistName ?? ''].join('|') : null
+
 async function auditOrg(org) {
   const subfolders = await children(org.id, ` and mimeType='${FOLDER}'`)
   const setlistsFolders = subfolders.filter(f => f.name === 'setlists')
@@ -60,6 +65,8 @@ async function auditOrg(org) {
           contentId: content?.id ?? null,
           date: content?.date ?? null,
           setlistName: content?.name ?? null,
+          owner: content?.owner ?? null,
+          setlistType: content?.type ?? null,
           songCount: content?.songs?.length ?? null,
           error,
         })
@@ -88,7 +95,7 @@ async function auditOrg(org) {
     duplicateContentIds: groupBy(f => f.contentId),
     mismatched: files.filter(f => f.setlistId && f.contentId && f.setlistId !== f.contentId),
     missingSetlistId: files.filter(f => !f.setlistId),
-    sameDate: groupBy(f => (f.date ? `${f.date}|${f.setlistName ?? ''}` : null)),
+    sameSetlist: groupBy(sameSetlistKey),
     downloadErrors: files.filter(f => f.error),
   }
 }
@@ -124,7 +131,7 @@ function render(orgs) {
     ${renderList('files whose contents are a different setlist than their setlistId', o.mismatched)}
     ${renderList('files without a setlistId', o.missingSetlistId)}
     ${renderList('download errors', o.downloadErrors)}
-    ${renderGroup('date + name shared by more than one file', o.sameDate)}
+    ${renderGroup('setlists with the same date, leader, type and name in more than one file', o.sameSetlist)}
     <details><summary>All files</summary><table>
       <tr><th>date</th><th>name</th><th>songs</th><th>file</th><th>created</th><th>modified</th><th>setlistId</th><th>contents id</th></tr>
       ${o.files
@@ -151,8 +158,15 @@ function planCleanup(orgs, keepName) {
   const keep = orgs.find(o => o.org === keepName)
   const others = orgs.filter(o => o !== keep)
   const otherIds = new Set(others.flatMap(o => o.files.map(f => f.setlistId)).filter(Boolean))
+  // Of files for the same setlist, keep the earliest created and trash the rest
+  const newerCopies = new Set()
+  for (const [, group] of keep.sameSetlist) {
+    const [, ...rest] = [...group].sort((a, b) => a.createdTime.localeCompare(b.createdTime))
+    for (const f of rest) newerCopies.add(f.fileId)
+  }
   const files = keep.files.flatMap(f => {
     const reasons = []
+    if (newerCopies.has(f.fileId)) reasons.push('newer copy of the same setlist')
     if (otherIds.has(f.setlistId)) reasons.push('copy of a setlist from another organisation')
     if (f.songCount === 0) reasons.push('empty setlist')
     return reasons.length ? [{ ...f, reason: reasons.join(', ') }] : []
