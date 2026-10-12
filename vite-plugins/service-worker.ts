@@ -16,12 +16,9 @@ import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
 // Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
-// reads and does not serve), source maps, and the icon tooling that sits in public/icons
+// reads and does not serve), and source maps
 const NOT_PRECACHED = (path: string) =>
-  path === FILE ||
-  path === '.assetsignore' ||
-  path === '_headers' ||
-  /\.(map|sh)$|(^|\/)justfile$/.test(path)
+  path === FILE || path === '.assetsignore' || path === '_headers' || path.endsWith('.map')
 
 async function bundle(
   root: string,

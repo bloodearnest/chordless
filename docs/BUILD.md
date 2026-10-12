@@ -37,7 +37,7 @@ needs are unusual:
   activation the old one is deleted. Files with hashes in their names are served from the cache;
   the shell (`/`) is fetched from the network first, but the cached copy is not replaced, so it
   always matches the cached files.
-- **Not precached:** the worker, source maps, the icon tooling in `public/icons`. Pad audio, and
+- **Not precached:** the worker, source maps. Pad audio, and
   other things fetched while running, go in `runtime-v1` and `padsets-cache-v1`, which survive
   an update.
 

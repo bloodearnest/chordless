@@ -1,6 +1,7 @@
 # Developing Chordless
 
-The app is in `src/` (and `public/` for the icons and manifest), and the Worker in
+The app is in `src/` (and `public/` for the icons and manifest; the tooling that makes the
+icons is in `icon-tooling/`), and the Worker in
 `worker/`. In development Vite serves `src/` as it is, with no build step; `just build`
 bundles it for production (see [docs/BUILD.md](docs/BUILD.md)). Commands are run with
 [`just`](https://github.com/casey/just); run `just` on its own to list them.

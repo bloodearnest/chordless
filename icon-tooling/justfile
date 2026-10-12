@@ -1,3 +1,6 @@
+# Icon tooling: the source is favicon-base.svg here, the icons it makes go to ../public/icons.
+# Run with `just --justfile icon-tooling/justfile <recipe>` (it works from this directory).
+
 # Generate both light and dark SVG favicons from transparent base
 # Both have transparent backgrounds, only difference is symbol color:
 # Light mode: #2980b9 (darker blue for visibility on light backgrounds)
@@ -9,17 +12,17 @@ generate-svg:
 # Uses ImageMagick convert since favicon-base.svg uses paths (no embedded fonts)
 # -background sets the background color, -density renders at high DPI for crisp output
 generate-apple-icon:
-    convert -density 300 -background "#2c3e50" favicon-base.svg -resize 192x192 apple-touch-icon.png
+    convert -density 300 -background "#2c3e50" favicon-base.svg -resize 192x192 ../public/icons/apple-touch-icon.png
 
 # Generate 512x512 icon for PWA manifest with dark background
 # Higher density for larger size to avoid blurriness
 generate-icon-512:
-    convert -density 600 -background "#2c3e50" favicon-base.svg -resize 512x512 icon-512.png
+    convert -density 600 -background "#2c3e50" favicon-base.svg -resize 512x512 ../public/icons/icon-512.png
 
 # Generate the maskable 512x512 icon: the glyph shrunk to ~57% and centred, so the
 # platform's mask (a circle or squircle, safe zone is the central 80%) never crops it
 generate-icon-maskable:
-    convert -density 600 -background "#2c3e50" favicon-base.svg -resize 290x290 -gravity center -extent 512x512 icon-maskable-512.png
+    convert -density 600 -background "#2c3e50" favicon-base.svg -resize 290x290 -gravity center -extent 512x512 ../public/icons/icon-maskable-512.png
 
 # Generate all PWA icons
 generate-pwa-icons: generate-apple-icon generate-icon-512 generate-icon-maskable
