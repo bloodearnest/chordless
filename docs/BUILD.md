@@ -74,11 +74,11 @@ tests see it) and puts a Content-Security-Policy, `nosniff`, a referrer policy a
 policy on every file. The dev server does not send them. It is not in the precache, and it is not
 served.
 
-The policy is sent as `Content-Security-Policy-Report-Only`: the browser reports what it would
-block in the console and blocks nothing. The `built` test opens every view and fails on a report.
-Rename the header to `Content-Security-Policy` once real use (Google sign-in, sync, the player,
-import) shows no reports. What the policy allows, and why, is in the comment at the top of the
-file. When the app starts using a new host, add it there; the service worker script gets the same
+The policy is enforced (`Content-Security-Policy`): the browser blocks what it doesn't allow and
+logs "Refused to ..." in the console. To trial a change without blocking, send it as
+`Content-Security-Policy-Report-Only` and watch the console. The `built` test opens every view and
+fails on a violation. What the policy allows, and why, is in the comment at the top of the file.
+When the app starts using a new host, add it there; the service worker script gets the same
 header, so its `connect-src` must cover what it fetches.
 
 The page has no inline script (`public/boot.js` is the one classic script), so scripts need no

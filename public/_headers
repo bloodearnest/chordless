@@ -1,16 +1,16 @@
 # Read by Cloudflare's static assets: these headers go on every file the app serves.
 # (See docs/BUILD.md. The dev server does not send them.)
 #
-# The policy is in Report-Only mode: the browser reports what it would have blocked in the
-# console and blocks nothing. Once real use (sign-in, sync, the player) shows no violations,
-# rename the header to Content-Security-Policy.
+# The policy is enforced: the browser blocks anything outside it, and says so in the console
+# ("Refused to ..."). To trial a change without blocking, send it as
+# Content-Security-Policy-Report-Only instead, and watch the console.
 #
 # accounts.google.com: Google Identity Services (the sign-in script, its styles and frame).
 # www.googleapis.com: the Drive API. *.googleusercontent.com: the Google account photo.
 # songselect.ccli.com: its icon in the song info dialog.
 # style-src-attr 'unsafe-inline' allows style="" attributes only: no <style> elements.
 /*
-  Content-Security-Policy-Report-Only: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; style-src-attr 'unsafe-inline'; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://*.googleusercontent.com; img-src 'self' data: https://*.googleusercontent.com https://songselect.ccli.com; media-src 'self' blob:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  Content-Security-Policy: default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; style-src 'self' https://accounts.google.com/gsi/style; style-src-attr 'unsafe-inline'; connect-src 'self' https://www.googleapis.com https://accounts.google.com/gsi/ https://*.googleusercontent.com; img-src 'self' data: https://*.googleusercontent.com https://songselect.ccli.com; media-src 'self' blob:; frame-src https://accounts.google.com/gsi/; worker-src 'self'; manifest-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()

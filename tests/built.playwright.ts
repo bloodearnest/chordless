@@ -63,12 +63,12 @@ test('the security headers are on the page, its deep links and the service worke
 }) => {
   for (const path of ['/', '/songs', '/service-worker.js', '/boot.js']) {
     const headers = (await request.get(path)).headers()
-    expect(headers['content-security-policy-report-only'], path).toContain("default-src 'self'")
+    expect(headers['content-security-policy'], path).toContain("default-src 'self'")
     expect(headers['x-content-type-options'], path).toBe('nosniff')
   }
 })
 
-/** Collect the Content-Security-Policy violations the page reports (the policy is report-only) */
+/** Collect the Content-Security-Policy violations the page reports (the browser also reports them while enforcing) */
 async function collectViolations(page) {
   const violations: string[] = []
   await page.exposeFunction('reportViolation', (text: string) => violations.push(text))

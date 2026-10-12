@@ -163,12 +163,9 @@ storage/sync
   free text can never leak. Never fall back to the title (it may be a private song). Songs with no
   CCLI number are not counted. The chart's number is in song.metadata.ccliSongNumber or .ccli (getSongWithContent). Plausible custom props: check which plan; GoatCounter can use an event
   name like song-added/<number>; Cloudflare Web Analytics has no events. Say it in the policy too
-- enforce the Content-Security-Policy: it is deployed as Content-Security-Policy-Report-Only
-  (public/_headers, docs/BUILD.md). Use the live app (Google sign-in, sync, the player and a pad
-  set, import and the SongSelect bookmarklet, the song info dialog) with the console open, fix or
-  allow what it reports, then rename the header to Content-Security-Policy. Check the service
-  worker's own fetches too (its violations are not in the page console: chrome://serviceworker-internals
-  or the worker's DevTools). Also consider HSTS (a Cloudflare zone setting)
+- the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
+  own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
+  worker's DevTools), and Safari. Also consider HSTS (a Cloudflare zone setting)
 - service-worker.ts still has a branch for Lit from cdn.jsdelivr.net, which the app no longer
   loads (Lit is bundled): remove it
 - production deployment: point chordless.app at the worker (currently a static Pages deploy)
