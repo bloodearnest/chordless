@@ -1,4 +1,9 @@
-import { getKeepAwakePreference, KeepAwakePreferenceEvent } from './preferences.ts'
+import {
+  getKeepAwakePreference,
+  KeepAwakeLimitEvent,
+  KeepAwakePreferenceEvent,
+  keepAwakeLimitMs,
+} from './preferences.ts'
 
 /**
  * Keeps the screen awake while a setlist is open, with the Screen Wake Lock API.
@@ -6,9 +11,15 @@ import { getKeepAwakePreference, KeepAwakePreferenceEvent } from './preferences.
  * There is no permission to ask for: the browser grants a lock to a visible page, and refuses
  * it when the device will not (Battery Saver, say). It drops the lock whenever the page is
  * hidden (another app, the screen off), and sometimes when the battery is low, so the lock
- * is asked for again each time the page is visible. It is held only while a setlist is open
- * (see SetlistView), to spare the battery everywhere else, and only if the user has not
- * turned it off in Preferences.
+ * is asked for again each time the page is visible. It is held while a setlist is open (see
+ * SetlistView) if the user has not turned that off in Preferences, and on any page when the
+ * user asks for it there ("Keep awake now"); never otherwise, to spare the battery.
+ *
+ * It is also let go after a time with no touch, key press or scroll (an hour unless the user
+ * chose another: see keepAwakeLimitMs), so a tablet left on a stand overnight does not stay
+ * lit: the next touch takes it again. On a charger there is no limit: the Battery Status API
+ * (Chromium only) says when the device is charging, and where it is not available the limit
+ * applies, as the safe guess.
  *
  * Nothing depends on it: a browser without the API gets the 'unsupported' state.
  */
@@ -25,6 +36,8 @@ export type WakeLockState =
   | 'released'
   /** The browser refused it; `error` says why (e.g. NotAllowedError) */
   | 'failed'
+  /** Let go by the app after the time chosen with no touch: the next touch takes it again */
+  | 'expired'
 
 /** The state changed (sent on window) */
 export class WakeLockStateEvent extends Event {
@@ -36,11 +49,12 @@ export class WakeLockStateEvent extends Event {
   }
 }
 
-/** What a trial request (see test()) found */
-export interface WakeLockTest {
-  ok: boolean
-  /** The error's name, when it was refused */
-  error?: string
+/** What counts as someone being there (on the document, in the capture phase) */
+const ACTIVITY_EVENTS = ['pointerdown', 'keydown', 'wheel', 'scroll'] as const
+
+/** The Battery Status API's object (Chromium only; not in TypeScript's DOM types) */
+interface BatteryManager extends EventTarget {
+  readonly charging: boolean
 }
 
 const errorName = (error: unknown) => (error instanceof Error ? error.name : String(error))
@@ -52,12 +66,58 @@ export class WakeLockController {
   #requesting = false
   #state: WakeLockState
   #error = ''
-  #lastTest: WakeLockTest | null = null
+  /** Kept awake from Preferences, whatever page this is, until it is turned off */
+  #manual = false
 
-  constructor() {
+  /** Whether the device is on a charger: unknown (null) where there is no Battery Status API */
+  #charging: boolean | null = null
+  #battery: BatteryManager | null = null
+  /** A test's own limit, in ms; else the user's setting */
+  #idleLimitOverride: number | undefined
+  #lastActivity = Date.now()
+  #idleTimer: ReturnType<typeof setTimeout> | undefined
+
+  /** @param idleLimit how long to hold it with no activity, in ms (a test sets its own) */
+  constructor(idleLimit?: number) {
+    this.#idleLimitOverride = idleLimit
     this.#state = this.#restingState()
     document.addEventListener('visibilitychange', this.#onVisibility)
     window.addEventListener(KeepAwakePreferenceEvent.type, this.#sync)
+    window.addEventListener(KeepAwakeLimitEvent.type, this.#onLimitChanged)
+    for (const type of ACTIVITY_EVENTS) {
+      document.addEventListener(type, this.#onActivity, { capture: true, passive: true })
+    }
+    void this.#watchBattery()
+  }
+
+  /** Whether the device is charging, when it can tell: there is no idle limit then */
+  get charging(): boolean | null {
+    return this.#charging
+  }
+
+  async #watchBattery(): Promise<void> {
+    try {
+      const battery = await (
+        navigator as Navigator & { getBattery?: () => Promise<BatteryManager> }
+      ).getBattery?.()
+      if (!battery) return
+      this.#battery = battery
+      this.#charging = battery.charging
+      battery.addEventListener('chargingchange', this.#onChargingChange)
+      this.#onChargingChange()
+    } catch {
+      // No battery information (blocked, or a desktop with none): the limit applies
+    }
+  }
+
+  #onChargingChange = (): void => {
+    const charging = this.#battery?.charging ?? null
+    const changed = charging !== this.#charging
+    this.#charging = charging
+    // Unplugging is someone being there: the limit counts from now
+    if (changed && charging === false) this.#lastActivity = Date.now()
+    this.#emit()
+    this.#onLimitChanged()
   }
 
   get state(): WakeLockState {
@@ -69,9 +129,9 @@ export class WakeLockController {
     return this.#error
   }
 
-  /** What the last test() found, if there has been one */
-  get lastTest(): WakeLockTest | null {
-    return this.#lastTest
+  /** Whether it was asked for from Preferences, for any page */
+  get manual(): boolean {
+    return this.#manual
   }
 
   static get supported(): boolean {
@@ -81,6 +141,7 @@ export class WakeLockController {
   /** A setlist is open: keep the screen awake until letGo() */
   hold(): void {
     this.#holders++
+    this.#lastActivity = Date.now()
     void this.#sync()
   }
 
@@ -90,31 +151,36 @@ export class WakeLockController {
     void this.#sync()
   }
 
-  /**
-   * Try again now, for the button in Preferences. With a setlist open this asks for the lock
-   * as it would; with none it asks for one and lets it go at once, to see whether the device
-   * would give it.
-   */
-  async check(): Promise<void> {
-    if (!WakeLockController.supported) return
-    if (this.#holders > 0 && getKeepAwakePreference()) {
-      await this.#acquire()
-      return
-    }
-    try {
-      const lock = await navigator.wakeLock.request('screen')
-      await lock.release()
-      this.#lastTest = { ok: true }
-    } catch (error) {
-      this.#lastTest = { ok: false, error: errorName(error) }
-    }
+  /** Keep the screen awake on any page, until turned off (or the idle limit passes) */
+  setManual(on: boolean): void {
+    this.#manual = on
+    if (on) this.#lastActivity = Date.now()
     this.#emit()
+    void this.#sync()
+  }
+
+  /** Ask again now, after it was let go or refused: for the button in Preferences */
+  async requestAgain(): Promise<void> {
+    if (!WakeLockController.supported || !this.#wanted()) return
+    this.#lastActivity = Date.now()
+    await this.#acquire()
   }
 
   dispose(): void {
     document.removeEventListener('visibilitychange', this.#onVisibility)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this.#sync)
+    window.removeEventListener(KeepAwakeLimitEvent.type, this.#onLimitChanged)
+    for (const type of ACTIVITY_EVENTS) {
+      document.removeEventListener(type, this.#onActivity, { capture: true })
+    }
+    this.#battery?.removeEventListener('chargingchange', this.#onChargingChange)
+    clearTimeout(this.#idleTimer)
     void this.#release()
+  }
+
+  /** Whether it should be held now: asked for from Preferences, or a setlist is open and it is on */
+  #wanted(): boolean {
+    return this.#manual || (this.#holders > 0 && getKeepAwakePreference())
   }
 
   /** The state when nothing is held: why not */
@@ -136,15 +202,58 @@ export class WakeLockController {
   }
 
   #onVisibility = (): void => {
-    // The browser let go when the page was hidden (that sets 'released'); ask again on return
-    if (document.visibilityState === 'visible') void this.#sync()
+    // The browser let go when the page was hidden (that sets 'released'); ask again on return,
+    // which is someone being there
+    if (document.visibilityState === 'visible') {
+      this.#lastActivity = Date.now()
+      void this.#sync()
+    }
+  }
+
+  #onActivity = (): void => {
+    this.#lastActivity = Date.now()
+    // A touch after it was let go for being idle takes it again
+    if (this.#state === 'expired') void this.#sync()
+  }
+
+  get #idleLimit(): number {
+    if (this.#charging) return Number.POSITIVE_INFINITY
+    return this.#idleLimitOverride ?? keepAwakeLimitMs()
+  }
+
+  /** A new limit applies to a lock already held (and, once it has passed, to an expired one) */
+  #onLimitChanged = (): void => {
+    if (this.#sentinel) this.#armIdleTimer()
+    else if (this.#state === 'expired' && Date.now() - this.#lastActivity < this.#idleLimit) {
+      void this.#sync()
+    }
+  }
+
+  /** Let go once the idle limit has passed since the last activity, else look again then */
+  #armIdleTimer(): void {
+    clearTimeout(this.#idleTimer)
+    if (this.#idleLimit === Number.POSITIVE_INFINITY) return
+    const remaining = this.#idleLimit - (Date.now() - this.#lastActivity)
+    this.#idleTimer = setTimeout(() => void this.#onIdleTimer(), Math.max(0, remaining))
+  }
+
+  async #onIdleTimer(): Promise<void> {
+    if (!this.#sentinel) return
+    if (Date.now() - this.#lastActivity < this.#idleLimit) {
+      this.#armIdleTimer()
+      return
+    }
+    await this.#release()
+    this.#set('expired')
   }
 
   #sync = async (): Promise<void> => {
-    const resting = this.#restingState()
-    if (resting !== 'idle' || this.#holders === 0) {
+    if (!WakeLockController.supported || !this.#wanted()) {
+      clearTimeout(this.#idleTimer)
       await this.#release()
-      this.#set(resting)
+      // It may have been asked for while the lock was being let go
+      if (WakeLockController.supported && this.#wanted()) return this.#sync()
+      this.#set(this.#restingState())
       return
     }
     if (document.visibilityState === 'visible' && !this.#sentinel) await this.#acquire()
@@ -156,17 +265,19 @@ export class WakeLockController {
     try {
       const lock = await navigator.wakeLock.request('screen')
       // The setlist may have closed, or the setting changed, while it was being asked for
-      if (this.#holders === 0 || this.#restingState() !== 'idle') {
+      if (!this.#wanted()) {
         await lock.release()
         this.#requesting = false
         await this.#sync()
         return
       }
       this.#sentinel = lock
+      this.#armIdleTimer()
       lock.addEventListener('release', () => {
         // Only when the device let go: our own release() clears #sentinel first
         if (this.#sentinel !== lock) return
         this.#sentinel = null
+        clearTimeout(this.#idleTimer)
         this.#set('released')
       })
       this.#set('active')

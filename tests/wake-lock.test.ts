@@ -1,5 +1,10 @@
 import { expect } from '@open-wc/testing'
-import { setKeepAwakePreference } from '../src/js/preferences.ts'
+import {
+  getKeepAwakeMinutes,
+  keepAwakeLimitMs,
+  setKeepAwakeMinutes,
+  setKeepAwakePreference,
+} from '../src/js/preferences.ts'
 import { WakeLockController } from '../src/js/wake-lock.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -116,7 +121,7 @@ describe('WakeLockController', () => {
     expect(controller.error).to.equal('NotAllowedError')
 
     refuse = null
-    await controller.check()
+    await controller.requestAgain()
     expect(controller.state).to.equal('active')
     expect(controller.error).to.equal('')
   })
@@ -138,16 +143,162 @@ describe('WakeLockController', () => {
     expect(locks[0].released).to.equal(true)
   })
 
-  it('tries for a lock with no setlist open, and lets it go at once', async () => {
-    await controller.check()
-    expect(controller.state).to.equal('idle')
-    expect(controller.lastTest).to.deep.equal({ ok: true })
-    expect(locks).to.have.length(1)
-    expect(locks[0].released).to.equal(true)
+  describe('asked for from Preferences', () => {
+    it('holds a lock on any page, until it is turned off', async () => {
+      controller.setManual(true)
+      await settle()
+      expect(controller.state).to.equal('active')
+      expect(controller.manual).to.equal(true)
+      expect(locks).to.have.length(1)
 
-    refuse = 'NotAllowedError'
-    await controller.check()
-    expect(controller.lastTest).to.deep.equal({ ok: false, error: 'NotAllowedError' })
+      // A setlist opening and closing meanwhile does not drop it
+      controller.hold()
+      controller.letGo()
+      await settle()
+      expect(controller.state).to.equal('active')
+
+      controller.setManual(false)
+      await settle()
+      expect(controller.state).to.equal('idle')
+      expect(locks[0].released).to.equal(true)
+    })
+
+    it('works with the setlist setting off', async () => {
+      setKeepAwakePreference(false)
+      controller.setManual(true)
+      await settle()
+      expect(controller.state).to.equal('active')
+      controller.setManual(false)
+      await settle()
+      expect(controller.state).to.equal('off')
+    })
+
+    it('says why the device refused it', async () => {
+      refuse = 'NotAllowedError'
+      controller.setManual(true)
+      await settle()
+      expect(controller.state).to.equal('failed')
+      expect(controller.error).to.equal('NotAllowedError')
+    })
+  })
+
+  describe('with no one there', () => {
+    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+    let idler: WakeLockController
+    /** A BatteryManager stand-in, in place of navigator.getBattery: unplugged unless a test says */
+    let battery: EventTarget & { charging: boolean }
+
+    const plug = (charging: boolean) => {
+      battery.charging = charging
+      battery.dispatchEvent(new Event('chargingchange'))
+    }
+
+    beforeEach(async () => {
+      battery = Object.assign(new EventTarget(), { charging: false })
+      Object.defineProperty(navigator, 'getBattery', {
+        configurable: true,
+        value: async () => battery,
+      })
+      idler = new WakeLockController(80)
+      await settle()
+    })
+    afterEach(() => {
+      idler.dispose()
+      Reflect.deleteProperty(navigator, 'getBattery')
+    })
+
+    it('lets go after the idle limit, and takes it again at the next touch', async () => {
+      idler.hold()
+      await settle()
+      expect(idler.state).to.equal('active')
+
+      await wait(160)
+      expect(idler.state).to.equal('expired')
+      expect(locks[0].released).to.equal(true)
+
+      document.dispatchEvent(new Event('pointerdown'))
+      await settle()
+      expect(idler.state).to.equal('active')
+      expect(locks).to.have.length(2)
+    })
+
+    it('counts a touch, a key press and a scroll as someone being there', async () => {
+      idler.hold()
+      await settle()
+      // Each comes inside the limit, so the clock starts again each time
+      for (const type of ['pointerdown', 'keydown', 'scroll']) {
+        await wait(50)
+        document.dispatchEvent(new Event(type))
+      }
+      await wait(50)
+      expect(idler.state).to.equal('active')
+      expect(locks).to.have.length(1)
+    })
+
+    it('is never let go with no limit', async () => {
+      const unlimited = new WakeLockController(Number.POSITIVE_INFINITY)
+      unlimited.hold()
+      await settle()
+      await wait(160)
+      expect(unlimited.state).to.equal('active')
+      unlimited.dispose()
+    })
+
+    describe('on a charger', () => {
+      it('has no limit while charging, and starts the clock when unplugged', async () => {
+        plug(true)
+        idler.hold()
+        await settle()
+        await wait(160)
+        expect(idler.charging).to.equal(true)
+        expect(idler.state).to.equal('active')
+
+        plug(false)
+        expect(idler.charging).to.equal(false)
+        await wait(40)
+        expect(idler.state).to.equal('active')
+        await wait(100)
+        expect(idler.state).to.equal('expired')
+      })
+
+      it('takes it again at once when plugged in after it was let go', async () => {
+        idler.hold()
+        await settle()
+        await wait(160)
+        expect(idler.state).to.equal('expired')
+
+        plug(true)
+        await settle()
+        expect(idler.state).to.equal('active')
+      })
+
+      it('applies the limit where the device cannot say whether it is charging', async () => {
+        // As in a browser with no Battery Status API
+        Object.defineProperty(navigator, 'getBattery', { configurable: true, value: undefined })
+        const unknown = new WakeLockController(80)
+        await settle()
+        expect(unknown.charging).to.equal(null)
+        unknown.hold()
+        await settle()
+        await wait(160)
+        expect(unknown.state).to.equal('expired')
+        unknown.dispose()
+      })
+    })
+
+    it('does not take it again at a touch once the setlist is closed', async () => {
+      idler.hold()
+      await settle()
+      await wait(160)
+      expect(idler.state).to.equal('expired')
+      idler.letGo()
+      await settle()
+      expect(idler.state).to.equal('idle')
+      document.dispatchEvent(new Event('pointerdown'))
+      await settle()
+      expect(idler.state).to.equal('idle')
+      expect(locks).to.have.length(1)
+    })
   })
 
   it("is 'unsupported' where the browser has no wake lock", async () => {
@@ -166,5 +317,27 @@ describe('WakeLockController', () => {
         get: () => 'wakeLock' in navigator,
       })
     }
+  })
+})
+
+describe('the keep-awake limit setting', () => {
+  afterEach(() => localStorage.removeItem('keep_awake_minutes'))
+
+  it('is an hour until chosen, and holds what is chosen', () => {
+    expect(getKeepAwakeMinutes()).to.equal(60)
+    expect(keepAwakeLimitMs()).to.equal(60 * 60 * 1000)
+    setKeepAwakeMinutes(30)
+    expect(getKeepAwakeMinutes()).to.equal(30)
+    expect(keepAwakeLimitMs()).to.equal(30 * 60 * 1000)
+  })
+
+  it('has no limit at 0, and ignores a value that is not on offer', () => {
+    setKeepAwakeMinutes(0)
+    expect(getKeepAwakeMinutes()).to.equal(0)
+    expect(keepAwakeLimitMs()).to.equal(Number.POSITIVE_INFINITY)
+    setKeepAwakeMinutes(7)
+    expect(getKeepAwakeMinutes()).to.equal(60)
+    localStorage.setItem('keep_awake_minutes', 'banana')
+    expect(getKeepAwakeMinutes()).to.equal(60)
   })
 })

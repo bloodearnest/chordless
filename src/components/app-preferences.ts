@@ -1,13 +1,18 @@
 import { css, html, LitElement } from 'lit'
+import type { IconName } from '../js/icons.ts'
 import {
   getCapoPreference,
+  getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
   getUseNashvilleNumbers,
   getUseUnicodeAccidentals,
+  KEEP_AWAKE_LIMITS,
+  KeepAwakeLimitEvent,
   KeepAwakePreferenceEvent,
   type MusicianType,
   setCapoPreference,
+  setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
   setUseNashvilleNumbers,
@@ -23,6 +28,9 @@ import { buttonStyles, panelStyles } from './shared-styles.ts'
  *
  * Preferences interface for the application
  */
+/** How the wake lock's state looks: the colour of its badge */
+type WakeLockLook = 'good' | 'warn' | 'bad' | 'idle' | 'none'
+
 export class AppPreferences extends LitElement {
   static override properties = {
     useNashville: { type: Boolean, attribute: false },
@@ -30,7 +38,7 @@ export class AppPreferences extends LitElement {
     musicianType: { type: String, attribute: false },
     capoEnabled: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
-    _checking: { state: true },
+    keepAwakeMinutes: { type: Number, attribute: false },
   }
 
   declare useNashville: boolean
@@ -38,7 +46,7 @@ export class AppPreferences extends LitElement {
   declare musicianType: MusicianType
   declare capoEnabled: boolean
   declare keepAwake: boolean
-  declare _checking: boolean
+  declare keepAwakeMinutes: number
 
   static override styles = [
     panelStyles,
@@ -65,6 +73,79 @@ export class AppPreferences extends LitElement {
     .toggle input[type='checkbox'] {
       width: 1.25rem;
       height: 1.25rem;
+    }
+
+    /* The wake lock's state: a badge whose icon and colour show it, with a word and the why */
+    .wake-status {
+      --look: var(--text-tertiary, #95a5a6);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 0.75rem 0;
+    }
+
+    .wake-status[data-look='good'] {
+      --look: var(--color-success, #27ae60);
+    }
+
+    .wake-status[data-look='warn'] {
+      --look: var(--color-warning, #f39c12);
+    }
+
+    .wake-status[data-look='bad'] {
+      --look: var(--color-danger, #e74c3c);
+    }
+
+    .wake-badge {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 3.5rem;
+      height: 3.5rem;
+      border-radius: 50%;
+      border: 3px solid var(--look);
+      background: color-mix(in srgb, var(--look) 18%, transparent);
+    }
+
+    /* A lit screen has a glow around it */
+    .wake-status[data-look='good'] .wake-badge {
+      box-shadow: 0 0 0.75rem color-mix(in srgb, var(--look) 70%, transparent);
+    }
+
+    .wake-text {
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+
+    .wake-label {
+      font-weight: 700;
+      font-size: var(--font-ui);
+    }
+
+    .wake-detail {
+      font-size: var(--font-ui-small);
+      opacity: 0.75;
+      line-height: 1.3;
+    }
+
+    .field {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin: 0.75rem 0;
+      font-size: var(--font-ui-small);
+    }
+
+    .field select {
+      font: inherit;
+      padding: 0.5rem;
+      border-radius: 4px;
+      border: 1px solid var(--border-color, #d5dbdb);
+      background: var(--bg-color, white);
+      color: inherit;
+      min-height: 2.5rem;
     }
 
     .radio-group {
@@ -115,7 +196,7 @@ export class AppPreferences extends LitElement {
     this.musicianType = getMusicianType()
     this.capoEnabled = getCapoPreference()
     this.keepAwake = getKeepAwakePreference()
-    this._checking = false
+    this.keepAwakeMinutes = getKeepAwakeMinutes()
   }
 
   override connectedCallback() {
@@ -123,12 +204,15 @@ export class AppPreferences extends LitElement {
     window.addEventListener(WakeLockStateEvent.type, this._onWakeLockState)
     // The menu's modal outlives each visit, and the setting can change elsewhere meanwhile
     window.addEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
+    window.addEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
     this.keepAwake = getKeepAwakePreference()
+    this.keepAwakeMinutes = getKeepAwakeMinutes()
   }
 
   override disconnectedCallback() {
     window.removeEventListener(WakeLockStateEvent.type, this._onWakeLockState)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
+    window.removeEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
     super.disconnectedCallback()
   }
 
@@ -138,37 +222,121 @@ export class AppPreferences extends LitElement {
     this.keepAwake = event.enabled
   }
 
-  /** What the wake lock is doing, in words */
-  _wakeLockStatus(): string {
-    const refused = (error: string) =>
-      `The device refused it (${error}). Battery Saver can cause this.`
+  _onKeepAwakeLimitChanged = (event: KeepAwakeLimitEvent): void => {
+    this.keepAwakeMinutes = event.minutes
+  }
+
+  /** A limit in words: "15 minutes", "1 hour", "2 hours" */
+  _limitLabel(minutes: number): string {
+    if (minutes === 0) return 'no limit'
+    if (minutes < 60) return `${minutes} minutes`
+    const hours = minutes / 60
+    return hours === 1 ? '1 hour' : `${hours} hours`
+  }
+
+  /** What the wake lock is doing, to show: a look (see data-state), an icon, a word, and why */
+  _wakeLockDisplay(): { look: WakeLockLook; icon: IconName; label: string; detail: string } {
+    const refused = (error: string) => ({
+      look: 'bad' as const,
+      icon: 'warning' as const,
+      label: 'Refused',
+      detail: `The device refused it (${error}). Battery Saver can cause this.`,
+    })
     switch (wakeLock.state) {
       case 'unsupported':
-        return "This browser can't keep the screen awake."
+        return {
+          look: 'none',
+          icon: 'ban',
+          label: 'Unsupported',
+          detail: "This browser can't keep the screen awake.",
+        }
       case 'off':
-        return 'Off: the screen may turn off while you play.'
+        return {
+          look: 'none',
+          icon: 'moon',
+          label: 'Off',
+          detail: 'The screen may turn off while you play.',
+        }
       case 'active':
-        return 'Active: the screen is being kept awake.'
+        return {
+          look: 'good',
+          icon: 'sun',
+          label: 'Awake',
+          detail:
+            (wakeLock.manual
+              ? 'The screen is being kept awake, on any page, until you stop it'
+              : 'The screen is being kept awake') +
+            (this.keepAwakeMinutes === 0 || wakeLock.charging
+              ? '.'
+              : `${wakeLock.manual ? ', or' : ','} until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`) +
+            (wakeLock.charging ? ' There is no time limit while it is charging.' : ''),
+        }
       case 'released':
-        return 'Let go by the device (another app, the screen off, or a low battery). It is taken again when you come back.'
+        return {
+          look: 'warn',
+          icon: 'moon',
+          label: 'Let go',
+          detail:
+            'The device let go (another app, the screen off, or a low battery). It is taken again when you come back.',
+        }
+      case 'expired':
+        return {
+          look: 'warn',
+          icon: 'clock',
+          label: 'Timed out',
+          detail: `Let go after ${this._limitLabel(this.keepAwakeMinutes)} with no touch, to spare the battery. Touch the screen to keep it awake again.`,
+        }
       case 'failed':
         return refused(wakeLock.error)
       default: {
-        const test = wakeLock.lastTest
-        if (test?.ok) return 'Ready: checked just now, and the device gives it.'
-        if (test) return refused(test.error ?? 'unknown error')
-        return 'Ready: the screen is kept awake while a setlist is open.'
+        return {
+          look: 'idle',
+          icon: 'sun',
+          label: 'Ready',
+          detail: 'The screen is kept awake while a setlist is open, or when you ask for it here.',
+        }
       }
     }
   }
 
-  async _checkWakeLock(): Promise<void> {
-    this._checking = true
-    try {
-      await wakeLock.check()
-    } finally {
-      this._checking = false
+  _renderWakeLockAction() {
+    const action = this._wakeLockAction()
+    return action
+      ? html`<button class="btn" type="button" @click=${action.run}>${action.label}</button>`
+      : ''
+  }
+
+  _renderWakeLockStatus() {
+    const { look, icon, label, detail } = this._wakeLockDisplay()
+    return html`
+      <div
+        class="wake-status"
+        id="wake-lock-status"
+        role="status"
+        data-state=${wakeLock.state}
+        data-look=${look}
+      >
+        <span class="wake-badge"><app-icon name=${icon} size="28"></app-icon></span>
+        <span class="wake-text">
+          <span class="wake-label">${label}</span>
+          <span class="wake-detail">${detail}</span>
+        </span>
+      </div>
+    `
+  }
+
+  /** What the button does: ask again after a drop or a refusal, else start or stop keeping awake */
+  _wakeLockAction(): { label: string; run: () => void } | null {
+    if (!WakeLockController.supported) return null
+    if (['released', 'failed', 'expired'].includes(wakeLock.state)) {
+      return { label: 'Ask again', run: () => void wakeLock.requestAgain() }
     }
+    if (wakeLock.manual) {
+      return { label: 'Stop keeping awake', run: () => wakeLock.setManual(false) }
+    }
+    // Over a setlist it is already held; otherwise it can be asked for here
+    if (wakeLock.state === 'active') return null
+    return { label: 'Keep awake now', run: () => wakeLock.setManual(true) }
   }
 
   override render() {
@@ -245,19 +413,26 @@ export class AppPreferences extends LitElement {
             />
             <span>Keep the screen awake</span>
           </label>
-          <p id="wake-lock-status" role="status">${this._wakeLockStatus()}</p>
-          ${
-            WakeLockController.supported && this.keepAwake
-              ? html`<button
-                class="btn"
-                type="button"
-                ?disabled=${this._checking || wakeLock.state === 'active'}
-                @click=${this._checkWakeLock}
-              >
-                ${wakeLock.state === 'released' || wakeLock.state === 'failed' ? 'Ask again' : 'Check now'}
-              </button>`
-              : ''
-          }
+          ${this._renderWakeLockStatus()}
+          <label class="field" for="keep-awake-limit">
+            <span>On battery, let go after no touch for</span>
+            <select
+              id="keep-awake-limit"
+              name="keep-awake-limit"
+              ?disabled=${!this.keepAwake || !WakeLockController.supported}
+              @change=${this._onKeepAwakeLimitChange}
+            >
+              ${KEEP_AWAKE_LIMITS.map(
+                minutes => html`<option
+                  value=${minutes}
+                  ?selected=${minutes === this.keepAwakeMinutes}
+                >
+                  ${minutes === 0 ? 'No limit' : this._limitLabel(minutes)}
+                </option>`
+              )}
+            </select>
+          </label>
+          ${this._renderWakeLockAction()}
         </div>
 
         <div class="panel">
@@ -321,6 +496,12 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.keepAwake = value
     setKeepAwakePreference(value)
+  }
+
+  _onKeepAwakeLimitChange(event: Event): void {
+    const minutes = Number((event.currentTarget as HTMLSelectElement).value)
+    this.keepAwakeMinutes = minutes
+    setKeepAwakeMinutes(minutes)
   }
 
   _onCapoToggle(event: Event): void {

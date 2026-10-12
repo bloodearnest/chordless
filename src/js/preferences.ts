@@ -58,6 +58,15 @@ export class KeepAwakePreferenceEvent extends Event {
     this.enabled = enabled
   }
 }
+/** The longest the screen is kept awake with no touch changed (sent on window) */
+export class KeepAwakeLimitEvent extends Event {
+  static readonly type = 'preferences:keep-awake-limit-changed'
+  readonly minutes: number
+  constructor(minutes: number) {
+    super(KeepAwakeLimitEvent.type)
+    this.minutes = minutes
+  }
+}
 const NASHVILLE_PREF_KEY = 'use-nashville'
 const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
 const MUSICIAN_TYPE_KEY = 'musician_type'
@@ -65,6 +74,11 @@ const SECTION_DEFAULTS_KEY = 'section_defaults'
 const ENABLE_CAPO_KEY = 'enable_capo'
 const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
 const KEEP_AWAKE_KEY = 'keep_screen_awake'
+const KEEP_AWAKE_MINUTES_KEY = 'keep_awake_minutes'
+
+/** The longest the screen is kept awake with no touch, in minutes: 0 is no limit */
+export const KEEP_AWAKE_LIMITS = [15, 30, 60, 120, 240, 0] as const
+export const DEFAULT_KEEP_AWAKE_MINUTES = 60
 
 let cachedUseNashville: boolean | null = null
 let cachedUseUnicodeAccidentals: boolean | null = null
@@ -223,8 +237,38 @@ export function setKeepAwakePreference(value: boolean) {
   window.dispatchEvent(new KeepAwakePreferenceEvent(enabled))
 }
 
+export function getKeepAwakeMinutes(): number {
+  try {
+    const stored = Number(localStorage.getItem(KEEP_AWAKE_MINUTES_KEY))
+    return localStorage.getItem(KEEP_AWAKE_MINUTES_KEY) !== null &&
+      (KEEP_AWAKE_LIMITS as readonly number[]).includes(stored)
+      ? stored
+      : DEFAULT_KEEP_AWAKE_MINUTES
+  } catch {
+    return DEFAULT_KEEP_AWAKE_MINUTES
+  }
+}
+
+export function setKeepAwakeMinutes(minutes: number) {
+  const value = (KEEP_AWAKE_LIMITS as readonly number[]).includes(minutes)
+    ? minutes
+    : DEFAULT_KEEP_AWAKE_MINUTES
+  try {
+    localStorage.setItem(KEEP_AWAKE_MINUTES_KEY, String(value))
+  } catch (error) {
+    console.error('Failed to save keep-awake limit', error)
+  }
+  window.dispatchEvent(new KeepAwakeLimitEvent(value))
+}
+
+/** The limit in ms, or Infinity for none */
+export function keepAwakeLimitMs(minutes = getKeepAwakeMinutes()): number {
+  return minutes === 0 ? Number.POSITIVE_INFINITY : minutes * 60 * 1000
+}
+
 declare global {
   interface GlobalEventHandlersEventMap {
+    [KeepAwakeLimitEvent.type]: KeepAwakeLimitEvent
     [KeepAwakePreferenceEvent.type]: KeepAwakePreferenceEvent
     [NashvillePreferenceEvent.type]: NashvillePreferenceEvent
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
