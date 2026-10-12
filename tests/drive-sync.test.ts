@@ -4,7 +4,7 @@ import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { setlistFileMetadata, songFileMetadata } from '../src/js/drive-metadata.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
-import { makeLocalState, makeSong } from './builders.ts'
+import { makeEntry, makeLocalState, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -103,6 +103,14 @@ describe('Drive sync (against FakeDrive)', () => {
     const files = drive.listFiles(f => f.appProperties.setlistId === setlistId)
     expect(files, `Drive files for setlist ${setlistId}`).to.have.length(1)
     return JSON.parse(files[0].content)
+  }
+
+  /** The Drive file `id` is replaced by a copy with another id, as when duplicates are cleaned up */
+  function replaceDriveFile(id: string, newId: string) {
+    const file = must(drive.files.get(id))
+    drive.files.delete(id)
+    file.id = newId
+    drive.files.set(newId, file)
   }
 
   beforeEach(() => {
@@ -500,6 +508,102 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(driveSetlist(setlist.id).name).to.equal('Edited')
     })
 
+    it('uploads nothing from a device whose setlists are unchanged, when another adds one', async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      for (let i = 0; i < 12; i++) {
+        await addSetlist(phone, {
+          date: `2026-09-${String(i + 1).padStart(2, '0')}`,
+          songs: [makeEntry({ songId: `title-song-${i}`, key: 'G', tempo: i % 2 ? 72 : null })],
+        })
+      }
+      await syncDevice(phone)
+      await syncDevice(tablet)
+      await syncDevice(phone)
+      await syncDevice(tablet)
+
+      await addSetlist(phone, { date: '2026-10-04' })
+      await syncDevice(phone)
+      drive.requests = []
+      await syncDevice(tablet)
+
+      expect(await tablet.db.getAllSetlists()).to.have.length(13)
+      const writes = drive.requests.filter(r => r.method !== 'GET')
+      expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
+    })
+
+    describe('when the Drive file a device knew is gone but another holds the setlist', () => {
+      // Duplicates were cleaned up in Drive (the audit page trashes all but one), so a device
+      // that knew a removed file points at nothing, while a live file for the setlist exists
+      let phone
+      let tablet
+      let setlist
+
+      beforeEach(async () => {
+        phone = await makeDevice('phone')
+        tablet = await makeDevice('tablet')
+        setlist = await addSetlist(phone, { name: 'Original' })
+        await syncDevice(phone)
+        await syncDevice(tablet)
+        replaceDriveFile(must(await tablet.db.getSetlist(setlist.id)).driveFileId, 'survivor')
+        drive.requests = []
+      })
+
+      const writes = () =>
+        drive.requests.filter(r => r.method !== 'GET').map(r => `${r.method} ${r.path}`)
+
+      it('adopts the live file, rather than uploading a copy', async () => {
+        await syncDevice(tablet)
+
+        expect(writes()).to.deep.equal([])
+        expect(driveSetlistFiles()).to.have.length(1)
+        expect(must(await tablet.db.getSetlist(setlist.id)).driveFileId).to.equal('survivor')
+        expect(
+          tablet.sync.setlistHasLocalChanges(must(await tablet.db.getSetlist(setlist.id)))
+        ).to.equal(false)
+      })
+
+      it('updates the live file with an edit made here, rather than uploading a copy', async () => {
+        await editSetlist(tablet, setlist.id, { name: 'Edited on the tablet' })
+
+        await syncDevice(tablet)
+
+        expect(driveSetlistFiles()).to.have.length(1)
+        expect(driveSetlist(setlist.id).name).to.equal('Edited on the tablet')
+        expect(must(await tablet.db.getSetlist(setlist.id)).driveFileId).to.equal('survivor')
+      })
+
+      it("takes the live file's content when it is newer and nothing was edited here", async () => {
+        drive.editContent(
+          'survivor',
+          JSON.stringify({ ...driveSetlist(setlist.id), name: 'Renamed' })
+        )
+
+        await syncDevice(tablet)
+
+        expect(writes()).to.deep.equal([])
+        expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Renamed')
+      })
+    })
+
+    it('adopts the live file for a setlist this device never uploaded', async () => {
+      // e.g. it was created here, and also reached Drive from another device
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const setlist = await addSetlist(phone, { name: 'Shared' })
+      await syncDevice(phone)
+      await tablet.db.saveSetlist({ ...setlist })
+      drive.requests = []
+
+      await syncDevice(tablet)
+
+      expect(drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+      expect(driveSetlistFiles()).to.have.length(1)
+      expect(must(await tablet.db.getSetlist(setlist.id)).driveFileId).to.equal(
+        driveSetlistFiles()[0].id
+      )
+    })
+
     it("doesn't duplicate setlists when the inventory spans several pages", async () => {
       // Regression: the inventory only read the first page of each folder, so
       // files on later pages looked missing and were re-uploaded.
@@ -853,6 +957,25 @@ describe('Drive sync (against FakeDrive)', () => {
       const song = await device.db.getSong(uuid)
       return (await device.db.getChordPro(song.chordproFileId)).content
     }
+
+    it('does not upload a copy of a song whose Drive file was replaced by another', async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: 'v1' })
+      await syncDevice(phone)
+      await syncDevice(tablet)
+      const known = must(await tablet.db.getSong('song-1')).driveFileId
+      replaceDriveFile(must(known), 'survivor')
+      const filesBefore = drive.listFiles(f => f.appProperties.songId || f.appProperties.versionId)
+      drive.requests = []
+
+      await syncDevice(tablet)
+
+      expect(drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+      expect(
+        drive.listFiles(f => f.appProperties.songId || f.appProperties.versionId)
+      ).to.have.length(filesBefore.length)
+    })
 
     it('uploads a song and downloads it on another device', async () => {
       const phone = await makeDevice('phone')

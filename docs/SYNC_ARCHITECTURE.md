@@ -67,7 +67,12 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 3. **Folder guard:** if local records point at Drive files that exist *outside* this
    organisation's folder, stop with `OrganisationFolderMismatchError` instead of
    re-uploading them as duplicates.
-4. **Pull** setlists then songs: download what's new or changed in Drive.
+4. **Pull** setlists then songs: download what's new or changed in Drive. A local setlist
+   whose own Drive file is gone from the folder (e.g. duplicates were cleaned up, leaving
+   another file for it), or that has no Drive file, **adopts** the live file for its id
+   instead of being uploaded again: same content, it just points at the live file; edited
+   here, it keeps its edits and the push updates the live file; unchanged here but newer in
+   Drive, Drive's content is taken. Without this, every such setlist was uploaded as a copy.
 5. **Push** setlists then songs: upload what's new or changed locally.
 
 ### Finding the organisation folder

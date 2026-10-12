@@ -519,6 +519,14 @@ export class DriveSyncManager {
   }
 
   /**
+   * Whether a local record has no Drive file to be found: it never had one, or the one it
+   * had is no longer in the folder. (With no inventory, any file is assumed to be there.)
+   */
+  isOrphaned(record: { driveFileId?: string | null }): boolean {
+    return !record.driveFileId || !this.fileExistsInDrive(record.driveFileId)
+  }
+
+  /**
    * Whether a setlist has local changes that aren't in Drive: never uploaded,
    * or edited since its last sync. Ignores whether its Drive file still exists.
    */
@@ -665,7 +673,14 @@ export class DriveSyncManager {
     const driveSetlists = await DriveAPI.listSetlists(this.#folderId)
     console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`)
 
-    const downloadQueue: { driveFile: DriveFile; setlistId: string; localSetlist?: Setlist }[] = []
+    const downloadQueue: {
+      driveFile: DriveFile
+      setlistId: string
+      localSetlist?: Setlist
+      /** The local record's own Drive file is gone: this live file is taking its place */
+      adopt?: boolean
+    }[] = []
+    const adopted = new Set<string>()
 
     for (const driveFile of driveSetlists) {
       try {
@@ -685,6 +700,13 @@ export class DriveSyncManager {
           if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
             downloadQueue.push({ driveFile, setlistId, localSetlist })
           }
+        } else if (!adopted.has(setlistId) && this.isOrphaned(localSetlist)) {
+          // The Drive file this device knew is gone (e.g. duplicates were cleaned up), yet
+          // another live file holds this setlist: take that one over rather than uploading
+          // a copy of it
+          console.log(`[DriveSync] Adopting ${driveFile.id} for setlist ${setlistId}`)
+          adopted.add(setlistId)
+          downloadQueue.push({ driveFile, setlistId, localSetlist, adopt: true })
         }
       } catch (error) {
         console.error(`[DriveSync] Failed to pull setlist ${driveFile.name}:`, error)
@@ -718,12 +740,39 @@ export class DriveSyncManager {
       const batch = downloadQueue.slice(i, i + this.CONCURRENT_LIMIT)
 
       const results = await Promise.allSettled(
-        batch.map(async ({ driveFile, setlistId, localSetlist }) => {
+        batch.map(async ({ driveFile, setlistId, localSetlist, adopt }) => {
           // Older setlists in Drive may hold a chart's text as a tempo. Saving
           // converts it too, but convert first: the hash recorded as synced must
           // be of what's stored, or the setlist would look edited here
           const remote = withNumericTempos(await DriveAPI.downloadSetlist(driveFile.id))
           const remoteHash = setlistContentHash(remote)
+
+          if (adopt && localSetlist) {
+            const localHash = setlistContentHash(localSetlist)
+            const syncedHash = localSetlist.syncedContentHash
+            if (localHash === remoteHash) {
+              // The same content: only the file it points at changes
+              return {
+                ...localSetlist,
+                driveFileId: driveFile.id,
+                driveModifiedTime: driveFile.modifiedTime,
+                driveChecksum: driveFile.md5Checksum,
+                lastSyncedAt: new Date().toISOString(),
+                syncedContentHash: remoteHash,
+              }
+            }
+            if (!syncedHash || localHash !== syncedHash) {
+              // Edited here (or never synced): keep it, and the next push updates the live file
+              console.warn(`[DriveSync] Setlist ${setlistId} has local changes: keeping them`)
+              return {
+                ...localSetlist,
+                driveFileId: driveFile.id,
+                driveModifiedTime: driveFile.modifiedTime,
+                driveChecksum: driveFile.md5Checksum,
+              }
+            }
+            // Unchanged here since it was synced, and Drive's copy differs: Drive's is newer
+          }
 
           if (localSetlist?.syncedContentHash === remoteHash) {
             // Same content as we last synced, e.g. a record from before checksums
@@ -1092,7 +1141,14 @@ export class DriveSyncManager {
       }
     }
 
-    console.log(`[DriveSync] ${setlistsToSync.length} setlists need syncing`)
+    const neverUploaded = setlistsToSync.filter(setlist => !setlist.driveFileId).length
+    const missing = setlistsToSync.filter(
+      setlist => setlist.driveFileId && !this.fileExistsInDrive(setlist.driveFileId)
+    ).length
+    console.log(
+      `[DriveSync] ${setlistsToSync.length} setlists need syncing: ${neverUploaded} never uploaded, ` +
+        `${missing} missing from Drive, ${setlistsToSync.length - neverUploaded - missing} edited here`
+    )
     if (progressCallback) {
       progressCallback({
         stage: 'pushing',
