@@ -58,9 +58,9 @@ test.describe('Song settings', () => {
     await page.locator('#musical-metadata').click()
 
     const capo = page.locator('#capo-selector')
-    await capo.locator('.picker-button').click()
-    await capo.getByRole('button', { name: /^2\b/ }).click()
-    await expect(capo.locator('.picker-button')).toHaveText('2')
+    await capo.getByRole('button', { name: /^Capo/ }).click()
+    await capo.getByRole('option', { name: /^2\b/ }).click()
+    await expect(capo.getByRole('button', { name: /^Capo/ })).toHaveText('2')
     const capoShown = () =>
       page.locator('#musical-metadata').evaluate(m => (m as MusicalMetadataDisplay).capoValue)
     await expect.poll(capoShown).toBe(2)
@@ -169,18 +169,19 @@ test.describe('Popups in the song settings', () => {
       .toBe(true)
 
     const key = page.locator('#key-selector')
-    const options = key.locator('.picker-popover')
-    await key.locator('.picker-button').click()
+    const options = key.getByRole('listbox')
+    const keyButton = key.getByRole('button', { name: /^Key/ })
+    await keyButton.click()
     await expect(options).toBeVisible()
-    await expect(key.locator('.picker-button')).toHaveAttribute('aria-expanded', 'true')
+    await expect(keyButton).toHaveAttribute('aria-expanded', 'true')
 
     // A tap outside. (iPadOS before 18.3 left a popover open for this.)
     await page.mouse.click(5, 300)
     await expect(options).toBeHidden()
-    await expect(key.locator('.picker-button')).toHaveAttribute('aria-expanded', 'false')
+    await expect(keyButton).toHaveAttribute('aria-expanded', 'false')
     expect(await settings.evaluate(element => (element as SongSettingsPopover).isOpen())).toBe(true)
 
-    await key.locator('.picker-button').click()
+    await keyButton.click()
     await expect(options).toBeVisible()
     await page.keyboard.press('Escape')
     await expect(options).toBeHidden()

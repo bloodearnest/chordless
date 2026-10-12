@@ -144,10 +144,8 @@ test.describe('Display preferences', () => {
       .getByRole('button', { name: 'Toggle edit mode' })
       .click()
     const keySelector = page.locator('#library-key-selector')
-    await keySelector.locator('.picker-button').click()
-    await keySelector
-      .locator('.picker-option', { has: page.locator('.option-label', { hasText: /^F$/ }) })
-      .click()
+    await keySelector.getByRole('button', { name: /^Key/ }).click()
+    await keySelector.getByRole('option', { name: /^F\s/ }).click()
     await expect(chords.nth(1)).toHaveText('Bb')
     await set('setUseUnicodeAccidentals', true)
     await expect(chords.nth(1)).toHaveText('B♭')

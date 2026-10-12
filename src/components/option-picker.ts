@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DialogPopup } from '../js/dialog-popup.ts'
 
@@ -184,7 +184,8 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
         ${ref(this._button)}
         class="picker-button"
         type="button"
-        aria-haspopup="dialog"
+        aria-haspopup="listbox"
+        aria-label=${this.label ? `${this.label}: ${this._displayValue()}` : nothing}
         aria-expanded=${this._popup.isOpen ? 'true' : 'false'}
         @click=${() => this._popup.toggle()}
       >
@@ -198,19 +199,22 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
         @click=${this._popup.onClick}
         @close=${this._popup.onClose}
       >
-        ${this._options().map(
-          option => html`
-            <button
-              type="button"
-              class="picker-option ${option.value === this.value ? 'selected' : ''}"
-              aria-pressed=${option.value === this.value ? 'true' : 'false'}
-              @click=${() => this._choose(option.value)}
-            >
-              <span class="option-label">${option.label}</span>
-              <span class="option-hint">${option.hint}</span>
-            </button>
-          `
-        )}
+        <div role="listbox" aria-label=${this.label || 'Options'}>
+          ${this._options().map(
+            option => html`
+              <button
+                type="button"
+                role="option"
+                class="picker-option ${option.value === this.value ? 'selected' : ''}"
+                aria-selected=${option.value === this.value ? 'true' : 'false'}
+                @click=${() => this._choose(option.value)}
+              >
+                <span class="option-label">${option.label}</span>
+                <span class="option-hint">${option.hint}</span>
+              </button>
+            `
+          )}
+        </div>
       </dialog>
     `
   }

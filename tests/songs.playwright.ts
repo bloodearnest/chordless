@@ -17,9 +17,9 @@ test.describe('Song library', () => {
     const firstChord = page.locator('#library-song-content song-section chord-display').first()
     await expect(firstChord).toHaveText('G')
     for (const key of ['A', 'Bb']) {
-      await keySelector.locator('.picker-button').click()
-      await keySelector.getByRole('button', { name: new RegExp(`^${key}\\b`) }).click()
-      await expect(keySelector.locator('.picker-button')).toHaveText(key)
+      await keySelector.getByRole('button', { name: /^Key/ }).click()
+      await keySelector.getByRole('option', { name: new RegExp(`^${key}\\s`) }).click()
+      await expect(keySelector.getByRole('button', { name: /^Key/ })).toHaveText(key)
       await expect(firstChord).toHaveText(key)
     }
   })

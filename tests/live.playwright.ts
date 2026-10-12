@@ -203,11 +203,9 @@ test.describe('Editing a setlist', () => {
 
     // Alpha is in G; choose A
     const keySelector = cards.nth(0).locator('key-selector')
-    await keySelector.locator('.picker-button').click()
-    await keySelector
-      .locator('.picker-option', { has: page.locator('.option-label', { hasText: /^A$/ }) })
-      .click()
-    await expect(keySelector.locator('.picker-button')).toHaveText('A')
+    await keySelector.getByRole('button', { name: /^Key/ }).click()
+    await keySelector.getByRole('option', { name: /^A\s/ }).click()
+    await expect(keySelector.getByRole('button', { name: /^Key/ })).toHaveText('A')
     await expect
       .poll(async () => (await fromDB(page, 'getSetlist', 'seeded-setlist')).songs[0].key)
       .toBe('A')
