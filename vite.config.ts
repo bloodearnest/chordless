@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { defineConfig } from 'vite'
 import { serviceWorker } from './vite-plugins/service-worker.ts'
@@ -16,6 +17,14 @@ export default defineConfig(({ command, isPreview }) => {
   return {
     root: 'src',
     publicDir: '../public',
+    // A server started for the tests (CHORDLESS_PORT) keeps its dependency cache apart: sharing
+    // one with the development server on 8787 makes each rewrite the other's, and the browser
+    // is left with "504 Outdated Optimize Dep" and a blank page
+    ...(process.env.CHORDLESS_PORT && {
+      cacheDir: fileURLToPath(
+        new URL(`./node_modules/.vite-${process.env.CHORDLESS_PORT}`, import.meta.url)
+      ),
+    }),
     build: {
       outDir: '../dist',
       emptyOutDir: true,
