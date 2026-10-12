@@ -88,6 +88,12 @@ export class SongSettingsPopover extends LitElement {
       white-space: nowrap;
     }
 
+    /* The BPM row starts a row of its own, whether or not the capo picker above fills the
+       first row's other two cells */
+    .bpm-label {
+      grid-column-start: 1;
+    }
+
     .control-button {
       background-color: color-mix(in srgb, currentColor 20%, transparent);
       border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
@@ -220,7 +226,7 @@ export class SongSettingsPopover extends LitElement {
           <slot name="capo-selector"></slot>
 
           <!-- Row 2: BPM controls -->
-          <label class="meta-label">BPM:</label>
+          <label class="meta-label bpm-label">BPM:</label>
           <button
             class="control-button"
             @click=${this._handleBPMDecrement}

@@ -793,7 +793,7 @@ export class SetlistPage {
       // Update musical metadata display
       if (musicalMetadata) {
         musicalMetadata.keyValue = song.currentKey || ''
-        musicalMetadata.capoValue = song.currentCapo ?? 0
+        musicalMetadata.capoValue = this._capoEnabled ? (song.currentCapo ?? 0) : 0
         musicalMetadata.bpm = song.currentBPM || null
         musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
         musicalMetadata.style.display = ''
@@ -1726,6 +1726,7 @@ export class SetlistPage {
     const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     if (!capoSelector) return
 
+    capoSelector.style.display = this._capoEnabled ? '' : 'none'
     if (!this._capoEnabled) {
       return
     }
@@ -2483,6 +2484,7 @@ export class SetlistPage {
     const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     if (capoSelector) {
+      capoSelector.style.display = this._capoEnabled ? '' : 'none'
       if (this._capoEnabled && currentSong) {
         this.updateCapoSelector(currentSong.currentCapo ?? 0, currentSong.currentKey)
       } else {

@@ -48,6 +48,27 @@ test.describe('Song settings', () => {
       .toBe(73)
   })
 
+  test('the song settings show no capo, label or value, while the capo is off', async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'no-capo-setlist' })
+    await page.goto('/setlist/no-capo-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    await page.locator('#musical-metadata').click()
+
+    const popover = page.locator('song-settings-popover')
+    await expect(popover.getByRole('button', { name: /^Key/ })).toBeVisible()
+    await expect(popover.getByRole('button', { name: /^Capo/ })).toBeHidden()
+    await expect(popover.locator('#capo-selector')).toBeHidden()
+
+    // The BPM row is still a row of its own, under the key
+    const key = await popover.getByRole('button', { name: /^Key/ }).boundingBox()
+    const bpm = await popover.getByRole('button', { name: 'Decrease BPM' }).boundingBox()
+    expect(must(bpm).y).toBeGreaterThan(must(key).y + must(key).height - 1)
+  })
+
   test('choosing a capo in the song settings changes it, and keeps it', async ({ page }) => {
     await seedSong(page, { setlistId: 'capo-test-setlist' })
     await page.evaluate(() => localStorage.setItem('enable_capo', 'true'))
