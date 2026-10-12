@@ -689,6 +689,11 @@ export async function getSetlistsFolder(orgFolderId: string): Promise<string> {
 
 const SHARE_CONTENT_TYPE = 'application/octet-stream'
 
+/** The organisation's shares folder, or null if nothing has ever been shared (nothing is created) */
+export function findSharesFolder(orgFolderId: string): Promise<string | null> {
+  return findSubfolder(orgFolderId, 'shares')
+}
+
 /** Get or create the shares folder within an organisation (it stays private) */
 export async function getSharesFolder(orgFolderId: string): Promise<string> {
   let folderId = await findSubfolder(orgFolderId, 'shares')

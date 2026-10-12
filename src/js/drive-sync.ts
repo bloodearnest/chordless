@@ -40,6 +40,7 @@ import {
 } from './drive-metadata.ts'
 import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
+import { syncShares } from './share-manager.ts'
 import { chartFields, hashText } from './song-utils.ts'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
 import { md5Hex } from './utils/md5.ts'
@@ -395,6 +396,10 @@ export class DriveSyncManager {
         })
       }
 
+      // Share links: update the live ones and end the finished ones, which changes setlists,
+      // so before they are pushed
+      await this.syncShares()
+
       // Then, push local changes
       if (progressCallback) progressCallback({ stage: 'pushing', message: 'Uploading to Drive...' })
       await this.pushToDrive(progressCallback)
@@ -418,6 +423,21 @@ export class DriveSyncManager {
       this._driveFileIds = null
       this._liveSetlistFiles = null
       this._pullIncomplete = false
+    }
+  }
+
+  /** Update and clean up this organisation's share links (see share-manager.ts) */
+  async syncShares(): Promise<number> {
+    try {
+      return await syncShares({
+        db: this.#db,
+        organisationId: this.organisationId,
+        organisationFolderId: this.#folderId,
+      })
+    } catch (error) {
+      // Shares must never stop setlists and songs syncing
+      console.error('[DriveSync] Share sync failed:', error)
+      return 0
     }
   }
 

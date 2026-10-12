@@ -44,6 +44,8 @@ export interface ShareSource {
   title: string
   /** The song's own key, for an entry that doesn't set one */
   songKey: string | null
+  /** The song's own tempo, for an entry that doesn't set one */
+  songTempo?: number | null
   /** The song's chart text, unless the entry has its own edited copy */
   chordpro: string
 }
@@ -79,10 +81,10 @@ export function buildShareBundle(
 ): ShareBundle {
   const songs = [...sources]
     .sort((a, b) => a.entry.order - b.entry.order)
-    .map(({ entry, title, songKey, chordpro }) => ({
+    .map(({ entry, title, songKey, songTempo, chordpro }) => ({
       title,
       key: entry.key ?? songKey,
-      tempo: entry.tempo ?? null,
+      tempo: entry.tempo ?? songTempo ?? null,
       notes: entry.notes ?? '',
       chordpro: entry.chordproEdits ?? chordpro,
     }))
