@@ -150,6 +150,10 @@ storage/sync
 - immediate background sync of just the changed record (setlist/song), in the
   service worker, with full sync as the backstop: designed in docs/SYNC_ARCHITECTURE.md,
   not built. Later: durable offline write queue.
+- richer PWA install UI (Chrome's devtools manifest tab warns): add "screenshots" to
+  public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
+  or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain
+  hymn (no copyrighted lyrics), and keep them out of the precache if they are large
 - security headers once chordless.app is live: a Content-Security-Policy (start as
   Content-Security-Policy-Report-Only, enforce once clean), set on the pages and on the service
   worker script. Needs: the inline <script> in index.html (move it or hash it), connect-src for
