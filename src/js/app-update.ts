@@ -88,16 +88,20 @@ export class AppUpdate {
     return this.#registration !== undefined
   }
 
-  /** Which version of the app is running, asked of the worker that serves it (null if it can't say) */
-  async runningVersion(): Promise<string | null> {
+  /**
+   * Which version of the app is running, and when it was released (an ISO date, or '' if
+   * unknown), asked of the worker that serves it. Null if it can't say.
+   */
+  async runningVersion(): Promise<{ version: string; released: string } | null> {
     const controller = this.#container?.controller
     if (!controller) return null
     return new Promise(resolve => {
       const channel = new MessageChannel()
       const timer = setTimeout(() => resolve(null), 3000)
-      channel.port1.onmessage = (event: MessageEvent<{ version?: string }>) => {
+      channel.port1.onmessage = (event: MessageEvent<{ version?: string; released?: string }>) => {
         clearTimeout(timer)
-        resolve(event.data.version ?? null)
+        const { version, released } = event.data
+        resolve(version ? { version, released: released ?? '' } : null)
       }
       controller.postMessage({ type: 'GET_VERSION', messageId: crypto.randomUUID() }, [
         channel.port2,

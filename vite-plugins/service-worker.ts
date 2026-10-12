@@ -9,6 +9,7 @@
 // In dev the precache is empty (Vite serves modules on demand) and the worker is bundled
 // per request.
 
+import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -24,7 +25,7 @@ async function bundle(
   root: string,
   precache: string[],
   version: string,
-  { minify, target }: { minify: boolean; target?: string[] }
+  { minify, target, released }: { minify: boolean; target?: string[]; released: string }
 ) {
   const result = await build({
     root,
@@ -34,6 +35,7 @@ async function bundle(
     define: {
       __PRECACHE__: JSON.stringify(precache),
       __CACHE_VERSION__: JSON.stringify(version),
+      __RELEASE_DATE__: JSON.stringify(released),
     },
     build: {
       write: false,
@@ -59,6 +61,33 @@ function listFiles(dir: string): string[] {
   )
 }
 
+/**
+ * When the files of the app last changed: the date of the last commit to anything that ends up in
+ * the build. Not the time of the build, which would make a rebuild of the same files look like a
+ * new version; and a commit of notes or docs does not move it. An ISO date, or '' with no git.
+ */
+function releaseDate(projectRoot: string): string {
+  try {
+    return execFileSync(
+      'git',
+      [
+        'log',
+        '-1',
+        '--format=%cI',
+        '--',
+        'src',
+        'public',
+        'package-lock.json',
+        'vite.config.ts',
+        'vite-plugins',
+      ],
+      { cwd: projectRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }
+    ).trim()
+  } catch {
+    return ''
+  }
+}
+
 /** The URLs to precache, and a hash of their contents */
 function precacheFor(outDir: string) {
   const hash = createHash('sha256')
@@ -76,18 +105,21 @@ function precacheFor(outDir: string) {
 /** `target` is the build target of the rest of the app, so the worker matches it */
 export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
   let root: string
+  let released = ''
   return {
     name: 'chordless:service-worker',
 
     configResolved(config) {
       root = config.root
+      // The app is in src/, one below the project
+      released = releaseDate(join(config.root, '..'))
     },
 
     configureServer(server) {
       server.middlewares.use(async (req, res, next) => {
         if (req.url?.split('?')[0] !== `/${FILE}`) return next()
         try {
-          const code = await bundle(root, [], 'dev', { minify: false, target })
+          const code = await bundle(root, [], 'dev', { minify: false, target, released })
           res.setHeader('Content-Type', 'text/javascript')
           res.setHeader('Cache-Control', 'no-cache')
           res.end(code)
@@ -101,7 +133,7 @@ export function serviceWorker({ target }: { target?: string[] } = {}): Plugin {
       if (this.environment?.name !== 'client') return
       if (!options.dir) return
       const { urls, version } = precacheFor(options.dir)
-      const code = await bundle(root, urls, version, { minify: true, target })
+      const code = await bundle(root, urls, version, { minify: true, target, released })
       writeFileSync(join(options.dir, FILE), code)
     },
   }

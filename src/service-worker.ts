@@ -59,7 +59,11 @@ self.addEventListener('message', async event => {
     switch (type) {
       case 'GET_VERSION':
         // Which version of the app this worker (and the files it serves) is
-        respondToClient(event, messageId, { success: true, version: __CACHE_VERSION__ })
+        respondToClient(event, messageId, {
+          success: true,
+          version: __CACHE_VERSION__,
+          released: __RELEASE_DATE__,
+        })
         break
 
       case 'SKIP_WAITING':

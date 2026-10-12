@@ -145,7 +145,7 @@
     {
       "includes": ["src/service-worker.{js,ts}"],
       "javascript": {
-        "globals": ["google", "__PRECACHE__", "__CACHE_VERSION__"]
+        "globals": ["google", "__PRECACHE__", "__CACHE_VERSION__", "__RELEASE_DATE__"]
       }
     },
     {

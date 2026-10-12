@@ -185,11 +185,14 @@ describe('AppUpdate', () => {
     answers.postMessage = (message: unknown, transfer?: Transferable[]) => {
       const port = transfer?.[0] as MessagePort
       expect((message as { type: string }).type).to.equal('GET_VERSION')
-      port.postMessage({ version: 'abc123def456' })
+      port.postMessage({ version: 'abc123def456', released: '2026-10-12T17:58:00+01:00' })
     }
     container.controller = answers
     await start()
-    expect(await update.runningVersion()).to.equal('abc123def456')
+    expect(await update.runningVersion()).to.deep.equal({
+      version: 'abc123def456',
+      released: '2026-10-12T17:58:00+01:00',
+    })
 
     container.controller = null
     expect(await update.runningVersion()).to.equal(null)
