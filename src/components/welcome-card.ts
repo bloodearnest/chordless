@@ -14,6 +14,7 @@ import {
 } from '../js/preferences.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
+import './why-install.ts'
 
 /**
  * WelcomeCard
@@ -207,9 +208,10 @@ export class WelcomeCard extends LitElement {
         <h3>Install it</h3>
         <p class="why">
           Browsers can clear the saved data of a website that has not been used for a while: Safari
-          does after about a week. An installed app is kept, opens full screen, and works offline,
-          so your songs are there when you need them.${separateData}
+          does after about a week. An installed app is kept, and opens full screen, so your songs
+          are there when you need them.${separateData}
         </p>
+        <p><why-install></why-install></p>
         ${
           mode === 'prompt'
             ? html`<div class="actions">

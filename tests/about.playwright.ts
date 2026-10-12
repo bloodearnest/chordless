@@ -133,3 +133,11 @@ test("the menu's About item opens the page", async ({ page }) => {
   await expect(page).toHaveURL(/\/about$/)
   await expect(page.locator('about-view')).toBeVisible()
 })
+
+test('the install panel says why installing is worth it', async ({ page }) => {
+  await openApp(page, '/about')
+  const about = page.locator('app-about')
+  await about.getByRole('button', { name: 'Why install?' }).click()
+  await expect(about.getByRole('dialog', { name: 'Why install Chordless?' })).toBeVisible()
+  await expect(about.locator('why-install .why')).toContainText('Your songs stay put')
+})

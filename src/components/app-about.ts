@@ -8,6 +8,7 @@ import {
 } from '../js/install.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
 import { renderStatus, type StatusShown } from './status-view.ts'
+import './why-install.ts'
 
 /** What the browser says of the device's storage for this app */
 interface StorageInfo {
@@ -386,6 +387,7 @@ export class AppAbout extends LitElement {
         <div class="panel">
           <h3>Install</h3>
           ${renderStatus(install, { id: 'install-status', state: install.state })}
+          <p><why-install></why-install></p>
           ${
             this._installMode === 'prompt'
               ? html`<div class="actions">
