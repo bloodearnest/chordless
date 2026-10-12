@@ -164,6 +164,42 @@ describe('AppRouter', () => {
     })
   })
 
+  describe("a view's own title", () => {
+    beforeEach(async () => {
+      window.history.replaceState(null, '', '/setlist/abc')
+      await makeRouter().start()
+    })
+
+    it("is the view's, with the app's name after it, until the view is left", async () => {
+      expect(document.title).to.equal('Setlist abc')
+      router.setTitle('Sun 11 Oct - Easter')
+      expect(document.title).to.equal('Sun 11 Oct - Easter - Chordless')
+
+      await router.navigate('/storage')
+      expect(document.title).to.equal('Storage - Chordless')
+    })
+
+    it('stays while the user moves within the view', async () => {
+      router.setTitle('Sun 11 Oct')
+      await router.navigate('/setlist/abc/song/1')
+      expect(document.title).to.equal('Sun 11 Oct - Chordless')
+      await router.navigate('/setlist/abc')
+      expect(document.title).to.equal('Sun 11 Oct - Chordless')
+    })
+
+    it("does not carry over to another setlist's view", async () => {
+      router.setTitle('Sun 11 Oct')
+      await router.navigate('/setlist/other')
+      expect(document.title).to.equal('Setlist other')
+    })
+
+    it("goes back to the entry's title when cleared", () => {
+      router.setTitle('Sun 11 Oct')
+      router.setTitle(null)
+      expect(document.title).to.equal('Setlist abc')
+    })
+  })
+
   describe('moving within a view', () => {
     beforeEach(async () => {
       window.history.replaceState(null, '', '/setlist/abc')

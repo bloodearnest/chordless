@@ -39,7 +39,7 @@ import {
 import { SongChangeEvent } from './app-events.ts'
 import type { HideMode, SectionState, Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
-import { goTo } from './navigation.ts'
+import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
@@ -896,6 +896,8 @@ export class SetlistPage {
 
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     this.updateHeader(song, true)
+    // The menu's heading and the window's title say the setlist's date and name
+    this.updateNavigationMenu()
     await dialog?.show(setlist)
   }
 
@@ -2337,6 +2339,9 @@ export class SetlistPage {
 
   /** The menu lists the setlist's songs, and links to the overview from a song */
   updateNavigationMenu() {
+    // The window's title (and the browser tab's) is the setlist's date, and its name if it has one
+    if (this.currentSetlist) setPageTitle(setlistTitle(this.currentSetlist, 'short'))
+
     const navMenu = document.getElementById('nav-menu') as NavMenu | null
     if (!navMenu) return
 

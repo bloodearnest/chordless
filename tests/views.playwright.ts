@@ -104,7 +104,7 @@ test.describe('Moving between views', () => {
     await markDocument(page)
     await page.locator('setlist-group').first().getByRole('link').first().click()
     await expect(page).toHaveURL(/\/setlist\/link-setlist$/)
-    await expect(page).toHaveTitle('Setlist - Chordless')
+    await expect(page).toHaveTitle(/^Sun,? 11 Oct - Chordless$/)
     await expect(page.locator('setlist-view')).toBeVisible()
     await expect(page.locator('setlist-overview')).toBeVisible()
     expect(await isSameDocument(page)).toBe(true)

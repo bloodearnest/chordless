@@ -112,6 +112,8 @@ export class AppRouter {
   #outlet: Element
   #views: Record<string, ViewEntry>
   #defaultTitle: string
+  /** The title the shown view gave itself (see setTitle), if it did */
+  #viewTitle: string | null = null
   #transitions: boolean
   #announcer: Element | null
   #errorView: (route: Route, error: unknown) => ShownView
@@ -317,13 +319,33 @@ export class AppRouter {
     this.#shownKey = window.history.state?.key ?? null
     this.#route = route
 
-    document.title = pageTitle(
-      entry.title?.(route) ?? this.#defaultTitle,
-      window.matchMedia('(display-mode: standalone)').matches
-    )
+    // A view's own title belongs to that view: a new view starts with its entry's
+    if (!keep) this.#viewTitle = null
+    this.#showTitle(route)
     if (!keep) this.#announceView(view, previous)
     provideRoute(route)
     document.dispatchEvent(new RouteChangeEvent(route, previous))
+  }
+
+  /** Set the document title from the shown view's own title, else its entry's, else the page's */
+  #showTitle(route: Route): void {
+    const entry = this.#views[route.name]
+    const title = this.#viewTitle
+      ? `${this.#viewTitle} - Chordless`
+      : (entry?.title?.(route) ?? this.#defaultTitle)
+    document.title = pageTitle(title, window.matchMedia('(display-mode: standalone)').matches)
+  }
+
+  /**
+   * Give the view being shown a title of its own, such as a setlist's date and name (null goes
+   * back to its entry's). It is kept for as long as the view stays, as it does while the
+   * user moves between a setlist's songs, and a new view starts without it.
+   * @param title the title without the app's name, which is added (or, in an installed app's
+   *   window, which has it already, left off)
+   */
+  setTitle(title: string | null): void {
+    this.#viewTitle = title
+    if (this.#route) this.#showTitle(this.#route)
   }
 
   /** Keep a view's state against the history entry it was left from, the latest few */

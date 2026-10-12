@@ -7,6 +7,7 @@
 /** What goTo needs of the router (AppRouter) */
 interface Navigates {
   navigate(url: string, options?: GoOptions): Promise<boolean>
+  setTitle?(title: string | null): void
 }
 
 export interface GoOptions {
@@ -18,6 +19,14 @@ let router: Navigates | null = null
 /** Called by app.js once the router exists */
 export function setRouter(value: Navigates | null) {
   router = value
+}
+
+/**
+ * Give the page being shown a title of its own, such as a setlist's date and name: without the
+ * app's name, which is added where it is wanted. It lasts while the view does.
+ */
+export function setPageTitle(title: string | null) {
+  router?.setTitle?.(title)
 }
 
 export async function goTo(url: string, options?: GoOptions) {

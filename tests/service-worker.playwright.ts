@@ -71,7 +71,7 @@ test('a setlist opened online can be reloaded while offline', async ({ page, con
   await context.setOffline(true)
   try {
     await page.reload()
-    await expect(page).toHaveTitle('Setlist - Chordless')
+    await expect(page).toHaveTitle(/^Sun,? 11 Oct - Chordless$/)
     await expect(page.locator('setlist-overview')).toBeVisible()
   } finally {
     await context.setOffline(false)
