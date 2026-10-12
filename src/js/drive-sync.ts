@@ -35,7 +35,6 @@ import {
 import {
   forUpdate,
   setlistFileMetadata,
-  setlistFilename,
   songFileDetails,
   songFileMetadata,
 } from './drive-metadata.ts'
@@ -188,8 +187,6 @@ export class DriveSyncManager {
   CONCURRENT_LIMIT: number
   /** The ids of the files in the organisation's Drive folder, once listed */
   _driveFileIds: Set<string> | null
-  /** The setlist files in Drive, as listed by the last pull */
-  _liveSetlistFiles: DriveFile[] | null
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -218,7 +215,6 @@ export class DriveSyncManager {
 
     // Drive file inventory (for existence checks)
     this._driveFileIds = null // Set of file IDs that exist in Drive
-    this._liveSetlistFiles = null
   }
 
   /** The database, once init() has set it */
@@ -399,7 +395,6 @@ export class DriveSyncManager {
       // Clear caches after sync
       this._folderCache.clear()
       this._driveFileIds = null
-      this._liveSetlistFiles = null
     }
   }
 
@@ -532,13 +527,18 @@ export class DriveSyncManager {
   }
 
   /**
-   * The live Drive file for the same setlist (same file name: date, leader, type and name)
-   * under another setlist id, if the last pull saw one
+   * Another setlist, with a live Drive file, for the same date, leader, type and name
    */
-  liveFileOfAnotherSetlist(setlist: Setlist): DriveFile | undefined {
-    const name = setlistFilename(setlist)
-    return this._liveSetlistFiles?.find(
-      file => file.name === name && file.appProperties?.setlistId !== setlist.id
+  syncedTwinOf(setlist: Setlist, setlists: Setlist[]): Setlist | undefined {
+    return setlists.find(
+      other =>
+        other.id !== setlist.id &&
+        other.driveFileId &&
+        this.fileExistsInDrive(other.driveFileId) &&
+        other.date === setlist.date &&
+        other.owner === setlist.owner &&
+        other.type === setlist.type &&
+        other.name === setlist.name
     )
   }
 
@@ -688,7 +688,6 @@ export class DriveSyncManager {
     // Get all setlists from Drive
     const driveSetlists = await DriveAPI.listSetlists(this.#folderId)
     console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`)
-    this._liveSetlistFiles = driveSetlists
 
     const downloadQueue: {
       driveFile: DriveFile
@@ -1195,15 +1194,16 @@ export class DriveSyncManager {
       }
     }
 
-    // A setlist with no live file of its own that Drive already holds under another id (the
-    // same date, leader, type and name) is that setlist stored twice, e.g. two devices each
-    // made their own record of it. Uploading it would duplicate it, so leave it here.
+    // A setlist with no live file of its own, while another setlist that has one is for the
+    // same date, leader, type and name, is that setlist stored twice, e.g. two devices each
+    // made their own record of it. Uploading it would duplicate it, so leave it here. (The
+    // pull has just made a local record of every file in Drive, so this needs no downloads.)
     const toUpload = newSetlists.filter(setlist => {
-      const twin = this.liveFileOfAnotherSetlist(setlist)
+      const twin = this.syncedTwinOf(setlist, localSetlists)
       if (!twin) return true
       console.warn(
-        `[DriveSync] Not uploading setlist ${setlist.id}: Drive already has ${twin.name} ` +
-          `(${twin.id}) for another setlist. Reset this device from Google Drive to fix it.`
+        `[DriveSync] Not uploading setlist ${setlist.id}: Drive already has setlist ${twin.id} ` +
+          `for the same ${setlist.date} ${setlist.type}. Reset this device from Google Drive to fix it.`
       )
       return false
     })
