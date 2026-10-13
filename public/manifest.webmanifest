@@ -49,7 +49,7 @@
       "files": [
         {
           "name": "files",
-          "accept": ["text/*", ".cho", ".chordpro", ".crd", ".chopro", ".txt"]
+          "accept": ["text/*", "application/pdf", ".cho", ".chordpro", ".crd", ".chopro", ".txt"]
         }
       ]
     }

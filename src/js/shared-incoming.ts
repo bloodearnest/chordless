@@ -11,11 +11,15 @@ export const SHARED_CACHE_NAME = 'shared-incoming-v1'
 
 const FILE_PATH = '/shared/file/'
 const TEXT_PATH = '/shared/text'
+const TITLE_PATH = '/shared/title'
+const URL_PATH = '/shared/url'
 
-/** What was shared: ChordPro files, and/or text */
+/** What was shared: files (ChordPro, PDFs), and/or text. Some apps put the text in `title` or `url` */
 export interface Shared {
   files: File[]
   text: string
+  title?: string
+  url?: string
 }
 
 /** A cache key for a path (a cache is keyed by requests) */
@@ -41,12 +45,18 @@ export async function storeShared(
       })
     )
   }
-  const text = form.get('text')
-  if (typeof text === 'string' && text.trim()) {
-    await cache.put(
-      keyFor(TEXT_PATH),
-      new Response(text, { headers: { 'Content-Type': 'text/plain' } })
-    )
+  for (const [field, path] of [
+    ['text', TEXT_PATH],
+    ['title', TITLE_PATH],
+    ['url', URL_PATH],
+  ] as const) {
+    const value = form.get(field)
+    if (typeof value === 'string' && value.trim()) {
+      await cache.put(
+        keyFor(path),
+        new Response(value, { headers: { 'Content-Type': 'text/plain' } })
+      )
+    }
   }
 }
 
@@ -56,12 +66,18 @@ export async function takeShared(cacheStorage: CacheStorage = caches): Promise<S
   const cache = await cacheStorage.open(SHARED_CACHE_NAME)
   const files: File[] = []
   let text = ''
+  let title = ''
+  let url = ''
   for (const request of await cache.keys()) {
     const path = new URL(request.url).pathname
     const response = await cache.match(request)
     if (!response) continue
     if (path === TEXT_PATH) {
       text = await response.text()
+    } else if (path === TITLE_PATH) {
+      title = await response.text()
+    } else if (path === URL_PATH) {
+      url = await response.text()
     } else if (path.startsWith(FILE_PATH)) {
       const name = decodeURIComponent(response.headers.get('X-File-Name') ?? 'shared')
       const type = response.headers.get('Content-Type') ?? ''
@@ -69,5 +85,5 @@ export async function takeShared(cacheStorage: CacheStorage = caches): Promise<S
     }
   }
   await cacheStorage.delete(SHARED_CACHE_NAME)
-  return files.length || text ? { files, text } : null
+  return files.length || text || title || url ? { files, text, title, url } : null
 }

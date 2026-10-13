@@ -6,6 +6,7 @@ import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
+import type { Shared } from '../js/shared-incoming.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -372,6 +373,26 @@ export class SongImport extends LitElement {
       songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
     }
     await this.receiveAll(songs)
+    this._reportUnusual(incoming)
+  }
+
+  /** Temporary probe: say what a share held beyond ChordPro files and text, to see what WhatsApp sends */
+  _reportUnusual(incoming: Shared): void {
+    if (
+      !incoming.title &&
+      !incoming.url &&
+      incoming.files.every(f => !f.type.startsWith('application/'))
+    )
+      return
+    const files = incoming.files.map(f => `${f.name} (${f.type || 'no type'}, ${f.size} bytes)`)
+    this._showError(
+      [
+        `Received ${incoming.files.length} file(s): ${files.join('; ') || 'none'}`,
+        `title: ${incoming.title || '-'}`,
+        `url: ${incoming.url || '-'}`,
+        `text: ${incoming.text.slice(0, 500) || '-'}`,
+      ].join(' | ')
+    )
   }
 
   _onMessage(event: MessageEvent): void {
