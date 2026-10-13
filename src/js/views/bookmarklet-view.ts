@@ -38,7 +38,7 @@ export class BookmarkletView extends PageView {
                   Create a new bookmark<span class="desktop-only"> (Ctrl+D or Cmd+D)</span
                   ><span class="touch-only"> of any page, then edit it</span>
                 </li>
-                <li>Name it "Import to Chordless"</li>
+                <li>Name it "🎵 Import to Chordless"</li>
                 <li>Copy the code below and paste it as the URL</li>
               </ol>
             </bookmarklet-installer>

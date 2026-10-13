@@ -116,7 +116,7 @@ export class BookmarkletInstaller extends LitElement {
     return html`
       <p>
         <a class="link" href=${this._url} @click=${this._onLinkClick} title="Drag me to your bookmarks bar"
-          >📝 Import to Chordless</a
+          >🎵 Import to Chordless</a
         >
       </p>
       <slot></slot>
