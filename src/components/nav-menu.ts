@@ -1,11 +1,13 @@
 import { ContextConsumer } from '@lit/context'
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { isReadOnlyOrganisation } from '../js/organisation.ts'
+import { FollowsReadOnly } from '../js/read-only-controller.ts'
 import { routeContext } from '../js/route-context.ts'
 import { HeaderMenuClickEvent } from './app-header.ts'
 
@@ -203,6 +205,8 @@ export class NavMenu extends LitElement {
     }
   `
 
+  _followsReadOnly = new FollowsReadOnly(this)
+
   constructor() {
     super()
     this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
@@ -370,15 +374,19 @@ export class NavMenu extends LitElement {
             <span>Preferences</span>
           </button>
 
-          <a href="/import-song" class="nav-menu-item" part="nav-item">
-            <app-icon name="upload" size="20" class="nav-icon"></app-icon>
-            <span>Import Songs</span>
-          </a>
+          ${
+            isReadOnlyOrganisation()
+              ? nothing
+              : html`<a href="/import-song" class="nav-menu-item" part="nav-item">
+                <app-icon name="upload" size="20" class="nav-icon"></app-icon>
+                <span>Import Songs</span>
+              </a>
 
-          <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
-            <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
-            <span>SongSelect Import</span>
-          </a>
+              <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
+                <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
+                <span>SongSelect Import</span>
+              </a>`
+          }
 
           <a href="/storage" class="nav-menu-item" part="nav-item">
             <app-icon name="layers" size="20" class="nav-icon"></app-icon>

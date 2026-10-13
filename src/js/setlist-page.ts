@@ -41,6 +41,7 @@ import { SongChangeEvent } from './app-events.ts'
 import type { HideMode, SectionState, Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { goTo, setPageTitle } from './navigation.ts'
+import { isReadOnlyOrganisation } from './organisation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
@@ -757,6 +758,10 @@ export class SetlistPage {
 
     if (!appHeader) return
 
+    // On the overview, edit mode changes the setlist itself (its songs, their keys): not for a
+    // user who can only read it. On a song it is the capo, the sections shown and so on.
+    if (!this._readOnly) appHeader.showEditToggle = !(isReadOnlyOrganisation() && !song)
+
     // Check if content is actually changing
     const titleChanged = appHeader.heading !== newTitle
     if (!titleChanged && !instant) {
@@ -894,8 +899,8 @@ export class SetlistPage {
       this._setlistDeleteHandler = () => this.deleteSetlist()
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
-    dialog.readonly = this._readOnly
-    dialog.people = this._readOnly ? [] : (await getOrganisationPeople()).people
+    dialog.readonly = this._readOnly || isReadOnlyOrganisation()
+    dialog.people = dialog.readonly ? [] : (await getOrganisationPeople()).people
     await dialog.show(this.currentSetlist)
   }
 
@@ -1547,7 +1552,8 @@ export class SetlistPage {
         // Update key selector edit mode
         const keySelector = this.root.querySelector<KeySelector>('#key-selector')
         if (keySelector) {
-          keySelector.editMode = true
+          // The key is part of the setlist: not for a user who can only read it
+          keySelector.editMode = !isReadOnlyOrganisation()
         }
         const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
         if (capoSelector && this._capoEnabled) {
@@ -1740,7 +1746,8 @@ export class SetlistPage {
     keySelector.value = selectedKey
     keySelector.keys = keys
     keySelector.originalKey = originalKey ?? ''
-    keySelector.editMode = document.body.classList.contains('edit-mode')
+    keySelector.editMode =
+      document.body.classList.contains('edit-mode') && !isReadOnlyOrganisation()
   }
 
   updateCapoSelector(value: unknown, currentKey: string | null | undefined = null) {
@@ -1806,10 +1813,12 @@ export class SetlistPage {
 
     // Update BPM value
     songSettingsPopover.bpmValue = song.currentBPM || 120
+    songSettingsPopover.bpmLocked = isReadOnlyOrganisation()
   }
 
   async handleBPMChange(newValue: number) {
-    if (this.currentSongIndex < 0) return
+    // The tempo is saved in the setlist, which a user who can only read can't change
+    if (this.currentSongIndex < 0 || isReadOnlyOrganisation()) return
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentBPM === newValue) return
 
@@ -1884,7 +1893,8 @@ export class SetlistPage {
   }
 
   async handleKeyChange(newKey: string) {
-    if (!newKey || this.currentSongIndex < 0) return
+    // The key is saved in the setlist, which a user who can only read can't change
+    if (!newKey || this.currentSongIndex < 0 || isReadOnlyOrganisation()) return
 
     console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`)
 
@@ -1988,8 +1998,8 @@ export class SetlistPage {
 
     const originalKey = song.originalKey
 
-    // Reset BPM to original
-    song.currentBPM = song.metadata.tempo
+    // Reset BPM to original (it is in the setlist: not for a user who can only read it)
+    if (!isReadOnlyOrganisation()) song.currentBPM = song.metadata.tempo
 
     // Reset font size to default
     song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE

@@ -248,6 +248,8 @@ export interface Organisation {
   modifiedDate: string
   driveFolderId?: string | null
   members?: OrganisationMember[]
+  /** The user can only read the Drive folder: sync doesn't push, and nothing syncable is edited */
+  readOnly?: boolean
 }
 
 /** A person who can lead setlists: id is their Google account email (empty if only a name) */
@@ -315,6 +317,8 @@ export interface DriveFile {
   parents?: string[]
   trashed?: boolean
   appProperties?: Record<string, string>
+  /** What the user may do with it (a request for `capabilities`) */
+  capabilities?: { canEdit?: boolean; canAddChildren?: boolean }
 }
 
 /** One page of a Drive file listing */

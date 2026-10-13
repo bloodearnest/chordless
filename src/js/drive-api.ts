@@ -55,7 +55,22 @@ export interface DriveError extends Error {
 
 /** What Drive's JSON error responses say */
 interface DriveErrorBody {
-  error?: { message?: string }
+  error?: { message?: string; errors?: { reason?: string }[] }
+}
+
+let writeRefusals = 0
+
+/**
+ * How many times Drive has refused a write for lack of permission (not for a rate limit). The
+ * push code tries again, and gives up quietly, on a failed write, so sync asks this after a
+ * push to find out whether the user can only read the folder.
+ */
+export const countWriteRefusals = () => writeRefusals
+
+function noteWriteRefusal(response: Response, body: DriveErrorBody): void {
+  if (response.status === 403 && !/rate/i.test(body.error?.errors?.[0]?.reason ?? '')) {
+    writeRefusals++
+  }
 }
 
 /** A file to upload with batchUploadFiles */
@@ -104,6 +119,7 @@ export async function driveRequest<T = DriveFileList>(
     const error: DriveErrorBody = await response
       .json()
       .catch(() => ({ error: { message: response.statusText } }))
+    if (options.method && options.method !== 'GET') noteWriteRefusal(response, error)
     throw Object.assign(
       new Error(`Drive API error: ${error.error?.message || response.statusText}`),
       {
@@ -216,7 +232,6 @@ export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile
 
   const CONCURRENT_LIMIT = 30 // Upload 30 files at once
   const results: (DriveFile | null)[] = []
-
   console.log(
     `[DriveAPI] Uploading ${files.length} files with ${CONCURRENT_LIMIT} concurrent requests...`
   )
@@ -259,6 +274,7 @@ export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile
           const error: DriveErrorBody = await response
             .json()
             .catch(() => ({ error: { message: response.statusText } }))
+          noteWriteRefusal(response, error)
           throw new Error(`Upload error: ${error.error?.message || response.statusText}`)
         }
 
@@ -309,6 +325,7 @@ export async function createFile(
     const error: DriveErrorBody = await response
       .json()
       .catch(() => ({ error: { message: response.statusText } }))
+    noteWriteRefusal(response, error)
     throw new Error(`Drive upload error: ${error.error?.message || response.statusText}`)
   }
 
@@ -381,6 +398,7 @@ export async function updateFile(
     const error: DriveErrorBody = await response
       .json()
       .catch(() => ({ error: { message: response.statusText } }))
+    noteWriteRefusal(response, error)
     throw new Error(`Drive update error: ${error.error?.message || response.statusText}`)
   }
 

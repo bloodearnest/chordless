@@ -11,6 +11,7 @@ import { OrganisationDB } from './organisation-db.ts'
 
 const ORGANISATION_ID_KEY = 'current-organisation-id'
 const ORGANISATION_NAME_KEY = 'current-organisation-name'
+const ORGANISATION_READ_ONLY_KEY = 'current-organisation-read-only'
 const DEFAULT_ORGANISATION_NAME = 'Personal'
 
 let orgDB: OrganisationDB | null = null
@@ -58,6 +59,39 @@ export function getCurrentOrganisation(): { id: string | null; name: string } {
   const id = localStorage.getItem(ORGANISATION_ID_KEY)
   const name = localStorage.getItem(ORGANISATION_NAME_KEY) || DEFAULT_ORGANISATION_NAME
   return { id, name }
+}
+
+/**
+ * Whether the user can only read the current organisation's Drive folder (known after a sync
+ * has asked Drive). Then nothing that syncs is edited here: no setlist or song edits, imports
+ * or share links; the user's own state (capo, shown sections) is still kept on the device.
+ * Read from localStorage, so it can be asked at any moment.
+ */
+export function isReadOnlyOrganisation(): boolean {
+  return localStorage.getItem(ORGANISATION_READ_ONLY_KEY) === '1'
+}
+
+/** Record that the user can (or can only read) an organisation's Drive folder */
+export async function setOrganisationReadOnly(
+  organisationId: string,
+  readOnly: boolean
+): Promise<void> {
+  const db = await getOrgDB()
+  const organisation = await db.getOrganisation(organisationId)
+  if (organisation && Boolean(organisation.readOnly) !== readOnly) {
+    await db.updateOrganisation(organisationId, { readOnly })
+  }
+  if (getCurrentOrganisation().id === organisationId) {
+    const changed = isReadOnlyOrganisation() !== readOnly
+    cacheReadOnly(readOnly)
+    // So what shows edits can follow (read-only-controller.ts)
+    if (changed) window.dispatchEvent(new Event('organisation-read-only-change'))
+  }
+}
+
+function cacheReadOnly(readOnly: boolean): void {
+  if (readOnly) localStorage.setItem(ORGANISATION_READ_ONLY_KEY, '1')
+  else localStorage.removeItem(ORGANISATION_READ_ONLY_KEY)
 }
 
 let defaultOrganisationPromise: Promise<Organisation> | null = null
@@ -131,6 +165,7 @@ export async function getCurrentOrganisationFull(): Promise<Organisation> {
     console.warn('[Organisation] Stored org ID not found, creating default:', id)
     localStorage.removeItem(ORGANISATION_ID_KEY)
     localStorage.removeItem(ORGANISATION_NAME_KEY)
+    localStorage.removeItem(ORGANISATION_READ_ONLY_KEY)
   }
 
   // No current org or org not found - create/get default
@@ -153,20 +188,14 @@ export async function setCurrentOrganisation(
 ): Promise<void> {
   localStorage.setItem(ORGANISATION_ID_KEY, organisationId)
 
-  // Cache the name if provided
-  if (organisationName) {
-    localStorage.setItem(ORGANISATION_NAME_KEY, organisationName)
-  } else {
-    // Fetch the name if not provided
-    try {
-      const db = await getOrgDB()
-      const org = await db.getOrganisation(organisationId)
-      if (org) {
-        localStorage.setItem(ORGANISATION_NAME_KEY, org.name)
-      }
-    } catch (error) {
-      console.error('[Organisation] Failed to fetch org name:', error)
-    }
+  // Cache the name if provided, and whether the folder is read-only
+  if (organisationName) localStorage.setItem(ORGANISATION_NAME_KEY, organisationName)
+  try {
+    const org = await (await getOrgDB()).getOrganisation(organisationId)
+    if (org && !organisationName) localStorage.setItem(ORGANISATION_NAME_KEY, org.name)
+    cacheReadOnly(Boolean(org?.readOnly))
+  } catch (error) {
+    console.error('[Organisation] Failed to read the organisation:', error)
   }
 }
 
@@ -283,5 +312,6 @@ export async function deleteOrganisation(organisationId: string): Promise<void> 
   if (getCurrentOrganisation().id === organisationId) {
     localStorage.removeItem(ORGANISATION_ID_KEY)
     localStorage.removeItem(ORGANISATION_NAME_KEY)
+    localStorage.removeItem(ORGANISATION_READ_ONLY_KEY)
   }
 }

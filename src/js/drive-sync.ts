@@ -38,6 +38,7 @@ import {
   songFileDetails,
   songFileMetadata,
 } from './drive-metadata.ts'
+import { setOrganisationReadOnly } from './organisation.ts'
 import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
@@ -78,6 +79,8 @@ export interface FolderLink {
 /** Where the organisation's members are cached for offline use */
 export interface MemberCache {
   set(members: OrganisationMember[]): Promise<void>
+  /** Record whether the user can only read the folder (so the app stops offering edits) */
+  setReadOnly?(readOnly: boolean): Promise<void>
 }
 
 export interface DriveSyncOptions {
@@ -175,6 +178,7 @@ function organisationMemberCache(organisationId: string): MemberCache {
       await db.init()
       await db.updateOrganisation(organisationId, { members })
     },
+    setReadOnly: readOnly => setOrganisationReadOnly(organisationId, readOnly),
   }
 }
 
@@ -197,6 +201,8 @@ export class DriveSyncManager {
   _liveSetlistFiles: DriveFile[] | null
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   _pullIncomplete: boolean
+  /** Whether the user can only read the folder, as the last check found (null: not asked) */
+  readOnly: boolean | null
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -227,6 +233,7 @@ export class DriveSyncManager {
     this._driveFileIds = null // Set of file IDs that exist in Drive
     this._liveSetlistFiles = null
     this._pullIncomplete = false
+    this.readOnly = null
   }
 
   /** The database, once init() has set it */
@@ -374,6 +381,7 @@ export class DriveSyncManager {
     try {
       // Who the organisation's folder is shared with, for choosing leaders
       await this.refreshMembers()
+      await this.refreshAccess()
 
       // Before changing anything, check local records belong to this folder
       if (progressCallback)
@@ -398,13 +406,25 @@ export class DriveSyncManager {
 
       // Share links: update the live ones and end the finished ones, which changes setlists,
       // so before they are pushed
-      await this.syncShares()
+      // Then, push local changes (a user who can only read has none to push). If the access
+      // check could not be made, a refusal to upload is how a reader is found out
+      try {
+        if (!this.readOnly) await this.syncShares()
+        if (!this.readOnly) {
+          if (progressCallback)
+            progressCallback({ stage: 'pushing', message: 'Uploading to Drive...' })
+          await this.pushToDrive(progressCallback)
+        }
+      } catch (error) {
+        if (!(await this.foundToBeReadOnly())) throw error
+      }
 
-      // Then, push local changes
-      if (progressCallback) progressCallback({ stage: 'pushing', message: 'Uploading to Drive...' })
-      await this.pushToDrive(progressCallback)
-
-      if (progressCallback) progressCallback({ stage: 'complete', message: 'Sync complete!' })
+      if (progressCallback) {
+        progressCallback({
+          stage: 'complete',
+          message: this.readOnly ? 'Sync complete (view-only: nothing uploaded)' : 'Sync complete!',
+        })
+      }
 
       console.log('[DriveSync] Full sync complete')
       return { success: true }
@@ -423,6 +443,7 @@ export class DriveSyncManager {
       this._driveFileIds = null
       this._liveSetlistFiles = null
       this._pullIncomplete = false
+      this.readOnly = null
     }
   }
 
@@ -501,6 +522,42 @@ export class DriveSyncManager {
       console.warn('[DriveSync] Could not refresh organisation members:', error)
       return null
     }
+  }
+
+  /**
+   * Ask Drive whether the user can add files to the organisation's folder, and remember it
+   * (on the organisation, so the app can stop offering edits that could never sync). If Drive
+   * can't be asked, the user is taken to have write access, as before: nothing changes.
+   * @returns whether the user can only read the folder
+   */
+  async refreshAccess(): Promise<boolean> {
+    let canAdd: boolean | undefined
+    try {
+      const folder = await DriveAPI.getFile(this.#folderId, 'id,capabilities')
+      canAdd = folder?.capabilities?.canAddChildren
+    } catch (error) {
+      console.warn('[DriveSync] Could not check access to the organisation folder:', error)
+    }
+    this.readOnly = canAdd === false
+    if (canAdd !== undefined) {
+      try {
+        await this.#memberCache.setReadOnly?.(this.readOnly)
+      } catch (error) {
+        console.warn('[DriveSync] Could not record the access to the organisation folder:', error)
+      }
+    }
+    return this.readOnly
+  }
+
+  /**
+   * After a write failed: ask again whether the user can only read the folder, and say so.
+   * A reader whose first check couldn't be made is found out by their refused upload. (Any
+   * failure asks, but only an answer from Drive that says read-only counts.)
+   */
+  async foundToBeReadOnly(): Promise<boolean> {
+    const readOnly = await this.refreshAccess()
+    if (readOnly) console.log('[DriveSync] Writing was refused: the user can only read the folder')
+    return readOnly
   }
 
   /**
@@ -1193,6 +1250,22 @@ export class DriveSyncManager {
    * Push local changes to Drive
    */
   async pushToDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
+    if (this.readOnly ?? (await this.refreshAccess())) {
+      console.log('[DriveSync] View-only access: nothing to push')
+      return
+    }
+    const refusals = DriveAPI.countWriteRefusals()
+    try {
+      await this.#pushAll(progressCallback)
+    } catch (error) {
+      if (!(await this.foundToBeReadOnly())) throw error
+      return
+    }
+    // Writes that failed were tried again and left for the next sync: were they refused?
+    if (DriveAPI.countWriteRefusals() > refusals) await this.foundToBeReadOnly()
+  }
+
+  async #pushAll(progressCallback: ProgressCallback | null): Promise<void> {
     console.log('[DriveSync] Pushing to Drive...')
 
     // Build inventory of existing Drive files

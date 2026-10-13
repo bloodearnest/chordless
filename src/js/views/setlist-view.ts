@@ -12,6 +12,7 @@ import '../../components/song-display.ts'
 import '../../components/song-info-dialog.ts'
 import '../../components/song-section.ts'
 import '../../components/song-settings-popover.ts'
+import { isReadOnlyOrganisation } from '../organisation.ts'
 import { SetlistPage } from '../setlist-page.ts'
 import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
@@ -183,7 +184,7 @@ export class SetlistView extends PageView {
   }
 
   override render() {
-    return setlistTemplate({ editable: true, shareable: true })
+    return setlistTemplate({ editable: true, shareable: !isReadOnlyOrganisation() })
   }
 }
 customElements.define('setlist-view', SetlistView)

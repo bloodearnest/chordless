@@ -39,6 +39,10 @@ await router.start()
 startMediaPlayer()
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
+// Whether the user can write to the organisation's Drive folder (a sync asks too)
+import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>
+  refreshOrganisationAccess()
+)
 void appUpdate.start()
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()

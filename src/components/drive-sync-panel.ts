@@ -2,7 +2,7 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.ts'
-import { getCurrentOrganisation } from '../js/organisation.ts'
+import { getCurrentOrganisation, isReadOnlyOrganisation } from '../js/organisation.ts'
 import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -233,7 +233,12 @@ export class DriveSyncPanel extends LitElement {
       localStorage.setItem('last-sync-time', now)
 
       // Show success briefly
-      this.syncProgress = { stage: 'success', message: '✓ Sync complete!' }
+      this.syncProgress = {
+        stage: 'success',
+        message: isReadOnlyOrganisation()
+          ? '✓ Sync complete (view-only access: nothing is uploaded)'
+          : '✓ Sync complete!',
+      }
       setTimeout(() => {
         this.syncing = false
         this.syncProgress = null

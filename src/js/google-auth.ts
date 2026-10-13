@@ -260,6 +260,11 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
             metadata,
           })
 
+          // A new sign-in may be a different account, with different access to the folder
+          import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>
+            refreshOrganisationAccess()
+          )
+
           resolve({ blob, access_token, expires_in, user: normalizedUser || user })
         } catch (error) {
           reject(error)

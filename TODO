@@ -109,7 +109,8 @@ storage/sync
 - setlist-page.js and views/home-view.js still report save/add/delete failures with alert():
   give pages a non-blocking message (toast) instead. (The bookmarklet's alerts stay: they
   show on SongSelect, where Chordless has no UI.)
-- edit chordpro/variants
+- read-only organisations (built; see docs/SYNC_ARCHITECTURE.md): still to do: try it with a real reader account
+- variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
@@ -195,13 +196,14 @@ sharing
   rights. This breaks the "never mixed into a library" rule in docs/SHARING.md, so update
   that when it's built. Not part of the first version.
 - email media team
-- invite people to an organisation: a dialog to share the org's Drive folder with an
-  email address, as read (musicians) or write (leaders) access. The leader dropdown
-  already lists the folder's members (cached at sync).
-- shared users' devices can't find the org folder yet: the app only has the drive.file
-  scope, which only covers files the app created for that user. Needs the Google Picker
-  (user picks the folder once) or a wider scope. See docs/SHARING.md and the worker's
-  /session/invite endpoint.
+- invite people to an organisation: DESIGNED, not built (docs/SHARING.md, "inviting people to
+  an organisation"). drive.file can't see a folder someone else made (tested), so the Worker
+  brokers the owner's token for invited members, with reader/writer roles enforced there;
+  succession by copying; the owner may pick where the folder lives (Picker, shared drives).
+  Also "copy to organisation": from any organisation to any other (e.g. my personal library
+  to the Workspace shared folder), run from the local copy; doubles as succession.
+  First step: prove a second user can read the owner's folder through a Worker route.
+  The leader dropdown already lists the folder's members (cached at sync).
 - restrict editing others' setlists, using the setlist's ownerId? (leader's Google email)
 
 player

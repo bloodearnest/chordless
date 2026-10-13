@@ -47,6 +47,7 @@ export class FakeDrive {
 
   corruptUploads: number
 
+  readOnly: boolean
   _failures: any
 
   errors: any
@@ -61,6 +62,8 @@ export class FakeDrive {
     this.clockOffsetMs = 0
     /** Largest page a list request returns (real Drive: 1000) */
     this.maxPageSize = 1000
+    /** The user can only read: every change is refused (403), and capabilities say so */
+    this.readOnly = false
     this._nextId = 1
     this.corruptUploads = 0
     this._failures = []
@@ -177,6 +180,11 @@ export class FakeDrive {
 
     if (request.headers.get('Authorization') !== `Bearer ${VALID_TOKEN}`) {
       return json({ error: { code: 401, message: 'Invalid Credentials' } }, 401)
+    }
+
+    if (this.readOnly && method !== 'GET' && method !== 'HEAD') {
+      this.requests.push({ method, path, params, failed: 403 })
+      return json({ error: { code: 403, message: 'The user does not have write access' } }, 403)
     }
 
     const bytes =
@@ -385,7 +393,9 @@ export class FakeDrive {
     const names = fields ? fields.split(',').map(s => s.trim()) : DEFAULT_FILE_FIELDS
     const out: any = {}
     for (const name of names) {
-      if (name === 'size') out.size = String(file.content?.length ?? 0)
+      if (name === 'capabilities') {
+        out.capabilities = { canEdit: !this.readOnly, canAddChildren: !this.readOnly }
+      } else if (name === 'size') out.size = String(file.content?.length ?? 0)
       else if (file[name] !== undefined && name !== 'content')
         out[name] = structuredClone(file[name])
     }

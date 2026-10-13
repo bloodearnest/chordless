@@ -174,6 +174,39 @@ leader typed in by name with "Other…"). The Leader dropdown lists the organisa
 folder's members (cached at sync) plus the signed-in user, who is the default for new
 setlists.
 
+### Read-only access
+
+A user the folder is shared with as a reader (or commenter) can pull but not push. It is asked
+at every `sync()`, when the app starts, and after a Google sign-in (`refreshOrganisationAccess()`,
+src/js/organisation-access.ts; an organisation switch reloads the app, and the flag is read from
+the organisation's record). A failure never makes anyone read-only. `refreshAccess()` asks Drive for the folder's `capabilities`; if
+`canAddChildren` is false the user is read-only. The result is kept on the organisation record
+(`readOnly`) and in localStorage (`isReadOnlyOrganisation()`, for the UI to ask at any moment).
+
+A read-only sync pulls, then stops: no share-link upkeep, no push (`pushToDrive` checks too, so
+the direct push path is covered), and it ends as "Sync complete (view-only ...)", not as an
+error. If Drive can't be asked, the user is taken to have write access, as before: failing closed
+would lock every writer out whenever they are offline. A reader whose check failed is found out
+by the push: when Drive refuses an upload for lack of permission (a 403 that isn't a rate limit;
+`countWriteRefusals()` in drive-api.ts, since the push code retries and gives up quietly on a
+failed write), `foundToBeReadOnly()` asks again and, if the answer is read-only, records it and
+ends the sync as view-only.
+
+The UI follows: nothing that changes what syncs is offered, and what stays on the device is.
+- Kept on the device, so still allowed: the capo, and which sections, chords and lyrics are
+  shown. They are in the organisation's database but not synced (the `setlist_local` store, and
+  the per-song preferences in localStorage), so a pull doesn't touch them.
+- Changes to the setlist, which sync, are not allowed: no edit mode on the setlist overview
+  (adding, removing and reordering songs, their keys), no key or BPM change on a song (the key
+  selector and the BPM buttons are locked, and `handleKeyChange` / `handleBPMChange` refuse),
+  no setlist details edit or delete, no new setlist, no share button. In the song library, the
+  key is not editable (it is saved on the song); no import menu items (the import page says
+  why) and no "Add to my library". Setlist and song edits are the ones a pull would drop, which
+  is why they are blocked rather than kept. Songs already on the device stay.
+- The controls follow a change at once (views, the menu and the song page re-render on
+  `organisation-read-only-change`; the setlist page's own header and popover on the next song
+  or page).
+
 ### Reset from Google Drive
 
 Storage page, only when sync is set up. Replaces the device's setlists, songs and
@@ -375,10 +408,8 @@ backstop.
   Background Sync has the same platform limits.
 - **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
   ideally merge setlist field changes.
-- **Restricting edits to a setlist's owner** (`ownerId`), and an **invite dialog** to
-  share the organisation folder as read (musicians) or write (leaders). Shared users'
-  devices can't find the folder yet: the app's `drive.file` scope only covers files
-  it created for that user, so this needs the Google Picker or a wider scope. See
-  SHARING.md and the worker's `/session/invite`.
+- **Restricting edits to a setlist's owner** (`ownerId`).
+- **Inviting people to an organisation:** shared users can't see the folder under
+  `drive.file`; the design (the Worker brokers the owner's access) is in SHARING.md.
 - **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
 - **Real Drive integration tests** (see Tests above).

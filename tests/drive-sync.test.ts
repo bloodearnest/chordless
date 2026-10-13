@@ -54,8 +54,12 @@ describe('Drive sync (against FakeDrive)', () => {
     await db.init()
     const memberCache = {
       value: null,
+      readOnly: null as boolean | null,
       async set(members) {
         this.value = members
+      },
+      async setReadOnly(readOnly: boolean) {
+        this.readOnly = readOnly
       },
     }
     const sync = new DriveSyncManager(orgName, ORG_ID, { db, folderLink, memberCache })
@@ -973,6 +977,77 @@ describe('Drive sync (against FakeDrive)', () => {
 
       expect(driveSetlist(setlist.id).name).to.equal('Synced anyway')
       expect(phone.memberCache.value).to.equal(null)
+    })
+  })
+
+  describe('a user who can only read the folder', () => {
+    const writes = () => drive.requests.filter(r => r.method !== 'GET' && r.method !== 'HEAD')
+
+    it('downloads what is in Drive, uploads nothing, and does not fail', async () => {
+      const leader = await makeDevice('leader')
+      const setlist = await addSetlist(leader, { name: 'Sunday' })
+      await syncDevice(leader)
+
+      drive.readOnly = true
+      const member = await makeDevice('member')
+      const local = await addSetlist(member, { name: 'Only here' })
+      drive.requests.length = 0
+      await syncDevice(member)
+
+      expect(await member.db.getSetlist(setlist.id)).to.include({ name: 'Sunday' })
+      expect(writes()).to.deep.equal([])
+      expect(driveSetlistFiles().map(file => JSON.parse(file.content).name)).to.deep.equal([
+        'Sunday',
+      ])
+      expect(member.memberCache.readOnly).to.equal(true)
+      // Kept on the device
+      expect(must(await member.db.getSetlist(local.id)).name).to.equal('Only here')
+    })
+
+    it('does not push when asked to push directly either', async () => {
+      const member = await makeDevice('member')
+      await addSetlist(member, { name: 'Only here' })
+      drive.readOnly = true
+      drive.requests.length = 0
+      await member.sync.pushToDrive()
+      expect(writes()).to.deep.equal([])
+    })
+
+    it('is found out by a refused upload when the first check could not be made', async () => {
+      const member = await makeDevice('member')
+      const local = await addSetlist(member, { name: 'Only here' })
+      drive.readOnly = true
+      drive.requests.length = 0
+      // The check fails once, so the sync goes ahead and tries to upload
+      drive.failRequests({ method: 'GET', path: /capabilities/, times: 1 })
+      await syncDevice(member)
+
+      expect(writes().length).to.be.greaterThan(0)
+      expect(writes().every(request => request.failed === 403)).to.equal(true)
+      expect(member.memberCache.readOnly).to.equal(true)
+      expect(driveSetlistFiles()).to.have.length(0)
+      expect(must(await member.db.getSetlist(local.id)).name).to.equal('Only here')
+    })
+
+    it('does not take a failing upload for a reader', async () => {
+      const member = await makeDevice('member')
+      await addSetlist(member, { name: 'Writer' })
+      drive.failRequests({ method: 'POST', path: /^\/upload\//, status: 500, times: 50 })
+      await syncDevice(member)
+      expect(member.memberCache.readOnly).to.equal(false)
+    })
+
+    it('uploads again once the user is given write access', async () => {
+      const member = await makeDevice('member')
+      const local = await addSetlist(member, { name: 'Waiting' })
+      drive.readOnly = true
+      await syncDevice(member)
+      expect(driveSetlistFiles()).to.have.length(0)
+
+      drive.readOnly = false
+      await syncDevice(member)
+      expect(driveSetlist(local.id).name).to.equal('Waiting')
+      expect(member.memberCache.readOnly).to.equal(false)
     })
   })
 

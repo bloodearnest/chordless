@@ -34,12 +34,15 @@ export class SongSettingsPopover extends LitElement {
     bpmValue: { type: Number, attribute: 'bpm-value' },
     bpmMin: { type: Number, attribute: 'bpm-min' },
     bpmMax: { type: Number, attribute: 'bpm-max' },
+    bpmLocked: { type: Boolean, attribute: 'bpm-locked' },
   }
 
   declare popoverId: string
   declare bpmValue: number
   declare bpmMin: number
   declare bpmMax: number
+  /** The BPM can't be changed (it is part of the setlist, which this user can't edit) */
+  declare bpmLocked: boolean
 
   _popup: DialogPopup
   triggerButton: HTMLElement | null
@@ -155,6 +158,7 @@ export class SongSettingsPopover extends LitElement {
     this.bpmValue = 120
     this.bpmMin = 40
     this.bpmMax = 240
+    this.bpmLocked = false
   }
 
   /** The <dialog> (once rendered) */
@@ -232,7 +236,7 @@ export class SongSettingsPopover extends LitElement {
           <button
             class="control-button"
             @click=${this._handleBPMDecrement}
-            ?disabled=${!canDecrementBPM}
+            ?disabled=${this.bpmLocked || !canDecrementBPM}
             aria-label="Decrease BPM"
             type="button"
           >
@@ -242,7 +246,7 @@ export class SongSettingsPopover extends LitElement {
           <button
             class="control-button"
             @click=${this._handleBPMIncrement}
-            ?disabled=${!canIncrementBPM}
+            ?disabled=${this.bpmLocked || !canIncrementBPM}
             aria-label="Increase BPM"
             type="button"
           >
