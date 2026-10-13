@@ -7,6 +7,12 @@ compatibility_flags = ["nodejs_compat"]
 # domain must not be attached to another Pages project or worker first.
 routes = [{ pattern = "chordless.app", custom_domain = true }]
 
+# Worker logs in the dashboard (Workers > chordless > Logs). The email handler logs only
+# errors, never the email's content.
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 [assets]
 directory = "src"
 not_found_handling = "single-page-application"

@@ -15,11 +15,10 @@ const bytes = (buffer: Buffer) =>
   buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
 
 test('an email with a list of songs is answered with a link that holds them', async () => {
-  const { subject, body } = await answerFor(
+  const { text: body, html } = await answerFor(
     bytes(email('Sunday 25th October', ['1. Alpha Song in G', '2. Brand New Song in D'], [PDF])),
     'https://chordless.test'
   )
-  assert.match(subject, /Sunday 25th October/)
   const link = body.match(/https:\/\/chordless\.test\/import-setlist#[\w-]+/)?.[0]
   assert.ok(link, body)
   const setlist = await decodeImport(new URL(link).hash)
@@ -32,15 +31,29 @@ test('an email with a list of songs is answered with a link that holds them', as
   )
   assert.equal(setlist.leader.email, 'one@example.com')
   assert.ok(!body.includes('%PDF'), 'no chart in the reply')
+  // The details and the songs are in both versions
+  for (const version of [body, html]) {
+    assert.match(version, /Sunday 25th October/)
+    assert.match(version, /2026-10-25/)
+    assert.match(version, /Leader One/)
+    assert.match(version, /Alpha Song \(G\)/)
+    assert.match(version, /Brand New Song \(D\)/)
+  }
+  // The long link is behind words, with a short one to see
+  assert.match(
+    html,
+    /<a href="https:\/\/chordless\.test\/import-setlist#[\w-]+"[^>]*>Review and create/
+  )
+  assert.match(html, />chordless\.test\/import-setlist#…<\/a>/)
 })
 
 test('an email with no songs, or no email at all, is answered with why', async () => {
   const none = await answerFor(bytes(email('Hello', [])), 'https://chordless.test')
-  assert.match(none.subject, /No songs/)
-  assert.ok(!none.body.includes('import-setlist#'))
+  assert.match(none.text, /could not find a list of songs/)
+  assert.ok(!none.text.includes('import-setlist#') && !none.html.includes('import-setlist#'))
   const broken = await answerFor(new TextEncoder().encode('\u0000\u0001').buffer, 'https://x.test')
-  assert.ok(broken.subject)
-  assert.ok(!broken.body.includes('import-setlist#'))
+  assert.match(broken.text, /could not (find a list of songs|read that email)/)
+  assert.ok(!broken.text.includes('import-setlist#'))
 })
 
 test('the reply goes to the sender, in reply to their email', async () => {
@@ -51,7 +64,16 @@ test('the reply goes to the sender, in reply to their email', async () => {
     to: 'import@chordless.test',
     rawSize: raw.length,
     raw: new Response(raw).body as ReadableStream<Uint8Array>,
-    headers: { get: name => (name === 'Message-ID' ? '<abc@example.com>' : null) },
+    headers: {
+      get: name =>
+        name === 'Subject'
+          ? 'Fwd: Fwd: Sunday 25th October'
+          : name === 'Message-ID'
+            ? '<abc@example.com>'
+            : name === 'References'
+              ? '<one@example.com> <two@example.com>'
+              : null,
+    },
     reply: async reply => {
       sent = reply
     },
@@ -69,7 +91,14 @@ test('the reply goes to the sender, in reply to their email', async () => {
   assert.ok(made)
   const text = (made as { raw: string }).raw
   assert.match(text, /^To: sender@example\.com/m)
+  assert.match(
+    text,
+    /^Subject: Re: Sunday 25th October\r?$/m,
+    'the conversation it was forwarded from'
+  )
   assert.match(text, /^In-Reply-To: <abc@example\.com>/m)
+  // Cloudflare's rule: the email's own References, then its Message-ID
+  assert.match(text, /^References: <one@example\.com> <two@example\.com> <abc@example\.com>\r?$/m)
   assert.match(text, /^From: Chordless <import@chordless\.test>/m)
 })
 
@@ -98,7 +127,8 @@ test('a subject cannot add headers to the reply', () => {
     to: 'b@x.test',
     subject: 'Hi\r\nBcc: evil@x.test',
     inReplyTo: null,
-    body: 'é',
+    references: null,
+    answer: { text: 'é', html: '<p>é</p>' },
   })
   assert.ok(!/^Bcc:/m.test(text))
 })

@@ -16,6 +16,7 @@ import {
   libraryForMatching,
   type ReviewedSong,
 } from '../js/import-setlist.ts'
+import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { goTo } from '../js/navigation.ts'
 import { getOrganisationPeople } from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
@@ -178,6 +179,7 @@ export class SetlistEmailImport extends LitElement {
     document.addEventListener('visibilitychange', this._onReturn)
     window.addEventListener('focus', this._onReturn)
     window.addEventListener('hashchange', this._onHash)
+    window.addEventListener(IncomingLinkEvent.type, this._onLink)
     void this._restore()
   }
 
@@ -185,7 +187,14 @@ export class SetlistEmailImport extends LitElement {
     document.removeEventListener('visibilitychange', this._onReturn)
     window.removeEventListener('focus', this._onReturn)
     window.removeEventListener('hashchange', this._onHash)
+    window.removeEventListener(IncomingLinkEvent.type, this._onLink)
     super.disconnectedCallback()
+  }
+
+  /** A link the installed app was launched with while this page is open */
+  _onLink = (): void => {
+    const fragment = takeLink()
+    if (fragment) void this._openLink(fragment)
   }
 
   /** A link opened in a tab that is already on this page */
@@ -197,8 +206,9 @@ export class SetlistEmailImport extends LitElement {
 
   /** The email reviewed before a reload or a trip to SongSelect, if the person left one */
   async _restore(): Promise<void> {
+    // The installed app is given the link's fragment (launch.ts); a tab keeps it in the address
     // biome-ignore lint/plugin: the setlist is the link's fragment (not a route)
-    const fragment = location.hash
+    const fragment = takeLink() ?? location.hash
     if (fragment.length > 1 && (await this._openLink(fragment))) return
     try {
       const text = sessionStorage.getItem(KEPT)

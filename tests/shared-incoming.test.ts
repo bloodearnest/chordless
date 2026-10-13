@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { takeLink } from '../src/js/incoming-link.ts'
 import { IncomingSongsEvent, offerIncoming, takeIncoming } from '../src/js/incoming-songs.ts'
 import { handleLaunch } from '../src/js/launch.ts'
 import { SHARED_CACHE_NAME, storeShared, takeShared } from '../src/js/shared-incoming.ts'
@@ -99,5 +100,15 @@ describe('launching the installed app', () => {
     await handleLaunch({ targetURL: location.href }, go)
     await handleLaunch({ targetURL: 'https://elsewhere.example/songs' }, go)
     expect(wentTo).to.deep.equal([])
+  })
+
+  it('keeps the setlist in a link from the email Worker, which a route would drop', async () => {
+    const wentTo: string[] = []
+    await handleLaunch({ targetURL: `${location.origin}/import-setlist#abc-123` }, async url => {
+      wentTo.push(url)
+    })
+    expect(wentTo).to.deep.equal(['/import-setlist'])
+    expect(takeLink()).to.equal('#abc-123')
+    expect(takeLink()).to.equal(null)
   })
 })

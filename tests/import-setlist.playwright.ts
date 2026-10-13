@@ -303,6 +303,15 @@ test('a link from the email Worker opens the review, and a reload keeps it', asy
   await page.reload()
   await expect(songsList(page)).toHaveCount(2)
 
+  // The installed app is launched with the link: the fragment is handed over, even to an open page
+  await page.getByRole('button', { name: 'Choose a different email' }).click()
+  await expect(page.locator('#email-file')).toBeVisible()
+  await page.evaluate(async fragment => {
+    const { offerLink } = await import('/js/incoming-link.ts')
+    offerLink(`#${fragment}`)
+  }, fragment)
+  await expect(songsList(page)).toHaveCount(2)
+
   await page.getByRole('button', { name: 'Choose a different email' }).click()
   await page.goto('/import-setlist#not-a-link')
   await expect(page.getByRole('alert')).toContainText('Could not read that link')

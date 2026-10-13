@@ -1,3 +1,4 @@
+import { offerLink } from './incoming-link.ts'
 import { offerIncoming } from './incoming-songs.ts'
 import { goTo } from './navigation.ts'
 
@@ -35,6 +36,10 @@ export async function handleLaunch(
   // A link or shortcut for the window that is open: go there (unless already there)
   if (params.targetURL) {
     const target = new URL(params.targetURL, location.href)
+    // A setlist link from the email Worker holds the setlist in its fragment, which routes drop
+    if (target.origin === location.origin && target.pathname === '/import-setlist' && target.hash) {
+      offerLink(target.hash)
+    }
     if (
       target.origin === location.origin &&
       target.pathname + target.search !== location.pathname + location.search
