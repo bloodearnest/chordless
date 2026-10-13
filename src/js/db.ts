@@ -868,6 +868,7 @@ export function createSetlist({
   name,
   owner,
   ownerId,
+  createdBy,
 }: {
   date?: string | Date
   time?: string
@@ -875,6 +876,8 @@ export function createSetlist({
   name?: string
   owner?: string
   ownerId?: string
+  /** Who made it (see Setlist.createdBy) */
+  createdBy?: string
 } = {}): Setlist {
   const setlistDate = date || getNextSunday()
   const dateString = typeof setlistDate === 'string' ? setlistDate : toLocalDateString(setlistDate)
@@ -888,6 +891,7 @@ export function createSetlist({
     owner: owner || '',
     // Leader's Google account email (empty for a leader known only by name)
     ownerId: ownerId || '',
+    ...(createdBy ? { createdBy } : {}),
     songs: [],
     createdDate: new Date().toISOString(),
     modifiedDate: new Date().toISOString(),

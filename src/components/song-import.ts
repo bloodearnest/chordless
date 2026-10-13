@@ -5,7 +5,7 @@ import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { ChordProParser } from '../js/parser.ts'
-import { getOrganisationPeople } from '../js/people.ts'
+import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -550,7 +550,10 @@ export class SongImport extends LitElement {
 
   async _createSetlist(event: SetlistDetailsSaveEvent): Promise<void> {
     event.stopPropagation()
-    const setlist = createSetlist(event.details)
+    const setlist = createSetlist({
+      ...event.details,
+      createdBy: (await getCurrentPerson())?.id,
+    })
     try {
       await this._database().saveSetlist(setlist)
       console.log('[Import] Created new setlist:', setlist.id)

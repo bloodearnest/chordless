@@ -212,7 +212,8 @@ ccli import
   Still to build: matching songs against the other databases too (other-songs.ts: "Shared with
   me" and other organisations); an existing setlist for the same date and leader (the review page
   only points it out now: offer to update it, and show the changes); other ways in than picking an .eml (Share To); a
-  createdBy field (an imported setlist's owner is the leader, so the importer cannot delete it;
+  use of the createdBy field (recorded now; an imported setlist's owner is the leader, so the
+  importer could not delete it under the owner rule: allow the owner or the creator;
   docs/SYNC_ARCHITECTURE.md).
 - email import, a rule: the PDFs are never imported as charts. They are read only for their title,
   key, tempo and CCLI number (src/js/pdf-text.ts). A song that is not in the library (by CCLI

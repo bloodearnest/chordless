@@ -285,9 +285,12 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
   (`getCurrentPerson()` in `people.js`, case-insensitive). Not signed in: no button.
 - Caveat until edit restrictions exist: anyone can change a setlist's leader to
   themselves first, so this guards against mistakes, not abuse.
-- Open question: owner currently means leader. A setlist created in error with
-  someone else as leader can't be deleted by its creator without changing the leader
-  first. A separate `createdBy` may be worth adding.
+- Owner means leader. A setlist created in error with someone else as leader (an imported
+  one, whose leader is named in the email) can't be deleted by its creator without changing
+  the leader first. So `Setlist.createdBy` (the maker's Google email) is recorded at
+  creation, from the new-setlist form, the song import and the email import. Nothing decides
+  by it yet: the delete rule above is the intended one, and would allow the owner or the
+  creator. Setlists made before it was added have none.
 
 #### Local effect
 

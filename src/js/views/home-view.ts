@@ -18,7 +18,7 @@ import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { getCurrentOrganisation, isReadOnlyOrganisation } from '../organisation.ts'
-import { claimSetlistsOnce, getOrganisationPeople } from '../people.ts'
+import { claimSetlistsOnce, getCurrentPerson, getOrganisationPeople } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -128,7 +128,10 @@ export class HomeView extends PageView {
 
   async #create(event: SetlistDetailsSaveEvent): Promise<void> {
     try {
-      const newSetlist = createSetlist(event.details)
+      const newSetlist = createSetlist({
+        ...event.details,
+        createdBy: (await getCurrentPerson())?.id,
+      })
       await (await getCurrentDB()).saveSetlist(newSetlist)
       this.#modal.value?.close()
       await goTo(`/setlist/${newSetlist.id}`)

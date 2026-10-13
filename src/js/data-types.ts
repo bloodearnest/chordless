@@ -203,6 +203,12 @@ export interface Setlist {
   owner: string
   /** The leader's Google account email (empty for a leader known only by name) */
   ownerId?: string
+  /**
+   * Who made the setlist in Chordless (their Google account email), where known. It is not the
+   * leader: an imported setlist's owner is the leader named in the email, and this is whoever
+   * imported it. Kept so that a setlist can be traced to its maker; nothing decides by it yet.
+   */
+  createdBy?: string
   songs: SetlistEntry[]
   /** Set while the setlist is shared by link */
   share?: SetlistShare | null

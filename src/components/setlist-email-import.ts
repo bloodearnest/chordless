@@ -23,7 +23,7 @@ import {
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { goTo } from '../js/navigation.ts'
 import { getSongsElsewhere } from '../js/other-songs.ts'
-import { getOrganisationPeople } from '../js/people.ts'
+import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -478,7 +478,11 @@ export class SetlistEmailImport extends LitElement {
       const existing = this._updating()
       const setlist = existing
         ? await updateImportedSetlist(this._db, existing, reviewed, this._keepIds)
-        : await createImportedSetlist(this._db, details ?? this._setlist, reviewed)
+        : await createImportedSetlist(
+            this._db,
+            { ...(details ?? this._setlist), createdBy: (await getCurrentPerson())?.id },
+            reviewed
+          )
       console.log('[EmailImport] Saved setlist', setlist.id, 'with', chosen.length, 'songs')
       this._forget()
       const url = `/setlist/${setlist.id}`

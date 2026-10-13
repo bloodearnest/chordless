@@ -28,6 +28,17 @@ describe('ChordlessDB', () => {
     }
   })
 
+  it('records who made a setlist, apart from its leader, only when it is known', () => {
+    const made = createSetlist({
+      owner: 'Leader',
+      ownerId: 'leader@example.com',
+      createdBy: 'me@example.com',
+    })
+    expect(made.createdBy).to.equal('me@example.com')
+    expect(made.ownerId).to.equal('leader@example.com')
+    expect('createdBy' in createSetlist({ owner: 'Leader' })).to.equal(false)
+  })
+
   it('saves and retrieves setlist', async () => {
     const orgName = `TEST-${uniqueName()}`
     db = new ChordlessDB(orgName)
