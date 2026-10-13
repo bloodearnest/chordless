@@ -2,7 +2,8 @@
  * Song User Preferences Module
  *
  * Manages per-user, per-song preferences that are NOT synced.
- * These are personal defaults for capo and section visibility.
+ * These are personal defaults for capo, section visibility, and the media player (double
+ * click, pad set).
  *
  * Storage: localStorage per organisation
  * Key format: 'song-prefs-${orgId}'
@@ -25,7 +26,14 @@ import type { SectionState } from './data-types.ts'
 export interface SongUserPrefs {
   capo?: number
   sectionDefaults?: Record<string, SectionState>
+  /** The click twice per beat: true or false is this song's own choice; absent, by its tempo */
+  doubleClick?: boolean
+  /** The id of the pad set this song uses; absent, the one chosen for the device */
+  padSetId?: string
 }
+
+/** What the media player takes from a song's preferences */
+export type SongMediaPrefs = Pick<SongUserPrefs, 'doubleClick' | 'padSetId'>
 
 /**
  * Get user preferences for a specific song
@@ -69,6 +77,35 @@ export function saveSongUserPrefs(songId: string, orgId: string, prefs: SongUser
 
     localStorage.setItem(key, JSON.stringify(allPrefs))
     console.log('[SongUserPrefs] Saved preferences for song:', songId, prefs)
+  } catch (error) {
+    console.error('[SongUserPrefs] Error saving preferences:', error)
+  }
+}
+
+/**
+ * Set or clear one preference of a song. `undefined` clears it (back to the default), and a
+ * song left with no preferences is dropped.
+ */
+export function setSongUserPref<K extends keyof SongUserPrefs>(
+  songId: string,
+  orgId: string,
+  name: K,
+  value: SongUserPrefs[K] | undefined
+) {
+  if (!songId || !orgId) return
+  const prefs = { ...getSongUserPrefs(songId, orgId) }
+  if (value === undefined) delete prefs[name]
+  else prefs[name] = value
+  if (Object.keys(prefs).length === 0) {
+    clearSongUserPrefs(songId, orgId)
+    return
+  }
+  // saveSongUserPrefs merges, so a cleared preference has to go the long way round
+  try {
+    const key = `song-prefs-${orgId}`
+    const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
+    allPrefs[songId] = prefs
+    localStorage.setItem(key, JSON.stringify(allPrefs))
   } catch (error) {
     console.error('[SongUserPrefs] Error saving preferences:', error)
   }

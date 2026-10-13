@@ -3,11 +3,22 @@ import { css, html, LitElement } from 'lit'
 import './help-tooltip.ts'
 import './app-modal.ts'
 import './icon.ts'
-import { SongChangeEvent } from '../js/app-events.ts'
-import { loadMediaSettings, type MediaSettings } from '../js/media-settings.ts'
+import { DoubleClickToggleEvent, SongChangeEvent } from '../js/app-events.ts'
+import { RouteChangeEvent } from '../js/app-router.ts'
+import {
+  DEFAULT_DOUBLE_CLICK_BELOW_BPM,
+  loadMediaSettings,
+  type MediaSettings,
+  wantsDoubleClick,
+} from '../js/media-settings.ts'
 import { MetronomeController } from '../js/metronome-controller.ts'
 import { PadAudioController } from '../js/pad-audio-controller.ts'
-import { getActivePadSet, type PadSet, PadSetChangedEvent } from '../js/pad-set-service.ts'
+import {
+  getActivePadSet,
+  listPadSets,
+  type PadSet,
+  PadSetChangedEvent,
+} from '../js/pad-set-service.ts'
 import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.ts'
 import { MediaSettingsChangeEvent } from './media-player-settings.ts'
 
@@ -56,12 +67,15 @@ export class MediaPlayer extends LitElement {
     _currentBpm: { state: true },
     _currentTempoNote: { state: true },
     _currentTimeSignature: { state: true },
+    _currentDoubleClick: { state: true }, // This user's choice for the song: true, false or undefined (by tempo)
+    _currentPadSetId: { state: true }, // This user's pad set for the song, if not the default
     // Active song metadata (loaded in player, only updated when play is pressed)
     _activeSongId: { state: true }, // The song ID currently loaded in media player
     _activeSongKey: { state: true }, // The song key currently loaded in media player
     _activeSongBpm: { state: true },
     _activeSongTempoNote: { state: true },
     _activeSongTimeSignature: { state: true },
+    _activeDoubleClick: { state: true }, // Whether the click it was started with is doubled
     _activeSongTitle: { state: true },
     _metronomeRunning: { state: true },
     _padLoadFailed: { state: true },
@@ -89,11 +103,21 @@ export class MediaPlayer extends LitElement {
   declare _currentBpm: number | null | undefined
   declare _currentTempoNote: string | null | undefined
   declare _currentTimeSignature: string | null | undefined
+  declare _currentDoubleClick: boolean | undefined
+  declare _currentPadSetId: string | undefined
   declare _activeSongId: string | null | undefined
   declare _activeSongKey: string | null
   declare _activeSongBpm: number | null | undefined
   declare _activeSongTempoNote: string | null | undefined
   declare _activeSongTimeSignature: string | null | undefined
+  declare _activeDoubleClick: boolean
+  /** The choice that decided it, to decide again when the settings change */
+  _activeDoubleClickChoice?: boolean
+  /** The pad set the pads were last started or crossfaded with */
+  _loadedPadSetId?: string
+  _autoDoubleClick = true
+  _doubleClickBelowBpm = DEFAULT_DOUBLE_CLICK_BELOW_BPM
+  _emphasiseDownbeat = true
   declare _activeSongTitle: string | null | undefined
   declare _metronomeRunning: boolean
   declare _padLoadFailed: boolean
@@ -109,6 +133,7 @@ export class MediaPlayer extends LitElement {
   _clickMerger?: ChannelMergerNode | null
   _clickSplitter?: ChannelSplitterNode | null
   _boundHandleKeydown?: (event: KeyboardEvent) => void
+  _boundHandleRouteChange?: () => void
   _boundHandleSettingsChange?: (event: MediaSettingsChangeEvent) => void
   _boundHandleSongChange?: (event: SongChangeEvent) => void
   _boundHandlePadSetChange?: (event?: PadSetChangedEvent) => void
@@ -280,6 +305,11 @@ export class MediaPlayer extends LitElement {
       border-top-left-radius: 0;
       border-bottom-left-radius: 0;
       margin-left: -2px;
+    }
+
+    .cassette-buttons .stop-button:not(:last-child) {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
     }
 
     .cassette-buttons .led-button {
@@ -532,8 +562,8 @@ export class MediaPlayer extends LitElement {
 
     .volume-knob {
       position: relative;
-      width: 3.4rem;
-      height: 3.4rem;
+      width: 3.9rem;
+      height: 3.9rem;
       border-radius: 50%;
       border: 2px solid var(--player-text, white);
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(0, 0, 0, 0.2) 100%);
@@ -561,7 +591,7 @@ export class MediaPlayer extends LitElement {
       height: 0.5rem;
       background: var(--player-text, white);
       border-radius: 1px;
-      transform-origin: center 1.45rem;
+      transform-origin: center 1.7rem; /* the knob's centre: half its height, less the top */
       transition: transform 0.1s;
     }
 
@@ -598,9 +628,53 @@ export class MediaPlayer extends LitElement {
       box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
     }
 
+    /* The transport is as wide as the display above, less the 2× button at its right edge,
+       which reaches towards the click's buttons (it is a click setting) and away from Stop */
+    .play-stop-section {
+      display: flex;
+      align-items: stretch;
+    }
+
+    .play-stop-section .cassette-buttons {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    .play-stop-section .cassette-buttons .play-button,
+    .play-stop-section .cassette-buttons .stop-button {
+      flex: 1 1 0;
+      min-width: 0;
+      width: auto;
+    }
+
+    .speed-button {
+      flex: 0 0 3.6rem;
+      margin-left: 1.1rem;
+      margin-right: -0.75rem;
+    }
+
+    .speed-button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .led-button {
+      flex-direction: column;
+      gap: 0.3rem;
+    }
+
+    .led-caption {
+      font-size: var(--font-ui-small);
+      font-weight: 600;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
     .led-light {
-      width: 1.2rem;
-      height: 1.2rem;
+      width: 1.6rem;
+      height: 1.6rem;
       border-radius: 50%;
       border: 1px solid var(--player-text, white);
       background: rgba(255, 255, 255, 0.1);
@@ -642,7 +716,7 @@ export class MediaPlayer extends LitElement {
       display: flex;
       flex-direction: column;
       align-items: center;
-      justify-content: space-between;
+      justify-content: space-evenly;
       width: 3.6rem;
       height: 100%;
     }
@@ -654,17 +728,6 @@ export class MediaPlayer extends LitElement {
       opacity: 0.7;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-    }
-
-    .toggle-label {
-      font-size: var(--font-icon);
-      font-weight: 600;
-      color: var(--player-text, white);
-      opacity: 0.7;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      margin-top: 0.3rem;
-      line-height: 1;
     }
 
     .collapsed-button {
@@ -705,6 +768,9 @@ export class MediaPlayer extends LitElement {
     this._padsEnabled = globalSettings.padsEnabled
     this._metronomeGlobalEnabled = globalSettings.metronomeEnabled
     this._stereoSplitEnabled = globalSettings.stereoSplitEnabled
+    this._autoDoubleClick = globalSettings.autoDoubleClick
+    this._doubleClickBelowBpm = globalSettings.doubleClickBelowBpm
+    this._emphasiseDownbeat = globalSettings.emphasiseDownbeat
 
     // User toggle states (independent of which song is active)
     // Load saved toggle states from localStorage, default to true (on)
@@ -720,6 +786,7 @@ export class MediaPlayer extends LitElement {
     this._activeSongBpm = null
     this._activeSongTempoNote = null
     this._activeSongTimeSignature = null
+    this._activeDoubleClick = false
     this._activeSongTitle = null
     this._activePadSet = getActivePadSet()
 
@@ -782,6 +849,9 @@ export class MediaPlayer extends LitElement {
     this._boundHandleSettingsChange = settingsChange
     this._boundHandleSongChange = songChange
     this._boundHandlePadSetChange = padSetChange
+    // Which page it is on decides whether it offers the song's speed
+    this._boundHandleRouteChange = () => this.requestUpdate()
+    document.addEventListener(RouteChangeEvent.type, this._boundHandleRouteChange)
     document.addEventListener('keydown', keydown)
     document.addEventListener(MediaSettingsChangeEvent.type, settingsChange)
     document.addEventListener(SongChangeEvent.type, songChange)
@@ -801,6 +871,9 @@ export class MediaPlayer extends LitElement {
 
     this._cleanup()
     if (this._boundHandleKeydown) document.removeEventListener('keydown', this._boundHandleKeydown)
+    if (this._boundHandleRouteChange) {
+      document.removeEventListener(RouteChangeEvent.type, this._boundHandleRouteChange)
+    }
     if (this._boundHandleSettingsChange) {
       document.removeEventListener(MediaSettingsChangeEvent.type, this._boundHandleSettingsChange)
     }
@@ -825,6 +898,20 @@ export class MediaPlayer extends LitElement {
     this._padsEnabled = settings.padsEnabled !== false
     this._metronomeGlobalEnabled = settings.metronomeEnabled !== false
     this._stereoSplitEnabled = settings.stereoSplitEnabled === true
+    this._autoDoubleClick = settings.autoDoubleClick
+    this._doubleClickBelowBpm = settings.doubleClickBelowBpm
+    this._emphasiseDownbeat = settings.emphasiseDownbeat
+    this._metronomeController?.setEmphasiseDownbeat(this._emphasiseDownbeat)
+    // A click that is running changes with the tempo threshold, or without the automatic doubling
+    if (
+      this._metronomeRunning &&
+      this._activeDoubleClick !==
+        this._doubleClickFor(this._activeSongBpm, this._activeDoubleClickChoice)
+    ) {
+      this._startSong().catch(error => {
+        console.error('[MediaPlayer] Failed to restart the click after a settings change:', error)
+      })
+    }
 
     // If only one feature is enabled, ensure it's always "on"
     const bothEnabled = this._padsEnabled && this._metronomeGlobalEnabled
@@ -849,13 +936,15 @@ export class MediaPlayer extends LitElement {
     this.requestUpdate()
   }
 
-  _handleSongChange(event: SongChangeEvent): void {
+  async _handleSongChange(event: SongChangeEvent): Promise<void> {
     const song = event.song
     console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
     this._currentSongId = song?.songId || null
     this._currentSongTitle = song?.title || null
+    this._currentDoubleClick = event.mediaPrefs.doubleClick
+    this._currentPadSetId = event.mediaPrefs.padSetId
     if (song?.metadata?.key) {
       this.currentKey = song.metadata.key
     } else {
@@ -872,6 +961,9 @@ export class MediaPlayer extends LitElement {
       this._currentTimeSignature = song.metadata.timeSignature || null
     }
 
+    // The pad set is the song's own, if it has one
+    await this._updatePadSetForSong()
+
     // If we're already playing this song and pads/click are active, refresh playback immediately
     const isActiveSong = this._activeSongId && song?.songId && this._activeSongId === song.songId
     const padsPlaying = this._padsOn && this._activeSongKey && this._padController?.isPlaying
@@ -887,9 +979,22 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _handlePadSetChange(event?: PadSetChangedEvent): void {
-    const padSet = event?.padSet || getActivePadSet()
+  /**
+   * The pad set for the song being viewed: this user's own choice for it if that is still
+   * there (a Drive pad set may not be on this device), else the one chosen for the device
+   */
+  async _updatePadSetForSong(): Promise<void> {
+    let padSet = getActivePadSet()
+    const ownId = this._currentPadSetId
+    if (ownId && ownId !== padSet.id) {
+      const own = (await listPadSets()).find(set => set.id === ownId)
+      if (own) padSet = own
+    }
     this._activePadSet = padSet
+  }
+
+  async _handlePadSetChange(_event?: PadSetChangedEvent): Promise<void> {
+    await this._updatePadSetForSong()
     this._padLoadFailed = false
 
     if (!this._padsOn) {
@@ -1130,6 +1235,23 @@ export class MediaPlayer extends LitElement {
     this._updateStereoMode()
   }
 
+  /** Whether the click is doubled for a song with this tempo and this user's choice */
+  _doubleClickFor(bpm: number | null | undefined, choice: boolean | undefined): boolean {
+    return wantsDoubleClick(
+      { autoDoubleClick: this._autoDoubleClick, doubleClickBelowBpm: this._doubleClickBelowBpm },
+      bpm,
+      choice
+    )
+  }
+
+  /** Double or normal speed for the song being viewed: remembered for this user, by the page */
+  _toggleDoubleClick(): void {
+    const doubled = this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
+    const byTempo = this._doubleClickFor(this._currentBpm, undefined)
+    // The song only keeps a choice that differs from what its tempo gives
+    document.dispatchEvent(new DoubleClickToggleEvent(!doubled === byTempo ? undefined : !doubled))
+  }
+
   _startMetronome(): void {
     const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm
     const timeSignature =
@@ -1147,7 +1269,10 @@ export class MediaPlayer extends LitElement {
     }
 
     // Start the metronome using controller
-    const started = this._metronomeController.start(bpmValue, timeSignature, tempoNote)
+    const started = this._metronomeController.start(bpmValue, timeSignature, tempoNote, {
+      doubleClick: this._activeDoubleClick,
+      emphasiseDownbeat: this._emphasiseDownbeat,
+    })
     this._metronomeRunning = started
     this.requestUpdate()
   }
@@ -1184,11 +1309,17 @@ export class MediaPlayer extends LitElement {
     // Store old active song values to check if we need to change
     const oldActiveKey = this._activeSongKey
     const oldActiveBpm = this._activeSongBpm
+    const oldPadSetId = this._loadedPadSetId
+    const doubleClick = this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
 
-    const needsKeyChange = oldActiveKey && oldActiveKey !== this.currentKey
+    // A different key, or this song's own pad set, is a different pad to play
+    const needsKeyChange =
+      oldActiveKey &&
+      (oldActiveKey !== this.currentKey || (oldPadSetId && oldPadSetId !== this._activePadSet.id))
     const needsTempoChange =
       oldActiveBpm &&
       (this._activeSongBpm !== this._currentBpm ||
+        this._activeDoubleClick !== doubleClick ||
         this._activeSongTempoNote !== this._currentTempoNote ||
         this._activeSongTimeSignature !== this._currentTimeSignature)
 
@@ -1216,6 +1347,9 @@ export class MediaPlayer extends LitElement {
     this._activeSongBpm = this._currentBpm
     this._activeSongTempoNote = this._currentTempoNote
     this._activeSongTimeSignature = this._currentTimeSignature
+    this._activeDoubleClick = doubleClick
+    this._activeDoubleClickChoice = this._currentDoubleClick
+    this._loadedPadSetId = this._activePadSet.id
     this._activeSongTitle = this._currentSongTitle
 
     // Handle click immediately so metronome isn't blocked by pad loading
@@ -1396,9 +1530,10 @@ export class MediaPlayer extends LitElement {
   _isCurrentSongActive(): boolean {
     return (
       this._activeSongKey === this.currentKey &&
-      this._activeSongBpm === this.bpm &&
-      this._activeSongTempoNote === this.tempoNote &&
-      this._activeSongTimeSignature === this.timeSignature
+      this._activeSongBpm === this._currentBpm &&
+      this._activeSongTempoNote === this._currentTempoNote &&
+      this._activeSongTimeSignature === this._currentTimeSignature &&
+      this._activeDoubleClick === this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
     )
   }
 
@@ -1588,6 +1723,10 @@ export class MediaPlayer extends LitElement {
     // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
     const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong)
 
+    const doubleClick = this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
+    // The button is always there with the click, so the player keeps its shape; it works on a
+    // setlist, where there is a song to be viewed
+    const canToggleSpeed = Boolean(this._currentSongId) && !this._isOffSetlist()
     const showPadError = this._padLoadFailed && !!this._activeSongKey
     const activeKeyDisplay = showPadError
       ? html`
@@ -1705,6 +1844,24 @@ export class MediaPlayer extends LitElement {
                 <app-icon name="stop" size="32"></app-icon>
               </button>
             </div>
+            ${
+              this._metronomeGlobalEnabled
+                ? html`
+                    <!-- At the end of the transport, by the click's buttons: the song's double-speed click -->
+                    <button
+                      class="led-button speed-button ${doubleClick ? 'active' : ''}"
+                      @click=${this._toggleDoubleClick}
+                      aria-pressed=${doubleClick ? 'true' : 'false'}
+                      aria-label="Double-speed click for this song"
+                      title="Double-speed click for this song"
+                      ?disabled=${!canToggleSpeed}
+                    >
+                      <div class="led-light ${doubleClick ? 'click-on' : ''}"></div>
+                      <span class="led-caption" aria-hidden="true">2×</span>
+                    </button>
+                  `
+                : ''
+            }
           </div>
 
           <!-- Divider spanning both rows -->
@@ -1714,36 +1871,12 @@ export class MediaPlayer extends LitElement {
               : ''
           }
 
-          <!-- Row 1, Column 3: Volume knobs -->
+          <!-- Row 1, Column 3: Volume knobs (the click first, over the click's own buttons) -->
           ${
             this._padsEnabled || this._metronomeGlobalEnabled
               ? html`
                 <div class="knobs-section">
                   <div class="knobs-row">
-                    ${
-                      this._padsEnabled
-                        ? html`
-                          <div class="knob-column">
-                            <div class="knob-label">Pads</div>
-                            <div
-                              class="volume-knob ${
-                                this._activeVolumeControl === 'pad' ? 'dragging' : ''
-                              }"
-                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'pad')}
-                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'pad')}
-                              title="Pad Volume"
-                            >
-                              <div
-                                class="volume-indicator"
-                                style="transform: rotate(${(this._padVolume - 0.5) * 270}deg)"
-                              ></div>
-                              <div class="volume-value">${Math.round(this._padVolume * 11)}</div>
-                            </div>
-                            <div class="toggle-label">${this._padsOn ? 'On' : 'Off'}</div>
-                          </div>
-                        `
-                        : ''
-                    }
                     ${
                       this._metronomeGlobalEnabled
                         ? html`
@@ -1763,7 +1896,29 @@ export class MediaPlayer extends LitElement {
                               ></div>
                               <div class="volume-value">${Math.round(this._clickVolume * 11)}</div>
                             </div>
-                            <div class="toggle-label">${this._clickOn ? 'On' : 'Off'}</div>
+                          </div>
+                        `
+                        : ''
+                    }
+                    ${
+                      this._padsEnabled
+                        ? html`
+                          <div class="knob-column">
+                            <div class="knob-label">Pads</div>
+                            <div
+                              class="volume-knob ${
+                                this._activeVolumeControl === 'pad' ? 'dragging' : ''
+                              }"
+                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'pad')}
+                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'pad')}
+                              title="Pad Volume"
+                            >
+                              <div
+                                class="volume-indicator"
+                                style="transform: rotate(${(this._padVolume - 0.5) * 270}deg)"
+                              ></div>
+                              <div class="volume-value">${Math.round(this._padVolume * 11)}</div>
+                            </div>
                           </div>
                         `
                         : ''
@@ -1781,44 +1936,34 @@ export class MediaPlayer extends LitElement {
                 <div class="toggles-section">
                   <div class="cassette-buttons">
                     ${
-                      this._padsEnabled && this._metronomeGlobalEnabled
+                      this._metronomeGlobalEnabled
                         ? html`
                           <button
-                            class="led-button middle ${this._padsOn ? 'active' : ''}"
-                            @click=${this._togglePads}
-                            title="Toggle pads on/off"
-                          >
-                            <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
-                          </button>
-                          <button
                             class="led-button ${this._clickOn ? 'active' : ''}"
+                            aria-pressed=${this._clickOn ? 'true' : 'false'}
                             @click=${this._toggleClick}
                             title="Toggle click on/off"
                           >
                             <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
+                            <span class="led-caption" aria-hidden="true">${this._clickOn ? 'On' : 'Off'}</span>
                           </button>
                         `
-                        : this._padsEnabled
-                          ? html`
-                            <button
-                              class="led-button ${this._padsOn ? 'active' : ''}"
-                              @click=${this._togglePads}
-                              title="Toggle pads on/off"
-                            >
-                              <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
-                            </button>
-                          `
-                          : this._metronomeGlobalEnabled
-                            ? html`
-                              <button
-                                class="led-button ${this._clickOn ? 'active' : ''}"
-                                @click=${this._toggleClick}
-                                title="Toggle click on/off"
-                              >
-                                <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
-                              </button>
-                            `
-                            : ''
+                        : ''
+                    }
+                    ${
+                      this._padsEnabled
+                        ? html`
+                          <button
+                            class="led-button ${this._padsOn ? 'active' : ''}"
+                            aria-pressed=${this._padsOn ? 'true' : 'false'}
+                            @click=${this._togglePads}
+                            title="Toggle pads on/off"
+                          >
+                            <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
+                            <span class="led-caption" aria-hidden="true">${this._padsOn ? 'On' : 'Off'}</span>
+                          </button>
+                        `
+                        : ''
                     }
                   </div>
                 </div>

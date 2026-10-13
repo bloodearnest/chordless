@@ -16,6 +16,7 @@ class MockAudioContext implements ClickAudioContext {
   state: string
   resumeCalled: boolean
   currentTime: number
+  oscillators: MockOscillator[] = []
   constructor(state = 'running') {
     this.state = state
     this.resumeCalled = false
@@ -29,7 +30,9 @@ class MockAudioContext implements ClickAudioContext {
   }
 
   createOscillator() {
-    return new MockOscillator()
+    const oscillator = new MockOscillator()
+    this.oscillators.push(oscillator)
+    return oscillator
   }
 
   createGain() {
@@ -122,6 +125,91 @@ describe('MetronomeController', () => {
       expect(controller.start(100, signature, '1/4')).to.be.true
       expect(controller.isRunning).to.be.true
       controller.stop()
+    })
+  })
+
+  describe('the sound of each click', () => {
+    const HEAVY = 1000
+    const MEDIUM = 900
+    const LIGHT = 800
+
+    /** The pitch of the first `count` clicks of a song */
+    function pitches(
+      count: number,
+      timeSignature: string,
+      options?: { doubleClick?: boolean; emphasiseDownbeat?: boolean }
+    ) {
+      const ctx = new MockAudioContext()
+      const controller = new MetronomeController(ctx, new MockGainNode())
+      controller.start(100, timeSignature, '1/4', options)
+      for (let i = 1; i < count; i++) controller._playClick()
+      controller.stop()
+      return ctx.oscillators.slice(0, count).map(oscillator => oscillator.frequency.value)
+    }
+
+    it('accents the downbeat', () => {
+      expect(pitches(8, '4/4')).to.deep.equal([
+        HEAVY,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+        HEAVY,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+      ])
+    })
+
+    it('accents the middle of 6/8', () => {
+      expect(pitches(6, '6/8')).to.deep.equal([HEAVY, LIGHT, LIGHT, MEDIUM, LIGHT, LIGHT])
+    })
+
+    it('sounds every click the same without the downbeat emphasis', () => {
+      expect(pitches(6, '6/8', { emphasiseDownbeat: false })).to.deep.equal(Array(6).fill(LIGHT))
+      expect(pitches(8, '4/4', { emphasiseDownbeat: false })).to.deep.equal(Array(8).fill(LIGHT))
+    })
+
+    it('clicks again halfway between the beats when doubled, with the downbeat where it was', () => {
+      expect(pitches(8, '4/4', { doubleClick: true })).to.deep.equal([
+        HEAVY,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+        LIGHT,
+      ])
+      // The downbeat comes round again after eight clicks: four beats
+      expect(pitches(9, '4/4', { doubleClick: true })[8]).to.equal(HEAVY)
+    })
+
+    it('keeps the 6/8 accent on its beat when doubled', () => {
+      const sequence = pitches(12, '6/8', { doubleClick: true })
+      expect(sequence[0]).to.equal(HEAVY)
+      expect(sequence[6]).to.equal(MEDIUM)
+      expect(sequence.filter(pitch => pitch === MEDIUM)).to.have.length(1)
+    })
+
+    it('halves the interval between clicks when doubled, which leaves the tempo alone', () => {
+      const normal = new MetronomeController(new MockAudioContext(), new MockGainNode())
+      const doubled = new MetronomeController(new MockAudioContext(), new MockGainNode())
+      normal.start(60, '4/4', '1/4')
+      doubled.start(60, '4/4', '1/4', { doubleClick: true })
+      expect(normal.beatInterval).to.equal(1000)
+      expect(doubled.beatInterval).to.equal(500)
+      normal.stop()
+      doubled.stop()
+    })
+
+    it('can have the emphasis changed while running', () => {
+      const ctx = new MockAudioContext()
+      const controller = new MetronomeController(ctx, new MockGainNode())
+      controller.start(100, '4/4', '1/4')
+      controller.setEmphasiseDownbeat(false)
+      for (let i = 0; i < 4; i++) controller._playClick()
+      controller.stop()
+      expect(ctx.oscillators.at(-1)?.frequency.value).to.equal(LIGHT)
     })
   })
 })

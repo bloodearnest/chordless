@@ -34,15 +34,17 @@ import {
 } from '../components/song-section.ts'
 import {
   BpmChangeEvent,
+  PadSetChoiceEvent,
   SongResetClickEvent,
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
-import { SongChangeEvent } from './app-events.ts'
+import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import type { HideMode, SectionState, Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
+import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { isReadOnlyOrganisation } from './organisation.ts'
-import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
+import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
 import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
@@ -50,7 +52,7 @@ import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
-import type { SongUserPrefs } from './song-user-prefs.ts'
+import { getSongUserPrefs, type SongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -273,6 +275,7 @@ export class SetlistPage {
     if (this._disposed) return
 
     this.setupKeyboardNavigation()
+    this.setupDoubleClickToggle()
     this.setupNavigationMenu()
 
     const { signal } = this._abort
@@ -877,7 +880,10 @@ export class SetlistPage {
 
   dispatchSongChange(song: RuntimeSong | null) {
     // Dispatch custom event for media player to listen to
-    document.dispatchEvent(new SongChangeEvent(song))
+    const prefs = song ? getSongUserPrefs(song.songId, this._database().organisationId) : null
+    document.dispatchEvent(
+      new SongChangeEvent(song, { doubleClick: prefs?.doubleClick, padSetId: prefs?.padSetId })
+    )
     console.log('[SongChange] Dispatched song:', song?.songId, song?.title)
   }
 
@@ -1099,8 +1105,6 @@ export class SetlistPage {
 
   async _applyCapoDefaults() {
     if (!this._capoEnabled) return
-
-    const { getSongUserPrefs } = await import('./song-user-prefs.ts')
 
     this.songs.forEach((song, index) => {
       // Skip if capo already set by setlist state (highest priority)
@@ -1684,6 +1688,10 @@ export class SetlistPage {
         await this.handleBPMChange(newValue)
       })
 
+      songSettingsPopover.addEventListener(PadSetChoiceEvent.type, e => {
+        this.saveSongMediaPref('padSetId', e.value)
+      })
+
       songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
         // Close the settings first, so the question is the only thing showing
         songSettingsPopover.close()
@@ -1814,6 +1822,32 @@ export class SetlistPage {
     // Update BPM value
     songSettingsPopover.bpmValue = song.currentBPM || 120
     songSettingsPopover.bpmLocked = isReadOnlyOrganisation()
+
+    // This user's media choices for the song (theirs alone: not in the setlist, so a user who
+    // can only read it can make them too). Shown only where the media player is
+    songSettingsPopover.mediaAvailable = wantsMediaPlayer()
+    if (songSettingsPopover.mediaAvailable) {
+      const prefs = getSongUserPrefs(song.songId, this._database().organisationId)
+      songSettingsPopover.padSetId = prefs?.padSetId
+      listPadSets()
+        .then(sets => {
+          songSettingsPopover.padSets = sets
+        })
+        .catch(error => console.warn('[SongSettings] Could not list the pad sets:', error))
+    }
+  }
+
+  /** Remember this user's choice for the current song, and tell the media player */
+  saveSongMediaPref(name: 'doubleClick' | 'padSetId', value: boolean | string | undefined) {
+    const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
+    if (!song) return
+    if (name === 'doubleClick') {
+      setSongUserPref(song.songId, this._database().organisationId, name, value as boolean)
+    } else {
+      setSongUserPref(song.songId, this._database().organisationId, name, value as string)
+    }
+    this.updateSongSettingsPopover()
+    this.dispatchSongChange(song)
   }
 
   async handleBPMChange(newValue: number) {
@@ -2294,6 +2328,15 @@ export class SetlistPage {
       "'": '&#039;',
     }
     return text.replace(/[&<>"']/g, m => map[m])
+  }
+
+  /** The media player's speed button remembers the choice for the song being viewed */
+  setupDoubleClickToggle() {
+    document.addEventListener(
+      DoubleClickToggleEvent.type,
+      e => this.saveSongMediaPref('doubleClick', e.value),
+      { signal: this._abort.signal }
+    )
   }
 
   setupKeyboardNavigation() {

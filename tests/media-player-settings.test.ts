@@ -9,6 +9,36 @@ describe('media-player-settings', () => {
 
   afterEach(() => settings?.remove())
 
+  it('saves the click settings, and says so', async () => {
+    localStorage.removeItem('media-settings')
+    settings = document.createElement('media-player-settings')
+    document.body.appendChild(settings)
+    await settings.updateComplete
+    const heard: unknown[] = []
+    document.addEventListener('media-player-settings:change', event =>
+      heard.push((event as Event & { settings: unknown }).settings)
+    )
+
+    const downbeat = settings.shadowRoot.querySelector('[aria-label="Emphasise downbeat"]')
+    expect(downbeat.getAttribute('aria-checked')).to.equal('true')
+    downbeat.click()
+    await settings.updateComplete
+    expect(downbeat.getAttribute('aria-checked')).to.equal('false')
+
+    const below = settings.shadowRoot.querySelector('#double-click-below-bpm')
+    expect(below.value).to.equal('72')
+    below.value = '75'
+    below.dispatchEvent(new Event('input'))
+    // A half-typed number is left alone
+    below.value = '7'
+    below.dispatchEvent(new Event('input'))
+
+    const saved = JSON.parse(localStorage.getItem('media-settings') ?? '{}')
+    expect(saved).to.include({ emphasiseDownbeat: false, doubleClickBelowBpm: 75 })
+    expect(heard).to.have.length(2)
+    localStorage.removeItem('media-settings')
+  })
+
   it('shows the chosen pad set when the list of pad sets arrives with it', async () => {
     settings = document.createElement('media-player-settings')
     document.body.appendChild(settings)

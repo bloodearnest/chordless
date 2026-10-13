@@ -7,6 +7,53 @@ import { expect, fromDB, seedSong, test } from './fixtures.ts'
 import { must } from './must.ts'
 
 test.describe('Song settings', () => {
+  test("this user's click and pad choices for a song stay on this device, and reach the player", async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'media-prefs-setlist' })
+    const openSong = async () => {
+      await page.goto('/setlist/media-prefs-setlist')
+      await page.locator('setlist-overview song-card').first().click()
+      await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    }
+    await openSong()
+    // Not here: it is on the player, which edits the song being viewed
+    await expect(page.locator('song-settings-popover').getByLabel('Click:')).toHaveCount(0)
+    const player = page.locator('#media-player')
+    await player.evaluate(element => {
+      ;(element as unknown as { _collapsed: boolean })._collapsed = false
+    })
+    const speed = player.getByRole('button', { name: 'Double-speed click for this song' })
+    await expect(speed).toHaveAttribute('aria-pressed', 'false')
+    await speed.click()
+
+    // The player is told
+    await expect
+      .poll(() =>
+        page.evaluate(
+          () =>
+            (
+              document.getElementById('media-player') as unknown as {
+                _currentDoubleClick?: boolean
+              }
+            )._currentDoubleClick
+        )
+      )
+      .toBe(true)
+
+    // It is this user's, on this device: nothing in the setlist
+    const setlist = await fromDB(page, 'getSetlist', 'media-prefs-setlist')
+    expect(JSON.stringify(setlist)).not.toContain('doubleClick')
+
+    await openSong()
+    await player.evaluate(element => {
+      ;(element as unknown as { _collapsed: boolean })._collapsed = false
+    })
+    await expect(
+      player.getByRole('button', { name: 'Double-speed click for this song' })
+    ).toHaveAttribute('aria-pressed', 'true')
+  })
+
   test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
     await seedSong(page, { setlistId: 'bpm-test-setlist' })
     // Give the library song a tempo of its own

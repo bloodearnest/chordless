@@ -4,10 +4,8 @@ editing
 
 
 song edit UI
-- pads on/off for this song
-    - pad sound 
-- click on/off for this song
-    - click pattern
+- the click sound: choose it (a later change; the downbeat emphasis and the double click are done)
+- pads on/off and the click on/off for this song (the pad set is in the edit box and the double click is a 2× button on the player: both in song-user-prefs.ts, kept on this device)
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
@@ -17,11 +15,6 @@ bugs
 - noUncheckedIndexedAccess was tried on the app project: 142 errors, mostly false positives
   (regex groups after a match, indexes checked against length just above), so it is off. If it
   is revisited: setlist-page.ts (45) is where `this.songs[i]` is the likeliest real bug
-- an easy toggle on the player to double the click speed: twice as many clicks per beat (a
-  finer subdivision), not a faster tempo. The downbeat and the BPM stay the same; each beat just
-  gets another click halfway. For slow songs, which need more clicks. Decide how it is shown
-  (the second click quieter than the beats, like a light accent in MetronomeController), and
-  whether it is remembered per device (media-settings) or per song
 
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc

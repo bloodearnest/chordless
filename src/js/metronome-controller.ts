@@ -52,6 +52,11 @@ export class MetronomeController {
   _activeOscillators: ClickOscillator[]
   _timeSignature: string | null
   _beatsPerBar: number
+  /** A click on every half beat as well; _offHalf says the next click is the half between beats */
+  _doubleClick: boolean
+  _offHalf: boolean
+  /** Whether the downbeat sounds different; off, every click is the light one */
+  _emphasiseDownbeat: boolean
 
   /**
    * @param audioContext - Web Audio API context
@@ -74,6 +79,9 @@ export class MetronomeController {
     this._activeOscillators = []
     this._timeSignature = null
     this._beatsPerBar = 0
+    this._doubleClick = false
+    this._offHalf = false
+    this._emphasiseDownbeat = true
   }
 
   /**
@@ -81,9 +89,18 @@ export class MetronomeController {
    * @param bpm - Beats per minute
    * @param timeSignature - Time signature (e.g., "4/4", "6/8")
    * @param tempoNote - Note value for tempo (e.g., "1/4", "1/8")
+   * @param options.doubleClick - Click twice per beat: the tempo and the downbeat stay, and
+   *   each beat gets another light click halfway
+   * @param options.emphasiseDownbeat - Sound the downbeat differently (default); off, every
+   *   click is the light one
    * @returns True if started successfully
    */
-  start(bpm: number | string, timeSignature: string, tempoNote: string | null = '1/4'): boolean {
+  start(
+    bpm: number | string,
+    timeSignature: string,
+    tempoNote: string | null = '1/4',
+    { doubleClick = false, emphasiseDownbeat = true } = {}
+  ): boolean {
     if (!bpm || !timeSignature) {
       console.warn('[MetronomeController] Cannot start: missing BPM or time signature')
       return false
@@ -111,6 +128,9 @@ export class MetronomeController {
     this._metronomeBeat = 0
     this._timeSignature = timeSignature
     this._beatsPerBar = beatsPerBar
+    this._doubleClick = doubleClick
+    this._offHalf = false
+    this._emphasiseDownbeat = emphasiseDownbeat
 
     // Calculate click interval
     const quarterNoteBpm = this._calculateQuarterNoteBpm(
@@ -121,7 +141,7 @@ export class MetronomeController {
     const clickNoteValue = this._getClickNoteValue(timeSignature, noteValue)
     const multiplier = (1 / clickNoteValue) * 4
     const quarterNoteInterval = 60000 / quarterNoteBpm
-    const beatInterval = quarterNoteInterval * multiplier
+    const beatInterval = (quarterNoteInterval * multiplier) / (doubleClick ? 2 : 1)
 
     console.log(
       `[MetronomeController] BPM: ${bpm} (${normalizedTempoNote}) -> Quarter note BPM: ${quarterNoteBpm.toFixed(1)} -> Clicking on 1/${clickNoteValue} notes -> Click interval: ${beatInterval.toFixed(1)}ms (multiplier: ${multiplier})`
@@ -160,6 +180,7 @@ export class MetronomeController {
 
     // Reset beat counter
     this._metronomeBeat = 0
+    this._offHalf = false
 
     // Stop all active oscillators immediately
     if (this._activeOscillators.length > 0) {
@@ -188,6 +209,11 @@ export class MetronomeController {
     }
   }
 
+  /** Change whether the downbeat is emphasised, while running too */
+  setEmphasiseDownbeat(emphasise: boolean): void {
+    this._emphasiseDownbeat = emphasise
+  }
+
   /**
    * Check if metronome is currently running
    */
@@ -196,7 +222,7 @@ export class MetronomeController {
   }
 
   /**
-   * Get the current beat interval in milliseconds (for testing)
+   * Get the current click interval in milliseconds (for testing): half a beat when doubled
    */
   get beatInterval(): number | null {
     return this._beatInterval
@@ -284,7 +310,9 @@ export class MetronomeController {
     // Determine accent level based on beat position and time signature
     let clickType: ClickType = 'light'
 
-    if (this._metronomeBeat === 0) {
+    if (this._offHalf || !this._emphasiseDownbeat) {
+      // The click between two beats, or every click: all the same
+    } else if (this._metronomeBeat === 0) {
       // First beat is always heavy (downbeat)
       clickType = 'heavy'
     } else if (beatsPerBar === 6 && noteValue === 8 && this._metronomeBeat === 3) {
@@ -337,8 +365,9 @@ export class MetronomeController {
       }
     }, 50)
 
-    // Increment beat counter
-    this._metronomeBeat = (this._metronomeBeat + 1) % beatsPerBar
+    // Increment beat counter (only after the half beat, when doubled)
+    if (this._doubleClick) this._offHalf = !this._offHalf
+    if (!this._offHalf) this._metronomeBeat = (this._metronomeBeat + 1) % beatsPerBar
   }
 
   /**

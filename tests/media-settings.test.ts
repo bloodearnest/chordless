@@ -1,5 +1,5 @@
 import { expect } from '@esm-bundle/chai'
-import { loadMediaSettings, saveMediaSettings } from '../src/js/media-settings.ts'
+import { loadMediaSettings, saveMediaSettings, wantsDoubleClick } from '../src/js/media-settings.ts'
 
 const { describe, it } = window
 
@@ -19,10 +19,13 @@ const defaults = {
   padsEnabled: true,
   metronomeEnabled: true,
   stereoSplitEnabled: false,
+  emphasiseDownbeat: true,
+  autoDoubleClick: true,
+  doubleClickBelowBpm: 72,
 }
 
 describe('media settings', () => {
-  it('defaults to everything on except stereo split', () => {
+  it('defaults to everything on except stereo split, with the double click at or below 72 BPM', () => {
     expect(loadMediaSettings(fakeStorage())).to.deep.equal(defaults)
   })
 
@@ -61,5 +64,35 @@ describe('media settings', () => {
     saveMediaSettings({ ...defaults, metronomeEnabled: false }, storage)
     expect(storage.map.has('mediaPlayerSettings')).to.equal(false)
     expect(loadMediaSettings(storage).metronomeEnabled).to.equal(false)
+  })
+})
+
+describe('wantsDoubleClick', () => {
+  const on = { autoDoubleClick: true, doubleClickBelowBpm: 72 }
+
+  it('is on at the threshold and below it, and off above', () => {
+    expect(wantsDoubleClick(on, 60)).to.equal(true)
+    expect(wantsDoubleClick(on, 72)).to.equal(true)
+    expect(wantsDoubleClick(on, 73)).to.equal(false)
+  })
+
+  it('is off without a tempo', () => {
+    expect(wantsDoubleClick(on, null)).to.equal(false)
+    expect(wantsDoubleClick(on, 0)).to.equal(false)
+  })
+
+  it('is off when switched off, whatever the tempo', () => {
+    expect(wantsDoubleClick({ ...on, autoDoubleClick: false }, 50)).to.equal(false)
+  })
+
+  it("goes by the song's own choice, either way, when it has one", () => {
+    expect(wantsDoubleClick(on, 120, true)).to.equal(true)
+    expect(wantsDoubleClick(on, 50, false)).to.equal(false)
+    expect(wantsDoubleClick({ ...on, autoDoubleClick: false }, 50, true)).to.equal(true)
+  })
+
+  it('ignores a threshold that is not a positive number', () => {
+    const storage = fakeStorage({ 'media-settings': JSON.stringify({ doubleClickBelowBpm: -5 }) })
+    expect(loadMediaSettings(storage).doubleClickBelowBpm).to.equal(72)
   })
 })

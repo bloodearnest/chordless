@@ -13,6 +13,16 @@ export class BpmChangeEvent extends Event {
   }
 }
 
+/** A pad set was chosen for the song, or undefined for the device's own */
+export class PadSetChoiceEvent extends Event {
+  static readonly type = 'song-settings:pad-set-choice'
+  readonly value: string | undefined
+  constructor(value: string | undefined) {
+    super(PadSetChoiceEvent.type, { bubbles: true, composed: true })
+    this.value = value
+  }
+}
+
 /** Reset was pressed */
 export class SongResetClickEvent extends Event {
   static readonly type = 'song-settings:reset-click'
@@ -35,6 +45,9 @@ export class SongSettingsPopover extends LitElement {
     bpmMin: { type: Number, attribute: 'bpm-min' },
     bpmMax: { type: Number, attribute: 'bpm-max' },
     bpmLocked: { type: Boolean, attribute: 'bpm-locked' },
+    mediaAvailable: { type: Boolean, attribute: false },
+    padSetId: { type: String, attribute: false },
+    padSets: { type: Array, attribute: false },
   }
 
   declare popoverId: string
@@ -43,6 +56,11 @@ export class SongSettingsPopover extends LitElement {
   declare bpmMax: number
   /** The BPM can't be changed (it is part of the setlist, which this user can't edit) */
   declare bpmLocked: boolean
+  /** The media player is on this device and switched on: its choices are shown */
+  declare mediaAvailable: boolean
+  /** This user's pad set for the song, if not the device's own */
+  declare padSetId: string | undefined
+  declare padSets: { id: string; name: string }[]
 
   _popup: DialogPopup
   triggerButton: HTMLElement | null
@@ -121,6 +139,22 @@ export class SongSettingsPopover extends LitElement {
       cursor: not-allowed;
     }
 
+    .media-choice {
+      grid-column: 2 / 5;
+      min-height: 2.5rem;
+      background-color: color-mix(in srgb, currentColor 20%, transparent);
+      border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+      color: var(--header-text, #fff);
+      border-radius: 6px;
+      padding: 0.4rem 0.6rem;
+      font: inherit;
+      font-size: var(--font-ui);
+    }
+
+    .media-choice option {
+      color: #1a1a1a;
+    }
+
     .bpm-value {
       color: var(--header-text, #fff);
       font-size: var(--font-ui);
@@ -159,6 +193,9 @@ export class SongSettingsPopover extends LitElement {
     this.bpmMin = 40
     this.bpmMax = 240
     this.bpmLocked = false
+    this.mediaAvailable = false
+    this.padSetId = undefined
+    this.padSets = []
   }
 
   /** The <dialog> (once rendered) */
@@ -209,6 +246,30 @@ export class SongSettingsPopover extends LitElement {
     }
   }
 
+  _handlePadSetChoice(event: Event) {
+    const value = (event.target as HTMLSelectElement).value
+    this.dispatchEvent(new PadSetChoiceEvent(value === '' ? undefined : value))
+  }
+
+  _renderMediaChoices() {
+    if (!this.mediaAvailable) return ''
+    // A pad set that is no longer there is still shown, so the choice can be seen and undone
+    const padSets =
+      this.padSets.some(set => set.id === this.padSetId) || !this.padSetId
+        ? this.padSets
+        : [...this.padSets, { id: this.padSetId, name: 'Not on this device' }]
+    return html`
+      <label class="meta-label bpm-label" for="pad-set-choice">Pads:</label>
+      <select id="pad-set-choice" class="media-choice" @change=${this._handlePadSetChoice}>
+        <option value="" ?selected=${!this.padSetId}>Default</option>
+        ${padSets.map(
+          set =>
+            html`<option value=${set.id} ?selected=${set.id === this.padSetId}>${set.name}</option>`
+        )}
+      </select>
+    `
+  }
+
   _handleReset() {
     this.dispatchEvent(new SongResetClickEvent())
   }
@@ -253,7 +314,10 @@ export class SongSettingsPopover extends LitElement {
             +
           </button>
 
-          <!-- Row 3: Reset -->
+          <!-- Row 3: this user's pad set for the song -->
+          ${this._renderMediaChoices()}
+
+          <!-- Last row: Reset -->
           <button class="reset-button" @click=${this._handleReset} aria-label="Reset song" type="button">
             Reset
           </button>
@@ -274,6 +338,7 @@ declare global {
 declare global {
   interface GlobalEventHandlersEventMap {
     [BpmChangeEvent.type]: BpmChangeEvent
+    [PadSetChoiceEvent.type]: PadSetChoiceEvent
     [SongResetClickEvent.type]: SongResetClickEvent
   }
 }

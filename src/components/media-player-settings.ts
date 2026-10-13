@@ -34,12 +34,18 @@ export class MediaPlayerSettings extends LitElement {
     padsEnabled: { type: Boolean, attribute: false },
     metronomeEnabled: { type: Boolean, attribute: false },
     stereoSplitEnabled: { type: Boolean, attribute: false },
+    emphasiseDownbeat: { type: Boolean, attribute: false },
+    autoDoubleClick: { type: Boolean, attribute: false },
+    doubleClickBelowBpm: { type: Number, attribute: false },
   }
 
   declare mediaPlayerEnabled: boolean
   declare padsEnabled: boolean
   declare metronomeEnabled: boolean
   declare stereoSplitEnabled: boolean
+  declare emphasiseDownbeat: boolean
+  declare autoDoubleClick: boolean
+  declare doubleClickBelowBpm: number
 
   _padSets: PadSetsController
 
@@ -102,6 +108,11 @@ export class MediaPlayerSettings extends LitElement {
         margin-top: 0.25rem;
       }
 
+      .bpm-input {
+        width: 6rem;
+        flex-shrink: 0;
+      }
+
       .padset-select {
         margin-top: 0.5rem;
       }
@@ -133,6 +144,9 @@ export class MediaPlayerSettings extends LitElement {
       padsEnabled: this.padsEnabled,
       metronomeEnabled: this.metronomeEnabled,
       stereoSplitEnabled: this.stereoSplitEnabled,
+      emphasiseDownbeat: this.emphasiseDownbeat,
+      autoDoubleClick: this.autoDoubleClick,
+      doubleClickBelowBpm: this.doubleClickBelowBpm,
     }
 
     saveMediaSettings(settings)
@@ -159,6 +173,24 @@ export class MediaPlayerSettings extends LitElement {
         @click=${onToggle}
       ></button>
     `
+  }
+
+  _toggleEmphasiseDownbeat(): void {
+    this.emphasiseDownbeat = !this.emphasiseDownbeat
+    this._saveSettings()
+  }
+
+  _toggleAutoDoubleClick(): void {
+    this.autoDoubleClick = !this.autoDoubleClick
+    this._saveSettings()
+  }
+
+  /** The threshold, saved once it is a usable number (a half-typed one is left alone) */
+  _handleBelowBpmInput(event: Event): void {
+    const value = Number((event.target as HTMLInputElement).value)
+    if (!Number.isFinite(value) || value < 20 || value > 200) return
+    this.doubleClickBelowBpm = Math.round(value)
+    this._saveSettings()
   }
 
   _toggleMediaPlayer(): void {
@@ -296,6 +328,67 @@ export class MediaPlayerSettings extends LitElement {
               this._toggleStereoSplit,
               { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
             )}
+          </div>
+
+          <div
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.metronomeEnabled ? 'disabled' : ''
+            }"
+          >
+            <div>
+              <div class="setting-label">Emphasise downbeat</div>
+              <div class="setting-description">
+                Off, every click sounds like an off-beat one
+              </div>
+            </div>
+            ${this._renderSwitch(
+              'Emphasise downbeat',
+              this.emphasiseDownbeat,
+              this._toggleEmphasiseDownbeat,
+              { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
+            )}
+          </div>
+
+          <div
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.metronomeEnabled ? 'disabled' : ''
+            }"
+          >
+            <div>
+              <div class="setting-label">Double the click for slow songs</div>
+              <div class="setting-description">
+                Two clicks per beat at or below this tempo, unless a song says otherwise
+              </div>
+            </div>
+            ${this._renderSwitch(
+              'Double the click for slow songs',
+              this.autoDoubleClick,
+              this._toggleAutoDoubleClick,
+              { disabled: !this.mediaPlayerEnabled || !this.metronomeEnabled }
+            )}
+          </div>
+
+          <div
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.metronomeEnabled || !this.autoDoubleClick
+                ? 'disabled'
+                : ''
+            }"
+          >
+            <div>
+              <label class="setting-label" for="double-click-below-bpm">At or below (BPM)</label>
+            </div>
+            <input
+              id="double-click-below-bpm"
+              class="field bpm-input"
+              type="number"
+              inputmode="numeric"
+              min="20"
+              max="200"
+              .value=${String(this.doubleClickBelowBpm)}
+              ?disabled=${!this.mediaPlayerEnabled || !this.metronomeEnabled || !this.autoDoubleClick}
+              @input=${this._handleBelowBpmInput}
+            />
           </div>
         </div>
       </div>
