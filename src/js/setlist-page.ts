@@ -24,6 +24,7 @@ import {
   OverviewSongKeyChangeEvent,
   type SetlistOverview,
 } from '../components/setlist-overview.ts'
+import { type SetlistShare, SetlistShareChangeEvent } from '../components/setlist-share.ts'
 import type { SongDisplay } from '../components/song-display.ts'
 import type { SongInfoDialog } from '../components/song-info-dialog.ts'
 import {
@@ -143,6 +144,7 @@ export class SetlistPage {
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
+  _shareSetup = false
   _editModeSetup?: boolean
   _appHeaderEventsSetup?: boolean
   _lastVisibleSection?: string | null
@@ -385,6 +387,7 @@ export class SetlistPage {
         this.songs = []
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
+        this._setupShare()
         this._setOverviewComponent(null)
 
         // Update header to show setlist info
@@ -424,6 +427,7 @@ export class SetlistPage {
       this.songs = songs
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
+      this._setupShare()
 
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs)
@@ -817,6 +821,7 @@ export class SetlistPage {
 
       // Store current song for info button handler
       this._currentSongForInfo = song
+      this._showShareButton(false)
     } else {
       // Overview - hide musical metadata
       if (musicalMetadata) {
@@ -834,7 +839,35 @@ export class SetlistPage {
 
       // Store that we're on overview for info button handler
       this._currentSongForInfo = null
+      this._showShareButton(true)
     }
+  }
+
+  /** The header's share button: on the overview only, lit while the setlist is shared */
+  _showShareButton(show: boolean) {
+    const button = this.root.querySelector<HTMLElement>('#share-button')
+    if (!button) return
+    button.hidden = !show
+    button.classList.toggle('shared', Boolean(this.currentSetlist?.share))
+  }
+
+  /** Hand the share dialog its setlist, and open it from the header's button */
+  _setupShare() {
+    const button = this.root.querySelector<HTMLElement>('#share-button')
+    const dialog = this.root.querySelector<SetlistShare>('#setlist-share')
+    if (!button || !dialog || !this.currentSetlist) return
+    dialog.setlist = this.currentSetlist
+    dialog.db = this._database()
+    if (this._shareSetup) return
+    this._shareSetup = true
+    button.addEventListener('click', () => {
+      // The page may have a newer copy of the setlist (after its details were edited)
+      dialog.setlist = this.currentSetlist ?? null
+      dialog.show()
+    })
+    dialog.addEventListener(SetlistShareChangeEvent.type, () => {
+      button.classList.toggle('shared', Boolean(dialog.setlist?.share))
+    })
   }
 
   dispatchSongChange(song: RuntimeSong | null) {
@@ -863,7 +896,6 @@ export class SetlistPage {
     }
     dialog.readonly = this._readOnly
     dialog.people = this._readOnly ? [] : (await getOrganisationPeople()).people
-    dialog.db = this._database()
     await dialog.show(this.currentSetlist)
   }
 

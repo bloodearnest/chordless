@@ -90,8 +90,9 @@ test.describe('A setlist shared by link', () => {
     const info = page.locator('setlist-info-dialog')
     await expect(info).toContainText('Ann Smith')
     await expect(info.locator('.edit-button')).toHaveCount(0)
-    await expect(info).not.toContainText('Share link')
     await page.keyboard.press('Escape')
+    // The reader isn't offered sharing
+    await expect(page.locator('setlist-share')).toHaveCount(0)
 
     await page.keyboard.press('ArrowRight')
     await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234\/song\/0$/)

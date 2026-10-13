@@ -6,6 +6,7 @@ import '../../components/key-selector.ts'
 import '../../components/musical-metadata-display.ts'
 import '../../components/setlist-info-dialog.ts'
 import '../../components/setlist-overview.ts'
+import '../../components/setlist-share.ts'
 import '../../components/song-card.ts'
 import '../../components/song-display.ts'
 import '../../components/song-info-dialog.ts'
@@ -21,9 +22,12 @@ import { PageView } from './page-view.ts'
  */
 export function setlistTemplate({
   editable,
+  shareable = false,
   belowHeader = nothing,
 }: {
   editable: boolean
+  /** The setlist can be shared by link: a share button in the header, on the overview */
+  shareable?: boolean
   /** Something to show under the header, e.g. a share's banner */
   belowHeader?: unknown
 }) {
@@ -34,6 +38,20 @@ export function setlistTemplate({
         ?show-edit-toggle=${editable}
         show-info-button
       >
+        ${
+          shareable
+            ? html`<button
+              slot="tools"
+              class="share-button"
+              id="share-button"
+              aria-label="Share setlist"
+              title="Share setlist"
+              hidden
+            >
+              <app-icon name="share" size="24"></app-icon>
+            </button>`
+            : nothing
+        }
         <div slot="controls" class="header-controls-slot">
           <!-- Musical metadata display / settings trigger -->
           <musical-metadata-display
@@ -61,6 +79,7 @@ export function setlistTemplate({
 
       <song-info-dialog id="song-info-dialog"></song-info-dialog>
       <setlist-info-dialog id="setlist-info-dialog"></setlist-info-dialog>
+      ${shareable ? html`<setlist-share id="setlist-share"></setlist-share>` : nothing}
 
       <app-modal
         id="reset-confirm-modal"
@@ -164,7 +183,7 @@ export class SetlistView extends PageView {
   }
 
   override render() {
-    return setlistTemplate({ editable: true })
+    return setlistTemplate({ editable: true, shareable: true })
   }
 }
 customElements.define('setlist-view', SetlistView)

@@ -1311,6 +1311,38 @@ body.edit-mode .key-selector:focus {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
+/* Share button in the setlist's header, a round icon button like the edit and info ones: lit while the setlist is shared */
+.share-button {
+  background: none;
+  border: 2px solid var(--header-text, white);
+  color: var(--header-text, white);
+  width: 2.5rem;
+  height: 2.5rem;
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.2s;
+}
+
+.share-button[hidden] {
+  display: none;
+}
+
+.share-button:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.share-button.shared {
+  background-color: var(--button-bg, #3498db);
+  color: var(--header-text, white);
+}
+
 #reset-confirm-modal p {
   margin: 1.5rem 0;
   line-height: 1.6;

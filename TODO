@@ -184,7 +184,7 @@ ccli import
  - make it reuse open windows for import (maybe need to get the default app, not opened via import, to have the tag tag?)
 
 sharing
-- share links: built (docs/SHARING.md Part 2): create/update/stop in the setlist info dialog,
+- share links: built (docs/SHARING.md Part 2): create/update/stop from a share button in the overview header (a modal with the link and QR code),
   QR code, sync keeps them current and ends them, /s/<id> opens one read-only and offline.
   Needs a real run: deploy, then share from a signed-in device and open the link on a phone
   with no account, offline too. Not tried against a Workspace account.

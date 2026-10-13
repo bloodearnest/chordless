@@ -53,6 +53,7 @@ export class HeaderExpandToggleEvent extends Event {
  *
  * Slots:
  * @slot controls - Center section for page-specific controls (key selector, font controls, etc.)
+ * @slot tools - Icon buttons in the second row, before the edit and info buttons (e.g. share)
  * @slot actions - Buttons that stay in the top row at its end, even on phones (e.g. the
  *   home page's create-setlist button)
  *
@@ -524,6 +525,7 @@ export class AppHeader extends LitElement {
         <!-- Row 2: Controls (hidden on mobile unless expanded) -->
         <div class="header-row-2" ?hidden=${!hasControls}>
           <slot name="controls" @slotchange=${this._onControlsSlotChange}></slot>
+          <slot name="tools"></slot>
 
           ${
             this.showEditToggle

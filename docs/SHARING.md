@@ -57,7 +57,7 @@ a crawler finding a link and a copyright takedown notice following. Two defences
 
 Built: the bundle and encryption (`share-bundle.ts`, `share-crypto.ts`), making, updating and
 ending a share (`share-manager.ts`, called by a sync step in `DriveSyncManager.sync()`), the
-share button in the setlist info dialog (`setlist-share.ts`, with a QR code), the worker's
+share button in the header of the setlist overview (`setlist-share.ts` is the modal it opens: the explanation and Create, or the link, QR code, Update and Stop; the button is lit while shared), the worker's
 download and preview (`worker/src/share.ts`, `share-page.ts`), and opening a link
 (`share-receiver.ts`, `views/share-view.ts`, route `/s/<id>`). Not done:
 
@@ -231,7 +231,7 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
    `ETag` and `expires`, so `/s/<fileId>` works again on that device without the fragment.
 5. Show it **read-only**, with the setlist page itself (given that database and
    `readOnly`):
-   - no edit mode, and the info dialog has no edit, delete or share
+   - no edit mode, and the info dialog has no edit or delete, and there is no share button
    - the overview says who sent it, with a link to what Chordless is
    - transposing and hiding chords work, as in any setlist
 

@@ -7,11 +7,20 @@ import { createSyncManager, isSyncAvailable } from '../js/drive-sync.ts'
 import { getCurrentOrganisation } from '../js/organisation.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
-import { formatSetlistDate } from '../js/utils/date-utils.ts'
+import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
+
+/** The setlist was shared, updated or stopped: its `share` has changed */
+export class SetlistShareChangeEvent extends Event {
+  static readonly type = 'setlist-share:change'
+  constructor() {
+    super(SetlistShareChangeEvent.type, { bubbles: true, composed: true })
+  }
+}
 
 /** A QR code for some text, as an image the page can show (black on white, whatever the theme) */
 export function qrDataUrl(text: string): string {
@@ -25,6 +34,9 @@ export function qrDataUrl(text: string): string {
  * Sharing a setlist by link (docs/SHARING.md Part 2): make the link, show it with a QR code
  * for the room, copy or send it, and stop sharing. The setlist's `share` is saved on the
  * setlist itself; sync keeps the shared copy up to date and ends it when the setlist is past.
+ *
+ * It is a modal: the explanation and Create, or once shared the link, QR code, Update and Stop.
+ * The page opens it from the header's share button (show()), and listens for the change event.
  *
  * Needs the setlist and the organisation's database. Anyone signed in to Google can share,
  * if their account can write to the organisation's Drive folder.
@@ -50,14 +62,7 @@ export class SetlistShare extends LitElement {
         display: flex;
         flex-direction: column;
         gap: 1rem;
-      }
-
-      h3 {
-        margin: 0;
-        font-size: var(--font-ui);
-        font-weight: 600;
-        color: var(--text-secondary, #5f6b6d);
-        text-transform: uppercase;
+        padding: 1rem;
       }
 
       p {
@@ -92,6 +97,31 @@ export class SetlistShare extends LitElement {
         gap: 0.5rem;
       }
 
+      a.btn {
+        text-decoration: none;
+      }
+
+      .actions.center {
+        justify-content: center;
+      }
+
+      .link {
+        display: flex;
+        gap: 0.5rem;
+      }
+
+      .link input {
+        flex: 1;
+        min-width: 0;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 1.25rem;
+        font-size: var(--font-ui-small);
+        line-height: 1.5;
+      }
+
       img {
         align-self: center;
         width: min(16rem, 100%);
@@ -110,6 +140,7 @@ export class SetlistShare extends LitElement {
   declare _copied: boolean
 
   _stopModal: Ref<AppModal> = createRef()
+  _dialog: Ref<AppModal> = createRef()
 
   constructor() {
     super()
@@ -160,6 +191,7 @@ export class SetlistShare extends LitElement {
       setlist.share = share
       await db.saveSetlist(setlist)
       this.requestUpdate()
+      this.dispatchEvent(new SetlistShareChangeEvent())
     })
   }
 
@@ -178,6 +210,7 @@ export class SetlistShare extends LitElement {
         await db.saveSetlist(setlist)
       }
       this.requestUpdate()
+      this.dispatchEvent(new SetlistShareChangeEvent())
     })
   }
 
@@ -189,6 +222,7 @@ export class SetlistShare extends LitElement {
       setlist.share = null
       await db.saveSetlist(setlist)
       this.requestUpdate()
+      this.dispatchEvent(new SetlistShareChangeEvent())
     })
   }
 
@@ -215,35 +249,50 @@ export class SetlistShare extends LitElement {
     }
   }
 
+  /** What to say with the link, in a message */
+  get _message() {
+    const setlist = this.setlist
+    if (!setlist?.share) return ''
+    return `Chordless setlist: ${setlistTitle(setlist)}. It opens in your browser, no login needed.`
+  }
+
+  /** Where to send people when there is no share sheet (Chrome on Linux has none) */
+  get _whatsapp() {
+    return `https://wa.me/?text=${encodeURIComponent(`${this._message}\n\n${this._url}`)}`
+  }
+
+  /** Gmail's compose window: a mailto: link does nothing on a desktop with no mail app set up */
+  get _gmail() {
+    const subject = `Setlist: ${this.setlist ? setlistTitle(this.setlist) : ''}`
+    const body = `${this._message}\n\n${this._url}\n`
+    return `https://mail.google.com/mail/?view=cm&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  }
+
+  /** The phone's (or the system's) share sheet: WhatsApp, Messages, and so on */
   async _send() {
     try {
-      await navigator.share({ title: 'Setlist', url: this._url })
+      await navigator.share({
+        title: `Setlist: ${this.setlist ? setlistTitle(this.setlist) : ''}`,
+        text: this._message,
+        url: this._url,
+      })
     } catch {
       // Cancelled, or not allowed: nothing to do
     }
   }
 
+  /** Open the dialog */
+  show() {
+    this._dialog.value?.show()
+  }
+
   override render() {
     const setlist = this.setlist
     if (!setlist) return nothing
-    const share = setlist.share
-    if (!share && !this._available) {
-      return html`
-        <section>
-          <h3>Share link</h3>
-          <p class="note">
-            Sign in with Google on the <a href="/storage">Storage page</a> to share this setlist by
-            link.
-          </p>
-        </section>
-      `
-    }
     return html`
-      <section>
-        <h3>Share link</h3>
-        ${share ? this._renderShared(share.expires) : this._renderNotShared()}
-        ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
-      </section>
+      <app-modal ${ref(this._dialog)} size="medium" heading="Share this setlist">
+        ${this._renderPanel(setlist.share)}
+      </app-modal>
       <app-modal
         ${ref(this._stopModal)}
         type="confirm"
@@ -255,14 +304,39 @@ export class SetlistShare extends LitElement {
     `
   }
 
+  /** What the modal shows */
+  _renderPanel(share: Setlist['share']) {
+    if (!share && !this._available) {
+      return html`
+        <section>
+          <p class="note">
+            Sign in with Google on the <a href="/storage">Storage page</a> to share this setlist by
+            link.
+          </p>
+        </section>
+      `
+    }
+    return html`
+      <section>
+        ${share ? this._renderShared(share.expires) : this._renderNotShared()}
+        ${this._error ? html`<p class="error" role="alert">${this._error}</p>` : nothing}
+      </section>
+    `
+  }
+
   _renderNotShared() {
     return html`
-      <p class="note">
-        Send this setlist and its charts to people who don't use Chordless. They need no account:
-        they open the link and see the set, and can keep it on their phone for the service. The
-        link is encrypted, updates when you change the setlist, and stops working two weeks after.
+      <p>
+        Make a link to this setlist for people outside your Chordless organisation, whether or not
+        they use Chordless.
       </p>
-      <div class="actions">
+      <ul>
+        <li>They need no account or install, and can keep it on their phone.</li>
+        <li>They can read it, but not change it.</li>
+        <li>It updates when you change the setlist, and ends two weeks after its date.</li>
+        <li>Anyone with the link can open it. You can stop sharing at any time.</li>
+      </ul>
+      <div class="actions center">
         <button class="btn primary" ?disabled=${this._busy} @click=${this._create}>
           ${this._busy ? 'Making link…' : 'Create share link'}
         </button>
@@ -272,24 +346,33 @@ export class SetlistShare extends LitElement {
 
   _renderShared(expires: string) {
     return html`
-      <input readonly aria-label="Share link" .value=${this._url} @focus=${(e: FocusEvent) => (e.target as HTMLInputElement).select()} />
-      <div class="actions">
-        <button class="btn primary" @click=${this._copy}>${this._copied ? 'Copied' : 'Copy link'}</button>
+      <div class="link">
+        <input readonly aria-label="Share link" .value=${this._url} @focus=${(e: FocusEvent) => (e.target as HTMLInputElement).select()} />
+        <button class="btn icon-button" aria-label="Copy link" @click=${this._copy}>
+          <app-icon name=${this._copied ? 'check' : 'copy'} size="20"></app-icon>
+        </button>
+      </div>
+      <div class="actions center">
         ${
           typeof navigator.share === 'function'
-            ? html`<button class="btn" @click=${this._send}>Send…</button>`
-            : nothing
+            ? html`<button class="btn primary" id="share-to" @click=${this._send}>Share to…</button>`
+            : html`
+              <a class="btn primary" id="share-whatsapp" href=${this._whatsapp} target="_blank" rel="noopener">WhatsApp</a>
+              <a class="btn" id="share-gmail" href=${this._gmail} target="_blank" rel="noopener">Email (Gmail)</a>
+            `
         }
-        <button class="btn" ?disabled=${this._busy} @click=${this._update}>
-          ${this._busy ? 'Working…' : 'Update now'}
-        </button>
-        <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>Stop sharing</button>
       </div>
       <img src=${qrDataUrl(this._url)} alt="QR code for the share link" />
       <p class="note">
         Ends after ${formatSetlistDate(expires, 'long')}. It updates by itself when you sync; "Update
         now" does it straight away.
       </p>
+      <div class="actions center">
+        <button class="btn" ?disabled=${this._busy} @click=${this._update}>
+          ${this._busy ? 'Working…' : 'Update now'}
+        </button>
+        <button class="btn danger" ?disabled=${this._busy} @click=${this._stop}>Stop sharing</button>
+      </div>
     `
   }
 }
