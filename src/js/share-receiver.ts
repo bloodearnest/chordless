@@ -176,6 +176,14 @@ export async function openShare(
     return { state: 'unavailable', offline: false }
   }
 
+  // Something other than the file (an error page from a proxy, say) isn't a bad key
+  if (!response.headers.get('Content-Type')?.startsWith('application/octet-stream')) {
+    if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
+    db.db?.close()
+    await forgetShare(fileId)
+    return { state: 'unavailable', offline: false }
+  }
+
   let bundle: ShareBundle
   try {
     bundle = await decryptBundle(key, new Uint8Array(await response.arrayBuffer()))

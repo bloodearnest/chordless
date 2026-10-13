@@ -276,3 +276,6 @@ UI
 
 library
  - ccli report nag
+
+- Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
+- The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.

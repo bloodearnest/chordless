@@ -44,7 +44,9 @@ describe('Receiving a share link', () => {
       calls.push(init)
       const headers = new Headers(init?.headers)
       if (headers.get('If-None-Match') === etag) return new Response(null, { status: 304 })
-      return new Response(body, { headers: { ETag: etag } })
+      return new Response(body, {
+        headers: { ETag: etag, 'Content-Type': 'application/octet-stream' },
+      })
     }) as unknown as typeof fetch
     return { fetchFile, calls }
   }
@@ -172,6 +174,14 @@ describe('Receiving a share link', () => {
     expect(calls).to.have.length(0)
     expect(await open(generateShareKey(), fetchFile)).to.deep.equal({ state: 'bad-key' })
     expect(await databases()).to.not.include(`${SHARE_DB_PREFIX}${FILE}`)
+  })
+
+  it("isn't a bad key when what came back isn't the file", async () => {
+    const html = (async () =>
+      new Response('<!doctype html>', {
+        headers: { 'Content-Type': 'text/html' },
+      })) as unknown as typeof fetch
+    expect(await open(key, html)).to.deep.equal({ state: 'unavailable', offline: false })
   })
 
   it('removes the copies of ended shares at start-up, and only those', async () => {

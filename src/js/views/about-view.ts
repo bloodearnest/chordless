@@ -10,6 +10,12 @@ export class AboutView extends PageView {
       <app-header heading="About"></app-header>
       <main class="home-content">
         <h2 style="margin: 2rem 1rem 1rem 1rem">About Chordless</h2>
+        <p id="about-blurb" style="margin: 0 1rem 1rem">
+          Chordless shows the lyrics and chords of worship songs for church, as a setlist you can
+          arrange and play from. Chords can be hidden or shown for each verse, the key can be
+          changed, and one touch moves between songs. It works offline, and your songs are kept in
+          your own Google Drive.
+        </p>
         <app-about id="app-about"></app-about>
         <p style="margin: 2rem 1rem">
           <a href="/privacy.html" rel="external">Privacy policy</a> ·

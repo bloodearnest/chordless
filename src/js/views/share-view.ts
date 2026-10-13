@@ -4,6 +4,7 @@ import type { ChordlessDB } from '../db.ts'
 import type { Route } from '../router.ts'
 import { SetlistPage } from '../setlist-page.ts'
 import { openShare, SHARED_SETLIST_ID, type ShareOpening } from '../share-receiver.ts'
+import { formatSetlistDate } from '../utils/date-utils.ts'
 import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
 import { setlistTemplate } from './setlist-view.ts'
@@ -120,13 +121,14 @@ export class ShareView extends PageView {
       // On the overview only: a song takes the whole screen
       const route = this.route?.name === 'share' ? this.route : null
       const owner = opening.setlist.owner?.trim()
+      const expires = opening.setlist.received?.expires
       const banner =
         route && route.songIndex < 0
           ? html`
             <aside class="share-banner" id="share-banner">
               <span>
                 Shared with you${owner ? html` by <strong>${owner}</strong>` : nothing}. You can
-                read it here, with no account.
+                read it here, with no account${expires ? html`, until ${formatSetlistDate(expires, 'long')}` : nothing}.
               </span>
               <a href="/about">What is Chordless?</a>
             </aside>
