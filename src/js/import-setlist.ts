@@ -115,3 +115,89 @@ export async function createImportedSetlist(
   await db.saveSetlist(setlist)
   return setlist
 }
+
+// ==================== Updating a setlist that is there already ====================
+
+/** What the email would change in a setlist that has its date already */
+export interface SetlistChanges {
+  /** Titles of songs the setlist does not have */
+  added: string[]
+  /** Songs the setlist has and the email does not: left out of the update unless kept */
+  removed: { songId: string; title: string }[]
+  /** Songs in both whose key the email changes */
+  keys: { title: string; from: string | null; to: string }[]
+  /** The songs in both are in another order */
+  reordered: boolean
+}
+
+/** The setlist's own songs, as the reviewed ones relate to them */
+export function changesTo(
+  existing: Setlist,
+  reviewed: ReviewedSong[],
+  titleOf: (songId: string) => string
+): SetlistChanges {
+  const had = new Map(existing.songs.map(entry => [entry.songId, entry]))
+  const now = new Set(reviewed.map(each => each.library.id))
+  const common = (ids: string[], other: Set<string> | Map<string, unknown>) =>
+    ids.filter(id => other.has(id))
+  const ordered = [...existing.songs].sort((a, b) => a.order - b.order).map(entry => entry.songId)
+  return {
+    added: reviewed.filter(each => !had.has(each.library.id)).map(each => each.library.title),
+    removed: ordered.filter(id => !now.has(id)).map(songId => ({ songId, title: titleOf(songId) })),
+    keys: reviewed.flatMap(each => {
+      const entry = had.get(each.library.id)
+      return entry && each.key && each.key !== entry.key
+        ? [{ title: each.library.title, from: entry.key, to: each.key }]
+        : []
+    }),
+    reordered:
+      common(ordered, now).join() !==
+      common(
+        reviewed.map(each => each.library.id),
+        had
+      ).join(),
+  }
+}
+
+/** Does the update change anything? */
+export const hasChanges = (changes: SetlistChanges): boolean =>
+  Boolean(
+    changes.added.length || changes.removed.length || changes.keys.length || changes.reordered
+  )
+
+/**
+ * Change a setlist to the reviewed songs, in the email's order. A song it already had keeps what
+ * the setlist knows of it (its edits to the chart, its tempo) and takes the email's key and note
+ * where the email gives one. Songs only the setlist had are dropped, unless their ids are in
+ * `keep`: those go at the end. Its date, name, time and leader are left as they are.
+ */
+export async function updateImportedSetlist(
+  db: ChordlessDB,
+  existing: Setlist,
+  reviewed: ReviewedSong[],
+  keep: ReadonlySet<string> = new Set()
+): Promise<Setlist> {
+  const had = new Map(existing.songs.map(entry => [entry.songId, entry]))
+  const now = new Set(reviewed.map(each => each.library.id))
+  const songs = reviewed.map(({ song, key, notes, library }) => {
+    const entry = had.get(library.id)
+    return {
+      ...entry,
+      songId: library.id,
+      songUuid: entry?.songUuid ?? library.uuid,
+      key: key ?? entry?.key ?? null,
+      tempo: song.tempo ?? entry?.tempo ?? null,
+      notes: notes || entry?.notes || '',
+    }
+  })
+  const kept = [...existing.songs]
+    .sort((a, b) => a.order - b.order)
+    .filter(entry => !now.has(entry.songId) && keep.has(entry.songId))
+  const updated: Setlist = {
+    ...existing,
+    songs: [...songs, ...kept].map((entry, order) => ({ ...entry, order })),
+    modifiedDate: new Date().toISOString(),
+  }
+  await db.saveSetlist(updated)
+  return updated
+}

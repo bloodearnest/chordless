@@ -174,11 +174,11 @@ test('an email with no date asks for one, and a date that has a setlist is point
 
   await page.getByRole('button', { name: 'Choose a different email' }).click()
   await choose(page, email('Sunday 11th October', ['1. Alpha Song in G']))
-  await expect(page.getByRole('note')).toContainText('You already have a setlist')
-  await expect(page.getByRole('note').getByRole('link')).toHaveAttribute(
-    'href',
-    '/setlist/seeded-setlist'
-  )
+  const group = page.getByRole('group', { name: 'A setlist for this date' })
+  await expect(group).toContainText('You already have a setlist')
+  await expect(group.getByRole('link')).toHaveAttribute('href', '/setlist/seeded-setlist')
+  // Not the leader's: a new setlist is the choice until they say
+  await expect(group.getByLabel('Make a new setlist')).toBeChecked()
 })
 
 test('something that is not an email, or has no songs, says so and stays on the page', async ({
@@ -358,4 +358,87 @@ test('a song only another database has is found there, and copied into the libra
   })
   // It is the library's own song now: the setlist does not depend on the other database
   expect(result).toEqual(['Alpha Song', 'Shared Only Song'])
+})
+
+test('an email for a date that has a setlist can update it, showing what changes first', async ({
+  page,
+}) => {
+  await seedSetlist(page)
+  // The seeded setlist is Alpha (G), Bravo (D), Charlie (A), for 11th October
+  await choose(
+    page,
+    email('Sunday 11th October', [
+      '1. Bravo Song in E',
+      '2. Alpha Song in G',
+      '3. Charlie Song in A',
+    ])
+  )
+  const group = page.getByRole('group', { name: 'A setlist for this date' })
+  await group.getByLabel(/Update/).check()
+  await expect(page.locator('setlist-details-form')).toBeHidden()
+
+  const changes = page.getByRole('region', { name: 'Changes to the setlist' })
+  await expect(changes).toContainText('Bravo Song: key D → E')
+  await expect(changes).toContainText('The songs are in the email’s order')
+  await expect(changes).not.toContainText('Adds')
+
+  await page.getByRole('button', { name: 'Update setlist' }).click()
+  await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)
+  const result = await page.evaluate(async () => {
+    const { getCurrentDB } = await import('/js/db.ts')
+    const db = await getCurrentDB()
+    const setlist = await db.getSetlist('seeded-setlist')
+    const all = await db.getAllSetlists()
+    return {
+      count: all.length,
+      date: setlist?.date,
+      entries: setlist?.songs.map(e => [e.songId, e.key, e.order]),
+    }
+  })
+  expect(result).toEqual({
+    count: 1,
+    date: '2026-10-11',
+    entries: [
+      ['title-bravosong', 'E', 0],
+      ['title-alphasong', 'G', 1],
+      ['title-charliesong', 'A', 2],
+    ],
+  })
+})
+
+test('updating drops a song the email left out, unless it is kept', async ({ page }) => {
+  await seedSetlist(page)
+  await choose(page, email('Sunday 11th October', ['1. Alpha Song in G', '2. Bravo Song in D']))
+  const group = page.getByRole('group', { name: 'A setlist for this date' })
+  await group.getByLabel(/Update/).check()
+  const changes = page.getByRole('region', { name: 'Changes to the setlist' })
+  await expect(changes).toContainText('Keep Charlie Song')
+  await changes.getByLabel(/Keep Charlie Song/).check()
+  await page.getByRole('button', { name: 'Update setlist' }).click()
+  await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)
+  const ids = await page.evaluate(async () => {
+    const { getCurrentDB } = await import('/js/db.ts')
+    const db = await getCurrentDB()
+    return (await db.getSetlist('seeded-setlist'))?.songs.map(e => e.songId)
+  })
+  expect(ids).toEqual(['title-alphasong', 'title-bravosong', 'title-charliesong'])
+})
+
+test('the same leader’s setlist for that date is the one updated, until they say otherwise', async ({
+  page,
+}) => {
+  await seedSetlist(page)
+  await page.evaluate(async () => {
+    const { getCurrentDB } = await import('/js/db.ts')
+    const db = await getCurrentDB()
+    const setlist = await db.getSetlist('seeded-setlist')
+    if (setlist)
+      await db.saveSetlist({ ...setlist, owner: 'Leader One', ownerId: 'one@example.com' })
+  })
+  await choose(page, email('Sunday 11th October', ['1. Alpha Song in G']))
+  const group = page.getByRole('group', { name: 'A setlist for this date' })
+  await expect(group.getByLabel(/Update/)).toBeChecked()
+  await group.getByLabel('Make a new setlist').check()
+  await expect(page.locator('setlist-details-form')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Create setlist' })).toBeEnabled()
 })

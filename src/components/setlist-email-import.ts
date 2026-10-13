@@ -11,11 +11,14 @@ import {
 } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary, type SongMatch } from '../js/import-plan.ts'
 import {
+  changesTo,
   copyFromElsewhere,
   createImportedSetlist,
+  hasChanges,
   type LyricsCache,
   libraryForMatching,
   type ReviewedSong,
+  updateImportedSetlist,
 } from '../js/import-setlist.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { goTo } from '../js/navigation.ts'
@@ -87,6 +90,8 @@ export class SetlistEmailImport extends LitElement {
     _setlist: { state: true },
     _people: { state: true },
     _sameDate: { state: true },
+    _target: { state: true },
+    _keepIds: { state: true },
   }
 
   declare _state: 'pick' | 'reading' | 'review' | 'saving'
@@ -97,6 +102,10 @@ export class SetlistEmailImport extends LitElement {
   declare _setlist: Partial<Setlist>
   declare _people: Person[]
   declare _sameDate: Setlist[]
+  /** 'new', or the id of the setlist of that date the email updates */
+  declare _target: string
+  /** Songs only the setlist has that the person keeps in an update */
+  declare _keepIds: Set<string>
 
   _db: ChordlessDB | null = null
   _library: LibrarySong[] = []
@@ -130,6 +139,11 @@ export class SetlistEmailImport extends LitElement {
       padding: 0.75rem 1rem;
       margin: 0 0 1rem;
     }
+    fieldset.notice label { display: block; margin: 0.35rem 0; }
+    fieldset.notice legend { padding: 0 0.25rem; font-weight: 600; }
+    .changes ul { margin: 0 0 0.75rem; padding-left: 1.25rem; }
+    .changes li { margin: 0.25rem 0; }
+    .changes .hint { color: var(--text-secondary, #5f6b6d); font-size: var(--font-ui-small); }
     ol.songs, ul.songs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.75rem; }
     .song {
       display: grid;
@@ -176,6 +190,8 @@ export class SetlistEmailImport extends LitElement {
     this._setlist = {}
     this._people = []
     this._sameDate = []
+    this._target = 'new'
+    this._keepIds = new Set()
   }
 
   override connectedCallback(): void {
@@ -334,8 +350,30 @@ export class SetlistEmailImport extends LitElement {
       ownerId: email.leader.email || me?.id || '',
     }
     this._sameDate = (await db.getAllSetlists()).filter(have => have.date === date)
+    this._keepIds = new Set()
+    // The same leader's setlist for that day is most likely the one this email is about
+    const mine = this._sameDate.filter(have => this._isLeader(have, email.leader))
+    this._target = mine.length === 1 ? mine[0].id : 'new'
     this._state = 'review'
     this._keep()
+  }
+
+  /** Is the setlist the leader's? By their email, else by their name */
+  _isLeader(setlist: Setlist, leader: { name: string; email: string }): boolean {
+    if (leader.email && setlist.ownerId) return setlist.ownerId.toLowerCase() === leader.email
+    return Boolean(leader.name) && setlist.owner.toLowerCase() === leader.name.toLowerCase()
+  }
+
+  /** The setlist being updated, if the person chose that */
+  _updating(): Setlist | undefined {
+    return this._sameDate.find(have => have.id === this._target)
+  }
+
+  /** The songs to go in the setlist, as the person has settled them (those in the library) */
+  _chosen(): ReviewedSong[] {
+    return [...this._rows, ...this._unlisted]
+      .filter(row => row.include && !this._needsImport(row))
+      .map(row => this._reviewed(row))
   }
 
   async _songsElsewhere(db: ChordlessDB): Promise<SongWithContent[]> {
@@ -426,16 +464,22 @@ export class SetlistEmailImport extends LitElement {
 
   async _create(event: SetlistDetailsSaveEvent): Promise<void> {
     event.stopPropagation()
+    await this._save(event.details)
+  }
+
+  /** Make the setlist, or change the one of that date, as the person chose */
+  async _save(details?: SetlistDetailsSaveEvent['details']): Promise<void> {
     if (!this._db) return
     if (this._missing().length) return
     this._state = 'saving'
     try {
-      const chosen = [...this._rows, ...this._unlisted]
-        .filter(row => row.include)
-        .map(row => this._reviewed(row))
+      const chosen = this._chosen()
       const reviewed = await copyFromElsewhere(this._db, chosen, this._elsewhere)
-      const setlist = await createImportedSetlist(this._db, event.details, reviewed)
-      console.log('[EmailImport] Created setlist', setlist.id, 'with', chosen.length, 'songs')
+      const existing = this._updating()
+      const setlist = existing
+        ? await updateImportedSetlist(this._db, existing, reviewed, this._keepIds)
+        : await createImportedSetlist(this._db, details ?? this._setlist, reviewed)
+      console.log('[EmailImport] Saved setlist', setlist.id, 'with', chosen.length, 'songs')
       this._forget()
       const url = `/setlist/${setlist.id}`
       if (this.dispatchEvent(new SetlistEmailImportedEvent(url))) goTo(url)
@@ -477,6 +521,7 @@ export class SetlistEmailImport extends LitElement {
     const email = this._email as ImportedSetlist
     const missing = this._missing()
     const included = [...this._rows, ...this._unlisted].filter(row => row.include).length
+    const updating = this._updating()
     return html`
       <h2>${email.name || 'Setlist from an email'}</h2>
       <p><button class="small" @click=${this._startAgain}>Choose a different email</button></p>
@@ -484,14 +529,16 @@ export class SetlistEmailImport extends LitElement {
       ${email.dateWarning ? html`<p class="notice" role="note">${email.dateWarning}. Check the date below.</p>` : nothing}
       ${email.date ? nothing : html`<p class="notice" role="note">The email gave no date: check the one below (the nearest Sunday).</p>`}
       ${this._sameDate.length ? this._renderSameDate() : nothing}
-      <h3>Setlist</h3>
-      <setlist-details-form
-        .setlist=${this._setlist}
-        .people=${this._people}
-        hide-actions
-        auto-type
-        @setlist-details-form:save=${this._create}
-      ></setlist-details-form>
+      <div ?hidden=${Boolean(updating)}>
+        <h3>Setlist</h3>
+        <setlist-details-form
+          .setlist=${this._setlist}
+          .people=${this._people}
+          hide-actions
+          auto-type
+          @setlist-details-form:save=${this._create}
+        ></setlist-details-form>
+      </div>
       <h3>Songs</h3>
       ${email.orderFromList ? nothing : html`<p class="notice" role="note">The email had no list of songs, so they are in the order the charts were attached. Check the order.</p>`}
       <ol class="songs" aria-label="Songs">${this._rows.map((row, i) => this._renderRow(row, i + 1))}</ol>
@@ -507,29 +554,79 @@ export class SetlistEmailImport extends LitElement {
           </p>`
           : nothing
       }
+      ${updating && !missing.length ? this._renderChanges(updating) : nothing}
       <div class="create">
         <button class="btn" @click=${() => goTo('/import-song')}>Cancel</button>
         <button
           class="btn primary"
           ?disabled=${missing.length > 0 || included === 0 || this._state === 'saving'}
-          @click=${() => this.shadowRoot?.querySelector('setlist-details-form')?.submit()}
-        >${this._state === 'saving' ? 'Creating…' : 'Create setlist'}</button>
+          @click=${() => (updating ? this._save() : this.shadowRoot?.querySelector('setlist-details-form')?.submit())}
+        >${this._state === 'saving' ? 'Saving…' : updating ? 'Update setlist' : 'Create setlist'}</button>
       </div>
     `
   }
 
   _renderSameDate() {
     return html`
-      <p class="notice" role="note">
-        You already have ${this._sameDate.length === 1 ? 'a setlist' : 'setlists'} for
-        ${formatSetlistDate(this._sameDate[0].date)}:
+      <fieldset class="notice" role="group" aria-label="A setlist for this date">
+        <legend>
+          You already have ${this._sameDate.length === 1 ? 'a setlist' : 'setlists'} for
+          ${formatSetlistDate(this._sameDate[0].date)}
+        </legend>
         ${this._sameDate.map(
-          (have, i) =>
-            html`${i ? ', ' : ''}<a href="/setlist/${have.id}" target="_blank" rel="noopener">${have.name || have.type}</a>`
-        )}.
-        Creating this makes another.
-      </p>
+          have =>
+            html`<label>
+              <input type="radio" name="target" .checked=${this._target === have.id} @change=${() => this._chooseTarget(have.id)} />
+              Update <a href="/setlist/${have.id}" target="_blank" rel="noopener">${have.name || have.type}</a>${have.owner ? html` (${have.owner})` : nothing}
+            </label>`
+        )}
+        <label>
+          <input type="radio" name="target" .checked=${this._target === 'new'} @change=${() => this._chooseTarget('new')} />
+          Make a new setlist
+        </label>
+      </fieldset>
     `
+  }
+
+  _chooseTarget(target: string): void {
+    this._target = target
+    this._keepIds = new Set()
+  }
+
+  /** What updating would change in the setlist, for the person to look over */
+  _renderChanges(setlist: Setlist) {
+    const titles = new Map(this._library.map(song => [song.id, song.title]))
+    const changes = changesTo(setlist, this._chosen(), id => titles.get(id) ?? 'A song')
+    return html`
+      <section class="changes" aria-label="Changes to the setlist">
+        <h3>Changes to ${setlist.name || 'the setlist'}</h3>
+        ${
+          hasChanges(changes)
+            ? html`<ul>
+              ${changes.added.map(title => html`<li>Adds ${title}</li>`)}
+              ${changes.removed.map(
+                ({ songId, title }) => html`<li>
+                  <label>
+                    <input type="checkbox" .checked=${this._keepIds.has(songId)} @change=${(e: Event) => this._keepSong(songId, (e.target as HTMLInputElement).checked)} />
+                    Keep ${title}, which the email does not have (it is removed otherwise)
+                  </label>
+                </li>`
+              )}
+              ${changes.keys.map(({ title, from, to }) => html`<li>${title}: key ${from ?? 'none'} → ${to}</li>`)}
+              ${changes.reordered ? html`<li>The songs are in the email’s order</li>` : nothing}
+            </ul>`
+            : html`<p>The email has the same songs, in the same order and keys: nothing changes.</p>`
+        }
+        <p class="hint">Its date, name, time and leader are left as they are.</p>
+      </section>
+    `
+  }
+
+  _keepSong(id: string, keep: boolean): void {
+    const ids = new Set(this._keepIds)
+    if (keep) ids.add(id)
+    else ids.delete(id)
+    this._keepIds = ids
   }
 
   _renderRow(row: Row, number: number) {
