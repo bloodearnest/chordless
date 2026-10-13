@@ -222,7 +222,8 @@ export async function deleteExpiredShares(today = toLocalDateString(new Date()))
       await db.init()
       const received = (await db.getAllSetlists())[0]?.received
       db.db?.close()
-      if (!received || isExpired(received.expires, today)) {
+      // One with no setlist yet is being opened (the setlist is saved last): leave it be
+      if (received && isExpired(received.expires, today)) {
         await deleteDatabase(name)
         deleted++
       }

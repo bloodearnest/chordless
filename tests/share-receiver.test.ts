@@ -198,4 +198,14 @@ describe('Receiving a share link', () => {
     expect((await indexedDB.databases()).map(d => d.name)).to.include('not-a-share-db')
     indexedDB.deleteDatabase('not-a-share-db')
   })
+
+  it('leaves a share that is still being opened (no setlist saved yet) alone', async () => {
+    const name = `${SHARE_DB_PREFIX}${FILE}`
+    const db = new ChordlessDB(name)
+    await db.init()
+    expect(await deleteExpiredShares('2026-10-21')).to.equal(0)
+    expect(await databases()).to.include(name)
+    db.db?.close()
+    await forgetShare(FILE)
+  })
 })
