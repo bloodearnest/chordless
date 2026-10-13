@@ -1,5 +1,6 @@
 // The production build (npm run build, served by vite preview): what the dev server can't show.
 import { expect, test, waitForServiceWorker } from './fixtures.ts'
+import { email } from './make-email.ts'
 import { must } from './must.ts'
 
 // Every view the router has, by the URL that shows it
@@ -8,6 +9,7 @@ const VIEWS = [
   ['/storage', 'storage-view'],
   ['/preferences', 'preferences-view'],
   ['/import-song', 'import-song-view'],
+  ['/import-setlist', 'import-setlist-view'],
   ['/bookmarklet', 'bookmarklet-view'],
   ['/about', 'about-view'],
   ['/no/such/page', 'not-found-view'],
@@ -57,6 +59,8 @@ test('the files it caches are the files the build made', async ({ page }) => {
   // The lazily loaded views and their code
   expect(cached.filter(path => /\/assets\/.*-view-.*\.js$/.test(path)).length).toBeGreaterThan(5)
   expect(cached).not.toContain('/service-worker.js')
+  // The PDF reader is large and rarely needed: it is not part of the install
+  expect(cached.filter(path => /pdfjs/.test(path))).toEqual([])
 })
 
 test('the security headers are on the page, its deep links and the service worker', async ({
@@ -134,4 +138,31 @@ test('the real app is named Chordless, not the dev name', async ({ request }) =>
   expect(manifest.name).toBe('Chordless')
   expect(manifest.short_name).toBe('Chordless')
   expect(manifest.theme_color).toBe('#2c3e50')
+})
+
+test('reading an email’s PDF works under the Content-Security-Policy', async ({ page }) => {
+  const violations = await collectViolations(page)
+  await page.goto('/')
+  await waitForServiceWorker(page)
+  await page.goto('/import-setlist')
+  await page.locator('#email-file').setInputFiles({
+    name: 'sunday.eml',
+    mimeType: 'message/rfc822',
+    buffer: email(
+      'Sunday 25th October',
+      ['1. Made Up Song in D'],
+      [
+        {
+          name: 'Made Up Song-chords-D.pdf',
+          lines: ['Made Up Song', 'Key - D | Tempo - 90', 'CCLI Song # 1234567'],
+        },
+      ]
+    ),
+  })
+  // The CCLI number in the PDF makes the link the song's own page, not a search
+  await expect(page.getByRole('link', { name: 'Open it on SongSelect' })).toHaveAttribute(
+    'href',
+    'https://songselect.ccli.com/songs/1234567'
+  )
+  expect(violations).toEqual([])
 })

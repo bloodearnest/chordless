@@ -89,6 +89,16 @@ describe('setlist-details-form', () => {
 
   afterEach(() => form?.remove())
 
+  it('can leave out its buttons, and be saved from outside with submit()', async () => {
+    await makeForm({ date: '2026-10-18', name: 'Sunday' })
+    form.hideActions = true
+    await form.updateComplete
+    expect(form.shadowRoot.querySelector('.submit')).to.equal(null)
+    const saved = nextEvent<SetlistDetailsSaveEvent>(SetlistDetailsSaveEvent.type)
+    form.submit()
+    expect((await saved).details.name).to.equal('Sunday')
+  })
+
   const setlist = {
     date: '2026-10-11',
     time: '18:30',

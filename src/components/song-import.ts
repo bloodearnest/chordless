@@ -638,6 +638,13 @@ export class SongImport extends LitElement {
             <span class="subtitle">Bookmarklet, best on desktop</span>
           </span>
         </a>
+        <a class="choice" href="/import-setlist">
+          <span class="icon">✉️</span>
+          <span class="content">
+            <span class="title">Import a Setlist from an Email</span>
+            <span class="subtitle">A leader's email, saved as a file</span>
+          </span>
+        </a>
       </div>
     `
   }

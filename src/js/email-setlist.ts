@@ -67,6 +67,12 @@ export interface ImportedSong {
   listed: string | null
   /** What the email said about the song for the band ("drop out at the bridge"), without links */
   notes: string
+  /**
+   * Set when the chart was not matched by title but because it was the one left over, in the
+   * same key as the one song left over: a leader may list a song by its chorus and attach it
+   * under its title. The page says so, for the person to see.
+   */
+  pairedBy?: 'elimination'
 }
 
 export interface ImportedSetlist {
@@ -695,6 +701,33 @@ function setName(subject: string): string {
   return cleanSubject(subject).replace(/^here['’]?s your set\s*[:\-–]?\s*/i, '')
 }
 
+/**
+ * A listed song with no chart, and an attached chart that no song has, are likely the same song
+ * under different names (a leader lists "Your Grace Is Enough" and attaches "This Is Our God"):
+ * when they are the only ones left with that key. Or when each is the only one left, and one of
+ * them has no key to disagree. Pairs them, as a guess the page shows.
+ */
+function pairLeftovers(
+  items: { song: ListedSong; chart: ChartInfo | null; guessed?: boolean }[],
+  charts: ChartInfo[]
+): void {
+  const free = () => charts.filter(chart => !items.some(item => item.chart === chart))
+  const lacking = () => items.filter(item => !item.chart)
+  for (const item of lacking()) {
+    const keyed = item.song.key
+    const alone = lacking().length === 1 && free().length === 1
+    const sameKey = free().filter(chart => keyed && chart.key === keyed)
+    const sharing = lacking().filter(other => keyed && other.song.key === keyed)
+    if (keyed && sameKey.length === 1 && sharing.length === 1) {
+      item.chart = sameKey[0]
+      item.guessed = true
+    } else if (alone && (!keyed || !free()[0].key)) {
+      item.chart = free()[0]
+      item.guessed = true
+    }
+  }
+}
+
 /** The setlist an email describes. See the top of this file for where each part comes from */
 export function importFromEmail(email: EmailText): ImportedSetlist {
   const forward = innermostForward(email.body)
@@ -724,7 +757,7 @@ export function importFromEmail(email: EmailText): ImportedSetlist {
   const list = parseSongList(text)
   const matched = matchCharts(list, charts)
   // Bullets are only a list of songs if they look like it: a key given, or a chart they match
-  const items = list
+  const items: { song: ListedSong; chart: ChartInfo | null; guessed?: boolean }[] = list
     .map((song, i) => ({ song, chart: matched[i] }))
     .filter(({ song, chart }) => song.numbered || song.key || chart)
   if (!items.length) {
@@ -749,8 +782,14 @@ export function importFromEmail(email: EmailText): ImportedSetlist {
     }
   }
 
-  const songs = items.map(({ song, chart }) =>
-    chart ? fromChart(chart, song, otherKeys.get(chart)) : fromListed(song)
+  pairLeftovers(items, charts)
+  const songs = items.map(({ song, chart, guessed }) =>
+    chart
+      ? {
+          ...fromChart(chart, song, otherKeys.get(chart)),
+          ...(guessed ? { pairedBy: 'elimination' as const } : {}),
+        }
+      : fromListed(song)
   )
   const used = new Set(items.map(item => item.chart))
   return {

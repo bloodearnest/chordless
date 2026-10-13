@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reconcile leaders - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 70rem;
+        margin: 0 auto;
+      }
+      h2 {
+        margin-block: 1.5rem 0.5rem;
+        font-weight: 600;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 0.85rem;
+      }
+      td,
+      th {
+        border: 1px solid #ccc;
+        padding: 0.2rem 0.4rem;
+        text-align: left;
+      }
+      .likely {
+        color: #2874a6;
+      }
+      .weak {
+        color: #b9770e;
+      }
+      .done {
+        color: #27ae60;
+      }
+      .problem {
+        color: #c0392b;
+      }
+      label {
+        display: block;
+        margin-block: 0.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Reconcile leaders</h1>
+      <p>
+        One-off. Setlists that other leaders led, but that say you lead them. Pick the emails those
+        leaders sent (<code>.eml</code> files: docs/TESTING.md, "Real emails", has
+        a script to download them); each setlist is matched to the email for its date (the songs
+        are only compared to choose between emails for the same date), and the email's sender is
+        proposed as its leader. Nothing is saved until you click
+        Apply, and only the rows ticked. This changes the current organisation's setlists on this
+        device; they reach Drive at the next sync.
+      </p>
+      <p>
+        <label>Emails: <input type="file" id="files" accept=".eml,message/rfc822" multiple /></label>
+        <label>
+          Or a folder of them:
+          <input type="file" id="folder" webkitdirectory />
+        </label>
+      </p>
+      <p>
+        <label>My name: <input id="me-name" /></label>
+        <label>My email: <input id="me-id" /></label>
+        <label
+          ><input type="checkbox" id="include-all" /> Also setlists led by other people (to correct
+          wrong leaders)</label
+        >
+      </p>
+      <p>
+        <label
+          >Setlists by name (one rule a line, <code>names, separated by commas =&gt; who</code>; "who"
+          is looked for among the leaders in the emails; these apply to any setlist, whoever leads it
+          now):
+          <textarea id="name-rules" rows="3" cols="60">devoted leaders, jubilee plus => pippa</textarea>
+        </label>
+      </p>
+      <button id="run">Find leaders</button>
+      <div id="status"></div>
+      <div id="output"></div>
+      <button id="apply" hidden>Apply ticked</button>
+    </main>
+    <script type="module" src="/dev/reconcile-leaders.js"></script>
+  </body>
+</html>

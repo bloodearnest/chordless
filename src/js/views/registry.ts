@@ -64,6 +64,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./import-song-view.ts'),
     () => 'Import Songs - Chordless'
   ),
+  'import-setlist': view(
+    'import-setlist-view',
+    () => import('./import-setlist-view.ts'),
+    () => 'Import a Setlist - Chordless'
+  ),
   songs: view(
     'library-view',
     () => import('./library-view.ts'),

@@ -86,6 +86,8 @@ export function leaderChoices(
  * @property {Object} setlist - Initial values ({date, time, type, name, owner, ownerId})
  * @property {Array} people - Who can be chosen as leader: [{id, name}] (see people.js)
  * @property {string} submitLabel - Label for the submit button
+ * @property {boolean} hideActions - Leave out the Cancel and submit buttons: the page has its own,
+ *   and calls submit() to save
  * @property {boolean} autoType - Guess the type from the date and name as they
  *   change (for new setlists)
  *
@@ -99,6 +101,7 @@ export class SetlistDetailsForm extends LitElement {
   static override properties = {
     setlist: { attribute: false },
     submitLabel: { type: String, attribute: 'submit-label' },
+    hideActions: { type: Boolean, attribute: 'hide-actions' },
     autoType: { type: Boolean, attribute: 'auto-type' },
     people: { attribute: false },
     _otherLeader: { state: true },
@@ -106,6 +109,7 @@ export class SetlistDetailsForm extends LitElement {
 
   declare setlist: Partial<Setlist>
   declare submitLabel: string
+  declare hideActions: boolean
   declare autoType: boolean
   declare people: Person[]
   declare _otherLeader: boolean
@@ -247,6 +251,11 @@ export class SetlistDetailsForm extends LitElement {
     return { owner: person?.name || '', ownerId: person?.id || '' }
   }
 
+  /** Save, as the submit button does: the browser checks the fields first, and says what is wrong */
+  submit(): void {
+    this.shadowRoot?.querySelector('form')?.requestSubmit()
+  }
+
   _submit(event: Event): void {
     event.preventDefault()
     const data = new FormData(event.target as HTMLFormElement)
@@ -334,10 +343,14 @@ export class SetlistDetailsForm extends LitElement {
               : ''
           }
         </div>
-        <div class="actions">
-          <button type="button" class="cancel" @click=${this._cancel}>Cancel</button>
-          <button type="submit" class="submit">${this.submitLabel}</button>
-        </div>
+        ${
+          this.hideActions
+            ? ''
+            : html`<div class="actions">
+              <button type="button" class="cancel" @click=${this._cancel}>Cancel</button>
+              <button type="submit" class="submit">${this.submitLabel}</button>
+            </div>`
+        }
       </form>
     `
   }

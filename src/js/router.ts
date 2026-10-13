@@ -9,7 +9,7 @@
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'storage' | 'import-song' | 'bookmarklet' | 'about' }
+ *   { name: 'preferences' | 'storage' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' }
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
  *                                             /setlist/<id>/song/<n>
  *   { name: 'share', fileId, songIndex }     /s/<id> (a setlist shared by link, songIndex -1 for
@@ -19,7 +19,14 @@
  */
 
 /** Routes that are a path of their own and nothing else (and the library's list) */
-export type PageName = 'home' | 'preferences' | 'storage' | 'import-song' | 'bookmarklet' | 'about'
+export type PageName =
+  | 'home'
+  | 'preferences'
+  | 'storage'
+  | 'import-song'
+  | 'import-setlist'
+  | 'bookmarklet'
+  | 'about'
 
 export type Route =
   | { name: PageName }
@@ -35,6 +42,7 @@ const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/preferences': 'preferences',
   '/storage': 'storage',
   '/import-song': 'import-song',
+  '/import-setlist': 'import-setlist',
   '/bookmarklet': 'bookmarklet',
   '/about': 'about',
 }

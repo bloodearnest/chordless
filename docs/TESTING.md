@@ -37,6 +37,11 @@ For code that doesn't run in a page:
 
 - `worker.node.test.ts`: the Cloudflare worker (static files, the SPA fallback, the
   OAuth and session routes).
+- `download-emails.node.test.ts`: the Gmail downloader (`scripts/`), against a fake Gmail.
+- `email-setlist.node.test.ts`: reading a forwarded email as a setlist, on made-up emails.
+- `emails-private.node.test.ts`: the importer over the real emails in `tests/fixtures/private/emails/` (skips when there are none): checks that every one reads as a well formed setlist.
+- `email-mime.node.test.ts`: reading a raw .eml (attachments, a message forwarded as an attachment, HTML only).
+- `leader-reconcile.node.test.ts`: matching setlists to the emails that say who led them.
 - `events.node.test.ts`: every component event class has a unique, namespaced
   `type` (`component:event`), so two events can't collide.
 
@@ -90,6 +95,7 @@ parallel, each in its own browser context.
 | `song-settings.playwright.ts` | A song's settings in a setlist, the media player's settings |
 | `service-worker.playwright.ts` | The service worker serving the shell, and reloading offline |
 | `dev-pages.playwright.ts` | Every page in `src/dev/` loads without errors |
+| `reconcile-leaders.playwright.ts` | The one-off page that sets setlists' leaders from the emails that sent them |
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error. It also has:
@@ -121,6 +127,59 @@ slower, which shows up races like these: `just test-browser-headless --repeat-ea
 good check for a new test.
 
 `just test-browser-ui` opens Playwright's UI, to step through a test.
+
+## Real emails
+
+The email importer (`src/js/email-setlist.ts`) is tuned on real emails from other leaders. They
+can't be committed: the PDFs are copyrighted, and the emails have other people's addresses in
+them. So they live in `tests/fixtures/private/`, which git ignores. Tests that read them skip when
+it is empty, and committed tests use made-up emails of the same shapes.
+
+`scripts/download-emails.ts` fetches them from Gmail. It only reads: the token needs the
+`gmail.readonly` scope and nothing else.
+
+### Getting an access token
+
+An access token lasts an hour, so this is done each time you download (a minute's work).
+
+1. Open the [OAuth 2.0 Playground](https://developers.google.com/oauthplayground/).
+2. Under **Step 1**, scroll to "Input your own scopes" at the bottom, type
+   `https://www.googleapis.com/auth/gmail.readonly`, and click **Authorize APIs**.
+3. Sign in with the Google account that holds the emails, and allow read-only access to Gmail.
+4. Under **Step 2**, click **Exchange authorization code for tokens**.
+5. Copy the **Access token** (it starts `ya29.`). Don't use the refresh token.
+6. When you have finished, revoke the access at
+   [myaccount.google.com/permissions](https://myaccount.google.com/permissions) (the app is
+   "Google OAuth 2.0 Playground").
+
+A Google Workspace account may block this; use a personal Gmail account, or ask its admin.
+
+### Downloading
+
+Put the senders' addresses in a file, one per line (`#` starts a comment), outside the repository
+or in `tests/fixtures/private/`, so the list is not committed either:
+
+```
+# worship leaders
+jenny@example.com
+pippa@example.com
+```
+
+Then, with the token in the environment (not on the command line, where your shell history would
+keep it):
+
+```
+GMAIL_TOKEN='ya29.…' node scripts/download-emails.ts --senders-file tests/fixtures/private/senders.txt --dry-run
+GMAIL_TOKEN='ya29.…' node scripts/download-emails.ts --senders-file tests/fixtures/private/senders.txt
+```
+
+It keeps emails from those senders with at least three PDFs attached (`--min-pdfs`), and saves
+each, whole, as `tests/fixtures/private/emails/<date>-<id>.eml`. Run again later to fetch new
+ones: those already saved are skipped. `--from a@x.com,b@x.com` gives addresses on the command
+line instead, `--after 2025/01/01` limits the dates, and `--dry-run` lists what it would save.
+The options are documented at the top of the script.
+
+If you forward emails to yourself to import them, include your own address as a sender.
 
 ## Coverage
 

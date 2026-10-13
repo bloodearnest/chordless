@@ -533,3 +533,79 @@ test('no date: a weekday alone is not guessed at, and the day it was sent is giv
   assert.equal(result.dateWarning, null)
   assert.equal(result.sentDate, '2026-10-03')
 })
+
+// ---- a listed song and a chart left over ----
+
+const leftoverEmail = (list: string, charts: ChartInfo[]) =>
+  importFromEmail({
+    subject: 'Sunday',
+    from: jenny,
+    date: 'Mon, 19 Oct 2026',
+    body: list,
+    charts,
+  })
+
+test('a listed song with no chart and a chart no song has, in the same key, are one song', () => {
+  const result = leftoverEmail('1. Your Grace Is Enough in E\n2. Other Song in G', [
+    chart('Other Song', 'G', '7001'),
+    chart('This Is Our God', 'E', '5060834'),
+  ])
+  assert.deepEqual(
+    result.songs.map(s => [s.title, s.ccli, s.key, s.pairedBy, s.listed]),
+    [
+      ['This Is Our God', '5060834', 'E', 'elimination', 'Your Grace Is Enough'],
+      ['Other Song', '7001', 'G', undefined, 'Other Song'],
+    ]
+  )
+  assert.deepEqual(result.unlisted, [])
+})
+
+test('the key picks the right chart of several left over, if it is the only one with that key', () => {
+  const result = leftoverEmail("1. Grace you've shown me grace G", [
+    chart('Who You Say I Am', 'Ab', '7102401'),
+    chart('You Have Won Me', 'G', '6143839'),
+  ])
+  assert.deepEqual(
+    result.songs.map(s => [s.title, s.pairedBy]),
+    [['You Have Won Me', 'elimination']]
+  )
+  assert.deepEqual(
+    result.unlisted.map(s => s.title),
+    ['Who You Say I Am']
+  )
+})
+
+test('no pairing when the keys differ, or more than one has the key', () => {
+  const differ = leftoverEmail('1. Unknown Song in E', [chart('Some Chart', 'G', null)])
+  assert.equal(differ.songs[0].chartFilename, null)
+  assert.equal(differ.unlisted.length, 1)
+
+  const twoSongs = leftoverEmail('1. First Unknown in E\n2. Second Unknown in E', [
+    chart('Chart One', 'E', null),
+  ])
+  assert.deepEqual(
+    twoSongs.songs.map(s => s.chartFilename),
+    [null, null],
+    'which of the two it is cannot be told'
+  )
+  const twoCharts = leftoverEmail('1. First Unknown in E', [
+    chart('Chart One', 'E', null),
+    chart('Chart Two', 'E', null),
+  ])
+  assert.equal(twoCharts.songs[0].chartFilename, null)
+})
+
+test('one song and one chart left over, with no key to disagree, are paired', () => {
+  const result = leftoverEmail('1. Mystery Song', [
+    { ...chart('Real Title', 'D', '8001'), key: null },
+  ])
+  assert.deepEqual(
+    result.songs.map(s => [s.title, s.pairedBy]),
+    [['Real Title', 'elimination']]
+  )
+})
+
+test('a song matched by title is not a guess', () => {
+  const result = leftoverEmail('1. Living Hope in Bb', [chart('Living Hope', 'Bb', '7106807')])
+  assert.equal(result.songs[0].pairedBy, undefined)
+})

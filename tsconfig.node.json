@@ -15,6 +15,7 @@
   "include": [
     "*.config.*",
     "vite-plugins",
+    "scripts/*.ts",
     "tests/*.node.test.*",
     "tests/*.playwright.*",
     "tests/fixtures.*",
