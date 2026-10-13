@@ -317,3 +317,45 @@ test('a link from the email Worker opens the review, and a reload keeps it', asy
   await expect(page.getByRole('alert')).toContainText('Could not read that link')
   await expect(page.locator('#email-file')).toBeVisible()
 })
+
+test('a song only another database has is found there, and copied into the library when the setlist is made', async ({
+  page,
+}) => {
+  await seedSetlist(page)
+  await page.evaluate(async () => {
+    const { ChordlessDB } = await import('/js/db.ts')
+    const { addChart } = await import('/js/song-utils.ts')
+    const { SHARED_DB_ID } = await import('/js/share-receiver.ts')
+    const shared = new ChordlessDB(SHARED_DB_ID)
+    await shared.init()
+    await addChart(
+      shared,
+      '{title: Shared Only Song}\n{key: A}\n{ccli: 7654321}\n\n[A]Words here',
+      {
+        variantLabel: 'Shared',
+        importSource: 'test',
+        makeDefault: 'first',
+      }
+    )
+    shared.db?.close()
+  })
+  await choose(
+    page,
+    email('Sunday 25th October', ['1. Alpha Song in G', '2. Shared Only Song in A'])
+  )
+  const row = songsList(page).nth(1)
+  await expect(row).toContainText('In “Shared with me”')
+  await expect(createButton(page)).toBeEnabled()
+
+  await createButton(page).click()
+  await expect(page).toHaveURL(/\/setlist\/[0-9a-f-]+$/)
+  const result = await page.evaluate(async () => {
+    const { getCurrentDB } = await import('/js/db.ts')
+    const db = await getCurrentDB()
+    const setlist = (await db.getAllSetlists()).find(have => have.name === 'Sunday 25th October')
+    const songs = await Promise.all((setlist?.songs ?? []).map(e => db.getSong(e.songUuid)))
+    return songs.map(song => song?.title)
+  })
+  // It is the library's own song now: the setlist does not depend on the other database
+  expect(result).toEqual(['Alpha Song', 'Shared Only Song'])
+})

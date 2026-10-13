@@ -7,6 +7,7 @@
  * has the SongSelect chart or nothing. A song it lacks has to be imported first, from SongSelect
  * with the bookmarklet (songselect-link.ts says where to go), before it can be in the setlist.
  */
+import type { SongSource } from './data-types.ts'
 import { type ImportedSong, normaliseTitle, titleScore } from './email-setlist.ts'
 
 /** A song of the library, as far as matching goes */
@@ -18,6 +19,8 @@ export interface LibrarySong {
   ccli: string | null
   /** The words of its chart, for finding a song by a line of it (see lyricsOf) */
   lyrics?: string
+  /** Set for a song of another database ('Shared with me', another organisation): not the library's yet */
+  source?: SongSource
 }
 
 export type SongMatch =

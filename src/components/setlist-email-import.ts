@@ -1,5 +1,5 @@
 import { css, html, LitElement, nothing } from 'lit'
-import type { Person, Setlist } from '../js/data-types.ts'
+import type { Person, Setlist, SongWithContent } from '../js/data-types.ts'
 import { type ChordlessDB, determineSetlistType, getCurrentDB } from '../js/db.ts'
 import { decodeImport } from '../js/email-link.ts'
 import { readEmail } from '../js/email-mime.ts'
@@ -11,6 +11,7 @@ import {
 } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary, type SongMatch } from '../js/import-plan.ts'
 import {
+  copyFromElsewhere,
   createImportedSetlist,
   type LyricsCache,
   libraryForMatching,
@@ -18,6 +19,7 @@ import {
 } from '../js/import-setlist.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { goTo } from '../js/navigation.ts'
+import { getSongsElsewhere } from '../js/other-songs.ts'
 import { getOrganisationPeople } from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
@@ -98,6 +100,8 @@ export class SetlistEmailImport extends LitElement {
 
   _db: ChordlessDB | null = null
   _library: LibrarySong[] = []
+  /** The songs of the other databases, which a setlist may use (copied in when it is made) */
+  _elsewhere: SongWithContent[] = []
   _lyrics: LyricsCache = new Map()
   _onReturn = () => {
     if (document.visibilityState === 'visible') void this._refresh()
@@ -306,7 +310,8 @@ export class SetlistEmailImport extends LitElement {
   async _review(email: ImportedSetlist, rows?: Decisions[], unlisted?: Decisions[]): Promise<void> {
     const db = await getCurrentDB()
     this._db = db
-    this._library = await libraryForMatching(db, this._lyrics)
+    this._elsewhere = await this._songsElsewhere(db)
+    this._library = await libraryForMatching(db, this._lyrics, this._elsewhere)
     this._email = email
     const make = (songs: ImportedSong[], include: boolean, kept?: Decisions[]) =>
       songs.map((song, i) => {
@@ -333,11 +338,22 @@ export class SetlistEmailImport extends LitElement {
     this._keep()
   }
 
+  async _songsElsewhere(db: ChordlessDB): Promise<SongWithContent[]> {
+    try {
+      return await getSongsElsewhere(db.dbName)
+    } catch (error) {
+      // The library is enough to go on without them
+      console.warn('[EmailImport] Could not read the other databases:', error)
+      return []
+    }
+  }
+
   /** Look at the library again, as songs may have been imported from SongSelect meanwhile */
   async _refresh(): Promise<void> {
     if (this._state !== 'review' || !this._db) return
     try {
-      this._library = await libraryForMatching(this._db, this._lyrics)
+      this._elsewhere = await this._songsElsewhere(this._db)
+      this._library = await libraryForMatching(this._db, this._lyrics, this._elsewhere)
     } catch (error) {
       console.warn('[EmailImport] Could not look at the library again:', error)
       return
@@ -417,7 +433,8 @@ export class SetlistEmailImport extends LitElement {
       const chosen = [...this._rows, ...this._unlisted]
         .filter(row => row.include)
         .map(row => this._reviewed(row))
-      const setlist = await createImportedSetlist(this._db, event.details, chosen)
+      const reviewed = await copyFromElsewhere(this._db, chosen, this._elsewhere)
+      const setlist = await createImportedSetlist(this._db, event.details, reviewed)
       console.log('[EmailImport] Created setlist', setlist.id, 'with', chosen.length, 'songs')
       this._forget()
       const url = `/setlist/${setlist.id}`
@@ -546,7 +563,8 @@ export class SetlistEmailImport extends LitElement {
   _renderMatch(row: Row) {
     const { match, song } = row
     if (match.kind === 'ccli' || match.kind === 'title') {
-      return html`<div class="match ok">✓ In your library${match.song.title === song.title ? '' : html`: ${match.song.title}`}</div>`
+      const there = match.song.source
+      return html`<div class="match ok">${there ? html`✓ In “${there.label}”: it is copied into your library when you create the setlist` : html`✓ In your library`}${match.song.title === song.title ? '' : html`: ${match.song.title}`}</div>`
     }
     if (match.kind === 'possible') {
       const name = `pick-${song.title}-${song.ccli ?? ''}`
