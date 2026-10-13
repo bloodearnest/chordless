@@ -176,6 +176,14 @@ setlists.
 
 ### Read-only access
 
+> **Status (2026-10-13):** the mode is built and needed, but today's *trigger* can never
+> fire. It is detected from the Drive folder's capabilities or a refused upload, and under
+> `drive.file` a person with only read access to someone else's folder cannot open it at
+> all (see SHARING.md, "inviting people to an organisation"). When the Worker broker is
+> built, the trigger becomes the member's role as the Worker reports it; the capability
+> check and the refusal counting can then go (or stay as a safety net). The flag, the UI
+> limits and the skipped uploads below stay as they are.
+
 A user the folder is shared with as a reader (or commenter) can pull but not push. It is asked
 at every `sync()`, when the app starts, and after a Google sign-in (`refreshOrganisationAccess()`,
 src/js/organisation-access.ts; an organisation switch reloads the app, and the flag is read from

@@ -109,7 +109,7 @@ storage/sync
 - setlist-page.js and views/home-view.js still report save/add/delete failures with alert():
   give pages a non-blocking message (toast) instead. (The bookmarklet's alerts stay: they
   show on SongSelect, where Chordless has no UI.)
-- read-only organisations (built; see docs/SYNC_ARCHITECTURE.md): still to do: try it with a real reader account
+- read-only organisations (built; see docs/SYNC_ARCHITECTURE.md): the Drive-capabilities trigger can't fire under drive.file (tested); the role will come from the Worker broker, see the invite item below
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
