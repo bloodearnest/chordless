@@ -267,3 +267,44 @@ test('a song listed under a chorus line but attached under its title is found, a
   // The one attached chart is not offered again as unlisted
   await expect(page.getByText('Charts attached but not in the list')).toHaveCount(0)
 })
+
+test('a link from the email Worker opens the review, and a reload keeps it', async ({ page }) => {
+  await seedSetlist(page)
+  await page.goto('/')
+  const fragment = await page.evaluate(async () => {
+    const { encodeImport } = await import('/js/email-link.ts')
+    const song = (title: string, key: string) => ({
+      title,
+      titles: [title],
+      author: null,
+      key,
+      tempo: null,
+      time: null,
+      ccli: null,
+      chartFilename: null,
+      listed: title,
+      notes: '',
+    })
+    return encodeImport({
+      name: 'Sunday 25th October',
+      date: '2026-10-25',
+      dateWarning: null,
+      sentDate: '2026-10-11',
+      orderFromList: true,
+      leader: { name: 'Leader One', email: 'one@example.com' },
+      songs: [song('Alpha Song', 'G'), song('Bravo Song', 'D')],
+      unlisted: [],
+    })
+  })
+  await page.goto(`/import-setlist#${fragment}`)
+  await expect(songsList(page)).toHaveCount(2)
+  await expect(createButton(page)).toBeEnabled()
+  expect(new URL(page.url()).hash).toBe('')
+  await page.reload()
+  await expect(songsList(page)).toHaveCount(2)
+
+  await page.getByRole('button', { name: 'Choose a different email' }).click()
+  await page.goto('/import-setlist#not-a-link')
+  await expect(page.getByRole('alert')).toContainText('Could not read that link')
+  await expect(page.locator('#email-file')).toBeVisible()
+})

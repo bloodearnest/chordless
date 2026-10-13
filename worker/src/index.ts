@@ -8,7 +8,9 @@
  * - Performs Drive API operations (invite/revoke) on-demand with decrypted blobs
  */
 
+import { EmailMessage } from 'cloudflare:email'
 import * as jose from 'jose'
+import { handleEmail, type IncomingEmail } from './email.ts'
 import { exchangeCode, type GoogleEnv, refreshAccessToken, verifyIdToken } from './google-auth.ts'
 import { handleShareDownload, type ShareCache, type ShareEnv, shareFileId } from './share.ts'
 import { withSharePreview } from './share-page.ts'
@@ -20,6 +22,8 @@ interface Env extends GoogleEnv, ShareEnv {
   DEV_PAGES?: string
   /** Used when the client sends no redirect_uri */
   GOOGLE_REDIRECT_URI?: string
+  /** The address links in email replies point to; chordless.app when unset */
+  APP_ORIGIN?: string
   /** Base64 AES-256 key for the token blobs */
   JWE_ENCRYPTION_KEY: string
 }
@@ -125,6 +129,15 @@ export default {
       console.error('Worker error:', error)
       return jsonResponse({ error: 'Internal server error', message: message(error) }, 500)
     }
+  },
+
+  /** An email sent to the import address (Cloudflare Email Routing): answered with a link */
+  async email(message: IncomingEmail, env: Env) {
+    await handleEmail(
+      message,
+      (from, to, raw) => new EmailMessage(from, to, raw),
+      env.APP_ORIGIN ?? 'https://chordless.app'
+    )
   },
 }
 

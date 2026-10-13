@@ -201,12 +201,17 @@ ccli import
   matching by CCLI number, then title, then close titles to confirm, then, if no title is close, a
   line of the songs' words (src/js/import-plan.ts: leaders call a song by its chorus, e.g. "Your Grace
   Is Enough" for "This Is Our God"; never picked for the person).
+  Built too: the email Worker (worker/src/email.ts; docs/EMAIL_IMPORT.md): a forwarded email gets a
+  reply with /import-setlist#<setlist> (src/js/email-link.ts), tried in workerd with wrangler dev.
+  Needs, by hand, in the Cloudflare dashboard: Email Routing on chordless.app and an address that
+  sends to the Worker; then a real forward from a phone. Consider rate limiting the replies.
+  Once the Worker is proven live: consider dropping the .eml file picker from the page. The app
+  would then not need postal-mime, unpdf or the 1.6 MB pdf.js chunk at all (only the Worker reads
+  emails and PDFs; the page just decodes the link). Kept for now: it is the only way in until the
+  Email Routing address exists, and the email never leaves the device.
   Still to build: matching songs against the other databases too (other-songs.ts: "Shared with
   me" and other organisations); an existing setlist for the same date and leader (the review page
-  only points it out now: offer to update it, and show the changes); the email Worker, replying
-  with a link that holds only the metadata in the # (the readers it needs, email-mime.ts and
-  pdf-text.ts, are built; the PDF reader is a 1.6 MB chunk the service worker does not precache);
-  other ways in than picking an .eml (a pasted link from the Worker, Share To); privacy.html; a
+  only points it out now: offer to update it, and show the changes); other ways in than picking an .eml (Share To); a
   createdBy field (an imported setlist's owner is the leader, so the importer cannot delete it;
   docs/SYNC_ARCHITECTURE.md).
 - email import, a rule: the PDFs are never imported as charts. They are read only for their title,
@@ -330,6 +335,32 @@ UI
 
 library
  - ccli report nag
+ - lyrics full-text search (IndexedDB has no native full-text search: only key/range and exact-match
+   multiEntry indexes; the library has to be an in-memory index we store ourselves). Use MiniSearch
+   (about 7 kB, ESM, toJSON/loadJSON, fuzzy + prefix; custom processTerm: lowercase, strip accents,
+   stem, drop stop words). One document per song: id, title, author, lyrics (author weighted above
+   lyrics, title above both; author is already on every song, from {artist}/{author}), where lyrics come from
+   lyricsOf (src/js/import-plan.ts), which strips chords, directives and CCLI lines and rejoins
+   SongSelect's split syllables ("e - [D]nough"); no library does that for ChordPro. Store the
+   serialised index in its own IndexedDB store, as a derived cache that is safe to drop.
+   Use it in: the library search box (find a song by its chorus; SongSelect's own search is bad),
+   and matchLibrary's "line of the song's words" step in place of the scan.
+   When the index must be updated or rebuilt:
+   - a chart is saved or deleted (db.saveChordPro/deleteChordPro: the writers are song-utils.ts
+     createSong/edit/delete and drive-sync.ts), so a song added by the SongSelect bookmarklet, an
+     edit, or a delete is reflected at once: re-add that one document (MiniSearch discard + add)
+   - after a Drive sync pulls charts changed on another device: re-index by comparing each
+     chart's contentHash (the same key import-setlist.ts uses for its lyrics cache), not everything
+   - switching organisation/database: one index per database (a received "Shared with me" song
+     is in its own database). Searching across them means querying each in-memory index and
+     merging by score, tagged "From …" like the library search does now: cheap (a search is
+     milliseconds), only the loading of each index costs, so load them lazily. Scores from
+     different indexes are not strictly comparable (they depend on each index's word counts); fine
+     for this, or one index with a database field if it ever matters. Per-database keeps dropping
+     an organisation's index trivial.
+   - a missing store, a different index version (bump when the tokeniser/stemmer changes) or
+     storage eviction: rebuild lazily on first search, in batches, off the main thread if slow
+   - Reset from Drive / organisation delete: drop that database's index with it
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.

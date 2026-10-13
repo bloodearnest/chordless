@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Person, Setlist } from '../js/data-types.ts'
 import { type ChordlessDB, determineSetlistType, getCurrentDB } from '../js/db.ts'
+import { decodeImport } from '../js/email-link.ts'
 import { readEmail } from '../js/email-mime.ts'
 import {
   type ImportedSetlist,
@@ -176,17 +177,29 @@ export class SetlistEmailImport extends LitElement {
     super.connectedCallback()
     document.addEventListener('visibilitychange', this._onReturn)
     window.addEventListener('focus', this._onReturn)
+    window.addEventListener('hashchange', this._onHash)
     void this._restore()
   }
 
   override disconnectedCallback(): void {
     document.removeEventListener('visibilitychange', this._onReturn)
     window.removeEventListener('focus', this._onReturn)
+    window.removeEventListener('hashchange', this._onHash)
     super.disconnectedCallback()
+  }
+
+  /** A link opened in a tab that is already on this page */
+  _onHash = (): void => {
+    // biome-ignore lint/plugin: the setlist is the link's fragment (not a route)
+    const fragment = location.hash
+    if (fragment.length > 1) void this._openLink(fragment)
   }
 
   /** The email reviewed before a reload or a trip to SongSelect, if the person left one */
   async _restore(): Promise<void> {
+    // biome-ignore lint/plugin: the setlist is the link's fragment (not a route)
+    const fragment = location.hash
+    if (fragment.length > 1 && (await this._openLink(fragment))) return
     try {
       const text = sessionStorage.getItem(KEPT)
       // Not the file picker, flashing up, while a review that was kept comes back
@@ -202,6 +215,26 @@ export class SetlistEmailImport extends LitElement {
       console.warn('[EmailImport] Could not restore the email:', error)
       this._forget()
       this._state = 'pick'
+    }
+  }
+
+  /**
+   * The setlist in a link from the email Worker (/import-setlist#...). The fragment is taken off
+   * the address once read, so a reload goes back to the review in progress, with its changes.
+   */
+  async _openLink(fragment: string): Promise<boolean> {
+    this._state = 'reading'
+    try {
+      const email = await decodeImport(fragment)
+      history.replaceState(history.state, '', location.pathname + location.search)
+      await this._review(email)
+      return true
+    } catch (error) {
+      console.error('[EmailImport] Could not read the link:', error)
+      history.replaceState(history.state, '', location.pathname + location.search)
+      this._error = `Could not read that link: ${errorMessage(error)}`
+      this._state = 'pick'
+      return true
     }
   }
 
