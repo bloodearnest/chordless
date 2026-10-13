@@ -333,6 +333,24 @@ UI
   src/js/install.ts and the welcome card: reuse them. Skip when already installed. Installing
   also lets Chrome grant persistent storage.
 
+- email replies: a logo where Gmail shows a profile picture needs BIMI, and BIMI needs a VMC or CMC
+  certificate (from a CA such as DigiCert or Entrust, a yearly cost; Let's Encrypt cannot issue it).
+  Without one Gmail shows the letter circle. The other parts: a DNS TXT at default._bimi.chordless.app
+  pointing at an SVG Tiny PS logo served over HTTPS (public/ would do), DMARC at p=quarantine or
+  reject, and SPF/DKIM that align with the domain (check that Cloudflare signs the Worker's replies
+  with the domain's own DKIM key: not known). Not worth it for one church team; revisit if a
+  certificate is bought for another reason.
+- infrastructure as code with the Cloudflare Terraform provider (v5), worth doing so an agent can
+  read the production set-up and change it, not only a person in the dashboard. Start with what is
+  in the dashboard by hand now: the zone's Email Routing settings and the import@chordless.app rule
+  that sends to the Worker (cloudflare_email_routing_settings, cloudflare_email_routing_rule), then
+  the DNS records (cloudflare_dns_record: SPF, DMARC, and BIMI if ever). Leave the Worker and its
+  assets to wrangler (it builds them). Put it in an infra/ directory, `terraform import` what exists
+  first so nothing is recreated, and run plan before apply. The API token goes in the environment
+  (CLOUDFLARE_API_TOKEN, scoped to this zone: DNS and Email Routing edit), never in a file or an
+  argument. Keep state out of git (it can hold secrets): a remote backend, or a gitignored local
+  file. Document it in docs/ (a new INFRASTRUCTURE.md) and in CLAUDE.md so an agent knows it is there.
+
 library
  - ccli report nag
  - lyrics full-text search (IndexedDB has no native full-text search: only key/range and exact-match
