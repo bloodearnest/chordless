@@ -27,6 +27,7 @@ export class SongList extends LitElement {
   static override properties = {
     songs: { type: Array, attribute: false },
     variant: { type: String, attribute: 'variant' },
+    search: { type: String },
     emptyMessage: { type: String, attribute: 'empty-message' },
     emptyDetail: { type: String, attribute: 'empty-detail' },
     dense: { type: Boolean, reflect: true },
@@ -34,6 +35,8 @@ export class SongList extends LitElement {
 
   declare songs: SongWithContent[]
   declare variant: string
+  /** The search the songs were filtered by: each card marks where it matched */
+  declare search: string
   declare emptyMessage: string
   declare emptyDetail: string
   declare dense: boolean
@@ -42,6 +45,7 @@ export class SongList extends LitElement {
     super()
     this.songs = []
     this.variant = 'library'
+    this.search = ''
     this.emptyMessage = 'No songs to display.'
     this.emptyDetail = ''
     this.dense = false
@@ -90,6 +94,7 @@ export class SongList extends LitElement {
             <song-card
               .song=${song}
               .variant=${this.variant}
+              .search=${this.search}
               @song-card:click=${(event: Event) => this._handleSongClick(song, index, event)}
             >
             </song-card>

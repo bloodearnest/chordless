@@ -1,6 +1,8 @@
 import { css, html, LitElement } from 'lit'
+import type { ParsedChart } from '../js/data-types.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
+import { lyricSnippet, matchedFields, normalizeTerm } from '../js/utils/song-filter.ts'
 import './icon.ts'
 import type { KeyChangeEvent } from './key-selector.ts'
 import './key-selector.ts'
@@ -9,6 +11,8 @@ import './key-selector.ts'
 export interface SongCardSong {
   title: string
   artist?: string | null
+  /** The chart, to show where a search matched its lyrics */
+  parsed?: ParsedChart | null
   metadata?: {
     key?: string | null
     tempo?: string | number | null
@@ -87,11 +91,14 @@ export class SongCard extends LitElement {
     song: { type: Object, attribute: false },
     variant: { type: String, reflect: true },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
+    search: { type: String },
   }
 
   declare song: SongCardSong | null
   declare variant: string
   declare editMode: boolean
+  /** The library search the song matched: its matches are marked, and a lyrics match is quoted */
+  declare search: string
 
   contextMenuHandler?: (e: Event) => void
 
@@ -178,6 +185,26 @@ export class SongCard extends LitElement {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+    }
+
+    mark {
+      background: var(--search-match-bg, rgba(255, 200, 0, 0.4));
+      color: inherit;
+      border-radius: 2px;
+    }
+
+    .lyric-match {
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary, #5f6b6d);
+      margin-top: 0.5rem;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .match-label {
+      font-weight: 600;
+      margin-inline-end: 0.5em;
     }
 
     .meta {
@@ -318,6 +345,7 @@ export class SongCard extends LitElement {
     this.song = null
     this.variant = 'library'
     this.editMode = false
+    this.search = ''
   }
 
   override render() {
@@ -334,7 +362,7 @@ export class SongCard extends LitElement {
         <div class="card" part="card" @click=${this._handleClick}>
           <div class="card-content">
             <div class="line1">
-              <div class="title" part="title">${this.song.title}</div>
+              <div class="title" part="title">${this._mark(this.song.title)}</div>
               ${
                 this.variant !== 'setlist' && this.song.artist
                   ? html`
@@ -348,6 +376,7 @@ export class SongCard extends LitElement {
               <div class="meta" part="meta">${this._renderMeta()}</div>
               ${this.variant !== 'setlist' ? this._renderLastPlayed() : ''}
             </div>
+            ${this._renderLyricMatch()}
           </div>
 
           <div class="edit-controls">
@@ -365,6 +394,34 @@ export class SongCard extends LitElement {
         </div>
       </div>
     `
+  }
+
+  /** The text with the search term marked wherever it occurs */
+  _mark(text: string) {
+    const term = normalizeTerm(this.search)
+    const lower = text.toLowerCase()
+    if (!term || lower.length !== text.length || !lower.includes(term)) return text
+    const parts: unknown[] = []
+    let from = 0
+    for (let at = lower.indexOf(term); at >= 0; at = lower.indexOf(term, from)) {
+      parts.push(text.slice(from, at), html`<mark>${text.slice(at, at + term.length)}</mark>`)
+      from = at + term.length
+    }
+    parts.push(text.slice(from))
+    return parts
+  }
+
+  /** For a song found by its words alone: the line that matched */
+  _renderLyricMatch() {
+    const { song, search } = this
+    if (!song?.parsed || !search) return ''
+    const found = matchedFields(song, search)
+    if (found.title || found.artist || !found.lyrics) return ''
+    const snippet = lyricSnippet(song.parsed, search)
+    if (!snippet) return ''
+    return html`<div class="lyric-match" part="lyric-match">
+      <span class="match-label">Lyrics</span>${snippet.before}<mark>${snippet.match}</mark>${snippet.after}
+    </div>`
   }
 
   _renderMeta(): string {
@@ -394,10 +451,10 @@ export class SongCard extends LitElement {
     if (cleanedArtists.length === 0) return ''
 
     if (cleanedArtists.length > 2) {
-      return html`${cleanedArtists[0]} <i>et al</i>`
+      return html`${this._mark(cleanedArtists[0])} <i>et al</i>`
     }
 
-    return cleanedArtists.join(', ')
+    return this._mark(cleanedArtists.join(', '))
   }
 
   _renderLastPlayed() {

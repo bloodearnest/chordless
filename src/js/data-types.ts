@@ -116,8 +116,6 @@ export interface SongRecord {
   /** What this device recorded about the synced file */
   driveProperties?: SongDriveProperties | null
   contentHash: string
-  /** Searchable lyrics; nothing sets this yet (see the TODO) */
-  lyricsText?: string
 }
 
 /** A song as it is passed to be saved: tempos may still be a chart's text */

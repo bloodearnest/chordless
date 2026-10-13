@@ -28,9 +28,6 @@ bugs
   gets another click halfway. For slow songs, which need more clicks. Decide how it is shown
   (the second click quieter than the beats, like a light accent in MetronomeController), and
   whether it is remembered per device (media-settings) or per song
-- the song library's search says "title, artist, or lyrics", but nothing sets song.lyricsText,
-  so only title and artist are searched (filterSongs in views/library-view.js; setlist-page.js's
-  add-song search has the same). Build lyricsText when a song is loaded, or search the chart
 
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc

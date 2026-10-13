@@ -546,6 +546,7 @@ export class LibraryView extends PageView {
       variant="library"
       empty-message="No songs match your search."
       .songs=${filterSongs(songs, this._search)}
+      .search=${this._search}
       @song-list:select=${(event: SongSelectEvent) => event.song && this.#openSong(event.song)}
     ></song-list>`
   }

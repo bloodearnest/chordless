@@ -91,10 +91,11 @@ export class AddSongModal {
       const listening = new AbortController()
       input.addEventListener(
         'input',
-        event => this.#renderResults(filterSongs(songs, (event.target as HTMLInputElement).value)),
-        {
-          signal: listening.signal,
-        }
+        event => {
+          const search = (event.target as HTMLInputElement).value
+          this.#renderResults(filterSongs(songs, search), search)
+        },
+        { signal: listening.signal }
       )
       modal.addEventListener(ModalCloseEvent.type, () => listening.abort(), { once: true })
     } catch (error) {
@@ -122,13 +123,14 @@ export class AddSongModal {
     }
   }
 
-  #renderResults(songs: SongWithContent[]): void {
+  #renderResults(songs: SongWithContent[], search = ''): void {
     const results = this.#results
     if (!results) return
     results.textContent = ''
 
     const songList = document.createElement('song-list')
     songList.songs = songs
+    songList.search = search
     songList.variant = 'library'
     songList.emptyMessage = 'No songs match your search.'
     songList.dense = true
