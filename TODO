@@ -208,8 +208,10 @@ ccli import
   Built too: matching songs of the other databases (copied into the library when the setlist is
   made); updating the setlist that has the date (the same leader's is the default, the changes
   are shown first); rate limits on the Worker (per sender and overall); createdBy on setlists
-  (recorded, nothing decides by it yet); no .eml file picker (only the Worker reads emails and
-  PDFs, so the app has no PDF reader). Other ways in are not built: Share To (email apps
+  (recorded, nothing decides by it yet); no .eml file picker (only the Worker reads emails;
+  the app reads a PDF only when one is shared to it, see docs/EMAIL_IMPORT.md). WhatsApp can
+  share neither text messages nor a selection of them, so a setlist cannot come from it: one
+  downloaded PDF at a time can. Other ways in are not built: Share To (email apps
   do not share an email to a web app) and a pasted link are not worth it, as the reply's link
   opens the installed app.
   Still to build: use of createdBy (an imported setlist's owner is the leader, so the importer

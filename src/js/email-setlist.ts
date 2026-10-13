@@ -629,6 +629,11 @@ function titlesOf(...titles: (string | null | undefined)[]): string[] {
 
 // ==================== Putting it together ====================
 
+/** The song a lone chart is, to look for in a library (a PDF shared to the app) */
+export function songOfChart(chart: ChartInfo): ImportedSong {
+  return fromChart(chart)
+}
+
 function fromChart(
   chart: ChartInfo,
   listed: ListedSong | null = null,

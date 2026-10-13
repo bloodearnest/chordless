@@ -3,11 +3,14 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist, SongRecord } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.ts'
+import { parseChartText, songOfChart } from '../js/email-setlist.ts'
+import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
+import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
-import type { Shared } from '../js/shared-incoming.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
+import { songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -33,6 +36,18 @@ const parser = new ChordProParser()
 
 const NOT_TEXT = /^(image|audio|video|font)\/|^application\/(pdf|zip)/
 
+/** A shared PDF chart whose song the library lacks, or is not sure of */
+interface UnmatchedChart {
+  title: string
+  key: string | null
+  /** SongSelect's page for the song, to import it with the bookmarklet */
+  link: string
+  /** Songs it might be: the person says */
+  candidates: LibrarySong[]
+}
+
+const isPdf = (file: File) => file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+
 /** A song arriving to be imported (from a file, pasted text or the bookmarklet) */
 export interface IncomingSong {
   name?: string
@@ -49,6 +64,8 @@ interface ImportItem {
   chordproText: string
   isDuplicate: boolean
   choice: 'update' | 'use-existing' | null
+  /** The key to play it in when added to a setlist (a shared chart's), else the song's own */
+  key?: string | null
 }
 
 /** "Amazing Grace.cho" -> "Amazing Grace" */
@@ -81,6 +98,7 @@ export class SongImport extends LitElement {
     // [{song, chordproText, isDuplicate, choice: null | 'update' | 'use-existing'}]
     _imports: { state: true },
     _skipped: { state: true }, // ['name: reason'], files that weren't songs
+    _unmatched: { state: true }, // shared PDFs the library has no song for
     _setlists: { state: true },
     _people: { state: true },
     _newSetlist: { state: true },
@@ -90,6 +108,7 @@ export class SongImport extends LitElement {
   declare _error: string
   declare _imports: ImportItem[]
   declare _skipped: string[]
+  declare _unmatched: UnmatchedChart[]
   declare _setlists: Setlist[]
   declare _people: Person[]
   declare _newSetlist: Partial<Setlist> | null
@@ -340,6 +359,7 @@ export class SongImport extends LitElement {
     this._error = ''
     this._imports = []
     this._skipped = []
+    this._unmatched = []
     this._setlists = []
     this._people = []
     this._newSetlist = null
@@ -368,30 +388,90 @@ export class SongImport extends LitElement {
   async _takeIncoming(): Promise<void> {
     const incoming = await takeIncoming()
     if (!incoming) return
-    const songs = await this._songsFromFiles(incoming.files)
+    const pdfs = incoming.files.filter(isPdf)
+    const songs = await this._songsFromFiles(incoming.files.filter(file => !isPdf(file)))
     if (incoming.text.trim()) {
       songs.push({ name: 'Shared text', chordproText: incoming.text, source: 'share' })
     }
-    await this.receiveAll(songs)
-    this._reportUnusual(incoming)
+    if (songs.length) await this.receiveAll(songs)
+    if (pdfs.length) await this._matchCharts(pdfs)
   }
 
-  /** Temporary probe: say what a share held beyond ChordPro files and text, to see what WhatsApp sends */
-  _reportUnusual(incoming: Shared): void {
-    if (
-      !incoming.title &&
-      !incoming.url &&
-      incoming.files.every(f => !f.type.startsWith('application/'))
-    )
-      return
-    const files = incoming.files.map(f => `${f.name} (${f.type || 'no type'}, ${f.size} bytes)`)
-    this._showError(
-      [
-        `Received ${incoming.files.length} file(s): ${files.join('; ') || 'none'}`,
-        `title: ${incoming.title || '-'}`,
-        `url: ${incoming.url || '-'}`,
-        `text: ${incoming.text.slice(0, 500) || '-'}`,
-      ].join(' | ')
+  /**
+   * Find the library's songs for PDF charts (a leader's, shared from a chat): read as an
+   * emailed chart is, and matched the same way. The PDF is never imported (see import-plan.ts):
+   * the library has the SongSelect chart or nothing, and a song it lacks is linked to SongSelect.
+   */
+  async _matchCharts(pdfs: File[]): Promise<void> {
+    try {
+      const db = await getCurrentDB()
+      this._db = db
+      const library = await libraryForMatching(db)
+      let readPdf = async (_pdf: ArrayBuffer) => ''
+      try {
+        readPdf = (await import('../js/pdf-text.ts')).readPdfText
+      } catch (error) {
+        console.warn('[Import] Could not load the PDF reader, using filenames:', error)
+      }
+      const found: { uuid: string; key: string | null }[] = []
+      const unmatched: UnmatchedChart[] = []
+      for (const pdf of pdfs) {
+        const chart = parseChartText(await readPdf(await pdf.arrayBuffer()), pdf.name)
+        const song = songOfChart(chart)
+        const match = matchLibrary(song, library)
+        if (match.kind === 'ccli' || match.kind === 'title')
+          found.push({ uuid: match.song.uuid, key: song.key })
+        else {
+          const candidates = match.kind === 'possible' ? match.candidates : []
+          unmatched.push({
+            title: song.title,
+            key: song.key,
+            link: songSelectLink(song),
+            candidates,
+          })
+        }
+      }
+      this._unmatched = [...this._unmatched, ...unmatched]
+      await this._addLibrarySongs(found)
+    } catch (error) {
+      console.error('[Import] Failed to read a chart:', error)
+      this._showError(`Failed to read the chart: ${errorMessage(error)}`)
+    }
+  }
+
+  /** Offer songs already in the library, as if just imported: to sing, or to add to a setlist */
+  async _addLibrarySongs(songs: { uuid: string; key: string | null }[]): Promise<void> {
+    const db = this._database()
+    const records = await db.getAllSongs()
+    const added: ImportItem[] = []
+    for (const { uuid, key } of songs) {
+      const song = records.find(record => record.uuid === uuid)
+      if (!song || [...this._imports, ...added].some(item => item.song.uuid === uuid)) continue
+      added.push({ song, chordproText: '', isDuplicate: false, choice: null, key })
+    }
+    if (!this._imports.length && !added.length) return
+    this._imports = [...this._imports, ...added]
+    this._setlists = (await db.getAllSetlists()).sort((a, b) => b.date.localeCompare(a.date))
+    this._state = 'choices'
+  }
+
+  async _useCandidate(chart: UnmatchedChart, candidate: LibrarySong): Promise<void> {
+    this._unmatched = this._unmatched.filter(each => each !== chart)
+    await this._addLibrarySongs([{ uuid: candidate.uuid, key: chart.key }])
+  }
+
+  _renderUnmatched() {
+    return this._unmatched.map(
+      chart => html`
+        <div class="status unmatched">
+          <p>Not in your library: <strong>${chart.title}</strong></p>
+          ${chart.candidates.map(
+            candidate =>
+              html`<button class="btn" @click=${() => this._useCandidate(chart, candidate)}>Use ${candidate.title}</button>`
+          )}
+          <p><a href=${chart.link} target="_blank" rel="noopener">Find it on SongSelect ↗</a></p>
+        </div>
+      `
     )
   }
 
@@ -521,12 +601,12 @@ export class SongImport extends LitElement {
       const db = this._database()
       const setlist = await db.getSetlist(setlistId)
       if (!setlist) throw new Error('Setlist not found')
-      for (const { song } of this._imports) {
+      for (const { song, key } of this._imports) {
         setlist.songs.push({
           order: setlist.songs.length,
           songId: song.id,
           songUuid: song.uuid,
-          key: null,
+          key: key ?? null,
           tempo: null,
           notes: '',
         })
@@ -599,7 +679,7 @@ export class SongImport extends LitElement {
   }
 
   override render() {
-    return html`<div class="page">${this._renderState()}</div>`
+    return html`<div class="page">${this._renderUnmatched()}${this._renderState()}</div>`
   }
 
   _renderState() {

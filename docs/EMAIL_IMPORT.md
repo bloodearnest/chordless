@@ -6,8 +6,8 @@ Chordless makes a setlist from it. Two ways in, one review page.
 ## The flow
 
 1. **Forward the email** to the import address (the Worker below). The Import a Setlist page
-   (`/import-setlist`) says so; it has no file picker, and the app reads no email or PDF itself:
-   only the Worker does, so the app has no PDF reader or email parser in it.
+   (`/import-setlist`) says so; it has no file picker, and the app reads no email itself: only the
+   Worker does. (The app reads a PDF only when one is shared to it, below.)
 2. The email is read: the leader (the innermost forwarded sender), the date, the songs in order
    with keys and notes, and each PDF's title, key, tempo and CCLI number
    (`src/js/email-setlist.ts`, `email-mime.ts`, `pdf-text.ts`).
@@ -58,3 +58,14 @@ The `.eml` needs a `Message-ID` header. The reply is written under `dist/chordle
 
 The link holds titles, keys, CCLI numbers, the date, and the leader's name and email: never a PDF,
 the body, or the `To:`/`Cc:` lists. `public/privacy.html` says so.
+
+## A PDF shared to the app
+
+WhatsApp cannot share text messages, or a selection of messages, to another app, so a whole setlist
+cannot come that way. A downloaded PDF can: Share on it, then Chordless (the manifest's
+`share_target` accepts `application/pdf`; Chromium only, so Android and installed Windows). The
+service worker keeps it for `/import-song` (`shared-incoming.ts`), which reads it with `pdf-text.ts`
+and `parseChartText`, and matches it as an emailed chart is (`matchLibrary`). A song found goes into
+the usual import choices (sing it, or add it to a setlist); one not found links to SongSelect, and
+close titles are offered. The PDF is never imported. The PDF reader (`assets/pdfjs-*.js`, 1.6 MB)
+is not precached: it is fetched the first time (so that needs the network), then cached.

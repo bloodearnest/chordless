@@ -42,6 +42,8 @@ test('a share is a POST of files and text to the address the service worker hand
   // The names the service worker reads (shared-incoming.ts)
   assert.equal(target.params.text, 'text')
   assert.equal(target.params.files[0].name, 'files')
+  // A leader's charts are PDFs
+  assert.ok(target.params.files[0].accept.includes('application/pdf'))
   // It is not a page of its own: the service worker answers it with a redirect
   assert.ok(!isView(target.action))
 })

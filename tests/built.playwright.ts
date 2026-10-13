@@ -61,7 +61,7 @@ test('the files it caches are the files the build made', async ({ page }) => {
   // The lazily loaded views and their code
   expect(cached.filter(path => /\/assets\/.*-view-.*\.js$/.test(path)).length).toBeGreaterThan(5)
   expect(cached).not.toContain('/service-worker.js')
-  // Reading emails and PDFs is the Worker's job: none of it is in the app
+  // Reading a PDF (a chart shared to the app) is loaded when first needed, not precached
   expect(cached.filter(path => /pdfjs/.test(path))).toEqual([])
 })
 

@@ -17,9 +17,14 @@ import { build, type Plugin } from 'vite'
 
 const FILE = 'service-worker.js'
 // Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
-// reads and does not serve), source maps
+// reads and does not serve), source maps, and the PDF reader (1.6 MB, for the one case of a PDF
+// shared to the app: the worker caches it when it is first fetched)
 const NOT_PRECACHED = (path: string) =>
-  path === FILE || path === '.assetsignore' || path === '_headers' || path.endsWith('.map')
+  path === FILE ||
+  path === '.assetsignore' ||
+  path === '_headers' ||
+  path.endsWith('.map') ||
+  /^assets\/pdfjs-/.test(path)
 
 async function bundle(
   root: string,
