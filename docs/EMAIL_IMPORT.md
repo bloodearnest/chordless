@@ -5,12 +5,13 @@ Chordless makes a setlist from it. Two ways in, one review page.
 
 ## The flow
 
-1. **Forward the email** to the import address (the Worker below), or pick an `.eml` file on
-   the Import a Setlist page (`/import-setlist`).
+1. **Forward the email** to the import address (the Worker below). The Import a Setlist page
+   (`/import-setlist`) says so; it has no file picker, and the app reads no email or PDF itself:
+   only the Worker does, so the app has no PDF reader or email parser in it.
 2. The email is read: the leader (the innermost forwarded sender), the date, the songs in order
    with keys and notes, and each PDF's title, key, tempo and CCLI number
    (`src/js/email-setlist.ts`, `email-mime.ts`, `pdf-text.ts`).
-3. With the Worker, the reply holds a link, `/import-setlist#<the setlist>`. The setlist is
+3. The reply holds a link, `/import-setlist#<the setlist>`. The setlist is
    deflated and base64url'd into the fragment (`src/js/email-link.ts`). A fragment is never sent to a
    server, and the page checks it as untrusted: every field is validated and cut down.
 4. The review page (`src/components/setlist-email-import.ts`) matches each song to the library

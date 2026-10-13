@@ -1,5 +1,7 @@
 // Making a setlist from a leader's email (/import-setlist): the email is made up, with a small
 // PDF made by tests/make-pdf.ts, as real charts are copyrighted.
+
+import { linkFor } from './email-link-for.ts'
 import { expect, seedSetlist, test } from './fixtures.ts'
 import { email } from './make-email.ts'
 
@@ -15,13 +17,10 @@ const NEW_PDF = {
 }
 
 async function choose(page, buffer: Buffer) {
-  await page.goto('/import-setlist')
-  await page.locator('#email-file').setInputFiles({
-    name: 'sunday.eml',
-    mimeType: 'message/rfc822',
-    buffer,
-  })
+  await page.goto(await linkFor(buffer))
 }
+
+const instructions = page => page.getByText('Forward the email a worship leader sent')
 
 /** The song arrives in the library, as the SongSelect bookmarklet would bring it */
 async function importFromSongSelect(page, title: string, ccli: string) {
@@ -159,9 +158,9 @@ test('the review survives a reload, with the changes made to it', async ({ page 
   await expect(songsList(page).nth(1).getByRole('checkbox')).not.toBeChecked()
   await expect(songsList(page).nth(3).getByLabel('Key')).toHaveValue('E')
 
-  await page.getByRole('button', { name: 'Choose a different email' }).click()
+  await page.getByRole('button', { name: 'Start over' }).click()
   await page.reload()
-  await expect(page.locator('#email-file')).toBeVisible()
+  await expect(instructions(page)).toBeVisible()
 })
 
 test('an email with no date asks for one, and a date that has a setlist is pointed out', async ({
@@ -172,7 +171,7 @@ test('an email with no date asks for one, and a date that has a setlist is point
   await expect(page.getByRole('note')).toContainText('no date')
   await expect(page.locator('setlist-details-form input[name="date"]')).not.toHaveValue('')
 
-  await page.getByRole('button', { name: 'Choose a different email' }).click()
+  await page.getByRole('button', { name: 'Start over' }).click()
   await choose(page, email('Sunday 11th October', ['1. Alpha Song in G']))
   const group = page.getByRole('group', { name: 'A setlist for this date' })
   await expect(group).toContainText('You already have a setlist')
@@ -181,13 +180,17 @@ test('an email with no date asks for one, and a date that has a setlist is point
   await expect(group.getByLabel('Make a new setlist')).toBeChecked()
 })
 
-test('something that is not an email, or has no songs, says so and stays on the page', async ({
+test('a link that holds no songs, or is not a link, says so and shows how to import', async ({
   page,
 }) => {
   await seedSetlist(page)
-  await choose(page, Buffer.from('just some text, not an email'))
-  await expect(page.getByRole('alert')).toContainText('Could not read that email')
-  await expect(page.locator('#email-file')).toBeVisible()
+  await choose(page, email('Hello', []))
+  await expect(page.getByRole('alert')).toContainText('That link holds no songs')
+  await expect(instructions(page)).toBeVisible()
+  await expect(page.getByRole('link', { name: 'import@chordless.app' })).toHaveAttribute(
+    'href',
+    'mailto:import@chordless.app'
+  )
 })
 
 test('a title that is a line of another song’s words finds it, for the person to confirm', async ({
@@ -304,18 +307,18 @@ test('a link from the email Worker opens the review, and a reload keeps it', asy
   await expect(songsList(page)).toHaveCount(2)
 
   // The installed app is launched with the link: the fragment is handed over, even to an open page
-  await page.getByRole('button', { name: 'Choose a different email' }).click()
-  await expect(page.locator('#email-file')).toBeVisible()
+  await page.getByRole('button', { name: 'Start over' }).click()
+  await expect(instructions(page)).toBeVisible()
   await page.evaluate(async fragment => {
     const { offerLink } = await import('/js/incoming-link.ts')
     offerLink(`#${fragment}`)
   }, fragment)
   await expect(songsList(page)).toHaveCount(2)
 
-  await page.getByRole('button', { name: 'Choose a different email' }).click()
+  await page.getByRole('button', { name: 'Start over' }).click()
   await page.goto('/import-setlist#not-a-link')
   await expect(page.getByRole('alert')).toContainText('Could not read that link')
-  await expect(page.locator('#email-file')).toBeVisible()
+  await expect(instructions(page)).toBeVisible()
 })
 
 test('a song only another database has is found there, and copied into the library when the setlist is made', async ({

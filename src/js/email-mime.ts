@@ -1,9 +1,9 @@
 /**
- * Reading a raw email (an .eml file, as the email Worker is given or a file picked on a page)
+ * Reading a raw email (an .eml file, as the email Worker is given)
  * into the text email-setlist.ts works from: sender, subject, date, body and the attached charts.
  *
- * Reading the text of a PDF is passed in, as the page and the Worker use different readers (and
- * the reconciler, which only needs the charts' names, uses none).
+ * Reading the text of a PDF is passed in, as the Worker and the tests use pdf-text.ts, and
+ * the reconciler, which only needs the charts' names, uses none.
  */
 import PostalMime, { type Email } from 'postal-mime'
 import { type ChartInfo, type EmailText, parseChartText } from './email-setlist.ts'

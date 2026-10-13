@@ -1,6 +1,6 @@
 /**
  * The text of a PDF chart, for email-mime.ts's readEmail (its PdfReader). It uses unpdf, a build
- * of pdf.js that runs in a Worker as well as in Node and the browser. This is what finds the CCLI
+ * of pdf.js that runs in a Worker as well as in Node. Only the email Worker and the tests read PDFs: the app never does. This is what finds the CCLI
  * number, key and tempo in the charts that come with an email.
  *
  * A PDF that cannot be read (damaged, encrypted, or just a scan with no text) gives '': the chart

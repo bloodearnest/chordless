@@ -1,14 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Person, Setlist, SongWithContent } from '../js/data-types.ts'
 import { type ChordlessDB, determineSetlistType, getCurrentDB } from '../js/db.ts'
-import { decodeImport } from '../js/email-link.ts'
-import { readEmail } from '../js/email-mime.ts'
-import {
-  type ImportedSetlist,
-  type ImportedSong,
-  importFromEmail,
-  nearestSunday,
-} from '../js/email-setlist.ts'
+import { decodeImport, IMPORT_ADDRESS } from '../js/email-link.ts'
+import { type ImportedSetlist, type ImportedSong, nearestSunday } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary, type SongMatch } from '../js/import-plan.ts'
 import {
   changesTo,
@@ -64,7 +58,6 @@ interface Row {
 }
 
 /** The PDF reader is large: it is loaded only when a PDF is in the email */
-const readPdf = async (pdf: ArrayBuffer) => (await import('../js/pdf-text.ts')).readPdfText(pdf)
 
 /**
  * SetlistEmailImport Component
@@ -305,23 +298,6 @@ export class SetlistEmailImport extends LitElement {
     this._state = 'pick'
   }
 
-  /** Read the email in a file the person picked */
-  async importFile(file: File): Promise<void> {
-    this._error = ''
-    this._state = 'reading'
-    try {
-      const email = importFromEmail(await readEmail(await file.arrayBuffer(), readPdf))
-      if (!email.songs.length && !email.unlisted.length) {
-        throw new Error('No songs were found in that email.')
-      }
-      await this._review(email)
-    } catch (error) {
-      console.error('[EmailImport] Could not read the email:', error)
-      this._error = `Could not read that email: ${errorMessage(error)}`
-      this._state = 'pick'
-    }
-  }
-
   /** Show an email for review, with what the person had decided about it, if they had */
   async _review(email: ImportedSetlist, rows?: Decisions[], unlisted?: Decisions[]): Promise<void> {
     const db = await getCurrentDB()
@@ -426,13 +402,6 @@ export class SetlistEmailImport extends LitElement {
     }
   }
 
-  async _onFileChosen(event: Event): Promise<void> {
-    const input = event.target as HTMLInputElement
-    const file = input.files?.[0]
-    input.value = ''
-    if (file) await this.importFile(file)
-  }
-
   _change(row: Row, changes: Partial<Row>): void {
     Object.assign(row, changes)
     this.requestUpdate()
@@ -502,22 +471,16 @@ export class SetlistEmailImport extends LitElement {
     return html`
       <h2>Import a setlist from an email</h2>
       <p>
-        Choose an email a worship leader sent with the songs attached, saved as an
-        <code>.eml</code> file (in Gmail: open the email, ⋮ then Download message). The
-        songs, keys, date and leader are read from it. The attached charts are not
-        imported: for a song the library does not have, you get a placeholder and a link to get the
-        SongSelect chart.
+        Forward the email a worship leader sent, with the songs attached as PDFs, to
+        <a href="mailto:${IMPORT_ADDRESS}">${IMPORT_ADDRESS}</a>. Chordless replies with a link:
+        open it and the songs, keys, date and leader are shown here for you to check.
+      </p>
+      <p>
+        The email and its charts are not kept, and the charts are not imported: a song your library
+        does not have is fetched from SongSelect.
       </p>
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : nothing}
       ${this._state === 'reading' ? html`<p class="status" role="status">Reading the email…</p>` : nothing}
-      <input
-        type="file"
-        id="email-file"
-        accept=".eml,message/rfc822"
-        aria-label="Choose an email"
-        ?disabled=${this._state === 'reading'}
-        @change=${this._onFileChosen}
-      />
     `
   }
 
@@ -528,7 +491,7 @@ export class SetlistEmailImport extends LitElement {
     const updating = this._updating()
     return html`
       <h2>${email.name || 'Setlist from an email'}</h2>
-      <p><button class="small" @click=${this._startAgain}>Choose a different email</button></p>
+      <p><button class="small" @click=${this._startAgain}>Start over</button></p>
       ${this._error ? html`<p class="status error" role="alert">❌ ${this._error}</p>` : nothing}
       ${email.dateWarning ? html`<p class="notice" role="note">${email.dateWarning}. Check the date below.</p>` : nothing}
       ${email.date ? nothing : html`<p class="notice" role="note">The email gave no date: check the one below (the nearest Sunday).</p>`}

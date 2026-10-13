@@ -6,6 +6,9 @@
  */
 import type { EmailPerson, ImportedSetlist, ImportedSong } from './email-setlist.ts'
 
+/** Where a leader's email is forwarded to (see worker/src/email.ts, docs/EMAIL_IMPORT.md) */
+export const IMPORT_ADDRESS = 'import@chordless.app'
+
 const MAX_SONGS = 100
 const MAX_TEXT = 500
 

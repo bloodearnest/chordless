@@ -197,23 +197,23 @@ ccli import
   for, defaulting to nearestSunday(); a date whose weekday is wrong ("Sunday 8th Nov" on a
   Saturday) becomes the nearest right weekday and must be confirmed (dateWarning); the subject is
   the setlist's name ("Prayer day" is one), and a date in it is not removed.
-  Built: the /import-setlist review page (pick an .eml; src/components/setlist-email-import.ts),
+  Built: the /import-setlist review page (src/components/setlist-email-import.ts),
   matching by CCLI number, then title, then close titles to confirm, then, if no title is close, a
   line of the songs' words (src/js/import-plan.ts: leaders call a song by its chorus, e.g. "Your Grace
   Is Enough" for "This Is Our God"; never picked for the person).
   Built too: the email Worker (worker/src/email.ts; docs/EMAIL_IMPORT.md): a forwarded email gets a
   reply with /import-setlist#<setlist> (src/js/email-link.ts), tried in workerd with wrangler dev.
-  Needs, by hand, in the Cloudflare dashboard: Email Routing on chordless.app and an address that
-  sends to the Worker; then a real forward from a phone. Consider rate limiting the replies.
-  Once the Worker is proven live: consider dropping the .eml file picker from the page. The app
-  would then not need postal-mime, unpdf or the 1.6 MB pdf.js chunk at all (only the Worker reads
-  emails and PDFs; the page just decodes the link). Kept for now: it is the only way in until the
-  Email Routing address exists, and the email never leaves the device.
-  Still to build: matching songs against the other databases too (other-songs.ts: "Shared with
-  me" and other organisations); an existing setlist for the same date and leader (the review page
-  only points it out now: offer to update it, and show the changes); other ways in than picking an .eml (Share To); a
-  use of the createdBy field (recorded now; an imported setlist's owner is the leader, so the
-  importer could not delete it under the owner rule: allow the owner or the creator;
+  Set up by hand in the Cloudflare dashboard (Email Routing on chordless.app, an address that
+  sends to the Worker); tried with real forwards.
+  Built too: matching songs of the other databases (copied into the library when the setlist is
+  made); updating the setlist that has the date (the same leader's is the default, the changes
+  are shown first); rate limits on the Worker (per sender and overall); createdBy on setlists
+  (recorded, nothing decides by it yet); no .eml file picker (only the Worker reads emails and
+  PDFs, so the app has no PDF reader). Other ways in are not built: Share To (email apps
+  do not share an email to a web app) and a pasted link are not worth it, as the reply's link
+  opens the installed app.
+  Still to build: use of createdBy (an imported setlist's owner is the leader, so the importer
+  could not delete it under the owner rule: allow the owner or the creator;
   docs/SYNC_ARCHITECTURE.md).
 - email import, a rule: the PDFs are never imported as charts. They are read only for their title,
   key, tempo and CCLI number (src/js/pdf-text.ts). A song that is not in the library (by CCLI
