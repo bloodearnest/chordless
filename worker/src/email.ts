@@ -192,12 +192,45 @@ export async function answerFor(raw: ArrayBuffer, origin: string): Promise<Answe
   }
 }
 
+/** Cloudflare's Rate Limiting binding: success is false once the key has used its allowance */
+export interface RateLimit {
+  limit(options: { key: string }): Promise<{ success: boolean }>
+}
+
+/** The limits to apply to the emails that come in, if any (see wrangler.toml) */
+export interface EmailLimits {
+  /** Per sender address */
+  perSender?: RateLimit
+  /** Over all senders: forged addresses get past a limit per sender */
+  overall?: RateLimit
+}
+
+/** An email over a limit is dropped without a reply: a reply would be the abuse */
+async function allowed(sender: string, limits: EmailLimits): Promise<boolean> {
+  try {
+    const checks = [
+      limits.perSender?.limit({ key: sender.toLowerCase() }),
+      limits.overall?.limit({ key: 'all' }),
+    ]
+    return (await Promise.all(checks)).every(result => result?.success !== false)
+  } catch (error) {
+    // The limit is for protection: if it fails, the leader still gets their reply
+    console.error('[email] could not check the rate limit:', error)
+    return true
+  }
+}
+
 export async function handleEmail(
   message: IncomingEmail,
   makeReply: MakeReply,
-  origin: string
+  origin: string,
+  limits: EmailLimits = {}
 ): Promise<void> {
   if (message.rawSize > MAX_BYTES) return
+  if (!(await allowed(message.from, limits))) {
+    console.warn('[email] over the rate limit: not answered')
+    return
+  }
   const raw = await new Response(message.raw).arrayBuffer()
   const answer = await answerFor(raw, origin)
   // The subject of the email it came from, so a mail program puts the reply in its conversation

@@ -132,3 +132,53 @@ test('a subject cannot add headers to the reply', () => {
   })
   assert.ok(!/^Bcc:/m.test(text))
 })
+
+test('an email over a rate limit is dropped with no reply, and a broken limit does not stop one', async () => {
+  const make = (): IncomingEmail & { replied: boolean } => {
+    const raw = email('Sunday 25th October', ['1. Alpha Song in G'])
+    const message = {
+      from: 'Sender@Example.com',
+      to: 'import@chordless.test',
+      rawSize: raw.length,
+      raw: new Response(raw).body as ReadableStream<Uint8Array>,
+      headers: { get: () => null },
+      replied: false,
+      reply: async () => {
+        message.replied = true
+      },
+    }
+    return message
+  }
+  const keys: string[] = []
+  const limit = (success: boolean) => ({
+    limit: async ({ key }: { key: string }) => {
+      keys.push(key)
+      return { success }
+    },
+  })
+
+  const limited = make()
+  await handleEmail(limited, () => ({}), 'https://x.test', { perSender: limit(false) })
+  assert.equal(limited.replied, false)
+  assert.deepEqual(keys, ['sender@example.com'], 'a sender is one key, whatever its case')
+
+  const overall = make()
+  await handleEmail(overall, () => ({}), 'https://x.test', { overall: limit(false) })
+  assert.equal(overall.replied, false)
+
+  const fine = make()
+  await handleEmail(fine, () => ({}), 'https://x.test', {
+    perSender: limit(true),
+    overall: limit(true),
+  })
+  assert.equal(fine.replied, true)
+
+  const broken = make()
+  const throws = {
+    limit: async () => {
+      throw new Error('down')
+    },
+  }
+  await handleEmail(broken, () => ({}), 'https://x.test', { perSender: throws })
+  assert.equal(broken.replied, true)
+})

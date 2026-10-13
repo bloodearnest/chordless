@@ -10,7 +10,7 @@
 
 import { EmailMessage } from 'cloudflare:email'
 import * as jose from 'jose'
-import { handleEmail, type IncomingEmail } from './email.ts'
+import { handleEmail, type IncomingEmail, type RateLimit } from './email.ts'
 import { exchangeCode, type GoogleEnv, refreshAccessToken, verifyIdToken } from './google-auth.ts'
 import { handleShareDownload, type ShareCache, type ShareEnv, shareFileId } from './share.ts'
 import { withSharePreview } from './share-page.ts'
@@ -22,6 +22,9 @@ interface Env extends GoogleEnv, ShareEnv {
   DEV_PAGES?: string
   /** Used when the client sends no redirect_uri */
   GOOGLE_REDIRECT_URI?: string
+  /** Limits on the emails answered (wrangler.toml [[ratelimits]]): unset in tests and dev */
+  EMAIL_PER_SENDER?: RateLimit
+  EMAIL_OVERALL?: RateLimit
   /** The address links in email replies point to; chordless.app when unset */
   APP_ORIGIN?: string
   /** Base64 AES-256 key for the token blobs */
@@ -136,7 +139,8 @@ export default {
     await handleEmail(
       message,
       (from, to, raw) => new EmailMessage(from, to, raw),
-      env.APP_ORIGIN ?? 'https://chordless.app'
+      env.APP_ORIGIN ?? 'https://chordless.app',
+      { perSender: env.EMAIL_PER_SENDER, overall: env.EMAIL_OVERALL }
     )
   },
 }

@@ -13,6 +13,19 @@ routes = [{ pattern = "chordless.app", custom_domain = true }]
 enabled = true
 invocation_logs = true
 
+# Limits on the emails the import address answers (worker/src/email.ts): an email over one is
+# dropped without a reply. Per sender, and overall (forged sender addresses get round the first).
+# period is 10 or 60 seconds. The namespace ids only have to be unique in the account.
+[[ratelimits]]
+name = "EMAIL_PER_SENDER"
+namespace_id = "7301"
+simple = { limit = 5, period = 60 }
+
+[[ratelimits]]
+name = "EMAIL_OVERALL"
+namespace_id = "7302"
+simple = { limit = 30, period = 60 }
+
 [assets]
 directory = "src"
 not_found_handling = "single-page-application"
