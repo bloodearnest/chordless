@@ -303,6 +303,27 @@ body:not([data-view='setlist']) media-player:not([active]) {
   transform: scale(0.95);
 }
 
+.song-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  padding: 0.5rem 1rem;
+  font-size: var(--font-ui-small);
+  border-bottom: 1px solid var(--border-light);
+}
+
+.song-source button {
+  background: var(--button-bg);
+  color: var(--header-text);
+  border: none;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  font: inherit;
+  cursor: pointer;
+}
+
 .library-song-content {
   flex: 1;
   overflow-y: auto;

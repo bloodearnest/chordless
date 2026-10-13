@@ -14,7 +14,7 @@ import type {
   SongWithContent,
 } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import { getCurrentDB, normalizeTitle } from './db.ts'
+import { generateSongId, getCurrentDB, normalizeTitle } from './db.ts'
 import { ChordProParser } from './parser.ts'
 import { hashText } from './utils/hash.ts'
 
@@ -324,6 +324,73 @@ export async function createSong(
   }
 
   return db.saveSong(song)
+}
+
+/** How addChart treats a chart of a song the database already has in another form */
+export interface AddChartOptions {
+  variantLabel: string
+  importSource: string
+  /** The new chart becomes the song's default ('newest'), or only if it is the first ('first') */
+  makeDefault: 'newest' | 'first'
+  /** The title to use if the chart has none */
+  title?: string
+}
+
+/**
+ * Put a chart into a database as a song, unless it already has this exact chart (then that
+ * song is returned). A chart of a song the database has in another form is added as a variant
+ * of it. Never deletes anything.
+ */
+export async function addChart(
+  db: ChordlessDB,
+  chordpro: string,
+  { variantLabel, importSource, makeDefault, title: fallbackTitle }: AddChartOptions
+): Promise<SongRecord> {
+  const contentHash = hashText(chordpro)
+  const known = await db.getAllSongs()
+  const same = known.find(existing => existing.contentHash === contentHash)
+  if (same) return same
+
+  const parsed = parser.parse(chordpro)
+  const metadata = parsed.metadata
+  const now = new Date().toISOString()
+  const chordproFileId = `chordpro-${crypto.randomUUID()}`
+  await db.saveChordPro({
+    id: chordproFileId,
+    content: chordpro,
+    contentHash,
+    createdDate: now,
+    modifiedDate: now,
+  })
+
+  const title = metadata.title || fallbackTitle || 'Untitled'
+  const id = generateSongId(parsed)
+  const sameSong = known.filter(existing => existing.id === id)
+  const currentDefault = sameSong.find(existing => existing.isDefault)
+  const isDefault = makeDefault === 'newest' || !currentDefault
+  if (isDefault && currentDefault) await db.saveSong({ ...currentDefault, isDefault: false })
+
+  return db.saveSong({
+    uuid: crypto.randomUUID(),
+    id,
+    variantOf: sameSong.length > 0 && !isDefault ? (currentDefault?.uuid ?? null) : null,
+    isDefault,
+    variantLabel,
+    chordproFileId,
+    ccliNumber: metadata.ccliSongNumber || metadata.ccli || null,
+    title,
+    titleNormalized: normalizeTitle(title),
+    ...chartFields(metadata),
+    importDate: now,
+    importUser: null,
+    importSource,
+    sourceUrl: null,
+    modifiedDate: now,
+    driveFileId: null,
+    driveModifiedTime: null,
+    lastSyncedAt: null,
+    contentHash,
+  })
 }
 
 /** The song fields that come from its chart's metadata */

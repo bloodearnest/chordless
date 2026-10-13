@@ -6,7 +6,7 @@ import type { BrowserContext, Page } from '@playwright/test'
 import { buildShareBundle } from '../src/js/share-bundle.ts'
 import { encryptBundle, generateShareKey, shareUrl } from '../src/js/share-crypto.ts'
 import { makeEntry } from './builders.ts'
-import { expect, test } from './fixtures.ts'
+import { expect, seedSetlist, test } from './fixtures.ts'
 
 const FILE = 'abcdefghijklmnop1234'
 
@@ -152,10 +152,25 @@ test.describe('A setlist shared by link', () => {
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('#share-status')).toHaveText('This share has ended')
 
-    const databases = await page.evaluate(async () =>
-      (await indexedDB.databases()).map(d => d.name).filter(n => n?.startsWith('chordless-share-'))
+    // The setlist is gone from this device, and its songs are kept
+    const kept = await page.evaluate(
+      () =>
+        new Promise<{ setlists: number; songs: number }>((resolve, reject) => {
+          const open = indexedDB.open('shared-with-me')
+          open.onerror = () => reject(open.error)
+          open.onsuccess = () => {
+            const db = open.result
+            const tx = db.transaction(['setlists', 'songs'], 'readonly')
+            const setlists = tx.objectStore('setlists').count()
+            const songs = tx.objectStore('songs').count()
+            tx.oncomplete = () => {
+              db.close()
+              resolve({ setlists: setlists.result, songs: songs.result })
+            }
+          }
+        })
     )
-    expect(databases).toEqual([])
+    expect(kept).toEqual({ setlists: 0, songs: 2 })
     await context.close()
   })
 
@@ -173,6 +188,77 @@ test.describe('A setlist shared by link', () => {
     await serveShare(context, key, { bundle: bundle({ expires: '2020-01-01' }) })
     await openLink(page, key)
     await expect(page.locator('#share-status')).toHaveText('This share has ended')
+    await context.close()
+  })
+
+  test('is listed under "Shared with me" on the home page, until it ends', async ({ browser }) => {
+    const key = generateShareKey()
+    const { context, page } = await recipient(browser)
+    await serveShare(context, key)
+    await openLink(page, key)
+    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+
+    await page.goto('/')
+    const group = page.locator('setlist-group', { hasText: 'Shared with me' })
+    await expect(group).toContainText('Ann Smith')
+    await expect(page.locator('welcome-card')).toHaveCount(0)
+    await group.getByRole('link').first().click()
+    await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234$/)
+    await expect(page.locator('setlist-overview')).toContainText('Be Still')
+
+    await context.unroute(`**/api/share/${FILE}`)
+    await serveShare(context, key, { status: 404 })
+    await page.goto(`/s/${FILE}`)
+    await expect(page.locator('#share-status')).toHaveText('This share has ended')
+    await page.goto('/')
+    await expect(page.locator('setlist-group', { hasText: 'Shared with me' })).toHaveCount(0)
+    await context.close()
+  })
+
+  test('goes to the setlist, with no download, for someone who has it in their organisation', async ({
+    page,
+  }) => {
+    const setlistId = '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'
+    const url = await seedSetlist(page, { setlistId })
+    const key = generateShareKey()
+    const requests = await serveShare(page.context(), key)
+
+    const link = new URL(shareUrl('http://localhost', FILE, key, setlistId))
+    await page.goto(`${link.pathname}${link.hash}`)
+    await expect(page).toHaveURL(new RegExp(`${url}$`))
+    expect(requests).toEqual([])
+
+    // A link for a setlist they don't have is opened as a share
+    const other = new URL(
+      shareUrl('http://localhost', FILE, key, 'aaaaaaaa-7b1e-4d55-9a6c-0e8f12345678')
+    )
+    await page.goto(`${other.pathname}${other.hash}`)
+    await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234$/)
+    await expect(page.locator('setlist-overview')).toContainText('Be Still')
+    expect(requests).toHaveLength(1)
+  })
+
+  test('its songs are in the song library, to read and to add to it', async ({ browser }) => {
+    const key = generateShareKey()
+    const { context, page } = await recipient(browser)
+    await serveShare(context, key)
+    await openLink(page, key)
+    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+
+    await page.goto('/songs')
+    const card = page.locator('song-card', { hasText: 'Be Still' })
+    await expect(card).toContainText('From Shared with me')
+    await card.click()
+    await expect(page.locator('#library-song-source')).toContainText('From Shared with me')
+    await expect(page.locator('#library-song-content')).toContainText('Be still and')
+
+    await page.locator('#add-to-library').click()
+    await expect(page.locator('#library-song-source')).toHaveCount(0)
+    await expect(page.locator('#library-song-content')).toContainText('Be still and')
+    await page.goto('/songs')
+    await expect(page.locator('song-card', { hasText: 'Be Still' })).not.toContainText(
+      'From Shared with me'
+    )
     await context.close()
   })
 })

@@ -1,9 +1,12 @@
 import { html, nothing } from 'lit'
 import '../../components/app-header.ts'
 import type { ChordlessDB } from '../db.ts'
+import { goTo } from '../navigation.ts'
 import type { Route } from '../router.ts'
+import { buildUrl } from '../router.ts'
 import { SetlistPage } from '../setlist-page.ts'
-import { openShare, SHARED_SETLIST_ID, type ShareOpening } from '../share-receiver.ts'
+import { parseShareFragment } from '../share-crypto.ts'
+import { openShare, ownSetlistFor, type ShareOpening, shareSetlistId } from '../share-receiver.ts'
 import { formatSetlistDate } from '../utils/date-utils.ts'
 import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
@@ -66,7 +69,16 @@ export class ShareView extends PageView {
     // The key is in the link's fragment, which browsers never send to a server. (Not a route:
     // routes stay paths.)
     // biome-ignore lint/plugin: the share key is the link's fragment
-    const key = location.hash.slice(1)
+    const { key, code } = parseShareFragment(location.hash)
+
+    // Someone who has this setlist in their organisation has the real one: go to that
+    const own = code && (await ownSetlistFor(code))
+    if (own && this.isConnected) {
+      await goTo(buildUrl({ name: 'setlist', setlistId: own, songIndex: songIndex }), {
+        replace: true,
+      })
+      return
+    }
     let opening: ShareOpening
     try {
       opening = await openShare(fileId, key)
@@ -85,7 +97,7 @@ export class ShareView extends PageView {
     await this.updateComplete
     this.#page = new SetlistPage({
       root: this,
-      setlistId: SHARED_SETLIST_ID,
+      setlistId: shareSetlistId(fileId),
       songIndex,
       restoredState: this.restoredState,
       db: opening.db,

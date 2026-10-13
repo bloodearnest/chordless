@@ -28,6 +28,11 @@ export interface ShareBundle {
   expires: string
   /** ISO time the bundle was built: not part of its hash */
   updated: string
+  /**
+   * The sharer's setlist id, so a recipient who later joins the organisation can tell this is a
+   * setlist they now have. A random id that gives no access. Absent in older shares.
+   */
+  setlistId?: string
   setlist: {
     date: string
     time: string
@@ -77,7 +82,11 @@ export function isExpired(expires: string, today: string): boolean {
 export function buildShareBundle(
   setlist: Pick<Setlist, 'date' | 'time' | 'type' | 'name' | 'owner'>,
   sources: ShareSource[],
-  { expires, updated = new Date().toISOString() }: { expires: string; updated?: string }
+  {
+    expires,
+    updated = new Date().toISOString(),
+    setlistId,
+  }: { expires: string; updated?: string; setlistId?: string }
 ): ShareBundle {
   const songs = [...sources]
     .sort((a, b) => a.entry.order - b.entry.order)
@@ -93,6 +102,7 @@ export function buildShareBundle(
     version: SHARE_VERSION,
     expires,
     updated,
+    ...(setlistId && { setlistId }),
     setlist: {
       date: setlist.date,
       time: setlist.time ?? '',
@@ -104,12 +114,17 @@ export function buildShareBundle(
   }
 }
 
+const sha256Hex = async (text: string) => {
+  const digest = new Uint8Array(
+    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
+  )
+  return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** A hash of what a recipient would see: changes when the content does, and not otherwise */
 export async function bundleHash(bundle: ShareBundle): Promise<string> {
   const { updated: _updated, ...content } = bundle
-  const bytes = new TextEncoder().encode(JSON.stringify(content))
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
-  return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('')
+  return sha256Hex(JSON.stringify(content))
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -129,6 +144,9 @@ export function parseShareBundle(data: unknown): ShareBundle {
     if (!isRecord(song) || typeof song.title !== 'string' || typeof song.chordpro !== 'string') {
       throw new Error('The share is damaged')
     }
+  }
+  if (data.setlistId !== undefined && typeof data.setlistId !== 'string') {
+    throw new Error('The share is damaged')
   }
   return data as unknown as ShareBundle
 }

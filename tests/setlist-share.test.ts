@@ -1,7 +1,7 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { qrDataUrl, type SetlistShare } from '../src/components/setlist-share.ts'
 import { createSetlist } from '../src/js/db.ts'
-import { generateShareKey } from '../src/js/share-crypto.ts'
+import { generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
 import '../src/components/setlist-share.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -44,7 +44,7 @@ describe('setlist-share', () => {
 
     const input = must(el.shadowRoot?.querySelector('input'))
     expect(input.value).to.equal(
-      `${location.origin}/s/${setlist.share.fileId}#${setlist.share.key}`
+      `${location.origin}/s/${setlist.share.fileId}#${setlist.share.key}${setlistCode(setlist.id)}`
     )
     expect(must(el.shadowRoot?.querySelector('img')).src).to.match(/^data:image\/gif/)
     expect(text(el)).to.include('Ends after')
@@ -101,7 +101,7 @@ describe('setlist-share', () => {
         html`<setlist-share .setlist=${setlist}></setlist-share>`
       )
       expect(el.shadowRoot?.querySelector('#share-to')).to.equal(null)
-      const link = `${location.origin}/s/${setlist.share.fileId}#${setlist.share.key}`
+      const link = `${location.origin}/s/${setlist.share.fileId}#${setlist.share.key}${setlistCode(setlist.id)}`
       const whatsapp = new URL(
         must(el.shadowRoot?.querySelector<HTMLAnchorElement>('#share-whatsapp')).href
       )

@@ -1,27 +1,36 @@
 /**
  * Opening a share link (docs/SHARING.md, "Opening a link"): download the encrypted file from
- * the worker, decrypt it with the key from the link, and keep it on this device, apart from
- * everything else. The copy is a database of its own (chordless-share-<fileId>) holding the
- * setlist and its songs the way an organisation's does, so the setlist page can show it.
+ * the worker, decrypt it with the key from the link, and keep it on this device. Received
+ * setlists go in one database of their own, "Shared with me" (a local-only organisation: it
+ * is never synced), with their songs the way an organisation's are, so the setlist page can
+ * show them.
+ *
+ * A setlist is kept only while its share lasts: it goes when the share ends or expires, or
+ * when the user joins the organisation it came from. Its songs stay: everything a user has
+ * seen is theirs to keep.
  */
 
-import type { ChordProRecord, ReceivedShare, Setlist, SetlistEntry } from './data-types.ts'
-import { ChordlessDB, normalizeTitle } from './db.ts'
-import { ChordProParser } from './parser.ts'
+import type { ReceivedShare, Setlist, SetlistEntry } from './data-types.ts'
+import { ChordlessDB } from './db.ts'
+import { getCurrentOrganisation, listOrganisations } from './organisation.ts'
 import { isExpired, type ShareBundle } from './share-bundle.ts'
-import { decryptBundle } from './share-crypto.ts'
-import { chartFields, hashText } from './song-utils.ts'
+import { decryptBundle, matchesSetlistCode } from './share-crypto.ts'
+import { addChart } from './song-utils.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
 
-export const SHARE_DB_PREFIX = 'chordless-share-'
+/** The database of received setlists and their songs (one for all shares) */
+export const SHARED_DB_ID = 'shared-with-me'
 
-/** The id of the one setlist in a share's database */
-export const SHARED_SETLIST_ID = 'shared'
+/** Before there was one database for all shares, each had its own, with this prefix */
+export const LEGACY_SHARE_DB_PREFIX = 'chordless-share-'
+
+/** The id of a share's setlist in the shared database */
+export const shareSetlistId = (fileId: string) => `share-${fileId}`
 
 export type ShareOpening =
   /** `db` holds the setlist to show; `fresh` if this open downloaded it */
   | { state: 'ready'; db: ChordlessDB; setlist: Setlist; fresh: boolean }
-  /** Stopped, expired or removed: nothing is kept */
+  /** Stopped, expired or removed: the setlist is gone from this device (its songs stay) */
   | { state: 'ended' }
   /** The link has no key, and this device has none for it */
   | { state: 'needs-key' }
@@ -36,8 +45,6 @@ export interface OpenShareOptions {
   today?: string
 }
 
-const databaseName = (fileId: string) => `${SHARE_DB_PREFIX}${fileId}`
-
 function deleteDatabase(name: string): Promise<void> {
   return new Promise(resolve => {
     const request = indexedDB.deleteDatabase(name)
@@ -46,57 +53,55 @@ function deleteDatabase(name: string): Promise<void> {
   })
 }
 
-/** Delete a share's copy from this device */
-export async function forgetShare(fileId: string): Promise<void> {
-  await deleteDatabase(databaseName(fileId))
+/** Whether a database exists, so that looking doesn't make it (true if the browser can't say) */
+export async function databaseExists(name: string): Promise<boolean> {
+  if (typeof indexedDB.databases !== 'function') return true
+  return (await indexedDB.databases()).some(database => database.name === name)
 }
 
-/** Put a received bundle into the database, replacing whatever was there */
+/** Remove a received setlist from this device, with its state here; its songs stay */
+async function forgetSetlist(db: ChordlessDB, fileId: string): Promise<void> {
+  await db.deleteSetlist(shareSetlistId(fileId))
+  await db.deleteLocalState(shareSetlistId(fileId))
+}
+
+/**
+ * Delete a share's setlist from this device (its songs stay)
+ * @param db the shared database, if the caller has it open
+ */
+export async function forgetShare(fileId: string, db?: ChordlessDB): Promise<void> {
+  if (db) return forgetSetlist(db, fileId)
+  if (!(await databaseExists(SHARED_DB_ID))) return
+  const own = new ChordlessDB(SHARED_DB_ID)
+  await own.init()
+  try {
+    await forgetSetlist(own, fileId)
+  } finally {
+    own.db?.close()
+  }
+}
+
+/**
+ * Put a received bundle into the database: its setlist, replacing the earlier copy of this
+ * share's, and its songs. A song this device already has the chart of is reused; one that is
+ * new is added, as the default of its song if the song is already here in another form.
+ */
 async function store(db: ChordlessDB, bundle: ShareBundle, received: ReceivedShare) {
-  const parser = new ChordProParser()
-  await db.clearAll()
   const now = new Date().toISOString()
   const entries: SetlistEntry[] = []
 
   for (const [index, song] of bundle.setlist.songs.entries()) {
-    const chordproFileId = `chordpro-${index}`
-    const record: ChordProRecord = {
-      id: chordproFileId,
-      content: song.chordpro,
-      contentHash: hashText(song.chordpro),
-      createdDate: now,
-      modifiedDate: now,
-    }
-    await db.saveChordPro(record)
-
-    const metadata = parser.parse(song.chordpro).metadata
-    const title = metadata.title || song.title
-    const songId = `shared-song-${index}`
-    await db.saveSong({
-      uuid: songId,
-      id: songId,
-      variantOf: null,
-      isDefault: true,
-      variantLabel: 'Original',
-      chordproFileId,
-      ccliNumber: null,
-      title,
-      titleNormalized: normalizeTitle(title),
-      ...chartFields(metadata),
-      importDate: now,
-      importUser: null,
+    // Newest chart is the default for its song; the ones before stay as variants
+    const record = await addChart(db, song.chordpro, {
+      variantLabel: 'Shared',
       importSource: 'share',
-      sourceUrl: null,
-      modifiedDate: now,
-      driveFileId: null,
-      driveModifiedTime: null,
-      lastSyncedAt: null,
-      contentHash: record.contentHash,
+      makeDefault: 'newest',
+      title: song.title,
     })
     entries.push({
       order: index,
-      songId,
-      songUuid: songId,
+      songId: record.id,
+      songUuid: record.uuid,
       key: song.key,
       tempo: song.tempo,
       notes: song.notes,
@@ -104,7 +109,7 @@ async function store(db: ChordlessDB, bundle: ShareBundle, received: ReceivedSha
   }
 
   const setlist: Setlist = {
-    id: SHARED_SETLIST_ID,
+    id: shareSetlistId(received.fileId),
     date: bundle.setlist.date,
     time: bundle.setlist.time,
     type: bundle.setlist.type,
@@ -130,23 +135,27 @@ export async function openShare(
   keyFromLink: string,
   { fetchFile = fetch, today = toLocalDateString(new Date()) }: OpenShareOptions = {}
 ): Promise<ShareOpening> {
-  const db = new ChordlessDB(databaseName(fileId))
+  const db = new ChordlessDB(SHARED_DB_ID)
   await db.init()
-  const kept = (await db.getAllSetlists())[0]
+  const kept = await db.getSetlist(shareSetlistId(fileId))
   const known = kept?.received
 
-  if (known && isExpired(known.expires, today)) {
+  /** Nothing of this share stays (its songs do), and the database is let go */
+  const ended = async (): Promise<ShareOpening> => {
+    if (kept) await forgetSetlist(db, fileId)
     db.db?.close()
-    await forgetShare(fileId)
     return { state: 'ended' }
   }
+  /** The setlist isn't going to be shown, and wasn't kept before either */
+  const empty = (state: ShareOpening): ShareOpening => {
+    db.db?.close()
+    return state
+  }
+
+  if (known && isExpired(known.expires, today)) return ended()
 
   const key = keyFromLink || known?.key || ''
-  if (!key) {
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'needs-key' }
-  }
+  if (!key) return empty({ state: 'needs-key' })
 
   // Ask for the file again only if the key is the one it was stored with
   const etag = known && known.key === key ? known.etag : ''
@@ -158,78 +167,150 @@ export async function openShare(
   } catch {
     // No connection: the copy on this device is what there is
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'unavailable', offline: true }
+    return empty({ state: 'unavailable', offline: true })
   }
 
-  if (response.status === 404) {
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'ended' }
-  }
+  if (response.status === 404) return ended()
   if (response.status === 304 && kept) return { state: 'ready', db, setlist: kept, fresh: false }
   if (!response.ok) {
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'unavailable', offline: false }
+    return empty({ state: 'unavailable', offline: false })
   }
 
   // Something other than the file (an error page from a proxy, say) isn't a bad key
   if (!response.headers.get('Content-Type')?.startsWith('application/octet-stream')) {
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'unavailable', offline: false }
+    return empty({ state: 'unavailable', offline: false })
   }
 
   let bundle: ShareBundle
   try {
     bundle = await decryptBundle(key, new Uint8Array(await response.arrayBuffer()))
   } catch {
-    // A wrong key can't have worked before: keep any earlier copy, but this link doesn't open it
-    db.db?.close()
-    if (!kept) await forgetShare(fileId)
-    return { state: 'bad-key' }
+    // A wrong key can't have worked before: this link doesn't open it
+    return empty({ state: 'bad-key' })
   }
-  if (isExpired(bundle.expires, today)) {
-    db.db?.close()
-    await forgetShare(fileId)
-    return { state: 'ended' }
-  }
+  if (isExpired(bundle.expires, today)) return ended()
 
   const setlist = await store(db, bundle, {
     fileId,
     key,
     etag: response.headers.get('ETag') ?? '',
     expires: bundle.expires,
+    ...(bundle.setlistId && { setlistId: bundle.setlistId }),
   })
   return { state: 'ready', db, setlist, fresh: true }
 }
 
 /**
- * Delete the copies of shares that have ended, on this device. Run at start-up, so a share
- * that expired while the app was closed doesn't linger. Returns how many it deleted.
+ * The id of the current organisation's setlist that a link's setlist code is of, if it has one:
+ * a member of the organisation has the real setlist, so the link has no need to be opened.
+ * (Not made to look for it: with no organisation yet, there is none.)
  */
-export async function deleteExpiredShares(today = toLocalDateString(new Date())): Promise<number> {
-  if (typeof indexedDB.databases !== 'function') return 0
-  let deleted = 0
-  for (const { name } of await indexedDB.databases()) {
-    if (!name?.startsWith(SHARE_DB_PREFIX)) continue
-    const db = new ChordlessDB(name)
-    try {
-      await db.init()
-      const received = (await db.getAllSetlists())[0]?.received
-      db.db?.close()
-      // One with no setlist yet is being opened (the setlist is saved last): leave it be
-      if (received && isExpired(received.expires, today)) {
-        await deleteDatabase(name)
-        deleted++
-      }
-    } catch (error) {
-      console.error('[Share] Could not check a stored share:', name, error)
+export async function ownSetlistFor(code: string): Promise<string | null> {
+  const { id } = getCurrentOrganisation()
+  if (!id || !(await databaseExists(id))) return null
+  const db = new ChordlessDB(id)
+  try {
+    await db.init()
+    const setlists = await db.getAllSetlists()
+    return setlists.find(setlist => matchesSetlistCode(code, setlist.id))?.id ?? null
+  } catch (error) {
+    console.error('[Share] Could not look for the setlist in the organisation:', error)
+    return null
+  } finally {
+    db.db?.close()
+  }
+}
+
+/** What tidySharedWithMe did */
+export interface Tidied {
+  /** Setlists removed because their share had expired */
+  expired: number
+  /** Setlists removed because the user's organisation has them now */
+  joined: number
+}
+
+/**
+ * Tidy what has been received, at start-up and when the list is shown:
+ * - delete the per-share databases from before there was one (their setlists were only ever
+ *   copies of shares: opening the link again brings them back)
+ * - delete received setlists whose share has expired
+ * - delete received setlists the user now has in an organisation (they joined it, and sync
+ *   gave them the setlist for good): the share's setlistId matches one of the organisation's setlists
+ *
+ * Songs are never deleted.
+ *
+ * @param organisationIds the organisations to look for setlists in (default: all this device has)
+ */
+export async function tidySharedWithMe({
+  today = toLocalDateString(new Date()),
+  organisationIds,
+}: {
+  today?: string
+  organisationIds?: string[]
+} = {}): Promise<Tidied> {
+  const tidied: Tidied = { expired: 0, joined: 0 }
+  if (typeof indexedDB.databases === 'function') {
+    for (const { name } of await indexedDB.databases()) {
+      if (name?.startsWith(LEGACY_SHARE_DB_PREFIX)) await deleteDatabase(name)
     }
   }
-  return deleted
+  if (!(await databaseExists(SHARED_DB_ID))) return tidied
+
+  const db = new ChordlessDB(SHARED_DB_ID)
+  await db.init()
+  try {
+    const received = (await db.getAllSetlists()).filter(setlist => setlist.received)
+    if (received.length === 0) return tidied
+
+    const ids = organisationIds ?? (await listOrganisations()).map(organisation => organisation.id)
+    const have = new Set<string>()
+    for (const id of ids) {
+      if (!(await databaseExists(id))) continue
+      const organisationDb = new ChordlessDB(id)
+      try {
+        await organisationDb.init()
+        for (const setlist of await organisationDb.getAllSetlists()) {
+          have.add(setlist.id)
+        }
+      } catch (error) {
+        console.error('[Share] Could not look in an organisation for a received setlist:', error)
+      } finally {
+        organisationDb.db?.close()
+      }
+    }
+
+    for (const setlist of received) {
+      const share = setlist.received
+      if (!share) continue
+      if (isExpired(share.expires, today)) {
+        await forgetSetlist(db, share.fileId)
+        tidied.expired++
+      } else if (share.setlistId && have.has(share.setlistId)) {
+        await forgetSetlist(db, share.fileId)
+        tidied.joined++
+      }
+    }
+  } catch (error) {
+    console.error('[Share] Could not tidy the received setlists:', error)
+  } finally {
+    db.db?.close()
+  }
+  return tidied
+}
+
+/** The setlists received and still current, newest first, for the home page (tidies first) */
+export async function listSharedWithMe(): Promise<Setlist[]> {
+  await tidySharedWithMe()
+  if (!(await databaseExists(SHARED_DB_ID))) return []
+  const db = new ChordlessDB(SHARED_DB_ID)
+  await db.init()
+  try {
+    return (await db.getAllSetlists())
+      .filter(setlist => setlist.received)
+      .sort((a, b) => b.date.localeCompare(a.date))
+  } finally {
+    db.db?.close()
+  }
 }

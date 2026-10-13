@@ -10,7 +10,7 @@
 import { parseShareBundle, type ShareBundle } from './share-bundle.ts'
 
 const IV_BYTES = 12
-const KEY_BYTES = 32
+const KEY_BYTES = 16
 
 /** A share is a few KB: anything that unpacks far bigger isn't one */
 const MAX_UNPACKED_BYTES = 2 * 1024 * 1024
@@ -30,7 +30,7 @@ export function fromBase64Url(text: string): Bytes {
   return Uint8Array.from(binary, c => c.charCodeAt(0))
 }
 
-/** A new random share key, as it goes in the link and the setlist: 43 base64url characters */
+/** A new random share key, as it goes in the link and the setlist: 22 base64url characters (128 bits: plenty for a link that lasts two weeks) */
 export function generateShareKey(): string {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(KEY_BYTES)))
 }
@@ -96,13 +96,37 @@ export async function decryptBundle(key: string, file: Bytes): Promise<ShareBund
   return parseShareBundle(JSON.parse(new TextDecoder().decode(await gunzip(packed))))
 }
 
-/** https://chordless.app/s/<fileId>#<key> */
-export function shareUrl(origin: string, fileId: string, key: string): string {
-  return `${origin}/s/${encodeURIComponent(fileId)}#${key}`
+/**
+ * A short code for a setlist id (a UUID): its first 32 bits, 6 base64url characters. A link
+ * carries it so that someone who has the setlist in their organisation is taken to that
+ * instead (see matchesSetlistCode). Empty for an id that isn't a UUID.
+ */
+export function setlistCode(setlistId: string): string {
+  const hex = /^[0-9a-f]{8}/i.exec(setlistId.replace(/-/g, ''))?.[0]
+  if (!hex) return ''
+  return toBase64Url(Uint8Array.from(hex.match(/../g) ?? [], pair => Number.parseInt(pair, 16)))
 }
 
-/** The file id and key in a share link (a full URL, or a path and fragment), or null */
-export function parseShareUrl(url: string): { fileId: string; key: string } | null {
+/** Whether a link's setlist code is this setlist's (a code is short: it is not a proof) */
+export const matchesSetlistCode = (code: string, setlistId: string) =>
+  code !== '' && code === setlistCode(setlistId)
+
+/** https://chordless.app/s/<fileId>#<key><setlist code>: the whole link is about 70 characters */
+export function shareUrl(origin: string, fileId: string, key: string, setlistId = ''): string {
+  return `${origin}/s/${encodeURIComponent(fileId)}#${key}${setlistCode(setlistId)}`
+}
+
+/**
+ * What a share link's fragment holds: the key, then (if the sharer's setlist is a UUID) its
+ * code. Empty if the fragment isn't one.
+ */
+export function parseShareFragment(fragment: string): { key: string; code: string } {
+  const match = /^([\w-]{22})([\w-]{6})?$/.exec(fragment.replace(/^#/, ''))
+  return { key: match?.[1] ?? '', code: match?.[2] ?? '' }
+}
+
+/** The file id, key and setlist code in a share link (a full URL, or a path and fragment), or null */
+export function parseShareUrl(url: string): { fileId: string; key: string; code: string } | null {
   let parsed: URL
   try {
     parsed = new URL(url, 'https://chordless.invalid')
@@ -110,7 +134,7 @@ export function parseShareUrl(url: string): { fileId: string; key: string } | nu
     return null
   }
   const match = /^\/s\/([\w-]+)$/.exec(parsed.pathname)
-  const key = parsed.hash.slice(1)
-  if (!match || !/^[\w-]{43}$/.test(key)) return null
-  return { fileId: match[1], key }
+  const { key, code } = parseShareFragment(parsed.hash)
+  if (!match || !key) return null
+  return { fileId: match[1], key, code }
 }

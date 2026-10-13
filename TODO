@@ -279,3 +279,4 @@ library
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.
+- Shared with me (docs/SHARING.md, "Shared with me"): built the database, the home page group, and tidying (expiry, and dropping a setlist once the user has it in an organisation). Search across all databases (library page and add-song modal, tagged "From …") and "Add to my library" (a copy into the current organisation) are built. Still to do: deleting received songs by hand; warnings on organisation delete/Reset from Drive. Links are shorter (128-bit key + 6-character setlist code that sends org members straight to their own setlist).

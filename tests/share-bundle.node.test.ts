@@ -16,7 +16,9 @@ import {
   encryptBundle,
   fromBase64Url,
   generateShareKey,
+  matchesSetlistCode,
   parseShareUrl,
+  setlistCode,
   shareUrl,
   toBase64Url,
 } from '../src/js/share-crypto.ts'
@@ -133,9 +135,9 @@ test('the hash changes with the content and not with the build time', async () =
   assert.notEqual(await bundleHash(dateChanged), base, 'the date')
 })
 
-test('keys are 43 base64url characters, and different every time', () => {
+test('keys are 22 base64url characters, and different every time', () => {
   const a = generateShareKey()
-  assert.match(a, /^[\w-]{43}$/)
+  assert.match(a, /^[\w-]{22}$/)
   assert.notEqual(generateShareKey(), a)
 })
 
@@ -185,12 +187,23 @@ test('decrypted data must be a bundle this version can show', () => {
   assert.throws(() => parseShareBundle(null))
 })
 
-test('links hold the file id and the key after the #, and read back', () => {
+test('links hold the file id, then the key and the setlist code after the #, and read back', () => {
   const key = generateShareKey()
-  const url = shareUrl('https://chordless.app', '1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y', key)
-  assert.equal(url, `https://chordless.app/s/1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y#${key}`)
-  assert.deepEqual(parseShareUrl(url), { fileId: '1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y', key })
-  assert.deepEqual(parseShareUrl(`/s/abc-DEF_123#${key}`), { fileId: 'abc-DEF_123', key })
+  const setlistId = '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'
+  const code = setlistCode(setlistId)
+  assert.match(code, /^[\w-]{6}$/)
+  const url = shareUrl('https://chordless.app', '1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y', key, setlistId)
+  assert.equal(url, `https://chordless.app/s/1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y#${key}${code}`)
+  assert.deepEqual(parseShareUrl(url), {
+    fileId: '1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y',
+    key,
+    code,
+  })
+  // A setlist whose id isn't a UUID has no code
+  assert.deepEqual(parseShareUrl(`/s/abc-DEF_123#${key}`), { fileId: 'abc-DEF_123', key, code: '' })
+  assert.equal(matchesSetlistCode(code, setlistId), true)
+  assert.equal(matchesSetlistCode(code, '3f2a9c11-7b1e-4d55-9a6c-0e8f12345678'), false)
+  assert.equal(matchesSetlistCode('', 'not-a-uuid'), false)
   assert.equal(parseShareUrl('https://chordless.app/s/abc'), null, 'no key')
   assert.equal(parseShareUrl(`https://chordless.app/songs/abc#${key}`), null, 'not a share path')
   assert.equal(parseShareUrl('https://chordless.app/s/abc#short'), null, 'bad key')

@@ -112,8 +112,13 @@ describe('AddSongModal', () => {
   })
 
   it('opens, with a message, when the library is empty', async () => {
-    const emptyDb = { getAllSongs: async () => [] } as unknown as ChordlessDB
-    modal = new AddSongModal({ root, getDb: () => emptyDb, onPick: () => {} })
+    const emptyDb = { dbName: 'org-empty', getAllSongs: async () => [] } as unknown as ChordlessDB
+    modal = new AddSongModal({
+      root,
+      getDb: () => emptyDb,
+      onPick: () => {},
+      getElsewhere: async () => [],
+    })
     await modal.open()
     await modalElement().updateComplete
     expect(modalElement().hasAttribute('open')).to.equal(true)

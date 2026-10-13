@@ -126,6 +126,12 @@ export type SongInput = Omit<SongRecord, 'tempo' | 'originalTempo'> & {
   originalTempo: TempoInput
 }
 
+/** A database a song can come from other than the organisation's: shared setlists, or another organisation */
+export interface SongSource {
+  dbId: string
+  label: string
+}
+
 /** A song with its chart parsed (see getSongWithContent) */
 export type LoadedSong = Pick<SongRecord, 'id' | 'uuid'> &
   Partial<SongRecord> & {
@@ -182,6 +188,8 @@ export interface ReceivedShare {
   etag: string
   /** YYYY-MM-DD */
   expires: string
+  /** The sharer's setlist id: this setlist, if the user later joins its organisation */
+  setlistId?: string
 }
 
 export interface Setlist {
@@ -288,6 +296,8 @@ export interface SongWithContent {
   chordpro: string
   chordproFileId: string
   parsed: ParsedChart
+  /** Set when the song is from another database than the organisation's (see other-songs.ts) */
+  source?: SongSource
   /** Set by getLibrarySongs when asked: the last setlist the song was played in */
   lastUsageInfo?: { date: string; leader: string; key: string | null }
 }

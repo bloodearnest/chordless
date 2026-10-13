@@ -9,7 +9,7 @@
  */
 import { Task } from '@lit/task'
 import type { PropertyValues } from 'lit'
-import { html } from 'lit'
+import { html, nothing } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import type { AppHeader } from '../../components/app-header.ts'
 import '../../components/app-header.ts'
@@ -33,10 +33,16 @@ import '../../components/status-message.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { getCurrentDB } from '../db.ts'
 import { goTo } from '../navigation.ts'
+import {
+  addToLibrary,
+  getSongFromAnywhere,
+  getSongsElsewhere,
+  withSongsFromElsewhere,
+} from '../other-songs.ts'
 import { ChordProParser } from '../parser.ts'
 import { buildUrl } from '../router.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
-import { getLibrarySongs, getSongWithContent } from '../song-utils.ts'
+import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
 import { filterSongs } from '../utils/song-filter.ts'
@@ -49,10 +55,13 @@ export class LibraryView extends PageView {
     ...PageView.properties,
     _search: { state: true },
     _heading: { state: true },
+    _source: { state: true },
   }
 
   declare _search: string
   declare _heading: string
+  /** Where the open song is from, if not this organisation's library */
+  declare _source: string
 
   #parser = new ChordProParser()
   #libraryList = createRef<HTMLElement>()
@@ -78,12 +87,21 @@ export class LibraryView extends PageView {
     super()
     this._search = ''
     this._heading = 'Song Library'
+    this._source = ''
   }
 
-  /** The library, by title, each song with when it was last used */
-  /** The library, by title, each song with when it was last used */
+  /**
+   * The library, by title, each song with when it was last used; and the songs of the device's
+   * other databases (shared setlists, other organisations) that it doesn't have
+   */
   #songs = new Task(this, {
-    task: async () => getLibrarySongs(await getCurrentDB(), { withLastUsage: true }),
+    task: async () => {
+      const db = await getCurrentDB()
+      return withSongsFromElsewhere(
+        await getLibrarySongs(db, { withLastUsage: true }),
+        await getSongsElsewhere(db.dbName)
+      )
+    },
     args: () => [],
   })
 
@@ -168,7 +186,7 @@ export class LibraryView extends PageView {
     }
     this.#openUuid = uuid
     try {
-      const song = await getSongWithContent(uuid)
+      const song = await getSongFromAnywhere(uuid, await getCurrentDB())
       if (sync !== this.#syncing) return
       await this.#viewSong(song)
     } catch (error) {
@@ -240,6 +258,9 @@ export class LibraryView extends PageView {
 
   async #viewSong(song: SongWithContent): Promise<void> {
     this.#song = song
+    this._source = song.source?.label ?? ''
+    // Not the library's: nothing here changes it
+    if (song.source) this.#setEditMode(false)
     if (!song.chordpro) {
       console.error('Song has no ChordPro content!', song)
       throw new Error('Song has no ChordPro content')
@@ -276,6 +297,7 @@ export class LibraryView extends PageView {
     this._heading = 'Song Library'
     this.#setEditMode(false)
     this.#song = null
+    this._source = ''
   }
 
   /** Render a (possibly transposed) chart into the song view, and set its sections up */
@@ -308,7 +330,9 @@ export class LibraryView extends PageView {
   }
 
   #toggleEditMode(): void {
-    if (this.#editMode) {
+    if (this.#song?.source) {
+      this.#setEditMode(false)
+    } else if (this.#editMode) {
       this.#setEditMode(false)
       this.#saveSong()
     } else {
@@ -484,8 +508,20 @@ export class LibraryView extends PageView {
     await this.#saveSong()
   }
 
+  /** Copy the open song, from another database, into this organisation's library, and open that */
+  async #addToLibrary(): Promise<void> {
+    const song = this.#song
+    if (!song?.source) return
+    try {
+      const added = await addToLibrary(song, await getCurrentDB())
+      await goTo(buildUrl({ name: 'songs', songUuid: added.uuid }), { replace: true })
+    } catch (error) {
+      console.error('Could not add the song to the library:', error)
+    }
+  }
+
   async #showInfo(): Promise<void> {
-    if (!this.#parsed || !this.#song) return
+    if (!this.#parsed || !this.#song || this.#song.source) return
     const dialog = this.#infoDialog.value
     if (!dialog) return
     dialog.db = await getCurrentDB()
@@ -594,6 +630,16 @@ export class LibraryView extends PageView {
 
           <!-- The song (slides in from the right) -->
           <div id="library-song-view" class="library-song-view" ${ref(this.#songView)}>
+            ${
+              this._source
+                ? html`<div class="song-source" id="library-song-source">
+                  <span>From ${this._source}: not in your library.</span>
+                  <button type="button" id="add-to-library" @click=${() => this.#addToLibrary()}>
+                    Add to my library
+                  </button>
+                </div>`
+                : nothing
+            }
             <div
               id="library-song-content"
               class="library-song-content"

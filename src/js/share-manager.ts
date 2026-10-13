@@ -72,7 +72,10 @@ export async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promi
 
 /** The bundle for a setlist as it is now, its hash, and the file to upload for a key */
 async function prepare(setlist: Setlist, key: string, expires: string, ctx: ShareContext) {
-  const bundle = buildShareBundle(setlist, await loadShareSources(setlist, ctx.db), { expires })
+  const bundle = buildShareBundle(setlist, await loadShareSources(setlist, ctx.db), {
+    expires,
+    setlistId: setlist.id,
+  })
   return { bundle, hash: await bundleHash(bundle), file: () => encryptBundle(key, bundle) }
 }
 

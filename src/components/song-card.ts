@@ -18,6 +18,8 @@ export interface SongCardSong {
   currentKey?: string
   originalKey?: string | null
   lastUsageInfo?: { date: string; leader: string; key: string | null }
+  /** Set for a song from another database than the organisation's: where it is from */
+  source?: { label: string }
   /** The older record of when it was last played */
   lastUsedAt?: string
 }
@@ -399,7 +401,11 @@ export class SongCard extends LitElement {
   }
 
   _renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt } = this.song ?? {}
+    const { lastUsageInfo, lastUsedAt, source } = this.song ?? {}
+
+    if (source) {
+      return html`<div class="last-played" part="last-played">From ${source.label}</div>`
+    }
 
     // Use new lastUsageInfo if available
     if (lastUsageInfo?.date) {

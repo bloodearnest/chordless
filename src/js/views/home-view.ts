@@ -19,9 +19,13 @@ import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from
 import { goTo } from '../navigation.ts'
 import { getCurrentOrganisation } from '../organisation.ts'
 import { claimSetlistsOnce, getOrganisationPeople } from '../people.ts'
+import { listSharedWithMe } from '../share-receiver.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
 import { PageView, type ViewState } from './page-view.ts'
+
+/** The heading of the group of setlists received by link (its "year", as the home page groups them) */
+export const SHARED_GROUP = 'Shared with me'
 
 /** One year's setlists, for a <setlist-group> */
 export interface SetlistYear {
@@ -67,6 +71,23 @@ export function groupSetlistsByYear(
     }))
 }
 
+/** The setlists received by link, as one group for <setlist-group>: they open at their link */
+export function sharedGroup(setlists: Setlist[]): SetlistYear[] {
+  if (setlists.length === 0) return []
+  return [
+    {
+      year: SHARED_GROUP,
+      expanded: true,
+      setlists: setlists.map(setlist => ({
+        id: setlist.id,
+        url: `/s/${encodeURIComponent(setlist.received?.fileId ?? '')}`,
+        displayName: `${setlistTitle(setlist, 'short')}${setlist.owner ? ` · ${setlist.owner}` : ''}`,
+        songCount: Array.isArray(setlist.songs) ? setlist.songs.length : 0,
+      })),
+    },
+  ]
+}
+
 /** The home page: the setlists, and a button to create one */
 export class HomeView extends PageView {
   declare restoredState: HomeViewState | undefined
@@ -79,7 +100,10 @@ export class HomeView extends PageView {
       const db = await getCurrentDB()
       // One-off: record leader ids on setlists from before they existed
       await claimSetlistsOnce(db, db.organisationId)
-      return groupSetlistsByYear(await db.getAllSetlists())
+      return {
+        groups: groupSetlistsByYear(await db.getAllSetlists()),
+        shared: sharedGroup(await listSharedWithMe().catch(() => [])),
+      }
     },
     args: () => [],
   })
@@ -123,14 +147,19 @@ export class HomeView extends PageView {
     return { expanded, scroll }
   }
 
-  #renderGroups(groups: SetlistYear[]) {
-    if (groups.length === 0) {
+  /**
+   * The setlists of the organisation, and those shared with the user below them. For someone
+   * with none of their own, the shared ones are all there is: they come first, in place of the
+   * welcome card, if there are any.
+   */
+  #renderGroups({ groups, shared }: { groups: SetlistYear[]; shared: SetlistYear[] }) {
+    if (groups.length === 0 && shared.length === 0) {
       // A new user's first sight: loaded only now, as most visits have setlists
       void import('../../components/welcome-card.ts')
       return html`<welcome-card></welcome-card>`
     }
     return repeat(
-      groups,
+      [...groups, ...shared],
       group => group.year,
       group => html`<setlist-group
         .year=${group.year}

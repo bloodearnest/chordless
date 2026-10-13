@@ -233,7 +233,7 @@ export class SetlistShare extends LitElement {
 
   get _url() {
     const share = this.setlist?.share
-    return share ? shareUrl(location.origin, share.fileId, share.key) : ''
+    return share ? shareUrl(location.origin, share.fileId, share.key, this.setlist?.id) : ''
   }
 
   async _copy() {

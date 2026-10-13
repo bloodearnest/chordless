@@ -131,12 +131,12 @@ All browser-native: `CompressionStream` and Web Crypto.
 
 1. Serialise the bundle to JSON and compress it (`CompressionStream('gzip')`).
    Compress before encrypting: encrypted data doesn't compress.
-2. Encrypt with AES-GCM, using a random 256-bit key and a fresh random 12-byte IV
+2. Encrypt with AES-GCM, using a random 128-bit key and a fresh random 12-byte IV
    on every upload.
 3. The file is the IV followed by the ciphertext.
 
 The key is created when a setlist is first shared, and kept for the life of that
-share. It's written into the link as base64url, without padding (43 characters).
+share. It's written into the link as base64url, without padding (22 characters).
 
 ### Where things are stored
 
@@ -166,8 +166,8 @@ changes.
 
 It's enforced in three places:
 1. **Sync** revokes the public permission of expired share files and trashes them (see Sync below).
-2. **Recipients** delete their local copy once it's past `expires`.
-3. **Recipients** delete their local copy if the file is gone, so the fetch returns
+2. **Recipients** delete the setlist once it's past `expires` (its songs stay: see "Shared with me").
+3. **Recipients** delete the setlist if the file is gone, so the fetch returns
    404.
 
 Expiry depends on someone in the organisation syncing. A file nobody cleans up stays
@@ -216,7 +216,13 @@ Later:
 
 ### Opening a link (recipient)
 
-The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
+The link is `https://chordless.app/s/<fileId>#<key><code>`, about 70 characters. The `<code>` is 6
+characters, the first 32 bits of the sharer's setlist id (a UUID), in base64url. Someone who has
+that setlist in their current organisation is taken to it at once (`replace`), with no download;
+the code is short, so a clash would only open another of their own setlists. Anyone else opens
+the share with the key. (The file id has to be Drive's own: Drive won't take ids we choose.)
+
+The service worker routes
 `/s/*` to the share page.
 
 1. Download the file from the worker: `GET /api/share/<fileId>`. No sign-in needed. It returns
@@ -224,11 +230,14 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
    anything changed (304). See "The download proxy".
 2. Decrypt with the key from the link and decompress.
 3. Check the format. If it's past `expires`, show "This share has ended" and keep
-   nothing.
-4. Store it in its own IndexedDB, `chordless-share-<fileId>`, apart from any
-   organisation: a `ChordlessDB` holding the setlist and its songs, as an organisation's
-   does, so the setlist page can show it. The setlist's `received` field holds the key,
-   `ETag` and `expires`, so `/s/<fileId>` works again on that device without the fragment.
+   no setlist.
+4. Store it in the **"Shared with me" database** (`shared-with-me`), apart from any
+   organisation: one `ChordlessDB`, local only (never synced), holding the received setlists
+   (id `share-<fileId>`) and their songs, as an organisation's does, so the setlist page can
+   show them. The setlist's `received` field holds the key, `ETag`, `expires` and `setlistId`, so
+   `/s/<fileId>` works again on that device without the fragment. Songs are reused when the
+   device already has that exact chart (by content hash); a changed chart is added as the new
+   default of its song, and the earlier one stays as a variant.
 5. Show it **read-only**, with the setlist page itself (given that database and
    `readOnly`):
    - no edit mode, and the info dialog has no edit or delete, and there is no share button
@@ -238,11 +247,41 @@ The link is `https://chordless.app/s/<fileId>#<key>`. The service worker routes
 **Opening it again:**
 - **Online:** ask the worker with the stored `ETag`. A 200 means it changed: decrypt and
   replace the local copy. A 304 means nothing did. A 404 means sharing stopped or expired: show "This share has ended" and
-  delete the local copy.
+  delete the setlist (its songs stay).
 - **Offline:** show the local copy.
 
-**Local expiry:** on every app start, delete `chordless-share-*` databases past their
-`expires`.
+**Tidying:** on every app start, and whenever the home page lists them
+(`tidySharedWithMe`), delete received setlists that are past their `expires`, or that the
+user now has in an organisation (below). The databases from before there was one
+(`chordless-share-*`) are deleted. Songs are never deleted.
+
+### Shared with me
+
+Everything a user has seen should stay available to them. Setlists are temporary, songs are
+not.
+
+- **Where:** the `shared-with-me` database, a local-only organisation. Sync never touches it.
+- **What's kept:** a received setlist lasts as long as its share. Its songs stay for good:
+  a share ending, expiring or being replaced never deletes one.
+- **Where it shows:** on the home page, as a "Shared with me" group of the current setlists
+  (it only appears when there are some). For someone with no setlists of their own it is all
+  there is, in place of the welcome card; otherwise it sits below their own.
+- **Joining the organisation:** a share carries `setlistId`, the sharer's setlist id (a random
+  UUID that gives no access to anything). When the user later joins that organisation and sync
+  brings the setlist, an organisation setlist has the share's `setlistId`, and the received copy
+  is deleted: they have the real one now, permanently. (Shares made before `setlistId` existed
+  get one the next time the sharer's sync updates them.)
+
+**Still to build:** search across the organisations' songs and "Shared with me" (the library
+and add-song modal show one database today), and "Add to my library", which copies a song
+from another database into the current organisation. A setlist can only point at songs in its
+own organisation's database, so adding is always a copy: deduplicated by content hash, then
+by the song's deterministic id, as a variant if the song is there in another form. It is up
+to the user to add: a song with a CCLI number is covered by any church's licence anyway.
+Explicit song deletion is separate: a synced song deleted only here would come back at the
+next sync, so it waits for the Drive trash design planned for setlists
+(SYNC_ARCHITECTURE.md). Songs received by link have no Drive copy, so those can be deleted
+locally.
 
 ### The download proxy
 
@@ -321,7 +360,7 @@ Still to check:
   - share a setlist, then open the link in a fresh browser context
   - change a key, sync, reopen: the recipient sees it
   - stop sharing: the recipient sees "ended" and the local copy is gone
-  - a past `expires` deletes the local copy on start
+  - a past `expires` deletes the setlist (not its songs) on start
 
 Where the tests are: `share-bundle.node.test.ts`, `share-proxy.node.test.ts`,
 `share-page.node.test.ts`, `share-drive.test.ts`, `share-sync.test.ts`,

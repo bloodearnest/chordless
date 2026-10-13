@@ -2,12 +2,15 @@ import { type AppModal, ModalCloseEvent } from '../../components/app-modal.ts'
 import { SongSelectEvent } from '../../components/song-list.ts'
 import type { SongWithContent } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
+import { addToLibrary, getSongsElsewhere, withSongsFromElsewhere } from '../other-songs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import { filterSongs } from '../utils/song-filter.ts'
 import { showStatusMessage } from '../utils/status-message.ts'
 
 /**
- * The "Add song" modal of a setlist: the library's songs, searchable, to choose one.
+ * The "Add song" modal of a setlist: the library's songs, searchable, to choose one. Songs
+ * from the device's other databases (received in shared setlists, other organisations) are
+ * listed too; choosing one adds it to the library first.
  * Works with the elements the setlist view has for it, found in `root`:
  * #add-song-modal (an <app-modal>), #add-song-search-input and #add-song-results.
  */
@@ -15,24 +18,29 @@ export class AddSongModal {
   #root: Element
   #getDb: () => ChordlessDB
   #onPick: (song: SongWithContent) => void
+  #getElsewhere: (dbName: string) => Promise<SongWithContent[]>
 
   /**
    * @param options.root where the modal's elements are
    * @param options.getDb the organisation's database
    * @param options.onPick a song was chosen; the modal stays open until close() is called
+   * @param options.getElsewhere the songs of the device's other databases (for tests to replace)
    */
   constructor({
     root,
     getDb,
     onPick,
+    getElsewhere = getSongsElsewhere,
   }: {
     root: Element
     getDb: () => ChordlessDB
     onPick: (song: SongWithContent) => void
+    getElsewhere?: (dbName: string) => Promise<SongWithContent[]>
   }) {
     this.#root = root
     this.#getDb = getDb
     this.#onPick = onPick
+    this.#getElsewhere = getElsewhere
   }
 
   get #modal(): AppModal | null {
@@ -57,7 +65,11 @@ export class AddSongModal {
     try {
       showStatusMessage(results, { message: 'Loading songs...', state: 'loading' })
 
-      const songs = await getLibrarySongs(this.#getDb())
+      const db = this.#getDb()
+      const songs = withSongsFromElsewhere(
+        await getLibrarySongs(db),
+        await this.#getElsewhere(db.dbName)
+      )
       if (songs.length === 0) {
         showStatusMessage(results, {
           message: 'No songs in library',
@@ -99,6 +111,17 @@ export class AddSongModal {
     this.#modal?.close()
   }
 
+  async #pick(song: SongWithContent): Promise<void> {
+    try {
+      this.#onPick(song.source ? await addToLibrary(song, this.#getDb()) : song)
+    } catch (error) {
+      console.error('[Add Song Modal] Could not add the song to the library:', error)
+      const results = this.#results
+      if (results)
+        showStatusMessage(results, { message: 'Could not add the song.', state: 'error' })
+    }
+  }
+
   #renderResults(songs: SongWithContent[]): void {
     const results = this.#results
     if (!results) return
@@ -111,7 +134,7 @@ export class AddSongModal {
     songList.dense = true
     songList.addEventListener(SongSelectEvent.type, event => {
       const { song } = event
-      if (song) this.#onPick(song)
+      if (song) this.#pick(song)
     })
     results.appendChild(songList)
   }
