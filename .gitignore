@@ -30,3 +30,6 @@ coverage/
 # Vite build output
 dist/
 .cloudflare-token
+
+# Real charts and emails for trying the importer locally (copyrighted: never commit)
+tests/fixtures/private/
