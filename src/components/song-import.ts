@@ -645,7 +645,7 @@ export class SongImport extends LitElement {
           <span class="icon">✉️</span>
           <span class="content">
             <span class="title">Import a Setlist from an Email</span>
-            <span class="subtitle">A leader's email, saved as a file</span>
+            <span class="subtitle">Forward a leader's email to Chordless</span>
           </span>
         </a>
       </div>

@@ -62,9 +62,10 @@ interface Row {
 /**
  * SetlistEmailImport Component
  *
- * Makes a setlist from a leader's email. The person picks the email as a file (an .eml); the
- * songs are read from the email's text and its PDFs, and the PDFs are then put aside: no chart
- * is imported from them. Each song is matched to the library. One it lacks has to be imported
+ * Makes a setlist from a leader's email. The email is forwarded to the import address, and the
+ * Worker's reply holds a link with the songs it read from the text and the PDFs (email-link.ts):
+ * no chart is imported from them. The page opens the link (or is given it by the installed
+ * app: incoming-link.ts). Each song is matched to the library. One it lacks has to be imported
  * first, from SongSelect with the bookmarklet: it gets a link to the song's page (or a search for
  * its title, if the email gave no clear CCLI number), and the page looks again when the person
  * comes back. The setlist can't be made until every song in it is in the library, so a song can
