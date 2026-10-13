@@ -85,6 +85,49 @@ describe('the media player and the keyboard', () => {
     })
   })
 
+  describe('off a setlist', () => {
+    let started
+    let stopped
+
+    beforeEach(() => {
+      started = 0
+      stopped = 0
+      player._startSong = async () => {
+        started++
+      }
+      player._stop = async () => {
+        stopped++
+      }
+      document.body.dataset.view = 'songs'
+    })
+
+    afterEach(() => {
+      delete document.body.dataset.view
+    })
+
+    it('Space stops what plays, even when the song it was started for is not the current one', () => {
+      player._isCurrentSongActive = () => false
+      player._metronomeRunning = true
+      expect(press('Space')).to.equal(true)
+      expect([started, stopped]).to.deep.equal([0, 1])
+    })
+
+    it('Space does not start anything', () => {
+      press('Space')
+      expect([started, stopped]).to.deep.equal([0, 0])
+    })
+
+    it('keeps the collapsed or expanded state it was in while something plays', async () => {
+      player._activeSongId = 'a-song'
+      for (const collapsed of [true, false]) {
+        player._collapsed = collapsed
+        await player.updateComplete
+        expect(player.hasAttribute('active')).to.equal(true)
+        expect(!!player.shadowRoot.querySelector('.collapsed-button')).to.equal(collapsed)
+      }
+    })
+  })
+
   it('has an active attribute only while a song is started', async () => {
     expect(player.isActive).to.equal(false)
     expect(player.hasAttribute('active')).to.equal(false)

@@ -17,12 +17,6 @@ bugs
 - noUncheckedIndexedAccess was tried on the app project: 142 errors, mostly false positives
   (regex groups after a match, indexes checked against length just above), so it is off. If it
   is revisited: setlist-page.ts (45) is where `this.songs[i]` is the likeliest real bug
-- Space should stop playback wherever we are in the app, not only on a setlist. Starting is only
-  possible from a song, but stopping is not: with a song playing and the user on the home page,
-  the library or the preferences, Space does nothing (the player's keydown handler returns while
-  the player is hidden, which is its way of leaving Space to a focused button). While something
-  is playing the player is shown, so the same handler could stop it; keep Space for a focused
-  button or switch, and for modals, as now
 - an easy toggle on the player to double the click speed: twice as many clicks per beat (a
   finer subdivision), not a faster tempo. The downbeat and the BPM stay the same; each beat just
   gets another click halfway. For slow songs, which need more clicks. Decide how it is shown

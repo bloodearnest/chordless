@@ -1016,10 +1016,13 @@ export class MediaPlayer extends LitElement {
     if (this.getClientRects().length === 0) return
     // A modal handles its own keys: Esc closes it, Space presses its buttons
     if (isInModalDialog(event)) return
-    // Space toggles: it starts the song being viewed, and stops it while it plays
+    // Space toggles: it starts the song being viewed, and stops it while it plays.
+    // Off a setlist there is no song being viewed, so it only stops
     if (event.code === 'Space' && !isTypingInField(event)) {
       event.preventDefault()
-      if (this._isCurrentSongActive() && this._isPlaying()) {
+      if (this._isOffSetlist()) {
+        if (this._isPlaying()) this._stop()
+      } else if (this._isCurrentSongActive() && this._isPlaying()) {
         this._stop()
       } else {
         this._startSong()
@@ -1030,6 +1033,12 @@ export class MediaPlayer extends LitElement {
       event.preventDefault()
       this._stop()
     }
+  }
+
+  /** Whether the page is something other than a setlist (the app says which in body[data-view]) */
+  _isOffSetlist(): boolean {
+    const view = document.body.dataset.view
+    return view !== undefined && view !== 'setlist'
   }
 
   /** Whether anything is sounding: the pads, or the click */
