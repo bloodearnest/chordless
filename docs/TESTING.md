@@ -44,7 +44,6 @@ For code that doesn't run in a page:
 - `email-link.node.test.ts`: the link the email Worker replies with: a setlist in a URL fragment, and a made-up link cut down to what the page can trust.
 - `email-worker.node.test.ts`: the email Worker's handler (`worker/src/email.ts`), with a fake message: the reply goes to the sender, with a link; no songs, too big, and header injection.
 - `email-mime.node.test.ts`: reading a raw .eml (attachments, a message forwarded as an attachment, HTML only).
-- `leader-reconcile.node.test.ts`: matching setlists to the emails that say who led them.
 - `events.node.test.ts`: every component event class has a unique, namespaced
   `type` (`component:event`), so two events can't collide.
 
@@ -98,7 +97,6 @@ parallel, each in its own browser context.
 | `song-settings.playwright.ts` | A song's settings in a setlist, the media player's settings |
 | `service-worker.playwright.ts` | The service worker serving the shell, and reloading offline |
 | `dev-pages.playwright.ts` | Every page in `src/dev/` loads without errors |
-| `reconcile-leaders.playwright.ts` | The one-off page that sets setlists' leaders from the emails that sent them |
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error. It also has:

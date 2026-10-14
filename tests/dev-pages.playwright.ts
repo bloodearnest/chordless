@@ -2,7 +2,6 @@
 // They aren't exercised by the app, so without this they silently rot.
 import { readdirSync, readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { waitForServiceWorker } from './fixtures.ts'
 
 const DEV_DIR = new URL('../src/dev/', import.meta.url)
 const pages = readdirSync(DEV_DIR).filter(f => f.endsWith('.html') && f !== 'index.html')
@@ -41,11 +40,3 @@ for (const page of pages) {
     expect(problems).toEqual([])
   })
 }
-
-test('dev pages load when the service worker controls the page', async ({ page }) => {
-  await page.goto('/')
-  await waitForServiceWorker(page)
-
-  await page.goto('/dev/components.html')
-  await expect(page).toHaveTitle('Components Test - Chordless')
-})

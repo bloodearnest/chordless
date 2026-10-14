@@ -218,12 +218,10 @@ ccli import
   databases), and offer replacing it with the SongSelect version, which is how the library stays
   one shared set. Leaders also write the key with no "in" ("Behold him Bb"), number the PDFs'
   filenames to give the order, and put a note or a second title in brackets.
-- email import, later: mass-import the emails that matched no setlist (the unmatched table of
-  src/dev/reconcile-leaders.html lists them) as new historic setlists, once the import works
+- email import, later: mass-import the emails that matched no setlist as new historic setlists, once the import works
   properly: the leader, date and songs from importFromEmail, songs matched to the library by
   CCLI number then title, with shells and SongSelect links for the rest. Many have no date (events
-  like "Prayer Day"), so it must ask. The leader reconcile page is a one-off: remove it, with
-  leader-reconcile.ts, once it has been run.
+  like "Prayer Day"), so it must ask.
 - notes on a setlist song (SetlistEntry.notes) are not shown anywhere yet: show them in live mode
   and the overview, and let them be edited. The email import fills them in ("fairly empty to
   start", "May also be in E").

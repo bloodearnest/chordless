@@ -22,7 +22,7 @@ test('the sample setlist has the four hymns, and the card goes once there is a s
   await expect(cards.first()).toContainText('Holy, Holy, Holy')
   await expect(cards.nth(3)).toContainText('It Is Well With My Soul')
 
-  // The songs are in the library, credited to the chart's author, and not from CCLI
+  // The songs are in the library
   await page.goto('/')
   await expect(page.locator('welcome-card')).toHaveCount(0)
   await expect(page.locator('setlist-group')).toBeVisible()

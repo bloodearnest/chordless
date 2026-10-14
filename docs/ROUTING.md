@@ -44,8 +44,7 @@ the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-c
 - The router removes the view when leaving it. **Undo what the view did outside itself**
   in `disconnectedCallback()`: listeners on `window`/`document`, observers, timers, classes
   on `<body>` (edit mode), and anything it put in the shell (the menu's song list).
-  `GlobalListeners` (`js/global-listeners.js`) is a reactive controller that removes
-  listeners for you; `SetlistPage.dispose()` and `LibraryView` are examples of the rest.
+  `SetlistPage.dispose()` and `LibraryView` are examples.
 - Views own their scrolling: the page itself doesn't scroll.
 - **Coming back to a view** with the back or forward button, it should look as it was left.
   What belongs in the URL goes there: the library's search is `/songs?q=...` (typing replaces

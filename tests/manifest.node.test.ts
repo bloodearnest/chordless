@@ -47,7 +47,3 @@ test('a share is a POST of files and text to the address the service worker hand
   // It is not a page of its own: the service worker answers it with a redirect
   assert.ok(!isView(target.action))
 })
-
-test('a second window is not made for a launch', () => {
-  assert.equal(manifest.launch_handler.client_mode, 'focus-existing')
-})

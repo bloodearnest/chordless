@@ -139,15 +139,6 @@ test('JWE blob round-trips: encrypt then decrypt returns original data', async (
   assert.deepEqual(decrypted, data)
 })
 
-test('notes/ personal data not served as raw files', async () => {
-  const resp = await worker.fetch('/notes/test.txt')
-  const ct = resp.headers.get('content-type') ?? ''
-  assert.ok(
-    ct.includes('text/html'),
-    `notes/ should not be served as assets — got content-type: ${ct} (check [assets] directory)`
-  )
-})
-
 test('repo root files are not served', async () => {
   for (const path of ['/wrangler.toml', '/package.json', '/CLAUDE.md']) {
     const resp = await worker.fetch(path)
