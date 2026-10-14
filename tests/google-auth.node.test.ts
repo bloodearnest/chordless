@@ -23,17 +23,21 @@ const sign = ({
   claims = {},
   exp = '1h',
   kid = 'k1',
+  iss = 'https://accounts.google.com',
+  aud = env.GOOGLE_CLIENT_ID,
 }: {
   key?: jose.CryptoKey | Uint8Array
   alg?: string
   claims?: object
   exp?: string | number | null
   kid?: string
+  iss?: string
+  aud?: string
 } = {}) => {
   const jwt = new jose.SignJWT({ email: 'a@example.com', ...claims })
     .setProtectedHeader({ alg, kid })
-    .setIssuer('https://accounts.google.com')
-    .setAudience(env.GOOGLE_CLIENT_ID)
+    .setIssuer(iss)
+    .setAudience(aud)
     .setSubject('sub-1')
     .setIssuedAt()
   if (exp) jwt.setExpirationTime(exp)
@@ -55,15 +59,8 @@ test('a valid token gives its claims', async () => {
 })
 
 test('the issuer without the scheme is accepted', async () => {
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-    .setIssuer('accounts.google.com')
-    .setAudience(env.GOOGLE_CLIENT_ID)
-    .setSubject('s')
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(privateKey)
-  assert.equal((await verifyIdToken(token, env, keys)).sub, 's')
+  const token = await sign({ iss: 'accounts.google.com' })
+  assert.equal((await verifyIdToken(token, env, keys)).sub, 'sub-1')
 })
 
 test('alg none is rejected', async () => {
@@ -89,26 +86,12 @@ test('a token signed by another key is rejected', async () => {
 })
 
 test('a token for another app (audience) is rejected', async () => {
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-    .setIssuer('https://accounts.google.com')
-    .setAudience('someone-else')
-    .setSubject('s')
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(privateKey)
+  const token = await sign({ aud: 'someone-else' })
   await rejects(token, 'wrong audience')
 })
 
 test('a token from another issuer is rejected', async () => {
-  const token = await new jose.SignJWT({})
-    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
-    .setIssuer('https://evil.example')
-    .setAudience(env.GOOGLE_CLIENT_ID)
-    .setSubject('s')
-    .setIssuedAt()
-    .setExpirationTime('1h')
-    .sign(privateKey)
+  const token = await sign({ iss: 'https://evil.example' })
   await rejects(token, 'wrong issuer')
 })
 

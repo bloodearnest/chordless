@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { AppUpdate, AppUpdateChangeEvent, type UpdateContainer } from '../src/js/app-update.ts'
+import { must } from './must.ts'
 import { settle } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -214,8 +215,3 @@ describe('AppUpdate', () => {
     expect(waiting.messages).to.have.length(1)
   })
 })
-
-function must<T>(value: T | null | undefined): T {
-  if (value == null) throw new Error('expected a value')
-  return value
-}
