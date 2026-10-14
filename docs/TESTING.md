@@ -42,8 +42,8 @@ For code that doesn't run in a page:
   links: the encrypted bundle, the page a link opens (with its preview), and the Worker's
   download proxy and its cache.
 - `import-plan.node.test.ts`: matching an email's songs to the library.
-- `manifest.node.test.ts`: the web app manifest (share target, file handlers, shortcuts).
-- `samples.node.test.ts`: the sample charts in `public/samples` parse and agree with themselves.
+- `manifest.node.test.ts`: the web app manifest's install-only features (shortcuts, file handler, share target) point at pages that exist.
+- `samples.node.test.ts`: the sample charts in `public/samples` are real charts, credited properly, with no CCLI number.
 - `songselect-link.node.test.ts`: the SongSelect search link for a missing song.
 - `download-emails.node.test.ts`: the Gmail downloader (`scripts/`), against a fake Gmail.
 - `email-setlist.node.test.ts`: reading a forwarded email as a setlist, on made-up emails.
