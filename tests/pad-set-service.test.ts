@@ -3,6 +3,7 @@ import { ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
+  derivePadSetName,
   ensurePadKeyCached,
   getActivePadSet,
   getPadCacheUrl,
@@ -10,12 +11,15 @@ import {
   listPadSets,
   type PadSet,
   PadSetChangedEvent,
+  PadSetListUpdatedEvent,
   preloadPadKeys,
   selectPadSet,
+  uploadPadSet,
 } from '../src/js/pad-set-service.ts'
 import { makePadSet } from './builders.ts'
-import { installFakeDrive } from './fake-drive.ts'
+import { binaryStringToBytes, installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
+import { buildZip, type ZipEntry } from './zip.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -252,6 +256,185 @@ describe('pad sets in Drive', () => {
       )
       expect(url).to.include('/pads/A%23')
       expect(drive.requests).to.have.length(0)
+    })
+  })
+
+  describe('uploading a set from a zip file', () => {
+    const allKeys = PAD_FILE_KEYS.map(key => key as string)
+    const mp3 = (name: string) => ({ name, data: audioOf(name) })
+    /** An entry for each key, in a folder like the zips pad makers give */
+    const entriesFor = (keys: string[], extra: Partial<ZipEntry> = {}) =>
+      keys.map(key => ({ ...mp3(`Pads/Warm Pad - ${key}.mp3`), ...extra }))
+
+    /** The files in a pad set's folder in Drive, by name */
+    const filesIn = (folderId: string) =>
+      Object.fromEntries(
+        drive
+          .listFiles((file: any) => file.parents.includes(folderId))
+          .map((file: any) => [file.name, binaryStringToBytes(file.content)])
+      )
+
+    async function failureOf(promise: Promise<unknown>) {
+      try {
+        await promise
+      } catch (error) {
+        return (error as Error).message
+      }
+      return null
+    }
+
+    it('puts a file for each key in a folder in Drive, and returns the set', async () => {
+      const zip = await buildZip(entriesFor(allKeys), 'Warm_Pad-Set.zip')
+
+      const padSet = await uploadPadSet(zip)
+
+      expect(padSet).to.deep.equal({ id: padSet.id, name: 'Warm Pad Set', type: 'drive' })
+      const files = filesIn(padSet.id)
+      expect(Object.keys(files).sort()).to.deep.equal(allKeys.map(key => `${key}.mp3`).sort())
+      for (const key of allKeys) {
+        expect(files[`${key}.mp3`], key).to.deep.equal(audioOf(`Pads/Warm Pad - ${key}.mp3`))
+      }
+    })
+
+    it('names a set by its file: without the extension, with spaces for dashes and underscores', () => {
+      expect(derivePadSetName('Warm_Pad-Set.zip')).to.equal('Warm Pad Set')
+      expect(derivePadSetName('Ambient Pads (v2).zip')).to.equal('Ambient Pads v2')
+      expect(derivePadSetName('---.zip')).to.equal('New Pad Set')
+      expect(derivePadSetName()).to.equal('New Pad Set')
+    })
+
+    it('reads files the zip tool deflated', async () => {
+      const zip = await buildZip(entriesFor(allKeys, { method: 'deflate' }))
+
+      const padSet = await uploadPadSet(zip, 'Deflated')
+
+      expect(filesIn(padSet.id)['G#.mp3']).to.deep.equal(audioOf('Pads/Warm Pad - G#.mp3'))
+    })
+
+    it('is named by the name it is given, else by its file', async () => {
+      const zip = await buildZip(entriesFor(allKeys), 'from-file.zip')
+
+      expect((await uploadPadSet(zip, '  Chosen name ')).name).to.equal('Chosen name')
+      expect((await uploadPadSet(zip)).name).to.equal('from file')
+    })
+
+    it('takes flats as the sharps the keys are named by', async () => {
+      const sharps = ['A#', 'C#', 'D#', 'F#', 'G#']
+      const flats = ['Bb', 'Db', 'Eb', 'Gb', 'Ab']
+      const names = allKeys.map(key => (sharps.includes(key) ? flats[sharps.indexOf(key)] : key))
+      const zip = await buildZip(names.map(name => mp3(`${name}.mp3`)))
+
+      const padSet = await uploadPadSet(zip, 'Flats')
+
+      expect(Object.keys(filesIn(padSet.id)).sort()).to.deep.equal(
+        allKeys.map(key => `${key}.mp3`).sort()
+      )
+      expect(filesIn(padSet.id)['A#.mp3']).to.deep.equal(audioOf('Bb.mp3'))
+    })
+
+    it('ignores folders, other kinds of file, and files that are not a key', async () => {
+      const zip = await buildZip([
+        { name: 'Pads/' },
+        { name: 'Pads/readme.txt', data: new Uint8Array([1]) },
+        mp3('Pads/Intro.mp3'),
+        ...entriesFor(allKeys),
+      ])
+
+      const padSet = await uploadPadSet(zip, 'Mixed')
+
+      expect(Object.keys(filesIn(padSet.id))).to.have.length(12)
+    })
+
+    it('takes the file nearest the top of the zip when two are for a key', async () => {
+      const zip = await buildZip([
+        mp3('Alternate takes/Old/C.mp3'),
+        mp3('C.mp3'),
+        ...entriesFor(allKeys.filter(key => key !== 'C')),
+      ])
+
+      const padSet = await uploadPadSet(zip, 'Doubled')
+
+      expect(filesIn(padSet.id)['C.mp3']).to.deep.equal(audioOf('C.mp3'))
+    })
+
+    it('tells the page the list of sets changed, and the list is read again', async () => {
+      let told = 0
+      const listener = () => told++
+      window.addEventListener(PadSetListUpdatedEvent.type, listener)
+      try {
+        await listPadSets(true)
+        const padSet = await uploadPadSet(await buildZip(entriesFor(allKeys)), 'Listed')
+        expect(told).to.equal(1)
+        expect((await listPadSets()).map(set => set.id)).to.include(padSet.id)
+      } finally {
+        window.removeEventListener(PadSetListUpdatedEvent.type, listener)
+      }
+    })
+
+    it('replaces what was in the folder, and what was kept of it for offline', async () => {
+      const zip = await buildZip(entriesFor(allKeys))
+      const first = await uploadPadSet(zip, 'Same name')
+      await ensurePadKeyCached(makePadSet({ id: first.id, name: first.name }), 'C')
+      expect(await cachedBytes(first as PadSet, 'C')).to.not.equal(null)
+
+      const again = await uploadPadSet(
+        await buildZip(entriesFor(allKeys).map(entry => ({ ...entry, data: audioOf('new') }))),
+        'Same name'
+      )
+
+      expect(again.id).to.equal(first.id)
+      const files = filesIn(first.id)
+      expect(drive.listFiles((file: any) => file.parents.includes(first.id))).to.have.length(12)
+      expect(files['C.mp3']).to.deep.equal(audioOf('new'))
+      expect(await cachedBytes(first as PadSet, 'C')).to.equal(null)
+    })
+
+    describe('refuses', () => {
+      /** Nothing is made in Drive for a zip that is refused */
+      const nothingMade = () => expect(drive.files.size).to.equal(0)
+
+      it('no file', async () => {
+        expect(await failureOf(uploadPadSet(null))).to.equal('Please select a pad set ZIP file.')
+        nothingMade()
+      })
+
+      it('a name of only spaces', async () => {
+        const zip = await buildZip(entriesFor(allKeys), 'pads.zip')
+        expect(await failureOf(uploadPadSet(zip, '   '))).to.equal('Please provide a pad set name.')
+        nothingMade()
+      })
+
+      it('a zip missing keys, naming them', async () => {
+        const zip = await buildZip(entriesFor(allKeys.filter(key => key !== 'D' && key !== 'F#')))
+        expect(await failureOf(uploadPadSet(zip, 'Short'))).to.equal(
+          'Missing keys in pad set: D, F#'
+        )
+        nothingMade()
+      })
+
+      it('a file that is not a zip', async () => {
+        const notZip = new File([new Uint8Array(100)], 'pads.zip')
+        expect(await failureOf(uploadPadSet(notZip, 'Bad'))).to.equal(
+          'Invalid ZIP file (EOCD not found)'
+        )
+        nothingMade()
+      })
+
+      it('an encrypted zip', async () => {
+        const zip = await buildZip(entriesFor(allKeys, { flags: 1 }))
+        expect(await failureOf(uploadPadSet(zip, 'Secret'))).to.equal(
+          'Encrypted ZIP archives are not supported.'
+        )
+        nothingMade()
+      })
+
+      it('a zip using a compression it cannot read', async () => {
+        const zip = await buildZip(entriesFor(allKeys, { rawMethod: 12 }))
+        expect(await failureOf(uploadPadSet(zip, 'Bzip'))).to.equal(
+          'Unsupported ZIP compression method: 12'
+        )
+        nothingMade()
+      })
     })
   })
 })

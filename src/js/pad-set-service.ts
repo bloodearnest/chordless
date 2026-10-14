@@ -301,7 +301,7 @@ export function preloadPadKeysForSongs(
 
 export function derivePadSetName(filename = ''): string {
   const base = filename.replace(/\.[^.]+$/, '')
-  const sanitized = base.replace(/[^a-zA-Z0-9\s-]+/g, '')
+  const sanitized = base.replace(/[^a-zA-Z0-9\s_-]+/g, '')
   const spaced = sanitized.replace(/[-_]+/g, ' ').trim()
   return spaced || 'New Pad Set'
 }

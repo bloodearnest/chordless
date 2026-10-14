@@ -1,5 +1,10 @@
 import { expect } from '@open-wc/testing'
-import { createFile, downloadFileBinary, driveRequest } from '../src/js/drive-api.ts'
+import {
+  batchDeleteFiles,
+  createFile,
+  downloadFileBinary,
+  driveRequest,
+} from '../src/js/drive-api.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 
@@ -32,6 +37,16 @@ describe('FakeDrive', () => {
     const bytes = Uint8Array.from({ length: 256 }, (_, i) => i)
     const file = await createFile({ name: 'pad.mp3' }, new Blob([bytes]), 'audio/mpeg')
     expect(new Uint8Array(await downloadFileBinary(file.id))).to.deep.equal(bytes)
+  })
+
+  it('deletes a batch of files, and answers each as Drive does', async () => {
+    const a = await createFile({ name: 'a' }, 'one')
+    const b = await createFile({ name: 'b' }, 'two')
+
+    const deleted = await batchDeleteFiles([a.id, 'not-there', b.id])
+
+    expect(deleted).to.equal(2)
+    expect(drive.listFiles()).to.deep.equal([])
   })
 
   it('keeps appProperties and properties separate in queries', async () => {
