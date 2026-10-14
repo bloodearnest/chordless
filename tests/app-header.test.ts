@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { wait } from './test-helpers.ts'
 import '../src/components/app-header.ts'
@@ -12,8 +12,7 @@ describe('app-header', () => {
     const header = await fixture<AppHeader>(html`<app-header heading="First"></app-header>`)
     expect(shownTitle(header)).to.equal('First')
     header.heading = 'Second'
-    await wait(800)
-    expect(shownTitle(header)).to.equal('Second')
+    await waitUntil(() => shownTitle(header) === 'Second', 'the heading changes')
   })
 
   it('ends on the latest heading when it changes again while fading', async () => {
@@ -21,8 +20,7 @@ describe('app-header', () => {
     header.heading = 'Second'
     await wait(400) // mid-fade: Second is shown, fading in
     header.heading = 'Third'
-    await wait(1500)
-    expect(shownTitle(header)).to.equal('Third')
+    await waitUntil(() => shownTitle(header) === 'Third', 'the latest heading is shown')
   })
 
   it('shows a heading set with setTitleInstant at once, in a single update', async () => {
@@ -41,7 +39,6 @@ describe('app-header', () => {
     expect(updates).to.equal(1)
     // The next change fades as usual
     header.heading = 'Third'
-    await wait(800)
-    expect(shownTitle(header)).to.equal('Third')
+    await waitUntil(() => shownTitle(header) === 'Third', 'the next change fades in')
   })
 })
