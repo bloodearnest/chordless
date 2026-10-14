@@ -2165,6 +2165,7 @@ export class SetlistPage {
       const updatedSections = Array.from(
         this.root.querySelectorAll<HTMLElement>('.section[id^="song-"]')
       )
+      const displays: SongDisplay[] = []
       updatedSections.forEach((section, index) => {
         section.id = `song-${index}`
 
@@ -2172,7 +2173,17 @@ export class SetlistPage {
         section.querySelectorAll<HTMLElement>('[data-song-index]').forEach(el => {
           el.dataset.songIndex = String(index)
         })
+
+        // The song display and its sections look songs up by their index
+        for (const display of section.querySelectorAll<SongDisplay>('song-display')) {
+          display.songIndex = index
+          displays.push(display)
+        }
       })
+      this.songs.forEach((song, index) => {
+        song.songIndex = index
+      })
+      await Promise.all(displays.map(display => display.updateComplete))
 
       // Re-apply section states with new indices
       this.applySectionState()
@@ -2612,14 +2623,9 @@ export class SetlistPage {
 
     const songDisplays = this.root.querySelectorAll<SongDisplay>('song-display')
     songDisplays.forEach(display => {
-      const attrIndex = Number(display.getAttribute('song-index'))
-      const fallbackIndex =
-        Number.isNaN(attrIndex) && typeof display.songIndex === 'number'
-          ? display.songIndex
-          : attrIndex
-      const index = Number.isNaN(fallbackIndex) ? -1 : fallbackIndex
-      if (this._capoEnabled && index >= 0 && this.songs[index]) {
-        display.capo = this.songs[index].currentCapo || 0
+      const song = this.songs[display.songIndex]
+      if (this._capoEnabled && song) {
+        display.capo = song.currentCapo || 0
       } else {
         display.capo = 0
       }
