@@ -40,6 +40,15 @@ function fakeView(name, { keepsState = true } = {}) {
   return view
 }
 
+/**
+ * Forward entries left by an earlier test's history.back() make a push drop them, so the history
+ * grows by less than one and a test of `history.length` fails now and then. Cut them off first.
+ */
+const atEndOfHistory = () => {
+  const { navigation } = window as unknown as { navigation: { canGoForward: boolean } }
+  if (navigation.canGoForward) window.history.pushState(null, '', window.location.href)
+}
+
 describe('AppRouter', () => {
   let outlet
   let router
@@ -112,6 +121,7 @@ describe('AppRouter', () => {
 
   describe('navigate', () => {
     beforeEach(async () => {
+      atEndOfHistory()
       window.history.replaceState(null, '', '/storage')
       await makeRouter().start()
     })
@@ -243,6 +253,7 @@ describe('AppRouter', () => {
 
   describe('history', () => {
     beforeEach(async () => {
+      atEndOfHistory()
       window.history.replaceState(null, '', '/setlist/abc')
       await makeRouter().start()
     })
