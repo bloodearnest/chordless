@@ -93,24 +93,6 @@ export interface SongUsage {
   order: number
 }
 
-/** A setlist from before the current schema (see migrateSetlist) */
-interface LegacySetlist extends Partial<Omit<Setlist, 'songs'>> {
-  id: string
-  date: string
-  leader?: string
-  createdAt?: string
-  updatedAt?: string
-  songs?: {
-    order?: number
-    songId: string
-    songUuid?: string
-    key?: string | null
-    tempo?: TempoInput
-    notes?: string
-    modifications?: { targetKey?: string; bpmOverride?: TempoInput }
-  }[]
-}
-
 export class ChordlessDB {
   dbName: string
   organisationId: string
@@ -513,71 +495,6 @@ export class ChordlessDB {
       }
       request.onerror = () => reject(request.error)
     })
-  }
-
-  // Migrate a setlist from old schema to new schema
-  migrateSetlist(oldSetlist: LegacySetlist): Setlist {
-    // Generate UUID if setlist has date-based ID
-    const needsNewId = /^\d{4}-\d{2}-\d{2}/.test(oldSetlist.id)
-
-    const newSetlist: Setlist = {
-      id: needsNewId ? crypto.randomUUID() : oldSetlist.id,
-      date: oldSetlist.date,
-      time: oldSetlist.time || '10:30',
-      type: oldSetlist.type || 'Church Service',
-      name: oldSetlist.name || '',
-      owner: oldSetlist.owner || oldSetlist.leader || '', // Rename leader → owner
-      songs: (oldSetlist.songs || []).map(song => ({
-        order: song.order ?? 0,
-        songId: song.songId,
-        songUuid: song.songUuid || song.songId, // Use songId as fallback if songUuid missing
-        key: song.key !== undefined ? song.key : song.modifications?.targetKey || null,
-        tempo: tempoBpm(song.tempo !== undefined ? song.tempo : song.modifications?.bpmOverride),
-        notes: song.notes || '',
-      })),
-      createdDate: oldSetlist.createdDate || oldSetlist.createdAt || new Date().toISOString(),
-      modifiedDate: oldSetlist.modifiedDate || oldSetlist.updatedAt || new Date().toISOString(),
-      driveFileId: oldSetlist.driveFileId || null,
-      driveModifiedTime: oldSetlist.driveModifiedTime || null,
-      lastSyncedAt: oldSetlist.lastSyncedAt || null,
-      _lastSyncHash: oldSetlist._lastSyncHash || null,
-    }
-
-    return newSetlist
-  }
-
-  // Migrate all setlists in database to new schema
-  async migrateAllSetlists(): Promise<number> {
-    // Old records may still have the old schema's fields
-    const allSetlists = (await this.getAllSetlists()) as LegacySetlist[]
-    let migratedCount = 0
-
-    for (const setlist of allSetlists) {
-      // Check if setlist needs migration
-      const needsMigration =
-        setlist.leader !== undefined ||
-        setlist.createdAt !== undefined ||
-        setlist.updatedAt !== undefined ||
-        setlist.songs?.some(s => s.modifications !== undefined)
-
-      if (needsMigration) {
-        const migrated = this.migrateSetlist(setlist)
-
-        // If ID changed, delete old one and save new one
-        if (migrated.id !== setlist.id) {
-          await this.deleteSetlist(setlist.id)
-        }
-
-        await this.saveSetlist(migrated)
-        migratedCount++
-        console.log(
-          `[Migration] Migrated setlist: ${setlist.date} (${setlist.id} → ${migrated.id})`
-        )
-      }
-    }
-
-    console.log(`[Migration] Migrated ${migratedCount} setlists`)
-    return migratedCount
   }
 
   // Clear setlists, songs and charts, keeping per-setlist device state
