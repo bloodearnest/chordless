@@ -1,5 +1,7 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/media-player.ts'
+import { SongChangeEvent } from '../src/js/app-events.ts'
+import type { RuntimeSong } from '../src/js/setlist/runtime-songs.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -123,9 +125,64 @@ describe('the media player and the keyboard', () => {
         player._collapsed = collapsed
         await player.updateComplete
         expect(player.hasAttribute('active')).to.equal(true)
-        expect(!!player.shadowRoot.querySelector('.collapsed-button')).to.equal(collapsed)
+        expect(!!player.shadowRoot.querySelector('.collapsed-pill')).to.equal(collapsed)
       }
     })
+  })
+
+  describe('the collapsed pill', () => {
+    let started
+    let stopped
+
+    beforeEach(async () => {
+      started = 0
+      stopped = 0
+      player._startSong = async () => {
+        started++
+      }
+      player._stop = async () => {
+        stopped++
+      }
+      player.currentKey = 'G'
+      player._collapsed = true
+      await player.updateComplete
+    })
+
+    const buttons = () => [...player.shadowRoot.querySelectorAll('.pill-button')]
+
+    it('has play, stop and expand; play starts the song without expanding', async () => {
+      expect(buttons()).to.have.length(3)
+      expect(buttons()[0].disabled).to.equal(false)
+      buttons()[0].click()
+      expect(started).to.equal(1)
+      expect(player._collapsed).to.equal(true)
+    })
+
+    it('stop is disabled until something plays, then stops', async () => {
+      expect(buttons()[1].disabled).to.equal(true)
+      player._metronomeRunning = true
+      await player.updateComplete
+      buttons()[1].click()
+      expect(stopped).to.equal(1)
+    })
+
+    it('expand opens the full player', async () => {
+      buttons()[2].click()
+      expect(player._collapsed).to.equal(false)
+    })
+  })
+
+  it('catches up with the song the page already showed when it is loaded late', async () => {
+    const song = { songId: 's1', title: 'A song', metadata: { key: 'G' } }
+    const before = SongChangeEvent.latest
+    SongChangeEvent.latest = new SongChangeEvent(song as unknown as RuntimeSong)
+    const late = document.createElement('media-player')
+    document.body.append(late)
+    await late.updateComplete
+    expect(late.currentKey).to.equal('G')
+    expect(late._currentSongId).to.equal('s1')
+    late.remove()
+    SongChangeEvent.latest = before
   })
 
   it('has an active attribute only while a song is started', async () => {

@@ -32,12 +32,13 @@ export class Icon extends LitElement {
       vertical-align: middle;
     }
 
-    /* Lucide icons: 2px outlines in the current colour */
+    /* Lucide icons: 2px outlines in the current colour (--icon-stroke, to match the line of an icon
+       drawn at another size) */
     svg {
       display: block;
       fill: none;
       stroke: currentColor;
-      stroke-width: 2;
+      stroke-width: var(--icon-stroke, 2);
       stroke-linecap: round;
       stroke-linejoin: round;
       width: var(--icon-size, 24px);

@@ -160,7 +160,7 @@ export class MediaPlayer extends LitElement {
     }
 
     .player,
-    .collapsed-button,
+    .collapsed-pill,
     app-modal {
       pointer-events: auto;
     }
@@ -730,29 +730,49 @@ export class MediaPlayer extends LitElement {
       letter-spacing: 0.05em;
     }
 
-    .collapsed-button {
-      width: 4rem;
+    .collapsed-pill {
+      display: flex;
       height: 4rem;
-      border-radius: 50%;
-      border: 0;
+      border-radius: 2rem;
+      overflow: hidden;
       background: rgba(52, 73, 94, 0.4);
+      -webkit-backdrop-filter: blur(4px);
+      backdrop-filter: blur(4px);
+      animation: fadeIn 0.2s ease-in-out;
+    }
+
+    .pill-button {
+      width: 3.5rem;
+      border: 0;
+      background: transparent;
       color: var(--player-text, white);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: var(--font-ui);
-      -webkit-backdrop-filter: blur(4px);
-      backdrop-filter: blur(4px);
-      transition: background 0.2s;
       padding: 0;
-      padding-left: 0.2rem;
       line-height: 1;
-      animation: fadeIn 0.2s ease-in-out;
+      transition: background 0.2s;
     }
 
-    .collapsed-button:active {
+    /* The play side is the main target. A triangle's weight is at its base, so it sits right of
+       centre to look centred, and the pill's round end takes some of the room on the left */
+    .pill-button:first-child {
+      width: 4.5rem;
+      padding-left: 0.6rem;
+    }
+
+    .pill-button + .pill-button {
+      border-left: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .pill-button:active:not(:disabled) {
       background: rgba(52, 73, 94, 0.8);
+    }
+
+    .pill-button:disabled {
+      opacity: 0.35;
+      cursor: default;
     }
   `
 
@@ -856,6 +876,8 @@ export class MediaPlayer extends LitElement {
     document.addEventListener(MediaSettingsChangeEvent.type, settingsChange)
     document.addEventListener(SongChangeEvent.type, songChange)
     window.addEventListener(PadSetChangedEvent.type, padSetChange)
+    // Loaded after the page showed its song (a reload straight onto one): catch up
+    if (SongChangeEvent.latest) songChange(SongChangeEvent.latest)
   }
 
   override disconnectedCallback() {
@@ -1741,12 +1763,37 @@ export class MediaPlayer extends LitElement {
         `
       : this._activeSongKey || '-'
 
-    // If collapsed, show just the expand button (always bottom-left)
+    // If collapsed, show just the pill (always bottom-right): play, stop, expand
     if (this._collapsed) {
       return html`
-        <button class="collapsed-button" @click=${this._toggleCollapse} title="Expand player">
-          <app-icon name="play" size="32"></app-icon>
-        </button>
+        <div class="collapsed-pill">
+          <button
+            class="pill-button"
+            @click=${this._startSong}
+            aria-label="Start song"
+            title="Start song"
+            ?disabled=${!this.currentKey || this._isCurrentSongActive()}
+          >
+            <app-icon name="play" size="30"></app-icon>
+          </button>
+          <button
+            class="pill-button"
+            @click=${this._stop}
+            aria-label="Stop"
+            title="Stop"
+            ?disabled=${!this._isPlaying()}
+          >
+            <app-icon name="stop" size="24" style="--icon-stroke: 2.5"></app-icon>
+          </button>
+          <button
+            class="pill-button"
+            @click=${this._toggleCollapse}
+            aria-label="Expand player"
+            title="Expand player"
+          >
+            <app-icon name="chevron-up" size="28"></app-icon>
+          </button>
+        </div>
       `
     }
 

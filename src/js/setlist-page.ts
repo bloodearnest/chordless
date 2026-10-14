@@ -881,9 +881,12 @@ export class SetlistPage {
   dispatchSongChange(song: RuntimeSong | null) {
     // Dispatch custom event for media player to listen to
     const prefs = song ? getSongUserPrefs(song.songId, this._database().organisationId) : null
-    document.dispatchEvent(
-      new SongChangeEvent(song, { doubleClick: prefs?.doubleClick, padSetId: prefs?.padSetId })
-    )
+    const event = new SongChangeEvent(song, {
+      doubleClick: prefs?.doubleClick,
+      padSetId: prefs?.padSetId,
+    })
+    SongChangeEvent.latest = event
+    document.dispatchEvent(event)
     console.log('[SongChange] Dispatched song:', song?.songId, song?.title)
   }
 

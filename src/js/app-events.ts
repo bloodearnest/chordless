@@ -10,6 +10,11 @@ import type { SongMediaPrefs } from './song-user-prefs.ts'
 /** The setlist page moved to another song (sent on document, for the media player) */
 export class SongChangeEvent extends Event {
   static readonly type = 'setlist:song-change'
+  /**
+   * The last one sent, for a listener that arrives late: the media player is loaded on demand,
+   * and a page opened straight on a song has already sent its event by then
+   */
+  static latest: SongChangeEvent | null = null
   readonly song: RuntimeSong | null
   /** This user's media choices for the song (see song-user-prefs.ts) */
   readonly mediaPrefs: SongMediaPrefs

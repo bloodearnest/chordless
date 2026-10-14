@@ -66,6 +66,7 @@ the stylesheet and ids apply; class `view`, so it lays out as a child of `.app-c
 `<media-player>` lives in the shell. It shows on setlists, and elsewhere only while
 something is playing (`active` attribute, `isActive`). Leaving a setlist sends
 `SongChangeEvent(null)`, which clears the *current* song but not the one playing.
+Collapsed, it is a translucent pill of three buttons: play (the song in view), stop, and expand.
 
 The player is optional: setlist navigation is the core, and the player may be off on an older
 device. `js/media-player-loader.js` loads its code only if the device has Web Audio and the
