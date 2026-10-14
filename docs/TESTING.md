@@ -44,8 +44,13 @@ safety. To keep it that way:
 
 For code that doesn't run in a page:
 
-- `worker.node.test.ts`: the Cloudflare worker (static files, the SPA fallback, the
-  OAuth and session routes, the share routes, the dev pages).
+- `worker.node.test.ts`: the whole Cloudflare worker, started with wrangler (`unstable_dev`): static
+  files, the SPA fallback, that the routes are wired up, the dev pages. Slow, so it checks the
+  wiring, and the logic is tested in Node on its own:
+- `worker-router.node.test.ts`, `worker-session.node.test.ts`: the Worker's routing
+  (`worker/src/router.ts`: what is the API, what is refused as cross-origin, share links, dev pages,
+  the 500) and the sign-in routes and token blob (`session.ts`, `blob.ts`), with the assets, cache
+  and Google replaced. `index.ts` is only what needs `cloudflare:email` and the Workers cache.
 - `google-auth.node.test.ts`: checking a Google ID token (signature, issuer, audience, expiry).
 - `share-bundle.node.test.ts`, `share-page.node.test.ts`, `share-proxy.node.test.ts`: share
   links: the encrypted bundle, the page a link opens (with its preview), and the Worker's
