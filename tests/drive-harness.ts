@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { installFakeDrive } from './fake-drive.ts'

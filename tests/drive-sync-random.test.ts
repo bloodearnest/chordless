@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'

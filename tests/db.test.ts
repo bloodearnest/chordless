@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
 const { describe, it } = window

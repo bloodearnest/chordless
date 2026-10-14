@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { setlistFileMetadata } from '../src/js/drive-metadata.ts'
 import { useSyncRig } from './drive-harness.ts'

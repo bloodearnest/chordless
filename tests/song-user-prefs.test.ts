@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { getSongUserPrefs, saveSongUserPrefs, setSongUserPref } from '../src/js/song-user-prefs.ts'
 
 const { describe, it, beforeEach, afterEach } = window

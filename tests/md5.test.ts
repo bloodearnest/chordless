@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { md5Hex } from '../src/js/utils/md5.ts'
 
 const { describe, it } = window

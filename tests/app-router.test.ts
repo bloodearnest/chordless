@@ -1,5 +1,5 @@
-import { expect } from '@esm-bundle/chai'
 import { ContextConsumer } from '@lit/context'
+import { expect } from '@open-wc/testing'
 import { LitElement } from 'lit'
 import { AppRouter, pageTitle, RouteChangeEvent } from '../src/js/app-router.ts'
 import { routeContext } from '../src/js/route-context.ts'

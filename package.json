@@ -28,7 +28,6 @@
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",
     "@cloudflare/vite-plugin": "^1.63.1",
-    "@esm-bundle/chai": "^4.3.4-fix.0",
     "@open-wc/testing": "^5.0.0",
     "@playwright/test": "^1.64.0",
     "@types/google.accounts": "^0.0.18",

@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { filterSongs, lyricSnippet, matchedFields } from '../src/js/utils/song-filter.ts'
 
 const { describe, it } = window

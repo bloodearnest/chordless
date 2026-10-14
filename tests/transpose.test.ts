@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import type { ParsedChart } from '../src/js/data-types.ts'
 import { makeChart } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'

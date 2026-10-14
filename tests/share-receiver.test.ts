@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { buildShareBundle } from '../src/js/share-bundle.ts'
 import { encryptBundle, generateShareKey } from '../src/js/share-crypto.ts'

@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { SetlistSong } from '../src/js/models/setlist-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'

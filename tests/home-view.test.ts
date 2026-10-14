@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { ROUTE_NAMES } from '../src/js/router.ts'
 import { groupSetlistsByYear } from '../src/js/views/home-view.ts'

@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { makeLocalState, makeSetlist } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'

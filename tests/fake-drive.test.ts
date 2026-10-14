@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { driveRequest } from '../src/js/drive-api.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'

@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import {
   createOrganisation,

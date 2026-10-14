@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { songFileMetadata } from '../src/js/drive-metadata.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { useSyncRig } from './drive-harness.ts'

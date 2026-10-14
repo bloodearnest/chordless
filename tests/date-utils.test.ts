@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { formatSetlistDate, getWeeksAgo, setlistTitle } from '../src/js/utils/date-utils.ts'
 
 const { describe, it } = window

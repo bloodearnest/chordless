@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { isInModalDialog, isTypingInField } from '../src/js/utils/keyboard.ts'
 import { must } from './must.ts'
 

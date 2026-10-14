@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeLocalState, makeSong } from './builders.ts'

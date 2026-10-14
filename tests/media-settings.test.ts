@@ -1,4 +1,4 @@
-import { expect } from '@esm-bundle/chai'
+import { expect } from '@open-wc/testing'
 import { loadMediaSettings, saveMediaSettings, wantsDoubleClick } from '../src/js/media-settings.ts'
 
 const { describe, it } = window
