@@ -6,6 +6,15 @@ import { defineConfig, devices } from '@playwright/test'
 const DEV_PORT = 8791
 const BUILT_PORT = 8792
 
+// The built app is a `vite build` away: skip it when the run names test files, or the chromium
+// project, and none of them is the built one (`just test-browser-headless tests/live.playwright.ts`)
+const args = process.argv.slice(2)
+const named = args.filter(a => /\.playwright\.|^--project/.test(a))
+const needsBuilt =
+  named.length === 0 ||
+  named.some(a => /built|--project[= ]?built/.test(a)) ||
+  args.includes('--ui')
+
 export default defineConfig({
   testDir: './tests',
   testMatch: '*.playwright.{js,ts}',
@@ -20,7 +29,7 @@ export default defineConfig({
     baseURL: `http://localhost:${DEV_PORT}`,
     // Dates follow the browser's locale; fix it so expectations are stable
     locale: 'en-GB',
-    trace: 'on-first-retry',
+    trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
 
@@ -47,11 +56,15 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120 * 1000,
     },
-    {
-      command: `npm run build && npm run preview -- --port ${BUILT_PORT} --strictPort`,
-      url: `http://localhost:${BUILT_PORT}`,
-      reuseExistingServer: !process.env.CI,
-      timeout: 120 * 1000,
-    },
+    ...(needsBuilt
+      ? [
+          {
+            command: `npm run build && npm run preview -- --port ${BUILT_PORT} --strictPort`,
+            url: `http://localhost:${BUILT_PORT}`,
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+          },
+        ]
+      : []),
   ],
 })
