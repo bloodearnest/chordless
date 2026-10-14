@@ -30,3 +30,21 @@ export function suppressConsoleLogs() {
     }
   })
 }
+
+/** Wait ms (0 lets queued tasks and promise callbacks run) */
+export const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+export const settle = () => wait(0)
+
+/** A unique name, so tests sharing the browser's IndexedDB do not meet each other's data */
+export const uniqueName = () => crypto.randomUUID()
+
+/** Delete an IndexedDB database, without waiting on connections left open */
+export const deleteDatabase = (name: string) =>
+  new Promise<void>(resolve => {
+    const request = indexedDB.deleteDatabase(name)
+    request.onsuccess = request.onerror = request.onblocked = () => resolve()
+  })
+
+/** The organisation the sync tests run in */
+export const TEST_ORG = { name: 'Test Church', id: 'org-test-church' }

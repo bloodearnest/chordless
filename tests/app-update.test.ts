@@ -1,9 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { AppUpdate, AppUpdateChangeEvent, type UpdateContainer } from '../src/js/app-update.ts'
+import { settle } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
-
-const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
 /** A ServiceWorker that records what it is sent, and whose state a test sets */
 class FakeWorker extends EventTarget {

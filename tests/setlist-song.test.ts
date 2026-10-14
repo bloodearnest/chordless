@@ -3,19 +3,11 @@ import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { SetlistSong } from '../src/js/models/setlist-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
-
-const uniqueName = () => crypto.randomUUID()
-
-const deleteDatabase = name =>
-  new Promise<void>(resolve => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = request.onerror = request.onblocked = () => resolve()
-  })
 
 const clearLocalStorage = (orgId, setlistId) => {
   localStorage.removeItem(`song-prefs-${orgId}`)

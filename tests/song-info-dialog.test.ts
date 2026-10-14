@@ -1,13 +1,12 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/song-info-dialog.ts'
 import { must } from './must.ts'
-import { A11Y } from './test-helpers.ts'
+import { A11Y, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
 /** A database with two songs; loading 'slow' takes a while */
 function fakeDb() {
-  const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
   const songs: Record<
     string,
     { uuid: string; id: string; title: string; chordproFileId: string; chordpro?: string }
@@ -59,7 +58,6 @@ describe('song-info-dialog', () => {
   }
 
   const modal = () => dialog.shadowRoot.querySelector('app-modal')
-  const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
   it('shows the song it was last asked for, even if an earlier one loads later', async () => {
     await setUp()

@@ -12,17 +12,11 @@ import {
 } from '../src/js/share-receiver.ts'
 import { makeEntry } from './builders.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
 suppressConsoleLogs()
-
-const deleteDatabase = (name: string) =>
-  new Promise<void>(resolve => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = request.onerror = request.onblocked = () => resolve()
-  })
 
 describe('Receiving a share link', () => {
   const FILE = `file-${crypto.randomUUID()}`

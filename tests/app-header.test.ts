@@ -1,12 +1,12 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
+import { wait } from './test-helpers.ts'
 import '../src/components/app-header.ts'
 
 const { describe, it } = window
 
 describe('app-header', () => {
   const shownTitle = header => header.shadowRoot.querySelector('.title').textContent.trim()
-  const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
   it('shows a new heading after fading the old one out', async () => {
     const header = await fixture<AppHeader>(html`<app-header heading="First"></app-header>`)

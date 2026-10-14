@@ -1,20 +1,11 @@
 import { expect } from '@esm-bundle/chai'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
 const { describe, it } = window
 
 suppressConsoleLogs()
 
 import { ChordlessDB } from '../src/js/db.ts'
-
-const uniqueName = () =>
-  crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2)
-
-const deleteDatabase = name =>
-  new Promise<void>(resolve => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = request.onerror = request.onblocked = () => resolve()
-  })
 
 describe('ChordlessDB usage aggregation', () => {
   let db

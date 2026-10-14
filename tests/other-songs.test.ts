@@ -9,17 +9,11 @@ import {
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, getLibrarySongs } from '../src/js/song-utils.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
-
-const deleteDatabase = (name: string) =>
-  new Promise<void>(resolve => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = request.onerror = request.onblocked = () => resolve()
-  })
 
 const ALPHA = '{title: Alpha}\n{key: G}\n[G]Alpha line'
 const ALPHA_EDITED = '{title: Alpha}\n{key: G}\n[G]Alpha line, edited'

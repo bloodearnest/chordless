@@ -10,24 +10,15 @@ import { toLocalDateString } from '../src/js/utils/date-utils.ts'
 import { makeEntry } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, TEST_ORG, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-const ORG_NAME = 'Test Church'
-const ORG_ID = 'org-test-church'
 /** Let the clock move on, so timestamps taken before and after differ */
-const tick = () => new Promise(resolve => setTimeout(resolve, 5))
 const today = toLocalDateString(new Date())
 const nextWeek = addDays(today, 7)
-
-const deleteDatabase = (name: string) =>
-  new Promise<void>(resolve => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = request.onerror = request.onblocked = () => resolve()
-  })
 
 describe('Share links: sync', () => {
   let drive
@@ -54,7 +45,11 @@ describe('Share links: sync', () => {
     const db = new ChordlessDB(`test-share-${name}-${crypto.randomUUID()}`)
     await db.init()
     const memberCache = { async set() {} }
-    const sync = new DriveSyncManager(ORG_NAME, ORG_ID, { db, folderLink: link, memberCache })
+    const sync = new DriveSyncManager(TEST_ORG.name, TEST_ORG.id, {
+      db,
+      folderLink: link,
+      memberCache,
+    })
     await sync.init()
     const device = { db, sync }
     devices.push(device)
@@ -91,7 +86,7 @@ describe('Share links: sync', () => {
     })
     song.modifiedDate = new Date().toISOString()
     await device.db.saveSong(song)
-    await tick()
+    await wait(5)
   }
 
   async function addSetlist(device: Device, songIds: string[], fields: Partial<Setlist> = {}) {
@@ -110,7 +105,7 @@ describe('Share links: sync', () => {
 
   const ctx = (device: Device, extra = {}) => ({
     db: device.db,
-    organisationId: ORG_ID,
+    organisationId: TEST_ORG.id,
     organisationFolderId: must(device.sync.driveFolderId),
     ...extra,
   })
@@ -167,7 +162,7 @@ describe('Share links: sync', () => {
     expect(bundle.setlist.songs[0].chordpro).to.include('[G]Alpha line')
     const text = JSON.stringify(bundle)
     expect(text).to.not.include('ann@example.com')
-    expect(text).to.not.include(ORG_ID)
+    expect(text).to.not.include(TEST_ORG.id)
     expect(share.expires).to.equal(addDays(nextWeek, SHARE_DAYS_AFTER))
   })
 
@@ -304,7 +299,7 @@ describe('Share links: sync', () => {
     const phone = await makeDevice('phone', folderLink())
     await addSetlist(phone, [])
     await phone.sync.sync()
-    expect(drive.findByPath(['Chordless', ORG_NAME, 'shares'])).to.equal(null)
+    expect(drive.findByPath(['Chordless', TEST_ORG.name, 'shares'])).to.equal(null)
   })
 
   it('a failing share does not stop setlists syncing', async () => {

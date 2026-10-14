@@ -7,25 +7,13 @@ import { hashText } from '../src/js/song-utils.ts'
 import { makeEntry, makeLocalState, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, TEST_ORG, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-const ORG_NAME = 'Test Church'
-const ORG_ID = 'org-test-church'
-
 /** Let the clock move on, so timestamps taken before and after differ */
-const tick = () => new Promise(resolve => setTimeout(resolve, 5))
-
-const deleteDatabase = name =>
-  new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-    request.onblocked = () => resolve()
-  })
 
 describe('Drive sync (against FakeDrive)', () => {
   let drive
@@ -46,7 +34,7 @@ describe('Drive sync (against FakeDrive)', () => {
   async function makeDevice(
     name,
     {
-      orgName = ORG_NAME,
+      orgName = TEST_ORG.name,
       folderLink = memoryFolderLink(),
     }: { orgName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
   ) {
@@ -62,7 +50,7 @@ describe('Drive sync (against FakeDrive)', () => {
         this.readOnly = readOnly
       },
     }
-    const sync = new DriveSyncManager(orgName, ORG_ID, { db, folderLink, memberCache })
+    const sync = new DriveSyncManager(orgName, TEST_ORG.id, { db, folderLink, memberCache })
     await sync.init()
     const device = { name, db, sync, folderLink, memberCache }
     devices.push(device)
@@ -71,7 +59,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
   /** Rename the device's organisation: sync from then on uses the new name */
   async function renameOrganisation(device, newName) {
-    device.sync = new DriveSyncManager(newName, ORG_ID, {
+    device.sync = new DriveSyncManager(newName, TEST_ORG.id, {
       db: device.db,
       folderLink: device.folderLink,
       memberCache: device.memberCache,
@@ -82,7 +70,7 @@ describe('Drive sync (against FakeDrive)', () => {
   async function addSetlist(device, fields = {}) {
     const setlist = { ...createSetlist({ date: '2026-10-11' }), ...fields }
     await device.db.saveSetlist(setlist)
-    await tick()
+    await wait(5)
     return setlist
   }
 
@@ -91,12 +79,12 @@ describe('Drive sync (against FakeDrive)', () => {
     const setlist = await device.db.getSetlist(id)
     Object.assign(setlist, changes, { modifiedDate: new Date().toISOString() })
     await device.db.saveSetlist(setlist)
-    await tick()
+    await wait(5)
   }
 
   async function syncDevice(device) {
     await device.sync.sync()
-    await tick()
+    await wait(5)
   }
 
   function driveSetlistFiles() {
@@ -141,7 +129,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await syncDevice(phone)
 
-      const folder = drive.findByPath(['Chordless', ORG_NAME, 'setlists'])
+      const folder = drive.findByPath(['Chordless', TEST_ORG.name, 'setlists'])
       const [file] = driveSetlistFiles()
       expect(file.parents).to.deep.equal([folder.id])
       expect(file.appProperties.setlistId).to.equal(setlist.id)
@@ -260,7 +248,8 @@ describe('Drive sync (against FakeDrive)', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Harvest', owner: 'Ann' })
       await syncDevice(phone)
-      const expected = () => setlistFileMetadata(setlist, { organisationId: ORG_ID }).appProperties
+      const expected = () =>
+        setlistFileMetadata(setlist, { organisationId: TEST_ORG.id }).appProperties
 
       expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
 
@@ -947,7 +936,7 @@ describe('Drive sync (against FakeDrive)', () => {
   describe('organisation members', () => {
     it("caches the people the organisation's folder is shared with", async () => {
       const phone = await makeDevice('phone')
-      const folder = drive.findByPath(['Chordless', ORG_NAME])
+      const folder = drive.findByPath(['Chordless', TEST_ORG.name])
       drive.addPermission(folder.id, {
         emailAddress: 'simon@example.com',
         displayName: 'Simon Davy',
@@ -1126,7 +1115,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await phone.db.saveSong(
         makeSong({ uuid: 'song-1', id: 'title-a', title: 'A', chordproFileId })
       )
-      await tick()
+      await wait(5)
       await syncDevice(phone)
       await phone.db.saveChordPro({
         id: chordproFileId,
@@ -1187,7 +1176,7 @@ describe('Drive sync (against FakeDrive)', () => {
         chordproFileId,
         modifiedDate: new Date().toISOString(),
       })
-      await tick()
+      await wait(5)
     }
 
     async function editSongContent(device, uuid, content) {
@@ -1200,7 +1189,7 @@ describe('Drive sync (against FakeDrive)', () => {
       })
       song.modifiedDate = new Date().toISOString()
       await device.db.saveSong(song)
-      await tick()
+      await wait(5)
     }
 
     const songContent = async (device, uuid) => {
@@ -1332,7 +1321,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const expected = async () => {
         const song = must(await phone.db.getSong('song-1'))
         const chart = await phone.db.getChordPro(song.chordproFileId)
-        return songFileMetadata(song, chart, { organisationId: ORG_ID }).appProperties
+        return songFileMetadata(song, chart, { organisationId: TEST_ORG.id }).appProperties
       }
       expect(file().appProperties).to.deep.equal(await expected())
 

@@ -6,6 +6,7 @@ import {
   setKeepAwakePreference,
 } from '../src/js/preferences.ts'
 import { WakeLockController } from '../src/js/wake-lock.ts'
+import { settle, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -17,8 +18,6 @@ class FakeLock extends EventTarget {
     this.dispatchEvent(new Event('release'))
   }
 }
-
-const settle = () => new Promise(resolve => setTimeout(resolve, 0))
 
 describe('WakeLockController', () => {
   let locks: FakeLock[]
@@ -183,7 +182,6 @@ describe('WakeLockController', () => {
   })
 
   describe('with no one there', () => {
-    const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
     let idler: WakeLockController
     /** A BatteryManager stand-in, in place of navigator.getBattery: unplugged unless a test says */
     let battery: EventTarget & { charging: boolean }

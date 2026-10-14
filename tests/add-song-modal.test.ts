@@ -3,11 +3,10 @@ import '../src/components/app-modal.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { AddSongModal } from '../src/js/setlist/add-song-modal.ts'
 import { createSong } from '../src/js/song-utils.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 const stamp = crypto.randomUUID().slice(0, 8)
 const chart = title => `{title: ${title}}\n{key: G}\n\n[G]Amazing [C]grace`
 

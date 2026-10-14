@@ -19,11 +19,9 @@ import '../src/js/views/setlist-view.ts'
 import '../src/js/views/storage-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
-
-const wait = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 /** Wait until a view has loaded what it shows, and run the setup it defers a frame */
 async function loaded(view) {

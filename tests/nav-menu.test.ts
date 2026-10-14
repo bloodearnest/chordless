@@ -2,7 +2,7 @@ import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/app-header.ts'
 import '../src/components/nav-menu.ts'
 import { provideRoute } from '../src/js/route-context.ts'
-import { A11Y } from './test-helpers.ts'
+import { A11Y, settle } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -19,7 +19,6 @@ describe('nav-menu', () => {
   }
 
   /** Let the dialog's close event, and the renders it causes, run */
-  const settle = () => new Promise(resolve => setTimeout(resolve))
 
   afterEach(() => container?.remove())
 

@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/key-selector.ts'
-import { A11Y } from './test-helpers.ts'
+import { A11Y, settle } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -18,7 +18,6 @@ describe('key-selector', () => {
   }
 
   /** Let the dialog's close event, and the renders it causes, run */
-  const settle = () => new Promise(resolve => setTimeout(resolve))
 
   afterEach(() => selector?.remove())
 
@@ -95,8 +94,6 @@ describe('capo-selector', () => {
     await selector.updateComplete
     return selector
   }
-
-  const settle = () => new Promise(resolve => setTimeout(resolve))
 
   it('offers capo 0 to 11, each with the key the chords are played in', async () => {
     await setUp()

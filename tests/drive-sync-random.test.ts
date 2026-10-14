@@ -4,7 +4,7 @@ import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { makeEntry } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -30,8 +30,6 @@ suppressConsoleLogs()
  * about a minute; the test runner gives up after two).
  */
 
-const ORG_NAME = 'Test Church'
-const ORG_ID = 'org-test-church'
 const DEVICES = 3
 const STEPS = 45
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1)
@@ -51,14 +49,6 @@ function random(seed: number) {
     pick: <T>(items: T[]): T => items[Math.floor(next() * items.length)],
   }
 }
-
-const deleteDatabase = (name: string) =>
-  new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(name)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-    request.onblocked = () => resolve()
-  })
 
 type Device = { name: string; db: ChordlessDB; sync: DriveSyncManager }
 
@@ -81,7 +71,7 @@ describe('Drive sync: random histories', () => {
     const memberCache = {
       async set() {},
     }
-    const sync = new DriveSyncManager(ORG_NAME, ORG_ID, { db, folderLink, memberCache })
+    const sync = new DriveSyncManager(TEST_ORG.name, TEST_ORG.id, { db, folderLink, memberCache })
     await sync.init()
     const device = { name, db, sync }
     devices.push(device)
