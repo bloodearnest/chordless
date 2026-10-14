@@ -33,7 +33,16 @@ const authorizationServer: oauth.AuthorizationServer = {
 // Fetches Google's signing keys, and caches them (jose honours the cache headers)
 const googleKeys = jose.createRemoteJWKSet(new URL(JWKS_URI), { timeoutDuration: TIMEOUT_MS })
 
-const requestOptions = () => ({ signal: AbortSignal.timeout(TIMEOUT_MS) })
+/** What tests replace: the fetch that reaches Google's token endpoint, and Google's signing keys */
+export interface GoogleTestHooks {
+  fetch?: typeof fetch
+  keys?: jose.JWTVerifyGetKey
+}
+
+const requestOptions = ({ fetch }: GoogleTestHooks) => ({
+  signal: AbortSignal.timeout(TIMEOUT_MS),
+  ...(fetch && { [oauth.customFetch]: fetch }),
+})
 
 /**
  * Verify a Google ID token: signature (against Google's keys, RS256 only), issuer, audience
@@ -59,7 +68,12 @@ export async function verifyIdToken(
  * Returns { refresh_token, access_token, expires_in, scope, id_token, claims }, where
  * claims are the verified ID token's.
  */
-export async function exchangeCode(code: string, redirectUri: string, env: GoogleEnv) {
+export async function exchangeCode(
+  code: string,
+  redirectUri: string,
+  env: GoogleEnv,
+  hooks: GoogleTestHooks = {}
+) {
   const client: oauth.Client = { client_id: env.GOOGLE_CLIENT_ID }
   const clientAuth = oauth.ClientSecretPost(env.GOOGLE_CLIENT_SECRET)
 
@@ -77,16 +91,20 @@ export async function exchangeCode(code: string, redirectUri: string, env: Googl
     params,
     redirectUri,
     oauth.nopkce,
-    requestOptions()
+    requestOptions(hooks)
   )
   const tokens = await oauth.processAuthorizationCodeResponse(authorizationServer, client, response)
 
   if (!tokens.id_token) return { ...tokens, claims: null }
-  return { ...tokens, claims: await verifyIdToken(tokens.id_token, env) }
+  return { ...tokens, claims: await verifyIdToken(tokens.id_token, env, hooks.keys) }
 }
 
 /** Get a new access token with a refresh token. Returns { access_token, expires_in }. */
-export async function refreshAccessToken(refreshToken: string, env: GoogleEnv) {
+export async function refreshAccessToken(
+  refreshToken: string,
+  env: GoogleEnv,
+  hooks: GoogleTestHooks = {}
+) {
   const client: oauth.Client = { client_id: env.GOOGLE_CLIENT_ID }
   const clientAuth = oauth.ClientSecretPost(env.GOOGLE_CLIENT_SECRET)
 
@@ -95,7 +113,7 @@ export async function refreshAccessToken(refreshToken: string, env: GoogleEnv) {
     client,
     clientAuth,
     refreshToken,
-    requestOptions()
+    requestOptions(hooks)
   )
   return oauth.processRefreshTokenResponse(authorizationServer, client, response)
 }
