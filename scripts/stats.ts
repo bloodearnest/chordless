@@ -74,6 +74,12 @@ function nodeStats(): SuiteStats {
     .filter(name => name.endsWith('.ts') && !name.endsWith('.d.ts'))
     .map(name => `worker/src/${name}`)
     .filter(file => !measured.has(file))
+    // (a file of only types has nothing to run)
+    .filter(file =>
+      /^(export\s+)?(async\s+)?(default|function|class|const|let)\b/m.test(
+        readFileSync(file, 'utf8')
+      )
+    )
   return {
     tests: occurrences(junit, /<testcase /g),
     failed: occurrences(junit, /<failure/g),
