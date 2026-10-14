@@ -1560,7 +1560,10 @@ export class MediaPlayer extends LitElement {
       this._activeSongBpm === this._currentBpm &&
       this._activeSongTempoNote === this._currentTempoNote &&
       this._activeSongTimeSignature === this._currentTimeSignature &&
-      this._activeDoubleClick === this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
+      this._activeDoubleClick ===
+        this._doubleClickFor(this._currentBpm, this._currentDoubleClick) &&
+      // A song with a pad set of its own is not the one playing, even in the same key
+      (this._loadedPadSetId === undefined || this._loadedPadSetId === this._activePadSet.id)
     )
   }
 
