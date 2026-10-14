@@ -55,13 +55,6 @@ async function serveShare(
   return requests
 }
 
-async function recipient(browser, { firstUse = false } = {}) {
-  const context = await browser.newContext({ serviceWorkers: 'block', locale: 'en-GB' })
-  // The first-use setup modal blocks the page: these tests have answered it already
-  if (!firstUse) await context.addInitScript(() => localStorage.setItem('setup-done', '1'))
-  return { context, page: await context.newPage() }
-}
-
 const linkTo = (key: string) => new URL(shareUrl('http://localhost', FILE, key))
 
 async function openLink(page: Page, key: string) {
@@ -70,30 +63,33 @@ async function openLink(page: Page, key: string) {
 }
 
 test.describe('A setlist shared by link', () => {
-  test('a first-time visitor is asked how they read, then sees the setlist', async ({
-    browser,
-  }) => {
-    const key = generateShareKey()
-    const { context, page } = await recipient(browser, { firstUse: true })
-    await serveShare(context, key)
+  // The recipient's browser has never seen the app; its own requests are the ones the stub sees
+  test.use({ serviceWorkers: 'block', locale: 'en-GB' })
 
-    await openLink(page, key)
-    const modal = page.getByRole('dialog', { name: 'Welcome to Chordless' })
-    await expect(modal).toBeVisible()
-    const setup = page.locator('first-use-setup')
-    await setup.getByRole('radio', { name: /^Lyrics only/ }).check()
-    await setup.getByRole('button', { name: 'Continue' }).click()
+  test.describe('on the first visit', () => {
+    test.use({ firstUse: true })
 
-    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
-    expect(await page.evaluate(() => localStorage.getItem('musician_type'))).toBe('singer')
-    await context.close()
+    test('a visitor is asked how they read, then sees the setlist', async ({ context, page }) => {
+      const key = generateShareKey()
+      await serveShare(context, key)
+
+      await openLink(page, key)
+      const modal = page.getByRole('dialog', { name: 'Welcome to Chordless' })
+      await expect(modal).toBeVisible()
+      const setup = page.locator('first-use-setup')
+      await setup.getByRole('radio', { name: /^Lyrics only/ }).check()
+      await setup.getByRole('button', { name: 'Continue' }).click()
+
+      await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+      expect(await page.evaluate(() => localStorage.getItem('musician_type'))).toBe('singer')
+    })
   })
 
   test('opens for someone with no account: the overview, then each song, read-only', async ({
-    browser,
+    context,
+    page,
   }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key)
 
     await openLink(page, key)
@@ -125,14 +121,13 @@ test.describe('A setlist shared by link', () => {
     await page.keyboard.press('ArrowLeft')
     await page.keyboard.press('ArrowLeft')
     await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234$/)
-    await context.close()
   })
 
   test('opens again without the key in the URL, and asks whether anything changed', async ({
-    browser,
+    context,
+    page,
   }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     const requests = await serveShare(context, key)
 
     await openLink(page, key)
@@ -141,12 +136,10 @@ test.describe('A setlist shared by link', () => {
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
     expect(requests).toEqual(['', '"v1"'])
-    await context.close()
   })
 
-  test('shows a changed setlist when it is opened again', async ({ browser }) => {
+  test('shows a changed setlist when it is opened again', async ({ context, page }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key)
     await openLink(page, key)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
@@ -158,12 +151,13 @@ test.describe('A setlist shared by link', () => {
     })
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace (new)')
-    await context.close()
   })
 
-  test('says the share has ended, and keeps nothing, when it was stopped', async ({ browser }) => {
+  test('says the share has ended, and keeps nothing, when it was stopped', async ({
+    context,
+    page,
+  }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key)
     await openLink(page, key)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
@@ -192,29 +186,26 @@ test.describe('A setlist shared by link', () => {
         })
     )
     expect(kept).toEqual({ setlists: 0, songs: 2 })
-    await context.close()
   })
 
-  test('says so when the link has lost its key', async ({ browser }) => {
-    const { context, page } = await recipient(browser)
+  test('says so when the link has lost its key', async ({ context, page }) => {
     await serveShare(context, generateShareKey())
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('#share-status')).toHaveText('This link is incomplete')
-    await context.close()
   })
 
-  test('does not open a share that has already expired', async ({ browser }) => {
+  test('does not open a share that has already expired', async ({ context, page }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key, { bundle: bundle({ expires: '2020-01-01' }) })
     await openLink(page, key)
     await expect(page.locator('#share-status')).toHaveText('This share has ended')
-    await context.close()
   })
 
-  test('is listed under "Shared with me" on the home page, until it ends', async ({ browser }) => {
+  test('is listed under "Shared with me" on the home page, until it ends', async ({
+    context,
+    page,
+  }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key)
     await openLink(page, key)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
@@ -233,35 +224,38 @@ test.describe('A setlist shared by link', () => {
     await expect(page.locator('#share-status')).toHaveText('This share has ended')
     await page.goto('/')
     await expect(page.locator('setlist-group', { hasText: 'Shared with me' })).toHaveCount(0)
-    await context.close()
   })
 
-  test('goes to the setlist, with no download, for someone who has it in their organisation', async ({
-    page,
-  }) => {
-    const setlistId = '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'
-    const url = await seedSetlist(page, { setlistId })
-    const key = generateShareKey()
-    const requests = await serveShare(page.context(), key)
+  test.describe('for someone who has the setlist', () => {
+    // seedSetlist waits for the service worker
+    test.use({ serviceWorkers: 'allow' })
 
-    const link = new URL(shareUrl('http://localhost', FILE, key, setlistId))
-    await page.goto(`${link.pathname}${link.hash}`)
-    await expect(page).toHaveURL(new RegExp(`${url}$`))
-    expect(requests).toEqual([])
+    test('goes to the setlist, with no download, for someone who has it in their organisation', async ({
+      page,
+    }) => {
+      const setlistId = '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'
+      const url = await seedSetlist(page, { setlistId })
+      const key = generateShareKey()
+      const requests = await serveShare(page.context(), key)
 
-    // A link for a setlist they don't have is opened as a share
-    const other = new URL(
-      shareUrl('http://localhost', FILE, key, 'aaaaaaaa-7b1e-4d55-9a6c-0e8f12345678')
-    )
-    await page.goto(`${other.pathname}${other.hash}`)
-    await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234$/)
-    await expect(page.locator('setlist-overview')).toContainText('Be Still')
-    expect(requests).toHaveLength(1)
+      const link = new URL(shareUrl('http://localhost', FILE, key, setlistId))
+      await page.goto(`${link.pathname}${link.hash}`)
+      await expect(page).toHaveURL(new RegExp(`${url}$`))
+      expect(requests).toEqual([])
+
+      // A link for a setlist they don't have is opened as a share
+      const other = new URL(
+        shareUrl('http://localhost', FILE, key, 'aaaaaaaa-7b1e-4d55-9a6c-0e8f12345678')
+      )
+      await page.goto(`${other.pathname}${other.hash}`)
+      await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234$/)
+      await expect(page.locator('setlist-overview')).toContainText('Be Still')
+      expect(requests).toHaveLength(1)
+    })
   })
 
-  test('its songs are in the song library, to read and to add to it', async ({ browser }) => {
+  test('its songs are in the song library, to read and to add to it', async ({ context, page }) => {
     const key = generateShareKey()
-    const { context, page } = await recipient(browser)
     await serveShare(context, key)
     await openLink(page, key)
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
@@ -280,6 +274,5 @@ test.describe('A setlist shared by link', () => {
     await expect(page.locator('song-card', { hasText: 'Be Still' })).not.toContainText(
       'From Shared with me'
     )
-    await context.close()
   })
 })
