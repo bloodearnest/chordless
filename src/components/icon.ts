@@ -1,5 +1,5 @@
 import { css, html, LitElement } from 'lit'
-import { unsafeSVG } from 'lit-html/directives/unsafe-svg.js'
+import { unsafeSVG } from 'lit/directives/unsafe-svg.js'
 import { icons } from '../js/icons.ts'
 
 /**
