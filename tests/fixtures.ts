@@ -3,7 +3,14 @@ import { test as base, expect } from '@playwright/test'
 import type { ChordProRecord, SongInput } from '../src/js/data-types.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 
-export const test = base.extend<{ pageErrors: string[] }>({
+export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
+  // The first-use setup modal blocks the page, so every test starts with it answered. Tests of
+  // the first visit itself opt out with test.use({ firstUse: true })
+  firstUse: [false, { option: true }],
+  context: async ({ context, firstUse }, use) => {
+    if (!firstUse) await context.addInitScript(() => localStorage.setItem('setup-done', '1'))
+    await use(context)
+  },
   // Every test fails if its page throws an uncaught error
   pageErrors: [
     async ({ page }, use) => {

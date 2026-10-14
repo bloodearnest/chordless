@@ -55,8 +55,10 @@ async function serveShare(
   return requests
 }
 
-async function recipient(browser) {
+async function recipient(browser, { firstUse = false } = {}) {
   const context = await browser.newContext({ serviceWorkers: 'block', locale: 'en-GB' })
+  // The first-use setup modal blocks the page: these tests have answered it already
+  if (!firstUse) await context.addInitScript(() => localStorage.setItem('setup-done', '1'))
   return { context, page: await context.newPage() }
 }
 
@@ -68,6 +70,25 @@ async function openLink(page: Page, key: string) {
 }
 
 test.describe('A setlist shared by link', () => {
+  test('a first-time visitor is asked how they read, then sees the setlist', async ({
+    browser,
+  }) => {
+    const key = generateShareKey()
+    const { context, page } = await recipient(browser, { firstUse: true })
+    await serveShare(context, key)
+
+    await openLink(page, key)
+    const modal = page.getByRole('dialog', { name: 'Welcome to Chordless' })
+    await expect(modal).toBeVisible()
+    const setup = page.locator('first-use-setup')
+    await setup.getByRole('radio', { name: /^Lyrics only/ }).check()
+    await setup.getByRole('button', { name: 'Continue' }).click()
+
+    await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
+    expect(await page.evaluate(() => localStorage.getItem('musician_type'))).toBe('singer')
+    await context.close()
+  })
+
   test('opens for someone with no account: the overview, then each song, read-only', async ({
     browser,
   }) => {

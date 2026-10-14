@@ -266,6 +266,9 @@ not.
 - **Where it shows:** on the home page, as a "Shared with me" group of the current setlists
   (it only appears when there are some). For someone with no setlists of their own it is all
   there is, in place of the welcome card; otherwise it sits below their own.
+- **First visit:** like anyone arriving for the first time, a recipient with no songs or
+  setlists is asked once, in a modal (`first-use-setup`), how they read (chords or lyrics only,
+  capo). The welcome card no longer asks.
 - **Joining the organisation:** a share carries `setlistId`, the sharer's setlist id (a random
   UUID that gives no access to anything). When the user later joins that organisation and sync
   brings the setlist, an organisation setlist has the share's `setlistId`, and the received copy

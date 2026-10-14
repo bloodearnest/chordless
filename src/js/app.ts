@@ -6,6 +6,7 @@ import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { appUpdate } from './app-update.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
+import { maybeShowFirstUseSetup } from './first-use.ts'
 import './install.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
@@ -35,6 +36,8 @@ document.addEventListener(RouteChangeEvent.type, event => {
 
 await router.start()
 
+// The one-time question of how they read a song, on whatever page they arrive at
+void maybeShowFirstUseSetup()
 // Optional, and not needed to show the first view, so after it
 startMediaPlayer()
 // Setlists shared by link are kept only until they end (their songs stay)

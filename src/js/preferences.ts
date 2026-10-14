@@ -73,6 +73,7 @@ const MUSICIAN_TYPE_KEY = 'musician_type'
 const SECTION_DEFAULTS_KEY = 'section_defaults'
 const ENABLE_CAPO_KEY = 'enable_capo'
 const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
+const SETUP_DONE_KEY = 'setup-done'
 const KEEP_AWAKE_KEY = 'keep_screen_awake'
 const KEEP_AWAKE_MINUTES_KEY = 'keep_awake_minutes'
 
@@ -274,5 +275,31 @@ declare global {
     [AccidentalsPreferenceEvent.type]: AccidentalsPreferenceEvent
     [SectionDefaultsEvent.type]: SectionDefaultsEvent
     [CapoPreferenceEvent.type]: CapoPreferenceEvent
+  }
+}
+
+/** Whether the first-use setup (musician type, capo) has been answered, skipped or made unnecessary */
+export function isSetupDone(): boolean {
+  try {
+    return localStorage.getItem(SETUP_DONE_KEY) === '1'
+  } catch {
+    return true
+  }
+}
+
+export function markSetupDone() {
+  try {
+    localStorage.setItem(SETUP_DONE_KEY, '1')
+  } catch (error) {
+    console.error('Failed to save the setup flag', error)
+  }
+}
+
+/** Whether a musician type has ever been stored, by the setup or in Preferences */
+export function hasStoredMusicianType(): boolean {
+  try {
+    return localStorage.getItem(MUSICIAN_TYPE_KEY) !== null
+  } catch {
+    return false
   }
 }
