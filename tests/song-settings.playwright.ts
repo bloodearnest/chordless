@@ -139,6 +139,59 @@ test.describe('Song settings', () => {
     await expect.poll(capoShown).toBe(2)
   })
 
+  test('resetting a song puts back its key, capo and tempo, and keeps them put', async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'reset-all-setlist' })
+    await page.evaluate(async () => {
+      localStorage.setItem('enable_capo', 'true')
+      const { getCurrentDB } = await import('/js/db.ts')
+      const db = await getCurrentDB()
+      const chart = (await db.getChordPro('chordpro-info-test')) as ChordProRecord
+      await db.saveChordPro({
+        ...chart,
+        content: chart.content.replace('{key: G}', '{key: G}\n{tempo: 72}'),
+      })
+    })
+    await page.goto('/setlist/reset-all-setlist')
+    await page.locator('setlist-overview song-card').first().click()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await page.locator('#app-header').getByRole('button', { name: 'Toggle edit mode' }).click()
+    const metadata = page.locator('#musical-metadata')
+    const popover = page.locator('song-settings-popover')
+    const shown = () =>
+      metadata.evaluate(element => {
+        const m = element as MusicalMetadataDisplay
+        return { key: m.keyValue, bpm: m.bpm, capo: m.capoValue }
+      })
+    // (the setlist plays it in A; the chart's own key is G)
+    await expect.poll(shown).toMatchObject({ key: 'A', bpm: 72 })
+
+    // Change all three
+    await metadata.click()
+    await popover.getByRole('button', { name: 'Increase BPM' }).click()
+    await popover.locator('#capo-selector').getByRole('button', { name: /^Capo/ }).click()
+    await popover.locator('#capo-selector').getByRole('option', { name: /^2\b/ }).click()
+    await popover.getByRole('button', { name: /^Key/ }).click()
+    await popover.getByRole('option', { name: /^D\b/ }).first().click()
+    await expect.poll(shown).toMatchObject({ key: 'D', bpm: 73, capo: 2 })
+
+    // Reset it: to the song's own key, tempo and no capo
+    await popover.getByRole('button', { name: 'Reset song' }).click()
+    const modal = page.locator('#reset-confirm-modal')
+    await expect(modal).toHaveAttribute('open', '')
+    await modal.locator('.modal-btn-confirm').click()
+    await expect.poll(shown).toMatchObject({ key: 'G', bpm: 72, capo: 0 })
+
+    // ...and it stays that way
+    await expect
+      .poll(async () => (await fromDB(page, 'getSetlist', 'reset-all-setlist')).songs[0].key)
+      .toBe('G')
+    await page.reload()
+    await expect(page.locator('#app-header')).toContainText('Info Test Song')
+    await expect.poll(shown).toMatchObject({ key: 'G', bpm: 72, capo: 0 })
+  })
+
   test('asking to reset a song closes the settings popover, which would cover the question', async ({
     page,
   }) => {

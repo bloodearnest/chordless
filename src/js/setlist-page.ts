@@ -2082,6 +2082,13 @@ export class SetlistPage {
       console.warn('[resetCurrentSong] No original key found in metadata!')
     }
 
+    // The tempo was put back above without going through handleBPMChange, so show it (the key
+    // reset does not), in the settings too, and tell the media player so the click follows
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
+    if (musicalMetadata) musicalMetadata.bpm = song.currentBPM || null
+    this.updateSongSettingsPopover()
+    this.dispatchSongChange(song)
+
     // Save state
     this.saveState()
   }
