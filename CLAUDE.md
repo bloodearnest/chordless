@@ -48,3 +48,22 @@ To do that, you have to enter edit mode explicitly. This has several goals
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`
 - Use modern HTML/CSS/JS, within `.browserslistrc` (iOS/Safari 17, Chrome/Edge 120: devices up to about five years old, which can all update to that). Vite doesn't read it: keep `TARGET` in `vite.config.ts` the same.
 - Always try to use browser native features as much as possible
+
+## Log of what the tests catch
+
+When a test fails and the cause turns out to be a real defect in the app code (not a wrong test,
+a flake, or an intended change of behaviour), append one JSON line to `docs/test-catches.jsonl`
+before moving on:
+
+    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "short sha, or uncommitted"}
+
+- `regression` is a bug in code being changed at the time; `existing-bug` was already there.
+- A bug caught in work in progress counts: that is a test doing its job.
+- Also log failures where the test was wrong or flaky, with `kind` `test-bug` or `flaky`, so we can
+  see which tests cost more than they catch.
+- Don't log an expected failure (a test written first), or a failure whose cause is not diagnosed
+  yet. Breaking the source on purpose to check a test (a mutation check) is not a catch.
+- When the fix is committed, fill in the sha of an `uncommitted` entry.
+
+`just test` also records counts, run times and coverage in `docs/stats.jsonl` (one line per commit,
+by `scripts/stats.ts`), so the history of both is in the repo.

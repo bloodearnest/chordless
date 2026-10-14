@@ -141,6 +141,15 @@ storage/sync
   app feature that finds duplicate or empty setlists and stray organisation folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
+ci/cd
+- set up CI/CD (GitHub Actions or similar): on each push and pull request run `just format lint test`
+  (Playwright needs its Chromium: `just setup`), keep the Playwright HTML report and traces of
+  failures as artifacts, and publish the coverage summary. Then deploy to Cloudflare Workers from
+  main once the tests pass (wrangler, with the token as a secret: see push-secrets.sh). `just
+  test` ends with `just stats`, which edits docs/stats.jsonl: in CI that is only a local change,
+  so decide whether CI commits it, uploads it, or skips the step. Consider a coverage floor, or a
+  check that coverage does not fall, once there is a baseline in docs/stats.jsonl.
+
 live mode
  - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
    overview, then the song again (the section observer's first callback): the media
