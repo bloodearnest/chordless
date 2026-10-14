@@ -1,0 +1,95 @@
+/**
+ * Routing for the Worker's HTTP requests: the auth API, share links, the dev pages, and
+ * everything else from the static assets. A function of the request and the Worker's bindings, so
+ * it runs in Node as well as in the Worker (`index.ts` passes in what only the Worker has).
+ */
+
+import type { Env } from './env.ts'
+import { isCrossOrigin, jsonResponse, message } from './http.ts'
+import {
+  type GoogleApi,
+  handleOAuthCallback,
+  handleSessionInvite,
+  handleSessionRevoke,
+  handleTokenRefresh,
+} from './session.ts'
+import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
+import { withSharePreview } from './share-page.ts'
+
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  cache: ShareCache,
+  google?: GoogleApi
+) {
+  const url = new URL(request.url)
+  const path = url.pathname
+
+  if (
+    (path.startsWith('/oauth/') ||
+      path.startsWith('/session/') ||
+      path.startsWith('/api/share/')) &&
+    isCrossOrigin(request, url)
+  ) {
+    return jsonResponse({ error: 'Cross-origin requests are not allowed' }, 403)
+  }
+
+  try {
+    // OAuth endpoints
+    if (path === '/oauth/callback' && request.method === 'POST') {
+      return await handleOAuthCallback(request, env, google)
+    }
+
+    // Token refresh endpoint
+    if (path === '/session/refresh' && request.method === 'POST') {
+      return await handleTokenRefresh(request, env, google)
+    }
+
+    // Session endpoints (require encrypted blob) - for future Drive collaboration features
+    if (path === '/session/invite' && request.method === 'POST') {
+      return await handleSessionInvite(request, env, google)
+    }
+
+    if (path === '/session/revoke' && request.method === 'POST') {
+      return await handleSessionRevoke(request, env, google)
+    }
+
+    // A share link's download (public, encrypted; see docs/SHARING.md)
+    const shareId = shareFileId(path)
+    if (shareId !== null) {
+      return await handleShareDownload(request, shareId, env, {
+        cache,
+        waitUntil: promise => ctx.waitUntil(promise),
+      })
+    }
+
+    // A share link opened as a page: the app, with a preview for whatever fetched it
+    if (path.startsWith('/s/') && request.method === 'GET') {
+      const page = await env.ASSETS.fetch(request)
+      if (!page.headers.get('Content-Type')?.includes('text/html')) return page
+      const headers = new Headers(page.headers)
+      headers.set('X-Robots-Tag', 'noindex, nofollow')
+      headers.delete('Content-Length')
+      return new Response(withSharePreview(await page.text(), url.origin), {
+        status: page.status,
+        headers,
+      })
+    }
+
+    // Dev-only component playgrounds (src/dev/). DEV_PAGES is set only in [env.dev]
+    // in wrangler.toml (`npm run dev`). Routed here first via run_worker_first.
+    if (path === '/dev' || path.startsWith('/dev/')) {
+      if (!env.DEV_PAGES) {
+        return new Response('Not Found', { status: 404 })
+      }
+      return env.ASSETS.fetch(request)
+    }
+
+    // Not an API route — delegate to static assets (SPA fallback handles unknown paths)
+    return env.ASSETS.fetch(request)
+  } catch (error) {
+    console.error('Worker error:', error)
+    return jsonResponse({ error: 'Internal server error', message: message(error) }, 500)
+  }
+}
