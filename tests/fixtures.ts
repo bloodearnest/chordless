@@ -8,6 +8,10 @@ export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
   // the first visit itself opt out with test.use({ firstUse: true })
   firstUse: [false, { option: true }],
   context: async ({ context, firstUse }, use) => {
+    // The seeded setlists are dated October 2026, and the year is left out of a date in the
+    // current year ("Sun, 11 Oct"). Pin the date so that stays true after the year ends; the
+    // clock still runs.
+    await context.clock.install({ time: new Date('2026-10-14T12:00:00') })
     if (!firstUse) await context.addInitScript(() => localStorage.setItem('setup-done', '1'))
     await use(context)
   },
