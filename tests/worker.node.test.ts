@@ -1,12 +1,4 @@
 /**
- * Functional tests for the Cloudflare Worker.
- * Validates wrangler.toml config, static asset serving, SPA fallback,
- * and that API routes are wired up.
- *
- * Uses wrangler's unstable_dev to start a real worker process.
- */
-
-/**
  * The whole Cloudflare Worker, running in workerd as it is deployed (wrangler.toml), through
  * Wrangler's test harness: static files, the SPA fallback, that the routes are wired up and the
  * dev pages are hidden, and the email handler. The logic of the routes is tested in Node on its own
