@@ -5,20 +5,19 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { decodeImport, encodeImport } from '../src/js/email-link.ts'
 import type { ImportedSetlist, ImportedSong } from '../src/js/email-setlist.ts'
+import { makeImportedSong } from './builders.ts'
 
-const song = (title: string, over: Partial<ImportedSong> = {}): ImportedSong => ({
-  title,
-  titles: [title],
-  author: null,
-  key: 'G',
-  tempo: 72,
-  time: '4/4',
-  ccli: '1234567',
-  chartFilename: `${title}.pdf`,
-  listed: title,
-  notes: 'drop out at the bridge',
-  ...over,
-})
+const song = (title: string, over: Partial<ImportedSong> = {}) =>
+  makeImportedSong(title, {
+    key: 'G',
+    tempo: 72,
+    time: '4/4',
+    ccli: '1234567',
+    chartFilename: `${title}.pdf`,
+    listed: title,
+    notes: 'drop out at the bridge',
+    ...over,
+  })
 
 const setlist: ImportedSetlist = {
   name: 'Sunday 25th October',

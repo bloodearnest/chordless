@@ -3,25 +3,18 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { Setlist } from '../src/js/data-types.ts'
-import type { ImportedSong } from '../src/js/email-setlist.ts'
 import { changesTo, hasChanges, type ReviewedSong } from '../src/js/import-setlist.ts'
+import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
 
-const entry = (id: string, order: number, key: string | null = 'G') => ({
-  order,
-  songId: id,
-  songUuid: `uuid-${id}`,
-  key,
-  tempo: null,
-  notes: '',
-})
-const setlist = {
+const entry = (id: string, order: number, key: string | null = 'G') =>
+  makeEntry({ order, songId: id, songUuid: `uuid-${id}`, key })
+const setlist = makeSetlist({
   id: 's',
   songs: [entry('a', 0), entry('b', 1, 'D'), entry('c', 2)],
-} as unknown as Setlist
+})
 const titleOf = (id: string) => `Song ${id.toUpperCase()}`
 const reviewed = (id: string, key: string | null = null): ReviewedSong => ({
-  song: { title: titleOf(id) } as ImportedSong,
+  song: makeImportedSong(titleOf(id)),
   key,
   notes: '',
   library: { uuid: `uuid-${id}`, id, title: titleOf(id), ccli: null },

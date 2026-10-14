@@ -3,22 +3,10 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { ImportedSong } from '../src/js/email-setlist.ts'
 import { type LibrarySong, lyricsOf, matchLibrary } from '../src/js/import-plan.ts'
+import { makeImportedSong } from './builders.ts'
 
-const song = (title: string, over: Partial<ImportedSong> = {}): ImportedSong => ({
-  title,
-  titles: [title],
-  author: null,
-  key: null,
-  tempo: null,
-  time: null,
-  ccli: null,
-  chartFilename: null,
-  listed: null,
-  notes: '',
-  ...over,
-})
+const song = makeImportedSong
 
 const lib = (title: string, ccli: string | null = null): LibrarySong => ({
   uuid: `uuid-${title}`,
