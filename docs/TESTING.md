@@ -12,7 +12,9 @@ Run it before committing.
 New test files are picked up by their name; there's no list to add them to.
 
 `just test` ends with `just stats`, which records each suite's test count, failures, run time and
-coverage (lines, branches, functions; the end-to-end suite has no coverage) with the commit, as a
+coverage (lines, branches, functions; the end-to-end suite has none, and the node suite's is of
+`worker/src` only, with the files it cannot see, such as `worker/src/index.ts` which runs under
+wrangler, listed as `notMeasured`) with the commit, as a
 line in `docs/stats.jsonl`: one line per commit, the latest run on it. The suites leave what it
 reads in `.stats/` and `coverage/` when they run in full, so a run of some files does not
 record anything. `docs/test-catches.jsonl` is the other record: the real bugs the tests found,

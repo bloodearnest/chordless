@@ -10,7 +10,7 @@
  *   node scripts/stats.ts
  */
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 
 const HISTORY = 'docs/stats.jsonl'
 const MAX_AGE_MS = 60 * 60 * 1000
@@ -19,6 +19,8 @@ interface Coverage {
   lines: { covered: number; total: number }
   branches: { covered: number; total: number }
   functions: { covered: number; total: number }
+  /** Files of the area the suite is meant to cover that its coverage run never loaded, so they are not in the totals */
+  notMeasured?: string[]
 }
 
 interface SuiteStats {
@@ -60,6 +62,18 @@ function nodeStats(): SuiteStats {
     else if (key === 'FNH') total.functions[0] += number
   }
   const part = ([covered, total]: number[]) => ({ covered, total })
+  // The node tests are measured on the worker (worker/src). A file they run in another process,
+  // as worker/src/index.ts runs under wrangler, never shows in the report: say so
+  const measured = new Set(
+    read('.stats/node.lcov')
+      .split('\n')
+      .filter(line => line.startsWith('SF:'))
+      .map(line => line.slice(3))
+  )
+  const notMeasured = readdirSync('worker/src')
+    .filter(name => name.endsWith('.ts') && !name.endsWith('.d.ts'))
+    .map(name => `worker/src/${name}`)
+    .filter(file => !measured.has(file))
   return {
     tests: occurrences(junit, /<testcase /g),
     failed: occurrences(junit, /<failure/g),
@@ -69,6 +83,7 @@ function nodeStats(): SuiteStats {
       lines: part(total.lines),
       branches: part(total.branches),
       functions: part(total.functions),
+      notMeasured,
     },
   }
 }
@@ -131,5 +146,8 @@ for (const name of ['node', 'unit', 'e2e'] as const) {
       `${suite.seconds}s` +
       (coverage ? `, lines ${percent(coverage.lines)}, branches ${percent(coverage.branches)}` : '')
   )
+  if (coverage?.notMeasured?.length) {
+    console.log(`      not measured: ${coverage.notMeasured.join(', ')}`)
+  }
 }
 console.log(`recorded in ${HISTORY} (${commit}${dirty ? ', with uncommitted changes' : ''})`)

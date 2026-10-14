@@ -34,10 +34,11 @@ format:
 coverage:
     npx web-test-runner --config web-test-runner.config.js --coverage
 
-# Run the node tests (the workers, email and share code, event names)
+# Run the node tests (the workers, email and share code, event names); coverage is of worker/src only,
+# as the rest of src/ is measured by the browser suites
 test-node:
     @mkdir -p .stats
-    node --test --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-include='worker/src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.stats/node.junit.xml --test-reporter=lcov --test-reporter-destination=.stats/node.lcov "tests/*.node.test.{js,ts}"
+    node --test --experimental-test-coverage --test-coverage-include='worker/src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.stats/node.junit.xml --test-reporter=lcov --test-reporter-destination=.stats/node.lcov "tests/*.node.test.{js,ts}"
 
 serve:
     npm run dev
