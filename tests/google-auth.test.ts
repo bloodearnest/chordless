@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import type { AuthMetadata, StoredBlob, StoredUser } from '../src/js/auth-db.ts'
+import type { AuthMetadata, StoredUser } from '../src/js/auth-db.ts'
 import {
   exportBlobBackup,
   getAccessToken,
@@ -7,49 +7,13 @@ import {
   isAuthenticated,
   logout,
 } from '../src/js/google-auth.ts'
+import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
-
-/** The service worker's end of the sign-in: it keeps the blob and answers the page's messages */
-class FakeAuthWorker {
-  stored: StoredBlob | undefined
-  messages: { type: string; data: Record<string, unknown> }[] = []
-  /** Types to answer with a failure, to see how the page copes */
-  failing = new Set<string>()
-
-  postMessage(
-    { type, data, messageId }: { type: string; data: Record<string, unknown>; messageId: string },
-    [port]: MessagePort[]
-  ) {
-    this.messages.push({ type, data })
-    const reply = (response: object) => port.postMessage({ messageId, ...response })
-    if (this.failing.has(type)) return reply({ success: false, error: 'worker failed' })
-    switch (type) {
-      case 'STORE_BLOB':
-        this.stored = {
-          blob: data.blob as string,
-          metadata: data.metadata as AuthMetadata,
-          updated_at: new Date().toISOString(),
-        }
-        return reply({ success: true })
-      case 'GET_BLOB':
-        return reply({ success: true, data: this.stored })
-      case 'DELETE_BLOB':
-        this.stored = undefined
-        return reply({ success: true })
-      case 'EXPORT_BLOB':
-        return this.stored
-          ? reply({ success: true, backup: { version: 1, ...this.stored } })
-          : reply({ success: false, error: 'No blob to export' })
-      default:
-        return reply({ success: false, error: `unknown message ${type}` })
-    }
-  }
-}
 
 /** An ID token with this payload (the signature is never checked by the page) */
 const idToken = (payload: object) => {
@@ -76,27 +40,17 @@ const inFromNow = (ms: number) => new Date(Date.now() + ms).toISOString()
 
 describe('google-auth', () => {
   let worker: FakeAuthWorker
+  let uninstallWorker: () => void
+  let setController: (controller: unknown) => void
   let realFetch: typeof fetch
   let fetches: { url: string; body: unknown }[]
   let respondTo: (url: string) => Response | Promise<Response>
-  const controllerDescriptor = Object.getOwnPropertyDescriptor(
-    ServiceWorkerContainer.prototype,
-    'controller'
-  )
-
-  const setController = (controller: unknown) =>
-    Object.defineProperty(navigator.serviceWorker, 'controller', {
-      configurable: true,
-      get: () => controller,
-    })
-
   const signIn = (metadata: AuthMetadata, blob = 'encrypted-blob') => {
     worker.stored = { blob, metadata, updated_at: new Date().toISOString() }
   }
 
   beforeEach(() => {
-    worker = new FakeAuthWorker()
-    setController(worker)
+    ;({ worker, uninstall: uninstallWorker, setController } = installFakeAuthWorker())
     fetches = []
     respondTo = () => new Response('not found', { status: 404 })
     realFetch = window.fetch
@@ -109,11 +63,7 @@ describe('google-auth', () => {
 
   afterEach(() => {
     window.fetch = realFetch
-    // Put back the prototype's own getter
-    delete (navigator.serviceWorker as { controller?: unknown }).controller
-    if (controllerDescriptor) {
-      Object.defineProperty(ServiceWorkerContainer.prototype, 'controller', controllerDescriptor)
-    }
+    uninstallWorker()
   })
 
   const json = (body: object, status = 200) =>
