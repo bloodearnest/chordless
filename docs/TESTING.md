@@ -44,9 +44,11 @@ safety. To keep it that way:
 
 For code that doesn't run in a page:
 
-- `worker.node.test.ts`: the whole Cloudflare worker, started with wrangler (`unstable_dev`): static
-  files, the SPA fallback, that the routes are wired up, the dev pages. Slow, so it checks the
-  wiring, and the logic is tested in Node on its own:
+- `worker.node.test.ts`: the whole Cloudflare worker in workerd, as `wrangler.toml` deploys it, through
+  Wrangler's `createTestHarness()` (made-up secrets: no `.dev.vars` needed): static files, the SPA
+  fallback, that the routes are wired up, the dev pages, and the email handler
+  (`worker.getWorker().email(...)` needs a `Message-ID`). Slow, so it checks the wiring, and the
+  logic is tested in Node on its own:
 - `worker-router.node.test.ts`, `worker-session.node.test.ts`: the Worker's routing
   (`worker/src/router.ts`: what is the API, what is refused as cross-origin, share links, dev pages,
   the 500) and the sign-in routes and token blob (`session.ts`, `blob.ts`), with the assets, cache

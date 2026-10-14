@@ -6,22 +6,35 @@
  * Uses wrangler's unstable_dev to start a real worker process.
  */
 
+/**
+ * The whole Cloudflare Worker, running in workerd as it is deployed (wrangler.toml), through
+ * Wrangler's test harness: static files, the SPA fallback, that the routes are wired up and the
+ * dev pages are hidden, and the email handler. The logic of the routes is tested in Node on its own
+ * (worker-router.node.test.ts, worker-session.node.test.ts), so this checks the wiring.
+ *
+ * The secrets are made up here, so no .dev.vars is needed.
+ */
+
 import assert from 'node:assert/strict'
 import { after, before, test } from 'node:test'
-import { unstable_dev } from 'wrangler'
+import { createTestHarness } from 'wrangler'
+import { email } from './make-email.ts'
 
-let worker
+const secrets = {
+  GOOGLE_CLIENT_ID: 'test-client-id',
+  GOOGLE_CLIENT_SECRET: 'test-client-secret',
+  GOOGLE_API_KEY: 'test-api-key',
+  JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
+}
+
+const worker = createTestHarness({ workers: [{ configPath: 'wrangler.toml', secrets }] })
 
 before(async () => {
-  worker = await unstable_dev('worker/src/index.ts', {
-    config: 'wrangler.toml',
-    logLevel: 'error',
-    experimental: { disableExperimentalWarning: true },
-  })
+  await worker.listen()
 })
 
 after(async () => {
-  await worker?.stop()
+  await worker.close()
 })
 
 test('serves root as HTML', async () => {
@@ -130,18 +143,14 @@ test('dev pages are not served without DEV_PAGES (production)', async () => {
 })
 
 test('dev pages are served in the dev environment (npm run dev)', async () => {
-  const devWorker = await unstable_dev('worker/src/index.ts', {
-    config: 'wrangler.toml',
-    env: 'dev',
-    logLevel: 'error',
-    experimental: { disableExperimentalWarning: true },
-  })
+  const dev = createTestHarness({ workers: [{ configPath: 'wrangler.toml', env: 'dev', secrets }] })
   try {
-    const resp = await devWorker.fetch('/dev/components.html')
+    await dev.listen()
+    const resp = await dev.fetch('/dev/components.html')
     assert.equal(resp.status, 200)
     assert.match(await resp.text(), /<title>Components Test - Chordless<\/title>/)
   } finally {
-    await devWorker.stop()
+    await dev.close()
   }
 })
 
@@ -160,4 +169,48 @@ test('a share link is the app with a preview, and not for indexing', async () =>
   const html = await resp.text()
   assert.ok(html.includes('property="og:title" content="A setlist shared with you"'))
   assert.ok(html.includes('id="view-outlet"'), 'it is still the app shell')
+})
+
+/** An email to the import address, with the Message-ID the runtime wants, as a real mail server gives */
+const emailTo = (subject: string, list: string[]) =>
+  worker.getWorker().email({
+    from: 'sender@example.com',
+    to: 'import@chordless.test',
+    raw: new Response(
+      Buffer.concat([Buffer.from('Message-ID: <test-1@example.com>\r\n'), email(subject, list)])
+    ).body as ReadableStream<Uint8Array>,
+  })
+
+/** The readable (text/plain) part of a reply message */
+function plainTextOf(raw: string) {
+  const encoded = raw.match(
+    /Content-Type: text\/plain[^\r\n]*\r\nContent-Transfer-Encoding: base64\r\n\r\n([^-]*)/
+  )?.[1]
+  assert.ok(encoded, raw)
+  return Buffer.from(encoded.replace(/\s+/g, ''), 'base64').toString('utf8')
+}
+
+test('an email to the import address is answered in the real runtime, with a link, to the sender', async () => {
+  const result = await emailTo('Sunday 25th October', ['1. Alpha Song in G'])
+
+  assert.equal(result.outcome, 'ok')
+  assert.equal(result.replies.length, 1)
+  const reply = result.replies[0]
+  assert.equal(reply.sender, 'import@chordless.test')
+  assert.match(reply.raw, /^To: sender@example\.com\r?$/m)
+  assert.match(reply.raw, /^Subject: Re: Sunday 25th October\r?$/m)
+  assert.match(reply.raw, /^In-Reply-To: <test-1@example\.com>\r?$/m)
+
+  // The readable version holds the setlist and the link to review it
+  const text = plainTextOf(reply.raw)
+  assert.match(text, /Alpha Song \(G\)/)
+  assert.match(text, /https:\/\/chordless\.app\/import-setlist#\S+/)
+})
+
+test('an email with no songs in it is answered with why, and no link', async () => {
+  const result = await emailTo('Hello', [])
+  assert.equal(result.outcome, 'ok')
+  assert.equal(result.replies.length, 1)
+  assert.match(result.replies[0].raw, /^Subject: Re: Hello\r?$/m)
+  assert.ok(!plainTextOf(result.replies[0].raw).includes('import-setlist#'))
 })
