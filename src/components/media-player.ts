@@ -1387,9 +1387,6 @@ export class MediaPlayer extends LitElement {
     } else if (this._clickOn && !wasPlayingClick) {
       console.log('[MediaPlayer] Starting click for first time')
       this._startMetronome()
-    } else if (!this._clickOn && wasPlayingClick) {
-      console.log('[MediaPlayer] Click toggle off, stopping')
-      this._stopMetronome()
     }
 
     // If we're currently fading out, cancel it and fade back in
@@ -1419,10 +1416,6 @@ export class MediaPlayer extends LitElement {
       if (hasSource) {
         await this._fadeIn()
       }
-    } else if (!this._padsOn && wasPlayingPads) {
-      // Pads toggle was turned off while playing, fade out
-      console.log('[MediaPlayer] Pads toggle off, fading out')
-      await this._fadeOut()
     } else if (this._padsOn && wasPlayingPads && !needsKeyChange) {
       // Pads already playing in the same key - do nothing
       console.log('[MediaPlayer] Pads already playing in same key, no action needed')
