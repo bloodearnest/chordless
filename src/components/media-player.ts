@@ -1253,7 +1253,12 @@ export class MediaPlayer extends LitElement {
   }
 
   _startMetronome(): void {
-    const bpmValue = this._activeSongBpm ?? this._currentBpm ?? this.bpm
+    // A song with no tempo has no click: there is no beat to keep
+    const bpmValue = this._activeSongBpm ?? this._currentBpm
+    if (!bpmValue) {
+      this._stopMetronome()
+      return
+    }
     const timeSignature =
       this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature
     const tempoNote = this._normalizeTempoNote(

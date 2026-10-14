@@ -29,6 +29,16 @@ describe("the media player and this user's choices for a song", () => {
       metadata: { key: 'G', tempo, tempoNote: '1/4', timeSignature: '4/4' },
     }) as never
 
+  describe('the click', () => {
+    it('does not start for a song with no tempo', async () => {
+      player._initAudio()
+      await player._handleSongChange(new SongChangeEvent(song(0)))
+      expect(player._currentBpm).to.equal(null)
+      player._startMetronome()
+      expect(player._metronomeRunning).to.equal(false)
+    })
+  })
+
   describe('the double click', () => {
     it('is on for a slow song, by default', () => {
       expect(player._doubleClickFor(60, undefined)).to.equal(true)
