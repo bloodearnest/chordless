@@ -48,3 +48,66 @@ export const deleteDatabase = (name: string) =>
 
 /** The organisation the sync tests run in */
 export const TEST_ORG = { name: 'Test Church', id: 'org-test-church' }
+
+/**
+ * Fake setInterval/setTimeout (and their clears) that only move when the test says so, for code
+ * that fades or waits in real time. `await clock.tick(ms)` runs every timer that falls due in
+ * the next ms, in order, letting promises settle between them. Call `uninstall()` when done
+ * (Mocha keeps its own references, so it is not affected while installed).
+ */
+export function installFakeTimers() {
+  const real = {
+    setInterval: window.setInterval,
+    setTimeout: window.setTimeout,
+    clearInterval: window.clearInterval,
+    clearTimeout: window.clearTimeout,
+  }
+  type Timer = { at: number; every: number | null; callback: () => void }
+  const timers = new Map<number, Timer>()
+  let now = 0
+  let nextId = 1
+
+  const add = (callback: () => void, ms = 0, every: boolean) => {
+    const id = nextId++
+    timers.set(id, { at: now + ms, every: every ? Math.max(ms, 1) : null, callback })
+    return id
+  }
+  const fake = window as unknown as Record<string, unknown>
+  fake.setTimeout = (callback: () => void, ms?: number) => add(callback, ms, false)
+  fake.setInterval = (callback: () => void, ms?: number) => add(callback, ms, true)
+  fake.clearTimeout = fake.clearInterval = (id: number) => {
+    timers.delete(id)
+  }
+
+  const settlePromises = async () => {
+    for (let i = 0; i < 10; i++) await Promise.resolve()
+  }
+
+  return {
+    /** How many timers are waiting to fire */
+    get pending() {
+      return timers.size
+    },
+    async tick(ms: number) {
+      const end = now + ms
+      await settlePromises()
+      for (;;) {
+        let due: [number, Timer] | null = null
+        for (const entry of timers) {
+          if (entry[1].at <= end && (!due || entry[1].at < due[1].at)) due = entry
+        }
+        if (!due) break
+        const [id, timer] = due
+        now = timer.at
+        if (timer.every === null) timers.delete(id)
+        else timer.at += timer.every
+        timer.callback()
+        await settlePromises()
+      }
+      now = end
+    },
+    uninstall() {
+      Object.assign(window, real)
+    },
+  }
+}

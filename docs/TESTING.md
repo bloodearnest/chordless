@@ -93,7 +93,9 @@ app's own modules, imported directly: there's no build step to test around.
 - **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
   failure names the chord and key.
 - Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,
-  `TEST_ORG`, `suppressConsoleLogs`. Wait for what the test is about (`waitUntil` from
+  `TEST_ORG`, `suppressConsoleLogs`, and `installFakeTimers()` (a clock that moves only on
+  `await clock.tick(ms)`, for code that fades or waits: see `pad-audio-controller.test.ts`).
+  Wait for what the test is about (`waitUntil` from
   `@open-wc/testing`) rather than a fixed time where you can.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
   only for tests that fail.
