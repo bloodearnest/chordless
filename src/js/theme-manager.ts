@@ -234,7 +234,8 @@ export class ThemeManager {
    * Toggle between light and dark themes
    */
   toggleTheme(): void {
-    const current = this.getCurrentTheme()
+    const stored = this.getCurrentTheme()
+    const current = stored === 'system' ? this.detectSystemPreference() : stored
     const newTheme = current === 'light' ? 'dark' : 'light'
     this.setTheme(newTheme)
   }
@@ -401,23 +402,17 @@ export class ThemeManager {
   }
 
   /**
-   * Setup keyboard shortcuts for theme switching
+   * Ctrl+Alt+M toggles light/dark. Ctrl+Alt+<letter> is mostly free in
+   * browsers; T, L and D are claimed by Linux desktops.
    * @private
    */
   _setupKeyboardShortcuts(): void {
     window.addEventListener('keydown', e => {
-      // Ctrl+L for Light mode
-      if (e.ctrlKey && e.key === 'l') {
-        e.preventDefault()
-        console.log('[ThemeManager] Keyboard shortcut: Switching to light mode')
-        this.setTheme('light')
-      }
-      // Ctrl+D for Dark mode
-      else if (e.ctrlKey && e.key === 'd') {
-        e.preventDefault()
-        console.log('[ThemeManager] Keyboard shortcut: Switching to dark mode')
-        this.setTheme('dark')
-      }
+      if (!e.ctrlKey || !e.altKey || e.metaKey || e.shiftKey || e.code !== 'KeyM') return
+      const target = e.target as HTMLElement | null
+      if (target?.closest?.('input, textarea, select, [contenteditable]')) return
+      e.preventDefault()
+      this.toggleTheme()
     })
   }
 }
@@ -428,7 +423,7 @@ export const themeManager = new ThemeManager()
 // Auto-load preferences on module load
 themeManager.loadPreferences()
 
-// Setup keyboard shortcuts for testing
+// Keyboard shortcut for toggling the theme
 themeManager._setupKeyboardShortcuts()
 
 declare global {
