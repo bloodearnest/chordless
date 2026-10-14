@@ -8,6 +8,14 @@ song edit UI
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
 bugs
+- Found by the setlist page tests, not fixed: moving a song in the overview moves the song but not
+  its section states (this.sectionState and the state-<setlistId> in localStorage are by position,
+  so a moved song takes the states of the song that was in its place). Check where song-model
+  saves them before deciding
+- Found by the library view tests, not fixed: its Reset says it resets the section states, but it
+  draws the song again from the saved ones and saves what it finds, so the sections stay as saved
+- Storage page: "Logout & Revoke Access" only deletes the sign-in on this device; it does not
+  revoke the token at Google, as the label and the confirm text say
 - tests are checked with strict on except noImplicitAny (tsconfig.tests.json, tsconfig.node.json):
   about 1,000 untyped helper parameters and `let`s remain. Turn it on file by file (it was 721
   errors in 50 files when tried); typed builders (tests/builders.ts) and must() are in place
