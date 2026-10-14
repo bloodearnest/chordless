@@ -14,6 +14,35 @@ const PDF = {
 const bytes = (buffer: Buffer) =>
   buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength) as ArrayBuffer
 
+/** A message as Cloudflare hands it to the Worker, which records whether and what it replied */
+const fakeIncoming = ({
+  from = 'sender@example.com',
+  raw = email('Sunday 25th October', ['1. Alpha Song in G']),
+  rawSize = raw.length,
+  headers = {},
+}: {
+  from?: string
+  raw?: string | Buffer
+  rawSize?: number
+  headers?: Record<string, string>
+} = {}) => {
+  const message: IncomingEmail & { replied: boolean; sent: unknown } = {
+    from,
+    to: 'import@chordless.test',
+    rawSize,
+    raw: new Response(typeof raw === 'string' ? raw : new Uint8Array(raw))
+      .body as ReadableStream<Uint8Array>,
+    headers: { get: name => headers[name] ?? null },
+    replied: false,
+    sent: undefined,
+    reply: async reply => {
+      message.replied = true
+      message.sent = reply
+    },
+  }
+  return message
+}
+
 test('an email with a list of songs is answered with a link that holds them', async () => {
   const { text: body, html } = await answerFor(
     bytes(email('Sunday 25th October', ['1. Alpha Song in G', '2. Brand New Song in D'], [PDF])),
@@ -57,27 +86,13 @@ test('an email with no songs, or no email at all, is answered with why', async (
 })
 
 test('the reply goes to the sender, in reply to their email', async () => {
-  const raw = email('Sunday 25th October', ['1. Alpha Song in G'])
-  let sent: unknown
-  const message: IncomingEmail = {
-    from: 'sender@example.com',
-    to: 'import@chordless.test',
-    rawSize: raw.length,
-    raw: new Response(raw).body as ReadableStream<Uint8Array>,
+  const message = fakeIncoming({
     headers: {
-      get: name =>
-        name === 'Subject'
-          ? 'Fwd: Fwd: Sunday 25th October'
-          : name === 'Message-ID'
-            ? '<abc@example.com>'
-            : name === 'References'
-              ? '<one@example.com> <two@example.com>'
-              : null,
+      Subject: 'Fwd: Fwd: Sunday 25th October',
+      'Message-ID': '<abc@example.com>',
+      References: '<one@example.com> <two@example.com>',
     },
-    reply: async reply => {
-      sent = reply
-    },
-  }
+  })
   let made: { from: string; to: string; raw: string } | null = null
   await handleEmail(
     message,
@@ -87,7 +102,7 @@ test('the reply goes to the sender, in reply to their email', async () => {
     },
     'https://chordless.test'
   )
-  assert.deepEqual(sent, { from: 'import@chordless.test', to: 'sender@example.com' })
+  assert.deepEqual(message.sent, { from: 'import@chordless.test', to: 'sender@example.com' })
   assert.ok(made)
   const text = (made as { raw: string }).raw
   assert.match(text, /^To: sender@example\.com/m)
@@ -103,22 +118,9 @@ test('the reply goes to the sender, in reply to their email', async () => {
 })
 
 test('an email that is too big is not read', async () => {
-  let replied = false
-  await handleEmail(
-    {
-      from: 'a@example.com',
-      to: 'b@example.com',
-      rawSize: 100 * 1024 * 1024,
-      raw: new Response('x').body as ReadableStream<Uint8Array>,
-      headers: { get: () => null },
-      reply: async () => {
-        replied = true
-      },
-    },
-    () => ({}),
-    'https://x.test'
-  )
-  assert.equal(replied, false)
+  const message = fakeIncoming({ raw: 'x', rawSize: 100 * 1024 * 1024 })
+  await handleEmail(message, () => ({}), 'https://x.test')
+  assert.equal(message.replied, false)
 })
 
 test('a subject cannot add headers to the reply', () => {
@@ -134,21 +136,7 @@ test('a subject cannot add headers to the reply', () => {
 })
 
 test('an email over a rate limit is dropped with no reply, and a broken limit does not stop one', async () => {
-  const make = (): IncomingEmail & { replied: boolean } => {
-    const raw = email('Sunday 25th October', ['1. Alpha Song in G'])
-    const message = {
-      from: 'Sender@Example.com',
-      to: 'import@chordless.test',
-      rawSize: raw.length,
-      raw: new Response(raw).body as ReadableStream<Uint8Array>,
-      headers: { get: () => null },
-      replied: false,
-      reply: async () => {
-        message.replied = true
-      },
-    }
-    return message
-  }
+  const make = () => fakeIncoming({ from: 'Sender@Example.com' })
   const keys: string[] = []
   const limit = (success: boolean) => ({
     limit: async ({ key }: { key: string }) => {
