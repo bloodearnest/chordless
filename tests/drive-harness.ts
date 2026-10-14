@@ -1,6 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
+import { hashText } from '../src/js/song-utils.ts'
+import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { deleteDatabase, TEST_ORG, wait } from './test-helpers.ts'
@@ -17,6 +19,44 @@ export const memoryFolderLink = (): FolderLink & { value: string | null } => ({
     this.value = value
   },
 })
+
+/** Give a device a song and its chart, as the app saves them */
+export async function addSong(
+  device: { db: ChordlessDB },
+  { uuid, title, content }: { uuid: string; title: string; content: string }
+) {
+  const chordproFileId = `chordpro-${uuid}`
+  await device.db.saveChordPro({
+    id: chordproFileId,
+    content,
+    contentHash: hashText(content),
+    lastModified: Date.now(),
+  })
+  await device.db.saveSong(
+    makeSong({
+      uuid,
+      id: `title-${title.toLowerCase()}`,
+      title,
+      titleNormalized: title.toLowerCase(),
+      chordproFileId,
+    })
+  )
+  await wait(5)
+}
+
+/** Edit a song's chart the way the app does: new content, and the song's modifiedDate moves */
+export async function editSong(device: { db: ChordlessDB }, uuid: string, content: string) {
+  const song = must(await device.db.getSong(uuid))
+  await device.db.saveChordPro({
+    id: song.chordproFileId,
+    content,
+    contentHash: hashText(content),
+    lastModified: Date.now(),
+  })
+  song.modifiedDate = new Date().toISOString()
+  await device.db.saveSong(song)
+  await wait(5)
+}
 
 /**
  * The setup the Drive sync tests share: a FakeDrive installed for each test, and simulated
@@ -37,17 +77,6 @@ export function useSyncRig() {
     replaceDriveFile,
   }
   const drive = () => rig.drive
-
-  /** In-memory stand-in for the organisation's stored Drive folder link */
-  const memoryFolderLink = (): FolderLink & { value: string | null } => ({
-    value: null as string | null,
-    async get() {
-      return this.value
-    },
-    async set(value: string) {
-      this.value = value
-    },
-  })
 
   /** A simulated device: its own local database, syncing the shared org */
   async function makeDevice(

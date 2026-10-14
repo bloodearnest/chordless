@@ -1,12 +1,11 @@
 import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
-import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
+import { createSetlist } from '../src/js/db.ts'
 import { makeEntry } from './builders.ts'
-import { installFakeDrive } from './fake-drive.ts'
-import { deleteDatabase, suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { useSyncRig } from './drive-harness.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 
-const { describe, it, beforeEach, afterEach } = window
+const { describe, it } = window
 
 suppressConsoleLogs()
 
@@ -50,49 +49,14 @@ function random(seed: number) {
   }
 }
 
-type Device = { name: string; db: ChordlessDB; sync: DriveSyncManager }
+type Device = Awaited<ReturnType<ReturnType<typeof useSyncRig>['makeDevice']>>
 
 describe('Drive sync: random histories', () => {
-  let drive: ReturnType<typeof installFakeDrive>
-  let devices: Device[]
-
-  async function makeDevice(name: string): Promise<Device> {
-    const db = new ChordlessDB(`test-random-${name}-${crypto.randomUUID()}`)
-    await db.init()
-    const folderLink: FolderLink & { value: string | null } = {
-      value: null,
-      async get() {
-        return this.value
-      },
-      async set(value: string) {
-        this.value = value
-      },
-    }
-    const memberCache = {
-      async set() {},
-    }
-    const sync = new DriveSyncManager(TEST_ORG.name, TEST_ORG.id, { db, folderLink, memberCache })
-    await sync.init()
-    const device = { name, db, sync }
-    devices.push(device)
-    return device
-  }
-
-  beforeEach(() => {
-    drive = installFakeDrive()
-    devices = []
-  })
-
-  afterEach(async () => {
-    drive.uninstall()
-    for (const device of devices) {
-      device.db.db?.close()
-      await deleteDatabase(device.db.dbName)
-    }
-  })
+  const rig = useSyncRig()
+  const { makeDevice } = rig
 
   const liveSetlistFiles = () =>
-    drive.listFiles(f => f.appProperties?.setlistId && !f.trashed) as {
+    rig.drive.listFiles(f => f.appProperties?.setlistId && !f.trashed) as {
       id: string
       appProperties: { setlistId: string }
       content: string
@@ -192,12 +156,12 @@ describe('Drive sync: random histories', () => {
         const files = liveSetlistFiles()
         if (files.length === 0) return
         const file = rng.pick(files)
-        drive.files.get(file.id).trashed = true
+        rig.drive.files.get(file.id).trashed = true
         trashedEver.add(file.appProperties.setlistId)
         log.push(`Drive trashes ${file.appProperties.setlistId.slice(0, 8)}`)
       },
       async restore() {
-        const trashed = drive.listFiles(f => f.appProperties?.setlistId && f.trashed)
+        const trashed = rig.drive.listFiles(f => f.appProperties?.setlistId && f.trashed)
         if (trashed.length === 0) return
         const file = rng.pick(trashed)
         // Only if nothing took its place meanwhile: restoring beside a copy is the user's doing
@@ -218,10 +182,10 @@ describe('Drive sync: random histories', () => {
         const files = liveSetlistFiles()
         if (files.length === 0) return
         const file = rng.pick(files)
-        const record = drive.files.get(file.id)
-        drive.files.delete(file.id)
+        const record = rig.drive.files.get(file.id)
+        rig.drive.files.delete(file.id)
         record.id = `reid-${crypto.randomUUID()}`
-        drive.files.set(record.id, record)
+        rig.drive.files.set(record.id, record)
         log.push(`Drive re-ids ${file.appProperties.setlistId.slice(0, 8)}`)
       },
       async reset() {
@@ -237,7 +201,7 @@ describe('Drive sync: random histories', () => {
         }
       },
       async fail() {
-        drive.failRequests({
+        rig.drive.failRequests({
           status: 500,
           network: rng.int(2) === 0,
           times: 1 + rng.int(2),
@@ -266,7 +230,7 @@ describe('Drive sync: random histories', () => {
     }
 
     // Quiet: no more failures, everyone syncs until nothing changes
-    drive._failures.length = 0
+    rig.drive._failures.length = 0
     failuresQueued = false
     for (let round = 0; round < 3; round++) {
       for (const device of devs) await syncDevice(device)

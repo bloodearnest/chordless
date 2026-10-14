@@ -1,18 +1,16 @@
 import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
-import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
+import { createSetlist } from '../src/js/db.ts'
 import { addDays, SHARE_DAYS_AFTER } from '../src/js/share-bundle.ts'
 import { decryptBundle } from '../src/js/share-crypto.ts'
 import { createShare, stopShare, syncShares } from '../src/js/share-manager.ts'
-import { hashText } from '../src/js/song-utils.ts'
 import { toLocalDateString } from '../src/js/utils/date-utils.ts'
 import { makeEntry } from './builders.ts'
-import { installFakeDrive } from './fake-drive.ts'
+import { addSong, editSong, memoryFolderLink, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { deleteDatabase, suppressConsoleLogs, TEST_ORG, wait } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
 
-const { describe, it, beforeEach, afterEach } = window
+const { describe, it } = window
 
 suppressConsoleLogs()
 
@@ -21,73 +19,9 @@ const today = toLocalDateString(new Date())
 const nextWeek = addDays(today, 7)
 
 describe('Share links: sync', () => {
-  let drive
-  let devices: Device[]
-
-  interface Device {
-    db: ChordlessDB
-    sync: DriveSyncManager
-  }
-
-  const folderLink = (): FolderLink => {
-    let value: string | null = null
-    return {
-      async get() {
-        return value
-      },
-      async set(v) {
-        value = v
-      },
-    }
-  }
-
-  async function makeDevice(name: string, link = folderLink()): Promise<Device> {
-    const db = new ChordlessDB(`test-share-${name}-${crypto.randomUUID()}`)
-    await db.init()
-    const memberCache = { async set() {} }
-    const sync = new DriveSyncManager(TEST_ORG.name, TEST_ORG.id, {
-      db,
-      folderLink: link,
-      memberCache,
-    })
-    await sync.init()
-    const device = { db, sync }
-    devices.push(device)
-    return device
-  }
-
-  async function addSong(device: Device, uuid: string, title: string, content: string) {
-    await device.db.saveChordPro({
-      id: `chordpro-${uuid}`,
-      content,
-      contentHash: hashText(content),
-      lastModified: Date.now(),
-    })
-    await device.db.saveSong({
-      uuid,
-      id: `title-${title.toLowerCase()}`,
-      title,
-      titleNormalized: title.toLowerCase(),
-      isDefault: true,
-      variantOf: null,
-      chordproFileId: `chordpro-${uuid}`,
-      modifiedDate: new Date().toISOString(),
-    } as never)
-  }
-
-  /** Edit a song's chart the way the app does */
-  async function editSong(device: Device, uuid: string, content: string) {
-    const song = must(await device.db.getSong(uuid))
-    await device.db.saveChordPro({
-      id: song.chordproFileId,
-      content,
-      contentHash: hashText(content),
-      lastModified: Date.now(),
-    })
-    song.modifiedDate = new Date().toISOString()
-    await device.db.saveSong(song)
-    await wait(5)
-  }
+  const rig = useSyncRig()
+  const { makeDevice } = rig
+  type Device = Awaited<ReturnType<typeof makeDevice>>
 
   async function addSetlist(device: Device, songIds: string[], fields: Partial<Setlist> = {}) {
     const setlist = {
@@ -112,35 +46,29 @@ describe('Share links: sync', () => {
 
   /** What a recipient would see: the file, decrypted */
   async function openShare(fileId: string, key: string) {
-    const { status, bytes } = drive.anonymousDownload(fileId)
+    const { status, bytes } = rig.drive.anonymousDownload(fileId)
     expect(status).to.equal(200)
-    return decryptBundle(key, bytes)
+    return decryptBundle(key, must(bytes) as Uint8Array<ArrayBuffer>)
   }
 
   const shareFiles = () =>
-    [...drive.files.values()].filter((f: any) => f.appProperties?.type === 'share')
+    [...rig.drive.files.values()].filter((f: any) => f.appProperties?.type === 'share')
   const uploads = () =>
-    drive.requests.filter(r => r.method === 'PATCH' && r.path.startsWith('/upload'))
-
-  beforeEach(() => {
-    drive = installFakeDrive()
-    devices = []
-  })
-
-  afterEach(async () => {
-    drive.uninstall()
-    for (const device of devices) {
-      device.db.db?.close()
-      await deleteDatabase(device.db.dbName)
-    }
-    expect(drive.errors.map(e => e.message)).to.deep.equal([])
-  })
+    rig.drive.requests.filter(r => r.method === 'PATCH' && r.path.startsWith('/upload'))
 
   /** A device with one shared setlist of two songs, synced */
   async function sharedSetlist() {
-    const phone = await makeDevice('phone', folderLink())
-    await addSong(phone, 'a', 'Alpha', '{title: Alpha}\n{key: G}\n[G]Alpha line')
-    await addSong(phone, 'b', 'Beta', '{title: Beta}\n{key: G}\n[G]Beta line')
+    const phone = await makeDevice('phone')
+    await addSong(phone, {
+      uuid: 'a',
+      title: 'Alpha',
+      content: '{title: Alpha}\n{key: G}\n[G]Alpha line',
+    })
+    await addSong(phone, {
+      uuid: 'b',
+      title: 'Beta',
+      content: '{title: Beta}\n{key: G}\n[G]Beta line',
+    })
     const setlist = await addSetlist(phone, ['title-alpha', 'title-beta'])
     await phone.sync.sync()
     const share = await createShare(setlist, ctx(phone))
@@ -170,7 +98,7 @@ describe('Share links: sync', () => {
     const { phone, share } = await sharedSetlist()
     await phone.sync.sync()
 
-    const laptop = await makeDevice('laptop', folderLink())
+    const laptop = await makeDevice('laptop')
     // The same Drive folder, found by name
     await laptop.sync.sync()
     const setlists = await laptop.db.getAllSetlists()
@@ -221,8 +149,8 @@ describe('Share links: sync', () => {
     const { phone, share } = await sharedSetlist()
     await phone.sync.sync()
 
-    const link = folderLink()
-    const laptop = await makeDevice('laptop', link)
+    const folderLink = memoryFolderLink()
+    const laptop = await makeDevice('laptop', { folderLink })
     await laptop.sync.sync()
     await editSong(laptop, 'a', '{title: Alpha}\n{key: G}\n[G]Alpha line, from the laptop')
     await laptop.sync.sync()
@@ -241,11 +169,11 @@ describe('Share links: sync', () => {
 
     await phone.sync.sync()
 
-    expect(drive.anonymousDownload(share.fileId).status).to.equal(404)
-    expect(drive.files.get(share.fileId).trashed).to.equal(true)
-    expect(drive.files.has(share.fileId), 'trashed, never deleted').to.equal(true)
+    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.drive.files.get(share.fileId).trashed).to.equal(true)
+    expect(rig.drive.files.has(share.fileId), 'trashed, never deleted').to.equal(true)
     expect((await phone.db.getSetlist(setlist.id))?.share).to.equal(null)
-    const driveCopy = [...drive.files.values()].find(
+    const driveCopy = [...rig.drive.files.values()].find(
       (f: any) => f.appProperties.setlistId === setlist.id && f.appProperties.type !== 'share'
     ) as any
     expect(JSON.parse(driveCopy.content).share).to.equal(null)
@@ -263,7 +191,7 @@ describe('Share links: sync', () => {
 
     const recorded = must((await phone.db.getSetlist(setlist.id))?.share)
     expect(recorded.expires).to.equal(addDays(later, SHARE_DAYS_AFTER))
-    expect(drive.files.get(share.fileId).appProperties.expires).to.equal(recorded.expires)
+    expect(rig.drive.files.get(share.fileId).appProperties.expires).to.equal(recorded.expires)
   })
 
   it('stopping a share ends access, and sharing again makes a new link', async () => {
@@ -273,12 +201,12 @@ describe('Share links: sync', () => {
       ...(await phone.db.getSetlist(setlist.id)),
       share: null,
     } as Setlist)
-    expect(drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
 
     const again = await createShare(must(await phone.db.getSetlist(setlist.id)), ctx(phone))
     expect(again.fileId).to.not.equal(share.fileId)
     expect(again.key).to.not.equal(share.key)
-    expect(drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
   })
 
   it('ends share files nothing points at once they are a day old, not before', async () => {
@@ -289,23 +217,23 @@ describe('Share links: sync', () => {
     } as Setlist)
 
     await syncShares(ctx(phone))
-    expect(drive.anonymousDownload(share.fileId).status, 'fresh orphan is left').to.equal(200)
+    expect(rig.drive.anonymousDownload(share.fileId).status, 'fresh orphan is left').to.equal(200)
 
     await syncShares(ctx(phone, { now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) }))
-    expect(drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
   })
 
   it('does not make a shares folder for an organisation that never shares', async () => {
-    const phone = await makeDevice('phone', folderLink())
+    const phone = await makeDevice('phone')
     await addSetlist(phone, [])
     await phone.sync.sync()
-    expect(drive.findByPath(['Chordless', TEST_ORG.name, 'shares'])).to.equal(null)
+    expect(rig.drive.findByPath(['Chordless', TEST_ORG.name, 'shares'])).to.equal(null)
   })
 
   it('a failing share does not stop setlists syncing', async () => {
     const { phone, share } = await sharedSetlist()
     await editSong(phone, 'a', '{title: Alpha}\n{key: G}\n[G]changed')
-    drive.failRequests({
+    rig.drive.failRequests({
       method: 'PATCH',
       path: new RegExp(`upload.*${share.fileId}`),
       status: 500,

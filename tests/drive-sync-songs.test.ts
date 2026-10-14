@@ -1,9 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { songFileMetadata } from '../src/js/drive-metadata.ts'
-import { hashText } from '../src/js/song-utils.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG, wait } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -14,40 +13,6 @@ describe('Drive sync: songs', () => {
   const { makeDevice, syncDevice, replaceDriveFile } = rig
 
   describe('songs', () => {
-    async function addSong(device, { uuid, title, content }) {
-      const chordproFileId = `chordpro-${uuid}`
-      await device.db.saveChordPro({
-        id: chordproFileId,
-        content,
-        contentHash: hashText(content),
-        lastModified: Date.now(),
-      })
-      await device.db.saveSong({
-        uuid,
-        id: `title-${title.toLowerCase()}`,
-        title,
-        titleNormalized: title.toLowerCase(),
-        isDefault: true,
-        variantOf: null,
-        chordproFileId,
-        modifiedDate: new Date().toISOString(),
-      })
-      await wait(5)
-    }
-
-    async function editSongContent(device, uuid, content) {
-      const song = await device.db.getSong(uuid)
-      await device.db.saveChordPro({
-        id: song.chordproFileId,
-        content,
-        contentHash: hashText(content),
-        lastModified: Date.now(),
-      })
-      song.modifiedDate = new Date().toISOString()
-      await device.db.saveSong(song)
-      await wait(5)
-    }
-
     const songContent = async (device, uuid) => {
       const song = await device.db.getSong(uuid)
       return (await device.db.getChordPro(song.chordproFileId)).content
@@ -123,7 +88,7 @@ describe('Drive sync: songs', () => {
       await syncDevice(phone)
       await syncDevice(tablet)
 
-      await editSongContent(phone, 'song-1', '{title: Amazing}\n[A]Grace')
+      await editSong(phone, 'song-1', '{title: Amazing}\n[A]Grace')
       await syncDevice(phone)
       await syncDevice(tablet)
 
@@ -188,7 +153,7 @@ describe('Drive sync: songs', () => {
       // A variant change only shows in appProperties, so updates must send them
       const song = must(await phone.db.getSong('song-1'))
       await phone.db.saveSong({ ...song, isDefault: false, variantOf: 'song-0' })
-      await editSongContent(phone, 'song-1', '{title: Amazing}\n[G]edited')
+      await editSong(phone, 'song-1', '{title: Amazing}\n[G]edited')
       await syncDevice(phone)
 
       expect(file().appProperties.isDefault).to.equal('false')
@@ -202,8 +167,8 @@ describe('Drive sync: songs', () => {
       await syncDevice(phone)
       await syncDevice(tablet)
 
-      await editSongContent(phone, 'song-1', 'phone version')
-      await editSongContent(tablet, 'song-1', 'tablet version')
+      await editSong(phone, 'song-1', 'phone version')
+      await editSong(tablet, 'song-1', 'tablet version')
       await syncDevice(phone)
       await syncDevice(tablet)
 
