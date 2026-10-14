@@ -29,7 +29,7 @@ format:
 coverage:
     npx web-test-runner --config web-test-runner.config.js --coverage
 
-# Run the node tests (the auth worker, event names)
+# Run the node tests (the workers, email and share code, event names)
 test-node:
     npm run test:node
 

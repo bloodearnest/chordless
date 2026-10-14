@@ -36,7 +36,15 @@ safety. To keep it that way:
 For code that doesn't run in a page:
 
 - `worker.node.test.ts`: the Cloudflare worker (static files, the SPA fallback, the
-  OAuth and session routes).
+  OAuth and session routes, the share routes, the dev pages).
+- `google-auth.node.test.ts`: checking a Google ID token (signature, issuer, audience, expiry).
+- `share-bundle.node.test.ts`, `share-page.node.test.ts`, `share-proxy.node.test.ts`: share
+  links: the encrypted bundle, the page a link opens (with its preview), and the Worker's
+  download proxy and its cache.
+- `import-plan.node.test.ts`: matching an email's songs to the library.
+- `manifest.node.test.ts`: the web app manifest (share target, file handlers, shortcuts).
+- `samples.node.test.ts`: the sample charts in `public/samples` parse and agree with themselves.
+- `songselect-link.node.test.ts`: the SongSelect search link for a missing song.
 - `download-emails.node.test.ts`: the Gmail downloader (`scripts/`), against a fake Gmail.
 - `email-setlist.node.test.ts`: reading a forwarded email as a setlist, on made-up emails.
 - `emails-private.node.test.ts`: the importer over the real emails in `tests/fixtures/private/emails/` (skips when there are none): checks that every one reads as a well formed setlist.
@@ -64,8 +72,15 @@ app's own modules, imported directly: there's no build step to test around.
 - **Drive sync** runs the real `drive-api.js` and `drive-sync.js` against FakeDrive
   (`fake-drive.js`), an in-memory fake of the parts of the Drive v3 API the app uses.
   It throws on anything it doesn't model rather than guessing, and has its own tests
-  (`fake-drive.test.ts`). `drive-sync.test.ts` sets up two devices syncing through one
-  fake Drive, which is how cross-device behaviour is tested.
+  (`fake-drive.test.ts`). Every test that syncs uses `useSyncRig()` from `drive-harness.ts`:
+  a FakeDrive for each test, simulated devices (`makeDevice`, each with its own database,
+  syncing one organisation), teardown, a check that FakeDrive saw nothing it doesn't model,
+  and `addSong`/`editSong`. Keep new sync tests on it, so they all run against the same fake
+  and setup. Two devices syncing through one fake Drive is how cross-device behaviour is
+  tested. The tests are split by topic: `drive-sync` (setlists, metadata, conflicts, change
+  detection), `drive-sync-resilience` (errors partway, files gone), `drive-sync-organisation`
+  (organisations, members, read-only folders), `drive-sync-reset`, `drive-sync-songs`, and
+  `share-sync` (share links).
   `drive-sync-random.test.ts` runs random histories of several devices (creating and editing
   setlists, syncing, files trashed, restored or re-id'd in Drive, resets, failing requests) and
   checks that Drive never holds a setlist twice, that devices end up matching Drive, and that
@@ -75,8 +90,11 @@ app's own modules, imported directly: there's no build step to test around.
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`
   also checks there is a view for every route.
-- **Transposition** (`transpose.test.ts`) has one test per case, so a failure names
-  the chord and key.
+- **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
+  failure names the chord and key.
+- Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,
+  `TEST_ORG`, `suppressConsoleLogs`. Wait for what the test is about (`waitUntil` from
+  `@open-wc/testing`) rather than a fixed time where you can.
 - `suppressConsoleLogs()` (`test-helpers.js`) hides the app's logging, printing it
   only for tests that fail.
 
@@ -97,9 +115,23 @@ parallel, each in its own browser context.
 | `song-settings.playwright.ts` | A song's settings in a setlist, the media player's settings |
 | `service-worker.playwright.ts` | The service worker serving the shell, and reloading offline |
 | `dev-pages.playwright.ts` | Every page in `src/dev/` loads without errors |
+| `about.playwright.ts`, `app-update.playwright.ts` | The About page, and the update notice in the menu |
+| `first-use.playwright.ts`, `welcome.playwright.ts` | The first-use setup modal, and the welcome card |
+| `import-setlist.playwright.ts` | Importing a setlist from an email's link |
+| `share.playwright.ts`, `share-button.playwright.ts`, `share-and-open.playwright.ts` | Opening a share link; the share button; songs shared to the app or opened with it |
+| `read-only.playwright.ts`, `setlist-title.playwright.ts` | A read-only organisation; a setlist's title in the header |
+| `wake-lock.playwright.ts` | Keeping the screen awake |
+| `built.playwright.ts` | The production build (the `built` project, port 8792): the precache, offline, security headers, CSP |
+
+Two projects: `chromium` (everything else, against the dev server) and `built` (only
+`built.playwright.ts`, against `vite build` and `vite preview`). A run that names test files,
+none of them `built`, skips the build. Traces are kept for failures.
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
-fails any test whose page throws an uncaught error. It also has:
+fails any test whose page throws an uncaught error, starts with the first-use modal answered
+(`test.use({ firstUse: true })` opts out), and pins the date to 14 October 2026 (the clock still
+runs), so the year-less dates in the seeded setlists ("Sun, 11 Oct") don't change when the
+year does. It also has:
 
 - `openApp(page, path)`: opens a view once the service worker controls it. The app
   reloads itself when that first happens, which would otherwise land mid-test.
