@@ -403,7 +403,16 @@ export class LibraryView extends PageView {
 
   async #changeKey(newKey: string): Promise<void> {
     if (!newKey || !this.#parsed) return
+    // Drawing the song again starts its sections from what is saved: put back what is set now
+    const states = this.#sections().map(({ hideMode, isCollapsed, isHidden }) => ({
+      hideMode,
+      isCollapsed,
+      isHidden,
+    }))
     await this.#renderInKey(newKey)
+    this.#sections().forEach((section, index) => {
+      if (states[index]) Object.assign(section, states[index])
+    })
     this.#updateKeySelector(newKey)
   }
 
