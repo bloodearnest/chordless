@@ -7,6 +7,7 @@ suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
+import { transactionError } from '../src/js/utils/idb.ts'
 import { must } from './must.ts'
 
 describe('ChordlessDB', () => {
@@ -155,5 +156,85 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
     expect(migratedEdited.songs[0].tempo).to.equal(80)
     expect(sync.setlistHasLocalChanges(migratedEdited)).to.equal(true)
     must(db.db).close()
+  })
+})
+
+describe('transactionError', () => {
+  it("is the failed request's error, not the transaction's null", async () => {
+    const name = `idb-test-${crypto.randomUUID()}`
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = indexedDB.open(name, 1)
+      open.onupgradeneeded = () => {
+        open.result.createObjectStore('things', { keyPath: 'id' }).createIndex('name', 'name', {
+          unique: true,
+        })
+      }
+      open.onsuccess = () => resolve(open.result)
+      open.onerror = () => reject(open.error)
+    })
+
+    const tx = db.transaction('things', 'readwrite')
+    tx.objectStore('things').put({ id: 1, name: 'same' })
+    tx.objectStore('things').put({ id: 2, name: 'same' })
+    const error = await new Promise<unknown>(resolve => {
+      tx.onerror = event => resolve(transactionError(event, tx))
+    })
+
+    db.close()
+    indexedDB.deleteDatabase(name)
+    expect(error).to.be.instanceOf(DOMException)
+    expect((error as DOMException).name).to.equal('ConstraintError')
+  })
+})
+
+describe('ChordlessDB usage aggregation', () => {
+  let db
+
+  afterEach(async () => {
+    if (db?.dbName) {
+      await deleteDatabase(db.dbName)
+      db = null
+    }
+  })
+
+  it('aggregates song appearances across setlists', async () => {
+    const orgName = `TEST-${uniqueName()}`
+    db = new ChordlessDB(orgName)
+    await db.init()
+
+    const setlists = [
+      {
+        id: crypto.randomUUID(),
+        date: '2024-01-01',
+        name: 'New Year',
+        owner: 'Leader A',
+        songs: [
+          { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'C', tempo: null, notes: '' },
+          { order: 1, songId: 'song-2', songUuid: 'uuid-2', key: 'G', tempo: null, notes: '' },
+        ],
+        createdDate: new Date().toISOString(),
+        modifiedDate: new Date().toISOString(),
+      },
+      {
+        id: crypto.randomUUID(),
+        date: '2024-02-01',
+        name: 'February',
+        owner: 'Leader B',
+        songs: [
+          { order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'D', tempo: null, notes: '' },
+        ],
+        createdDate: new Date().toISOString(),
+        modifiedDate: new Date().toISOString(),
+      },
+    ]
+
+    for (const setlist of setlists) {
+      await db.saveSetlist(setlist)
+    }
+
+    const usage = await db.getSongUsageFromSetlists('song-1')
+    expect(usage).to.have.lengthOf(2)
+    expect(usage[0].leader).to.equal('Leader B') // sorted by date desc
+    expect(usage[1].leader).to.equal('Leader A')
   })
 })
