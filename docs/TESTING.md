@@ -11,6 +11,13 @@ Run it before committing.
 
 New test files are picked up by their name; there's no list to add them to.
 
+`just test` ends with `just stats`, which records each suite's test count, failures, run time and
+coverage (lines, branches, functions; the end-to-end suite has no coverage) with the commit, as a
+line in `docs/stats.jsonl`: one line per commit, the latest run on it. The suites leave what it
+reads in `.stats/` and `coverage/` when they run in full, so a run of some files does not
+record anything. `docs/test-catches.jsonl` is the other record: the real bugs the tests found,
+which the agent logs as it works (see CLAUDE.md).
+
 Tests are TypeScript, type-checked by `tsc -b` (part of `just lint`) with `strict` on, except
 `noImplicitAny` (`tsconfig.tests.json`, `tsconfig.node.json`): helper parameters and `let`s need no
 annotations, but everything the tests call is checked against the app's types, including null

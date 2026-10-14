@@ -1,5 +1,7 @@
 import { esbuildPlugin } from '@web/dev-server-esbuild'
+import { defaultReporter } from '@web/test-runner'
 import { playwrightLauncher } from '@web/test-runner-playwright'
+import { statsReporter } from './scripts/wtr-stats-reporter.js'
 
 export default {
   // Every test file except the node ones (*.node.test.js, run by just test-node)
@@ -12,8 +14,11 @@ export default {
     include: ['src/**/*.{js,ts}'],
     exclude: ['node_modules/**'],
     reportDir: 'coverage',
-    reporters: ['html', 'text-summary'],
+    // json-summary is read by `just stats`
+    reporters: ['html', 'text-summary', 'json-summary'],
   },
+  // A full run for `just stats` (STATS=1) also writes its counts to .stats/unit.json
+  ...(process.env.STATS && { reporters: [defaultReporter(), statsReporter()] }),
   browsers: [
     playwrightLauncher({
       product: 'chromium',

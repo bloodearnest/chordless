@@ -4,13 +4,18 @@
 default:
     @just --list
 
-# Run all tests: node, browser unit (Web Test Runner) and Playwright
-test: test-node test-unit test-browser-headless
+# Run all tests: node, browser unit (Web Test Runner) and Playwright, then record the results
+test: test-node test-unit test-browser-headless && stats
+
+# Record the last full run's counts, times and coverage in docs/stats.jsonl (`just test` does it)
+stats:
+    node scripts/stats.ts
 
 # Run browser unit tests, optionally just some files: just test-unit tests/db.test.ts
+# (a full run also measures coverage and leaves its results for `just stats`)
 test-unit *args:
     @echo "Running browser unit tests with Web Test Runner..."
-    @npm run test:web -- {{args}}
+    @{{ if args == "" { "STATS=1 npm run test:web -- --coverage" } else { "npm run test:web -- " + args } }}
 
 # Lint JS/JSON files with Biome (fast!)
 lint:
@@ -31,7 +36,8 @@ coverage:
 
 # Run the node tests (the workers, email and share code, event names)
 test-node:
-    npm run test:node
+    @mkdir -p .stats
+    node --test --experimental-test-coverage --test-coverage-include='src/**' --test-coverage-include='worker/src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.stats/node.junit.xml --test-reporter=lcov --test-reporter-destination=.stats/node.lcov "tests/*.node.test.{js,ts}"
 
 serve:
     npm run dev
@@ -61,7 +67,7 @@ funnel:
 test-browser-headless *args:
     @echo "Running browser tests with Playwright..."
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
-    npx playwright test {{args}}
+    {{ if args == "" { "PLAYWRIGHT_JSON_OUTPUT_NAME=.stats/e2e.json npx playwright test --reporter=list,json" } else { "npx playwright test " + args } }}
 
 # Run browser tests with Playwright UI
 test-browser-ui:
