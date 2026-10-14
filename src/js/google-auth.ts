@@ -470,7 +470,8 @@ export async function getStoredBlob(): Promise<StoredBlob | undefined> {
  * Logout - delete blob from SW
  */
 export async function logout(): Promise<void> {
-  await sendToServiceWorker('DELETE_BLOB')
+  const response = await sendToServiceWorker('DELETE_BLOB')
+  if (!response.success) throw new Error(response.error || 'Failed to delete the sign-in')
 }
 
 /**

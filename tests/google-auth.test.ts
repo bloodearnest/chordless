@@ -181,6 +181,19 @@ describe('google-auth', () => {
       expect(await isAuthenticated()).to.equal(false)
     })
 
+    it('says so when the worker cannot forget the blob, and stays signed in', async () => {
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
+      worker.failing.add('DELETE_BLOB')
+
+      let error: Error | null = null
+      await logout().catch(e => {
+        error = e
+      })
+
+      expect((error as Error | null)?.message).to.equal('worker failed')
+      expect(await isAuthenticated()).to.equal(true)
+    })
+
     it('exports the blob for a backup, or says why not', async () => {
       let error: Error | null = null
       await exportBlobBackup().catch(e => {
