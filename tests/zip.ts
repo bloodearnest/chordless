@@ -25,7 +25,7 @@ export async function buildZip(entries: ZipEntry[], name = 'pads.zip'): Promise<
 
   for (const entry of entries) {
     const fileName = encoder.encode(entry.name)
-    const raw = entry.data ?? new Uint8Array()
+    const raw = (entry.data ?? new Uint8Array()) as Uint8Array<ArrayBuffer>
     const method = entry.rawMethod ?? (entry.method === 'deflate' ? 8 : 0)
     const stored = entry.method === 'deflate' ? await deflateRaw(raw) : raw
     const flags = entry.flags ?? 0
