@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { driveRequest } from '../src/js/drive-api.ts'
+import { createFile, downloadFileBinary, driveRequest } from '../src/js/drive-api.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 
@@ -26,6 +26,12 @@ describe('FakeDrive', () => {
       body: JSON.stringify({ name: 'a.json', appProperties: { setlistId: 's1' } }),
     })
     expect(Object.keys(created).sort()).to.deep.equal(['id', 'kind', 'mimeType', 'name'])
+  })
+
+  it('keeps the bytes of a file that is not text, whatever they are', async () => {
+    const bytes = Uint8Array.from({ length: 256 }, (_, i) => i)
+    const file = await createFile({ name: 'pad.mp3' }, new Blob([bytes]), 'audio/mpeg')
+    expect(new Uint8Array(await downloadFileBinary(file.id))).to.deep.equal(bytes)
   })
 
   it('keeps appProperties and properties separate in queries', async () => {

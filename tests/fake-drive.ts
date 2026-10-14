@@ -497,7 +497,9 @@ function parseMultipart(contentType, body) {
     })
   if (parts.length !== 2)
     throw new FakeDriveError(`Expected 2 multipart parts, got ${parts.length}`)
-  const binary = /application\/octet-stream/.test(parts[1].headers)
+  // Drive keeps a file's bytes as they were sent: only text and JSON are read as text here
+  const type = parts[1].headers.match(/content-type:\s*([^\r\n;]+)/i)?.[1]?.trim() ?? ''
+  const binary = type !== '' && !/^text\/|^application\/json$/i.test(type)
   return {
     metadata: JSON.parse(binaryStringToText(parts[0].body)),
     content: binary ? parts[1].body : binaryStringToText(parts[1].body),
