@@ -109,23 +109,11 @@
     "branches": 6,
     "functions": 5
   },
-  "src/components/welcome-card.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 166
-  },
   "src/js/app.ts": {
     "lines": 0,
     "branches": 0,
     "functions": 0,
-    "unloaded": 29
-  },
-  "src/js/auth-db.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 179
+    "unloaded": 0
   },
   "src/js/db.ts": {
     "lines": 106,
@@ -147,12 +135,6 @@
     "branches": 0,
     "functions": 5
   },
-  "src/js/first-use.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 10
-  },
   "src/js/google-auth.ts": {
     "lines": 167,
     "branches": 12,
@@ -170,19 +152,13 @@
   },
   "src/js/pad-set-service.ts": {
     "lines": 36,
-    "branches": 31,
+    "branches": 30,
     "functions": 0
   },
   "src/js/preferences.ts": {
-    "lines": 63,
+    "lines": 51,
     "branches": 19,
-    "functions": 6
-  },
-  "src/js/samples.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 33
+    "functions": 4
   },
   "src/js/setlist-page.ts": {
     "lines": 932,
@@ -239,6 +215,6 @@
     "lines": 0,
     "branches": 0,
     "functions": 0,
-    "unloaded": 14
+    "unloaded": 0
   }
 }

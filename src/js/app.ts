@@ -1,3 +1,4 @@
+/* v8 ignore start -- start-up wiring of the whole app: the Playwright tests run it, a unit test cannot load it */
 /**
  * The app shell: starts the router, which shows the view for the URL in
  * #view-outlet. The menu and the media player stay while views come and go.
@@ -49,3 +50,4 @@ import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>
 void appUpdate.start()
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()
+/* v8 ignore stop */

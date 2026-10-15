@@ -7,6 +7,8 @@
  * - Track operation status and retry logic
  */
 
+import { requestResult } from './utils/idb.ts'
+
 const DB_NAME = 'auth'
 const DB_VERSION = 1
 
@@ -112,11 +114,7 @@ export async function storeBlob(blob: string, metadata: AuthMetadata = {}): Prom
     updated_at: new Date().toISOString(),
   }
 
-  await new Promise<IDBValidKey>((resolve, reject) => {
-    const request = store.put(data, 'current')
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  await requestResult(store.put(data, 'current'))
 
   db.close()
   return data
@@ -130,11 +128,7 @@ export async function getBlob(): Promise<StoredBlob | undefined> {
   const tx = db.transaction(STORES.BLOB, 'readonly')
   const store = tx.objectStore(STORES.BLOB)
 
-  const result = await new Promise<StoredBlob | undefined>((resolve, reject) => {
-    const request = store.get('current')
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  const result = await requestResult(store.get('current'))
 
   db.close()
   return result
@@ -148,11 +142,7 @@ export async function deleteBlob(): Promise<void> {
   const tx = db.transaction(STORES.BLOB, 'readwrite')
   const store = tx.objectStore(STORES.BLOB)
 
-  await new Promise<void>((resolve, reject) => {
-    const request = store.delete('current')
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+  await requestResult(store.delete('current'))
 
   db.close()
 }
@@ -173,11 +163,7 @@ export async function queueOperation(operation: OperationRequest): Promise<numbe
     last_error: null,
   }
 
-  const id = await new Promise<number>((resolve, reject) => {
-    const request = store.add(queueItem)
-    request.onsuccess = () => resolve(Number(request.result))
-    request.onerror = () => reject(request.error)
-  })
+  const id = Number(await requestResult(store.add(queueItem)))
 
   db.close()
   return id
@@ -192,11 +178,7 @@ export async function getPendingOperations(): Promise<QueuedOperation[]> {
   const store = tx.objectStore(STORES.QUEUE)
   const index = store.index('status')
 
-  const results = await new Promise<QueuedOperation[]>((resolve, reject) => {
-    const request = index.getAll('pending')
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  const results = await requestResult(index.getAll('pending'))
 
   db.close()
   return results
@@ -215,11 +197,7 @@ export async function updateOperationStatus(
   const store = tx.objectStore(STORES.QUEUE)
 
   // Get current operation
-  const operation = await new Promise<QueuedOperation | undefined>((resolve, reject) => {
-    const request = store.get(id)
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  const operation = await requestResult(store.get(id))
 
   if (!operation) {
     db.close()
@@ -234,11 +212,7 @@ export async function updateOperationStatus(
   }
   operation.updated_at = new Date().toISOString()
 
-  await new Promise<void>((resolve, reject) => {
-    const request = store.put(operation)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+  await requestResult(store.put(operation))
 
   db.close()
 }
@@ -251,11 +225,7 @@ export async function deleteOperation(id: number): Promise<void> {
   const tx = db.transaction(STORES.QUEUE, 'readwrite')
   const store = tx.objectStore(STORES.QUEUE)
 
-  await new Promise<void>((resolve, reject) => {
-    const request = store.delete(id)
-    request.onsuccess = () => resolve()
-    request.onerror = () => reject(request.error)
-  })
+  await requestResult(store.delete(id))
 
   db.close()
 }
@@ -270,19 +240,11 @@ export async function clearCompletedOperations(): Promise<void> {
 
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const results = await new Promise<QueuedOperation[]>((resolve, reject) => {
-    const request = store.getAll()
-    request.onsuccess = () => resolve(request.result)
-    request.onerror = () => reject(request.error)
-  })
+  const results = await requestResult(store.getAll())
 
   for (const op of results) {
     if (op.status === 'completed' && op.updated_at !== undefined && op.updated_at < cutoff) {
-      await new Promise<void>((resolve, reject) => {
-        const request = store.delete(op.id)
-        request.onsuccess = () => resolve()
-        request.onerror = () => reject(request.error)
-      })
+      await requestResult(store.delete(op.id))
     }
   }
 

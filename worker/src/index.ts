@@ -8,6 +8,7 @@
  * - Performs Drive API operations (invite/revoke) on-demand with decrypted blobs
  */
 
+/* v8 ignore start -- needs `cloudflare:email` and the Workers cache: only workerd has them (worker.node.test.ts runs it there, unmeasured) */
 import { EmailMessage } from 'cloudflare:email'
 import { handleEmail, type IncomingEmail } from './email.ts'
 import type { Env } from './env.ts'
@@ -33,3 +34,4 @@ export default {
     )
   },
 }
+/* v8 ignore stop */
