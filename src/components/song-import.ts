@@ -350,6 +350,10 @@ export class SongImport extends LitElement {
   `,
   ]
 
+  /** Loads the PDF reader, which is large and wanted only for a shared PDF (a test gives its own) */
+  loadPdfReader: () => Promise<{ readPdfText(pdf: ArrayBuffer): Promise<string> }> = () =>
+    import('../js/pdf-text.ts')
+
   constructor() {
     super()
     this._paste = createRef()
@@ -409,7 +413,7 @@ export class SongImport extends LitElement {
       const library = await libraryForMatching(db)
       let readPdf = async (_pdf: ArrayBuffer) => ''
       try {
-        readPdf = (await import('../js/pdf-text.ts')).readPdfText
+        readPdf = (await this.loadPdfReader()).readPdfText
       } catch (error) {
         console.warn('[Import] Could not load the PDF reader, using filenames:', error)
       }
