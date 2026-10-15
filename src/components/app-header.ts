@@ -2,6 +2,7 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { AppUpdateChangeEvent, appUpdate } from '../js/app-update.ts'
+import { sleep } from '../js/utils/sleep.ts'
 import './icon.ts'
 
 /** The menu button was pressed; trigger is the button, to open the menu under */
@@ -444,7 +445,7 @@ export class AppHeader extends LitElement {
     titleEl?.classList.add('fade-out')
 
     // Wait for fade-out to complete
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await sleep(300)
 
     // Update the displayed title
     this._displayTitle = this.heading
@@ -458,7 +459,7 @@ export class AppHeader extends LitElement {
     requestAnimationFrame(() => titleEl?.classList.remove('fade-out'))
 
     // Wait for fade-in to complete
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await sleep(300)
 
     this._animating = false
 

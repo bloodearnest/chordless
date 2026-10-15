@@ -1,6 +1,7 @@
 import type { LoadedSong, ParsedChart, SectionState, SetlistEntry } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
+import { normalizeCapo } from '../utils/capo.ts'
 import { SongModel } from './song-model.ts'
 
 /**
@@ -145,7 +146,7 @@ export class SetlistSong extends SongModel {
       setlistState.capoValues &&
       setlistState.capoValues[this._songIndex.toString()] !== undefined
     ) {
-      return this._normalizeCapo(setlistState.capoValues[this._songIndex.toString()])
+      return normalizeCapo(setlistState.capoValues[this._songIndex.toString()])
     }
 
     // Priority 2: Song-user-prefs (conditional on key match)
@@ -155,7 +156,7 @@ export class SetlistSong extends SongModel {
     if (currentKey === canonicalKey) {
       const prefs = getSongUserPrefs(this._songEntry.songId, this._orgId)
       if (prefs && prefs.capo !== undefined) {
-        return this._normalizeCapo(prefs.capo)
+        return normalizeCapo(prefs.capo)
       }
     }
 
@@ -164,7 +165,7 @@ export class SetlistSong extends SongModel {
   }
 
   override setCapo(capo: number | string): void {
-    this._pendingChanges.capo = this._normalizeCapo(capo)
+    this._pendingChanges.capo = normalizeCapo(capo)
   }
 
   override getSectionState(sectionIndex: number): SectionState {

@@ -55,13 +55,16 @@ import {
 } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
+import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
+import { defaultHideMode, sectionLabel } from './setlist/section-defaults.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
+import { normalizeCapo } from './utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
-import { isInModalDialog, isTypingInField } from './utils/keyboard.ts'
+import { sleep } from './utils/sleep.ts'
 import { showStatusMessage } from './utils/status-message.ts'
 import type { ViewState } from './views/page-view.ts'
 
@@ -1066,7 +1069,7 @@ export class SetlistPage {
     if (this._capoEnabled) {
       for (const [songIndex, capo] of Object.entries(capos)) {
         const song = this.songs[Number(songIndex)]
-        if (song) song.currentCapo = this._normalizeCapoValue(capo)
+        if (song) song.currentCapo = normalizeCapo(capo)
       }
     }
 
@@ -1098,7 +1101,7 @@ export class SetlistPage {
       // The song user prefs capo is based on the canonical key at the time they set it
       if (setlistSongEntry.key === song.currentKey) {
         // Key hasn't been changed from canonical, apply user's preferred capo
-        song.currentCapo = this._normalizeCapoValue(songUserPrefs.capo)
+        song.currentCapo = normalizeCapo(songUserPrefs.capo)
         console.log(
           `[Capo] Applied song user pref capo=${songUserPrefs.capo} for song ${song.title}`
         )
@@ -1122,15 +1125,10 @@ export class SetlistPage {
     )
   }
 
-  /**
-   * Save section states for a specific song using SongModel
-   */
-  async _saveSectionStateViaModel(songIndex: number) {
-    const song = this.songs[songIndex]
-    if (!song) return
-
-    const { createSetlistSongModel, syncSectionStates } = await import('./song-model-factory.ts')
-    const model = createSetlistSongModel(
+  /** The model that saves a song's changes in this setlist (loaded when first needed) */
+  async _songModel(song: RuntimeSong) {
+    const { createSetlistSongModel } = await import('./song-model-factory.ts')
+    return createSetlistSongModel(
       song,
       song._setlistEntry,
       song._canonicalSong,
@@ -1138,6 +1136,17 @@ export class SetlistPage {
       this._database(),
       this._database().organisationId
     )
+  }
+
+  /**
+   * Save section states for a specific song using SongModel
+   */
+  async _saveSectionStateViaModel(songIndex: number) {
+    const song = this.songs[songIndex]
+    if (!song) return
+
+    const { syncSectionStates } = await import('./song-model-factory.ts')
+    const model = await this._songModel(song)
 
     // Sync all section states for this song
     const sectionStatesForSong = this.sectionState[songIndex] || {}
@@ -1211,61 +1220,11 @@ export class SetlistPage {
     if (!sectionElement) {
       sectionElement = this._getSongSectionComponent(songIndex, sectionIndex)
     }
-    const recommended = sectionElement ? sectionElement.getRecommendedHideMode() : 'none'
-    const defaultsConfig = getSectionDefaults()
-    let hideMode: HideMode | null = null
-    const label = this._normalizeSectionLabel(sectionElement)
-    if (label && Object.hasOwn(defaultsConfig, label)) {
-      hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig[label])
-    } else if (Object.hasOwn(defaultsConfig, 'all')) {
-      hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig.all)
-    }
-
-    if (!hideMode || hideMode === 'none') {
-      return recommended
-    }
-
-    if (hideMode === 'chords' && recommended === 'lyrics') {
-      // User wants lyrics-only view, but section has only chords
-      return 'collapse'
-    }
-
-    if (hideMode === 'lyrics' && recommended === 'chords') {
-      // User wants chords-only view, but section has only lyrics
-      return 'collapse'
-    }
-
-    return hideMode
-  }
-
-  _mapDefaultChoiceToHideMode(choice: unknown): HideMode {
-    const value = String(choice || '').toLowerCase()
-    switch (value) {
-      case 'all':
-      case 'show-all':
-      case 'default':
-      case 'none':
-        return 'none'
-      case 'lyrics':
-        return 'chords'
-      case 'chords':
-        return 'lyrics'
-      case 'collapse':
-        return 'collapse'
-      case 'hide':
-      case 'hidden':
-        return 'hide'
-      default:
-        return 'none'
-    }
-  }
-
-  _normalizeSectionLabel(sectionElement: SongSection | null): string {
-    if (!sectionElement) {
-      return ''
-    }
-    const label = sectionElement.dataset?.label || sectionElement.label || ''
-    return label.trim().toLowerCase()
+    return defaultHideMode(
+      sectionLabel(sectionElement),
+      sectionElement ? sectionElement.getRecommendedHideMode() : 'none',
+      getSectionDefaults()
+    )
   }
 
   async setSectionHideMode(songIndex: number, sectionIndex: number, mode: string) {
@@ -1662,7 +1621,7 @@ export class SetlistPage {
     if (!this._capoEnabled) return
     const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
     if (!capoSelector) return
-    capoSelector.value = this._normalizeCapoValue(value)
+    capoSelector.value = normalizeCapo(value)
     capoSelector.referenceKey = currentKey || this._currentKeyForCapo || ''
     this._currentKeyForCapo = capoSelector.referenceKey
     capoSelector.editMode = document.body.classList.contains('edit-mode')
@@ -1761,15 +1720,7 @@ export class SetlistPage {
     song.currentBPM = newValue
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.ts')
-    const model = createSetlistSongModel(
-      song,
-      song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId as string,
-      this._database(),
-      this._database().organisationId
-    )
+    const model = await this._songModel(song)
     model.setTempo(newValue)
     await model.save()
 
@@ -1792,22 +1743,14 @@ export class SetlistPage {
 
   async handleCapoChange(newValue: unknown) {
     if (!this._capoEnabled || this.currentSongIndex < 0) return
-    const normalized = this._normalizeCapoValue(newValue)
+    const normalized = normalizeCapo(newValue)
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentCapo === normalized) return
 
     song.currentCapo = normalized
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.ts')
-    const model = createSetlistSongModel(
-      song,
-      song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId as string,
-      this._database(),
-      this._database().organisationId
-    )
+    const model = await this._songModel(song)
     model.setCapo(normalized)
     await model.save()
 
@@ -1838,15 +1781,7 @@ export class SetlistPage {
     song.currentKey = newKey
 
     // Use SongModel to persist the change
-    const { createSetlistSongModel } = await import('./song-model-factory.ts')
-    const model = createSetlistSongModel(
-      song,
-      song._setlistEntry,
-      song._canonicalSong,
-      this.currentSetlistId as string,
-      this._database(),
-      this._database().organisationId
-    )
+    const model = await this._songModel(song)
     model.setKey(newKey)
     await model.save()
 
@@ -1885,13 +1820,13 @@ export class SetlistPage {
     }
 
     // Wait for fade-out (300ms to match app-header)
-    await new Promise(resolve => setTimeout(resolve, 300))
+    await sleep(300)
 
     // Update content (this happens while opacity is 0, so changes are invisible)
     await updateCallback()
 
     // Small delay to ensure DOM has updated
-    await new Promise(resolve => setTimeout(resolve, 10))
+    await sleep(10)
 
     // Fade in
     if (controlsSlot) {
@@ -2184,26 +2119,12 @@ export class SetlistPage {
 
   _updateSongDisplayCapo(songIndex: number, capoValue: unknown) {
     if (songIndex < 0) return
-    const normalized = this._capoEnabled ? this._normalizeCapoValue(capoValue) : 0
+    const normalized = this._capoEnabled ? normalizeCapo(capoValue) : 0
     const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
     const songDisplay = songSection?.querySelector('song-display')
     if (songDisplay) {
       songDisplay.capo = normalized
     }
-  }
-
-  _normalizeCapoValue(value: unknown): number {
-    const num = Number(value)
-    if (!Number.isFinite(num)) {
-      return 0
-    }
-    if (num <= 0) {
-      return 0
-    }
-    if (num >= 11) {
-      return 11
-    }
-    return Math.round(num)
   }
 
   /** The media player's speed button remembers the choice for the song being viewed */
@@ -2216,78 +2137,19 @@ export class SetlistPage {
   }
 
   setupKeyboardNavigation() {
-    document.addEventListener(
-      'keydown',
-      e => {
-        // Leave keys alone while typing in a field (e.g. the setlist details form),
-        // or in a modal, which handles its own keys (Esc closes it)
-        if (isTypingInField(e) || isInModalDialog(e)) return
-
-        // Handle Escape key to exit edit mode
-        if (e.key === 'Escape') {
-          const isEditMode = document.body.classList.contains('edit-mode')
-          if (isEditMode) {
-            e.preventDefault()
-            const appHeader = this.root.querySelector<AppHeader>('#app-header')
-            if (appHeader) {
-              // Trigger the edit-mode-toggle event
-              appHeader.dispatchEvent(new EditModeToggleEvent())
-            }
-          }
-          return
-        }
-
-        // Don't intercept if modifier keys are pressed (Alt, Ctrl, Meta)
-        // This allows browser shortcuts like Alt+Left/Right to work
-        if (e.altKey || e.ctrlKey || e.metaKey) {
-          return
-        }
-
-        switch (e.key) {
-          case 'ArrowLeft':
-            e.preventDefault()
-            // Navigate to previous song or overview
-            if (this.currentSongIndex > 0) {
-              this.navigateTo(this.currentSongIndex - 1)
-            } else if (this.currentSongIndex === 0) {
-              this.navigateTo(-1)
-            }
-            break
-          case 'ArrowRight':
-            e.preventDefault()
-            // Navigate to next song
-            if (this.currentSongIndex < 0 && this.songs.length > 0) {
-              // From overview to first song
-              this.navigateTo(0)
-            } else if (
-              this.currentSongIndex >= 0 &&
-              this.currentSongIndex < this.songs.length - 1
-            ) {
-              this.navigateTo(this.currentSongIndex + 1)
-            }
-            break
-          case 'ArrowUp': {
-            e.preventDefault()
-            const currentSectionUp =
-              this.currentSongIndex >= 0
-                ? this.root.querySelector<HTMLElement>(`#song-${this.currentSongIndex}`)
-                : this.root.querySelector<HTMLElement>('#overview')
-            currentSectionUp?.scrollBy({ top: -CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
-            break
-          }
-          case 'ArrowDown': {
-            e.preventDefault()
-            const currentSectionDown =
-              this.currentSongIndex >= 0
-                ? this.root.querySelector<HTMLElement>(`#song-${this.currentSongIndex}`)
-                : this.root.querySelector<HTMLElement>('#overview')
-            currentSectionDown?.scrollBy({ top: CONFIG.KEYBOARD_SCROLL_AMOUNT, behavior: 'smooth' })
-            break
-          }
-        }
+    listenForNavigationKeys({
+      root: this.root,
+      signal: this._abort.signal,
+      currentIndex: () => this.currentSongIndex,
+      songCount: () => this.songs.length,
+      goTo: index => this.navigateTo(index),
+      scrollAmount: CONFIG.KEYBOARD_SCROLL_AMOUNT,
+      onEscape: () => {
+        if (!document.body.classList.contains('edit-mode')) return false
+        this.root.querySelector<AppHeader>('#app-header')?.dispatchEvent(new EditModeToggleEvent())
+        return true
       },
-      { signal: this._abort.signal }
-    )
+    })
   }
 
   setupNavigationMenu() {

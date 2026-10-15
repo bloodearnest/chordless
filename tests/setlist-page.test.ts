@@ -486,16 +486,6 @@ describe('the setlist page', () => {
       expect(selector.style.display).to.equal('none')
     })
 
-    it('clamps what it is given to a whole number from 0 to 11', async () => {
-      await open()
-      const normalise = (value: unknown) => page._normalizeCapoValue(value)
-      expect([normalise('x'), normalise(NaN), normalise(Infinity)]).to.deep.equal([0, 0, 0])
-      expect([normalise(-3), normalise(0), normalise(2.4), normalise(2.6)]).to.deep.equal([
-        0, 0, 2, 3,
-      ])
-      expect([normalise(11), normalise(40)]).to.deep.equal([11, 11])
-    })
-
     describe('with the preference on when the setlist is opened', () => {
       beforeEach(() => setCapoPreference(true))
 

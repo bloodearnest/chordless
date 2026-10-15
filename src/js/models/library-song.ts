@@ -6,6 +6,7 @@ import {
   type SongUserPrefs,
   saveSongUserPrefs,
 } from '../song-user-prefs.ts'
+import { normalizeCapo } from '../utils/capo.ts'
 import { SongModel } from './song-model.ts'
 
 /**
@@ -119,14 +120,14 @@ export class LibrarySong extends SongModel {
     // Load from song-user-prefs
     const prefs = getSongUserPrefs(this._song.id, this._orgId)
     if (prefs && prefs.capo !== undefined) {
-      return this._normalizeCapo(prefs.capo)
+      return normalizeCapo(prefs.capo)
     }
 
     return 0
   }
 
   override setCapo(capo: number | string): void {
-    this._pendingChanges.capo = this._normalizeCapo(capo)
+    this._pendingChanges.capo = normalizeCapo(capo)
   }
 
   override getSectionState(sectionIndex: number): SectionState {

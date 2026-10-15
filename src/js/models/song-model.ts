@@ -102,17 +102,4 @@ export abstract class SongModel {
    * Reset song to default/original state
    */
   abstract reset(): Promise<void>
-
-  // ==================== Helpers ====================
-
-  /**
-   * Normalize capo value to valid range (0-11)
-   * @param capo - Capo value to normalize
-   * @returns Normalized capo value
-   */
-  protected _normalizeCapo(capo: number | string): number {
-    const val = Number.parseInt(String(capo), 10)
-    if (Number.isNaN(val)) return 0
-    return Math.min(Math.max(val, 0), 11)
-  }
 }

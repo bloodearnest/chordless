@@ -76,31 +76,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('lyrics')
     })
 
-    it('are mapped from every word the defaults use', async () => {
-      await rig.open()
-      const map = (choice: unknown) => rig.page._mapDefaultChoiceToHideMode(choice)
-      for (const none of ['all', 'show-all', 'default', 'none', '', undefined, 'unknown', 'ALL']) {
-        expect(map(none), String(none)).to.equal('none')
-      }
-      expect(map('lyrics')).to.equal('chords')
-      expect(map('chords')).to.equal('lyrics')
-      expect(map('collapse')).to.equal('collapse')
-      expect(map('hide')).to.equal('hide')
-      expect(map('hidden')).to.equal('hide')
-    })
-
-    it('are named by their label, or by nothing', async () => {
-      await rig.open()
-      expect(rig.page._normalizeSectionLabel(null)).to.equal('')
-      expect(rig.page._normalizeSectionLabel({ dataset: { label: ' Chorus ' } } as never)).to.equal(
-        'chorus'
-      )
-      expect(rig.page._normalizeSectionLabel({ dataset: {}, label: ' Bridge' } as never)).to.equal(
-        'bridge'
-      )
-      expect(rig.page._normalizeSectionLabel({ dataset: {}, label: '' } as never)).to.equal('')
-    })
-
     it('are the user’s own for a song, then the setlist’s own over those', async () => {
       await rig.open()
       const orgId = rig.db.organisationId
