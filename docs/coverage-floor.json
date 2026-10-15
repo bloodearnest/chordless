@@ -1,9 +1,4 @@
 {
-  "src/components/app-about.ts": {
-    "lines": 123,
-    "branches": 28,
-    "functions": 7
-  },
   "src/components/drive-sync-panel.ts": {
     "lines": 0,
     "branches": 2,
@@ -25,9 +20,9 @@
     "functions": 0
   },
   "src/components/song-import.ts": {
-    "lines": 133,
-    "branches": 16,
-    "functions": 10
+    "lines": 18,
+    "branches": 17,
+    "functions": 0
   },
   "src/components/song-section.ts": {
     "lines": 0,
