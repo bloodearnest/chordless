@@ -45,11 +45,6 @@
     "branches": 12,
     "functions": 4
   },
-  "src/components/first-use-setup.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "src/components/help-tooltip.ts": {
     "lines": 49,
     "branches": 1,
@@ -62,7 +57,7 @@
   },
   "src/components/key-selector.ts": {
     "lines": 0,
-    "branches": 1,
+    "branches": 0,
     "functions": 1
   },
   "src/components/media-player-settings.ts": {
@@ -76,8 +71,8 @@
     "functions": 14
   },
   "src/components/musical-metadata-display.ts": {
-    "lines": 23,
-    "branches": 6,
+    "lines": 19,
+    "branches": 5,
     "functions": 4
   },
   "src/components/nav-menu.ts": {
@@ -89,11 +84,6 @@
     "lines": 2,
     "branches": 8,
     "functions": 1
-  },
-  "src/components/pad-set-manager.ts": {
-    "lines": 65,
-    "branches": 10,
-    "functions": 4
   },
   "src/components/select-organisation.ts": {
     "lines": 81,
@@ -176,16 +166,6 @@
     "branches": 4,
     "functions": 19
   },
-  "src/components/status-message.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/components/status-view.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
   "src/components/storage-page.ts": {
     "lines": 158,
     "branches": 8,
@@ -206,11 +186,6 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 166
-  },
-  "src/components/why-install.ts": {
-    "lines": 1,
-    "branches": 1,
-    "functions": 0
   },
   "src/js/app-events.ts": {
     "lines": 0,
@@ -290,11 +265,6 @@
     "branches": 14,
     "functions": 11
   },
-  "src/js/import-plan.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
   "src/js/import-setlist.ts": {
     "lines": 106,
     "branches": 0,
@@ -340,18 +310,13 @@
     "branches": 2,
     "functions": 0
   },
-  "src/js/organisation-access.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
   "src/js/organisation-db.ts": {
-    "lines": 11,
+    "lines": 4,
     "branches": 4,
-    "functions": 12
+    "functions": 11
   },
   "src/js/organisation.ts": {
-    "lines": 57,
+    "lines": 54,
     "branches": 4,
     "functions": 2
   },
@@ -371,19 +336,14 @@
     "functions": 0
   },
   "src/js/pad-set-service.ts": {
-    "lines": 38,
-    "branches": 32,
+    "lines": 36,
+    "branches": 31,
     "functions": 1
   },
   "src/js/pad-sets-controller.ts": {
     "lines": 20,
     "branches": 2,
     "functions": 1
-  },
-  "src/js/parser.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
   },
   "src/js/pdf-text.ts": {
     "lines": 3,
@@ -396,8 +356,8 @@
     "functions": 1
   },
   "src/js/preferences.ts": {
-    "lines": 64,
-    "branches": 20,
+    "lines": 63,
+    "branches": 19,
     "functions": 16
   },
   "src/js/read-only-controller.ts": {
@@ -417,9 +377,9 @@
     "unloaded": 33
   },
   "src/js/setlist-page.ts": {
-    "lines": 1059,
-    "branches": 112,
-    "functions": 43
+    "lines": 994,
+    "branches": 115,
+    "functions": 40
   },
   "src/js/setlist/add-song-modal.ts": {
     "lines": 5,
@@ -458,12 +418,12 @@
   },
   "src/js/shared-incoming.ts": {
     "lines": 0,
-    "branches": 4,
+    "branches": 2,
     "functions": 0
   },
   "src/js/song-model-factory.ts": {
-    "lines": 13,
-    "branches": 3,
+    "lines": 11,
+    "branches": 1,
     "functions": 1
   },
   "src/js/song-user-prefs.ts": {
@@ -501,31 +461,6 @@
     "branches": 64,
     "functions": 0
   },
-  "src/js/utils/chord-utils.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/js/utils/date-utils.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/js/utils/errors.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/js/utils/idb.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/js/utils/keyboard.ts": {
-    "lines": 0,
-    "branches": 3,
-    "functions": 0
-  },
   "src/js/utils/lyrics-normalizer.ts": {
     "lines": 23,
     "branches": 10,
@@ -539,11 +474,6 @@
   "src/js/utils/song-filter.ts": {
     "lines": 0,
     "branches": 5,
-    "functions": 0
-  },
-  "src/js/utils/status-message.ts": {
-    "lines": 0,
-    "branches": 1,
     "functions": 0
   },
   "src/js/views/about-view.ts": {
@@ -562,11 +492,6 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 25
-  },
-  "src/js/views/import-song-view.ts": {
-    "lines": 1,
-    "branches": 1,
-    "functions": 0
   },
   "src/js/views/library-view.ts": {
     "lines": 78,
@@ -600,20 +525,10 @@
     "functions": 0,
     "unloaded": 276
   },
-  "worker/src/blob.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "worker/src/email.ts": {
     "lines": 8,
     "branches": 11,
     "functions": 2
-  },
-  "worker/src/http.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
   },
   "worker/src/index.ts": {
     "lines": 0,
@@ -629,11 +544,6 @@
   "worker/src/session.ts": {
     "lines": 0,
     "branches": 5,
-    "functions": 0
-  },
-  "worker/src/share.ts": {
-    "lines": 0,
-    "branches": 4,
     "functions": 0
   }
 }

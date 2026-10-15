@@ -12,6 +12,7 @@ import { render } from 'lit'
 import type { SongDisplay } from '../src/components/song-display.ts'
 import '../src/components/song-display.ts'
 import '../src/components/song-section.ts'
+import { CapoChangeEvent } from '../src/components/capo-selector.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
@@ -22,7 +23,7 @@ import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { settle, suppressConsoleLogs } from './test-helpers.ts'
+import { settle, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, before, beforeEach, afterEach } = window
 
@@ -82,6 +83,8 @@ describe('the setlist page', () => {
     await db.saveSetlist(setlist)
     page = new SetlistPage({ root, setlistId: setlist.id, db })
     await page.start()
+    // The page finishes setting up (selectors, the observer of the song in view) in the next frame
+    await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
     return setlist
   }
 
@@ -489,6 +492,63 @@ describe('the setlist page', () => {
       localStorage.removeItem('enable_capo')
     })
 
+    it('clamps what it is given to a whole number from 0 to 11', async () => {
+      await open()
+      const normalise = (value: unknown) => page._normalizeCapoValue(value)
+      expect([normalise('x'), normalise(NaN), normalise(Infinity)]).to.deep.equal([0, 0, 0])
+      expect([normalise(-3), normalise(0), normalise(2.4), normalise(2.6)]).to.deep.equal([
+        0, 0, 2, 3,
+      ])
+      expect([normalise(11), normalise(40)]).to.deep.equal([11, 11])
+    })
+
+    describe('with the preference on when the setlist is opened', () => {
+      beforeEach(() => localStorage.setItem('enabled_capo', 'true'))
+
+      /** Be on a song, as if scrolled to it: without the observer of what is in view putting it back */
+      const showSong = (index: number) => {
+        page.sectionObserver?.disconnect()
+        page.currentSongIndex = index
+      }
+
+      it('shows the capo selector, on the first song’s capo', async () => {
+        await open()
+        const selector = must(root.querySelector<HTMLElement & { value: number }>('#capo-selector'))
+        expect(selector.style.display).to.equal('')
+        expect(selector.value).to.equal(0)
+      })
+
+      it('shows a capo chosen in the selector on the song, and not on the others', async () => {
+        await open()
+        showSong(0)
+        const selector = must(root.querySelector<HTMLElement>('#capo-selector'))
+
+        selector.dispatchEvent(new CapoChangeEvent(3))
+        for (let i = 0; i < 100 && capoOf(0) !== 3; i++) await wait(20)
+
+        expect(page.songs[0].currentCapo).to.equal(3)
+        expect(capoOf(0)).to.equal(3)
+        expect(capoOf(1)).to.equal(0)
+      })
+
+      it('keeps a capo to the whole numbers there are', async () => {
+        await open()
+        showSong(0)
+        await page.handleCapoChange(40)
+        expect(page.songs[0].currentCapo).to.equal(11)
+        // The same again changes nothing
+        await page.handleCapoChange(11)
+        expect(page.songs[0].currentCapo).to.equal(11)
+      })
+
+      it('does nothing on the overview, where no song is being shown', async () => {
+        await open()
+        page.currentSongIndex = -1
+        await page.handleCapoChange(4)
+        expect(page.songs.every(song => !song.currentCapo)).to.equal(true)
+      })
+    })
+
     it('does nothing when an event brings no change', async () => {
       await open()
       page.songs[0].currentCapo = 2
@@ -497,6 +557,24 @@ describe('the setlist page', () => {
       await settle()
 
       expect(capoOf(0)).to.equal(0)
+    })
+  })
+
+  describe('watching which song is in view', () => {
+    it('starts again, with the old observer let go, when it is set up a second time', async () => {
+      await open()
+      const first = must(page.sectionObserver)
+      let disconnected = 0
+      const realDisconnect = first.disconnect.bind(first)
+      first.disconnect = () => {
+        disconnected++
+        realDisconnect()
+      }
+
+      page.setupSectionObserver()
+
+      expect(disconnected).to.equal(1)
+      expect(page.sectionObserver).to.not.equal(first)
     })
   })
 })

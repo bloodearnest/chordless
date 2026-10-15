@@ -129,3 +129,13 @@ describe('capo-selector', () => {
     await expect(selector).to.be.accessible(A11Y)
   })
 })
+
+describe('key-selector, with no key', () => {
+  it('shows a dash for it', () => {
+    const selector = document.createElement('key-selector')
+    selector.value = ''
+    expect(selector._displayValue()).to.equal('-')
+    selector.value = 'G'
+    expect(selector._displayValue()).to.equal('G')
+  })
+})

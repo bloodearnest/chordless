@@ -40,7 +40,6 @@ async function getOrgDB(): Promise<OrganisationDB> {
       return db
     } catch (error) {
       console.error('[Organisation] Failed to initialize OrganisationDB:', error)
-      initPromise = null
       throw error
     } finally {
       initPromise = null

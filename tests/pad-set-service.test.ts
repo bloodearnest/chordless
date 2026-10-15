@@ -303,6 +303,23 @@ describe('pad sets in Drive', () => {
       expect(derivePadSetName()).to.equal('New Pad Set')
     })
 
+    it('is listed once for two askers at the same time, after an upload cleared the list', async () => {
+      await uploadPadSet(await buildZip(entriesFor(allKeys), 'Listed.zip'))
+      const listings = () =>
+        drive.requests.filter((r: any) => r.method === 'GET' && r.params?.has('q')).length
+      const before = listings()
+
+      const [first, second] = await Promise.all([listPadSets(), listPadSets()])
+      const asked = listings() - before
+
+      expect(second).to.equal(first)
+      expect(await listPadSets(), 'and then it is kept').to.equal(first)
+      expect(listings() - before).to.equal(asked)
+      // (Drive is asked as often as for a single list)
+      await listPadSets(true)
+      expect(listings() - before - asked).to.equal(asked)
+    })
+
     it('reads files the zip tool deflated', async () => {
       const zip = await buildZip(entriesFor(allKeys, { method: 'deflate' }))
 

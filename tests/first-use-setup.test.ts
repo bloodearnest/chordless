@@ -41,6 +41,17 @@ describe('first-use-setup', () => {
     expect(localStorage.getItem('enable_capo')).to.equal('true')
   })
 
+  it('can be set back to chords and lyrics after choosing lyrics only', async () => {
+    await setUp()
+    const [both, lyrics] = root().querySelectorAll('input[type="radio"]')
+    // (a choice made in an earlier test is remembered, and a radio already chosen does not change)
+    lyrics.click()
+    both.click()
+    expect(localStorage.getItem('musician_type')).to.equal('general')
+    lyrics.click()
+    expect(localStorage.getItem('musician_type')).to.equal('singer')
+  })
+
   it('marks the setup done and goes away when closed', async () => {
     await setUp()
     root().querySelector('.actions .primary').click()

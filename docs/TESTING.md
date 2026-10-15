@@ -242,9 +242,12 @@ test reaches; `--all` lists every file. (The browser suite's own report is `cove
 The end-to-end tests aren't measured.
 
 The goal is 100%, and `docs/coverage-floor.json` holds the way there: for each file, how much is
-still missing. `just test` fails if a file has more missing than that, or a new file has any, and
-lowers the file when coverage goes up, so commit it with the change that did it. A fully covered file
-drops out of the floor; when the floor is empty, coverage is 100%.
+still missing. `just test` fails if a file has more missing than that, or a new file has any. When
+coverage goes up it says so, and `node scripts/coverage.ts --lower` records it: commit the floor with
+the change that did it. (It is not lowered by itself because a few lines come and go with timing
+from run to run, as a `setTimeout` that fires before the page is closed or not: a test that makes
+that happen every time is a better test, and the file shows in the failure until then.) A fully
+covered file drops out of the floor; when the floor is empty, coverage is 100%.
 
 Code that is not worth covering is marked, with the reason after `--`:
 

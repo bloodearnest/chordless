@@ -93,6 +93,11 @@ describe('the token blob', () => {
     assert.deepEqual(header, { alg: 'dir', enc: 'A256GCM', kid: 'k2' })
   })
 
+  test('has the key id "default" when the data names none', async () => {
+    const header = jose.decodeProtectedHeader(await encryptBlob(blobData({ kid: '' }), env))
+    assert.equal(header.kid, 'default')
+  })
+
   test('is not readable with another key', async () => {
     const blob = await encryptBlob(blobData(), env)
     await assert.rejects(decryptBlob(blob, { JWE_ENCRYPTION_KEY: randomKey() }))

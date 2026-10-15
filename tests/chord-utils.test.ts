@@ -39,3 +39,10 @@ describe('convertAccidentalsToSymbols', () => {
     expect(convertAccidentalsToSymbols('G#sus4/Bb')).to.equal('G♯sus4/B♭')
   })
 })
+
+describe('convertAccidentalsToSymbols, with nothing to convert', () => {
+  it('gives back empty or non-text input as it is', () => {
+    expect(convertAccidentalsToSymbols('')).to.equal('')
+    expect(convertAccidentalsToSymbols(undefined as unknown as string)).to.equal(undefined)
+  })
+})

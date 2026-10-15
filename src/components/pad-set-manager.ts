@@ -158,6 +158,7 @@ export class PadSetManager extends LitElement {
     const raw = input.value
     const sanitized = raw.replace(/[^a-zA-Z0-9\s-]+/g, '')
     if (sanitized !== raw) {
+      /* v8 ignore next -- a text field always has a cursor position; null is for other inputs */
       const pos = (input.selectionStart ?? 0) - (raw.length - sanitized.length)
       input.value = sanitized
       input.setSelectionRange(Math.max(0, pos), Math.max(0, pos))
@@ -186,6 +187,7 @@ export class PadSetManager extends LitElement {
       await this._padSets.load(true)
     } catch (error) {
       console.error('[PadSetManager] Upload failed:', error)
+      /* v8 ignore next -- only for an error with no message, which the upload does not throw */
       this._error = errorMessage(error) || 'Failed to upload pad set.'
     } finally {
       this._uploading = false

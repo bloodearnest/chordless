@@ -100,3 +100,10 @@ describe('isInModalDialog', () => {
     expect(inModal(document.body)).to.equal(false)
   })
 })
+
+describe('keyboard checks, for an event not dispatched anywhere', () => {
+  it('say no: it has no path and no target', () => {
+    expect(isTypingInField(new Event('keydown'))).to.equal(false)
+    expect(isInModalDialog(new Event('keydown'))).to.equal(false)
+  })
+})

@@ -8,7 +8,7 @@
  * component itself, not the field.
  */
 export function isTypingInField(event: Event): boolean {
-  const target = event.composedPath?.()[0] ?? event.target
+  const target = event.composedPath()[0] ?? event.target
   if (!(target instanceof Element)) return false
   if (target instanceof HTMLElement && target.isContentEditable) return true
   if (target.matches('textarea, select')) return true
@@ -27,6 +27,6 @@ export function isTypingInField(event: Event): boolean {
  * on it unless something calls preventDefault().
  */
 export function isInModalDialog(event: Event): boolean {
-  const path = event.composedPath?.() ?? []
+  const path = event.composedPath()
   return path.some(node => node instanceof HTMLDialogElement && node.matches(':modal'))
 }

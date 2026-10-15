@@ -35,3 +35,15 @@ describe('ChordProParser sections', () => {
     expect(sections[0].label).to.equal('Chorus')
   })
 })
+
+describe('ChordProParser, a label with a note after a section', () => {
+  it('ends the section before it, and keeps that one', () => {
+    const { sections } = parse(
+      '{comment: Verse 1}\n[G]One\n\n{comment: Chorus} (first time a cappella)\n[C]Two'
+    )
+    expect(sections.map(section => [section.label, section.note])).to.deep.equal([
+      ['Verse 1', undefined],
+      ['Chorus', '(first time a cappella)'],
+    ])
+  })
+})

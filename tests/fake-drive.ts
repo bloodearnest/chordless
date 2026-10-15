@@ -48,6 +48,7 @@ export class FakeDrive {
   corruptUploads: number
 
   readOnly: boolean
+  omitCapabilities: boolean
   _failures: any
 
   errors: any
@@ -64,6 +65,8 @@ export class FakeDrive {
     this.maxPageSize = 1000
     /** The user can only read: every change is refused (403), and capabilities say so */
     this.readOnly = false
+    /** Capabilities are left out of file metadata, as if Drive did not say */
+    this.omitCapabilities = false
     this._nextId = 1
     this.corruptUploads = 0
     this._failures = []
@@ -407,7 +410,8 @@ export class FakeDrive {
     const out: any = {}
     for (const name of names) {
       if (name === 'capabilities') {
-        out.capabilities = { canEdit: !this.readOnly, canAddChildren: !this.readOnly }
+        if (!this.omitCapabilities)
+          out.capabilities = { canEdit: !this.readOnly, canAddChildren: !this.readOnly }
       } else if (name === 'size') out.size = String(file.content?.length ?? 0)
       else if (file[name] !== undefined && name !== 'content')
         out[name] = structuredClone(file[name])

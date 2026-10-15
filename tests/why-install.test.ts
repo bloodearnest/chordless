@@ -33,3 +33,25 @@ describe('why-install', () => {
     await expect(el).to.be.accessible(A11Y)
   })
 })
+
+describe('why-install, on an iPhone or iPad', () => {
+  const text = async (userAgent: string) => {
+    Object.defineProperty(navigator, 'userAgent', { value: userAgent, configurable: true })
+    try {
+      const el = await fixture<WhyInstall>(html`<why-install></why-install>`)
+      return modalOf(el).textContent
+    } finally {
+      delete (navigator as { userAgent?: string }).userAgent
+    }
+  }
+  const modalOf = (el: WhyInstall) => el.shadowRoot?.querySelector('app-modal') as AppModal
+
+  it('adds that the installed app keeps its own data, and not on other devices', async () => {
+    expect(await text('Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)')).to.contain(
+      'keeps its own data'
+    )
+    expect(await text('Mozilla/5.0 (X11; Linux x86_64) Chrome/120')).to.not.contain(
+      'keeps its own data'
+    )
+  })
+})

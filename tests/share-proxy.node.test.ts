@@ -149,3 +149,58 @@ test('refuses what is not a share: bad ids, big files, other methods, no key', a
   const tooBig = await handleShareDownload(get(), ID, env, { fetchDrive: big.fetchDrive })
   assert.equal(tooBig.status, 502)
 })
+
+test('refuses a file that says it is too big before reading it', async () => {
+  let read = false
+  const body = new ReadableStream(
+    {
+      pull(controller) {
+        read = true
+        controller.close()
+      },
+    },
+    { highWaterMark: 0 }
+  )
+  const drive = fakeDrive(
+    () => new Response(body, { headers: { 'Content-Length': String(1024 * 1024 + 1) } })
+  )
+  const res = await handleShareDownload(get(), ID, env, { fetchDrive: drive.fetchDrive })
+  assert.equal(res.status, 502)
+  assert.equal(read, false)
+})
+
+test('hands the caching to waitUntil when the runtime gives one, and does not wait for it', async () => {
+  const cache = memoryCache()
+  const pending: Promise<unknown>[] = []
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const res = await handleShareDownload(get(), ID, env, {
+    fetchDrive: drive.fetchDrive,
+    cache,
+    waitUntil: promise => pending.push(promise),
+  })
+  assert.equal(res.status, 200)
+  assert.equal(pending.length, 1)
+  await Promise.all(pending)
+  assert.equal(cache.size, 1)
+})
+
+test('a HEAD gets the headers and no body', async () => {
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const res = await handleShareDownload(get({}, 'HEAD'), ID, env, { fetchDrive: drive.fetchDrive })
+  assert.equal(res.status, 200)
+  assert.ok(res.headers.get('ETag'))
+  assert.equal((await res.arrayBuffer()).byteLength, 0)
+})
+
+test('an answer in the cache with no content type is given as plain text', async () => {
+  const cache = memoryCache()
+  await cache.put(
+    new Request(`https://chordless.app/api/share/${ID}`),
+    new Response('old', { headers: { 'Content-Type': '' } })
+  )
+  const cached = await cache.match(new Request(`https://chordless.app/api/share/${ID}`))
+  cached?.headers.delete('Content-Type')
+  const bare: ShareCache = { match: async () => cached, put: async () => {} }
+  const res = await handleShareDownload(get(), ID, env, { cache: bare })
+  assert.equal(res.headers.get('Content-Type'), 'text/plain')
+})

@@ -11,6 +11,7 @@ import {
   type ClickOscillator,
   MetronomeController,
 } from '../src/js/metronome-controller.ts'
+import { wait } from './test-helpers.ts'
 
 class MockAudioContext implements ClickAudioContext {
   state: string
@@ -211,5 +212,29 @@ describe('MetronomeController', () => {
       controller.stop()
       expect(ctx.oscillators.at(-1)?.frequency.value).to.equal(LIGHT)
     })
+  })
+})
+
+describe('MetronomeController, tracking the clicks that are sounding', () => {
+  const make = () => {
+    const controller = new MetronomeController(new MockAudioContext(), new MockGainNode())
+    controller.start(100, '4/4', '1/4')
+    return controller
+  }
+
+  it('forgets a click once it has stopped sounding', async () => {
+    const controller = make()
+    expect(controller._activeOscillators).to.have.length(1)
+    await wait(80)
+    expect(controller._activeOscillators).to.have.length(0)
+    controller.stop()
+  })
+
+  it('has nothing to forget when stopped first, which already let go of them', async () => {
+    const controller = make()
+    controller.stop()
+    expect(controller._activeOscillators).to.have.length(0)
+    await wait(80)
+    expect(controller._activeOscillators).to.have.length(0)
   })
 })

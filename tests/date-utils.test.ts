@@ -73,3 +73,9 @@ describe('setlistTitle', () => {
     )
   })
 })
+
+describe('getWeeksAgo, a long time ago', () => {
+  it('counts years once it is more than one', () => {
+    expect(getWeeksAgo('2024-09-01', new Date(2026, 9, 8, 15, 30))).to.equal('2 years ago')
+  })
+})

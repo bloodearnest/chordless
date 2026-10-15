@@ -76,4 +76,24 @@ describe('Knowing whether the user can write to the organisation folder', () => 
     await refreshOrganisationAccess()
     expect(isReadOnlyOrganisation()).to.equal(true)
   })
+
+  it('leaves what is known alone when Drive does not say what the user can do', async () => {
+    await setOrganisationReadOnly(organisationId, true)
+    drive.omitCapabilities = true
+    await refreshOrganisationAccess()
+    expect(isReadOnlyOrganisation()).to.equal(true)
+  })
+
+  it('does not ask Drive about an organisation that has no folder yet', async () => {
+    const fresh = await createOrganisation(`Fresh ${crypto.randomUUID().slice(0, 8)}`)
+    try {
+      await setCurrentOrganisation(fresh.id, fresh.name)
+      const asked = drive.requests.length
+      await refreshOrganisationAccess()
+      expect(drive.requests.length).to.equal(asked)
+    } finally {
+      await setCurrentOrganisation(organisationId)
+      await deleteOrganisation(fresh.id)
+    }
+  })
 })

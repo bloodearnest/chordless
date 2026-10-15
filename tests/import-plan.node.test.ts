@@ -145,3 +145,19 @@ test('another of its titles can be the line: "Your Grace Is Enough (This Is Our 
     'This Is Our God is a title of the library'
   )
 })
+
+test('songs with the line equally often come in title order', () => {
+  const same = [
+    withWords('Zebra Song', '[G]Your grace is enough'),
+    withWords('Apple Song', '[G]Your grace is enough'),
+  ]
+  const match = matchLibrary(song('Your Grace Is Enough'), same)
+  assert.deepEqual(match.kind === 'possible' && match.candidates.map(c => c.title), [
+    'Apple Song',
+    'Zebra Song',
+  ])
+})
+
+test('a song with no list of titles is matched by its title', () => {
+  assert.equal(matchLibrary(song('Behold Him', { titles: [] }), library).kind, 'title')
+})

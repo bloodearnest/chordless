@@ -112,3 +112,28 @@ describe('launching the installed app', () => {
     expect(takeLink()).to.equal(null)
   })
 })
+
+describe('what is shared, when it is not tidy', () => {
+  beforeEach(() => caches.delete(SHARED_CACHE_NAME))
+  afterEach(() => caches.delete(SHARED_CACHE_NAME))
+
+  it('ignores text sent in the files field, and gives a file with no type a generic one', async () => {
+    const form = new FormData()
+    form.append('files', 'not a file')
+    form.append('files', new File(['x'], 'x.cho'))
+    await storeShared(form)
+    const shared = await takeShared()
+    expect(shared?.files.map(file => file.name)).to.deep.equal(['x.cho'])
+    expect(shared?.files[0].type).to.equal('application/octet-stream')
+  })
+
+  it('names a stored file "shared" when its name is missing, and takes it with no type', async () => {
+    const cache = await caches.open(SHARED_CACHE_NAME)
+    await cache.put(
+      new Request(new URL('/shared/file/0', location.href)),
+      new Response('words', { headers: { 'Content-Type': '' } })
+    )
+    const shared = await takeShared()
+    expect(shared?.files.map(file => file.name)).to.deep.equal(['shared'])
+  })
+})

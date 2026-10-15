@@ -6,6 +6,7 @@
  *   node scripts/coverage.ts                 a summary, and the files with the most missing
  *   node scripts/coverage.ts --all           every file with something missing
  *   node scripts/coverage.ts src/js/db.ts    the lines and branches of one file that no test reaches
+ *   node scripts/coverage.ts --lower         record better coverage as the new floor
  *
  * What it adds to the two reports:
  * - A line is covered if either suite ran it (branches and functions are merged by the line they
@@ -17,8 +18,10 @@
  *       /* v8 ignore next -- why *\/            this line     (`next 3`: this and the next 2)
  *       /* v8 ignore start -- why *\/ ... /* v8 ignore stop *\/
  *   `node:coverage` and `c8` are read as `v8`, and `disable`/`enable` as `start`/`stop`.
- * - It fails when a file has more missing than `docs/coverage-floor.json` allows, and lowers the
- *   floor when a file has less: so coverage can only go up, until the file is empty (100%).
+ * - It fails when a file has more missing than `docs/coverage-floor.json` allows, and says when a
+ *   file has less, so the floor can be lowered (`--lower`): coverage can only go up, until the
+ *   floor is empty (100%). The floor is not lowered by itself, as a few lines of a few files come
+ *   and go with timing from run to run: lower it from a run or two that agree.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -214,6 +217,7 @@ const ranges = (numbers: number[]) => {
 
 const args = process.argv.slice(2)
 const showAll = args.includes('--all')
+const lower = args.includes('--lower')
 const only = args.find(arg => !arg.startsWith('--'))
 
 for (const path of REPORTS) {
@@ -362,9 +366,12 @@ if (unexplained.length) {
   problems.push(`ignore marks with no reason (add \`-- why\`): ${unexplained.join(', ')}`)
 }
 
-if ((starting || JSON.stringify(next) !== JSON.stringify(floor)) && problems.length === 0) {
+const better = JSON.stringify(next) !== JSON.stringify(floor)
+if ((starting || (lower && better)) && problems.length === 0) {
   writeFileSync(FLOOR, `${JSON.stringify(next, null, 2)}\n`)
-  console.log(`${FLOOR} lowered or created: commit it`)
+  console.log(`${FLOOR} ${starting ? 'created' : 'lowered'}: commit it`)
+} else if (better && problems.length === 0) {
+  console.log(`Better than ${FLOOR}: node scripts/coverage.ts --lower records it`)
 }
 if (problems.length) {
   console.error('\nCoverage went down:')
