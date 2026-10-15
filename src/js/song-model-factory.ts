@@ -1,8 +1,7 @@
-import type { LoadedSong, SectionState, SetlistEntry } from './data-types.ts'
+import type { LoadedSong, SetlistEntry } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { LibrarySong } from './models/library-song.ts'
 import { SetlistSong } from './models/setlist-song.ts'
-import type { SongModel } from './models/song-model.ts'
 import type { RuntimeSong } from './setlist/runtime-songs.ts'
 
 /**
@@ -83,21 +82,4 @@ export function createLibrarySongModel(
   orgId: string
 ): LibrarySong {
   return new LibrarySong(fullSong, db, orgId)
-}
-
-/**
- * Sync section states from app into model
- *
- * @param model - Song model instance
- * @param sectionState - Section state from app { sectionIndex: {hideMode, isCollapsed, isHidden} }
- */
-export function syncSectionStates(
-  model: SongModel,
-  sectionState: Record<string, SectionState> | null | undefined
-): void {
-  if (!sectionState) return
-
-  for (const [sectionIndex, state] of Object.entries(sectionState)) {
-    model.setSectionState(Number(sectionIndex), state)
-  }
 }

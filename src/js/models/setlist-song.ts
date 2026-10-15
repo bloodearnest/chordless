@@ -1,41 +1,28 @@
-import type { LoadedSong, ParsedChart, SectionState, SetlistEntry } from '../data-types.ts'
+import type { LoadedSong, ParsedChart, SetlistEntry } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
+import { loadSetlistLocalState, saveSetlistLocalState } from '../setlist/local-state.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { normalizeCapo } from '../utils/capo.ts'
 import { SongModel } from './song-model.ts'
+
+/** Changes made but not yet saved */
+interface PendingChanges {
+  key: string | null
+  tempo: number | null
+  capo: number | null
+}
 
 /**
  * SetlistSong - Song model for setlist view
  *
  * Storage:
  * - Key/Tempo: Explicit snapshots in setlist entry (IndexedDB, synced)
- * - Capo: Setlist localStorage → song-user-prefs (conditional) → 0
- * - Section visibility: Setlist localStorage → song-user-prefs → app defaults
- *
- * Priority cascade:
- * 1. Setlist localStorage (per-setlist overrides)
- * 2. Song-user-prefs (per-user defaults)
- * 3. App defaults
+ * - Capo: Setlist localStorage → song-user-prefs (conditional) → 0 (see setlist/local-state.ts,
+ *   which also keeps the section states: those are the setlist page's own)
  *
  * Conditional capo inheritance:
  * - Only applies song-user-prefs capo if setlist entry key === canonical song key
  */
-/** Changes made but not yet saved */
-interface PendingChanges {
-  key: string | null
-  tempo: number | null
-  capo: number | null
-  sectionStates: Record<number, SectionState>
-}
-
-/** What a setlist keeps in localStorage for this device (not synced) */
-interface SetlistViewState {
-  /** Per song index, then per section index */
-  sectionState?: Record<number | string, Record<number | string, SectionState>>
-  /** Per song index */
-  capoValues?: Record<string, number>
-}
-
 export class SetlistSong extends SongModel {
   _songEntry: SetlistEntry
   _canonical: LoadedSong
@@ -74,7 +61,6 @@ export class SetlistSong extends SongModel {
       key: null,
       tempo: null,
       capo: null,
-      sectionStates: {},
     }
   }
 
@@ -141,13 +127,8 @@ export class SetlistSong extends SongModel {
     }
 
     // Priority 1: Setlist localStorage
-    const setlistState = this._loadSetlistState()
-    if (
-      setlistState.capoValues &&
-      setlistState.capoValues[this._songIndex.toString()] !== undefined
-    ) {
-      return normalizeCapo(setlistState.capoValues[this._songIndex.toString()])
-    }
+    const { capoValues } = loadSetlistLocalState(this._setlistId)
+    if (capoValues[this._songIndex] !== undefined) return normalizeCapo(capoValues[this._songIndex])
 
     // Priority 2: Song-user-prefs (conditional on key match)
     const currentKey = this.getKey()
@@ -166,42 +147,6 @@ export class SetlistSong extends SongModel {
 
   override setCapo(capo: number | string): void {
     this._pendingChanges.capo = normalizeCapo(capo)
-  }
-
-  override getSectionState(sectionIndex: number): SectionState {
-    // Return pending change if it exists
-    if (this._pendingChanges.sectionStates[sectionIndex]) {
-      return this._pendingChanges.sectionStates[sectionIndex]
-    }
-
-    // Priority 1: Setlist localStorage
-    const setlistState = this._loadSetlistState()
-    if (
-      setlistState.sectionState?.[this._songIndex] &&
-      setlistState.sectionState[this._songIndex][sectionIndex]
-    ) {
-      return setlistState.sectionState[this._songIndex][sectionIndex]
-    }
-
-    // Priority 2: Song-user-prefs
-    const prefs = getSongUserPrefs(this._songEntry.songId, this._orgId)
-    if (prefs?.sectionDefaults?.[sectionIndex.toString()]) {
-      return prefs.sectionDefaults[sectionIndex.toString()]
-    }
-
-    // Default
-    return {
-      hideMode: 'none',
-      isCollapsed: false,
-      isHidden: false,
-    }
-  }
-
-  override setSectionState(sectionIndex: number, state: Partial<SectionState>): void {
-    this._pendingChanges.sectionStates[sectionIndex] = {
-      ...this.getSectionState(sectionIndex),
-      ...state,
-    }
   }
 
   // ==================== Persistence ====================
@@ -223,37 +168,18 @@ export class SetlistSong extends SongModel {
       }
     }
 
-    // Save capo and section states to setlist localStorage
-    const setlistState = this._loadSetlistState()
-
+    // Save the capo to the setlist's local state
     if (this._pendingChanges.capo !== null) {
-      if (!setlistState.capoValues) {
-        setlistState.capoValues = {}
-      }
-      setlistState.capoValues[this._songIndex.toString()] = this._pendingChanges.capo
+      const state = loadSetlistLocalState(this._setlistId)
+      state.capoValues[this._songIndex] = this._pendingChanges.capo
+      saveSetlistLocalState(this._setlistId, state)
     }
-
-    if (Object.keys(this._pendingChanges.sectionStates).length > 0) {
-      if (!setlistState.sectionState) {
-        setlistState.sectionState = {}
-      }
-      if (!setlistState.sectionState[this._songIndex]) {
-        setlistState.sectionState[this._songIndex] = {}
-      }
-
-      for (const [index, state] of Object.entries(this._pendingChanges.sectionStates)) {
-        setlistState.sectionState[this._songIndex][index] = state
-      }
-    }
-
-    this._saveSetlistState(setlistState)
 
     // Clear pending changes
     this._pendingChanges = {
       key: null,
       tempo: null,
       capo: null,
-      sectionStates: {},
     }
   }
 
@@ -262,50 +188,14 @@ export class SetlistSong extends SongModel {
     this._pendingChanges.key = this.getOriginalKey() ?? null
     this._pendingChanges.tempo = this.getOriginalTempo() ?? null
 
-    // Clear capo and section states from setlist localStorage
-    const setlistState = this._loadSetlistState()
-
-    if (setlistState.capoValues?.[this._songIndex.toString()]) {
-      delete setlistState.capoValues[this._songIndex.toString()]
-    }
-
-    if (setlistState.sectionState?.[this._songIndex]) {
-      delete setlistState.sectionState[this._songIndex]
-    }
-
-    this._saveSetlistState(setlistState)
+    // Forget the capo this device kept for the song
+    const state = loadSetlistLocalState(this._setlistId)
+    delete state.capoValues[this._songIndex]
+    saveSetlistLocalState(this._setlistId, state)
 
     this._pendingChanges.capo = 0
-    this._pendingChanges.sectionStates = {}
 
     // Save the reset state
     await this.save()
-  }
-
-  // ==================== Helpers ====================
-
-  _loadSetlistState(): SetlistViewState {
-    const key = `state-${this._setlistId}`
-    try {
-      const state = localStorage.getItem(key)
-      if (state) {
-        return JSON.parse(state)
-      }
-    } catch (error) {
-      console.error('[SetlistSong] Error loading setlist state:', error)
-    }
-    return {
-      sectionState: {},
-      capoValues: {},
-    }
-  }
-
-  _saveSetlistState(state: SetlistViewState) {
-    const key = `state-${this._setlistId}`
-    try {
-      localStorage.setItem(key, JSON.stringify(state))
-    } catch (error) {
-      console.error('[SetlistSong] Error saving setlist state:', error)
-    }
   }
 }

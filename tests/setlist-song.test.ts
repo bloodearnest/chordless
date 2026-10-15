@@ -272,89 +272,6 @@ describe('SetlistSong', () => {
     })
   })
 
-  describe('Section State (priority cascade)', () => {
-    it('returns default section state when nothing is set', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      const state = song.getSectionState(0)
-      expect(state.hideMode).to.equal('none')
-      expect(state.isCollapsed).to.equal(false)
-      expect(state.isHidden).to.equal(false)
-    })
-
-    it('loads section state from song-user-prefs', () => {
-      const key = `song-prefs-${orgId}`
-      localStorage.setItem(
-        key,
-        JSON.stringify({
-          'ccli-12345': {
-            sectionDefaults: {
-              0: { hideMode: 'chords', isCollapsed: false, isHidden: false },
-            },
-          },
-        })
-      )
-
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      const state = song.getSectionState(0)
-      expect(state.hideMode).to.equal('chords')
-    })
-
-    it('setlist localStorage overrides song-user-prefs', () => {
-      // Set song-user-prefs
-      const prefsKey = `song-prefs-${orgId}`
-      localStorage.setItem(
-        prefsKey,
-        JSON.stringify({
-          'ccli-12345': {
-            sectionDefaults: {
-              0: { hideMode: 'chords', isCollapsed: false, isHidden: false },
-            },
-          },
-        })
-      )
-
-      // Set setlist state
-      const stateKey = `state-${setlist.id}`
-      localStorage.setItem(
-        stateKey,
-        JSON.stringify({
-          sectionState: {
-            0: {
-              // Song index 0
-              0: { hideMode: 'lyrics', isCollapsed: true, isHidden: false }, // Section index 0
-            },
-          },
-          capoValues: {},
-        })
-      )
-
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      const state = song.getSectionState(0)
-      expect(state.hideMode).to.equal('lyrics') // Should use setlist state
-      expect(state.isCollapsed).to.equal(true)
-    })
-
-    it('allows setting section state', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      song.setSectionState(0, { hideMode: 'chords', isCollapsed: false, isHidden: false })
-      const state = song.getSectionState(0)
-      expect(state.hideMode).to.equal('chords')
-    })
-
-    it('persists section state to setlist localStorage', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      song.setSectionState(0, { hideMode: 'chords', isCollapsed: false, isHidden: false })
-      song.setSectionState(1, { hideMode: 'lyrics', isCollapsed: true, isHidden: false })
-      await song.save()
-
-      const stateKey = `state-${setlist.id}`
-      const state = JSON.parse(must(localStorage.getItem(stateKey)))
-      expect(state.sectionState['0']['0'].hideMode).to.equal('chords')
-      expect(state.sectionState['0']['1'].hideMode).to.equal('lyrics')
-      expect(state.sectionState['0']['1'].isCollapsed).to.equal(true)
-    })
-  })
-
   describe('Reset', () => {
     it('resets key to original from canonical song', async () => {
       const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
@@ -377,16 +294,6 @@ describe('SetlistSong', () => {
       await song.reset()
 
       expect(song.getCapo()).to.equal(0)
-    })
-
-    it('clears section states from setlist localStorage', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
-      song.setSectionState(0, { hideMode: 'chords', isCollapsed: false, isHidden: false })
-      await song.save()
-      await song.reset()
-
-      const state = song.getSectionState(0)
-      expect(state.hideMode).to.equal('none')
     })
   })
 })
@@ -424,46 +331,18 @@ describe('SetlistSong, with little recorded about the song or the setlist', () =
     expect(bare({ tempo: 80, originalTempo: 70 }).getOriginalTempo()).to.equal(70)
   })
 
-  it('adds a capo and section states to a saved state that has neither', async () => {
+  it('adds a capo to a saved state that has none', async () => {
     localStorage.setItem(stateKey, JSON.stringify({}))
     const song = bare()
     song.setCapo(3)
-    song.setSectionState(1, { hideMode: 'chords' })
     await song.save()
     const state = JSON.parse(must(localStorage.getItem(stateKey)))
     expect(state.capoValues).to.deep.equal({ 0: 3 })
-    expect(state.sectionState[0][1]).to.include({ hideMode: 'chords' })
   })
 
   it('can be reset when it has no key or tempo at all', async () => {
     const song = bare()
     await song.reset()
     expect(song.getCapo()).to.equal(0)
-  })
-
-  it('starts from an empty state when the saved one is damaged', () => {
-    const error = console.error
-    console.error = () => {}
-    try {
-      localStorage.setItem(stateKey, '{not json')
-      expect(bare()._loadSetlistState()).to.deep.equal({ sectionState: {}, capoValues: {} })
-    } finally {
-      console.error = error
-    }
-  })
-
-  it('carries on when the state cannot be kept, as when storage is full', () => {
-    const error = console.error
-    const realSetItem = Storage.prototype.setItem
-    console.error = () => {}
-    Storage.prototype.setItem = () => {
-      throw new DOMException('full', 'QuotaExceededError')
-    }
-    try {
-      expect(() => bare()._saveSetlistState({ sectionState: {}, capoValues: {} })).to.not.throw()
-    } finally {
-      Storage.prototype.setItem = realSetItem
-      console.error = error
-    }
   })
 })

@@ -276,17 +276,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       ).to.deep.equal({})
     })
 
-    it('saves the sections of a song through its model, and not those of one that is not there', async () => {
-      await rig.open()
-      rig.page.sectionState = {
-        0: { 0: { hideMode: 'chords', isCollapsed: false, isHidden: false } },
-      }
-      await rig.page._saveSectionStateViaModel(0)
-      await rig.page._saveSectionStateViaModel(9)
-      rig.page.sectionState = {}
-      await rig.page._saveSectionStateViaModel(1)
-    })
-
     it('puts the sections back when the user’s defaults change, once the setlist is shown', async () => {
       await rig.open()
       window.dispatchEvent(new SectionDefaultsEvent('singer', { all: 'lyrics' }))

@@ -56,6 +56,12 @@ import {
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
+import {
+  clearSetlistLocalState,
+  loadSetlistLocalState,
+  type SectionStates,
+  saveSetlistLocalState,
+} from './setlist/local-state.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { defaultHideMode, sectionLabel } from './setlist/section-defaults.ts'
@@ -87,19 +93,6 @@ const CONFIG = {
 export interface SetlistPageState extends ViewState {
   scrolls?: Record<string, number>
 }
-
-/** What loadState reads: the song models' format, or the older flat one */
-interface SavedState {
-  sectionState?: SectionStates
-  capoValues?: Record<string, unknown>
-  capo?: Record<string, unknown>
-  [songIndex: string]: unknown
-}
-
-/** The sections' states that differ from the defaults, by song index then section index */
-type SectionStates = Record<number, Record<number, SectionState>>
-
-/** Which words of `section_defaults` are saved: a choice per section label, and 'all' */
 
 /**
  * The setlist page: the overview of a setlist and each of its songs, side by
@@ -886,7 +879,7 @@ export class SetlistPage {
     }
     // The section states and capos this device kept for it
     try {
-      localStorage.removeItem(`state-${setlist.id}`)
+      clearSetlistLocalState(setlist.id)
     } catch {
       // Storage may be unavailable; nothing else refers to it
     }
@@ -1026,30 +1019,12 @@ export class SetlistPage {
     })
   }
 
-  /**
-   * Load this setlist's saved section states and capos, from localStorage
-   * state-<setlistId>, saved by the song models as {sectionState, capoValues}
-   * (keyed by song index). Saves made before the models were flat:
-   * {<songIndex>: sections, capo: capos}, and are still read.
-   */
+  /** Load this setlist's section states and capos, as this device kept them (local-state.ts) */
   loadState() {
-    const stateKey = `state-${this.currentSetlistId}`
-    let saved: SavedState = {}
-    try {
-      saved = JSON.parse(localStorage.getItem(stateKey) ?? 'null') ?? {}
-    } catch (e) {
-      console.error('Failed to parse saved state:', e)
-    }
-    const sections: SectionStates =
-      saved.sectionState ??
-      (Object.fromEntries(
-        Object.entries(saved).filter(([key]) => /^\d+$/.test(key))
-      ) as SectionStates)
-    const capos: Record<string, unknown> = saved.capoValues ?? saved.capo ?? {}
-
-    this.sectionState = sections
+    const { sectionState, capoValues } = loadSetlistLocalState(this.currentSetlistId)
+    this.sectionState = sectionState
     if (this._capoEnabled) {
-      for (const [songIndex, capo] of Object.entries(capos)) {
+      for (const [songIndex, capo] of Object.entries(capoValues)) {
         const song = this.songs[Number(songIndex)]
         if (song) song.currentCapo = normalizeCapo(capo)
       }
@@ -1088,7 +1063,7 @@ export class SetlistPage {
     })
   }
 
-  /** Save the section states and capos, in the song models' format (see loadState) */
+  /** Keep the section states and capos on this device (see loadState) */
   saveState() {
     const capoValues: Record<number, number> = {}
     if (this._capoEnabled) {
@@ -1098,10 +1073,7 @@ export class SetlistPage {
         }
       })
     }
-    localStorage.setItem(
-      `state-${this.currentSetlistId}`,
-      JSON.stringify({ sectionState: this.sectionState, capoValues })
-    )
+    saveSetlistLocalState(this.currentSetlistId, { sectionState: this.sectionState, capoValues })
   }
 
   /** The model that saves a song's changes in this setlist (loaded when first needed) */
@@ -1115,23 +1087,6 @@ export class SetlistPage {
       this._database(),
       this._database().organisationId
     )
-  }
-
-  /**
-   * Save section states for a specific song using SongModel
-   */
-  async _saveSectionStateViaModel(songIndex: number) {
-    const song = this.songs[songIndex]
-    if (!song) return
-
-    const { syncSectionStates } = await import('./song-model-factory.ts')
-    const model = await this._songModel(song)
-
-    // Sync all section states for this song
-    const sectionStatesForSong = this.sectionState[songIndex] || {}
-    syncSectionStates(model, sectionStatesForSong)
-
-    await model.save()
   }
 
   _resolveSectionState(
@@ -1240,7 +1195,7 @@ export class SetlistPage {
           state.hideMode = 'none'
         }
       }
-      await this._saveSectionStateViaModel(songIndex)
+      this.saveState()
       this.updateSectionDOM(songIndex, sectionIndex)
       return
     }
@@ -1257,7 +1212,7 @@ export class SetlistPage {
     } else {
       state.hideMode = state.hideMode === mappedMode ? 'none' : mappedMode
     }
-    await this._saveSectionStateViaModel(songIndex)
+    this.saveState()
     this.updateSectionDOM(songIndex, sectionIndex)
   }
 
@@ -1277,7 +1232,7 @@ export class SetlistPage {
       // Opening: update state first
       state.isCollapsed = false
       state.hideMode = 'none'
-      await this._saveSectionStateViaModel(songIndex)
+      this.saveState()
 
       // Update wrapper classes
       wrapper.classList.remove('section-collapsed')
@@ -1323,7 +1278,7 @@ export class SetlistPage {
         setTimeout(async () => {
           state.isCollapsed = true
           state.hideMode = 'collapse'
-          await this._saveSectionStateViaModel(songIndex)
+          this.saveState()
 
           // Update wrapper classes (adds section-collapsed)
           wrapper.classList.add('section-collapsed')

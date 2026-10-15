@@ -130,7 +130,7 @@ export class LibrarySong extends SongModel {
     this._pendingChanges.capo = normalizeCapo(capo)
   }
 
-  override getSectionState(sectionIndex: number): SectionState {
+  getSectionState(sectionIndex: number): SectionState {
     // Return pending change if it exists
     if (this._pendingChanges.sectionStates[sectionIndex]) {
       return this._pendingChanges.sectionStates[sectionIndex]
@@ -150,7 +150,7 @@ export class LibrarySong extends SongModel {
     }
   }
 
-  override setSectionState(sectionIndex: number, state: Partial<SectionState>): void {
+  setSectionState(sectionIndex: number, state: Partial<SectionState>): void {
     this._pendingChanges.sectionStates[sectionIndex] = {
       ...this.getSectionState(sectionIndex),
       ...state,

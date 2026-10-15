@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import '../src/components/song-display.ts'
 import type { SongSection } from '../src/components/song-section.ts'
 import type { SectionState } from '../src/js/data-types.ts'
-import type { SongModel } from '../src/js/models/song-model.ts'
+import type { LibrarySong } from '../src/js/models/library-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import { initializeSongSections, renderSongView } from '../src/js/song-view-manager.ts'
 import { must } from './must.ts'
@@ -31,7 +31,7 @@ describe('the song view', () => {
     Array.from(must(display.shadowRoot).querySelectorAll<SongSection>('song-section'))
 
   const modelWith = (states: Record<number, Partial<SectionState>>) =>
-    ({ getSectionState: (index: number) => states[index] ?? {} }) as unknown as SongModel
+    ({ getSectionState: (index: number) => states[index] ?? {} }) as unknown as LibrarySong
 
   it('sets each section to the state the model has for it', async () => {
     const display = await show()

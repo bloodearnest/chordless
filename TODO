@@ -164,8 +164,6 @@ live mode
    overview, then the song again (the section observer's first callback): the media
    player is told "no song" in between, and for that moment the edit button and arrow
    keys act on the overview. tests/live.playwright.js opens songs with the arrow instead
- - section states are saved asynchronously (_saveSectionStateViaModel), so hiding a
-   section and reloading straight away can lose it
  - button on setlist
  - fullscreen
  - webrtc sync (live session: following the leader's song/section)

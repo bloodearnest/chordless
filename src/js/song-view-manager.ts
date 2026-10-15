@@ -1,7 +1,7 @@
 import type { SongDisplay } from '../components/song-display.ts'
 import type { SongSection } from '../components/song-section.ts'
 import type { ParsedChart } from './data-types.ts'
-import type { SongModel } from './models/song-model.ts'
+import type { LibrarySong } from './models/library-song.ts'
 
 /**
  * Song View Manager
@@ -87,7 +87,7 @@ export async function renderSongView(
  */
 export function initializeSongSections(
   container: HTMLElement,
-  songModel: SongModel,
+  songModel: Pick<LibrarySong, 'getSectionState'>,
   options: { editMode?: boolean } = {}
 ): void {
   const { editMode = false } = options

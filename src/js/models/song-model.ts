@@ -1,4 +1,4 @@
-import type { ParsedChart, SectionState } from '../data-types.ts'
+import type { ParsedChart } from '../data-types.ts'
 
 /**
  * Base class for song data abstraction
@@ -78,18 +78,6 @@ export abstract class SongModel {
    * @param capo - Capo fret (0-11)
    */
   abstract setCapo(capo: number | string): void
-
-  /**
-   * Get the state for a specific section
-   * @param sectionIndex - Zero-based section index
-   */
-  abstract getSectionState(sectionIndex: number): SectionState
-
-  /**
-   * Set the state for a specific section
-   * @param sectionIndex - Zero-based section index
-   */
-  abstract setSectionState(sectionIndex: number, state: Partial<SectionState>): void
 
   // ==================== Persistence ====================
 
