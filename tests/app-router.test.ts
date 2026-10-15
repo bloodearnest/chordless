@@ -571,6 +571,20 @@ describe('AppRouter', () => {
       expect(window.history.state.key).to.not.equal(first)
     })
 
+    it('gives an entry the browser made, such as one for a link to #here, a key', async () => {
+      window.history.replaceState(null, '', '/storage')
+      await makeRouter().start()
+      const first = window.history.state.key
+      const popped = new Promise(resolve =>
+        window.addEventListener('popstate', resolve, { once: true })
+      )
+      window.location.hash = '#here'
+      await popped
+      await new Promise(resolve => setTimeout(resolve, 30))
+      expect(window.history.state.key).to.be.a('string').and.to.not.equal(first)
+      expect(router.route).to.deep.equal({ name: 'storage' })
+    })
+
     it('hands back what a view showed when you return with the back button', async () => {
       const left = router.view.captureViewState()
       captured-- // the router will capture it again in a moment: the same number comes round

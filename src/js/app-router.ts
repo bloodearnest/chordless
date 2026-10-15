@@ -177,9 +177,7 @@ export class AppRouter {
     const route = matchRoute(window.location)
     if (!this.handles(route)) return false
     // The entry we load on needs a key too (state a reload kept has one already)
-    if (!window.history.state?.key) {
-      window.history.replaceState({ ...window.history.state, key: newKey() }, '')
-    }
+    this.#keyEntry()
     await this.#show(route)
     return true
   }
@@ -246,7 +244,15 @@ export class AppRouter {
     this.#remember(this.#shownKey, this.#view?.captureViewState?.())
   }
 
+  /** Give the entry being shown a key, if it has none (the browser made it, as for a link to #here) */
+  #keyEntry(): void {
+    if (!window.history.state?.key) {
+      window.history.replaceState({ ...window.history.state, key: newKey() }, '')
+    }
+  }
+
   #onPopState = (): void => {
+    this.#keyEntry()
     const route = matchRoute(window.location)
     /* v8 ignore next 6 -- reloading the page would end the test run */
     if (this.handles(route)) {

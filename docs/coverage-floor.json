@@ -152,7 +152,7 @@
   },
   "src/js/pad-set-service.ts": {
     "lines": 36,
-    "branches": 30,
+    "branches": 31,
     "functions": 0
   },
   "src/js/preferences.ts": {
@@ -204,12 +204,6 @@
     "lines": 103,
     "branches": 0,
     "functions": 6
-  },
-  "src/service-worker.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 276
   },
   "worker/src/index.ts": {
     "lines": 0,
