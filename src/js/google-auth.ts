@@ -135,14 +135,11 @@ export async function getCurrentUserInfo(): Promise<UserInfo | null> {
     }
 
     if (!user.avatarDataUrl && user.picture) {
-      try {
-        const enriched = await buildStoredUserProfile(user)
-        if (enriched.avatarDataUrl) {
-          user = enriched
-          shouldPersist = true
-        }
-      } catch (error) {
-        console.warn('[Auth] Failed to cache avatar image:', error)
+      // (a picture that cannot be had leaves the user as they were)
+      const enriched = await buildStoredUserProfile(user)
+      if (enriched.avatarDataUrl) {
+        user = enriched
+        shouldPersist = true
       }
     }
 
@@ -404,11 +401,8 @@ async function refreshAccessToken(
 }
 
 async function buildStoredUserProfile(user: StoredUser): Promise<StoredUser> {
-  if (!user?.picture) {
-    return user
-  }
-
-  const picture = user.picture
+  // (only for a user with a picture)
+  const picture = user.picture as string
 
   try {
     const response = await fetch(picture, {
@@ -447,9 +441,7 @@ function blobToDataUrl(blob: Blob): Promise<string> {
   })
 }
 
-function formatUserInfoForUI(user: StoredUser | null): UserInfo | null {
-  if (!user) return null
-
+function formatUserInfoForUI(user: StoredUser): UserInfo {
   return {
     name: user.name || null,
     email: user.email || null,
@@ -481,10 +473,9 @@ export async function logout(): Promise<void> {
  */
 export async function exportBlobBackup(): Promise<BlobBackup> {
   const response = await sendToServiceWorker('EXPORT_BLOB')
-  if (!response.success) {
+  if (!response.success || !response.backup) {
     throw new Error(response.error || 'Failed to export blob')
   }
-  if (!response.backup) throw new Error('Failed to export blob')
   return response.backup
 }
 

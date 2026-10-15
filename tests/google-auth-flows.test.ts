@@ -254,6 +254,17 @@ describe('google-auth: signing in', () => {
       expect(message).to.equal('ID token not available')
     })
 
+    it('is not there when Google skips its prompt', async () => {
+      promptNotification = { isNotDisplayed: () => false, isSkippedMoment: () => true }
+      let message = ''
+      try {
+        await getIdToken()
+      } catch (error) {
+        message = (error as Error).message
+      }
+      expect(message).to.equal('ID token not available')
+    })
+
     describe('asked for by the service worker', () => {
       let listening = false
       const ask = () =>

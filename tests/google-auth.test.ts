@@ -206,6 +206,90 @@ describe('google-auth', () => {
     })
   })
 
+  describe('the service worker not answering well', () => {
+    it('gives an empty token for a sign-in with none', async () => {
+      signIn({ expires_at: inFromNow(30 * MINUTE) })
+      expect(await getAccessToken()).to.equal('')
+    })
+
+    it('says why a backup could not be made, or that it could not', async () => {
+      const post = worker.postMessage.bind(worker)
+      let reply: object = { success: false }
+      worker.postMessage = ((message: { messageId: string }, [port]: MessagePort[]) =>
+        port.postMessage({ messageId: message.messageId, ...reply })) as never
+      const failure = async () => {
+        try {
+          await exportBlobBackup()
+        } catch (error) {
+          return (error as Error).message
+        }
+        return ''
+      }
+      expect(await failure()).to.equal('Failed to export blob')
+      reply = { success: true }
+      expect(await failure()).to.equal('Failed to export blob')
+      reply = { success: false, error: 'No way' }
+      expect(await failure()).to.equal('No way')
+      worker.postMessage = post
+    })
+
+    it('still gives the user when what it worked out cannot be sent to the worker', async () => {
+      signIn({ access_token: 'a', id_token: idToken({ email: 'lee@example.com' }) })
+      const post = worker.postMessage.bind(worker)
+      worker.postMessage = ((message: { type: string }, ports: MessagePort[]) => {
+        if (message.type === 'STORE_BLOB') throw new Error('port closed')
+        return post(message as never, ports)
+      }) as never
+      expect(must(await getCurrentUserInfo()).email).to.equal('lee@example.com')
+    })
+
+    it('is nobody when the worker cannot be asked at all', async () => {
+      worker.postMessage = () => {
+        throw new Error('port closed')
+      }
+      const realError = console.error
+      console.error = () => {}
+      try {
+        expect(await getCurrentUserInfo()).to.equal(null)
+      } finally {
+        console.error = realError
+      }
+    })
+
+    it('logs what went wrong when it cannot be asked', async () => {
+      const logged: unknown[][] = []
+      const realError = console.error
+      console.error = (...args: unknown[]) => {
+        logged.push(args)
+      }
+      worker.postMessage = () => {
+        throw new Error('port closed')
+      }
+      try {
+        expect(await isAuthenticated()).to.equal(false)
+      } finally {
+        console.error = realError
+      }
+      expect(logged).to.have.length(1)
+    })
+
+    it('gives up waiting for an answer', async () => {
+      worker.postMessage = () => {}
+      const realSetTimeout = window.setTimeout
+      window.setTimeout = ((fn: () => void, ms?: number) =>
+        realSetTimeout(fn, ms === 10000 ? 0 : ms)) as typeof setTimeout
+      let message = ''
+      try {
+        await exportBlobBackup()
+      } catch (error) {
+        message = (error as Error).message
+      } finally {
+        window.setTimeout = realSetTimeout
+      }
+      expect(message).to.equal('Service Worker timeout')
+    })
+  })
+
   describe('getCurrentUserInfo', () => {
     it('is nothing when nobody is signed in', async () => {
       expect(await getCurrentUserInfo()).to.equal(null)
@@ -235,6 +319,32 @@ describe('google-auth', () => {
       expect(info.name).to.equal('José Müller')
       expect(info.givenName).to.equal('José')
       expect(must(worker.stored).metadata.user?.email).to.equal('jose@example.com')
+    })
+
+    it('has a user of nothing known from an ID token that says nothing', async () => {
+      signIn({ access_token: 'a', id_token: idToken({}) })
+      expect(await getCurrentUserInfo()).to.deep.equal({
+        name: null,
+        email: null,
+        picture: null,
+        avatarDataUrl: null,
+        givenName: null,
+        familyName: null,
+      })
+    })
+
+    it('still gives the user when the worker cannot keep what it worked out', async () => {
+      signIn({ access_token: 'a', id_token: idToken({ email: 'kay@example.com' }) })
+      worker.failing.add('STORE_BLOB')
+      expect(must(await getCurrentUserInfo()).email).to.equal('kay@example.com')
+    })
+
+    it('still gives the user when the picture fails in a way that is no Error', async () => {
+      signIn({ access_token: 'a', user: makeUser({ picture: 'https://pics.example/ann.png' }) })
+      respondTo = () => {
+        throw 'offline'
+      }
+      expect(must(await getCurrentUserInfo()).avatarDataUrl).to.equal(null)
     })
 
     it('is nothing for an ID token it cannot read', async () => {
