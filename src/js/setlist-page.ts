@@ -73,9 +73,6 @@ const CONFIG = {
 
   // Intersection Observer
   VISIBILITY_THRESHOLD: 0.5, // 50% - section must be this visible to be considered "current"
-
-  // Import
-  DEFAULT_IMPORT_CUTOFF: '2000-01-01', // Default date for importing setlists (imports all)
 }
 
 const SECTION_DEFAULTS_KEY = 'section_defaults'
@@ -131,9 +128,6 @@ export class SetlistPage {
   sectionState: SectionStates
   sectionObserver: IntersectionObserver | null
   overviewEditMode: boolean
-  settingsImportHandler: null
-  storageImportHandler: null
-  globalImportHandler: null
   _overviewComponent: SetlistOverview | null
   _sectionDefaultsCache: SectionDefaultsConfig | null
   _sectionDefaultsRaw: string | null
@@ -210,9 +204,6 @@ export class SetlistPage {
     this.sectionState = {}
     this.sectionObserver = null
     this.overviewEditMode = false // Track whether overview is in edit mode
-    this.settingsImportHandler = null
-    this.storageImportHandler = null
-    this.globalImportHandler = null
     this._overviewComponent = null
     this._sectionDefaultsCache = null
     this._sectionDefaultsRaw = null
@@ -355,17 +346,14 @@ export class SetlistPage {
 
   _readCapoPreference() {
     try {
-      if (typeof localStorage === 'undefined') {
-        return false
-      }
+      return ['enabled_capo', 'enable_capo'].some(key => {
+        const value = localStorage.getItem(key)
+        return value === 'true' || value === '1'
+      })
     } catch {
+      // (storage is blocked)
       return false
     }
-    const keys = ['enabled_capo', 'enable_capo']
-    return keys.some(key => {
-      const value = localStorage.getItem(key)
-      return value === 'true' || value === '1'
-    })
   }
 
   async renderSetlist(setlistId: string, songIndex = -1) {
@@ -2338,17 +2326,6 @@ export class SetlistPage {
       return 11
     }
     return Math.round(num)
-  }
-
-  escapeHtml(text: string) {
-    const map: Record<string, string> = {
-      '&': '&amp;',
-      '<': '&lt;',
-      '>': '&gt;',
-      '"': '&quot;',
-      "'": '&#039;',
-    }
-    return text.replace(/[&<>"']/g, m => map[m])
   }
 
   /** The media player's speed button remembers the choice for the song being viewed */
