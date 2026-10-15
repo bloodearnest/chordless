@@ -79,7 +79,6 @@ export class LibraryView extends PageView {
   #parsed: ParsedChart | null = null
   #key: string | undefined = undefined
   #fontSize = CONFIG.DEFAULT_FONT_SIZE
-  #capo = 0
   #syncing = 0
 
   constructor() {
@@ -211,8 +210,7 @@ export class LibraryView extends PageView {
 
   /** Swiping back to the list closes the song */
   #observeScrollBack(): void {
-    const list = this.#libraryList.value
-    if (!list) return
+    const list = this.#libraryList.value as HTMLElement
     this.#scrollObserver = new IntersectionObserver(
       entries => {
         for (const entry of entries) {
@@ -282,7 +280,7 @@ export class LibraryView extends PageView {
     const metaHeader = this.#control('library-song-meta-header')
     if (metaHeader) metaHeader.textContent = meta.join(' • ')
 
-    await this.#renderSong(parsed)
+    await this.#renderSong(parsed, song)
 
     this.#fontSize ||= CONFIG.DEFAULT_FONT_SIZE
     this.#applyFontSize()
@@ -302,12 +300,11 @@ export class LibraryView extends PageView {
   }
 
   /** Render a (possibly transposed) chart into the song view, and set its sections up */
-  async #renderSong(parsed: ParsedChart): Promise<void> {
-    const content = this.#content.value
-    if (!content || !this.#song) return
-    await SongViewManager.renderSongView(parsed, content, { songIndex: 0, capo: this.#capo })
+  async #renderSong(parsed: ParsedChart, song: SongWithContent): Promise<void> {
+    const content = this.#content.value as HTMLElement
+    await SongViewManager.renderSongView(parsed, content, { songIndex: 0 })
     const db = await getCurrentDB()
-    const model = createLibrarySongModel(this.#song, db, db.organisationId)
+    const model = createLibrarySongModel(song, db, db.organisationId)
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
   }
 
@@ -363,11 +360,8 @@ export class LibraryView extends PageView {
       for (const [index, state] of Object.entries(this.#sectionDefaults())) {
         model.setSectionState(Number(index), state)
       }
-      if (this.#capo) model.setCapo(this.#capo)
 
       await model.save()
-
-      if (this.#key && this.#key !== this.#song.key) this.#song.key = this.#key
     } catch (error) {
       console.error('Error saving library song:', error)
     }
@@ -378,10 +372,7 @@ export class LibraryView extends PageView {
     const defaults: Record<string, SectionState> = {}
     for (const section of this.#sections()) {
       const index = Number(section.getAttribute('section-index'))
-      if (Number.isNaN(index)) continue
-      const hideMode = section.hideMode || 'none'
-      const isCollapsed = section.isCollapsed || false
-      const isHidden = section.isHidden || false
+      const { hideMode, isCollapsed, isHidden } = section
       if (hideMode !== 'none' || isCollapsed || isHidden) {
         defaults[index.toString()] = { hideMode, isCollapsed, isHidden }
       }
@@ -392,17 +383,16 @@ export class LibraryView extends PageView {
   // ==================== Key ====================
 
   #updateKeySelector(selectedKey: string): void {
-    const keySelector = this.#control<KeySelector>('library-key-selector')
-    if (!keySelector) return
+    const keySelector = this.#control<KeySelector>('library-key-selector') as KeySelector
     keySelector.value = selectedKey
     keySelector.keys = getAvailableKeys(selectedKey)
-    keySelector.originalKey = this.#song?.originalKey || this.#parsed?.metadata?.key || ''
+    keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
     // The key is saved with the song, which a user who can only read can't change
     keySelector.editMode = this.#editMode && !isReadOnlyOrganisation()
   }
 
   async #changeKey(newKey: string): Promise<void> {
-    if (!newKey || !this.#parsed) return
+    if (!newKey) return
     // Drawing the song again starts its sections from what is saved: put back what is set now
     const states = this.#sections().map(({ hideMode, isCollapsed, isHidden }) => ({
       hideMode,
@@ -417,11 +407,9 @@ export class LibraryView extends PageView {
   }
 
   async #renderInKey(targetKey: string | undefined): Promise<void> {
-    if (!this.#parsed) return
-
     // Transpose a copy from the song's own key: transposeSong changes the chart
     // in place, and the stored one (shared with the parse cache) must stay as is
-    const parsed = structuredClone(this.#parsed)
+    const parsed = structuredClone(this.#parsed as ParsedChart)
     const originalKey = parsed.metadata.key
     if (originalKey && targetKey && targetKey !== originalKey) {
       transposeSong(parsed, originalKey, targetKey)
@@ -429,7 +417,7 @@ export class LibraryView extends PageView {
     parsed.metadata.key = targetKey
     this.#key = targetKey
 
-    await this.#renderSong(parsed)
+    await this.#renderSong(parsed, this.#song as SongWithContent)
     this.#applyFontSize()
   }
 
@@ -451,15 +439,13 @@ export class LibraryView extends PageView {
   // ==================== Sections ====================
 
   #onSectionAction(event: SectionActionEvent): void {
-    const { sectionIndex, action } = event
-    if (typeof sectionIndex !== 'number' || !action) return
-    this.#setSectionHideMode(sectionIndex, action)
+    this.#setSectionHideMode(event.sectionIndex, event.action)
   }
 
   #onSectionToggle(event: SectionToggleEvent): void {
-    if (typeof event.sectionIndex !== 'number') return
-    const details = this.#section(event.sectionIndex)?.getDetailsElement()
-    if (details) this.#toggleSection(event.sectionIndex, details)
+    const section = this.#section(event.sectionIndex)
+    const details = section?.getDetailsElement()
+    if (section && details) this.#toggleSection(section, details)
   }
 
   #setSectionHideMode(sectionIndex: number, mode: string): void {
@@ -468,7 +454,7 @@ export class LibraryView extends PageView {
 
     if (mode === 'collapse') {
       const details = component.getDetailsElement()
-      if (details) this.#toggleSection(sectionIndex, details)
+      if (details) this.#toggleSection(component, details)
       return
     }
 
@@ -499,9 +485,7 @@ export class LibraryView extends PageView {
     }
   }
 
-  #toggleSection(sectionIndex: number, detailsElement: HTMLDetailsElement): void {
-    const component = this.#section(sectionIndex)
-    if (!component) return
+  #toggleSection(component: SongSection, detailsElement: HTMLDetailsElement): void {
     const closing = detailsElement.open
     component.isCollapsed = closing
     detailsElement.open = !closing
@@ -523,8 +507,8 @@ export class LibraryView extends PageView {
 
   /** Copy the open song, from another database, into this organisation's library, and open that */
   async #addToLibrary(): Promise<void> {
-    const song = this.#song
-    if (!song?.source) return
+    // (the button is there only for a song from another database)
+    const song = this.#song as SongWithContent
     try {
       const added = await addToLibrary(song, await getCurrentDB())
       await goTo(buildUrl({ name: 'songs', songUuid: added.uuid }), { replace: true })
@@ -535,8 +519,7 @@ export class LibraryView extends PageView {
 
   async #showInfo(): Promise<void> {
     if (!this.#parsed || !this.#song || this.#song.source) return
-    const dialog = this.#infoDialog.value
-    if (!dialog) return
+    const dialog = this.#infoDialog.value as SongInfoDialog
     dialog.db = await getCurrentDB()
     await dialog.show(this.#song.id, { title: this.#parsed.metadata.title })
   }

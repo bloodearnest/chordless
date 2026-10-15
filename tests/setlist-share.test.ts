@@ -1,7 +1,7 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import {
   qrDataUrl,
-  type SetlistShare,
+  SetlistShare,
   SetlistShareChangeEvent,
 } from '../src/components/setlist-share.ts'
 import { type ChordlessDB, createSetlist, getCurrentDB } from '../src/js/db.ts'
@@ -20,7 +20,12 @@ const { describe, it, beforeEach, afterEach } = window
 
 describe('setlist-share', () => {
   let drive: ReturnType<typeof installFakeDrive> | undefined
-  afterEach(() => drive?.uninstall())
+  let restoreAfter = () => {}
+  afterEach(() => {
+    drive?.uninstall()
+    restoreAfter()
+    restoreAfter = () => {}
+  })
 
   const shared = () => {
     const key = generateShareKey()
@@ -247,6 +252,19 @@ describe('setlist-share', () => {
       expect(setlist.share).to.not.equal(null)
     })
 
+    it('saves the share again when the setlist has changed since', async () => {
+      const { el, setlist } = await show()
+      await press(el, /Create share link/)
+      const hash = must(setlist.share).bundleHash
+      setlist.name = 'Changed since it was shared'
+      await db.saveSetlist(setlist)
+      await press(el, /Update now/)
+      expect(must(setlist.share).bundleHash).to.not.equal(hash)
+      expect(must(await db.getSetlist(setlist.id)).share?.bundleHash).to.equal(
+        must(setlist.share).bundleHash
+      )
+    })
+
     it('has nothing to update without a share', async () => {
       const { el } = await show()
       must(el._stopModal.value).ask = async () => true
@@ -273,6 +291,11 @@ describe('setlist-share', () => {
     it('copies the link, and shows it has', async () => {
       const { el } = await show()
       await press(el, /Create share link/)
+      const realMs = SetlistShare.copiedMs
+      SetlistShare.copiedMs = 30
+      restoreAfter = () => {
+        SetlistShare.copiedMs = realMs
+      }
       const written: string[] = []
       Object.defineProperty(navigator, 'clipboard', {
         value: { writeText: async (text: string) => written.push(text) },
@@ -282,6 +305,8 @@ describe('setlist-share', () => {
       await new Promise(resolve => setTimeout(resolve, 20))
       expect(written).to.deep.equal([el._url])
       expect(el._copied).to.equal(true)
+      await new Promise(resolve => setTimeout(resolve, 60))
+      expect(el._copied).to.equal(false)
     })
 
     it('selects the link for the user when it cannot copy it', async () => {
@@ -319,6 +344,8 @@ describe('setlist-share', () => {
           },
           configurable: true,
         })
+        await el._send()
+        el.setlist = null
         await el._send()
       } finally {
         if (had) Object.defineProperty(navigator, 'share', had)

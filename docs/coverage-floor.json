@@ -9,19 +9,9 @@
     "branches": 1,
     "functions": 0
   },
-  "src/components/setlist-share.ts": {
-    "lines": 6,
-    "branches": 3,
-    "functions": 0
-  },
   "src/components/song-section.ts": {
     "lines": 0,
     "branches": 5,
-    "functions": 0
-  },
-  "src/components/storage-page.ts": {
-    "lines": 9,
-    "branches": 8,
     "functions": 0
   },
   "src/js/app.ts": {
@@ -33,11 +23,6 @@
   "src/js/google-auth.ts": {
     "lines": 7,
     "branches": 10,
-    "functions": 0
-  },
-  "src/js/views/library-view.ts": {
-    "lines": 2,
-    "branches": 20,
     "functions": 0
   },
   "worker/src/index.ts": {

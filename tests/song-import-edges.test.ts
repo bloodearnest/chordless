@@ -14,9 +14,7 @@ suppressConsoleLogs()
 describe('song-import: corners', () => {
   const unique = (name: string) => `${name} ${crypto.randomUUID().slice(0, 8)}`
   const chart = (title: string, body = '[C]Hello') => `{title: ${title}}\n{key: C}\n\n${body}`
-  // biome-ignore lint/suspicious/noExplicitAny: the page's internals
   const importer = async (): Promise<any> => fixture(html`<song-import></song-import>`)
-  // biome-ignore lint/suspicious/noExplicitAny: the page's internals
   const $ = (element: any, selector: string) => element.shadowRoot.querySelector(selector)
   const waitFor = async (check: () => unknown, timeout = 2000) => {
     const start = Date.now()

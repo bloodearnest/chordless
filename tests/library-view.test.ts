@@ -42,6 +42,8 @@ const CHART = `{title: Library Test Song}
 describe('the library view, with a song open', () => {
   let db: ChordlessDB
   let song: { uuid: string; id: string }
+  let keyless: { uuid: string; id: string }
+  let unrecorded: { uuid: string; id: string }
   let outlet: HTMLElement
   let view: LibraryView
 
@@ -62,9 +64,9 @@ describe('the library view, with a song open', () => {
     expect(condition(), what).to.be.ok
   }
 
-  async function open() {
+  async function open(uuid = song.uuid) {
     view = document.createElement('library-view')
-    view.route = { name: 'songs', songUuid: song.uuid }
+    view.route = { name: 'songs', songUuid: uuid }
     outlet.append(view)
     await until(() => sections().length === 3, 'the song to be shown')
     await wait(50)
@@ -95,6 +97,45 @@ describe('the library view, with a song open', () => {
         chordproFileId: `chordpro-${id}`,
         key: 'G',
         originalKey: 'G',
+      })
+    )
+    const keylessId = crypto.randomUUID()
+    keyless = { uuid: `song-${keylessId}`, id: `title-library-view-${keylessId}` }
+    await db.saveChordPro({
+      id: `chordpro-${keylessId}`,
+      content:
+        '{title: No Key Song}\n\n{comment: Verse}\nJust words\n\n{comment: Chorus}\nMore words\n\n{comment: Bridge}\nLast words',
+      contentHash: keylessId,
+      lastModified: Date.now(),
+    })
+    await db.saveSong(
+      makeSong({
+        uuid: keyless.uuid,
+        id: keyless.id,
+        title: 'No Key Song',
+        titleNormalized: 'nokeysong',
+        chordproFileId: `chordpro-${keylessId}`,
+        key: '',
+        originalKey: '',
+      })
+    )
+    const unrecordedId = crypto.randomUUID()
+    unrecorded = { uuid: `song-${unrecordedId}`, id: `title-library-view-${unrecordedId}` }
+    await db.saveChordPro({
+      id: `chordpro-${unrecordedId}`,
+      content: CHART.replace('Library Test Song', 'Unrecorded Key').replace('{key: G}', '{key: D}'),
+      contentHash: unrecordedId,
+      lastModified: Date.now(),
+    })
+    await db.saveSong(
+      makeSong({
+        uuid: unrecorded.uuid,
+        id: unrecorded.id,
+        title: 'Unrecorded Key',
+        titleNormalized: 'unrecordedkey',
+        chordproFileId: `chordpro-${unrecordedId}`,
+        key: 'D',
+        originalKey: '',
       })
     )
   })
@@ -338,6 +379,87 @@ describe('the library view, with a song open', () => {
         view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>('song-display')
           ?.parsed.metadata.key
       ).to.equal('A')
+    })
+  })
+
+  describe('corners', () => {
+    it('ignores a key change with no key', async () => {
+      await open()
+      control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent(''))
+      await wait(50)
+      expect(
+        view.querySelector<HTMLElement & { parsed: { metadata: { key: string } } }>('song-display')
+          ?.parsed.metadata.key
+      ).to.equal('G')
+    })
+
+    it('has nothing to save when edit mode is left with no song open', async () => {
+      view = document.createElement('library-view')
+      view.route = { name: 'songs' }
+      outlet.append(view)
+      await view.updateComplete
+      toggleEditMode()
+      toggleEditMode()
+      expect(document.body.classList.contains('edit-mode')).to.equal(false)
+    })
+
+    it('goes on when what it saves cannot be: the edit is left', async () => {
+      await open()
+      toggleEditMode()
+      control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
+      await wait(100)
+      const real = db.constructor.prototype.saveSong
+      db.constructor.prototype.saveSong = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        toggleEditMode()
+        await wait(200)
+      } finally {
+        db.constructor.prototype.saveSong = real
+      }
+      expect(document.body.classList.contains('edit-mode')).to.equal(false)
+    })
+
+    it('shows and resets a song with no key', async () => {
+      await open(keyless.uuid)
+      toggleEditMode()
+      control('library-reset-button').click()
+      const modal = control<AppModal>('library-reset-confirm-modal')
+      await until(() => modal.open, 'the question to be asked')
+      await modal.updateComplete
+      must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
+      await wait(200)
+      expect(sections()).to.have.length(3)
+    })
+
+    it('takes the chart’s key as the original when the song has none recorded', async () => {
+      await open(unrecorded.uuid)
+      expect(control<KeySelector>('library-key-selector').originalKey).to.equal('D')
+      toggleEditMode()
+      control('library-reset-button').click()
+      const modal = control<AppModal>('library-reset-confirm-modal')
+      await until(() => modal.open, 'the question to be asked')
+      await modal.updateComplete
+      must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
+      await wait(200)
+      expect(control<KeySelector>('library-key-selector').value).to.equal('D')
+    })
+
+    it('does nothing when the song is closed while the reset is being asked', async () => {
+      await open()
+      toggleEditMode()
+      control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
+      await wait(100)
+      control('library-reset-button').click()
+      const modal = control<AppModal>('library-reset-confirm-modal')
+      await until(() => modal.open, 'the question to be asked')
+      view.route = { name: 'songs' }
+      await wait(100)
+      await modal.updateComplete
+      must(modal.shadowRoot?.querySelector<HTMLElement>('.modal-btn-confirm')).click()
+      await wait(100)
+      expect(control<KeySelector>('library-key-selector').value).to.equal('A')
     })
   })
 })

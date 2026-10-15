@@ -102,6 +102,47 @@ describe('the storage page, signed in to Google', () => {
     expect(text()).to.contain('ann@example.com')
   })
 
+  it('shows the photo of whoever is connected, or their initial when they have none', async () => {
+    await open()
+    must(worker.stored).metadata.user = {
+      ...must(worker.stored).metadata.user,
+      picture: 'https://example.com/ann.png',
+    } as never
+    page.remove()
+    await open(false)
+    expect(page.shadowRoot?.querySelector('img.user-avatar')?.getAttribute('src')).to.contain(
+      'ann.png'
+    )
+    page.remove()
+    must(worker.stored).metadata.user = {
+      ...must(worker.stored).metadata.user,
+      name: null,
+      avatarDataUrl: 'data:image/png;base64,AA',
+    } as never
+    await open(false)
+    expect(page.shadowRoot?.querySelector('img.user-avatar')?.getAttribute('alt')).to.equal(
+      'Google account photo'
+    )
+    page.remove()
+    must(worker.stored).metadata.user = {
+      ...must(worker.stored).metadata.user,
+      picture: null,
+      avatarDataUrl: undefined,
+      name: null,
+    } as never
+    await open(false)
+    expect(page.shadowRoot?.querySelector('.user-avatar')?.textContent?.trim()).to.equal('A')
+    page.remove()
+    must(worker.stored).metadata.user = {
+      ...must(worker.stored).metadata.user,
+      email: null,
+    } as never
+    await open(false)
+    expect(page.shadowRoot?.querySelector('.user-avatar')?.textContent?.trim()).to.equal('?')
+    expect(text()).to.contain('Signed in user')
+    expect(page.shadowRoot?.querySelector('.user-email')).to.equal(null)
+  })
+
   it('offers to connect when nobody is signed in', async () => {
     await open(false)
     expect(text()).to.contain('Not Connected')

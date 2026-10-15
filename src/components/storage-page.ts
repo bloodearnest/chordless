@@ -218,15 +218,11 @@ export class StoragePage extends LitElement {
   }
 
   async checkAuthStatus(): Promise<void> {
-    try {
-      const { isAuthenticated, getCurrentUserInfo } = await import('../js/google-auth.ts')
-      this.isAuthenticated = await isAuthenticated()
-      this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
-      this.authStatus = 'ready'
-    } catch (error) {
-      console.error('[StoragePage] Failed to check auth:', error)
-      this.authStatus = 'error'
-    }
+    // (neither of these throws: a failed check is a user who is not signed in)
+    const { isAuthenticated, getCurrentUserInfo } = await import('../js/google-auth.ts')
+    this.isAuthenticated = await isAuthenticated()
+    this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
+    this.authStatus = 'ready'
   }
 
   override render() {
@@ -580,9 +576,10 @@ export class StoragePage extends LitElement {
       await getAccessToken()
       console.log('[Test] ✅ Token refresh successful!')
 
-      const updatedBlob: StoredBlob | undefined = await getStoredBlob()
-      const oldExpiry = new Date(metadata.expires_at ?? 0)
-      const newExpiry = new Date(updatedBlob?.metadata.expires_at ?? 0)
+      // (the refresh has stored a token, with its expiry)
+      const updatedBlob = (await getStoredBlob()) as StoredBlob
+      const oldExpiry = new Date(metadata.expires_at as string)
+      const newExpiry = new Date(updatedBlob.metadata.expires_at as string)
 
       if (newExpiry > new Date()) {
         this._authMessage = {

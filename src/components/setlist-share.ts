@@ -42,6 +42,9 @@ export function qrDataUrl(text: string): string {
  * if their account can write to the organisation's Drive folder.
  */
 export class SetlistShare extends LitElement {
+  /** How long "Copied" is shown (a property for tests to shorten) */
+  static copiedMs = 2000
+
   static override properties = {
     setlist: { attribute: false },
     db: { attribute: false },
@@ -154,11 +157,8 @@ export class SetlistShare extends LitElement {
 
   override async connectedCallback() {
     super.connectedCallback()
-    try {
-      this._available = await isSyncAvailable()
-    } catch {
-      this._available = false
-    }
+    // (a failed check is no access: it does not throw)
+    this._available = await isSyncAvailable()
   }
 
   /** Make the link, or bring an existing share up to date, and save it on the setlist */
@@ -237,7 +237,7 @@ export class SetlistShare extends LitElement {
       this._copied = true
       setTimeout(() => {
         this._copied = false
-      }, 2000)
+      }, SetlistShare.copiedMs)
     } catch {
       // Clipboard access can be refused: the link is in the box, selectable
       this.renderRoot.querySelector('input')?.select()
