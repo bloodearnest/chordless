@@ -77,6 +77,10 @@ just format lint test
 - Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
   native browser features.
 - Components are [Lit](https://lit.dev/) web components in `src/components/`.
+- What a class keeps to itself is `#name` (native private) in new plain classes. A Lit
+  component's reactive state has to be a named property, so a component's own members are
+  `_name`; so are the members of the older classes in `src/js/`, which tests read. TypeScript's
+  `private` is not used (only `protected`, where a subclass needs the member).
 
 ## Dev pages (component playgrounds)
 
