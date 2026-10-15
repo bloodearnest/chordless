@@ -269,8 +269,6 @@ export class DriveSyncManager {
   }
 
   async init(): Promise<boolean> {
-    console.log(`[DriveSync] Initializing sync for: ${this.organisationName}`)
-
     // Initialize database
     if (this.organisationDb) {
       this.organisationId ??= this.organisationDb.organisationId
@@ -286,7 +284,6 @@ export class DriveSyncManager {
     this.folderLink ??= organisationFolderLink(organisationId)
     this.memberCache ??= organisationMemberCache(organisationId)
     const isNew = await this.resolveDriveFolder()
-    console.log(`[DriveSync] Organisation folder ID: ${this.driveFolderId}`)
     return isNew
   }
 
@@ -334,9 +331,6 @@ export class DriveSyncManager {
 
     if (existing && existing.id !== folder.id) {
       if (!(await this.hasSyncedRecords())) {
-        console.log(
-          `[DriveSync] Joining existing Drive folder "${this.organisationName}" instead of "${folder.name}"`
-        )
         this.driveFolderId = existing.id
         await this.#folderLink.set(existing.id)
         return
@@ -348,7 +342,6 @@ export class DriveSyncManager {
       return
     }
 
-    console.log(`[DriveSync] Renaming Drive folder "${folder.name}" to "${this.organisationName}"`)
     await DriveAPI.renameFile(folder.id, this.organisationName)
   }
 
@@ -383,8 +376,6 @@ export class DriveSyncManager {
    * Full sync: pull from Drive, then push local changes
    */
   async sync(progressCallback: ProgressCallback | null = null): Promise<{ success: true }> {
-    console.log('[DriveSync] Starting full sync...')
-
     if (progressCallback) progressCallback({ stage: 'starting', message: 'Starting sync...' })
 
     try {
@@ -434,8 +425,6 @@ export class DriveSyncManager {
           message: this.readOnly ? 'Sync complete (view-only: nothing uploaded)' : 'Sync complete!',
         })
       }
-
-      console.log('[DriveSync] Full sync complete')
     } catch (error) {
       console.error('[DriveSync] Sync failed:', error)
       if (progressCallback) {
@@ -476,13 +465,10 @@ export class DriveSyncManager {
    * This is called at the start of sync to detect missing files
    */
   async buildDriveInventory(): Promise<void> {
-    console.log('[DriveSync] Building Drive file inventory...')
-
     try {
       const fileIds = new Set<string>()
       await this._addFolderContentsToInventory(this.#folderId, fileIds)
       this._driveFileIds = fileIds
-      console.log(`[DriveSync] Drive inventory: ${fileIds.size} files found`)
     } catch (error) {
       // Without a complete inventory we can't tell which files are missing, so
       // skip the check (fileExistsInDrive assumes they exist). An incomplete set
@@ -564,9 +550,7 @@ export class DriveSyncManager {
    * failure asks, but only an answer from Drive that says read-only counts.)
    */
   async foundToBeReadOnly(): Promise<boolean> {
-    const readOnly = await this.refreshAccess()
-    if (readOnly) console.log('[DriveSync] Writing was refused: the user can only read the folder')
-    return readOnly
+    return this.refreshAccess()
   }
 
   /**
@@ -610,9 +594,6 @@ export class DriveSyncManager {
       if (!setlist.driveFileId || this.fileExistsInDrive(setlist.driveFileId)) continue
       if (this.hasLiveFileOfItsOwn(setlist)) continue
       if (this.setlistHasLocalChanges(setlist)) continue
-      console.log(
-        `[DriveSync] Removing setlist ${setlist.id}: its Drive file ${setlist.driveFileId} is gone`
-      )
       await this.#db.deleteSetlist(setlist.id)
       removed++
     }
@@ -642,9 +623,6 @@ export class DriveSyncManager {
 
     // Check if file actually exists in Drive
     if (!this.fileExistsInDrive(setlist.driveFileId)) {
-      console.log(
-        `[DriveSync] Setlist ${setlist.id} missing from Drive (driveFileId: ${setlist.driveFileId}) - forcing re-upload`
-      )
       return true
     }
 
@@ -712,10 +690,6 @@ export class DriveSyncManager {
 
     // Check if file actually exists in Drive
     if (!this.fileExistsInDrive(song.driveFileId)) {
-      const songUuid = this.getSongUuid(song)
-      console.log(
-        `[DriveSync] Song ${song.id}/${songUuid} missing from Drive (driveFileId: ${song.driveFileId}) - forcing re-upload`
-      )
       return true
     }
 
@@ -805,8 +779,6 @@ export class DriveSyncManager {
    * Pull changes from Drive to local
    */
   async pullFromDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
-    console.log('[DriveSync] Pulling from Drive...')
-
     // Pull setlists
     if (progressCallback)
       progressCallback({ stage: 'pulling', message: 'Checking setlists...', current: 0, total: 1 })
@@ -816,19 +788,14 @@ export class DriveSyncManager {
     if (progressCallback)
       progressCallback({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 })
     await this.pullSongs(progressCallback)
-
-    console.log('[DriveSync] Pull complete')
   }
 
   /**
    * Pull setlists from Drive (with batch database operations)
    */
   async pullSetlists(progressCallback: ProgressCallback | null = null): Promise<void> {
-    console.log('[DriveSync] Pulling setlists...')
-
     // Get all setlists from Drive
     const driveSetlists = await DriveAPI.listSetlists(this.#folderId)
-    console.log(`[DriveSync] Found ${driveSetlists.length} setlists in Drive`)
     this._liveSetlistFiles = driveSetlists
     this._pullIncomplete = false
 
@@ -850,7 +817,6 @@ export class DriveSyncManager {
 
         if (!localSetlist) {
           // New setlist, download it
-          console.log(`[DriveSync] Downloading new setlist: ${setlistId}`)
           downloadQueue.push({ driveFile, setlistId })
         } else if (localSetlist.driveFileId === driveFile.id) {
           // Drive's content changed since our last sync if its md5Checksum (computed
@@ -862,7 +828,6 @@ export class DriveSyncManager {
           // The Drive file this device knew is gone (e.g. duplicates were cleaned up), yet
           // another live file holds this setlist: take that one over rather than uploading
           // a copy of it
-          console.log(`[DriveSync] Adopting ${driveFile.id} for setlist ${setlistId}`)
           adopted.add(setlistId)
           downloadQueue.push({ driveFile, setlistId, localSetlist, adopt: true })
         }
@@ -981,7 +946,6 @@ export class DriveSyncManager {
 
     if (setlistsToSave.length > 0) {
       await this.#db.saveSetlistsBatch(setlistsToSave)
-      console.log(`[DriveSync] ✅ Synced ${setlistsToSave.length} setlists from Drive`)
     }
   }
 
@@ -1003,11 +967,8 @@ export class DriveSyncManager {
    * 5. Parse chordpro content and create/update song records
    */
   async pullSongs(progressCallback: ProgressCallback | null = null): Promise<void> {
-    console.log('[DriveSync] Pulling songs...')
-
     const songsFolderId = await this.getCachedSongsFolder()
     const driveFiles = await this.listDriveSongFiles(songsFolderId)
-    console.log(`[DriveSync] Found ${driveFiles.length} chord charts in Drive`)
 
     const latestByUuid = new Map<
       string,
@@ -1032,7 +993,6 @@ export class DriveSyncManager {
     }
 
     if (latestByUuid.size === 0) {
-      console.log('[DriveSync] No chord charts found in Drive')
       if (progressCallback) {
         progressCallback({
           stage: 'pulling',
@@ -1071,7 +1031,6 @@ export class DriveSyncManager {
     }
 
     if (downloads.length === 0) {
-      console.log('[DriveSync] Local song library already up to date')
       if (progressCallback) {
         progressCallback({
           stage: 'pulling',
@@ -1083,7 +1042,6 @@ export class DriveSyncManager {
       return
     }
 
-    console.log(`[DriveSync] Downloading ${downloads.length} songs from Drive...`)
     let downloaded = 0
 
     if (progressCallback) {
@@ -1116,8 +1074,6 @@ export class DriveSyncManager {
           console.error('[DriveSync] Failed to download song:', result.reason)
         })
     }
-
-    console.log(`[DriveSync] ✅ Pulled ${downloaded} songs from Drive`)
   }
 
   async listDriveSongFiles(folderId: string): Promise<DriveFile[]> {
@@ -1252,7 +1208,6 @@ export class DriveSyncManager {
    */
   async pushToDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
     if (this.readOnly ?? (await this.refreshAccess())) {
-      console.log('[DriveSync] View-only access: nothing to push')
       return
     }
     const refusals = DriveAPI.countWriteRefusals()
@@ -1267,8 +1222,6 @@ export class DriveSyncManager {
   }
 
   async #pushAll(progressCallback: ProgressCallback | null): Promise<void> {
-    console.log('[DriveSync] Pushing to Drive...')
-
     // Build inventory of existing Drive files
     if (progressCallback)
       progressCallback({ stage: 'scanning', message: 'Checking Drive files...' })
@@ -1293,18 +1246,13 @@ export class DriveSyncManager {
         total: 1,
       })
     await this.pushSongs(progressCallback)
-
-    console.log('[DriveSync] Push complete')
   }
 
   /**
    * Push setlists to Drive (with batch upload for new files)
    */
   async pushSetlists(progressCallback: ProgressCallback | null = null): Promise<void> {
-    console.log('[DriveSync] Pushing setlists...')
-
     const localSetlists = await this.#db.getAllSetlists()
-    console.log(`[DriveSync] Found ${localSetlists.length} local setlists`)
 
     // Filter to only setlists that need syncing (using smart detection)
     const setlistsToSync: Setlist[] = []
@@ -1314,14 +1262,6 @@ export class DriveSyncManager {
       }
     }
 
-    const neverUploaded = setlistsToSync.filter(setlist => !setlist.driveFileId).length
-    const missing = setlistsToSync.filter(
-      setlist => setlist.driveFileId && !this.fileExistsInDrive(setlist.driveFileId)
-    ).length
-    console.log(
-      `[DriveSync] ${setlistsToSync.length} setlists need syncing: ${neverUploaded} never uploaded, ` +
-        `${missing} missing from Drive, ${setlistsToSync.length - neverUploaded - missing} edited here`
-    )
     if (progressCallback) {
       progressCallback({
         stage: 'pushing',
@@ -1342,7 +1282,6 @@ export class DriveSyncManager {
       } else {
         // New or missing from Drive, needs upload
         if (setlist.driveFileId && !this.fileExistsInDrive(setlist.driveFileId)) {
-          console.log(`[DriveSync] Clearing stale Drive ID for setlist ${setlist.id}`)
           setlist.driveFileId = null
           setlist.driveModifiedTime = null
           setlist.driveChecksum = null
@@ -1395,8 +1334,6 @@ export class DriveSyncManager {
     })
     newSetlists.splice(0, newSetlists.length, ...toUpload)
 
-    console.log(`[DriveSync] ${newSetlists.length} new, ${updatedSetlists.length} updates`)
-
     let processed = 0
 
     // Batch upload new setlists (50 at a time)
@@ -1415,7 +1352,6 @@ export class DriveSyncManager {
         }))
 
         try {
-          console.log(`[DriveSync] Uploading ${files.length} new setlists...`)
           const uploadedFiles = await batchUploadFiles(files)
 
           // Update local records with Drive metadata (batch save)
@@ -1440,8 +1376,6 @@ export class DriveSyncManager {
           if (savedSetlists.length > 0) {
             await this.#db.saveSetlistsBatch(savedSetlists)
           }
-
-          console.log(`[DriveSync] ✅ Uploaded ${savedSetlists.length}/${batch.length} setlists`)
         } catch (error) {
           console.error(`[DriveSync] Concurrent upload failed:`, error)
           // Fallback to sequential uploads for this batch
@@ -1488,8 +1422,6 @@ export class DriveSyncManager {
         }
       }
     }
-
-    console.log(`[DriveSync] ✅ Pushed ${processed} setlists`)
   }
 
   /**
@@ -1499,7 +1431,6 @@ export class DriveSyncManager {
     try {
       if (!setlist.driveFileId) {
         // New setlist, upload it
-        console.log(`[DriveSync] Uploading new setlist: ${setlist.id}`)
 
         const content = setlistJson(setlist)
         const driveFile = await DriveAPI.createFile(
@@ -1516,11 +1447,8 @@ export class DriveSyncManager {
           setlist.syncedContentHash = setlistContentHash(setlist)
         }
         await this.#db.saveSetlist(setlist)
-
-        console.log(`[DriveSync] ✅ Uploaded setlist: ${setlist.id}`)
       } else {
         // Existing setlist, update it
-        console.log(`[DriveSync] Updating setlist: ${setlist.id}`)
 
         // Metadata too, so the file name follows e.g. a changed date or leader
         const content = setlistJson(setlist)
@@ -1538,8 +1466,6 @@ export class DriveSyncManager {
           setlist.syncedContentHash = setlistContentHash(setlist)
         }
         await this.#db.saveSetlist(setlist)
-
-        console.log(`[DriveSync] ✅ Updated setlist: ${setlist.id}`)
       }
     } catch (error) {
       console.error(`[DriveSync] Failed to push setlist ${setlist.id}:`, error)
@@ -1551,10 +1477,7 @@ export class DriveSyncManager {
    * Push songs (flattened variants) to Drive
    */
   async pushSongs(progressCallback: ProgressCallback | null = null): Promise<void> {
-    console.log('[DriveSync] Pushing songs...')
-
     const songs = await this.#db.getAllSongs()
-    console.log(`[DriveSync] Found ${songs.length} local song variants`)
 
     const newSongs: { song: SongRecord; chordproFile: ChordProRecord }[] = []
     const updatesToProcess: { song: SongRecord; chordproFile: ChordProRecord }[] = []
@@ -1576,9 +1499,6 @@ export class DriveSyncManager {
           updatesToProcess.push({ song, chordproFile })
         } else {
           if (song.driveFileId && !existsInDrive) {
-            console.log(
-              `[DriveSync] Clearing stale Drive ID for ${song.id}/${this.getSongUuid(song)}`
-            )
             song.driveFileId = null
             song.driveProperties = null
             song.driveChecksum = null
@@ -1589,9 +1509,6 @@ export class DriveSyncManager {
       }
     }
 
-    console.log(
-      `[DriveSync] ${newSongs.length} songs need upload, ${updatesToProcess.length} need updates`
-    )
     if (progressCallback) {
       progressCallback({
         stage: 'pushing',
@@ -1620,7 +1537,6 @@ export class DriveSyncManager {
       }
 
       try {
-        console.log(`[DriveSync] Uploading ${files.length} files...`)
         const uploadedFiles = await batchUploadFiles(files)
         const updatedSongs: SongRecord[] = []
 
@@ -1651,8 +1567,6 @@ export class DriveSyncManager {
         if (updatedSongs.length > 0) {
           await this.#db.saveSongsBatch(updatedSongs)
         }
-
-        console.log(`[DriveSync] ✅ Uploaded ${updatedSongs.length} songs`)
       } catch (error) {
         console.error(`[DriveSync] Concurrent upload failed:`, error)
         for (const { song, chordproFile } of batch) {
@@ -1679,8 +1593,6 @@ export class DriveSyncManager {
     }
 
     if (updatesToProcess.length > 0) {
-      console.log(`[DriveSync] Updating ${updatesToProcess.length} existing song variants...`)
-
       for (let i = 0; i < updatesToProcess.length; i += this.CONCURRENT_LIMIT) {
         const batch = updatesToProcess.slice(i, i + this.CONCURRENT_LIMIT)
 
@@ -1701,8 +1613,6 @@ export class DriveSyncManager {
         }
       }
     }
-
-    console.log(`[DriveSync] ✅ Pushed ${processed} song variants`)
   }
 
   /**
@@ -1711,13 +1621,11 @@ export class DriveSyncManager {
   async pushSongVariant(song: SongRecord, chordproFile: ChordProRecord): Promise<void> {
     const songUuid = this.getSongUuid(song)
     try {
-      const { title } = songFileDetails(song, chordproFile)
       const contentHash = hashText(chordproFile.content)
       const metadata = this.songMetadata(song, chordproFile)
       let driveFile: DriveFile
 
       if (!song.driveFileId) {
-        console.log(`[DriveSync] Uploading song: ${title} (${song.id}/${songUuid})`)
         driveFile = await DriveAPI.createFile(
           { ...metadata, parents: [await this.getCachedSongsFolder()] },
           chordproFile.content,
@@ -1725,7 +1633,6 @@ export class DriveSyncManager {
         )
         song.driveFileId = driveFile.id
       } else {
-        console.log(`[DriveSync] Updating song: ${title} (${song.id}/${songUuid})`)
         driveFile = await DriveAPI.updateFile(
           song.driveFileId,
           forUpdate(metadata, 'song'),
@@ -1743,8 +1650,6 @@ export class DriveSyncManager {
       }
 
       await this.#db.saveSong(song)
-
-      console.log(`[DriveSync] ✅ Synced song: ${title}`)
     } catch (error) {
       console.error(`[DriveSync] Failed to push song ${song.id}/${songUuid}:`, error)
       throw error

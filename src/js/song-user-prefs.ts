@@ -76,7 +76,6 @@ export function saveSongUserPrefs(songId: string, orgId: string, prefs: SongUser
     }
 
     localStorage.setItem(key, JSON.stringify(allPrefs))
-    console.log('[SongUserPrefs] Saved preferences for song:', songId, prefs)
   } catch (error) {
     console.error('[SongUserPrefs] Error saving preferences:', error)
   }
@@ -124,7 +123,6 @@ export function clearSongUserPrefs(songId: string, orgId: string) {
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     delete allPrefs[songId]
     localStorage.setItem(key, JSON.stringify(allPrefs))
-    console.log('[SongUserPrefs] Cleared preferences for song:', songId)
   } catch (error) {
     console.error('[SongUserPrefs] Error clearing preferences:', error)
   }
@@ -157,7 +155,6 @@ export function clearAllSongUserPrefs(orgId: string) {
   try {
     const key = `song-prefs-${orgId}`
     localStorage.removeItem(key)
-    console.log('[SongUserPrefs] Cleared all preferences for org:', orgId)
   } catch (error) {
     console.error('[SongUserPrefs] Error clearing all preferences:', error)
   }

@@ -443,7 +443,6 @@ export class SetlistEmailImport extends LitElement {
             { ...(details ?? this._setlist), createdBy: (await getCurrentPerson())?.id },
             reviewed
           )
-      console.log('[EmailImport] Saved setlist', setlist.id, 'with', chosen.length, 'songs')
       this._forget()
       const url = `/setlist/${setlist.id}`
       if (this.dispatchEvent(new SetlistEmailImportedEvent(url))) goTo(url)

@@ -482,7 +482,6 @@ export class SongImport extends LitElement {
   _onMessage(event: MessageEvent): void {
     if (event.origin !== SONGSELECT_ORIGIN) return
     if (event.data?.type === 'CHORDLESS_IMPORT') {
-      console.log('[Import] Received import message from:', event.origin)
       this.receive(event.data.data)
     } else if (event.data?.type === 'CHORDLESS_IMPORT_FAILED') {
       this._showError(`Import from SongSelect failed: ${event.data.data?.message}`)
@@ -494,8 +493,8 @@ export class SongImport extends LitElement {
     if (!window.opener) return
     try {
       window.opener.postMessage({ type: 'CHORDLESS_READY' }, SONGSELECT_ORIGIN)
-    } catch (error) {
-      console.log('[Import] Could not signal opener:', error)
+    } catch {
+      // The opener has gone, or isn't the page we were told of: it has nothing to be told
     }
   }
 
@@ -551,7 +550,6 @@ export class SongImport extends LitElement {
    * choices. A song with `skip` (a reason) is listed as not imported.
    */
   async receiveAll(songs: IncomingSong[]): Promise<void> {
-    console.log('[Import] Importing', songs.length, 'song(s)')
     this._error = ''
     try {
       const db = await getCurrentDB()
@@ -617,7 +615,6 @@ export class SongImport extends LitElement {
       }
       setlist.modifiedDate = new Date().toISOString()
       await db.saveSetlist(setlist)
-      console.log('[Import] Added', this._imports.length, 'song(s) to setlist:', setlistId)
       this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
@@ -661,7 +658,6 @@ export class SongImport extends LitElement {
     })
     try {
       await this._database().saveSetlist(setlist)
-      console.log('[Import] Created new setlist:', setlist.id)
     } catch (error) {
       console.error('[Import] Error creating setlist:', error)
       this._newSetlistModal()?.close()
@@ -781,7 +777,6 @@ export class SongImport extends LitElement {
   async _update(item: ImportItem): Promise<void> {
     try {
       const song = await overwriteSong(item.song.uuid, item.chordproText, this._database())
-      console.log('[Import] Updated existing song:', song.title)
       this._setChoice(item, 'update', song)
     } catch (error) {
       console.error('[Import] Failed to update song:', error)

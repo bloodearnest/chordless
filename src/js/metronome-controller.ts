@@ -114,15 +114,8 @@ export class MetronomeController {
     const normalizedTempoNote = this._normalizeTempoNote(tempoNote)
     const bpmNumber = Number(bpm)
 
-    console.log(
-      `[MetronomeController] Starting at ${bpm} BPM, ${normalizedTempoNote} notes, ${timeSignature}`
-    )
-
     // Parse time signature
     const [beatsPerBar, noteValue] = timeSignature.split('/').map(Number)
-    console.log(
-      `[MetronomeController] Time signature parsed: ${timeSignature} -> beatsPerBar: ${beatsPerBar}`
-    )
 
     // Reset beat counter
     this._metronomeBeat = 0
@@ -143,10 +136,6 @@ export class MetronomeController {
     const quarterNoteInterval = 60000 / quarterNoteBpm
     const beatInterval = (quarterNoteInterval * multiplier) / (doubleClick ? 2 : 1)
 
-    console.log(
-      `[MetronomeController] BPM: ${bpm} (${normalizedTempoNote}) -> Quarter note BPM: ${quarterNoteBpm.toFixed(1)} -> Clicking on 1/${clickNoteValue} notes -> Click interval: ${beatInterval.toFixed(1)}ms (multiplier: ${multiplier})`
-    )
-
     // Store the beat interval
     this._beatInterval = beatInterval
     this._isRunning = true
@@ -165,11 +154,6 @@ export class MetronomeController {
     if (!this._isRunning && !this._metronomeInterval) {
       return
     }
-
-    console.log(
-      '[MetronomeController] Stopping, active oscillators:',
-      this._activeOscillators.length
-    )
 
     // Clear timeout and beat interval
     if (this._metronomeInterval) {
@@ -196,7 +180,6 @@ export class MetronomeController {
     }
 
     this._isRunning = false
-    console.log('[MetronomeController] Stopped')
   }
 
   /**
@@ -253,9 +236,6 @@ export class MetronomeController {
       // BPM refers to dotted quarter notes (3 eighths)
       // Convert to quarter note tempo: bpm × 1.5
       quarterNoteBpm = bpm * 1.5
-      console.log(
-        `[MetronomeController] Applied compound time conversion: ${bpm} -> ${quarterNoteBpm}`
-      )
     } else if (tempoNote && tempoNote !== '1/4') {
       const [numerator, denominator] = tempoNote.split('/').map(Number)
       if (numerator && denominator) {

@@ -352,7 +352,6 @@ export async function getAccessToken(): Promise<string> {
   }
 
   // Token expired or about to expire, refresh it
-  console.log('[Auth] Access token expired, refreshing...')
   const newToken = await refreshAccessToken(blob, metadata)
   return newToken
 }

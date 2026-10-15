@@ -191,20 +191,15 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
   const request = new Request(getPadCacheUrl(padSet.id, normalizedKey))
   const cached = await cache.match(request)
   if (cached) {
-    console.log(`[PadSetService] Pad key ${normalizedKey} already cached for set ${padSet.name}`)
     return
   }
 
   const inflightKey = `${padSet.id}:${normalizedKey}`
   if (INFLIGHT_PAD_DOWNLOADS.has(inflightKey)) {
-    console.log(
-      `[PadSetService] Pad key ${normalizedKey} download already in progress for set ${padSet.name}`
-    )
     return INFLIGHT_PAD_DOWNLOADS.get(inflightKey)
   }
 
   const downloadPromise = (async () => {
-    console.log(`[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name}`)
     const metadata = await ensurePadSetMetadata(padSet)
     const entry: PadFile | undefined = metadata[normalizedKey]
     if (!entry) {

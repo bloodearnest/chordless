@@ -214,7 +214,6 @@ export async function batchDeleteFiles(fileIds: string[]): Promise<number | unde
   const responseText = await response.text()
   const successCount = (responseText.match(/HTTP\/\d\.\d 2\d\d/g) || []).length
 
-  console.log(`[DriveAPI] Batch deleted ${successCount}/${fileIds.length} files`)
   return successCount
 }
 
@@ -232,9 +231,6 @@ export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile
 
   const CONCURRENT_LIMIT = 30 // Upload 30 files at once
   const results: (DriveFile | null)[] = []
-  console.log(
-    `[DriveAPI] Uploading ${files.length} files with ${CONCURRENT_LIMIT} concurrent requests...`
-  )
 
   // Process in chunks of CONCURRENT_LIMIT
   for (let i = 0; i < files.length; i += CONCURRENT_LIMIT) {
@@ -288,12 +284,8 @@ export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile
     // Wait for all uploads in this chunk to complete. Keep nulls (failed uploads)
     // so results stay aligned with files.
     results.push(...(await Promise.all(uploadPromises)))
-
-    console.log(`[DriveAPI] Progress: ${results.length}/${files.length} files processed`)
   }
 
-  const succeeded = results.filter(r => r !== null).length
-  console.log(`[DriveAPI] Completed: ${succeeded}/${files.length} files uploaded successfully`)
   return results
 }
 
@@ -463,8 +455,6 @@ export async function findOrganisationFolderByName(
 }
 
 export async function findOrCreateRootFolder(): Promise<string> {
-  console.log('[DriveAPI] Finding/creating root Chordless folder...')
-
   // Search for existing Chordless folder
   const query = `name='${ROOT_FOLDER_NAME}' and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
@@ -472,12 +462,10 @@ export async function findOrCreateRootFolder(): Promise<string> {
   )
 
   if (result.files.length > 0) {
-    console.log('[DriveAPI] Found existing Chordless folder:', result.files[0].id)
     return result.files[0].id
   }
 
   // Create new root folder
-  console.log('[DriveAPI] Creating new Chordless folder...')
   const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
@@ -487,7 +475,6 @@ export async function findOrCreateRootFolder(): Promise<string> {
     }),
   })
 
-  console.log('[DriveAPI] Created Chordless folder:', folder.id)
   return folder.id
 }
 
@@ -498,8 +485,6 @@ export async function findOrCreateOrganisationFolder(
   organisationName: string,
   organisationId: string
 ): Promise<{ folderId: string; isNew: boolean }> {
-  console.log(`[DriveAPI] Finding/creating organisation folder: ${organisationName}`)
-
   const rootFolderId = await findOrCreateRootFolder()
 
   // Search for existing organisation folder by name and parent
@@ -509,7 +494,6 @@ export async function findOrCreateOrganisationFolder(
   )
 
   if (result.files.length > 0) {
-    console.log('[DriveAPI] Found existing organisation folder:', result.files[0].id)
     return {
       folderId: result.files[0].id,
       isNew: false,
@@ -517,7 +501,6 @@ export async function findOrCreateOrganisationFolder(
   }
 
   // Create new organisation folder with appProperties
-  console.log('[DriveAPI] Creating new organisation folder...')
   const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
@@ -532,8 +515,6 @@ export async function findOrCreateOrganisationFolder(
       },
     }),
   })
-
-  console.log('[DriveAPI] Created organisation folder:', folder.id)
 
   // Create songs and setlists subfolders
   await createSubfolder(folder.id, 'songs')
@@ -648,8 +629,6 @@ export async function uploadPadFile(folderId: string, key: string, blob: Blob): 
  * Create a subfolder
  */
 async function createSubfolder(parentId: string, name: string): Promise<string> {
-  console.log(`[DriveAPI] Creating subfolder: ${name}`)
-
   const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
@@ -804,7 +783,6 @@ export async function listShareFiles(sharesFolderId: string): Promise<DriveFile[
  * Download a chordpro file from Drive
  */
 export async function downloadChordProFile(fileId: string): Promise<string> {
-  console.log(`[DriveAPI] Downloading chordpro: ${fileId}`)
   return downloadFile(fileId)
 }
 
@@ -812,7 +790,6 @@ export async function downloadChordProFile(fileId: string): Promise<string> {
  * Download a setlist from Drive
  */
 export async function downloadSetlist(fileId: string): Promise<Setlist> {
-  console.log(`[DriveAPI] Downloading setlist: ${fileId}`)
   const content = await downloadFile(fileId)
   return JSON.parse(content)
 }
@@ -851,8 +828,6 @@ export async function listSetlists(organisationFolderId: string): Promise<DriveF
  * List all Chordless organisation folders
  */
 export async function listOrganisations(): Promise<DriveFile[]> {
-  console.log('[DriveAPI] Listing all Chordless organisations...')
-
   const rootFolderId = await findOrCreateRootFolder()
 
   // Find all folders in Chordless root with type=organisation
@@ -864,7 +839,6 @@ export async function listOrganisations(): Promise<DriveFile[]> {
   // Filter to only Chordless organisation folders
   const organisations = result.files.filter(folder => folder.appProperties?.type === 'organisation')
 
-  console.log(`[DriveAPI] Found ${organisations.length} organisations`)
   return organisations
 }
 

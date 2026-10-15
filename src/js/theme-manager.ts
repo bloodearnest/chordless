@@ -176,10 +176,6 @@ export class ThemeManager {
       return
     }
 
-    console.log(
-      `[ThemeManager] Applying theme: ${themeName}${themeName === 'system' ? ` (${actualTheme})` : ''}`
-    )
-
     // Apply all theme variables
     for (const [key, value] of Object.entries(theme)) {
       this.setVariable(key, value)
@@ -337,12 +333,10 @@ export class ThemeManager {
    * @private
    */
   _setupSystemThemeListener(): void {
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
       // Auto-switch if user preference is 'system'
       const userPreference = localStorage.getItem('theme')
       if (!userPreference || userPreference === 'system') {
-        const newTheme = e.matches ? 'dark' : 'light'
-        console.log(`[ThemeManager] System theme changed to ${newTheme}`)
         this.setTheme('system')
       }
     })

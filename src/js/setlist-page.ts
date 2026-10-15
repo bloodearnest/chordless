@@ -345,7 +345,6 @@ export class SetlistPage {
   }
 
   async renderSetlist(setlistId: string, songIndex = -1) {
-    console.log('renderSetlist called with:', setlistId)
     try {
       // Load setlist from IndexedDB
       const setlist = await this._database().getSetlist(setlistId)
@@ -381,7 +380,7 @@ export class SetlistPage {
         // Clear container (will show Add Song button via overview)
         const container = this._songContainer()
         container.textContent = ''
-        container.appendChild(this.renderFullSetlist(setlist, []))
+        container.appendChild(this.renderFullSetlist([]))
 
         // Show overview immediately
         if (songIndex >= 0) this.navigateTo(-1, { replace: true })
@@ -392,16 +391,12 @@ export class SetlistPage {
         return
       }
 
-      console.log('Loaded setlist:', setlist.date, setlist.songs.length, 'songs')
-
       // Parse each song on-demand
       const songs = await buildRuntimeSongs(setlist, {
         db: this._database(),
         parser: this.parser,
         fontSize: CONFIG.DEFAULT_FONT_SIZE,
       })
-
-      console.log('Parsed songs:', songs.length)
 
       // Store songs for navigation
       this.songs = songs
@@ -422,10 +417,9 @@ export class SetlistPage {
 
       // Render all songs on one page
       const container = this._songContainer()
-      console.log('Rendering full setlist into container:', container)
       // Clear container and append fragment
       container.textContent = ''
-      const fragment = this.renderFullSetlist(setlist, songs)
+      const fragment = this.renderFullSetlist(songs)
       container.appendChild(fragment)
       this._initializeSongSections(container)
 
@@ -552,7 +546,7 @@ export class SetlistPage {
     this.navigateTo(-1, { replace: true })
   }
 
-  renderFullSetlist(_setlist: Setlist, songs: RuntimeSong[]) {
+  renderFullSetlist(songs: RuntimeSong[]) {
     const fragment = document.createDocumentFragment()
 
     // Create overview section rendered by Lit component
@@ -706,7 +700,6 @@ export class SetlistPage {
 
         // Save to database
         await this._database().saveSetlist(this.currentSetlist)
-        console.log('[ExitEditMode] Saved setlist to IndexedDB')
       }
     }
   }
@@ -716,7 +709,6 @@ export class SetlistPage {
     const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
     const keySelector = this.root.querySelector<KeySelector>('#key-selector')
     const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-    const fontSizeControls = this.root.querySelector<HTMLElement>('.font-size-controls')
 
     // Determine new title
     let newTitle: string
@@ -745,19 +737,13 @@ export class SetlistPage {
     if (instant) {
       // Instant update - no animation
       appHeader.setTitleInstant(newTitle)
-      this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector, fontSizeControls)
+      this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector)
     } else {
       // Animated update - fade out old, swap content, fade in new
       appHeader.heading = newTitle
 
       await this._animateSlottedContent(async () => {
-        this._updateHeaderContent(
-          song,
-          musicalMetadata,
-          keySelector,
-          capoSelector,
-          fontSizeControls
-        )
+        this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector)
       })
     }
   }
@@ -766,8 +752,7 @@ export class SetlistPage {
     song: RuntimeSong | null,
     musicalMetadata: MusicalMetadataDisplay | null,
     keySelector: KeySelector | null,
-    capoSelector: CapoSelector | null,
-    _fontSizeControls: HTMLElement | null
+    capoSelector: CapoSelector | null
   ) {
     if (song) {
       // Update key selector
@@ -858,7 +843,6 @@ export class SetlistPage {
     })
     SongChangeEvent.latest = event
     document.dispatchEvent(event)
-    console.log('[SongChange] Dispatched song:', song?.songId, song?.title)
   }
 
   async showSongInfo(song: RuntimeSong) {
@@ -939,8 +923,6 @@ export class SetlistPage {
   scrollToSection(sectionId: string, newIndex: number, instant = false) {
     const section = this.root.querySelector<HTMLElement>(`#${sectionId}`)
     const container = this.root.querySelector<HTMLElement>('.song-container')
-
-    console.log('Scrolling to:', sectionId, 'index:', newIndex, 'instant:', instant)
 
     if (!section || !container) return
 
@@ -1102,9 +1084,6 @@ export class SetlistPage {
       if (setlistSongEntry.key === song.currentKey) {
         // Key hasn't been changed from canonical, apply user's preferred capo
         song.currentCapo = normalizeCapo(songUserPrefs.capo)
-        console.log(
-          `[Capo] Applied song user pref capo=${songUserPrefs.capo} for song ${song.title}`
-        )
       }
     })
   }
@@ -1153,7 +1132,6 @@ export class SetlistPage {
     syncSectionStates(model, sectionStatesForSong)
 
     await model.save()
-    console.log('[SongModel] Saved section states via model for song:', songIndex)
   }
 
   _resolveSectionState(
@@ -1494,7 +1472,6 @@ export class SetlistPage {
 
             // Save to database
             await this._database().saveSetlist(this.currentSetlist)
-            console.log('[ExitEditMode] Saved setlist to IndexedDB')
           }
         }, 250)
       }
@@ -1715,16 +1692,12 @@ export class SetlistPage {
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentBPM === newValue) return
 
-    console.log(`BPM changed to: ${newValue} for song ${this.currentSongIndex}`)
-
     song.currentBPM = newValue
 
     // Use SongModel to persist the change
     const model = await this._songModel(song)
     model.setTempo(newValue)
     await model.save()
-
-    console.log('[SongModel] Saved BPM change via model:', newValue)
 
     // Update the musical metadata display with the new BPM
     const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
@@ -1754,8 +1727,6 @@ export class SetlistPage {
     model.setCapo(normalized)
     await model.save()
 
-    console.log('[SongModel] Saved capo change via model:', normalized)
-
     this.updateCapoSelector(normalized, song.currentKey)
     this._updateSongDisplayCapo(this.currentSongIndex, normalized)
 
@@ -1773,8 +1744,6 @@ export class SetlistPage {
     // The key is saved in the setlist, which a user who can only read can't change
     if (!newKey || this.currentSongIndex < 0 || isReadOnlyOrganisation()) return
 
-    console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`)
-
     const song = this.songs[this.currentSongIndex]
 
     // Update key in runtime song object
@@ -1784,8 +1753,6 @@ export class SetlistPage {
     const model = await this._songModel(song)
     model.setKey(newKey)
     await model.save()
-
-    console.log('[SongModel] Saved key change via model:', newKey)
 
     // Re-render the song with transposition
     await this.reRenderSong(this.currentSongIndex)
@@ -1849,20 +1816,12 @@ export class SetlistPage {
   }
 
   async resetCurrentSong() {
-    console.log('[resetCurrentSong] Called - currentSongIndex:', this.currentSongIndex)
     if (this.currentSongIndex < 0 || this.currentSongIndex >= this.songs.length) {
       console.warn('[resetCurrentSong] Invalid song index, returning')
       return
     }
 
     const song = this.songs[this.currentSongIndex]
-    console.log('[resetCurrentSong] Resetting song:', song.title)
-    console.log(
-      '[resetCurrentSong] Current key:',
-      song.currentKey,
-      'Original key:',
-      song.originalKey
-    )
 
     const originalKey = song.originalKey
 
@@ -1874,7 +1833,6 @@ export class SetlistPage {
 
     // Reset capo to 0 (using handleCapoChange to update all displays)
     if (this._capoEnabled && song.currentCapo !== 0) {
-      console.log('[resetCurrentSong] Resetting capo from', song.currentCapo, 'to 0')
       await this.handleCapoChange(0)
     }
 
@@ -1890,19 +1848,9 @@ export class SetlistPage {
     this.applyFontSize(this.currentSongIndex)
 
     // Reset key last - this will handle re-rendering and updating all displays
-    console.log(
-      '[resetCurrentSong] Checking key reset - originalKey:',
-      originalKey,
-      'currentKey:',
-      song.currentKey,
-      'different?:',
-      song.currentKey !== originalKey
-    )
     if (originalKey && song.currentKey !== originalKey) {
-      console.log('[resetCurrentSong] Calling handleKeyChange to reset key to:', originalKey)
       await this.handleKeyChange(originalKey)
     } else if (originalKey) {
-      console.log('[resetCurrentSong] Key already correct, just updating displays')
       // Key is already correct, just update displays
       const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
       if (musicalMetadata) musicalMetadata.keyValue = originalKey
@@ -2244,8 +2192,6 @@ export class SetlistPage {
       // Save to database
       await this._database().saveSetlist(setlist)
 
-      console.log('Added song to setlist:', song.title, 'with current key:', songCurrentKey)
-
       this._addSongModal.close()
 
       // Reload the setlist to show the new song
@@ -2297,8 +2243,6 @@ export class SetlistPage {
 
       // Save to database
       await this._database().saveSetlist(setlist)
-
-      console.log('Deleted song from setlist at index:', index)
 
       // Reload the setlist
       await this.renderSetlist(setlist.id)

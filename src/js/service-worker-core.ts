@@ -110,8 +110,6 @@ export function startServiceWorker(
     // (a message that needs its data and has none fails below, and is answered as an error)
     const data = event.data?.data as MessagePayload
 
-    console.log('[SW] Received message:', type)
-
     try {
       switch (type) {
         case 'GET_VERSION':
@@ -124,7 +122,6 @@ export function startServiceWorker(
           break
 
         case 'SKIP_WAITING':
-          console.log('[SW] Received SKIP_WAITING message')
           scope.skipWaiting()
           break
 
@@ -229,11 +226,8 @@ export function startServiceWorker(
 
   // Process operation queue
   async function processOperationQueue() {
-    console.log('[SW] Processing operation queue')
-
     try {
       const pending = await AuthDB.getPendingOperations()
-      console.log('[SW] Found', pending.length, 'pending operations')
 
       for (const operation of pending) {
         // Skip if retried too many times
@@ -246,7 +240,6 @@ export function startServiceWorker(
         try {
           await processOperation(operation)
           await AuthDB.updateOperationStatus(operation.id, 'completed')
-          console.log('[SW] Operation', operation.id, 'completed')
         } catch (error) {
           console.error('[SW] Operation', operation.id, 'failed:', error)
           await AuthDB.updateOperationStatus(operation.id, 'failed', errorMessage(error))
@@ -341,15 +334,12 @@ export function startServiceWorker(
 
   // Process queue periodically when online
   scope.addEventListener('online', () => {
-    console.log('[SW] Back online, processing queue')
     processOperationQueue()
   })
 
   // Fetch event handler - routes requests
   scope.addEventListener('fetch', event => {
     const url = new URL(event.request.url)
-
-    console.log('[SW] Fetch:', event.request.method, url.pathname)
 
     // Always pass through Google OAuth/GSI requests
     if (url.origin === 'https://accounts.google.com') {
@@ -422,7 +412,6 @@ export function startServiceWorker(
 
     // Direct HTML file requests - pass through to network
     if (url.pathname.endsWith('.html')) {
-      console.log('[SW] Direct HTML file request, passing through:', url.pathname)
       event.respondWith(doFetch(event.request))
       return
     }
@@ -430,7 +419,6 @@ export function startServiceWorker(
     // HTML navigation requests - route-based page generation
     const acceptHeader = event.request.headers.get('Accept') || ''
     if (event.request.mode === 'navigate' || acceptHeader.includes('text/html')) {
-      console.log('[SW] Handling navigation to:', url.pathname)
       event.respondWith(handleRoute())
       return
     }
@@ -440,12 +428,10 @@ export function startServiceWorker(
       event.respondWith(
         caches.match(event.request).then(cached => {
           if (cached) {
-            console.log('[SW] Serving cached pad:', url.pathname)
             return cached
           }
 
           // Not cached, fetch and cache it
-          console.log('[SW] Fetching and caching pad:', url.pathname)
           return doFetch(event.request)
             .then(response => {
               // Only cache full responses (200), not partial responses (206)
@@ -453,7 +439,6 @@ export function startServiceWorker(
                 const responseToCache = response.clone()
                 caches.open(RUNTIME_CACHE_NAME).then(cache => {
                   cache.put(event.request, responseToCache)
-                  console.log('[SW] Cached pad for offline use:', url.pathname)
                 })
               }
               return response

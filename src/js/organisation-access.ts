@@ -21,8 +21,7 @@ export async function refreshOrganisationAccess(): Promise<void> {
     const canAdd = folder?.capabilities?.canAddChildren
     if (canAdd === undefined) return
     await setOrganisationReadOnly(organisation.id, !canAdd)
-  } catch (error) {
+  } catch {
     // Not signed in, offline, or the folder is gone: sync reports those
-    console.log('[Access] Could not check access to the organisation folder:', error)
   }
 }

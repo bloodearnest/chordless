@@ -396,11 +396,6 @@ export class AppHeader extends LitElement {
     // Initialize display title
     this._displayTitle = this.heading
     this._previousTitle = this.heading
-    console.log('[AppHeader] Connected with props:', {
-      showEditToggle: this.showEditToggle,
-      showInfoButton: this.showInfoButton,
-      editMode: this.editMode,
-    })
   }
 
   override disconnectedCallback() {
@@ -574,7 +569,6 @@ export class AppHeader extends LitElement {
 
   _handleExpandToggle() {
     this.expanded = !this.expanded
-    console.log('[AppHeader] Expanded state:', this.expanded)
 
     // Emit custom event instead of direct DOM manipulation
     this.dispatchEvent(new HeaderExpandToggleEvent(this.expanded))

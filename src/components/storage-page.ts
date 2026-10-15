@@ -546,7 +546,6 @@ export class StoragePage extends LitElement {
       }
 
       const { blob, metadata } = blobData
-      console.log('[Test] Current token expires at:', metadata.expires_at)
 
       // Force expiry by setting expires_at to the past
       const expiredMetadata = {
@@ -572,9 +571,7 @@ export class StoragePage extends LitElement {
         )
       })
 
-      console.log('[Test] Token expiry set to past, now calling getAccessToken()...')
       await getAccessToken()
-      console.log('[Test] ✅ Token refresh successful!')
 
       // (the refresh has stored a token, with its expiry)
       const updatedBlob = (await getStoredBlob()) as StoredBlob

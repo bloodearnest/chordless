@@ -107,7 +107,6 @@ function getOrCreateDefaultOrganisation(): Promise<Organisation> {
     if (existing) return existing
     try {
       const created = await db.createOrganisation(DEFAULT_ORGANISATION_NAME)
-      console.log('[Organisation] Created default organisation:', created.id)
       return created
     } catch (error) {
       if (!(error instanceof Error) || error.name !== 'ConstraintError') throw error
@@ -139,7 +138,6 @@ export async function ensureCurrentOrganisation(): Promise<{ id: string; name: s
 
   // Set as current
   await setCurrentOrganisation(defaultOrg.id, defaultOrg.name)
-  console.log('[Organisation] Initialized with organisation:', defaultOrg.name)
 
   return { id: defaultOrg.id, name: defaultOrg.name }
 }
@@ -277,7 +275,6 @@ export async function renameOrganisation(
     localStorage.setItem(ORGANISATION_NAME_KEY, newName)
   }
 
-  console.log(`[Organisation] Renamed organisation ${organisationId} to "${newName}"`)
   return updated
 }
 
@@ -307,7 +304,6 @@ export async function deleteOrganisation(organisationId: string): Promise<void> 
   // Delete the organisation's data database
   // Database name is just the org ID
   await indexedDB.deleteDatabase(organisationId)
-  console.log(`[Organisation] Deleted database: ${organisationId}`)
 
   // Delete from organisation metadata
   await db.deleteOrganisation(organisationId)

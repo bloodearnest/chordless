@@ -135,12 +135,9 @@ export class ChordlessDB {
         const db = request.result
         const oldVersion = event.oldVersion
 
-        console.log(`[ChordlessDB] Upgrading ${this.dbName} from v${oldVersion} to v${DB_VERSION}`)
-
         // Create Songs store (moved from global SongsDB)
         // Now uses uuid as keyPath instead of id
         if (!db.objectStoreNames.contains('songs')) {
-          console.log('[ChordlessDB] Creating songs store')
           const songStore = db.createObjectStore('songs', { keyPath: 'uuid' })
           songStore.createIndex('id', 'id', { unique: false })
           songStore.createIndex('ccliNumber', 'ccliNumber', { unique: false })
@@ -151,14 +148,12 @@ export class ChordlessDB {
 
         // Create ChordPro store (moved from global ChordProDB)
         if (!db.objectStoreNames.contains('chordpro')) {
-          console.log('[ChordlessDB] Creating chordpro store')
           const chordproStore = db.createObjectStore('chordpro', { keyPath: 'id' })
           chordproStore.createIndex('contentHash', 'contentHash', { unique: false })
         }
 
         // Create/Update Setlists store
         if (!db.objectStoreNames.contains('setlists')) {
-          console.log('[ChordlessDB] Creating setlists store')
           const setlistStore = db.createObjectStore('setlists', { keyPath: 'id' })
           setlistStore.createIndex('date', 'date', { unique: false })
           setlistStore.createIndex('type', 'type', { unique: false })
@@ -167,14 +162,12 @@ export class ChordlessDB {
           // Add owner index if upgrading from old version
           const setlistStore = (request.transaction as IDBTransaction).objectStore('setlists')
           if (!setlistStore.indexNames.contains('owner')) {
-            console.log('[ChordlessDB] Adding owner index to setlists')
             setlistStore.createIndex('owner', 'owner', { unique: false })
           }
         }
 
         // Create setlist_local store (new in v5)
         if (!db.objectStoreNames.contains('setlist_local')) {
-          console.log('[ChordlessDB] Creating setlist_local store')
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
@@ -184,7 +177,6 @@ export class ChordlessDB {
 
         // Clean up old stores
         if (db.objectStoreNames.contains('song_usage')) {
-          console.log('[ChordlessDB] Removing song_usage store')
           db.deleteObjectStore('song_usage')
         }
       }

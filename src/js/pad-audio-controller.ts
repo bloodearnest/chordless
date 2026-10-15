@@ -124,7 +124,6 @@ export class PadAudioController {
       return false
     }
 
-    console.log('[PadAudioController] Loading pad:', url)
     audio.src = url
     this._loadFailed = false
     return true
@@ -161,8 +160,6 @@ export class PadAudioController {
    * @param padSet - Optional pad set configuration
    */
   async crossfadeTo(newKey: string, padSet: PadSet | null = null): Promise<void> {
-    console.log('[PadAudioController] Crossfading to', newKey)
-
     const oldAudio = this._audio
     const oldPadGain = this._padGain
 
@@ -237,8 +234,6 @@ export class PadAudioController {
           oldAudio.currentTime = 0
           oldAudio.removeEventListener('error', this._boundErrorHandler)
         }
-
-        console.log('[PadAudioController] Crossfade complete')
       }
     }, fadeInterval)
   }
@@ -412,12 +407,10 @@ export class PadAudioController {
     }
 
     const fadeDuration = duration || this._fadeDuration
-    console.log('[PadAudioController] Fading in, audio src:', audio.src)
 
     // Resume AudioContext if suspended
     const audioContext = this._context()
     if (audioContext.state === 'suspended') {
-      console.log('[PadAudioController] Resuming AudioContext')
       await audioContext.resume()
     }
 
@@ -432,7 +425,6 @@ export class PadAudioController {
 
     // Check if audio is already playing
     const alreadyPlaying = !audio.paused
-    const startVolume = padGain.gain.value
 
     if (!alreadyPlaying) {
       // Start playing at volume 0
@@ -460,8 +452,6 @@ export class PadAudioController {
           setTimeout(resolve, 200) // Fallback timeout
         }
       })
-    } else {
-      console.log('[PadAudioController] Audio already playing at volume', startVolume)
     }
 
     // Fade in with exponential curve
@@ -484,7 +474,6 @@ export class PadAudioController {
         this._fadeInterval = null
         gain.gain.value = this._volume
         this._fadingIn = false
-        console.log('[PadAudioController] Fade in complete')
       }
     }, stepDuration)
   }
@@ -498,7 +487,6 @@ export class PadAudioController {
     if (!audio) return
 
     const fadeDuration = duration || this._fadeDuration
-    console.log('[PadAudioController] Fading out')
     this._fadingOut = true
 
     // Clear any existing fade interval
@@ -528,7 +516,6 @@ export class PadAudioController {
           audio.pause()
           this._fadingOut = false
           this._isPlaying = false
-          console.log('[PadAudioController] Fade out complete')
           resolve()
         }
       }, stepDuration)

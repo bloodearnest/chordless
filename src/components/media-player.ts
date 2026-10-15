@@ -894,7 +894,6 @@ export class MediaPlayer extends LitElement {
 
   _handleSettingsChange(event: MediaSettingsChangeEvent): void {
     const settings = event.settings
-    console.log('[MediaPlayer] Settings changed:', settings)
     this._showIfEnabled(settings)
 
     this._padsEnabled = settings.padsEnabled !== false
@@ -939,7 +938,6 @@ export class MediaPlayer extends LitElement {
 
   async _handleSongChange(event: SongChangeEvent): Promise<void> {
     const song = event.song
-    console.log('[MediaPlayer] Song changed:', song?.songId, song?.title)
 
     // Update current song metadata (stored but not activated until play is pressed)
     this._currentSongId = song?.songId || null
@@ -971,9 +969,6 @@ export class MediaPlayer extends LitElement {
     const clickRunning = this._clickOn && this._metronomeRunning
 
     if (isActiveSong && (padsPlaying || clickRunning)) {
-      console.log(
-        '[MediaPlayer] Active song metadata changed – restarting playback for crossfade/update'
-      )
       this._startSong().catch(error => {
         console.error('[MediaPlayer] Failed to restart song after metadata change:', error)
       })
@@ -1148,8 +1143,6 @@ export class MediaPlayer extends LitElement {
   }
 
   async _stop(): Promise<void> {
-    console.log('[MediaPlayer] Stop - stopping click and fading out pads')
-
     // Check what's actually playing (panic button semantics: treat existing audio as playing)
     const padsAvailable = !!this._padController
     const clickPlaying = this._metronomeRunning
@@ -1286,16 +1279,8 @@ export class MediaPlayer extends LitElement {
 
     // Check if this song is already the active one
     if (this._isCurrentSongActive()) {
-      console.log('[MediaPlayer] Current song is already active, ignoring')
       return
     }
-
-    console.log(
-      '[MediaPlayer] Starting song:',
-      this.currentKey,
-      this._currentBpm,
-      this._currentTimeSignature
-    )
 
     // Store old active song values to check if we need to change
     const oldActiveKey = this._activeSongKey
@@ -1317,17 +1302,6 @@ export class MediaPlayer extends LitElement {
     const wasPlayingPads = this._padsOn && oldActiveKey && this._padController?.isPlaying
     const wasPlayingClick = this._clickOn && oldActiveBpm && this._metronomeRunning
 
-    console.log('[MediaPlayer] _startSong state check:', {
-      _padsOn: this._padsOn,
-      _padsEnabled: this._padsEnabled,
-      _clickOn: this._clickOn,
-      _metronomeGlobalEnabled: this._metronomeGlobalEnabled,
-      wasPlayingPads,
-      wasPlayingClick,
-      oldActiveKey,
-      needsKeyChange,
-    })
-
     // Reset pad failure state for the new active selection
     this._padLoadFailed = false
 
@@ -1345,17 +1319,14 @@ export class MediaPlayer extends LitElement {
 
     // Handle click immediately so metronome isn't blocked by pad loading
     if (needsTempoChange && this._clickOn && wasPlayingClick) {
-      console.log('[MediaPlayer] Restarting click with new tempo:', this._currentBpm)
       this._stopMetronome()
       this._startMetronome()
     } else if (this._clickOn && !wasPlayingClick) {
-      console.log('[MediaPlayer] Starting click for first time')
       this._startMetronome()
     }
 
     // If we're currently fading out, cancel it and fade back in
     if (this._fadingOut) {
-      console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in')
       this._fadingOut = false
 
       // Restart pads if they're toggled on
@@ -1367,21 +1338,17 @@ export class MediaPlayer extends LitElement {
       // Click will be started below in the normal flow if needed
     } else if (needsKeyChange && this._padsOn && wasPlayingPads) {
       // Handle pads: crossfade if key changed and pads toggle is on
-      console.log('[MediaPlayer] Crossfading pads from', oldActiveKey, 'to', this.currentKey)
       await this._crossfadeToNewSong()
     } else if (this._padsOn && !wasPlayingPads) {
       // Pads toggle is on but not playing yet, start them
-      console.log('[MediaPlayer] Starting pads for first time, _padsOn =', this._padsOn)
       const hasSource = await this._updateAudioSource() // Set the audio source before playing
       if (hasSource) {
         await this._fadeIn()
       }
     } else if (this._padsOn && wasPlayingPads && !needsKeyChange) {
       // Pads already playing in the same key - do nothing
-      console.log('[MediaPlayer] Pads already playing in same key, no action needed')
     } else if (!this._padsOn) {
       // Pads toggle is off, just update the audio source (preload for later)
-      console.log('[MediaPlayer] Pads off, preloading audio source')
       this._updateAudioSource().catch(error => {
         console.error('[MediaPlayer] Failed to preload pad source while pads off:', error)
       })
@@ -1392,7 +1359,6 @@ export class MediaPlayer extends LitElement {
 
   _togglePads(): void {
     this._padsOn = !this._padsOn
-    console.log('[MediaPlayer] Pads toggle:', this._padsOn)
 
     saveMediaPlayerState('padsOn', this._padsOn)
 
@@ -1411,7 +1377,6 @@ export class MediaPlayer extends LitElement {
 
   _toggleClick(): void {
     this._clickOn = !this._clickOn
-    console.log('[MediaPlayer] Click toggle:', this._clickOn)
 
     saveMediaPlayerState('clickOn', this._clickOn)
 
@@ -1429,7 +1394,6 @@ export class MediaPlayer extends LitElement {
 
   _toggleCollapse(): void {
     this._collapsed = !this._collapsed
-    console.log('[MediaPlayer] Collapsed:', this._collapsed)
 
     saveMediaPlayerState('collapsed', this._collapsed)
   }
@@ -1516,8 +1480,6 @@ export class MediaPlayer extends LitElement {
       return
     }
 
-    console.log('[MediaPlayer] Crossfading to new song')
-
     await this._padController.crossfadeTo(this.currentKey, this._activePadSet)
     this._padLoadFailed = this._padController.loadFailed
     this._padsOn = !this._padLoadFailed
@@ -1531,7 +1493,6 @@ export class MediaPlayer extends LitElement {
 
     // If currently fading, interrupt and switch direction
     if (this._fadingIn || this._fadingOut) {
-      console.log('[MediaPlayer] Interrupting current fade to switch direction')
       const wasFadingIn = this._fadingIn
       const wasFadingOut = this._fadingOut
 

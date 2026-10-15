@@ -44,28 +44,24 @@ export async function handleFirstTimeAuth(
     const { getCurrentUserInfo } = await import('./google-auth.ts')
     const userInfo = await getCurrentUserInfo()
     if (!userInfo?.name) {
-      console.log('[FirstAuth] No user info available, skipping org rename')
       return false
     }
 
     // Get current org from localStorage (synchronous)
     const { id, name } = getCurrentOrganisation()
     if (!id) {
-      console.log('[FirstAuth] No current org found, skipping rename')
       markFirstAuthComplete()
       return false
     }
 
     // Check if current org is "Personal"
     if (name !== 'Personal') {
-      console.log('[FirstAuth] Current org is not "Personal", skipping rename')
       markFirstAuthComplete()
       return false
     }
 
     // Rename "Personal" to user's name
     const userName = userInfo.name
-    console.log(`[FirstAuth] Renaming "Personal" to "${userName}"`)
 
     await renameOrganisation(id, userName)
 
@@ -73,7 +69,6 @@ export async function handleFirstTimeAuth(
     markFirstAuthComplete()
 
     // Show notification
-    console.log(`[FirstAuth] ✅ Welcome ${userName}! Your personal workspace has been set up.`)
 
     // Switch to the renamed org (will reload the page)
     await switchTo(id)
@@ -108,7 +103,6 @@ export async function nameOrganisationBeforeSync(): Promise<boolean> {
     return false
   }
 
-  console.log(`[FirstAuth] Renaming "Personal" to "${userInfo.name}" before syncing`)
   await renameOrganisation(id, userInfo.name)
   markFirstAuthComplete()
   return true

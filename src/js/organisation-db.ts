@@ -49,15 +49,12 @@ export class OrganisationDB {
 
       request.onsuccess = () => {
         this.db = request.result
-        console.log('[OrganisationDB] Database initialized successfully')
         ensurePersistentStorage('organisations')
         resolve()
       }
 
       request.onupgradeneeded = () => {
         const db = request.result
-
-        console.log('[OrganisationDB] Creating database schema')
 
         // Create organisations store
         if (!db.objectStoreNames.contains('organisations')) {

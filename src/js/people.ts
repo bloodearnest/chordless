@@ -79,7 +79,6 @@ export async function claimSetlistsOnce(db: ChordlessDB, organisationId: string)
     if (!me) return 0 // not signed in: try again next time
     const claimed = await claimSetlistsWithoutOwnerId(db, me)
     localStorage.setItem(key, new Date().toISOString())
-    if (claimed) console.log(`[People] Set ${me.name} as leader id on ${claimed} setlist(s)`)
     return claimed
   } catch (error) {
     console.warn('[People] Could not set setlist leader ids:', error)
