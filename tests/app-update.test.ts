@@ -214,4 +214,47 @@ describe('AppUpdate', () => {
     update.apply()
     expect(waiting.messages).to.have.length(1)
   })
+
+  it('reloads straight away when told to apply an update that has no waiting worker', async () => {
+    await start()
+    update.apply()
+    expect(reloads).to.equal(1)
+  })
+
+  it('does nothing without a service worker container to start from', async () => {
+    update = new AppUpdate(
+      null as unknown as UpdateContainer,
+      () => reloads++,
+      () => clock
+    )
+    await update.start()
+    expect(update.ready).to.equal(false)
+    expect(await update.runningVersion()).to.equal(null)
+  })
+
+  it('stays ready when a second new version arrives while one is waiting', async () => {
+    must(container.registration).waiting = new FakeWorker()
+    await start()
+    const worker = new FakeWorker()
+    must(container.registration).installing = worker
+    must(container.registration).dispatchEvent(new Event('updatefound'))
+    worker.state = 'installed'
+    worker.dispatchEvent(new Event('statechange'))
+    expect(update.ready).to.equal(true)
+  })
+
+  it('has no version to give when the worker does not say one, and no release date if it has none', async () => {
+    const reply = (data: object) => {
+      const worker = new FakeWorker()
+      worker.postMessage = (_message: unknown, transfer?: Transferable[]) =>
+        (transfer as MessagePort[])[0].postMessage(data)
+      return worker
+    }
+    container.controller = reply({})
+    await start()
+    expect(await update.runningVersion()).to.equal(null)
+
+    container.controller = reply({ version: 'abc123' })
+    expect(await update.runningVersion()).to.deep.equal({ version: 'abc123', released: '' })
+  })
 })

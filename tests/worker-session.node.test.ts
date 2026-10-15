@@ -203,6 +203,63 @@ describe('POST /oauth/callback', () => {
     assert.equal(body.granted_scopes, 'openid email')
   })
 
+  test('says nothing was granted when Google names no scopes', async () => {
+    const { google } = fakeGoogle({
+      exchangeCode: (async () => ({
+        refresh_token: 'r',
+        id_token: 'i',
+        claims: { sub: 's' },
+      })) as unknown as GoogleApi['exchangeCode'],
+    })
+    const response = await handleOAuthCallback(
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
+      env,
+      google
+    )
+    assert.equal(response.status, 400)
+    assert.equal((await bodyOf(response)).granted_scopes, '')
+  })
+
+  test('gives the app only the details Google gave about who signed in', async () => {
+    const answer = (claims: object) =>
+      fakeGoogle({
+        exchangeCode: (async () => ({
+          refresh_token: 'r',
+          scope: DRIVE_SCOPE,
+          id_token: 'i',
+          claims,
+        })) as unknown as GoogleApi['exchangeCode'],
+      }).google
+    const request = () =>
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' })
+
+    const bare = await bodyOf(await handleOAuthCallback(request(), env, answer({})))
+    assert.deepEqual(bare.user, {
+      name: null,
+      email: null,
+      picture: null,
+      given_name: null,
+      family_name: null,
+      sub: null,
+    })
+
+    const named = await bodyOf(
+      await handleOAuthCallback(
+        request(),
+        env,
+        answer({ sub: 's', given_name: 'Ann', family_name: 'Smith' })
+      )
+    )
+    assert.deepEqual(named.user, {
+      name: null,
+      email: null,
+      picture: null,
+      given_name: 'Ann',
+      family_name: 'Smith',
+      sub: 's',
+    })
+  })
+
   describe('when it works', () => {
     let body: Record<string, unknown>
     let response: Response

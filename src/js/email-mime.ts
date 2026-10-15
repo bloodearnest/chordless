@@ -35,11 +35,9 @@ async function chartsOf(email: Email, readPdf: PdfReader): Promise<ChartInfo[]> 
   const charts: ChartInfo[] = []
   for (const attachment of email.attachments) {
     if (!isPdf(attachment)) continue
-    const content = attachment.content
-    const buffer = typeof content === 'string' ? new TextEncoder().encode(content).buffer : content
-    charts.push(
-      parseChartText(await readPdf(buffer as ArrayBuffer), attachment.filename ?? 'chart.pdf')
-    )
+    // (PostalMime gives an attachment's bytes as an ArrayBuffer unless asked for text)
+    const buffer = attachment.content as ArrayBuffer
+    charts.push(parseChartText(await readPdf(buffer), attachment.filename ?? 'chart.pdf'))
   }
   return charts
 }

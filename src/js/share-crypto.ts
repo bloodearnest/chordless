@@ -104,7 +104,10 @@ export async function decryptBundle(key: string, file: Bytes): Promise<ShareBund
 export function setlistCode(setlistId: string): string {
   const hex = /^[0-9a-f]{8}/i.exec(setlistId.replace(/-/g, ''))?.[0]
   if (!hex) return ''
-  return toBase64Url(Uint8Array.from(hex.match(/../g) ?? [], pair => Number.parseInt(pair, 16)))
+  // (eight hex digits: four pairs)
+  return toBase64Url(
+    Uint8Array.from(hex.match(/../g) as RegExpMatchArray, pair => Number.parseInt(pair, 16))
+  )
 }
 
 /** Whether a link's setlist code is this setlist's (a code is short: it is not a proof) */

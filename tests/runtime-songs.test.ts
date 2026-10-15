@@ -102,6 +102,14 @@ describe('buildRuntimeSongs', () => {
     expect(chords).to.include('"D"')
   })
 
+  it('gives the key the setlist asks for to a chart that has none', async () => {
+    const songId = await addSong('{title: Grace}\n\n{comment: Verse 1}\n[G]Amazing [C]grace')
+    const [song] = await build([{ songId, key: 'D', order: 0 }])
+    expect(song.originalKey).to.equal(null)
+    expect(song.parsed.metadata.key).to.equal('D')
+    expect(JSON.stringify(song.parsed), 'the chords are as written').to.include('"G"')
+  })
+
   it("falls back to the library song's key and tempo for an old setlist", async () => {
     const songId = await addSong(chart(), { key: 'A', tempo: 80 })
     const [song] = await build([{ songId, key: null, tempo: null, order: 0 }])

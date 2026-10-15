@@ -222,10 +222,4 @@ export class LibrarySong extends SongModel {
     // Save the reset state
     await this.save()
   }
-
-  // ==================== Protected Methods ====================
-
-  protected override _getUnderlyingSong(): LoadedSong {
-    return this._song
-  }
 }

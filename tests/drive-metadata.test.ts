@@ -4,6 +4,7 @@ import {
   forUpdate,
   setlistFileMetadata,
   setlistFilename,
+  songFileDetails,
   songFileMetadata,
 } from '../src/js/drive-metadata.ts'
 import { makeSetlist } from './builders.ts'
@@ -88,5 +89,50 @@ describe('Drive file metadata', () => {
     expect(update.appProperties.leader).to.equal(null)
     expect(update.appProperties.date).to.equal(null)
     expect(update.appProperties.setlistId).to.equal('setlist-1')
+  })
+})
+
+describe('Drive file metadata, with less recorded', () => {
+  it('names a setlist file by its id when it has no date', () => {
+    expect(setlistFilename({ id: 'setlist-9', date: '', owner: '', type: '', name: '' })).to.equal(
+      'setlist-9.json'
+    )
+  })
+
+  it('has no organisation in a file’s details when there is none', () => {
+    const metadata = setlistFileMetadata(
+      { id: 'x', date: '2026-06-22', owner: '', type: '', name: '' },
+      { organisationId: null }
+    )
+    expect(metadata.appProperties.organisationId).to.equal('')
+  })
+
+  it('titles a song’s file by its record, else its chart, else “Untitled”', () => {
+    expect(
+      songFileDetails({ title: 'Record title' }, { content: '{title: Chart}' }).title
+    ).to.equal('Record title')
+    expect(songFileDetails({}, { content: '{title: Chart title}' }).title).to.equal('Chart title')
+    expect(songFileDetails({}, { content: 'no title here' }).title).to.equal('Untitled')
+    expect(songFileDetails({}, null).title).to.equal('Untitled')
+  })
+
+  it('labels a song’s file Original, or Variant for one that is a variant of another', () => {
+    expect(songFileDetails({ variantLabel: 'Acoustic' }).variantLabel).to.equal('Acoustic')
+    expect(songFileDetails({ isDefault: true }).variantLabel).to.equal('Original')
+    expect(songFileDetails({ variantOf: 'title-x' }).variantLabel).to.equal('Variant')
+    expect(songFileDetails({}).variantLabel).to.equal('Original')
+  })
+
+  it('records only what a song has, and the id for its uuid if it has none', () => {
+    const metadata = songFileMetadata({ id: 'title-x', title: 'X' }, null, { organisationId: null })
+    expect(metadata.appProperties).to.include({
+      organisationId: '',
+      songUuid: 'title-x',
+      variantOf: '',
+      isDefault: 'false',
+      importDate: '',
+      importUser: '',
+      importSource: '',
+    })
   })
 })

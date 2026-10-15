@@ -69,7 +69,7 @@ export class CapoSelector extends OptionPicker<number> {
   _keyAtCapo(capo: number): string {
     if (!this.referenceKey) return capo === 0 ? 'Open' : `Down ${capo}`
     if (capo === 0) return this.referenceKey
-    return transposeKeyName(this.referenceKey, -capo) || `Down ${capo}`
+    return transposeKeyName(this.referenceKey, -capo)
   }
 }
 

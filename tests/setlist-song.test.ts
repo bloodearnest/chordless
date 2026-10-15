@@ -1,7 +1,9 @@
 import { expect } from '@open-wc/testing'
+import type { LoadedSong, SetlistEntry } from '../src/js/data-types.ts'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { SetlistSong } from '../src/js/models/setlist-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { makeEntry } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
@@ -387,5 +389,82 @@ describe('SetlistSong', () => {
       const state = song.getSectionState(0)
       expect(state.hideMode).to.equal('none')
     })
+  })
+})
+
+describe('SetlistSong, with little recorded about the song or the setlist', () => {
+  const setlistId = `setlist-${crypto.randomUUID()}`
+  const stateKey = `state-${setlistId}`
+  const bare = (canonical: object = {}, entry: Partial<SetlistEntry> = {}) =>
+    new SetlistSong(
+      makeEntry({ songId: 'title-x', ...entry }),
+      { uuid: 'u', ...canonical } as LoadedSong,
+      setlistId,
+      {
+        getSetlist: async () => undefined,
+        saveSetlist: async () => {},
+      } as unknown as ChordlessDB,
+      'org',
+      0
+    )
+
+  afterEach(() => localStorage.removeItem(stateKey))
+
+  it('is called Untitled with no title, and has no artist with no author', () => {
+    expect(bare().title).to.equal('Untitled')
+    expect(bare().artist).to.equal(null)
+    expect(bare({ artist: 'Newton' }).artist).to.equal('Newton')
+    expect(bare({ author: 'Wesley', artist: 'Newton' }).artist).to.equal('Wesley')
+  })
+
+  it('takes the original key and tempo to be the current ones when none were kept', () => {
+    const song = bare({ key: 'A', tempo: 80 })
+    expect(song.getOriginalKey()).to.equal('A')
+    expect(song.getOriginalTempo()).to.equal(80)
+    expect(bare({ key: 'A', originalKey: 'G' }).getOriginalKey()).to.equal('G')
+    expect(bare({ tempo: 80, originalTempo: 70 }).getOriginalTempo()).to.equal(70)
+  })
+
+  it('adds a capo and section states to a saved state that has neither', async () => {
+    localStorage.setItem(stateKey, JSON.stringify({}))
+    const song = bare()
+    song.setCapo(3)
+    song.setSectionState(1, { hideMode: 'chords' })
+    await song.save()
+    const state = JSON.parse(must(localStorage.getItem(stateKey)))
+    expect(state.capoValues).to.deep.equal({ 0: 3 })
+    expect(state.sectionState[0][1]).to.include({ hideMode: 'chords' })
+  })
+
+  it('can be reset when it has no key or tempo at all', async () => {
+    const song = bare()
+    await song.reset()
+    expect(song.getCapo()).to.equal(0)
+  })
+
+  it('starts from an empty state when the saved one is damaged', () => {
+    const error = console.error
+    console.error = () => {}
+    try {
+      localStorage.setItem(stateKey, '{not json')
+      expect(bare()._loadSetlistState()).to.deep.equal({ sectionState: {}, capoValues: {} })
+    } finally {
+      console.error = error
+    }
+  })
+
+  it('carries on when the state cannot be kept, as when storage is full', () => {
+    const error = console.error
+    const realSetItem = Storage.prototype.setItem
+    console.error = () => {}
+    Storage.prototype.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError')
+    }
+    try {
+      expect(() => bare()._saveSetlistState({ sectionState: {}, capoValues: {} })).to.not.throw()
+    } finally {
+      Storage.prototype.setItem = realSetItem
+      console.error = error
+    }
   })
 })

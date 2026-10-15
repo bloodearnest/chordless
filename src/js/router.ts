@@ -218,7 +218,7 @@ export function historyAction(
   if (!a || !b || a.section !== b.section) return 'push'
 
   if (a.depth === 0 && b.depth === 1) return 'push'
-  if (a.depth === 1 && b.depth === 1) return 'replace'
   if (a.depth === 1 && b.depth === 0) return state?.fromParent ? 'back' : 'replace'
+  // From song to song
   return 'replace'
 }

@@ -86,3 +86,45 @@ describe('filterSongs', () => {
     expect(lyricSnippet(parsed, 'zzz')).to.equal(undefined)
   })
 })
+
+describe('matching in songs with missing fields, and quoting long lines', () => {
+  const chart = (...lyrics: string[]) => ({
+    metadata: {},
+    sections: [
+      {
+        type: 'section' as const,
+        label: null,
+        lines: lyrics.map(text => ({ segments: [{ chord: '', lyrics: text }] })),
+      },
+    ],
+  })
+
+  it('matches nothing in a song with no title or artist, and nothing at all for no search', () => {
+    expect(matchedFields({}, 'grace')).to.deep.equal({ title: false, artist: false, lyrics: false })
+    expect(matchedFields({ title: 'Grace' }, '  ')).to.deep.equal({
+      title: false,
+      artist: false,
+      lyrics: false,
+    })
+    expect(lyricSnippet(chart('Amazing grace'), '  ')).to.equal(undefined)
+  })
+
+  it('cuts a long line to either side of the match, marking where', () => {
+    const line = `${'a'.repeat(60)} grace ${'b'.repeat(60)}`
+    const snippet = lyricSnippet(chart(line), 'grace')
+    expect(snippet?.match).to.equal('grace')
+    expect(snippet?.before.startsWith('…')).to.equal(true)
+    expect(snippet?.after.endsWith('…')).to.equal(true)
+    expect(snippet?.before.length).to.equal(41)
+  })
+
+  it('does not mark an end that is the end of the line', () => {
+    const snippet = lyricSnippet(chart('grace'), 'grace')
+    expect(snippet).to.deep.equal({ before: '', match: 'grace', after: '' })
+  })
+
+  it('finds no place in a line that changes length when lower-cased', () => {
+    // "İ" is two characters in lower case, so a position in one is not a position in the other
+    expect(lyricSnippet(chart('İstanbul grace'), 'grace')).to.equal(undefined)
+  })
+})

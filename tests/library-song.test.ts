@@ -1,7 +1,9 @@
 import { expect } from '@open-wc/testing'
+import type { LoadedSong } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { LibrarySong } from '../src/js/models/library-song.ts'
 import { ChordProParser } from '../src/js/parser.ts'
+import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
@@ -425,5 +427,44 @@ describe('LibrarySong', () => {
       const state1 = song2.getSectionState(1)
       expect(state1.isCollapsed).to.equal(true)
     })
+  })
+})
+
+describe('LibrarySong, with little recorded about the song', () => {
+  const orgId = `test-org-${crypto.randomUUID()}`
+  const bare = (fields: object = {}) =>
+    new LibrarySong({ uuid: 'u', id: 'title-x', ...fields } as LoadedSong, {} as ChordlessDB, orgId)
+
+  afterEach(() => localStorage.removeItem(`song-prefs-${orgId}`))
+
+  it('is called Untitled with no title, and has no artist with no author', () => {
+    expect(bare().title).to.equal('Untitled')
+    expect(bare().artist).to.equal(null)
+    expect(bare({ artist: 'Newton' }).artist).to.equal('Newton')
+    expect(bare({ author: 'Wesley', artist: 'Newton' }).artist).to.equal('Wesley')
+  })
+
+  it('takes the original key and tempo to be the current ones when none were kept', () => {
+    const song = bare({ key: 'A', tempo: 80 })
+    expect(song.getOriginalKey()).to.equal('A')
+    expect(song.getOriginalTempo()).to.equal(80)
+    expect(bare({ key: 'A', originalKey: 'G' }).getOriginalKey()).to.equal('G')
+  })
+
+  it('adds a section’s state to what was saved for the song, even if that was only a capo', async () => {
+    saveSongUserPrefs('title-x', orgId, { capo: 2 })
+    const song = bare()
+    song.setSectionState(1, { hideMode: 'chords' })
+    await song.save()
+    const prefs = getSongUserPrefs('title-x', orgId)
+    expect(prefs?.capo).to.equal(2)
+    expect(prefs?.sectionDefaults?.[1]).to.include({ hideMode: 'chords' })
+  })
+
+  it('can be reset when it has no key or tempo at all', async () => {
+    const song = bare()
+    await song.reset()
+    expect(song.getKey()).to.equal(undefined)
+    expect(song.getCapo()).to.equal(0)
   })
 })

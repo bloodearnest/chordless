@@ -164,10 +164,6 @@ export async function buildRuntimeSongs(
         tempoNote = `1/${denominator}`
       }
     }
-    // Override with explicit tempoNote if available from database
-    if (canonicalSong?.metadata?.tempoNote) {
-      tempoNote = canonicalSong.metadata.tempoNote
-    }
 
     // Create song object for runtime
     songs.push({

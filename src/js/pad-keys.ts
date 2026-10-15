@@ -42,19 +42,12 @@ export function normalizePadKey(key: string | null | undefined): string | null {
 
   // Match any pattern like A, Bb, A#, etc.
   const match = cleaned.match(/([A-Ga-g])([#b]?)/)
-  if (!match) {
-    const upper = cleaned.toUpperCase()
-    const mapped = ENHARMONIC_KEY_MAP[upper] || upper
-    return PAD_FILE_KEY_SET.has(mapped) ? mapped : null
-  }
+  // (every key has a letter from A to G in it)
+  if (!match) return null
 
-  const letter = match[1].toUpperCase()
-  const accidentalRaw = match[2] || ''
-  const accidental = accidentalRaw === '#' ? '#' : accidentalRaw.toLowerCase() === 'b' ? 'b' : ''
-
-  const canonical = `${letter}${accidental}`
-  const padKey = ENHARMONIC_KEY_MAP[canonical] || canonical
-  return PAD_FILE_KEY_SET.has(padKey) ? padKey : null
+  // Any letter with a sharp or flat is a pad key, or the enharmonic name of one
+  const canonical = `${match[1].toUpperCase()}${match[2]}`
+  return ENHARMONIC_KEY_MAP[canonical] ?? canonical
 }
 
 /**

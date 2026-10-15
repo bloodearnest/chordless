@@ -57,11 +57,7 @@ export class ChordDisplay extends LitElement {
     if (isBarMarker(text)) {
       return html`${text}`
     }
-    const segments = this._buildSegments(text)
-    if (!segments.length) {
-      return html`${text}`
-    }
-    return html`${segments.map(segment => {
+    return html`${this._buildSegments(text).map(segment => {
       const value = this.unicodeAccidentals
         ? convertAccidentalsToSymbols(segment.value)
         : segment.value
@@ -154,12 +150,8 @@ export class ChordDisplay extends LitElement {
   }
 
   _splitExtensionSegments(extensionText: string): ChordDisplaySegment[] {
-    const mockChord = `C${extensionText}`
-    const parsed = splitChordDisplaySegments(mockChord)
-    if (!parsed.length) {
-      return [{ type: 'extension', value: extensionText }]
-    }
-    return parsed.slice(1)
+    // Read after a root, as a standard chord's extension is
+    return splitChordDisplaySegments(`C${extensionText}`).slice(1)
   }
 }
 

@@ -104,7 +104,6 @@ export function initializeSongSections(
 
   sections.forEach(section => {
     const sectionIndex = Number(section.getAttribute('section-index'))
-    if (Number.isNaN(sectionIndex)) return
 
     // Get state from model
     const state = songModel.getSectionState(sectionIndex)

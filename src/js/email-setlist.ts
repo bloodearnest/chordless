@@ -486,10 +486,13 @@ export function parseSongList(body: string): ListedSong[] {
         notes = rest.slice(found.index + found[0].length)
         rest = rest.slice(0, found.index).trim()
         // "in Gm at 72 BPM in 4/4", as OnSong has it
-        const details = /^\s*(?:at\s+(\d+)\s*BPM)?(?:\s+in\s+(\d+\/\d+))?/i.exec(notes)
-        tempo = details?.[1] ? Number(details[1]) : null
-        time = details?.[2] ?? null
-        notes = notes.slice(details?.[0].length ?? 0)
+        // (all of it is optional, so it always matches)
+        const details = /^\s*(?:at\s+(\d+)\s*BPM)?(?:\s+in\s+(\d+\/\d+))?/i.exec(
+          notes
+        ) as RegExpExecArray
+        tempo = details[1] ? Number(details[1]) : null
+        time = details[2] ?? null
+        notes = notes.slice(details[0].length)
         break
       }
       if (!key) {

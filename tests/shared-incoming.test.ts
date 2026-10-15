@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { takeLink } from '../src/js/incoming-link.ts'
 import { IncomingSongsEvent, offerIncoming, takeIncoming } from '../src/js/incoming-songs.ts'
-import { handleLaunch } from '../src/js/launch.ts'
+import { handleLaunch, listenForLaunches } from '../src/js/launch.ts'
 import { SHARED_CACHE_NAME, storeShared, takeShared } from '../src/js/shared-incoming.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -135,5 +135,23 @@ describe('what is shared, when it is not tidy', () => {
     )
     const shared = await takeShared()
     expect(shared?.files.map(file => file.name)).to.deep.equal(['shared'])
+  })
+})
+
+describe('listening for launches', () => {
+  afterEach(() => Reflect.deleteProperty(window, 'launchQueue'))
+
+  it('gives the browser’s launch queue something to call', () => {
+    let consumer: unknown
+    Object.defineProperty(window, 'launchQueue', {
+      configurable: true,
+      value: { setConsumer: (given: unknown) => (consumer = given) },
+    })
+    listenForLaunches()
+    expect(consumer).to.equal(handleLaunch)
+  })
+
+  it('does nothing where the browser has no launch queue', () => {
+    expect(() => listenForLaunches()).to.not.throw()
   })
 })

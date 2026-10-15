@@ -134,3 +134,25 @@ test('an email with only an HTML body is read as text', async () => {
   assert.match(email.body, /1\. Made Up Song in D\n2\. Other & Song in G/)
   assert.equal(textOfHtml('<p>a</p><p>b</p>'), 'a\nb')
 })
+
+test('a PDF with no file name is a chart called chart.pdf', async () => {
+  const raw = [
+    headers(['Content-Type: multipart/mixed; boundary="B"']),
+    '',
+    '--B',
+    'Content-Type: text/plain',
+    '',
+    '1. Made Up Song in D',
+    '--B',
+    'Content-Type: application/pdf',
+    'Content-Transfer-Encoding: base64',
+    '',
+    base64('Made Up Song\nKey - D\nCCLI Song # 1111111'),
+    '--B--',
+  ].join('\r\n')
+
+  const email = await readEmail(raw, readText)
+  assert.equal(email.charts.length, 1)
+  assert.equal(email.charts[0].filename, 'chart.pdf')
+  assert.equal(email.charts[0].ccli, '1111111')
+})

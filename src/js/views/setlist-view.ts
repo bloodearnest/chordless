@@ -146,6 +146,7 @@ export class SetlistView extends PageView {
   /** This view is only shown for the setlist route */
   #setlistRoute() {
     const route = this.route
+    /* v8 ignore next -- the router only shows this view for a setlist route */
     if (route?.name !== 'setlist') throw new Error('The setlist view has no setlist route')
     return route
   }

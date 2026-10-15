@@ -21,6 +21,7 @@ describe('normalizePath', () => {
     ['/index.html', '/'],
     ['/', '/'],
     ['', '/'],
+    ['.html', '/'],
   ]
   for (const [input, expected] of cases) {
     it(`${JSON.stringify(input)} is ${expected}`, () => {
@@ -64,6 +65,7 @@ describe('matchRoute', () => {
     ['/setlist/abc/song/0', setlist('abc', 0)],
     ['/setlist/abc/song/12/', setlist('abc', 12)],
     ['/setlist/a%20b', setlist('a b', -1)], // an encoded id is decoded
+    ['/setlist/%E0%A4%A', setlist('%E0%A4%A', -1)], // one that cannot be is left as it is
 
     // A setlist shared by link (the key is in the #fragment, which says nothing to a route)
     ['/s/abc-DEF_1', { name: 'share', fileId: 'abc-DEF_1', songIndex: -1 }],

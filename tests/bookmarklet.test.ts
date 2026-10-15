@@ -205,6 +205,32 @@ describe('bookmarklet-installer', () => {
     expect($('[role="status"]').textContent).to.contain('Copied')
   })
 
+  it('selects the code, and says to copy it from there, when copying is blocked', async () => {
+    await makeInstaller()
+    const realWarn = console.warn
+    console.warn = () => {}
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: {
+        writeText: async () => {
+          throw new DOMException('blocked', 'NotAllowedError')
+        },
+      },
+    })
+    try {
+      $('.copy').click()
+      await new Promise(resolve => setTimeout(resolve))
+      await installer.updateComplete
+    } finally {
+      Reflect.deleteProperty(navigator, 'clipboard')
+      console.warn = realWarn
+    }
+    expect($('[role="status"]').textContent).to.contain('Copying was blocked')
+    const code = $('textarea')
+    expect(code.selectionStart).to.equal(0)
+    expect(code.selectionEnd).to.equal(code.value.length)
+  })
+
   it('is accessible', async () => {
     await makeInstaller()
     await expect(installer).to.be.accessible(A11Y)

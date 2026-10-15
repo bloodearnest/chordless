@@ -1,6 +1,20 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { claimSetlistsWithoutOwnerId, mergePeople } from '../src/js/people.ts'
+import {
+  createOrganisation,
+  deleteOrganisation,
+  getCurrentOrganisation,
+  setCurrentOrganisation,
+} from '../src/js/organisation.ts'
+import { OrganisationDB } from '../src/js/organisation-db.ts'
+import {
+  claimSetlistsOnce,
+  claimSetlistsWithoutOwnerId,
+  getCurrentPerson,
+  getOrganisationPeople,
+  mergePeople,
+} from '../src/js/people.ts'
+import { installFakeAuthWorker } from './fake-auth-worker.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -70,5 +84,128 @@ describe('claimSetlistsWithoutOwnerId', () => {
   it('does nothing without a signed-in person', async () => {
     await save('no-leader', { owner: '' })
     expect(await claimSetlistsWithoutOwnerId(db, null)).to.equal(0)
+  })
+})
+
+describe('the signed-in person and the organisation’s people', () => {
+  let auth: ReturnType<typeof installFakeAuthWorker>
+  let before: { id: string | null; name: string }
+  let organisationId: string
+
+  beforeEach(async () => {
+    auth = installFakeAuthWorker()
+    before = getCurrentOrganisation()
+    const organisation = await createOrganisation(`People ${crypto.randomUUID().slice(0, 8)}`)
+    organisationId = organisation.id
+    await setCurrentOrganisation(organisation.id, organisation.name)
+  })
+
+  afterEach(async () => {
+    auth.uninstall()
+    localStorage.removeItem(`setlist-owner-ids-claimed:${organisationId}`)
+    await deleteOrganisation(organisationId)
+    if (before.id) await setCurrentOrganisation(before.id, before.name)
+  })
+
+  const signIn = (user: { name: string | null; email: string | null }) => {
+    auth.worker.stored = {
+      blob: 'blob',
+      metadata: {
+        access_token: 'token',
+        expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+        user: { picture: null, given_name: null, family_name: null, sub: '1', ...user },
+      },
+      updated_at: new Date().toISOString(),
+    }
+  }
+
+  it('is nobody when not signed in, or signed in with no address', async () => {
+    expect(await getCurrentPerson()).to.equal(null)
+    signIn({ name: 'Ann', email: null })
+    expect(await getCurrentPerson()).to.equal(null)
+  })
+
+  it('is the signed-in user by address, and by name if there is one', async () => {
+    signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+    expect(await getCurrentPerson()).to.deep.equal({ id: 'ann@example.com', name: 'Ann Singer' })
+    signIn({ name: null, email: 'ann@example.com' })
+    expect(await getCurrentPerson()).to.deep.equal({
+      id: 'ann@example.com',
+      name: 'ann@example.com',
+    })
+  })
+
+  it('lists the members of the organisation, and the signed-in user, by name', async () => {
+    const organisations = new OrganisationDB()
+    await organisations.init()
+    await organisations.updateOrganisation(organisationId, {
+      members: [{ email: 'ben@example.com', name: 'Ben' }, { email: 'cat@example.com' }],
+    })
+    organisations.db?.close()
+    signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+
+    const { people, me } = await getOrganisationPeople()
+
+    expect(me).to.deep.equal({ id: 'ann@example.com', name: 'Ann Singer' })
+    expect(people.map(person => person.name)).to.deep.equal([
+      'Ann Singer',
+      'Ben',
+      'cat@example.com',
+    ])
+  })
+
+  it('lists just the members when nobody is signed in, and none when it has none', async () => {
+    const { people, me } = await getOrganisationPeople()
+    expect(me).to.equal(null)
+    expect(people).to.deep.equal([])
+  })
+
+  describe('claiming the setlists with no leader, once', () => {
+    const key = () => `setlist-owner-ids-claimed:${organisationId}`
+    const stubDb = (setlists: object[]) => {
+      const saved: object[] = []
+      return {
+        saved,
+        db: {
+          getAllSetlists: async () => setlists,
+          saveSetlist: async (setlist: object) => saved.push(setlist),
+        } as unknown as ChordlessDB,
+      }
+    }
+
+    it('waits, and tries again later, when nobody is signed in', async () => {
+      const { db } = stubDb([{ id: 'x', owner: '' }])
+      expect(await claimSetlistsOnce(db, organisationId)).to.equal(0)
+      expect(localStorage.getItem(key())).to.equal(null)
+    })
+
+    it('claims them for the signed-in user, and does not do it again', async () => {
+      signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+      const { db, saved } = stubDb([{ id: 'x', owner: '' }])
+
+      expect(await claimSetlistsOnce(db, organisationId)).to.equal(1)
+      expect(saved).to.have.length(1)
+      expect(localStorage.getItem(key())).to.be.ok
+
+      expect(await claimSetlistsOnce(db, organisationId)).to.equal(0)
+      expect(saved).to.have.length(1)
+    })
+
+    it('gives up quietly, and tries again later, if the setlists cannot be read', async () => {
+      signIn({ name: 'Ann Singer', email: 'ann@example.com' })
+      const warn = console.warn
+      console.warn = () => {}
+      try {
+        const db = {
+          getAllSetlists: async () => {
+            throw new Error('database closed')
+          },
+        } as unknown as ChordlessDB
+        expect(await claimSetlistsOnce(db, organisationId)).to.equal(0)
+      } finally {
+        console.warn = warn
+      }
+      expect(localStorage.getItem(key())).to.equal(null)
+    })
   })
 })

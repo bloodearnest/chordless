@@ -176,6 +176,14 @@ test('a wrong key, a changed file or a truncated one fails to decrypt', async ()
 
   await assert.rejects(decryptBundle(key, file.slice(0, 12)), 'truncated')
   await assert.rejects(decryptBundle('too-short', file), 'bad key')
+  await assert.rejects(decryptBundle('AAAAAAAA', file), /wrong length/, 'a key of the wrong size')
+})
+
+test('a share that unpacks to too much is refused rather than filling the memory', async () => {
+  const key = generateShareKey()
+  const big = bundleOf([source(1, {}, 'x'.repeat(3 * 1024 * 1024))])
+  const file = await encryptBundle(key, big)
+  await assert.rejects(decryptBundle(key, file), /too big/)
 })
 
 test('decrypted data must be a bundle this version can show', () => {
@@ -185,6 +193,37 @@ test('decrypted data must be a bundle this version can show', () => {
   assert.throws(() => parseShareBundle({ ...good, version: 99 }), /newer Chordless/)
   assert.throws(() => parseShareBundle({ ...good, setlist: { songs: [{ title: 1 }] } }), /damaged/)
   assert.throws(() => parseShareBundle(null))
+  assert.throws(() => parseShareBundle({ ...good, expires: 5 }), /damaged/)
+  assert.throws(() => parseShareBundle({ ...good, setlist: null }), /damaged/)
+  assert.throws(() => parseShareBundle({ ...good, setlist: { songs: 'no' } }), /damaged/)
+  assert.throws(() => parseShareBundle({ ...good, setlist: { songs: [null] } }), /damaged/)
+  assert.throws(
+    () => parseShareBundle({ ...good, setlist: { songs: [{ title: 'A', chordpro: 1 }] } }),
+    /damaged/
+  )
+  assert.throws(() => parseShareBundle({ ...good, setlistId: 5 }), /damaged/)
+})
+
+test('a setlist with no time, type, name or owner, and a song with no notes, is shared with them empty', () => {
+  const bundle = buildShareBundle(
+    { date: '2026-10-11' } as Parameters<typeof buildShareBundle>[0],
+    [
+      {
+        entry: { order: 0, songId: 's', songUuid: 'u', key: null, tempo: null },
+        title: 'A',
+        songKey: 'G',
+        chordpro: '{title: A}',
+      } as unknown as ShareSource,
+    ],
+    { expires: '2026-10-25' }
+  )
+  assert.deepEqual(
+    [bundle.setlist.time, bundle.setlist.type, bundle.setlist.name, bundle.setlist.owner],
+    ['', '', '', '']
+  )
+  assert.equal(bundle.setlist.songs[0].notes, '')
+  assert.ok(bundle.updated, 'it is stamped with the time it was made')
+  assert.equal('setlistId' in bundle, false)
 })
 
 test('links hold the file id, then the key and the setlist code after the #, and read back', () => {
@@ -207,4 +246,9 @@ test('links hold the file id, then the key and the setlist code after the #, and
   assert.equal(parseShareUrl('https://chordless.app/s/abc'), null, 'no key')
   assert.equal(parseShareUrl(`https://chordless.app/songs/abc#${key}`), null, 'not a share path')
   assert.equal(parseShareUrl('https://chordless.app/s/abc#short'), null, 'bad key')
+})
+
+test('an id that is not a UUID has no setlist code, and so matches nothing', () => {
+  assert.equal(setlistCode('not-a-uuid'), '')
+  assert.equal(matchesSetlistCode('', 'not-a-uuid'), false)
 })

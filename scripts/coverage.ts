@@ -7,6 +7,8 @@
  *   node scripts/coverage.ts --all           every file with something missing
  *   node scripts/coverage.ts src/js/db.ts    the lines and branches of one file that no test reaches
  *   node scripts/coverage.ts --lower         record better coverage as the new floor
+ *   node scripts/coverage.ts --accept        record the files that went down too: when that is wanted,
+ *                                            such as a change that adds code the tests do not reach yet
  *
  * What it adds to the two reports:
  * - A line is covered if either suite ran it (branches and functions are merged by the line they
@@ -218,6 +220,7 @@ const ranges = (numbers: number[]) => {
 const args = process.argv.slice(2)
 const showAll = args.includes('--all')
 const lower = args.includes('--lower')
+const accept = args.includes('--accept')
 const only = args.find(arg => !arg.startsWith('--'))
 
 for (const path of REPORTS) {
@@ -350,7 +353,7 @@ for (const file of [...new Set([...Object.keys(floor), ...missing.keys()])].sort
     problems.push(
       `${file}: ${worse.map(key => `${key} ${was[key] ?? 0} -> ${now[key]}`).join(', ')}`
     )
-    next[file] = was
+    next[file] = accept ? now : was
   } else {
     next[file] = {
       lines: Math.min(now.lines, was.lines),
@@ -367,13 +370,16 @@ if (unexplained.length) {
 }
 
 const better = JSON.stringify(next) !== JSON.stringify(floor)
-if ((starting || (lower && better)) && problems.length === 0) {
+if ((starting || ((lower || accept) && better)) && (accept || problems.length === 0)) {
   writeFileSync(FLOOR, `${JSON.stringify(next, null, 2)}\n`)
   console.log(`${FLOOR} ${starting ? 'created' : 'lowered'}: commit it`)
 } else if (better && problems.length === 0) {
   console.log(`Better than ${FLOOR}: node scripts/coverage.ts --lower records it`)
 }
-if (problems.length) {
+if (problems.length && accept) {
+  console.log('\nAccepted as the floor, though lower:')
+  for (const problem of problems) console.log(`  ${problem}`)
+} else if (problems.length) {
   console.error('\nCoverage went down:')
   for (const problem of problems) console.error(`  ${problem}`)
   process.exit(1)

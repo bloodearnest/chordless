@@ -30,6 +30,7 @@ export function setPageTitle(title: string | null) {
 }
 
 export async function goTo(url: string, options?: GoOptions) {
+  /* v8 ignore next 4 -- loading a page would end the test run: tests give a router instead */
   if (router && (await router.navigate(url, options))) return
   // biome-ignore lint/plugin: the router can't show it, so load it as a page
   window.location.assign(url)

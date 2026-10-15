@@ -170,3 +170,52 @@ test('an email over a rate limit is dropped with no reply, and a broken limit do
   await handleEmail(broken, () => ({}), 'https://x.test', { perSender: throws })
   assert.equal(broken.replied, true)
 })
+
+test('the reply lists attached charts that are not in the list, songs with no key, and a date to check', async () => {
+  const { text, html } = await answerFor(
+    bytes(email('Sunday 7th Nov', ['1. Alpha & Co <b> in G', '2. Plain Song'], [PDF])),
+    'https://chordless.test'
+  )
+  assert.match(text, /Date: 2026-11-08 \("Sunday 7th Nov" is a Saturday/)
+  assert.match(text, /^1\. Alpha & Co <b> \(G\)$/m)
+  assert.match(text, /^2\. Plain Song$/m)
+  assert.match(text, /Attached, but not in the list:\n- Brand New Song \(D\)/)
+  assert.match(html, /Alpha &#38; Co &#60;b&#62; \(G\)/, 'escaped in the HTML version')
+  assert.match(html, /Attached, but not in the list/)
+})
+
+test('the reply says so when the email has no name, date or sender', async () => {
+  const raw = ['MIME-Version: 1.0', 'Content-Type: text/plain', '', '1. Plain Song'].join('\r\n')
+  const { text } = await answerFor(new TextEncoder().encode(raw).buffer, 'https://chordless.test')
+  assert.match(text, /Setlist: \(no name\)/)
+  assert.match(text, /Date: none found: you will be asked/)
+  assert.match(text, /Led by: not found/)
+})
+
+test('an email that cannot be read at all is answered with how to import it another way', async () => {
+  const log = console.error
+  console.error = () => {}
+  try {
+    // (a buffer that has been handed over cannot be read)
+    const gone = new ArrayBuffer(8)
+    structuredClone(gone, { transfer: [gone] })
+    const { text, html } = await answerFor(gone, 'https://x.test')
+    assert.match(text, /could not read that email/)
+    assert.match(html, /Could not read that email/)
+  } finally {
+    console.error = log
+  }
+})
+
+test('a reply without a conversation to join, or from an address with no domain, is still a message', () => {
+  const text = replyMessage({
+    from: 'import',
+    to: 'b@x.test',
+    subject: 'Hi',
+    inReplyTo: '<abc@x.test>',
+    references: null,
+    answer: { text: 'words', html: '<p>words</p>' },
+  })
+  assert.match(text, /^Message-ID: <[\w-]+@chordless\.app>/m)
+  assert.match(text, /^References: <abc@x\.test>\r?$/m)
+})

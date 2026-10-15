@@ -9,6 +9,7 @@ import {
   type ChartInfo,
   chartFilenameParts,
   cleanSubject,
+  findBareSunday,
   findDate,
   findDateWithWrongNumber,
   importFromEmail,
@@ -19,6 +20,7 @@ import {
   parsePerson,
   parseSongList,
   sentDay,
+  songOfChart,
 } from '../src/js/email-setlist.ts'
 
 const chart = (title: string, key: string, ccli: string | null): ChartInfo => ({
@@ -608,4 +610,62 @@ test('one song and one chart left over, with no key to disagree, are paired', ()
 test('a song matched by title is not a guess', () => {
   const result = leftoverEmail('1. Living Hope in Bb', [chart('Living Hope', 'Bb', '7106807')])
   assert.equal(result.songs[0].pairedBy, undefined)
+})
+
+test('a person with only an address, or less, is read as far as it goes', () => {
+  assert.deepEqual(parsePerson('jenny@x.test'), { name: 'jenny', email: 'jenny@x.test' })
+  assert.deepEqual(parsePerson('<j@x.test>'), { name: 'j', email: 'j@x.test' })
+  assert.deepEqual(parsePerson('Jenny'), { name: '', email: '' })
+})
+
+test('a forwarded header block can have no subject, and say Sent rather than Date', () => {
+  const forward = innermostForward(
+    '---------- Forwarded message ---------\nFrom: A <a@x.test>\nSent: Fri, 9 Oct 2026\n\n1. Song'
+  )
+  assert.equal(forward?.date, 'Fri, 9 Oct 2026')
+  assert.equal(forward?.subject, '')
+  const undated = innermostForward(
+    '---------- Forwarded message ---------\nFrom: A <a@x.test>\nSubject: Sunday\n\n1. Song'
+  )
+  assert.equal(undated?.date, '')
+})
+
+test('a send date can be any date format Date can read, and is nothing if it is not one', () => {
+  assert.equal(day('2026-10-09T18:11:00Z')?.toISOString(), '2026-10-09T00:00:00.000Z')
+  assert.equal(day('garbage'), null)
+})
+
+test('a bare day of the month is only taken for a Sunday that comes soon after the email', () => {
+  const sent = (text: string) => new Date(`${text}T12:00:00Z`)
+  assert.equal(findBareSunday('Sunday the 18th', sent('2026-10-09'))?.date, '2026-10-18')
+  assert.equal(findBareSunday('the 19th', sent('2026-10-09')), null, 'a Monday')
+  assert.equal(findBareSunday('the 30th', sent('2026-01-31')), null, 'no such day in February')
+  assert.equal(findBareSunday('the 31st', sent('2026-11-20')), null, 'a Thursday in December')
+  assert.equal(findBareSunday('the 18th', null), null)
+})
+
+test('a date with no year needs the day the email was sent', () => {
+  assert.equal(findDate('Sunday 25th Oct', null), '')
+})
+
+test('a key may be written with the musical sharp and flat signs', () => {
+  assert.equal(normaliseKey('F♯m'), 'F#m')
+  assert.equal(normaliseKey('B♭'), 'Bb')
+})
+
+test('a chart whose file name says nothing is titled by its text, and one with no text by its file', () => {
+  assert.equal(parseChartText('Key of G\nHello World', 'scan 0012.pdf').title, 'Hello World')
+  assert.equal(parseChartText('', 'Living Hope.pdf').title, 'Living Hope')
+})
+
+test('a song line that is only a bracketed note keeps it as its title', () => {
+  assert.equal(parseSongList('1. (Reprise)')[0].title, '(Reprise)')
+})
+
+test('a lone chart is a song, by its title, key and filename', () => {
+  const song = songOfChart(chart('Alpha Song', 'G', '1234567'))
+  assert.equal(song.title, 'Alpha Song')
+  assert.equal(song.key, 'G')
+  assert.equal(song.ccli, '1234567')
+  assert.equal(song.chartFilename, 'Alpha Song-chords-G.pdf')
 })

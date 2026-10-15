@@ -281,12 +281,6 @@ export class SetlistSong extends SongModel {
     await this.save()
   }
 
-  // ==================== Protected Methods ====================
-
-  protected override _getUnderlyingSong(): LoadedSong {
-    return this._canonical
-  }
-
   // ==================== Helpers ====================
 
   _loadSetlistState(): SetlistViewState {

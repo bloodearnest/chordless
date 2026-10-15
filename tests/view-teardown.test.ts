@@ -254,4 +254,20 @@ describe('views leave nothing behind', () => {
     expect(menu.songs.length).to.equal(0)
     expect(menu.showOverviewLink).to.equal(false)
   })
+
+  it('setlist-view gives the router its scroll positions, and follows the route to a song', async function () {
+    this.timeout(15000)
+    const view = document.createElement('setlist-view')
+    view.route = { name: 'setlist', setlistId: seeded.setlistId, songIndex: -1 }
+    outlet.append(view)
+    await loaded(view)
+    // (nothing has been scrolled)
+    expect(view.captureViewState()).to.equal(undefined)
+
+    view.route = { name: 'setlist', setlistId: seeded.setlistId, songIndex: 0 }
+    await view.updateComplete
+    await wait(100)
+    expect(menu.songs.length).to.equal(1)
+    view.remove()
+  })
 })

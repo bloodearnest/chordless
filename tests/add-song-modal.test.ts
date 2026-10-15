@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/app-modal.ts'
+import type { SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { AddSongModal } from '../src/js/setlist/add-song-modal.ts'
 import { createSong } from '../src/js/song-utils.ts'
@@ -141,5 +142,64 @@ describe('AddSongModal', () => {
     await modalElement().updateComplete
     expect(modalElement().hasAttribute('open')).to.equal(true)
     expect(results().querySelector('status-message').state).to.equal('error')
+  })
+
+  it('does nothing when the page has no modal to open', async () => {
+    root.innerHTML = ''
+    await modal.open()
+    expect(root.children).to.have.length(0)
+  })
+
+  it('does not mind the results going while the search is typed into', async () => {
+    await createSong(chart(`Vanishing ${stamp}`))
+    await modal.open()
+    results().remove()
+    await type('van')
+  })
+
+  describe('a song from another database', () => {
+    const elsewhere = (over: object = {}) =>
+      ({
+        uuid: `from-elsewhere-${stamp}`,
+        id: `title-elsewhere-${stamp}`,
+        title: `Elsewhere ${stamp}`,
+        chordpro: chart(`Elsewhere ${stamp}`),
+        variantOf: null,
+        isDefault: true,
+        source: { dbId: 'other-db', label: 'Other church' },
+        ...over,
+      }) as unknown as SongWithContent
+
+    const choose = async (song: SongWithContent) => {
+      modal = new AddSongModal({
+        root,
+        getDb: () => db,
+        onPick: chosen => picked.push(chosen),
+        getElsewhere: async () => [song],
+      })
+      await modal.open()
+      const list = results().querySelector('song-list')
+      const chosen = list.songs.find(candidate => candidate.id === song.id)
+      list.dispatchEvent(
+        Object.assign(new Event('song-list:select', { bubbles: true, composed: true }), {
+          song: chosen,
+        })
+      )
+      await wait(50)
+    }
+
+    it('is copied into the library first, and the copy is what is chosen', async () => {
+      await choose(elsewhere())
+      expect(picked).to.have.length(1)
+      expect(picked[0].source).to.equal(undefined)
+      expect(picked[0].title).to.equal(`Elsewhere ${stamp}`)
+    })
+
+    it('says so, and chooses nothing, when it cannot be copied', async () => {
+      await choose(elsewhere({ chordpro: undefined }))
+      expect(picked).to.have.length(0)
+      expect(results().querySelector('status-message').state).to.equal('error')
+      expect(results().querySelector('status-message').message).to.equal('Could not add the song.')
+    })
   })
 })

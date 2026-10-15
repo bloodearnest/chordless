@@ -13,13 +13,10 @@ import { getCurrentOrganisationFull } from './organisation.ts'
 
 /** The signed-in user as a person, or null if not signed in */
 export async function getCurrentPerson(): Promise<Person | null> {
-  try {
-    const user = await getCurrentUserInfo()
-    if (!user?.email) return null
-    return { id: user.email, name: user.name || user.email }
-  } catch {
-    return null
-  }
+  // (getCurrentUserInfo gives null rather than failing)
+  const user = await getCurrentUserInfo()
+  if (!user?.email) return null
+  return { id: user.email, name: user.name || user.email }
 }
 
 /**

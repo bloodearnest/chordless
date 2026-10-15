@@ -53,6 +53,19 @@ test('what is not a setlist is refused', async () => {
   await assert.rejects(decodeImport('not-a-link!'))
   await assert.rejects(decodeImport(await hostile({ songs: 'no' })))
   await assert.rejects(decodeImport(await hostile({ songs: [] })))
+  // Base64 that is not compressed data
+  await assert.rejects(decodeImport('AAAAAAAA'), /damaged/)
+})
+
+test('a link with nothing where a person or a song should be is read as having none', async () => {
+  const link = await decodeImport(
+    await hostile({ leader: null, songs: [null, 5, { title: 'Alpha Song' }] })
+  )
+  assert.deepEqual(link.leader, { name: '', email: '' })
+  assert.deepEqual(
+    link.songs.map(each => each.title),
+    ['Alpha Song']
+  )
 })
 
 test('a made-up link is cut down to what the page can trust', async () => {

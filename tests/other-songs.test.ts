@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
+import { createOrganisation, deleteOrganisation } from '../src/js/organisation.ts'
 import {
   addToLibrary,
   getSongFromAnywhere,
@@ -109,5 +110,97 @@ describe('Songs from the other databases', () => {
     expect(all).to.have.length(2)
     expect(all.filter(each => each.isDefault).map(each => each.uuid)).to.deep.equal([mine.uuid])
     expect(must(await library.getSong(added.uuid)).variantOf).to.equal(mine.uuid)
+  })
+})
+
+describe('Songs from the other organisations', () => {
+  const libraryId = `org-${crypto.randomUUID()}`
+  let other: { id: string; name: string }
+  let otherDb: ChordlessDB
+  let realError: typeof console.error
+  let errors: unknown[][]
+
+  beforeEach(async () => {
+    errors = []
+    realError = console.error
+    console.error = (...args) => errors.push(args)
+    other = await createOrganisation(`Other church ${crypto.randomUUID().slice(0, 8)}`)
+    otherDb = new ChordlessDB(other.id)
+    await otherDb.init()
+  })
+
+  afterEach(async () => {
+    console.error = realError
+    otherDb.db?.close()
+    await deleteDatabase(other.id)
+    await deleteOrganisation(other.id)
+  })
+
+  it('lists the songs of an organisation with a database, marked with its name', async () => {
+    await addChart(otherDb, BETA, ADD)
+    const found = (await getSongsElsewhere(libraryId)).filter(
+      song => song.source?.dbId === other.id
+    )
+    expect(found.map(song => song.title)).to.deep.equal(['Beta'])
+    expect(found[0].source).to.deep.equal({ dbId: other.id, label: other.name })
+  })
+
+  it('does not list the songs of the organisation that is asking', async () => {
+    await addChart(otherDb, BETA, ADD)
+    const songs = await getSongsElsewhere(other.id)
+    expect(songs.filter(song => song.source?.dbId === other.id)).to.deep.equal([])
+  })
+
+  it('skips an organisation that has no database on this device', async () => {
+    const empty = await createOrganisation(`Empty ${crypto.randomUUID().slice(0, 8)}`)
+    try {
+      const sources = (await getSongsElsewhere(libraryId)).map(song => song.source?.dbId)
+      expect(sources).to.not.include(empty.id)
+    } finally {
+      await deleteOrganisation(empty.id)
+    }
+  })
+
+  it('marks a song copied from an organisation as copied, not shared', async () => {
+    await addChart(otherDb, BETA, ADD)
+    const library = new ChordlessDB(libraryId)
+    await library.init()
+    try {
+      const song = (await getSongsElsewhere(libraryId)).find(each => each.source?.dbId === other.id)
+      const added = await addToLibrary(must(song), library)
+      expect(must(await library.getSong(added.uuid)).variantLabel).to.equal('Copied')
+    } finally {
+      library.db?.close()
+      await deleteDatabase(libraryId)
+    }
+  })
+
+  it('carries on without the songs of a database that cannot be read, and says so', async () => {
+    await addChart(otherDb, BETA, ADD)
+    const realInit = ChordlessDB.prototype.init
+    ChordlessDB.prototype.init = async function () {
+      if (this.organisationId === other.id) throw new Error('database damaged')
+      return realInit.call(this)
+    }
+    try {
+      const songs = await getSongsElsewhere(libraryId)
+      expect(songs.filter(song => song.source?.dbId === other.id)).to.deep.equal([])
+    } finally {
+      ChordlessDB.prototype.init = realInit
+    }
+    expect(errors.some(args => String(args[0]).includes(other.name))).to.equal(true)
+  })
+
+  it('carries on with none when it cannot even look for them, and says so', async () => {
+    const realDatabases = indexedDB.databases
+    indexedDB.databases = async () => {
+      throw new Error('no access')
+    }
+    try {
+      expect(await getSongsElsewhere(libraryId)).to.deep.equal([])
+    } finally {
+      indexedDB.databases = realDatabases
+    }
+    expect(errors).to.have.length(1)
   })
 })
