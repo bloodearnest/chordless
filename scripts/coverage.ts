@@ -11,8 +11,8 @@
  *                                            such as a change that adds code the tests do not reach yet
  *
  * What it adds to the two reports:
- * - A line is covered if either suite ran it (branches and functions are merged by the line they
- *   are on, taking the better of the two).
+ * - A line is covered if either suite ran it. Branches are merged by the line they are on, taking
+ *   the better of the two; for functions, the report of a file that ran more of them is used.
  * - Source files that neither suite loaded are listed as unloaded, since they are not in either
  *   report at all.
  * - Code marked as not worth covering is left out of every count. The marks are comments, each with
@@ -108,9 +108,11 @@ function mergeReports(reports: Map<string, FileCoverage>[]) {
           have.hit = Math.max(have.hit, count.hit)
         }
       }
-      for (const [id, hits] of file.functions) {
-        into.functions.set(id, Math.max(into.functions.get(id) ?? 0, hits))
-      }
+      // Functions are named and placed differently by Node and by V8, so two reports of one file
+      // cannot be added up: the one that ran more of them is taken
+      const ran = (functions: Map<string, number>) =>
+        [...functions.values()].filter(hits => hits > 0).length
+      if (ran(file.functions) > ran(into.functions)) into.functions = file.functions
     }
   }
   return merged

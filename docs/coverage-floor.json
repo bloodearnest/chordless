@@ -284,11 +284,6 @@
     "branches": 10,
     "functions": 0
   },
-  "src/js/utils/persistence.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
-  },
   "src/js/views/about-view.ts": {
     "lines": 18,
     "branches": 0,
