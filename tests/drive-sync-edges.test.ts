@@ -4,14 +4,13 @@
  * other drive-sync files.)
  */
 import { expect } from '@open-wc/testing'
+import type { ChordProRecord, SongRecord } from '../src/js/data-types.ts'
 import type { ChordlessDB } from '../src/js/db.ts'
 import {
   DriveSyncManager,
-  driveMarkers,
   isSyncAvailable,
   OrganisationFolderMismatchError,
   type SyncProgress,
-  setlistIdOf,
   UnsyncedChangesError,
 } from '../src/js/drive-sync.ts'
 import {
@@ -21,6 +20,15 @@ import {
   setCurrentOrganisation,
 } from '../src/js/organisation.ts'
 import { OrganisationDB } from '../src/js/organisation-db.ts'
+import {
+  driveMarkers,
+  setlistHasLocalChanges,
+  setlistIdOf,
+  songHasLocalChanges,
+  songUuidOf,
+} from '../src/js/sync/changes.ts'
+import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
+import { pushSetlist, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
 import { makeSetlist, makeSong } from './builders.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -43,7 +51,7 @@ describe('Drive sync: the less common turns', () => {
       for (const ask of [
         () => sync.hasSyncedRecords(),
         () => sync.resolveDriveFolder(),
-        () => sync.getCachedSongsFolder(),
+        () => sync.songsFolder(),
       ]) {
         let message = ''
         try {
@@ -80,36 +88,30 @@ describe('Drive sync: the less common turns', () => {
   })
 
   describe('records from before checksums were kept', () => {
-    it('are judged by their dates', async () => {
-      const phone = await makeDevice('phone')
-      const sync = phone.sync
+    it('are judged by their dates', () => {
       const base = makeSetlist({ id: 's', driveFileId: 'f', modifiedDate: '2026-10-05T10:00:00Z' })
-      expect(sync.setlistHasLocalChanges({ ...base, driveFileId: null })).to.equal(true)
+      expect(setlistHasLocalChanges({ ...base, driveFileId: null })).to.equal(true)
       // never synced by the clock, so edited
-      expect(sync.setlistHasLocalChanges(base)).to.equal(true)
-      expect(
-        sync.setlistHasLocalChanges({ ...base, lastSyncedAt: '2026-10-06T10:00:00Z' })
-      ).to.equal(false)
-      expect(
-        sync.setlistHasLocalChanges({ ...base, lastSyncedAt: '2026-10-01T10:00:00Z' })
-      ).to.equal(true)
+      expect(setlistHasLocalChanges(base)).to.equal(true)
+      expect(setlistHasLocalChanges({ ...base, lastSyncedAt: '2026-10-06T10:00:00Z' })).to.equal(
+        false
+      )
+      expect(setlistHasLocalChanges({ ...base, lastSyncedAt: '2026-10-01T10:00:00Z' })).to.equal(
+        true
+      )
     })
 
-    it('are judged by their dates and hashes, for a song', async () => {
-      const phone = await makeDevice('phone')
-      const sync = phone.sync
+    it('are judged by their dates and hashes, for a song', () => {
       const song = makeSong({
         driveFileId: 'f',
         modifiedDate: '2026-10-05T10:00:00Z',
-      }) as never as Parameters<typeof sync.songHasLocalChanges>[0]
+      }) as never as SongRecord
       const chart = (extra: object = {}) =>
-        ({ id: 'c', content: 'x', contentHash: 'h1', lastModified: 0, ...extra }) as Parameters<
-          typeof sync.songHasLocalChanges
-        >[1]
-      expect(sync.songHasLocalChanges({ ...song, driveFileId: null }, chart())).to.equal(true)
+        ({ id: 'c', content: 'x', contentHash: 'h1', lastModified: 0, ...extra }) as ChordProRecord
+      expect(songHasLocalChanges({ ...song, driveFileId: null }, chart())).to.equal(true)
       // synced, the chart edited since by its own date
       expect(
-        sync.songHasLocalChanges(
+        songHasLocalChanges(
           {
             ...song,
             lastSyncedAt: '2026-10-01T10:00:00Z',
@@ -120,7 +122,7 @@ describe('Drive sync: the less common turns', () => {
       ).to.equal(true)
       // ...unless its hash is the one Drive has
       expect(
-        sync.songHasLocalChanges(
+        songHasLocalChanges(
           {
             ...song,
             lastSyncedAt: '2026-10-01T10:00:00Z',
@@ -131,13 +133,13 @@ describe('Drive sync: the less common turns', () => {
       ).to.equal(false)
       // no date on the chart: the song's own is used
       expect(
-        sync.songHasLocalChanges(
+        songHasLocalChanges(
           { ...song, lastSyncedAt: '2026-10-06T10:00:00Z' },
           chart({ lastModified: 0 })
         )
       ).to.equal(false)
       expect(
-        sync.songHasLocalChanges({ ...song, lastSyncedAt: null }, chart({ lastModified: 0 }))
+        songHasLocalChanges({ ...song, lastSyncedAt: null }, chart({ lastModified: 0 }))
       ).to.equal(true)
     })
   })
@@ -235,7 +237,7 @@ describe('Drive sync: the less common turns', () => {
     it('says what it reports when there are no charts in Drive at all', async () => {
       const phone = await makeDevice('phone')
       const said: string[] = []
-      await phone.sync.pullSongs(progress => said.push(progress.message))
+      await pullSongs(phone.sync, progress => said.push(progress.message))
       expect(said).to.deep.equal(['No songs found in Drive'])
     })
 
@@ -312,7 +314,7 @@ describe('Drive sync: the less common turns', () => {
       await phone.db.saveChordPro({ ...chart, content: '{title: Amazing}\n[G]Edited here' })
       const [file] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
       rig.drive.editContent(file.id, '{title: Amazing}\n[G]Edited in Drive')
-      await phone.sync.pullSongs()
+      await pullSongs(phone.sync)
       const after = must(await phone.db.getChordPro(song.chordproFileId))
       expect(after.content).to.contain('Edited in Drive')
     })
@@ -589,12 +591,12 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const song = must(await phone.db.getSong('song-1'))
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
-      expect(await phone.sync.songNeedsSync(song, chart)).to.equal(false)
+      expect(await songNeedsSync(phone.sync, song, chart)).to.equal(false)
       await phone.sync.buildDriveInventory()
       rig.drive.files.delete(must(song.driveFileId))
       await phone.sync.buildDriveInventory()
-      expect(await phone.sync.songNeedsSync(song, chart)).to.equal(true)
-      expect(await phone.sync.songNeedsSync({ ...song, driveFileId: null }, chart)).to.equal(true)
+      expect(await songNeedsSync(phone.sync, song, chart)).to.equal(true)
+      expect(await songNeedsSync(phone.sync, { ...song, driveFileId: null }, chart)).to.equal(true)
     })
   })
 
@@ -630,8 +632,8 @@ describe('Drive sync: the less common turns', () => {
       tablet.db.getSetlist = async () => {
         throw new Error('unreadable')
       }
-      await tablet.sync.pullSetlists()
-      expect(tablet.sync._pullIncomplete).to.equal(true)
+      await pullSetlists(tablet.sync)
+      expect(tablet.sync.pullIncomplete).to.equal(true)
       tablet.db.getSetlist = real
     })
 
@@ -641,7 +643,7 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const record = must(await phone.db.getSetlist(setlist.id))
       await phone.db.saveSetlist({ ...record, driveChecksum: 'out of date' })
-      await phone.sync.pullSetlists()
+      await pullSetlists(phone.sync)
       expect(must(await phone.db.getSetlist(setlist.id)).driveChecksum).to.not.equal('out of date')
     })
 
@@ -651,8 +653,8 @@ describe('Drive sync: the less common turns', () => {
       await addSetlist(phone, { name: 'There' })
       await syncDevice(phone)
       rig.drive.failRequests({ method: 'GET', path: /alt=media/, status: 500, times: 5 })
-      await tablet.sync.pullSetlists()
-      expect(tablet.sync._pullIncomplete).to.equal(true)
+      await pullSetlists(tablet.sync)
+      expect(tablet.sync.pullIncomplete).to.equal(true)
     })
   })
 
@@ -689,7 +691,7 @@ describe('Drive sync: the less common turns', () => {
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       await syncDevice(phone)
       rig.drive.failRequests({ method: 'GET', path: /alt=media/, status: 500, times: 5 })
-      await tablet.sync.pullSongs()
+      await pullSongs(tablet.sync)
       expect(await tablet.db.getSong('song-1')).to.equal(undefined)
     })
   })
@@ -701,8 +703,8 @@ describe('Drive sync: the less common turns', () => {
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       const song = must(await phone.db.getSong('song-1'))
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
-      await phone.sync.pushSetlist(setlist)
-      await phone.sync.pushSongVariant(song, chart)
+      await pushSetlist(phone.sync, setlist)
+      await pushSongVariant(phone.sync, song, chart)
       expect(rig.driveSetlistFiles()).to.have.length(1)
       expect(rig.drive.listFiles(each => each.appProperties.type === 'chordpro')).to.have.length(1)
     })
@@ -713,7 +715,7 @@ describe('Drive sync: the less common turns', () => {
       rig.drive.failRequests({ method: 'POST', path: /^\/upload\//, status: 500, times: 5 })
       let failed = false
       try {
-        await phone.sync.pushSetlist(setlist)
+        await pushSetlist(phone.sync, setlist)
       } catch {
         failed = true
       }
@@ -730,19 +732,15 @@ describe('Drive sync: the less common turns', () => {
       expect(setlistIdOf({ id: 'f' })).to.equal('')
     })
 
-    it('is told by its properties, in order, which song a chart is, and by its name what it is called', async () => {
-      const phone = await makeDevice('phone')
-      const sync = phone.sync
-      expect(sync.getDriveSongUuid({ songUuid: 'u', versionId: 'v', songId: 's' }, 'f')).to.equal(
-        'u'
-      )
-      expect(sync.getDriveSongUuid({ versionId: 'v', songId: 's' }, 'f')).to.equal('v')
-      expect(sync.getDriveSongUuid({ songId: 's' }, 'f')).to.equal('s')
-      expect(sync.getDriveSongUuid({}, 'f')).to.equal('f')
-      expect(sync.getTitleFromFilename('Amazing Grace.cho')).to.equal('Amazing Grace')
-      expect(sync.getTitleFromFilename(undefined)).to.equal('Untitled')
-      expect(sync.getSongUuid({ uuid: 'u', id: 'i' })).to.equal('u')
-      expect(sync.getSongUuid({ uuid: '', id: 'i' })).to.equal('i')
+    it('is told by its properties, in order, which song a chart is, and by its name what it is called', () => {
+      expect(driveSongUuid({ songUuid: 'u', versionId: 'v', songId: 's' }, 'f')).to.equal('u')
+      expect(driveSongUuid({ versionId: 'v', songId: 's' }, 'f')).to.equal('v')
+      expect(driveSongUuid({ songId: 's' }, 'f')).to.equal('s')
+      expect(driveSongUuid({}, 'f')).to.equal('f')
+      expect(titleFromFilename('Amazing Grace.cho')).to.equal('Amazing Grace')
+      expect(titleFromFilename(undefined)).to.equal('Untitled')
+      expect(songUuidOf({ uuid: 'u', id: 'i' })).to.equal('u')
+      expect(songUuidOf({ uuid: '', id: 'i' })).to.equal('i')
     })
 
     it('is made up for, when a chart in Drive has no properties, dates or id', async () => {
@@ -859,7 +857,7 @@ describe('Drive sync: the less common turns', () => {
 
     it('fails when something other than being view-only goes wrong', async () => {
       const phone = await makeDevice('phone')
-      phone.sync.pushSetlists = async () => {
+      phone.db.getAllSetlists = async () => {
         throw new Error('broken')
       }
       let message = ''
@@ -913,14 +911,13 @@ describe('Drive sync: the less common turns', () => {
   })
 
   describe('legacy songs, by date', () => {
-    it('are judged by the song’s own date when there is none on the chart or the song', async () => {
-      const phone = await makeDevice('phone')
+    it('are judged by the song’s own date when there is none on the chart or the song', () => {
       const song = {
         ...makeSong({ driveFileId: 'f', lastSyncedAt: '2026-10-01T00:00:00Z' }),
         modifiedDate: '',
       }
       const chart = { id: 'c', content: 'x', contentHash: 'h', lastModified: 0 }
-      expect(phone.sync.songHasLocalChanges(song as never, chart as never)).to.equal(false)
+      expect(songHasLocalChanges(song as never, chart as never)).to.equal(false)
     })
   })
 })

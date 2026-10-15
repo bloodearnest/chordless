@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
+import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { makeEntry, makeLocalState } from './builders.ts'
 import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -173,14 +174,14 @@ describe('Drive sync: errors and missing files', () => {
 
         const afterFirst = must(await phone.db.getSetlist(setlist.id))
         expect(afterFirst.driveFileId).to.be.a('string')
-        expect(phone.sync.setlistHasLocalChanges(afterFirst)).to.equal(true)
+        expect(setlistHasLocalChanges(afterFirst)).to.equal(true)
 
         await syncDevice(phone)
 
         expect(driveSetlistFiles()).to.have.length(1)
         const settled = must(await phone.db.getSetlist(setlist.id))
         expect(settled.driveFileId).to.equal(afterFirst.driveFileId)
-        expect(phone.sync.setlistHasLocalChanges(settled)).to.equal(false)
+        expect(setlistHasLocalChanges(settled)).to.equal(false)
       })
 
       it('does the same for a setlist update', async () => {
@@ -191,16 +192,12 @@ describe('Drive sync: errors and missing files', () => {
         rig.drive.corruptUploads = 1
 
         await syncDevice(phone)
-        expect(
-          phone.sync.setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))
-        ).to.equal(true)
+        expect(setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))).to.equal(true)
 
         await syncDevice(phone)
 
         expect(driveSetlist(setlist.id).name).to.equal('Edited')
-        expect(
-          phone.sync.setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))
-        ).to.equal(false)
+        expect(setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))).to.equal(false)
       })
 
       it('records a good upload as synced', async () => {
@@ -210,7 +207,7 @@ describe('Drive sync: errors and missing files', () => {
         await syncDevice(phone)
 
         const local = must(await phone.db.getSetlist(setlist.id))
-        expect(phone.sync.setlistHasLocalChanges(local)).to.equal(false)
+        expect(setlistHasLocalChanges(local)).to.equal(false)
         expect(local.driveChecksum).to.equal(rig.drive.listFiles()[0].md5Checksum)
       })
     })
@@ -264,9 +261,7 @@ describe('Drive sync: errors and missing files', () => {
         expect(writes()).to.deep.equal([])
         expect(driveSetlistFiles()).to.have.length(1)
         expect(must(await tablet.db.getSetlist(setlist.id)).driveFileId).to.equal('survivor')
-        expect(
-          tablet.sync.setlistHasLocalChanges(must(await tablet.db.getSetlist(setlist.id)))
-        ).to.equal(false)
+        expect(setlistHasLocalChanges(must(await tablet.db.getSetlist(setlist.id)))).to.equal(false)
       })
 
       it('updates the live file with an edit made here, rather than uploading a copy', async () => {

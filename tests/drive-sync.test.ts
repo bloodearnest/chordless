@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { setlistFileMetadata } from '../src/js/drive-metadata.ts'
+import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
@@ -56,7 +57,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(tablet)
       const onTablet = must(await tablet.db.getSetlist(setlist.id))
       expect(onTablet.songs[0].tempo).to.equal(72)
-      expect(tablet.sync.setlistHasLocalChanges(onTablet)).to.equal(false)
+      expect(setlistHasLocalChanges(onTablet)).to.equal(false)
 
       rig.drive.requests = []
       await syncDevice(tablet)

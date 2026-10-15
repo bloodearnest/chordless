@@ -40,7 +40,8 @@ UI (main thread)          drive-sync-panel.js (Sync / Reset from Google Drive bu
         │
 Orchestration             sync-orchestrator.ts: wraps the engine, reports progress
         │                 (to a callback)
-Sync engine               drive-sync.js: DriveSyncManager
+Sync engine               drive-sync.ts: DriveSyncManager (folder, inventory, access, reset);
+                          sync/pull.ts, sync/push.ts, sync/changes.ts: what it pulls and pushes
         │
 File metadata             drive-metadata.js: names, MIME types and appProperties
         │

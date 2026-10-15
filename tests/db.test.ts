@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -6,7 +7,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist, parseTempo } from '../src/js/db.ts'
-import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
+import { setlistContentHash } from '../src/js/sync/setlist-hash.ts'
 import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
 import { must } from './must.ts'
 
@@ -148,13 +149,12 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
     expect([song.tempo, song.originalTempo]).to.deep.equal([150, 150])
     expect(must(await db.getSong('uuid-2')).tempo).to.equal(96)
 
-    const sync = new DriveSyncManager('Test', null, { db })
     const migratedInSync = must(await db.getSetlist('in-sync'))
     expect(migratedInSync.songs[0].tempo).to.equal(72)
-    expect(sync.setlistHasLocalChanges(migratedInSync)).to.equal(false)
+    expect(setlistHasLocalChanges(migratedInSync)).to.equal(false)
     const migratedEdited = must(await db.getSetlist('edited'))
     expect(migratedEdited.songs[0].tempo).to.equal(80)
-    expect(sync.setlistHasLocalChanges(migratedEdited)).to.equal(true)
+    expect(setlistHasLocalChanges(migratedEdited)).to.equal(true)
     must(db.db).close()
   })
 })
