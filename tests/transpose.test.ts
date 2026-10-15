@@ -639,6 +639,50 @@ describe('the keys on offer', () => {
   })
 })
 
+describe('transposeKeyName, picks the easiest key', () => {
+  for (const [key, semitones, expected] of [
+    ['Bb', 1, 'B'],
+    ['C', 1, 'Db'],
+    ['G', 1, 'Ab'],
+    ['A', 1, 'Bb'],
+    ['F', 5, 'Bb'],
+    ['Bbm', 1, 'Bm'],
+    ['G', -1, 'F#'],
+    ['Db', 5, 'Gb'],
+    ['D', 4, 'F#'],
+  ] as const) {
+    it(`${key} up ${semitones} is ${expected}`, () => {
+      expect(transposeKeyName(key, semitones)).to.equal(expected)
+    })
+  }
+
+  it('never gives a key with more than six sharps or flats', () => {
+    for (const key of [
+      'C',
+      'G',
+      'D',
+      'A',
+      'E',
+      'B',
+      'F',
+      'Bb',
+      'Eb',
+      'Ab',
+      'Db',
+      'Am',
+      'Em',
+      'Dm',
+    ]) {
+      for (let semitones = -11; semitones <= 11; semitones++) {
+        expect(['Cb', 'C#', 'A#m', 'Abm']).to.not.include(
+          transposeKeyName(key, semitones),
+          `${key} ${semitones}`
+        )
+      }
+    }
+  })
+})
+
 describe('transposeKeyName, for other keys', () => {
   it('leaves a key that is not one, or no move', () => {
     expect(transposeKeyName('', 2)).to.equal('')
@@ -646,9 +690,9 @@ describe('transposeKeyName, for other keys', () => {
     expect(transposeKeyName('X', 2)).to.equal('X')
   })
 
-  it('names the new key the way the old one was written', () => {
+  it('names the new key the way the old one was written, when two spellings are as easy', () => {
     expect(transposeKeyName('Bb', 2)).to.equal('C')
-    expect(transposeKeyName('C', 1)).to.equal('C#')
+    expect(transposeKeyName('C', 1)).to.equal('Db')
     expect(transposeKeyName('Bb', 3)).to.equal('Db')
     expect(transposeKeyName('F#', 1)).to.equal('G')
     expect(transposeKeyName('Dbm', 2)).to.equal('Ebm')

@@ -487,17 +487,16 @@ export function transposeKeyName(key: string, semitones: number): string {
     const candidateRoot = extractKeyRoot(candidate)
     return candidateRoot !== null && noteToSemitone(candidateRoot) === targetSemitone
   })
-  const preference = determineAccidentalPreference(root)
-  if (preference === 'flat') {
-    const flatCandidate = candidates.find(name => name.includes('b'))
-    if (flatCandidate) return flatCandidate
-  } else if (preference === 'sharp') {
-    const sharpCandidate = candidates.find(name => name.includes('#'))
-    if (sharpCandidate) return sharpCandidate
+  // The key with the fewest sharps or flats (Bb up a semitone is B, not Cb): the easiest to play.
+  // Where two spellings tie (F# and Gb), the one that suits the key it came from
+  const accidentals = (name: string) => {
+    const info = KEY_INFO[name]
+    return 'sharps' in info ? (info.sharps ?? 0) : (info.flats ?? 0)
   }
-  const naturalCandidate = candidates.find(name => !name.includes('#') && !name.includes('b'))
-  if (naturalCandidate) return naturalCandidate
-  return candidates[0]
+  const fewest = Math.min(...candidates.map(accidentals))
+  const easiest = candidates.filter(name => accidentals(name) === fewest)
+  const wantFlats = determineAccidentalPreference(root) === 'flat'
+  return easiest.find(name => name.includes('b') === wantFlats) ?? easiest[0]
 }
 
 const DEGREE_OFFSETS: Record<number, number> = {
