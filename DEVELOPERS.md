@@ -77,6 +77,10 @@ just format lint test
 - Use modern HTML, CSS and JS, within the browsers in `.browserslistrc`, and prefer
   native browser features.
 - Components are [Lit](https://lit.dev/) web components in `src/components/`.
+- Dependencies run on machines that hold credentials, so `.npmrc` sets `ignore-scripts=true`:
+  no package runs an install script. If one ever needs it, run that package's script by hand
+  (`npm rebuild <package> --ignore-scripts=false`) after reading it. Browsers come from
+  `just setup` (`playwright install`), which that setting does not affect.
 - What a class keeps to itself is `#name` (native private) in new plain classes. A Lit
   component's reactive state has to be a named property, so a component's own members are
   `_name`; so are the members of the older classes in `src/js/`, which tests read. TypeScript's
