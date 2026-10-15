@@ -1,5 +1,12 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import type { AppHeader } from '../src/components/app-header.ts'
+import {
+  type AppHeader,
+  EditModeToggleEvent,
+  HeaderExpandToggleEvent,
+  HeaderInfoClickEvent,
+  HeaderMenuClickEvent,
+} from '../src/components/app-header.ts'
+import { AppUpdateChangeEvent } from '../src/js/app-update.ts'
 import { wait } from './test-helpers.ts'
 import '../src/components/app-header.ts'
 
@@ -40,5 +47,92 @@ describe('app-header', () => {
     // The next change fades as usual
     header.heading = 'Third'
     await waitUntil(() => shownTitle(header) === 'Third', 'the next change fades in')
+  })
+
+  describe('buttons', () => {
+    const button = (header: AppHeader, selector: string) =>
+      header.shadowRoot?.querySelector(selector) as HTMLButtonElement | null
+
+    it('has only the menu button, and no second row of controls, by default', async () => {
+      const header = await fixture<AppHeader>(html`<app-header heading="Plain"></app-header>`)
+      expect(button(header, '.edit-toggle')).to.equal(null)
+      expect(button(header, '.info-button')).to.equal(null)
+      expect(button(header, '.expand-toggle')).to.equal(null)
+      expect(header.shadowRoot?.querySelector('.logo')).to.equal(null)
+      let menu: HeaderMenuClickEvent | null = null
+      header.addEventListener(
+        HeaderMenuClickEvent.type,
+        event => (menu = event as HeaderMenuClickEvent)
+      )
+      button(header, '.nav-menu-button')?.click()
+      expect(menu).to.not.equal(null)
+      expect((menu as unknown as HeaderMenuClickEvent).trigger).to.equal(
+        button(header, '.nav-menu-button')
+      )
+    })
+
+    it('shows the logo when asked', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Home" show-logo></app-header>`
+      )
+      expect(header.shadowRoot?.querySelector('.logo')).to.not.equal(null)
+    })
+
+    it('tells of the edit and info buttons being pressed', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-edit-toggle show-info-button></app-header>`
+      )
+      const seen: string[] = []
+      header.addEventListener(EditModeToggleEvent.type, () => seen.push('edit'))
+      header.addEventListener(HeaderInfoClickEvent.type, () => seen.push('info'))
+      button(header, '.edit-toggle')?.click()
+      button(header, '.info-button')?.click()
+      expect(seen).to.deep.equal(['edit', 'info'])
+    })
+
+    it('marks the edit button while in edit mode', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-edit-toggle edit-mode></app-header>`
+      )
+      expect(button(header, '.edit-toggle')?.classList.contains('active')).to.equal(true)
+    })
+
+    it('shows and hides the second row with its toggle, and says so', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-edit-toggle></app-header>`
+      )
+      const seen: boolean[] = []
+      header.addEventListener(HeaderExpandToggleEvent.type, event =>
+        seen.push((event as HeaderExpandToggleEvent).expanded)
+      )
+      button(header, '.expand-toggle')?.click()
+      await header.updateComplete
+      expect(button(header, '.expand-toggle')?.textContent?.trim()).to.equal('▲')
+      button(header, '.expand-toggle')?.click()
+      await header.updateComplete
+      expect(button(header, '.expand-toggle')?.textContent?.trim()).to.equal('▼')
+      expect(seen).to.deep.equal([true, false])
+    })
+
+    it('has controls when something is in the controls slot', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page"><button slot="controls">Go</button></app-header>`
+      )
+      await header.updateComplete
+      expect(button(header, '.expand-toggle')).to.not.equal(null)
+    })
+
+    it('shows a dot on the menu button while an update is waiting', async () => {
+      const header = await fixture<AppHeader>(html`<app-header heading="Page"></app-header>`)
+      expect(header.shadowRoot?.querySelector('.update-dot')).to.equal(null)
+      window.dispatchEvent(new AppUpdateChangeEvent(true))
+      await header.updateComplete
+      expect(header.shadowRoot?.querySelector('.update-dot')).to.not.equal(null)
+      expect(button(header, '.nav-menu-button')?.getAttribute('aria-label')).to.contain(
+        'update ready'
+      )
+      header.remove()
+      window.dispatchEvent(new AppUpdateChangeEvent(false))
+    })
   })
 })

@@ -51,7 +51,7 @@
   },
   "src/components/setlist-email-import.ts": {
     "lines": 503,
-    "branches": 2,
+    "branches": 10,
     "functions": 31
   },
   "src/components/setlist-info-dialog.ts": {
