@@ -56,7 +56,7 @@ describe('the setlist page: corners', () => {
   it('collapses a section with a details element, animating it', async () => {
     await rig.open()
     rig.page.showSong(0, true)
-    await rig.page.setSectionHideMode(0, 0, 'collapse')
+    await rig.page.sections.setHideMode(0, 0, 'collapse')
     await wait(500)
     expect(rig.errors).to.deep.equal([])
   })
@@ -104,7 +104,7 @@ describe('the setlist page: corners', () => {
     const stray = document.createElement('song-section')
     stray.setAttribute('song-index', 'x')
     rig.root.append(stray)
-    rig.page._initializeSongSections()
+    rig.page.sections.applyAll()
     expect(stray.hideMode).to.not.equal('lyrics')
   })
 
@@ -166,11 +166,11 @@ describe('the setlist page: corners', () => {
     stray.setAttribute('song-index', '7')
     stray.setAttribute('section-index', '7')
     rig.root.append(stray)
-    expect(rig.page._getSongSectionComponent(7, 7)).to.equal(stray)
-    expect(rig.page._getSongSectionComponent(8, 8)).to.equal(null)
+    expect(rig.page.sections.find(7, 7)).to.equal(stray)
+    expect(rig.page.sections.find(8, 8)).to.equal(null)
     stray.setAttribute('song-index', '0')
     stray.setAttribute('section-index', 'x')
-    rig.page._initializeSongSections()
+    rig.page.sections.applyAll()
   })
 
   it('mixes a section’s own state with the song’s defaults and the app’s, field by field', async () => {
@@ -185,20 +185,20 @@ describe('the setlist page: corners', () => {
         },
       })
     )
-    rig.page.sectionState = { 0: { 0: { hideMode: 'chords' } as never } }
-    expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
+    rig.page.sections.states = { 0: { 0: { hideMode: 'chords' } as never } }
+    expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
       hideMode: 'chords',
       isCollapsed: true,
       isHidden: true,
     })
-    rig.page.sectionState = { 0: { 0: { isCollapsed: false, isHidden: false } as never } }
-    expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
+    rig.page.sections.states = { 0: { 0: { isCollapsed: false, isHidden: false } as never } }
+    expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
       hideMode: 'lyrics',
       isCollapsed: false,
       isHidden: false,
     })
-    rig.page.sectionState = {}
-    expect(rig.page._resolveSectionState(0, 0).hideMode).to.equal('lyrics')
+    rig.page.sections.states = {}
+    expect(rig.page.sections.resolve(0, 0).hideMode).to.equal('lyrics')
   })
 
   it('does nothing for the parts of the page that are not there', async () => {
@@ -220,7 +220,7 @@ describe('the setlist page: corners', () => {
     rig.page._editModeSetup = false
     rig.page.setupEditMode()
     rig.page.setupKeySelector()
-    rig.page.setupSectionControls()
+    rig.page.sections.listen()
     rig.page.setupSectionObserver()
     rig.page.setupKeyboardNavigation()
     expect(rig.errors).to.deep.equal([])

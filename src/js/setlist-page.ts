@@ -28,18 +28,13 @@ import { type SetlistShare, SetlistShareChangeEvent } from '../components/setlis
 import type { SongDisplay } from '../components/song-display.ts'
 import type { SongInfoDialog } from '../components/song-info-dialog.ts'
 import {
-  SectionActionEvent,
-  SectionToggleEvent,
-  type SongSection,
-} from '../components/song-section.ts'
-import {
   BpmChangeEvent,
   PadSetChoiceEvent,
   SongResetClickEvent,
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
-import type { HideMode, SectionState, Setlist, SongWithContent } from './data-types.ts'
+import type { Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
@@ -47,24 +42,19 @@ import { isReadOnlyOrganisation } from './organisation.ts'
 import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
-import {
-  CapoPreferenceEvent,
-  getCapoPreference,
-  getSectionDefaults,
-  SectionDefaultsEvent,
-} from './preferences.ts'
+import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
+import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   clearSetlistLocalState,
   loadSetlistLocalState,
-  type SectionStates,
   saveSetlistLocalState,
 } from './setlist/local-state.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
-import { defaultHideMode, sectionLabel } from './setlist/section-defaults.ts'
+import { SectionController } from './setlist/section-controller.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
@@ -123,15 +113,13 @@ export class SetlistPage {
   songs: RuntimeSong[]
   currentSetlistId: string | null
   currentSetlist: Setlist | undefined
-  sectionState: SectionStates
+  sections: SectionController
   sectionObserver: IntersectionObserver | null
   overviewEditMode: boolean
   _overviewComponent: SetlistOverview | null
   _capoEnabled: boolean
   _capoChangeHandler: ((event: CapoChangeEvent) => void) | null
   _keyChangeHandler?: (event: KeyChangeEvent) => void
-  _sectionActionHandler?: (event: SectionActionEvent) => void
-  _sectionToggleHandler?: (event: SectionToggleEvent) => void
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _currentKeyForCapo: string
@@ -196,7 +184,7 @@ export class SetlistPage {
     this.currentSetlistId = null
     this.currentSetlist = undefined
     // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
-    this.sectionState = {}
+    this.sections = new SectionController(this)
     this.sectionObserver = null
     this.overviewEditMode = false // Track whether overview is in edit mode
     this._overviewComponent = null
@@ -246,6 +234,11 @@ export class SetlistPage {
   }
 
   /** The organisation's database; start() opens it */
+  /** The organisation the setlist is in (a section's song may have preferences of the user's) */
+  organisationId(): string {
+    return this._database().organisationId
+  }
+
   _database(): ChordlessDB {
     if (!this.db) throw new Error('The setlist page has not been started')
     return this.db
@@ -401,7 +394,7 @@ export class SetlistPage {
       preloadPadKeysForSongs(this.songs)
 
       // Initialize section states (load saved overrides for this setlist)
-      this.sectionState = {}
+      this.sections.states = {}
       this.loadState()
 
       // Which view to start in comes from the route; a song that isn't there means the overview
@@ -414,7 +407,7 @@ export class SetlistPage {
       container.textContent = ''
       const fragment = this.renderFullSetlist(songs)
       container.appendChild(fragment)
-      this._initializeSongSections(container)
+      this.sections.applyAll(container)
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
       if (shouldShowSongDirectly) {
@@ -457,10 +450,10 @@ export class SetlistPage {
         }
 
         // Set up section control buttons
-        this.setupSectionControls()
+        this.sections.listen()
 
         // Apply saved state to sections
-        this.applySectionState()
+        this.sections.applyAll()
 
         // Set up key selector
         this.setupKeySelector()
@@ -580,59 +573,6 @@ export class SetlistPage {
     return fragment
   }
 
-  _initializeSongSections(root: ParentNode = this.root) {
-    const isEditMode = document.body.classList.contains('edit-mode')
-
-    // Find all song-section elements, including those inside song-display shadow DOMs
-    const sections: SongSection[] = []
-
-    // First, get any song-sections directly in the root
-    sections.push(...root.querySelectorAll('song-section'))
-
-    // Then, query into song-display shadow roots
-    const songDisplays = root.querySelectorAll('song-display')
-    songDisplays.forEach(songDisplay => {
-      if (songDisplay.shadowRoot) {
-        sections.push(...songDisplay.shadowRoot.querySelectorAll('song-section'))
-      }
-    })
-
-    sections.forEach(section => {
-      const songIndex = Number(section.getAttribute('song-index'))
-      const sectionIndex = Number(section.getAttribute('section-index'))
-      if (Number.isNaN(songIndex) || Number.isNaN(sectionIndex)) {
-        return
-      }
-      const state = this._resolveSectionState(songIndex, sectionIndex, section)
-      // Apply state via reactive properties
-      section.hideMode = state.hideMode
-      section.isCollapsed = state.isCollapsed
-      section.isHidden = state.isHidden
-      section.editMode = isEditMode
-    })
-  }
-
-  _getSongSectionComponent(songIndex: number, sectionIndex: number): SongSection | null {
-    // First try direct query (in case not in shadow DOM)
-    let section: SongSection | null = this.root.querySelector<SongSection>(
-      `song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`
-    )
-    if (section) return section
-
-    // Query into song-display shadow roots
-    const songDisplays = this.root.querySelectorAll<SongDisplay>('song-display')
-    for (const songDisplay of songDisplays) {
-      if (songDisplay.shadowRoot) {
-        section = songDisplay.shadowRoot.querySelector<SongSection>(
-          `song-section[song-index="${songIndex}"][section-index="${sectionIndex}"]`
-        )
-        if (section) return section
-      }
-    }
-
-    return null
-  }
-
   showOverview(instant = false) {
     // Update the last visible section to prevent observer from triggering
     this._lastVisibleSection = 'overview'
@@ -684,7 +624,7 @@ export class SetlistPage {
       }
 
       // Update all sections to reflect non-edit mode
-      this._initializeSongSections()
+      this.sections.applyAll()
 
       // Save setlist to IndexedDB
       if (this.currentSetlist) {
@@ -1022,7 +962,7 @@ export class SetlistPage {
   /** Load this setlist's section states and capos, as this device kept them (local-state.ts) */
   loadState() {
     const { sectionState, capoValues } = loadSetlistLocalState(this.currentSetlistId)
-    this.sectionState = sectionState
+    this.sections.states = sectionState
     if (this._capoEnabled) {
       for (const [songIndex, capo] of Object.entries(capoValues)) {
         const song = this.songs[Number(songIndex)]
@@ -1073,7 +1013,7 @@ export class SetlistPage {
         }
       })
     }
-    saveSetlistLocalState(this.currentSetlistId, { sectionState: this.sectionState, capoValues })
+    saveSetlistLocalState(this.currentSetlistId, { sectionState: this.sections.states, capoValues })
   }
 
   /** The model that saves a song's changes in this setlist (loaded when first needed) */
@@ -1087,231 +1027,6 @@ export class SetlistPage {
       this._database(),
       this._database().organisationId
     )
-  }
-
-  _resolveSectionState(
-    songIndex: number,
-    sectionIndex: number,
-    sectionElement: SongSection | null = null
-  ): SectionState {
-    // Priority 1: Setlist state override (explicit per-setlist override)
-    const overridesForSong = this.sectionState[songIndex] || {}
-    const override = overridesForSong[sectionIndex] || null
-
-    // Priority 2: Song user prefs (user's defaults for this song)
-    const songUserPrefsDefaults = this._getSongUserPrefsSectionDefaults(songIndex, sectionIndex)
-
-    // Priority 3: Global section defaults & app defaults
-    const appDefaults = {
-      hideMode: this._resolveDefaultHideMode(sectionElement, songIndex, sectionIndex),
-      isCollapsed: false,
-      isHidden: false,
-    }
-
-    // Merge priorities, field by field
-    return { ...appDefaults, ...songUserPrefsDefaults, ...override }
-  }
-
-  _getSongUserPrefsSectionDefaults(songIndex: number, sectionIndex: number): SectionState | null {
-    // Get song user prefs for this song
-    const song = this.songs?.[songIndex]
-    if (!song) return null
-
-    const songId = song.songId
-    if (!songId) return null
-
-    const prefs = getSongUserPrefs(songId, this._database().organisationId)
-    if (!prefs?.sectionDefaults) return null
-
-    return prefs.sectionDefaults[sectionIndex.toString()] || null
-  }
-
-  _ensureSectionOverride(
-    songIndex: number,
-    sectionIndex: number,
-    sectionElement: SongSection | null = null
-  ): SectionState {
-    if (!this.sectionState[songIndex]) {
-      this.sectionState[songIndex] = {}
-    }
-    if (!this.sectionState[songIndex][sectionIndex]) {
-      const resolved = this._resolveSectionState(songIndex, sectionIndex, sectionElement)
-      this.sectionState[songIndex][sectionIndex] = {
-        hideMode: resolved.hideMode,
-        isCollapsed: resolved.isCollapsed,
-        isHidden: resolved.isHidden,
-      }
-    }
-    return this.sectionState[songIndex][sectionIndex]
-  }
-
-  _resolveDefaultHideMode(
-    sectionElement: SongSection | null,
-    songIndex: number,
-    sectionIndex: number
-  ): HideMode {
-    if (!sectionElement) {
-      sectionElement = this._getSongSectionComponent(songIndex, sectionIndex)
-    }
-    return defaultHideMode(
-      sectionLabel(sectionElement),
-      sectionElement ? sectionElement.getRecommendedHideMode() : 'none',
-      getSectionDefaults()
-    )
-  }
-
-  async setSectionHideMode(songIndex: number, sectionIndex: number, mode: string) {
-    const component = this._getSongSectionComponent(songIndex, sectionIndex)
-    const state = this._ensureSectionOverride(songIndex, sectionIndex, component)
-
-    if (mode === 'collapse') {
-      const details = component?.getDetailsElement()
-      if (details) {
-        this.animateSectionToggle(songIndex, sectionIndex, details)
-      }
-      return
-    }
-
-    const explicitShowMap: Record<string, HideMode> = {
-      'show-all': 'none',
-      'show-lyrics': 'chords',
-      'show-chords': 'lyrics',
-      'show-none': 'hide',
-    }
-    const mappedMode = (explicitShowMap[mode] || mode) as HideMode
-    const isExplicit = Boolean(explicitShowMap[mode])
-
-    if (mappedMode === 'hide') {
-      if (isExplicit) {
-        state.isHidden = true
-        state.hideMode = 'hide'
-        state.isCollapsed = false
-      } else {
-        state.isHidden = !state.isHidden
-        if (state.isHidden) {
-          state.hideMode = 'hide'
-          state.isCollapsed = false
-        } else {
-          state.hideMode = 'none'
-        }
-      }
-      this.saveState()
-      this.updateSectionDOM(songIndex, sectionIndex)
-      return
-    }
-
-    if (state.isHidden) {
-      state.isHidden = false
-    }
-    if (state.isCollapsed) {
-      state.isCollapsed = false
-    }
-
-    if (isExplicit || mappedMode === 'none') {
-      state.hideMode = mappedMode
-    } else {
-      state.hideMode = state.hideMode === mappedMode ? 'none' : mappedMode
-    }
-    this.saveState()
-    this.updateSectionDOM(songIndex, sectionIndex)
-  }
-
-  async animateSectionToggle(songIndex: number, sectionIndex: number, details: HTMLDetailsElement) {
-    const state = this._ensureSectionOverride(songIndex, sectionIndex)
-    const content = details.querySelector<HTMLElement>('.section-content')
-    const wrapper = details.closest<HTMLElement>('.song-section-wrapper') || details
-    if (!content) return
-
-    const isEditMode = document.body.classList.contains('edit-mode')
-
-    // Determine if we're opening or closing based on current state
-    const isCurrentlyCollapsed = state.isCollapsed
-    const isOpening = isCurrentlyCollapsed
-
-    if (isOpening) {
-      // Opening: update state first
-      state.isCollapsed = false
-      state.hideMode = 'none'
-      this.saveState()
-
-      // Update wrapper classes
-      wrapper.classList.remove('section-collapsed')
-
-      // In normal mode, open details; in edit mode it's always open
-      if (!isEditMode) {
-        details.open = true
-      }
-
-      // Get the natural height
-      const startHeight = 0
-      const endHeight = content.scrollHeight
-
-      // Animate from 0 to full height
-      content.style.height = `${startHeight}px`
-      content.style.overflow = 'hidden'
-
-      requestAnimationFrame(() => {
-        content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-        content.style.height = `${endHeight}px`
-
-        // Clean up after animation
-        setTimeout(() => {
-          content.style.height = ''
-          content.style.overflow = ''
-          content.style.transition = ''
-        }, 350)
-      })
-    } else {
-      // Closing: animate first, then update state
-      const startHeight = content.scrollHeight
-      const endHeight = 0
-
-      // Set explicit height
-      content.style.height = `${startHeight}px`
-      content.style.overflow = 'hidden'
-
-      requestAnimationFrame(() => {
-        content.style.transition = 'height 0.35s cubic-bezier(0.4, 0, 0.2, 1)'
-        content.style.height = `${endHeight}px`
-
-        // After animation completes, update state
-        setTimeout(async () => {
-          state.isCollapsed = true
-          state.hideMode = 'collapse'
-          this.saveState()
-
-          // Update wrapper classes (adds section-collapsed)
-          wrapper.classList.add('section-collapsed')
-
-          // In normal mode, close details; in edit mode keep it open
-          if (!isEditMode) {
-            details.open = false
-          }
-
-          content.style.height = ''
-          content.style.overflow = ''
-          content.style.transition = ''
-        }, 350)
-      })
-    }
-  }
-
-  updateSectionDOM(songIndex: number, sectionIndex: number) {
-    const component = this._getSongSectionComponent(songIndex, sectionIndex)
-    if (!component) {
-      return
-    }
-    const state = this._resolveSectionState(songIndex, sectionIndex, component)
-    const isEditMode = document.body.classList.contains('edit-mode')
-    // Apply state via reactive properties
-    component.hideMode = state.hideMode
-    component.isCollapsed = state.isCollapsed
-    component.isHidden = state.isHidden
-    component.editMode = isEditMode
-  }
-
-  applySectionState() {
-    this._initializeSongSections()
   }
 
   setupEditMode() {
@@ -1331,104 +1046,24 @@ export class SetlistPage {
       }
 
       // We're on song view - handle song edit mode
-      const isEnteringEditMode = !document.body.classList.contains('edit-mode')
-
-      if (isEnteringEditMode) {
-        // Entering edit mode - fade out normal controls, fade in edit controls
-        document.body.classList.add('edit-mode')
-        document.body.setAttribute('data-edit-mode', '')
-        appHeader.editMode = true
-
-        // Update musical metadata to edit mode (makes it clickable)
-        const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-        if (musicalMetadata) {
-          musicalMetadata.editMode = true
-        }
-
-        // Update key selector edit mode
-        const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-        if (keySelector) {
+      if (!document.body.classList.contains('edit-mode')) {
+        enterEditMode(this.root, appHeader, {
           // The key is part of the setlist: not for a user who can only read it
-          keySelector.editMode = !isReadOnlyOrganisation()
-        }
-        const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-        if (capoSelector && this._capoEnabled) {
-          capoSelector.editMode = true
-        }
-
-        // Clear inline display:none if it was set during previous exit
-        this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
-          el.style.display = ''
+          keyEditable: !isReadOnlyOrganisation(),
+          capoEnabled: this._capoEnabled,
         })
-
-        // Trigger fade-in for all edit mode controls after a frame
-        requestAnimationFrame(() => {
-          this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
-            el.classList.add('fade-in')
-          })
-        })
-
-        // After fade completes, mark normal controls as fade-complete
-        setTimeout(() => {
-          this.root.querySelectorAll<HTMLElement>('.normal-mode-control').forEach(el => {
-            el.classList.add('fade-complete')
-          })
-        }, 250)
-
         // Update all sections based on edit mode
-        this._initializeSongSections()
+        this.sections.applyAll()
       } else {
-        // Exiting edit mode - fade everything simultaneously
-        // Remove edit mode class immediately to trigger all fades
-        document.body.classList.remove('edit-mode')
-        document.body.removeAttribute('data-edit-mode')
-        appHeader.editMode = false
-
-        // Update musical metadata to normal mode (not clickable)
-        const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-        if (musicalMetadata) {
-          musicalMetadata.editMode = false
-        }
-
-        // Update key selector edit mode
-        const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-        if (keySelector) {
-          keySelector.editMode = false
-        }
-        const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-        if (capoSelector) {
-          capoSelector.editMode = false
-        }
-
-        // Remove fade-in classes from edit controls (triggers fade out)
-        this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
-          el.classList.remove('fade-in')
-        })
-
-        // Remove fade-complete from normal controls (makes them visible again)
-        this.root.querySelectorAll<HTMLElement>('.normal-mode-control').forEach(el => {
-          el.classList.remove('fade-complete')
-        })
-
-        // Refresh song sections immediately so their controls begin fading out in sync
-        this._initializeSongSections()
-
-        // Wait for fade to complete, then save and cleanup
-        setTimeout(async () => {
-          // Hide edit controls completely now that fade is done
-          this.root.querySelectorAll<HTMLElement>('.edit-mode-control').forEach(el => {
-            el.style.display = 'none'
-          })
-
-          // Save setlist to IndexedDB
+        leaveEditMode(this.root, appHeader, async () => {
+          // Save the setlist to IndexedDB
           if (this.currentSetlist) {
-            // Update timestamp
             this.currentSetlist.modifiedDate = new Date().toISOString()
-
-            // Save to database
             await this._database().saveSetlist(this.currentSetlist)
           }
-        }, 250)
+        })
+        // Refresh song sections immediately so their controls begin fading out in sync
+        this.sections.applyAll()
       }
     })
   }
@@ -1494,37 +1129,6 @@ export class SetlistPage {
           }
         }
       })
-    }
-  }
-
-  setupSectionControls() {
-    const container = this.root.querySelector<HTMLElement>('.song-container')
-    if (!container) return
-
-    if (!this._sectionActionHandler) {
-      this._sectionActionHandler = event => {
-        const { songIndex, sectionIndex, action } = event
-        if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number' || !action) {
-          return
-        }
-        this.setSectionHideMode(songIndex, sectionIndex, action)
-      }
-      container.addEventListener(SectionActionEvent.type, this._sectionActionHandler)
-    }
-
-    if (!this._sectionToggleHandler) {
-      this._sectionToggleHandler = event => {
-        const { songIndex, sectionIndex } = event
-        if (typeof songIndex !== 'number' || typeof sectionIndex !== 'number') {
-          return
-        }
-        const component = this._getSongSectionComponent(songIndex, sectionIndex)
-        const details = component?.getDetailsElement()
-        if (details) {
-          this.animateSectionToggle(songIndex, sectionIndex, details)
-        }
-      }
-      container.addEventListener(SectionToggleEvent.type, this._sectionToggleHandler)
     }
   }
 
@@ -1792,12 +1396,12 @@ export class SetlistPage {
     }
 
     // Reset all section states for this song
-    if (this.sectionState[this.currentSongIndex]) {
-      delete this.sectionState[this.currentSongIndex]
+    if (this.sections.states[this.currentSongIndex]) {
+      delete this.sections.states[this.currentSongIndex]
     }
 
     // Reapply section states (all back to default)
-    this.applySectionState()
+    this.sections.applyAll()
 
     // Apply font size
     this.applyFontSize(this.currentSongIndex)
@@ -1893,7 +1497,7 @@ export class SetlistPage {
       await Promise.all(displays.map(display => display.updateComplete))
 
       // Re-apply section states with new indices
-      this.applySectionState()
+      this.sections.applyAll()
 
       // Re-apply font sizes
       this.songs.forEach((_song, index) => {
@@ -1929,7 +1533,7 @@ export class SetlistPage {
       this._reorder.disable()
     }
 
-    this._initializeSongSections()
+    this.sections.applyAll()
   }
 
   /**
@@ -2005,7 +1609,7 @@ export class SetlistPage {
 
       // Wait for song-section elements to be ready before initializing
       await customElements.whenDefined('song-section')
-      this._initializeSongSections(songSection)
+      this.sections.applyAll(songSection)
 
       // Re-apply font size
       const songContentEl = songSection.querySelector<HTMLElement>('.song-content')
@@ -2211,7 +1815,7 @@ export class SetlistPage {
     if (Number.isNaN(this.currentSongIndex)) {
       return
     }
-    this.applySectionState()
+    this.sections.applyAll()
   }
 
   _handleCapoPreferenceChange() {

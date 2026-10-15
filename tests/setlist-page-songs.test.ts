@@ -36,8 +36,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     localStorage.removeItem(`state-${rig.page?.currentSetlistId}`)
   })
 
-  const section = (song: number, index: number) =>
-    must(rig.page._getSongSectionComponent(song, index))
+  const section = (song: number, index: number) => must(rig.page.sections.find(song, index))
   const popover = () => must($<SongSettingsPopover>('#song-settings-popover'))
   const setReadOnly = async () => setOrganisationReadOnly(must(getCurrentOrganisation().id), true)
 
@@ -45,7 +44,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('start from the app’s defaults', async () => {
       await rig.open()
       expect(section(0, 0).hideMode).to.equal('none')
-      expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
+      expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
         hideMode: 'none',
         isCollapsed: false,
         isHidden: false,
@@ -58,8 +57,8 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         JSON.stringify({ all: 'lyrics', chorus: 'hide', 'verse 1': 'collapse' })
       )
       await rig.open()
-      expect(rig.page._resolveSectionState(0, 0, section(0, 0)).hideMode).to.equal('collapse')
-      expect(rig.page._resolveSectionState(0, 1, section(0, 1)).hideMode).to.equal('hide')
+      expect(rig.page.sections.resolve(0, 0, section(0, 0)).hideMode).to.equal('collapse')
+      expect(rig.page.sections.resolve(0, 1, section(0, 1)).hideMode).to.equal('hide')
     })
 
     it('are collapsed when what the user chose has nothing to show in a section', async () => {
@@ -67,13 +66,13 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       const chordsOnly = { getRecommendedHideMode: () => 'lyrics', dataset: {}, label: '' } as never
       const lyricsOnly = { getRecommendedHideMode: () => 'chords', dataset: {}, label: '' } as never
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'lyrics' }))
-      expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('collapse')
-      expect(rig.page._resolveDefaultHideMode(lyricsOnly, 0, 0)).to.equal('chords')
+      expect(rig.page.sections.defaultHideModeFor(chordsOnly, 0, 0)).to.equal('collapse')
+      expect(rig.page.sections.defaultHideModeFor(lyricsOnly, 0, 0)).to.equal('chords')
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'chords' }))
-      expect(rig.page._resolveDefaultHideMode(lyricsOnly, 0, 0)).to.equal('collapse')
-      expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('lyrics')
+      expect(rig.page.sections.defaultHideModeFor(lyricsOnly, 0, 0)).to.equal('collapse')
+      expect(rig.page.sections.defaultHideModeFor(chordsOnly, 0, 0)).to.equal('lyrics')
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'all' }))
-      expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('lyrics')
+      expect(rig.page.sections.defaultHideModeFor(chordsOnly, 0, 0)).to.equal('lyrics')
     })
 
     it('are the user’s own for a song, then the setlist’s own over those', async () => {
@@ -82,35 +81,37 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       saveSongUserPrefs(rig.page.songs[0].songId, orgId, {
         sectionDefaults: { '0': { hideMode: 'chords', isCollapsed: true, isHidden: false } },
       })
-      expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
+      expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
         hideMode: 'chords',
         isCollapsed: true,
         isHidden: false,
       })
-      rig.page.sectionState = { 0: { 0: { hideMode: 'hide', isCollapsed: false, isHidden: true } } }
-      expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
+      rig.page.sections.states = {
+        0: { 0: { hideMode: 'hide', isCollapsed: false, isHidden: true } },
+      }
+      expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
         hideMode: 'hide',
         isCollapsed: false,
         isHidden: true,
       })
-      expect(rig.page._getSongUserPrefsSectionDefaults(0, 5)).to.equal(null)
-      expect(rig.page._getSongUserPrefsSectionDefaults(99, 0)).to.equal(null)
+      expect(rig.page.sections.userDefaults(0, 5)).to.equal(null)
+      expect(rig.page.sections.userDefaults(99, 0)).to.equal(null)
       rig.page.songs[1].songId = ''
-      expect(rig.page._getSongUserPrefsSectionDefaults(1, 0)).to.equal(null)
+      expect(rig.page.sections.userDefaults(1, 0)).to.equal(null)
     })
 
     it('are not the user’s when what they saved cannot be read', async () => {
       await rig.open()
       localStorage.setItem(`song-prefs-${rig.db.organisationId}`, '{not json')
-      expect(rig.page._getSongUserPrefsSectionDefaults(0, 0)).to.equal(null)
+      expect(rig.page.sections.userDefaults(0, 0)).to.equal(null)
     })
 
     it('are the setlist’s own once one is set, and kept for the others to see', async () => {
       await rig.open()
-      const state = rig.page._ensureSectionOverride(0, 1)
+      const state = rig.page.sections.ensureOverride(0, 1)
       // (this section has only words, so only words are shown by default)
       expect(state).to.deep.equal({ hideMode: 'chords', isCollapsed: false, isHidden: false })
-      expect(rig.page._ensureSectionOverride(0, 1)).to.equal(state)
+      expect(rig.page.sections.ensureOverride(0, 1)).to.equal(state)
     })
   })
 
@@ -129,57 +130,62 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       act(0, 0, 'show-all')
       await wait(50)
       expect(section(0, 0).hideMode).to.equal('none')
-      await rig.page.setSectionHideMode(0, 0, 'chords')
-      expect(rig.page.sectionState[0][0].hideMode).to.equal('chords')
-      await rig.page.setSectionHideMode(0, 0, 'chords')
-      expect(rig.page.sectionState[0][0].hideMode).to.equal('none')
+      await rig.page.sections.setHideMode(0, 0, 'chords')
+      expect(rig.page.sections.states[0][0].hideMode).to.equal('chords')
+      await rig.page.sections.setHideMode(0, 0, 'chords')
+      expect(rig.page.sections.states[0][0].hideMode).to.equal('none')
     })
 
     it('hide a section outright, which showing it any way brings back, and toggle hiding', async () => {
       await rig.open()
-      await rig.page.setSectionHideMode(0, 0, 'show-none')
+      await rig.page.sections.setHideMode(0, 0, 'show-none')
       expect(section(0, 0).isHidden).to.equal(true)
-      await rig.page.setSectionHideMode(0, 0, 'show-lyrics')
+      await rig.page.sections.setHideMode(0, 0, 'show-lyrics')
       expect(section(0, 0).isHidden).to.equal(false)
-      await rig.page.setSectionHideMode(0, 1, 'hide')
-      expect(rig.page.sectionState[0][1].isHidden).to.equal(true)
-      await rig.page.setSectionHideMode(0, 1, 'hide')
-      expect(rig.page.sectionState[0][1].isHidden).to.equal(false)
-      expect(rig.page.sectionState[0][1].hideMode).to.equal('none')
+      await rig.page.sections.setHideMode(0, 1, 'hide')
+      expect(rig.page.sections.states[0][1].isHidden).to.equal(true)
+      await rig.page.sections.setHideMode(0, 1, 'hide')
+      expect(rig.page.sections.states[0][1].isHidden).to.equal(false)
+      expect(rig.page.sections.states[0][1].hideMode).to.equal('none')
     })
 
     it('open a collapsed section again, and collapse an open one', async () => {
       await rig.open()
-      rig.page.sectionState = {
+      rig.page.sections.states = {
         0: { 0: { hideMode: 'collapse', isCollapsed: true, isHidden: false } },
       }
-      rig.page.applySectionState()
-      await rig.page.setSectionHideMode(0, 0, 'show-lyrics')
-      expect(rig.page.sectionState[0][0].isCollapsed).to.equal(false)
+      rig.page.sections.applyAll()
+      await rig.page.sections.setHideMode(0, 0, 'show-lyrics')
+      expect(rig.page.sections.states[0][0].isCollapsed).to.equal(false)
 
       $('.song-container')?.dispatchEvent(new SectionToggleEvent(0, 1))
       await wait(500)
-      expect(rig.page.sectionState[0][1].isCollapsed).to.equal(true)
+      expect(rig.page.sections.states[0][1].isCollapsed).to.equal(true)
       $('.song-container')?.dispatchEvent(new SectionToggleEvent(0, 1))
       await wait(500)
-      expect(rig.page.sectionState[0][1].isCollapsed).to.equal(false)
+      expect(rig.page.sections.states[0][1].isCollapsed).to.equal(false)
     })
 
     it('do nothing for a section that is not there', async () => {
       await rig.open()
       act(0, 9, 'show-lyrics')
       $('.song-container')?.dispatchEvent(new SectionToggleEvent(0, 9))
-      rig.page.updateSectionDOM(0, 9)
-      await rig.page.animateSectionToggle(0, 0, document.createElement('details'))
+      rig.page.sections.updateDOM(0, 9)
+      await rig.page.sections.animateToggle(0, 0, document.createElement('details'))
       $('.song-container')?.dispatchEvent(new CustomEvent(SectionActionEvent.type, { detail: {} }))
       $('.song-container')?.dispatchEvent(new CustomEvent(SectionToggleEvent.type))
     })
 
     it('are set up once', async () => {
       await rig.open()
-      const handler = rig.page._sectionActionHandler
-      rig.page.setupSectionControls()
-      expect(rig.page._sectionActionHandler).to.equal(handler)
+      rig.page.sections.listen()
+      let saves = 0
+      rig.page.saveState = () => {
+        saves++
+      }
+      act(0, 0, 'show-lyrics')
+      await wait(0)
+      expect(saves).to.equal(1)
     })
   })
 
@@ -195,7 +201,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         })
       )
       rig.page.loadState()
-      expect(rig.page.sectionState[0][0].hideMode).to.equal('chords')
+      expect(rig.page.sections.states[0][0].hideMode).to.equal('chords')
       expect(rig.page.songs[1].currentCapo).to.equal(3)
     })
 
@@ -210,7 +216,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         })
       )
       rig.page.loadState()
-      expect(rig.page.sectionState[0][1].isHidden).to.equal(true)
+      expect(rig.page.sections.states[0][1].isHidden).to.equal(true)
       expect(rig.page.songs[2].currentCapo).to.equal(4)
     })
 
@@ -218,10 +224,10 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       const setlist = await rig.open()
       localStorage.setItem(`state-${setlist.id}`, '{not json')
       rig.page.loadState()
-      expect(rig.page.sectionState).to.deep.equal({})
+      expect(rig.page.sections.states).to.deep.equal({})
       localStorage.removeItem(`state-${setlist.id}`)
       rig.page.loadState()
-      expect(rig.page.sectionState).to.deep.equal({})
+      expect(rig.page.sections.states).to.deep.equal({})
     })
 
     it('uses the capo the user prefers for a song, in the key it is in, unless one is set', async () => {
@@ -258,7 +264,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       setCapoPreference(true)
       const setlist = await rig.open()
       rig.page.songs[1].currentCapo = 4
-      rig.page.sectionState = {
+      rig.page.sections.states = {
         0: { 0: { hideMode: 'chords', isCollapsed: false, isHidden: false } },
       }
       rig.page.saveState()
@@ -483,14 +489,16 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.page.handleKeyChange('A')
       await rig.page.handleBPMChange(120)
       await rig.page.handleCapoChange(3)
-      rig.page.sectionState = { 0: { 0: { hideMode: 'hide', isCollapsed: false, isHidden: true } } }
+      rig.page.sections.states = {
+        0: { 0: { hideMode: 'hide', isCollapsed: false, isHidden: true } },
+      }
       rig.page.songs[0].currentFontSize = 2.5
       await rig.page.resetCurrentSong()
       expect(rig.page.songs[0].currentKey).to.equal('G')
       expect(rig.page.songs[0].currentBPM).to.equal(90)
       expect(rig.page.songs[0].currentCapo).to.equal(0)
       expect(rig.page.songs[0].currentFontSize).to.equal(1.6)
-      expect(rig.page.sectionState[0]).to.equal(undefined)
+      expect(rig.page.sections.states[0]).to.equal(undefined)
     })
 
     it('shows the key again when it was right already', async () => {
