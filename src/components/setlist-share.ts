@@ -186,7 +186,7 @@ export class SetlistShare extends LitElement {
       const share = await createShare(setlist, {
         db,
         organisationId: id,
-        organisationFolderId: this.#folderOf(manager),
+        organisationFolderId: manager.driveFolderId as string, // (init found or made it)
       })
       setlist.share = share
       await db.saveSetlist(setlist)
@@ -203,7 +203,7 @@ export class SetlistShare extends LitElement {
       const manager = await createSyncManager(name, id)
       const share = await refreshShare(
         { ...setlist, share: setlist.share },
-        { db, organisationId: id, organisationFolderId: this.#folderOf(manager) }
+        { db, organisationId: id, organisationFolderId: manager.driveFolderId as string }
       )
       if (share !== setlist.share) {
         setlist.share = share
@@ -224,11 +224,6 @@ export class SetlistShare extends LitElement {
       this.requestUpdate()
       this.dispatchEvent(new SetlistShareChangeEvent())
     })
-  }
-
-  #folderOf(manager: { driveFolderId: string | null }): string {
-    if (!manager.driveFolderId) throw new Error("This organisation's Drive folder isn't known yet")
-    return manager.driveFolderId
   }
 
   get _url() {

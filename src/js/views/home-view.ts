@@ -60,7 +60,7 @@ export function groupSetlistsByYear(
     .map(year => ({
       year,
       expanded: Number(year) === currentYear,
-      setlists: (byYear.get(year) ?? [])
+      setlists: (byYear.get(year) as Setlist[])
         .sort((a, b) => b.date.localeCompare(a.date))
         .map(setlist => ({
           id: setlist.id,
@@ -112,8 +112,7 @@ export class HomeView extends PageView {
     const { people, me } = await getOrganisationPeople()
     const date = toLocalDateString(getNextSunday())
     // Defaults: next Sunday, a Sunday morning service, led by you
-    const form = this.#form.value
-    if (!form) return
+    const form = this.#form.value as SetlistDetailsForm
     form.people = people
     form.setlist = {
       date,

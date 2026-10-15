@@ -20,9 +20,9 @@
     "functions": 31
   },
   "src/components/setlist-share.ts": {
-    "lines": 83,
-    "branches": 8,
-    "functions": 8
+    "lines": 6,
+    "branches": 3,
+    "functions": 0
   },
   "src/components/song-import.ts": {
     "lines": 133,
@@ -46,59 +46,29 @@
     "unloaded": 0
   },
   "src/js/db.ts": {
-    "lines": 106,
+    "lines": 103,
     "branches": 0,
     "functions": 28
   },
   "src/js/drive-sync.ts": {
-    "lines": 260,
-    "branches": 111,
-    "functions": 3
-  },
-  "src/js/first-time-auth.ts": {
-    "lines": 92,
-    "branches": 0,
-    "functions": 5
+    "lines": 205,
+    "branches": 98,
+    "functions": 0
   },
   "src/js/google-auth.ts": {
     "lines": 167,
     "branches": 12,
     "functions": 11
   },
-  "src/js/import-setlist.ts": {
-    "lines": 106,
-    "branches": 0,
-    "functions": 4
-  },
   "src/js/setlist-page.ts": {
-    "lines": 932,
-    "branches": 120,
-    "functions": 36
-  },
-  "src/js/sync-orchestrator.ts": {
-    "lines": 81,
-    "branches": 12,
-    "functions": 4
-  },
-  "src/js/transpose.ts": {
-    "lines": 83,
-    "branches": 4,
-    "functions": 0
-  },
-  "src/js/views/home-view.ts": {
-    "lines": 0,
-    "branches": 5,
-    "functions": 0
+    "lines": 887,
+    "branches": 117,
+    "functions": 35
   },
   "src/js/views/library-view.ts": {
-    "lines": 78,
-    "branches": 36,
-    "functions": 9
-  },
-  "src/js/views/share-view.ts": {
-    "lines": 103,
-    "branches": 0,
-    "functions": 6
+    "lines": 5,
+    "branches": 27,
+    "functions": 0
   },
   "worker/src/index.ts": {
     "lines": 0,

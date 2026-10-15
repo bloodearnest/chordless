@@ -38,8 +38,8 @@ document and SETLIST_DELETION.md.
 ```
 UI (main thread)          drive-sync-panel.js (Sync / Reset from Google Drive buttons)
         │
-Orchestration             sync-orchestrator.js: wraps the engine, broadcasts progress
-        │                 (callback on the main thread, postMessage from a service worker)
+Orchestration             sync-orchestrator.ts: wraps the engine, reports progress
+        │                 (to a callback)
 Sync engine               drive-sync.js: DriveSyncManager
         │
 File metadata             drive-metadata.js: names, MIME types and appProperties
@@ -48,7 +48,7 @@ Drive API                 drive-api.js: REST calls via fetch
 ```
 
 Sync currently runs on the **main thread**, started by the user from the Storage
-page. The orchestrator and engine have no DOM dependencies, so they can run in the
+page. The orchestrator and engine have no DOM dependencies, so they could run in the
 service worker too (planned below).
 
 **Auth:** the service worker holds the session (a JWE blob from the worker). Pages
@@ -414,9 +414,9 @@ backstop.
   unused) could be generalised. Trigger on the `online` event (and on app start);
   the Background Sync API would be natural but isn't supported in Safari/iPadOS, so
   it can only be a progressive enhancement.
-- **Full sync in the service worker / periodic sync:** the orchestrator already
-  broadcasts progress via `postMessage` (`listenForSyncProgress`). Periodic
-  Background Sync has the same platform limits.
+- **Full sync in the service worker / periodic sync:** the orchestrator would have to
+  broadcast its progress to the pages with `postMessage` (today it calls a callback).
+  Periodic Background Sync has the same platform limits.
 - **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
   ideally merge setlist field changes.
 - **Restricting edits to a setlist's owner** (`ownerId`).

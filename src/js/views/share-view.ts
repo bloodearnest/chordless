@@ -49,6 +49,8 @@ export class ShareView extends PageView {
   }
 
   declare _opening: ShareOpening | 'loading'
+  /** How a share is opened (a test gives its own) */
+  receiver = { openShare, ownSetlistFor }
   #page: SetlistPage | null = null
   #db: ChordlessDB | null = null
 
@@ -72,7 +74,7 @@ export class ShareView extends PageView {
     const { key, code } = parseShareFragment(location.hash)
 
     // Someone who has this setlist in their organisation has the real one: go to that
-    const own = code && (await ownSetlistFor(code))
+    const own = code && (await this.receiver.ownSetlistFor(code))
     if (own && this.isConnected) {
       await goTo(buildUrl({ name: 'setlist', setlistId: own, songIndex: songIndex }), {
         replace: true,
@@ -81,7 +83,7 @@ export class ShareView extends PageView {
     }
     let opening: ShareOpening
     try {
-      opening = await openShare(fileId, key)
+      opening = await this.receiver.openShare(fileId, key)
     } catch (error) {
       console.error('[ShareView] Failed to open the share:', error)
       opening = { state: 'unavailable', offline: false }
@@ -131,11 +133,11 @@ export class ShareView extends PageView {
     const opening = this._opening
     if (opening !== 'loading' && opening.state === 'ready') {
       // On the overview only: a song takes the whole screen
-      const route = this.route?.name === 'share' ? this.route : null
+      const route = this.route as ShareRoute
       const owner = opening.setlist.owner?.trim()
       const expires = opening.setlist.received?.expires
       const banner =
-        route && route.songIndex < 0
+        route.songIndex < 0
           ? html`
             <aside class="share-banner" id="share-banner">
               <span>

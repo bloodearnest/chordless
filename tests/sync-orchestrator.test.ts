@@ -1,10 +1,17 @@
 import { expect } from '@open-wc/testing'
 import type { DriveSyncManager, ProgressCallback } from '../src/js/drive-sync.ts'
 import {
-  listenForSyncProgress,
+  createOrganisation,
+  deleteOrganisation,
+  getCurrentOrganisation,
+  setCurrentOrganisation,
+} from '../src/js/organisation.ts'
+import {
+  createSyncOrchestrator,
   type SyncBroadcast,
   SyncOrchestrator,
 } from '../src/js/sync-orchestrator.ts'
+import { installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -176,59 +183,40 @@ describe('SyncOrchestrator', () => {
   })
 })
 
-describe('listenForSyncProgress', () => {
-  let added: EventListenerOrEventListenerObject[]
-  let removed: EventListenerOrEventListenerObject[]
-  let realAdd: typeof navigator.serviceWorker.addEventListener
-  let realRemove: typeof navigator.serviceWorker.removeEventListener
+describe('SyncOrchestrator against a Drive', () => {
+  let drive: ReturnType<typeof installFakeDrive>
+  let before: { id: string | null; name: string }
+  let organisation: { id: string; name: string }
 
-  beforeEach(() => {
-    added = []
-    removed = []
-    realAdd = navigator.serviceWorker.addEventListener
-    realRemove = navigator.serviceWorker.removeEventListener
-    // Record the listener instead of attaching it, so nothing else hears the test's messages
-    navigator.serviceWorker.addEventListener = ((_type: string, listener) => {
-      added.push(listener)
-    }) as typeof realAdd
-    navigator.serviceWorker.removeEventListener = ((_type: string, listener) => {
-      removed.push(listener)
-    }) as typeof realRemove
+  beforeEach(async () => {
+    drive = installFakeDrive()
+    before = getCurrentOrganisation()
+    organisation = await createOrganisation(`Orchestrated ${crypto.randomUUID().slice(0, 8)}`)
+    await setCurrentOrganisation(organisation.id, organisation.name)
   })
 
-  afterEach(() => {
-    navigator.serviceWorker.addEventListener = realAdd
-    navigator.serviceWorker.removeEventListener = realRemove
+  afterEach(async () => {
+    drive.uninstall()
+    await deleteOrganisation(organisation.id)
+    if (before.id) await setCurrentOrganisation(before.id, before.name)
   })
 
-  const deliver = (listener: EventListenerOrEventListenerObject, data: unknown) =>
-    (listener as (event: MessageEvent) => void)({ data } as MessageEvent)
-
-  it('passes on the progress in SYNC_PROGRESS messages from the service worker', () => {
-    const received: SyncBroadcast[] = []
-    listenForSyncProgress(progress => received.push(progress))
-
-    const progress = { stage: 'pushing', message: 'Pushing', timestamp: 't' }
-    deliver(added[0], { type: 'SYNC_PROGRESS', data: progress })
-
-    expect(received).to.deep.equal([progress])
+  it('is made ready by createSyncOrchestrator, and syncs', async () => {
+    const orchestrator = await createSyncOrchestrator(organisation.name, organisation.id)
+    expect(orchestrator.syncManager).to.not.equal(null)
+    const stages: string[] = []
+    expect(await orchestrator.sync(progress => stages.push(progress.stage))).to.deep.equal({
+      success: true,
+    })
+    expect(stages[0]).to.equal('starting')
+    expect(stages.at(-1)).to.equal('complete')
   })
 
-  it('ignores other messages', () => {
-    const received: SyncBroadcast[] = []
-    listenForSyncProgress(progress => received.push(progress))
-
-    deliver(added[0], { type: 'SOMETHING_ELSE', data: {} })
-    deliver(added[0], null)
-    deliver(added[0], undefined)
-
-    expect(received).to.deep.equal([])
-  })
-
-  it('returns a function that stops listening', () => {
-    const stop = listenForSyncProgress(() => {})
-    expect(removed).to.deep.equal([])
-    stop()
-    expect(removed).to.deep.equal([added[0]])
+  it('makes its manager when it is first asked to do something', async () => {
+    const orchestrator = new SyncOrchestrator(organisation.name, organisation.id)
+    expect(orchestrator.syncManager).to.equal(null)
+    expect(await orchestrator.push()).to.deep.equal({ success: true })
+    expect(orchestrator.syncManager).to.not.equal(null)
+    expect(await orchestrator.pull()).to.deep.equal({ success: true })
   })
 })

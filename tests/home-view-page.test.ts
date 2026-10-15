@@ -15,6 +15,7 @@ import {
 import '../src/js/views/home-view.ts'
 import { type HomeView, sharedGroup } from '../src/js/views/home-view.ts'
 import { makeSetlist } from './builders.ts'
+import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -160,6 +161,46 @@ describe('the home view', () => {
       expect(modal().open).to.equal(true)
       expect(form().setlist?.time).to.equal('10:30')
       expect(new Date(`${form().setlist?.date}T12:00`).getDay()).to.equal(0)
+    })
+
+    it('is led by the user who is signed in, who is recorded as having made it', async () => {
+      const auth = installFakeAuthWorker(new FakeAuthWorker())
+      auth.worker.stored = {
+        blob: 'blob',
+        metadata: {
+          user: {
+            name: 'Ann Smith',
+            email: 'ann@example.com',
+            picture: null,
+            given_name: null,
+            family_name: null,
+            sub: 's',
+          },
+        },
+        updated_at: 'now',
+      }
+      try {
+        await open()
+        view.querySelector<HTMLButtonElement>('#create-setlist-button')?.click()
+        await wait(150)
+        expect(form().setlist?.owner).to.equal('Ann Smith')
+        expect(form().setlist?.ownerId).to.equal('ann@example.com')
+        form().dispatchEvent(
+          new SetlistDetailsSaveEvent({
+            date: '2026-11-08',
+            time: '',
+            type: 'Other',
+            name: 'By Ann',
+            owner: 'Ann Smith',
+            ownerId: 'ann@example.com',
+          })
+        )
+        await wait(150)
+        const [saved] = await db.getAllSetlists()
+        expect(saved.createdBy).to.equal('ann@example.com')
+      } finally {
+        auth.uninstall()
+      }
     })
 
     it('saves it, and goes to it', async () => {

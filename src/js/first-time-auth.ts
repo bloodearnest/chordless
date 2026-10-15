@@ -28,9 +28,12 @@ function markFirstAuthComplete(): void {
  * If user has authenticated for the first time and is using "Personal" org,
  * rename it to their name and switch to it
  *
+ * @param switchTo - switches to the organisation, which reloads the page (a test gives its own)
  * @returns True if org was renamed and switched
  */
-export async function handleFirstTimeAuth(): Promise<boolean> {
+export async function handleFirstTimeAuth(
+  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+): Promise<boolean> {
   // Check if this is first auth
   if (!isFirstAuth()) {
     return false
@@ -73,7 +76,7 @@ export async function handleFirstTimeAuth(): Promise<boolean> {
     console.log(`[FirstAuth] ✅ Welcome ${userName}! Your personal workspace has been set up.`)
 
     // Switch to the renamed org (will reload the page)
-    await switchOrganisation(id)
+    await switchTo(id)
 
     return true
   } catch (error) {
@@ -115,7 +118,9 @@ export async function nameOrganisationBeforeSync(): Promise<boolean> {
  * Check and handle first-time auth on app startup
  * Call this from your main app initialization
  */
-export async function checkFirstTimeAuth(): Promise<boolean> {
+export async function checkFirstTimeAuth(
+  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+): Promise<boolean> {
   if (!isFirstAuth()) {
     return false
   }
@@ -126,7 +131,7 @@ export async function checkFirstTimeAuth(): Promise<boolean> {
 
   // If user is authenticated, handle the rename
   if (userInfo?.name) {
-    return await handleFirstTimeAuth()
+    return await handleFirstTimeAuth(switchTo)
   }
 
   return false

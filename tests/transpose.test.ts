@@ -13,6 +13,7 @@ import {
   getAvailableKeys,
   getKeyOffset,
   isNashvilleChord,
+  normalizeSongChordsToStandard,
   parseChord,
   transposeChord,
   transposeChordBySemitones,
@@ -527,5 +528,232 @@ describe('transposeSong', () => {
     })
     expect(() => transposeSong({} as unknown as ParsedChart, 'G', 'A')).to.not.throw()
     expect(() => transposeSong(null, 'G', 'A')).to.not.throw()
+  })
+})
+
+describe('what is not a chord, or not a key', () => {
+  it('is left as it is, and said to be invalid, or special', () => {
+    for (const mark of ['', '.', 'N.C.', '|', '||', '||:', ':||']) {
+      expect(parseChord(mark).isSpecial, mark).to.equal(true)
+      expect(transposeChord(mark, 'C', 'D')).to.deep.equal({
+        chord: mark,
+        transposed: true,
+        valid: true,
+      })
+      expect(transposeChordBySemitones(mark, 2)).to.deep.equal({
+        chord: mark,
+        transposed: true,
+        valid: true,
+      })
+    }
+    for (const word of ['X', 'Hm7', '(X)']) {
+      expect(transposeChord(word, 'C', 'D')).to.deep.equal({
+        chord: word,
+        transposed: false,
+        valid: false,
+      })
+      expect(transposeChordBySemitones(word, 2)).to.deep.equal({
+        chord: word,
+        transposed: false,
+        valid: false,
+      })
+    }
+  })
+
+  it('is not moved when the keys are the same, or the shift is nothing', () => {
+    expect(transposeChord('Am7', 'C', 'C')).to.deep.equal({
+      chord: 'Am7',
+      transposed: true,
+      valid: true,
+    })
+    expect(transposeChord('Am7', null, 'D')).to.deep.equal({
+      chord: 'Am7',
+      transposed: true,
+      valid: true,
+    })
+    expect(transposeChordBySemitones('Am7', 0)).to.deep.equal({
+      chord: 'Am7',
+      transposed: false,
+      valid: true,
+    })
+  })
+
+  it('has no notes to transpose when there is nothing to transpose', () => {
+    expect(transposeNote(null, 2, false)).to.equal(null)
+    expect(transposeNote(undefined, 2, false)).to.equal(null)
+    expect(transposeNote('H', 2, false)).to.equal(null)
+    expect(transposeNote('C', 2, false)).to.equal('D')
+  })
+
+  it('has no offset between keys that are not keys', () => {
+    expect(getKeyOffset('C', 'X')).to.equal(0)
+    expect(getKeyOffset('X', 'C')).to.equal(0)
+    expect(getKeyOffset(null, 'C')).to.equal(0)
+    expect(getKeyOffset('C', 'D')).to.equal(2)
+  })
+})
+
+describe('brackets and slash chords, when moved', () => {
+  it('keep their brackets and bass', () => {
+    expect(transposeChord('(C/E)', 'C', 'D').chord).to.equal('(D/F#)')
+    expect(transposeChordBySemitones('(Am7/G)', 2, 'Em').chord).to.equal('(Bm7/A)')
+  })
+
+  it('name notes by the key they go to, and the accidental they were written with', () => {
+    expect(transposeChord('Bb', 'F', 'G').chord).to.equal('C')
+    expect(transposeChord('C#', 'C', 'F').chord).to.equal('F#')
+    expect(transposeChord('C', 'C', 'Gb').chord).to.equal('Gb')
+    expect(transposeChord('E', 'C', 'Gb').chord).to.equal('Bb')
+    expect(transposeChord('F#', 'Gb', 'Cb').chord).to.equal('B')
+    expect(transposeChord('Eb', 'C', 'D').chord).to.equal('F')
+  })
+})
+
+describe('the keys on offer', () => {
+  it('are none for no key, or one that is not known', () => {
+    expect(getAvailableKeys(null)).to.deep.equal([])
+    expect(getAvailableKeys('')).to.deep.equal([])
+    expect(getAvailableKeys('H')).to.deep.equal([])
+  })
+
+  it('have the current key in the middle, for each key', () => {
+    for (const key of ['C', 'G', 'F', 'Bb', 'E', 'Ab', 'F#', 'Am', 'Em', 'Dm', 'Bbm', 'F#m']) {
+      const keys = getAvailableKeys(key)
+      expect(keys, key).to.include(key)
+      expect(keys.length, key).to.be.greaterThan(10)
+      expect(keys[Math.floor(keys.length / 2)] ?? keys[0], key).to.be.a('string')
+    }
+  })
+
+  it('are the whole list for a key that is not on offer, such as Db', () => {
+    const keys = getAvailableKeys('Db')
+    expect(keys).to.not.include('Db')
+    expect(keys).to.include('C')
+  })
+
+  it('are in order, from one rotation to the next', () => {
+    const cKeys = getAvailableKeys('C')
+    const gKeys = getAvailableKeys('G')
+    expect(new Set(cKeys)).to.deep.equal(new Set(gKeys))
+    expect(cKeys).to.not.deep.equal(gKeys)
+  })
+})
+
+describe('transposeKeyName, for other keys', () => {
+  it('leaves a key that is not one, or no move', () => {
+    expect(transposeKeyName('', 2)).to.equal('')
+    expect(transposeKeyName('C', 0)).to.equal('C')
+    expect(transposeKeyName('X', 2)).to.equal('X')
+  })
+
+  it('names the new key the way the old one was written', () => {
+    expect(transposeKeyName('Bb', 2)).to.equal('C')
+    expect(transposeKeyName('C', 1)).to.equal('C#')
+    expect(transposeKeyName('Bb', 3)).to.equal('Db')
+    expect(transposeKeyName('F#', 1)).to.equal('G')
+    expect(transposeKeyName('Dbm', 2)).to.equal('Ebm')
+    expect(transposeKeyName('C#m', 1)).to.equal('Dm')
+  })
+})
+
+describe('Nashville numbers, for what is not one', () => {
+  it('knows a Nashville chord from one in brackets or with a bass', () => {
+    expect(isNashvilleChord('(4)')).to.equal(true)
+    expect(isNashvilleChord('4/6')).to.equal(true)
+    expect(isNashvilleChord('4/X')).to.equal(false)
+    expect(isNashvilleChord('')).to.equal(false)
+    expect(isNashvilleChord(null)).to.equal(false)
+    expect(isNashvilleChord('(')).to.equal(false)
+  })
+
+  it('does not convert to letters with no key, or a key that is not one, or what is not a number', () => {
+    expect(convertNashvilleChordToStandard('4', null)).to.equal('4')
+    expect(convertNashvilleChordToStandard('4', 'X')).to.equal('4')
+    expect(convertNashvilleChordToStandard('G', 'C')).to.equal('G')
+  })
+
+  it('converts to letters with brackets and a bass kept', () => {
+    expect(convertNashvilleChordToStandard('(4)', 'C')).to.equal('(F)')
+    expect(convertNashvilleChordToStandard('(1/3)', 'G')).to.equal('(G/B)')
+    expect(convertNashvilleChordToStandard('b7', 'C')).to.equal('Bb')
+    expect(convertNashvilleChordToStandard('#4', 'C')).to.equal('F#')
+    expect(convertNashvilleChordToStandard('6m', 'Bb')).to.equal('Gm')
+  })
+
+  it('does not convert to numbers with no key, or no chord, or a key that is not one, or a bar line', () => {
+    expect(convertChordToNashville('G', null)).to.equal('G')
+    expect(convertChordToNashville('', 'C')).to.equal('')
+    expect(convertChordToNashville('G', 'X')).to.equal('G')
+    expect(convertChordToNashville('|', 'C')).to.equal('|')
+    expect(convertChordToNashville('Xm', 'C')).to.equal('Xm')
+    expect(convertChordToNashville('4', 'C')).to.equal('4')
+  })
+
+  it('names every note by a number, with the accidental it was written with', () => {
+    const sharps = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
+    const flats = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']
+    expect(sharps.map(note => convertChordToNashville(note, 'C'))).to.deep.equal([
+      '1',
+      '#1',
+      '2',
+      '#2',
+      '3',
+      '4',
+      '#4',
+      '5',
+      '#5',
+      '6',
+      '#6',
+      '7',
+    ])
+    expect(flats.map(note => convertChordToNashville(note, 'C'))).to.deep.equal([
+      '1',
+      'b2',
+      '2',
+      'b3',
+      '3',
+      '4',
+      'b5',
+      '5',
+      'b6',
+      '6',
+      'b7',
+      '7',
+    ])
+  })
+
+  it('brackets and a slash bass survive the conversion to numbers', () => {
+    expect(convertChordToNashville('(G/B)', 'C')).to.equal('(5/7)')
+    expect(convertChordToNashville('Am7/G', 'C')).to.equal('6m7/5')
+  })
+})
+
+describe('transposeSong, and putting a song back to letters', () => {
+  const song = (chords: Array<string | null>) =>
+    ({
+      sections: [{ lines: [{ segments: chords.map(chord => ({ chord, text: '' })) }] }],
+    }) as unknown as ParsedChart
+  const chordsOf = (parsed: ParsedChart) =>
+    (parsed.sections[0].lines[0].segments as unknown as Array<{ chord: string | null }>).map(
+      segment => segment.chord
+    )
+
+  it('does nothing for no song', () => {
+    expect(() => transposeSong(null, 'C', 'D')).to.not.throw()
+    expect(() => transposeSong({} as ParsedChart, 'C', 'D')).to.not.throw()
+    expect(() => normalizeSongChordsToStandard(null, 'C')).to.not.throw()
+    expect(() => normalizeSongChordsToStandard(song(['1']), null)).to.not.throw()
+  })
+
+  it('turns Nashville numbers to letters first, when it moves a song, and leaves empty places', () => {
+    const parsed = song(['1', '4', null, 'G'])
+    transposeSong(parsed, 'C', 'D')
+    expect(chordsOf(parsed)).to.deep.equal(['D', 'G', null, 'A'])
+  })
+
+  it('puts a song in numbers back to letters, and leaves letters', () => {
+    const parsed = song(['1', '5/7', 'Am', null])
+    normalizeSongChordsToStandard(parsed, 'A')
+    expect(chordsOf(parsed)).to.deep.equal(['A', 'E/G#', 'Am', null])
   })
 })

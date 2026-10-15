@@ -12,7 +12,8 @@
  *
  * What it adds to the two reports:
  * - A line is covered if either suite ran it. Branches are merged by the line they are on, taking
- *   the better of the two; for functions, the report of a file that ran more of them is used.
+ *   the better of the two; for functions, the report of a file that ran more of them is used,
+ *   with the functions the other ran on a line where it ran none counted as run.
  * - Source files that neither suite loaded are listed as unloaded, since they are not in either
  *   report at all.
  * - Code marked as not worth covering is left out of every count. The marks are comments, each with
@@ -125,7 +126,16 @@ function mergeReports(reports: Map<string, FileCoverage>[]) {
       // cannot be added up: the one that ran more of them is taken
       const ran = (functions: Map<string, number>) =>
         [...functions.values()].filter(hits => hits > 0).length
-      if (ran(file.functions) > ran(into.functions)) into.functions = file.functions
+      const [more, fewer] =
+        ran(file.functions) > ran(into.functions)
+          ? [file.functions, into.functions]
+          : [into.functions, file.functions]
+      // ...and a function the other report ran, that is declared on the same line as one the
+      // taken report did not run, counts as run (the two suites may each run different ones)
+      const lineOf = (id: string) => id.split('@')[1]
+      const ranOnLine = new Set([...fewer].filter(([, hits]) => hits > 0).map(([id]) => lineOf(id)))
+      for (const [id, hits] of more) if (hits === 0 && ranOnLine.has(lineOf(id))) more.set(id, 1)
+      into.functions = more
     }
   }
   return merged
