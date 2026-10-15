@@ -36,8 +36,8 @@
     "@web/dev-server-esbuild": "^2.0.0",
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-commands": "^1.0.1",
-    "@web/test-runner-mocha": "^1.0.0",
     "@web/test-runner-playwright": "^1.0.0",
+    "knip": "^6.41.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "wrangler": "^4.149.0"

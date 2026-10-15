@@ -1,0 +1,2 @@
+# Local worker state (miniflare keeps it next to the assets in dev): not assets, and over their size limit
+.wrangler

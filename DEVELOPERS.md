@@ -49,7 +49,7 @@ just format lint test
 | Recipe | What it does |
 | --- | --- |
 | `just format` | Formats with Biome |
-| `just lint` | Lints with Biome |
+| `just lint` | Lints with Biome, type-checks with `tsc -b`, and runs knip (unused files, exports and dependencies; see `knip.json`) |
 | `just test` | Runs the three suites below |
 | `just test-node` | Node tests (the worker, event names) |
 | `just test-unit` | Browser unit tests, in Web Test Runner. Takes files: `just test-unit tests/db.test.js` |

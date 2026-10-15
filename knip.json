@@ -1,0 +1,17 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "src/service-worker.ts",
+    "src/dev/*.js",
+    "scripts/*.ts",
+    "web-test-runner.config.js",
+    "tests/**/*.{ts,js}"
+  ],
+  "project": ["src/**/*.{ts,js}", "worker/src/**/*.ts", "scripts/**/*.{ts,js}", "tests/**/*.ts"],
+  "paths": {
+    "/components/*": ["src/components/*"],
+    "/js/*": ["src/js/*"]
+  },
+  "ignoreExportsUsedInFile": true,
+  "ignoreDependencies": ["@biomejs/biome", "cloudflare"]
+}

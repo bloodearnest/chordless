@@ -23,6 +23,8 @@ lint:
     npx @biomejs/biome check .
     @echo "Running the TypeScript check..."
     npx tsc -b
+    @echo "Running knip (unused files, exports and dependencies)..."
+    npx knip --no-progress
 
 # Format project files with Biome
 format:
