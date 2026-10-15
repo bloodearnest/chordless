@@ -84,7 +84,8 @@ export const DEFAULT_KEEP_AWAKE_MINUTES = 60
 let cachedUseNashville: boolean | null = null
 let cachedUseUnicodeAccidentals: boolean | null = null
 let cachedMusicianType: MusicianType | null = null
-let cachedCapoPreference: boolean | null = null
+/** The capo preference, when it could not be saved: kept here until the page is left */
+let unsavedCapoPreference: boolean | null = null
 
 function readPreference(): boolean {
   if (cachedUseNashville !== null) return cachedUseNashville
@@ -149,29 +150,42 @@ export function setMusicianType(value: string) {
 }
 
 function readCapoPreferenceFromStorage(): boolean {
-  const keys = [ENABLE_CAPO_KEY, ENABLED_CAPO_FLAG_KEY]
-  return keys.some(key => {
-    const value = localStorage.getItem(key)
-    return value === 'true' || value === '1'
-  })
+  try {
+    return [ENABLE_CAPO_KEY, ENABLED_CAPO_FLAG_KEY].some(key => {
+      const value = localStorage.getItem(key)
+      return value === 'true' || value === '1'
+    })
+  } catch {
+    // (storage is blocked)
+    return false
+  }
+}
+
+/** What each part of a song shows by default: the user's choice, or everything */
+export function getSectionDefaults(): SectionDefaults {
+  try {
+    const stored = JSON.parse(localStorage.getItem(SECTION_DEFAULTS_KEY) ?? 'null')
+    if (stored && typeof stored === 'object') return stored
+  } catch (error) {
+    console.error('Failed to read section defaults:', error)
+  }
+  return { all: 'all' }
 }
 
 export function getCapoPreference(): boolean {
-  if (cachedCapoPreference === null) {
-    cachedCapoPreference = readCapoPreferenceFromStorage()
-  }
-  return cachedCapoPreference
+  return unsavedCapoPreference ?? readCapoPreferenceFromStorage()
 }
 
 export function setCapoPreference(value: boolean) {
   const enabled = !!value
-  cachedCapoPreference = enabled
   const storageValue = enabled ? 'true' : 'false'
   try {
     localStorage.setItem(ENABLE_CAPO_KEY, storageValue)
     localStorage.setItem(ENABLED_CAPO_FLAG_KEY, storageValue)
+    unsavedCapoPreference = null
   } catch (error) {
     console.error('Failed to save capo preference', error)
+    unsavedCapoPreference = enabled
   }
   window.dispatchEvent(new CapoPreferenceEvent(enabled))
 }

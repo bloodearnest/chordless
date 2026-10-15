@@ -15,7 +15,11 @@ import {
 } from '../src/components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from '../src/js/app-events.ts'
 import { getCurrentOrganisation, setOrganisationReadOnly } from '../src/js/organisation.ts'
-import { CapoPreferenceEvent, SectionDefaultsEvent } from '../src/js/preferences.ts'
+import {
+  CapoPreferenceEvent,
+  SectionDefaultsEvent,
+  setCapoPreference,
+} from '../src/js/preferences.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
 import { wait } from './test-helpers.ts'
@@ -54,8 +58,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         JSON.stringify({ all: 'lyrics', chorus: 'hide', 'verse 1': 'collapse' })
       )
       await rig.open()
-      rig.page._sectionDefaultsCache = null
-      rig.page._sectionDefaultsRaw = null
       expect(rig.page._resolveSectionState(0, 0, section(0, 0)).hideMode).to.equal('collapse')
       expect(rig.page._resolveSectionState(0, 1, section(0, 1)).hideMode).to.equal('hide')
     })
@@ -65,8 +67,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       const chordsOnly = { getRecommendedHideMode: () => 'lyrics', dataset: {}, label: '' } as never
       const lyricsOnly = { getRecommendedHideMode: () => 'chords', dataset: {}, label: '' } as never
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'lyrics' }))
-      rig.page._sectionDefaultsCache = null
-      rig.page._sectionDefaultsRaw = null
       expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('collapse')
       expect(rig.page._resolveDefaultHideMode(lyricsOnly, 0, 0)).to.equal('chords')
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'chords' }))
@@ -74,47 +74,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('lyrics')
       localStorage.setItem('section_defaults', JSON.stringify({ all: 'all' }))
       expect(rig.page._resolveDefaultHideMode(chordsOnly, 0, 0)).to.equal('lyrics')
-    })
-
-    it('make the defaults when there are none, or they are not readable', async () => {
-      await rig.open()
-      localStorage.setItem('section_defaults', '{not json')
-      rig.page._sectionDefaultsCache = null
-      rig.page._sectionDefaultsRaw = null
-      expect(rig.page._getSectionDefaultsConfig()).to.equal(null)
-      expect(rig.page._resolveDefaultHideMode(null, 0, 0)).to.be.a('string')
-      expect(JSON.parse(localStorage.getItem('section_defaults') ?? '')).to.deep.equal({
-        all: 'all',
-      })
-    })
-
-    it('are read again only when what is stored changes', async () => {
-      await rig.open()
-      localStorage.setItem('section_defaults', JSON.stringify({ all: 'all' }))
-      const first = rig.page._getSectionDefaultsConfig()
-      expect(rig.page._getSectionDefaultsConfig()).to.equal(first)
-      localStorage.removeItem('section_defaults')
-      expect(rig.page._getSectionDefaultsConfig()).to.equal(null)
-    })
-
-    it('are read as null when storage cannot be read, and the default cannot be kept', async () => {
-      await rig.open()
-      rig.page._sectionDefaultsRaw = 'stale'
-      const realGet = Storage.prototype.getItem
-      const realSet = Storage.prototype.setItem
-      Storage.prototype.getItem = () => {
-        throw new Error('blocked')
-      }
-      Storage.prototype.setItem = () => {
-        throw new Error('blocked')
-      }
-      try {
-        expect(rig.page._getSectionDefaultsConfig()).to.equal(null)
-        expect(rig.page._resolveDefaultHideMode(null, 0, 0)).to.be.a('string')
-      } finally {
-        Storage.prototype.getItem = realGet
-        Storage.prototype.setItem = realSet
-      }
     })
 
     it('are mapped from every word the defaults use', async () => {
@@ -148,7 +107,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       saveSongUserPrefs(rig.page.songs[0].songId, orgId, {
         sectionDefaults: { '0': { hideMode: 'chords', isCollapsed: true, isHidden: false } },
       })
-      rig.page._songUserPrefsCache = undefined
       expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
         hideMode: 'chords',
         isCollapsed: true,
@@ -169,7 +127,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('are not the user’s when what they saved cannot be read', async () => {
       await rig.open()
       localStorage.setItem(`song-prefs-${rig.db.organisationId}`, '{not json')
-      rig.page._songUserPrefsCache = undefined
       expect(rig.page._getSongUserPrefsSectionDefaults(0, 0)).to.equal(null)
     })
 
@@ -253,7 +210,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
   describe('the state it keeps', () => {
     it('reads the song models’ format, with the capos', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       const setlist = await rig.open()
       localStorage.setItem(
         `state-${setlist.id}`,
@@ -268,7 +225,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     })
 
     it('reads the older format, and the capos kept in it', async () => {
-      localStorage.setItem('enabled_capo', 'true')
+      setCapoPreference(true)
       const setlist = await rig.open()
       localStorage.setItem(
         `state-${setlist.id}`,
@@ -293,7 +250,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     })
 
     it('uses the capo the user prefers for a song, in the key it is in, unless one is set', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       await rig.open()
       saveSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId, { capo: 3 })
       saveSongUserPrefs(rig.page.songs[1].songId, rig.db.organisationId, { capo: 5 })
@@ -310,7 +267,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('uses no prefs when the capo is off, or the song has none, or the setlist lost its entry', async () => {
       await rig.open()
       await rig.page._applyCapoDefaults()
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       rig.page._capoEnabled = true
       rig.page.songs.forEach(song => {
         song.currentCapo = 0
@@ -323,7 +280,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     })
 
     it('saves the sections and the capos', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       const setlist = await rig.open()
       rig.page.songs[1].currentCapo = 4
       rig.page.sectionState = {
@@ -358,7 +315,6 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('puts the sections back when the user’s defaults change, once the setlist is shown', async () => {
       await rig.open()
       window.dispatchEvent(new SectionDefaultsEvent('singer', { all: 'lyrics' }))
-      expect(rig.page._sectionDefaultsCache).to.deep.equal({ all: 'all' })
       rig.page.currentSongIndex = Number.NaN
       rig.page._handleSectionDefaultsChanged()
     })
@@ -440,7 +396,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
   describe('the capo', () => {
     it('is changed with its selector, saved, and shown on the song', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       await rig.open()
       rig.page.showSong(0, true)
       $('#capo-selector')?.dispatchEvent(new CapoChangeEvent(4))
@@ -465,14 +421,14 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('is hidden when it is off, and the selector is set up once when it is on', async () => {
       await rig.open()
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('none')
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       window.dispatchEvent(new CapoPreferenceEvent(true))
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('')
       rig.page.setupCapoSelector()
       const handler = rig.page._capoChangeHandler
       rig.page.setupCapoSelector()
       expect(rig.page._capoChangeHandler).to.equal(handler)
-      localStorage.removeItem('enable_capo')
+      setCapoPreference(false)
       window.dispatchEvent(new CapoPreferenceEvent(false))
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('none')
       expect(($('#song-0 song-display') as unknown as { capo: number }).capo).to.equal(0)
@@ -482,13 +438,13 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.open()
       rig.page.showSong(1, true)
       rig.page.songs[1].currentCapo = 2
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       window.dispatchEvent(new CapoPreferenceEvent(true))
       expect(($('#capo-selector') as unknown as { value: number }).value).to.equal(2)
     })
 
     it('does not draw the capo on a selector that is not there', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       await rig.open()
       rig.root.querySelector('#capo-selector')?.remove()
       rig.page.updateCapoSelector(2)
@@ -557,7 +513,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
   describe('resetting a song', () => {
     it('puts back the key, tempo, font size, capo and sections', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       await rig.open()
       rig.page.showSong(0, true)
       await rig.page.handleKeyChange('A')

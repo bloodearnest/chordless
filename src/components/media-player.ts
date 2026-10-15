@@ -5,6 +5,7 @@ import './app-modal.ts'
 import './icon.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from '../js/app-events.ts'
 import { RouteChangeEvent } from '../js/app-router.ts'
+import { loadMediaPlayerState, saveMediaPlayerState } from '../js/media-player-state.ts'
 import {
   DEFAULT_DOUBLE_CLICK_BELOW_BPM,
   loadMediaSettings,
@@ -789,13 +790,10 @@ export class MediaPlayer extends LitElement {
     this._doubleClickBelowBpm = globalSettings.doubleClickBelowBpm
     this._emphasiseDownbeat = globalSettings.emphasiseDownbeat
 
-    // User toggle states (independent of which song is active)
-    // Load saved toggle states from localStorage, default to true (on)
-    const savedPadsOn = localStorage.getItem('media-player-pads-on')
-    const savedClickOn = localStorage.getItem('media-player-click-on')
-
-    this._padsOn = savedPadsOn !== null ? JSON.parse(savedPadsOn) : true
-    this._clickOn = savedClickOn !== null ? JSON.parse(savedClickOn) : true
+    // What the player remembers of itself (independent of which song is active)
+    const saved = loadMediaPlayerState()
+    this._padsOn = saved.padsOn
+    this._clickOn = saved.clickOn
 
     // Active song state (what's currently loaded in the player)
     this._activeSongId = null
@@ -807,9 +805,7 @@ export class MediaPlayer extends LitElement {
     this._activeSongTitle = null
     this._activePadSet = getActivePadSet()
 
-    // UI state - load from localStorage, default to collapsed
-    const savedCollapsed = localStorage.getItem('media-player-collapsed')
-    this._collapsed = savedCollapsed !== null ? JSON.parse(savedCollapsed) : true
+    this._collapsed = saved.collapsed
     this._showingSettings = false
 
     // Drag state
@@ -817,24 +813,12 @@ export class MediaPlayer extends LitElement {
     this._dragStartX = 0
     this._dragStartY = 0
 
-    // Load saved position from localStorage immediately
-    const savedPosition = localStorage.getItem('media-player-position')
-    if (savedPosition) {
-      const { x, y } = JSON.parse(savedPosition)
-      this._dragOffsetX = x
-      this._dragOffsetY = y
-    } else {
-      this._dragOffsetX = 0
-      this._dragOffsetY = 0
-    }
+    this._dragOffsetX = saved.position.x
+    this._dragOffsetY = saved.position.y
 
-    // Load persistent volume settings from localStorage
-    const savedPadVolume = localStorage.getItem('pad-volume')
-    const savedClickVolume = localStorage.getItem('click-volume')
-
-    // Volume properties
-    this._padVolume = savedPadVolume !== null ? parseFloat(savedPadVolume) : 0.5 // 0-1 range
-    this._clickVolume = savedClickVolume !== null ? parseFloat(savedClickVolume) : 0.8 // 0-1 range
+    // Volumes, 0 to 1
+    this._padVolume = saved.padVolume
+    this._clickVolume = saved.clickVolume
     this._showingVolumeSlider = false
     this._activeVolumeControl = null // 'pad' or 'click'
     this._sliderX = 0
@@ -1410,8 +1394,7 @@ export class MediaPlayer extends LitElement {
     this._padsOn = !this._padsOn
     console.log('[MediaPlayer] Pads toggle:', this._padsOn)
 
-    // Save to localStorage
-    localStorage.setItem('media-player-pads-on', JSON.stringify(this._padsOn))
+    saveMediaPlayerState('padsOn', this._padsOn)
 
     // If a song is active, immediately start/stop pads
     if (this._activeSongKey) {
@@ -1430,8 +1413,7 @@ export class MediaPlayer extends LitElement {
     this._clickOn = !this._clickOn
     console.log('[MediaPlayer] Click toggle:', this._clickOn)
 
-    // Save to localStorage
-    localStorage.setItem('media-player-click-on', JSON.stringify(this._clickOn))
+    saveMediaPlayerState('clickOn', this._clickOn)
 
     // If a song is active, immediately start/stop click
     if (this._activeSongBpm) {
@@ -1449,8 +1431,7 @@ export class MediaPlayer extends LitElement {
     this._collapsed = !this._collapsed
     console.log('[MediaPlayer] Collapsed:', this._collapsed)
 
-    // Save to localStorage
-    localStorage.setItem('media-player-collapsed', JSON.stringify(this._collapsed))
+    saveMediaPlayerState('collapsed', this._collapsed)
   }
 
   _toggleSettings(): void {
@@ -1507,14 +1488,7 @@ export class MediaPlayer extends LitElement {
     document.removeEventListener('touchmove', handleMove)
     document.removeEventListener('touchend', handleEnd)
 
-    // Save position to localStorage
-    localStorage.setItem(
-      'media-player-position',
-      JSON.stringify({
-        x: this._dragOffsetX,
-        y: this._dragOffsetY,
-      })
-    )
+    saveMediaPlayerState('position', { x: this._dragOffsetX, y: this._dragOffsetY })
   }
 
   _applyPosition(): void {
@@ -1663,16 +1637,14 @@ export class MediaPlayer extends LitElement {
       if (this._padController) {
         this._padController.setVolume(this._padVolume)
       }
-      // Save to localStorage
-      localStorage.setItem('pad-volume', this._padVolume.toString())
+      saveMediaPlayerState('padVolume', this._padVolume)
     } else if (this._activeVolumeControl === 'click') {
       this._clickVolume = newVolume
       // Update metronome controller volume
       if (this._metronomeController) {
         this._metronomeController.setVolume(this._clickVolume)
       }
-      // Save to localStorage
-      localStorage.setItem('click-volume', this._clickVolume.toString())
+      saveMediaPlayerState('clickVolume', this._clickVolume)
     }
 
     // Update slider Y position for next calculation

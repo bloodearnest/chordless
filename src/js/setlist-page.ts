@@ -47,12 +47,17 @@ import { isReadOnlyOrganisation } from './organisation.ts'
 import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
-import { CapoPreferenceEvent, SectionDefaultsEvent } from './preferences.ts'
+import {
+  CapoPreferenceEvent,
+  getCapoPreference,
+  getSectionDefaults,
+  SectionDefaultsEvent,
+} from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
-import { getSongUserPrefs, type SongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -75,8 +80,6 @@ const CONFIG = {
   VISIBILITY_THRESHOLD: 0.5, // 50% - section must be this visible to be considered "current"
 }
 
-const SECTION_DEFAULTS_KEY = 'section_defaults'
-
 /** What the page keeps of itself for when the user comes back: how far each section was scrolled */
 export interface SetlistPageState extends ViewState {
   scrolls?: Record<string, number>
@@ -94,7 +97,6 @@ interface SavedState {
 type SectionStates = Record<number, Record<number, SectionState>>
 
 /** Which words of `section_defaults` are saved: a choice per section label, and 'all' */
-type SectionDefaultsConfig = Record<string, string>
 
 /**
  * The setlist page: the overview of a setlist and each of its songs, side by
@@ -129,9 +131,6 @@ export class SetlistPage {
   sectionObserver: IntersectionObserver | null
   overviewEditMode: boolean
   _overviewComponent: SetlistOverview | null
-  _sectionDefaultsCache: SectionDefaultsConfig | null
-  _sectionDefaultsRaw: string | null
-  _songUserPrefsCache?: Record<string, SongUserPrefs | null>
   _capoEnabled: boolean
   _capoChangeHandler: ((event: CapoChangeEvent) => void) | null
   _keyChangeHandler?: (event: KeyChangeEvent) => void
@@ -205,9 +204,7 @@ export class SetlistPage {
     this.sectionObserver = null
     this.overviewEditMode = false // Track whether overview is in edit mode
     this._overviewComponent = null
-    this._sectionDefaultsCache = null
-    this._sectionDefaultsRaw = null
-    this._capoEnabled = this._readCapoPreference()
+    this._capoEnabled = getCapoPreference()
     this._capoChangeHandler = null
     this._currentKeyForCapo = ''
     this._onSectionDefaultsChanged = this._handleSectionDefaultsChanged.bind(this)
@@ -342,18 +339,6 @@ export class SetlistPage {
 
     // Nothing is current any more (what is playing carries on)
     this.dispatchSongChange(null)
-  }
-
-  _readCapoPreference() {
-    try {
-      return ['enabled_capo', 'enable_capo'].some(key => {
-        const value = localStorage.getItem(key)
-        return value === 'true' || value === '1'
-      })
-    } catch {
-      // (storage is blocked)
-      return false
-    }
   }
 
   async renderSetlist(setlistId: string, songIndex = -1) {
@@ -1162,31 +1147,6 @@ export class SetlistPage {
     console.log('[SongModel] Saved section states via model for song:', songIndex)
   }
 
-  _getSectionDefaultsConfig(): SectionDefaultsConfig | null {
-    let stored: string | null = null
-    try {
-      stored = localStorage.getItem(SECTION_DEFAULTS_KEY)
-    } catch (error) {
-      console.error('Failed to read section defaults:', error)
-      stored = null
-    }
-    if (stored === this._sectionDefaultsRaw) {
-      return this._sectionDefaultsCache
-    }
-    this._sectionDefaultsRaw = stored
-    if (!stored) {
-      this._sectionDefaultsCache = null
-      return null
-    }
-    try {
-      this._sectionDefaultsCache = JSON.parse(stored)
-    } catch (error) {
-      console.error('Failed to parse section defaults:', error)
-      this._sectionDefaultsCache = null
-    }
-    return this._sectionDefaultsCache
-  }
-
   _resolveSectionState(
     songIndex: number,
     sectionIndex: number,
@@ -1218,25 +1178,7 @@ export class SetlistPage {
     const songId = song.songId
     if (!songId) return null
 
-    // Check if we have cached prefs
-    if (!this._songUserPrefsCache) {
-      this._songUserPrefsCache = {}
-    }
-
-    // Load prefs if not cached
-    if (!(songId in this._songUserPrefsCache)) {
-      try {
-        // Synchronous access for performance
-        const key = `song-prefs-${this._database().organisationId}`
-        const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
-        this._songUserPrefsCache[songId] = allPrefs[songId] || null
-      } catch (error) {
-        console.error('[SongUserPrefs] Error loading prefs:', error)
-        this._songUserPrefsCache[songId] = null
-      }
-    }
-
-    const prefs = this._songUserPrefsCache[songId]
+    const prefs = getSongUserPrefs(songId, this._database().organisationId)
     if (!prefs?.sectionDefaults) return null
 
     return prefs.sectionDefaults[sectionIndex.toString()] || null
@@ -1270,25 +1212,13 @@ export class SetlistPage {
       sectionElement = this._getSongSectionComponent(songIndex, sectionIndex)
     }
     const recommended = sectionElement ? sectionElement.getRecommendedHideMode() : 'none'
-    let defaultsConfig = this._getSectionDefaultsConfig()
-    if (!defaultsConfig || typeof defaultsConfig !== 'object') {
-      defaultsConfig = { all: 'all' }
-      this._sectionDefaultsCache = defaultsConfig
-      this._sectionDefaultsRaw = JSON.stringify(defaultsConfig)
-      try {
-        localStorage.setItem(SECTION_DEFAULTS_KEY, this._sectionDefaultsRaw)
-      } catch (error) {
-        console.error('Failed to persist default section defaults:', error)
-      }
-    }
+    const defaultsConfig = getSectionDefaults()
     let hideMode: HideMode | null = null
-    if (defaultsConfig) {
-      const label = this._normalizeSectionLabel(sectionElement)
-      if (label && Object.hasOwn(defaultsConfig, label)) {
-        hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig[label])
-      } else if (Object.hasOwn(defaultsConfig, 'all')) {
-        hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig.all)
-      }
+    const label = this._normalizeSectionLabel(sectionElement)
+    if (label && Object.hasOwn(defaultsConfig, label)) {
+      hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig[label])
+    } else if (Object.hasOwn(defaultsConfig, 'all')) {
+      hideMode = this._mapDefaultChoiceToHideMode(defaultsConfig.all)
     }
 
     if (!hideMode || hideMode === 'none') {
@@ -2517,8 +2447,6 @@ export class SetlistPage {
   }
 
   _handleSectionDefaultsChanged() {
-    this._sectionDefaultsCache = null
-    this._sectionDefaultsRaw = null
     if (Number.isNaN(this.currentSongIndex)) {
       return
     }
@@ -2527,7 +2455,7 @@ export class SetlistPage {
 
   _handleCapoPreferenceChange() {
     const previous = this._capoEnabled
-    this._capoEnabled = this._readCapoPreference()
+    this._capoEnabled = getCapoPreference()
     if (previous === this._capoEnabled) {
       return
     }

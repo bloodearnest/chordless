@@ -17,7 +17,7 @@ import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import { CapoPreferenceEvent } from '../src/js/preferences.ts'
+import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
@@ -114,7 +114,7 @@ describe('the setlist page', () => {
     // Without a router, goTo() would load a page: and so end the test run
     setRouter({ navigate: async () => true })
     localStorage.removeItem('enabled_capo')
-    localStorage.removeItem('enable_capo')
+    setCapoPreference(false)
     root = document.createElement('div')
     document.body.append(root)
     render(setlistTemplate({ editable: true }), root)
@@ -136,7 +136,7 @@ describe('the setlist page', () => {
     root.remove()
     window.alert = realAlert
     console.error = realError
-    localStorage.removeItem('enabled_capo')
+    setCapoPreference(false)
     document.body.classList.remove('edit-mode')
   })
 
@@ -471,25 +471,19 @@ describe('the setlist page', () => {
       page.songs[1].currentCapo = 4
       const selector = must(root.querySelector<HTMLElement>('#capo-selector'))
 
-      localStorage.setItem('enabled_capo', 'true')
+      setCapoPreference(true)
       window.dispatchEvent(new CapoPreferenceEvent(true))
       await settle()
 
       expect([capoOf(0), capoOf(1), capoOf(2)]).to.deep.equal([2, 4, 0])
       expect(selector.style.display).to.equal('')
 
-      localStorage.setItem('enabled_capo', 'false')
+      setCapoPreference(false)
       window.dispatchEvent(new CapoPreferenceEvent(false))
       await settle()
 
       expect([capoOf(0), capoOf(1)]).to.deep.equal([0, 0])
       expect(selector.style.display).to.equal('none')
-    })
-
-    it('reads the older preference name too', async () => {
-      localStorage.setItem('enable_capo', '1')
-      expect(new SetlistPage({ root, setlistId: 'x', db })._readCapoPreference()).to.equal(true)
-      localStorage.removeItem('enable_capo')
     })
 
     it('clamps what it is given to a whole number from 0 to 11', async () => {
@@ -503,7 +497,7 @@ describe('the setlist page', () => {
     })
 
     describe('with the preference on when the setlist is opened', () => {
-      beforeEach(() => localStorage.setItem('enabled_capo', 'true'))
+      beforeEach(() => setCapoPreference(true))
 
       /** Be on a song, as if scrolled to it: without the observer of what is in view putting it back */
       const showSong = (index: number) => {

@@ -30,6 +30,7 @@ import {
 import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import { getCurrentOrganisation, setOrganisationReadOnly } from '../src/js/organisation.ts'
+import { setCapoPreference } from '../src/js/preferences.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { wait } from './test-helpers.ts'
 
@@ -306,7 +307,7 @@ describe('the setlist page: header, menu and keys', () => {
     })
 
     it('has the capo selector editable too when the capo is on', async () => {
-      localStorage.setItem('enable_capo', 'true')
+      setCapoPreference(true)
       await rig.open()
       rig.page.showSong(0, true)
       header().dispatchEvent(new EditModeToggleEvent())

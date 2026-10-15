@@ -106,6 +106,11 @@ describe('preferences', () => {
   })
 
   describe('the capo', () => {
+    it('is read from the older key too', async () => {
+      localStorage.setItem('enable_capo', '1')
+      expect((await fresh()).getCapoPreference()).to.equal(true)
+    })
+
     it('is kept under both keys, and said on window', async () => {
       const preferences = await fresh()
       const events = heard<InstanceType<Preferences['CapoPreferenceEvent']>>(
@@ -118,6 +123,23 @@ describe('preferences', () => {
       expect(preferences.getCapoPreference()).to.equal(true)
       preferences.setCapoPreference(false)
       expect(localStorage.getItem('enable_capo')).to.equal('false')
+    })
+  })
+
+  describe('the section defaults', () => {
+    it('are what the user chose, or everything when nothing is stored', async () => {
+      const preferences = await fresh()
+      expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
+      localStorage.setItem('section_defaults', JSON.stringify({ all: 'lyrics', chorus: 'hide' }))
+      expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'lyrics', chorus: 'hide' })
+    })
+
+    it('are everything when what is stored cannot be read', async () => {
+      const preferences = await fresh()
+      localStorage.setItem('section_defaults', '{not json')
+      expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
+      localStorage.setItem('section_defaults', '7')
+      expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
     })
   })
 
@@ -183,11 +205,27 @@ describe('preferences', () => {
       expect(() => preferences.setKeepAwakeMinutes(30)).to.not.throw()
     })
 
+    it('has no capo when it cannot ask whether it is on', async () => {
+      const preferences = await fresh()
+      block()
+      expect(preferences.getCapoPreference()).to.equal(false)
+    })
+
+    it('has everything shown when it cannot ask what the sections show', async () => {
+      const preferences = await fresh()
+      block()
+      expect(preferences.getSectionDefaults()).to.deep.equal({ all: 'all' })
+    })
+
     it('copes with not being able to save the capo', async () => {
       const preferences = await fresh()
       block()
       preferences.setCapoPreference(true)
       expect(preferences.getCapoPreference()).to.equal(true)
+      Storage.prototype.getItem = realGet
+      Storage.prototype.setItem = realSet
+      preferences.setCapoPreference(false)
+      expect(preferences.getCapoPreference()).to.equal(false)
     })
 
     it('says the setup is done, as it cannot ask again, and that no type was chosen', async () => {

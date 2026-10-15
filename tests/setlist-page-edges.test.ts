@@ -7,6 +7,7 @@ import { EditModeToggleEvent } from '../src/components/app-header.ts'
 import { SongSettingsClickEvent } from '../src/components/musical-metadata-display.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import type { SongSettingsPopover } from '../src/components/song-settings-popover.ts'
+import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongWithContent } from '../src/js/song-utils.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
@@ -18,20 +19,6 @@ describe('the setlist page: corners', () => {
   const rig = useSetlistPage()
   const { $, $$ } = rig
   const header = () => must($<HTMLElement>('#app-header'))
-
-  it('has no capo when the browser will not say whether it is on', async () => {
-    const real = Storage.prototype.getItem
-    Storage.prototype.getItem = () => {
-      throw new Error('blocked')
-    }
-    try {
-      expect(rig.page?._readCapoPreference?.() ?? false).to.equal(false)
-      await rig.open()
-      expect(rig.page._readCapoPreference()).to.equal(false)
-    } finally {
-      Storage.prototype.getItem = real
-    }
-  })
 
   it('fades the edit and normal controls with edit mode, and hides the edit ones once faded out', async () => {
     await rig.open()
@@ -198,7 +185,6 @@ describe('the setlist page: corners', () => {
         },
       })
     )
-    rig.page._songUserPrefsCache = {}
     rig.page.sectionState = { 0: { 0: { hideMode: 'chords' } as never } }
     expect(rig.page._resolveSectionState(0, 0)).to.deep.equal({
       hideMode: 'chords',
@@ -245,7 +231,7 @@ describe('the setlist page: corners', () => {
     rig.page.showSong(0, true)
     rig.page.updateCapoSelector(2)
     rig.page._updateSongDisplayCapo(0, 3)
-    localStorage.setItem('enable_capo', 'true')
+    setCapoPreference(true)
     rig.page._capoEnabled = true
     rig.page.songs[0].currentCapo = undefined as never
     rig.page.setupKeySelector()

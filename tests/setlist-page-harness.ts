@@ -11,6 +11,7 @@ import '../src/components/song-section.ts'
 import type { Setlist } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
+import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
@@ -128,8 +129,8 @@ export function useSetlistPage() {
         return true
       },
     })
-    for (const key of ['enabled_capo', 'enable_capo', 'section_defaults'])
-      localStorage.removeItem(key)
+    setCapoPreference(false)
+    localStorage.removeItem('section_defaults')
     rig.root = document.createElement('div')
     document.body.append(rig.root)
     render(setlistTemplate({ editable: true, shareable: true }), rig.root)
@@ -151,8 +152,8 @@ export function useSetlistPage() {
     rig.root.remove()
     window.alert = realAlert
     console.error = realError
-    for (const key of ['enabled_capo', 'enable_capo', 'section_defaults'])
-      localStorage.removeItem(key)
+    setCapoPreference(false)
+    localStorage.removeItem('section_defaults')
     localStorage.removeItem(`song-prefs-${rig.db.organisationId}`)
     document.body.classList.remove('edit-mode', 'header-expanded')
     document.body.removeAttribute('data-edit-mode')
