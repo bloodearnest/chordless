@@ -234,6 +234,14 @@ export async function findExistingSong(
   return null
 }
 
+/** Store a chart's text as a new chordpro file; its id */
+async function saveNewChordPro(db: ChordlessDB, content: string, contentHash: string) {
+  const id = `chordpro-${crypto.randomUUID()}`
+  const now = new Date().toISOString()
+  await db.saveChordPro({ id, content, contentHash, createdDate: now, modifiedDate: now })
+  return id
+}
+
 /** What createSong (and createVariant) can be told beyond the chart itself */
 export interface CreateSongOptions {
   ccliNumber?: string | null
@@ -284,17 +292,8 @@ export async function createSong(
     )
   }
 
-  // Create chordpro file
-  const chordproFileId = `chordpro-${crypto.randomUUID()}`
   const contentHash = hashText(chordproContent)
-
-  await db.saveChordPro({
-    id: chordproFileId,
-    content: chordproContent,
-    contentHash: contentHash,
-    createdDate: new Date().toISOString(),
-    modifiedDate: new Date().toISOString(),
-  })
+  const chordproFileId = await saveNewChordPro(db, chordproContent, contentHash)
 
   // Create song
   const song: SongInput = {
@@ -354,14 +353,7 @@ export async function addChart(
   const parsed = parser.parse(chordpro)
   const metadata = parsed.metadata
   const now = new Date().toISOString()
-  const chordproFileId = `chordpro-${crypto.randomUUID()}`
-  await db.saveChordPro({
-    id: chordproFileId,
-    content: chordpro,
-    contentHash,
-    createdDate: now,
-    modifiedDate: now,
-  })
+  const chordproFileId = await saveNewChordPro(db, chordpro, contentHash)
 
   const title = metadata.title || fallbackTitle || 'Untitled'
   const id = generateSongId(parsed)

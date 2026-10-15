@@ -53,7 +53,7 @@ export function countPdfs(part: GmailPart): number {
 }
 
 /** Gmail's base64url, as bytes */
-export const fromBase64Url = (text: string) => Buffer.from(text, 'base64url')
+const fromBase64Url = (text: string) => Buffer.from(text, 'base64url')
 
 class GmailError extends Error {
   status: number

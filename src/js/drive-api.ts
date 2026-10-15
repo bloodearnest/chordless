@@ -758,7 +758,7 @@ export async function updateShareFile(
 }
 
 /** Move a file to the Drive trash (recoverable). Trashing alone leaves a public file readable. */
-export async function trashFile(fileId: string): Promise<void> {
+async function trashFile(fileId: string): Promise<void> {
   await driveRequest(`/files/${fileId}`, {
     method: 'PATCH',
     body: JSON.stringify({ trashed: true }),

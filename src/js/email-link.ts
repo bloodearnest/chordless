@@ -4,6 +4,7 @@
  * into the fragment, which a browser never sends to a server, so only the person's own device reads
  * it. The page decodes it as untrusted input: anyone can write a link.
  */
+import { fromBase64Url, toBase64Url } from './base64url.ts'
 import type { EmailPerson, ImportedSetlist, ImportedSong } from './email-setlist.ts'
 
 /** Where a leader's email is forwarded to (see worker/src/email.ts, docs/EMAIL_IMPORT.md) */
@@ -21,17 +22,6 @@ async function pipe(bytes: Uint8Array, stream: CompressionStream | Decompression
       // A stream that cannot be read fails the read below, which is where it is reported
     })
   return new Uint8Array(await new Response(stream.readable).arrayBuffer())
-}
-
-function toBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-function fromBase64Url(text: string): Uint8Array {
-  const binary = atob(text.replace(/-/g, '+').replace(/_/g, '/'))
-  return Uint8Array.from(binary, char => char.charCodeAt(0))
 }
 
 /** The setlist as text that is safe in a URL fragment */

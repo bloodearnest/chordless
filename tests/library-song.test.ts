@@ -56,7 +56,6 @@ describe('LibrarySong', () => {
   describe('Core Properties', () => {
     beforeEach(async () => {
       // Create a song in the database
-      const _parsed = parser.parse(sampleChordPro)
       const chordproFileId = `chordpro-${uniqueName()}`
 
       await db.saveChordPro({
@@ -138,7 +137,6 @@ describe('LibrarySong', () => {
 
   describe('Key and Tempo', () => {
     beforeEach(async () => {
-      const _parsed = parser.parse(sampleChordPro)
       const chordproFileId = `chordpro-${uniqueName()}`
 
       await db.saveChordPro({
@@ -245,7 +243,6 @@ describe('LibrarySong', () => {
 
   describe('Capo (from song-user-prefs)', () => {
     beforeEach(async () => {
-      const _parsed = parser.parse(sampleChordPro)
       const chordproFileId = `chordpro-${uniqueName()}`
 
       await db.saveChordPro({
@@ -331,7 +328,6 @@ describe('LibrarySong', () => {
 
   describe('Section State (from song-user-prefs)', () => {
     beforeEach(async () => {
-      const _parsed = parser.parse(sampleChordPro)
       const chordproFileId = `chordpro-${uniqueName()}`
 
       await db.saveChordPro({

@@ -13,9 +13,7 @@ export const PAD_FILE_KEYS = Object.freeze([
   'G#',
 ] as const)
 
-export const PAD_FILE_KEY_SET = new Set<string>(PAD_FILE_KEYS)
-
-export const ENHARMONIC_KEY_MAP: Readonly<Record<string, string>> = {
+const ENHARMONIC_KEY_MAP: Readonly<Record<string, string>> = {
   Bb: 'A#',
   Db: 'C#',
   Eb: 'D#',

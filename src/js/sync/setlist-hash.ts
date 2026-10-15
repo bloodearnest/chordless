@@ -9,7 +9,7 @@ import { hashText } from '../utils/hash.ts'
 // Fields describing a setlist's sync state on this device rather than its
 // content. Excluded from content hashes and from the copy uploaded to Drive.
 // (_lastSyncHash is the pre-content-hash field, kept only for old records.)
-export const SETLIST_SYNC_FIELDS = [
+const SETLIST_SYNC_FIELDS = [
   'driveFileId',
   'driveModifiedTime',
   'driveChecksum',
@@ -28,7 +28,7 @@ export function setlistContent(setlist: Setlist): Omit<Setlist, SyncField> {
 }
 
 /** JSON with object keys sorted, so equal content always hashes the same */
-export function stableStringify(value: unknown): string {
+function stableStringify(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
   if (value && typeof value === 'object') {
     const record = value as Record<string, unknown>

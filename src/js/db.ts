@@ -487,7 +487,7 @@ export function parseTempo(tempoStr: TempoInput): { bpm: number | null; note: st
 }
 
 /** A tempo (number, or a chart's text such as '72' or '150 (1/8)') as a number of BPM, or null */
-export function tempoBpm(tempo: TempoInput): number | null {
+function tempoBpm(tempo: TempoInput): number | null {
   return parseTempo(tempo).bpm
 }
 

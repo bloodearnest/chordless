@@ -11,7 +11,7 @@ import { listOrganisations } from './organisation.ts'
 import { databaseExists, SHARED_DB_ID } from './share-receiver.ts'
 import { addChart, getLibrarySongs, getSongWithContent } from './song-utils.ts'
 
-export const SHARED_LABEL = 'Shared with me'
+const SHARED_LABEL = 'Shared with me'
 
 /** The databases other than the current organisation's that may hold songs, shared first */
 async function otherSources(currentDbId: string): Promise<SongSource[]> {

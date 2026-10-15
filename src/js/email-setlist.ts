@@ -599,7 +599,7 @@ function matchScore(song: ListedSong, chart: ChartInfo): number {
  * For each listed song, the attached chart it is, or null. Each chart goes to one song, the best
  * matches first.
  */
-export function matchCharts(list: ListedSong[], charts: ChartInfo[]): (ChartInfo | null)[] {
+function matchCharts(list: ListedSong[], charts: ChartInfo[]): (ChartInfo | null)[] {
   const pairs: { song: number; chart: number; score: number }[] = []
   for (const [s, song] of list.entries()) {
     for (const [c, chart] of charts.entries()) {

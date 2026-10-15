@@ -2,6 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
+import { fromBase64Url, toBase64Url } from '../src/js/base64url.ts'
 import {
   addDays,
   buildShareBundle,
@@ -14,13 +15,11 @@ import {
 import {
   decryptBundle,
   encryptBundle,
-  fromBase64Url,
   generateShareKey,
   matchesSetlistCode,
   parseShareUrl,
   setlistCode,
   shareUrl,
-  toBase64Url,
 } from '../src/js/share-crypto.ts'
 
 const setlist = {

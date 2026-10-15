@@ -42,7 +42,7 @@ export interface ShareContext {
 const todayOf = ({ today, now }: ShareContext) => today ?? toLocalDateString(now ?? new Date())
 
 /** Each of a setlist's songs with its chart, as the bundle needs them. A song missing from the library is left out. */
-export async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<ShareSource[]> {
+async function loadShareSources(setlist: Setlist, db: ChordlessDB): Promise<ShareSource[]> {
   const sources: ShareSource[] = []
   for (const entry of setlist.songs) {
     try {

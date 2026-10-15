@@ -41,7 +41,6 @@ describe('SetlistSong', () => {
     parser = new ChordProParser()
 
     // Create a canonical song in the database
-    const _parsed = parser.parse(sampleChordPro)
     const chordproFileId = `chordpro-${uniqueName()}`
 
     await db.saveChordPro({

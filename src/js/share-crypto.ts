@@ -7,6 +7,7 @@
  * as the share. AES-GCM also rejects a file that was changed.
  */
 
+import { fromBase64Url, toBase64Url } from './base64url.ts'
 import { parseShareBundle, type ShareBundle } from './share-bundle.ts'
 
 const IV_BYTES = 12
@@ -16,19 +17,6 @@ const KEY_BYTES = 16
 const MAX_UNPACKED_BYTES = 2 * 1024 * 1024
 
 type Bytes = Uint8Array<ArrayBuffer>
-
-export function toBase64Url(bytes: Uint8Array): string {
-  let binary = ''
-  for (const byte of bytes) binary += String.fromCharCode(byte)
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
-}
-
-export function fromBase64Url(text: string): Bytes {
-  if (!/^[\w-]*$/.test(text)) throw new Error('Not base64url')
-  const base64 = text.replace(/-/g, '+').replace(/_/g, '/')
-  const binary = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '='))
-  return Uint8Array.from(binary, c => c.charCodeAt(0))
-}
 
 /** A new random share key, as it goes in the link and the setlist: 22 base64url characters (128 bits: plenty for a link that lasts two weeks) */
 export function generateShareKey(): string {

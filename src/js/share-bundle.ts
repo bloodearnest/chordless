@@ -6,7 +6,7 @@
 import type { Setlist, SetlistEntry } from './data-types.ts'
 
 export const SHARE_FORMAT = 'chordless-share'
-export const SHARE_VERSION = 1
+const SHARE_VERSION = 1
 
 /** How long a share outlives its setlist's date */
 export const SHARE_DAYS_AFTER = 14

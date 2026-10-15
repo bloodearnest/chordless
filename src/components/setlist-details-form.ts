@@ -3,7 +3,7 @@ import { css, html, LitElement } from 'lit'
 import { live } from 'lit/directives/live.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Person, Setlist } from '../js/data-types.ts'
-import { determineSetlistType } from '../js/db.ts'
+import { determineSetlistType, SETLIST_TYPES } from '../js/db.ts'
 
 /** What the form collects (and a setlist keeps) */
 export interface SetlistDetails {
@@ -39,7 +39,7 @@ export class SetlistDetailsCancelEvent extends Event {
   }
 }
 
-export const SETLIST_TYPES = ['Church Service', 'Prayer Meeting', 'Event', 'Other']
+const SETLIST_TYPE_NAMES = Object.values(SETLIST_TYPES)
 
 const NO_LEADER = ''
 const OTHER_LEADER = 'other'
@@ -230,7 +230,7 @@ export class SetlistDetailsForm extends LitElement {
     if (changed.has('setlist') || changed.has('people')) {
       const typeField = this._typeField.value
       const leaderField = this._leaderField.value
-      if (typeField) typeField.value = this.setlist.type || SETLIST_TYPES[0]
+      if (typeField) typeField.value = this.setlist.type || SETLIST_TYPE_NAMES[0]
       if (leaderField) leaderField.value = this._leaders.selected
     }
   }
@@ -278,7 +278,9 @@ export class SetlistDetailsForm extends LitElement {
   override render() {
     const s: Partial<Setlist> = this.setlist
     const types =
-      !s.type || SETLIST_TYPES.includes(s.type) ? SETLIST_TYPES : [...SETLIST_TYPES, s.type]
+      !s.type || SETLIST_TYPE_NAMES.includes(s.type)
+        ? SETLIST_TYPE_NAMES
+        : [...SETLIST_TYPE_NAMES, s.type]
     return html`
       <form @submit=${this._submit}>
         <div class="form-field">
