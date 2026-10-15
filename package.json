@@ -35,6 +35,7 @@
     "@types/node": "^26.6.5",
     "@web/dev-server-esbuild": "^2.0.0",
     "@web/test-runner": "^1.0.0",
+    "@web/test-runner-commands": "^1.0.1",
     "@web/test-runner-mocha": "^1.0.0",
     "@web/test-runner-playwright": "^1.0.0",
     "typescript": "^7.0.2",
