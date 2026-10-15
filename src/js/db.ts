@@ -9,7 +9,7 @@ import type {
 } from './data-types.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
-import { transactionError } from './utils/idb.ts'
+import { requestResult, transactionDone } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 // IndexedDB wrapper for database operations
@@ -164,9 +164,7 @@ export class ChordlessDB {
           setlistStore.createIndex('owner', 'owner', { unique: false })
         } else {
           // Add owner index if upgrading from old version
-          const transaction = request.transaction
-          if (!transaction) throw new Error('No upgrade transaction')
-          const setlistStore = transaction.objectStore('setlists')
+          const setlistStore = (request.transaction as IDBTransaction).objectStore('setlists')
           if (!setlistStore.indexNames.contains('owner')) {
             console.log('[ChordlessDB] Adding owner index to setlists')
             setlistStore.createIndex('owner', 'owner', { unique: false })
@@ -179,8 +177,8 @@ export class ChordlessDB {
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
-        if (oldVersion > 0 && oldVersion < 6 && request.transaction) {
-          migrateTemposToNumbers(request.transaction)
+        if (oldVersion > 0 && oldVersion < 6) {
+          migrateTemposToNumbers(request.transaction as IDBTransaction)
         }
 
         // Clean up old stores
@@ -199,10 +197,7 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
     const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
     store.put(stored)
-    return new Promise<Setlist>((resolve, reject) => {
-      tx.oncomplete = () => resolve(stored)
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx, stored)
   }
 
   /**
@@ -219,40 +214,28 @@ export class ChordlessDB {
       store.put(cloneForStorage(withNumericTempos(setlist)))
     }
 
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   async getSetlist(id: string): Promise<Setlist | undefined> {
     const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.get(id)
-    return new Promise<Setlist | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request)
   }
 
   async getAllSetlists(): Promise<Setlist[]> {
     const tx = this.#transaction(['setlists'], 'readonly')
     const store = tx.objectStore('setlists')
     const request = store.getAll()
-    return new Promise<Setlist[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request)
   }
 
   async deleteSetlist(id: string): Promise<void> {
     const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
     await store.delete(id)
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   /**
@@ -278,10 +261,7 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
     store.put(stored)
-    return new Promise<SongRecord>((resolve, reject) => {
-      tx.oncomplete = () => resolve(stored)
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx, stored)
   }
 
   async saveSongsBatch(songs: SongInput[]): Promise<void> {
@@ -294,30 +274,21 @@ export class ChordlessDB {
       store.put(withNumericSongTempos(song))
     }
 
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   async getSong(uuid: string): Promise<SongRecord | undefined> {
     const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const request = store.get(uuid)
-    return new Promise<SongRecord | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request)
   }
 
   async getAllSongs(): Promise<SongRecord[]> {
     const tx = this.#transaction(['songs'], 'readonly')
     const store = tx.objectStore('songs')
     const request = store.getAll()
-    return new Promise<SongRecord[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || [])
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request).then(result => result || [])
   }
 
   async findSongByCCLI(ccliNumber: string): Promise<SongRecord[]> {
@@ -325,10 +296,7 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const index = store.index('ccliNumber')
     const request = index.getAll(ccliNumber)
-    return new Promise<SongRecord[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || [])
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request).then(result => result || [])
   }
 
   async findSongByNormalizedTitle(titleNormalized: string): Promise<SongRecord[]> {
@@ -336,10 +304,7 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const index = store.index('titleNormalized')
     const request = index.getAll(titleNormalized)
-    return new Promise<SongRecord[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || [])
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request).then(result => result || [])
   }
 
   async getSongVariants(songId: string): Promise<SongRecord[]> {
@@ -347,10 +312,7 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const index = store.index('id')
     const request = index.getAll(songId)
-    return new Promise<SongRecord[]>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result || [])
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request).then(result => result || [])
   }
 
   async getDefaultSongVariant(songId: string): Promise<SongRecord | null> {
@@ -358,56 +320,19 @@ export class ChordlessDB {
     return variants.find(v => v.isDefault) || variants[0] || null
   }
 
-  async deleteSong(uuid: string): Promise<void> {
-    const tx = this.#transaction(['songs'], 'readwrite')
-    const store = tx.objectStore('songs')
-    await store.delete(uuid)
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
-  }
-
   // ChordPro operations (per-organisation)
   async saveChordPro(chordpro: ChordProRecord): Promise<void> {
     const tx = this.#transaction(['chordpro'], 'readwrite')
     const store = tx.objectStore('chordpro')
     await store.put(chordpro)
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   async getChordPro(id: string): Promise<ChordProRecord | undefined> {
     const tx = this.#transaction(['chordpro'], 'readonly')
     const store = tx.objectStore('chordpro')
     const request = store.get(id)
-    return new Promise<ChordProRecord | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
-  }
-
-  async deleteChordPro(id: string): Promise<void> {
-    const tx = this.#transaction(['chordpro'], 'readwrite')
-    const store = tx.objectStore('chordpro')
-    await store.delete(id)
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
-  }
-
-  async findChordProByContentHash(contentHash: string): Promise<ChordProRecord | undefined> {
-    const tx = this.#transaction(['chordpro'], 'readonly')
-    const store = tx.objectStore('chordpro')
-    const index = store.index('contentHash')
-    const request = index.get(contentHash)
-    return new Promise<ChordProRecord | undefined>((resolve, reject) => {
-      request.onsuccess = () => resolve(request.result)
-      request.onerror = () => reject(request.error)
-    })
+    return requestResult(request)
   }
 
   // Local state operations (per-setlist, per-user)
@@ -437,26 +362,14 @@ export class ChordlessDB {
     const tx = this.#transaction(['setlist_local'], 'readwrite')
     const store = tx.objectStore('setlist_local')
     await store.put(localState)
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
-  }
-
-  async updateLastUsed(setlistId: string): Promise<void> {
-    const state = await this.getLocalState(setlistId)
-    state.lastUsedDate = new Date().toISOString()
-    return this.saveLocalState(state)
+    return transactionDone(tx)
   }
 
   async deleteLocalState(setlistId: string): Promise<void> {
     const tx = this.#transaction(['setlist_local'], 'readwrite')
     const store = tx.objectStore('setlist_local')
     await store.delete(setlistId)
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   // Song Usage operations (workspace-specific)
@@ -467,34 +380,27 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
     const request = store.getAll()
 
-    return new Promise<SongUsage[]>((resolve, reject) => {
-      request.onsuccess = () => {
-        const setlists: Setlist[] = request.result || []
-        const appearances: SongUsage[] = []
+    const setlists: Setlist[] = await requestResult(request)
+    const appearances: SongUsage[] = []
+    for (const setlist of setlists) {
+      if (!Array.isArray(setlist.songs)) continue
 
-        for (const setlist of setlists) {
-          if (!Array.isArray(setlist.songs)) continue
+      setlist.songs.forEach((song, index) => {
+        if (song.songId !== songId) return
 
-          setlist.songs.forEach((song, index) => {
-            if (song.songId !== songId) return
+        appearances.push({
+          setlistId: setlist.id,
+          setlistDate: setlist.date,
+          setlistName: setlist.name,
+          leader: setlist.owner,
+          type: setlist.type,
+          playedInKey: song.key,
+          order: index,
+        })
+      })
+    }
 
-            appearances.push({
-              setlistId: setlist.id,
-              setlistDate: setlist.date,
-              setlistName: setlist.name,
-              leader: setlist.owner,
-              type: setlist.type,
-              playedInKey: song.key,
-              order: index,
-            })
-          })
-        }
-
-        appearances.sort((a, b) => (b.setlistDate || '').localeCompare(a.setlistDate || ''))
-        resolve(appearances)
-      }
-      request.onerror = () => reject(request.error)
-    })
+    return appearances.sort((a, b) => (b.setlistDate || '').localeCompare(a.setlistDate || ''))
   }
 
   // Clear setlists, songs and charts, keeping per-setlist device state
@@ -504,10 +410,7 @@ export class ChordlessDB {
     for (const name of ['setlists', 'songs', 'chordpro']) {
       tx.objectStore(name).clear()
     }
-    return new Promise<void>((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 
   // Clear all data (for re-import)
@@ -524,10 +427,7 @@ export class ChordlessDB {
     await chordproStore.clear()
     await localStore.clear()
 
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve()
-      tx.onerror = event => reject(transactionError(event, tx))
-    })
+    return transactionDone(tx)
   }
 }
 
@@ -538,17 +438,6 @@ export function normalizeTitle(title: string): string {
     .replace(/[^\w\s]/g, '') // Remove punctuation
     .replace(/\s+/g, '') // Remove all whitespace
     .trim()
-}
-
-export function hashText(text: string): string {
-  // Simple hash for conflict detection
-  let hash = 0
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i)
-    hash = (hash << 5) - hash + char
-    hash = hash & hash // Convert to 32bit integer
-  }
-  return hash.toString(36)
 }
 
 /**
@@ -667,33 +556,6 @@ function migrateTemposToNumbers(transaction: IDBTransaction) {
 }
 
 /**
- * Format tempo for display as "BPM/note"
- * Examples:
- *   150, "1/4" -> "150"
- *   150, "1/8" -> "150/8"
- *   150, "1/16" -> "150/16"
- *
- * @param bpm - The BPM number
- * @param tempoNote - The note subdivision (e.g., "1/4", "1/8")
- */
-export function formatTempo(bpm: number | null | undefined, tempoNote = '1/4'): string {
-  if (!bpm) return ''
-
-  // If quarter note (default), just show BPM
-  if (!tempoNote || tempoNote === '1/4') {
-    return `${bpm}`
-  }
-
-  // Otherwise show BPM/denominator (e.g., "150/8" for 1/8 notes)
-  const [, denominator] = tempoNote.split('/').map(Number)
-  if (denominator) {
-    return `${bpm}/${denominator}`
-  }
-
-  return `${bpm}`
-}
-
-/**
  * Helper to get current organisation database
  * Returns a database instance for the currently active organisation
  */
@@ -717,21 +579,6 @@ export function generateSongId(parsed: ParsedChart): string {
   }
   // Last resort: random ID
   return `song-${crypto.randomUUID()}`
-}
-
-export function extractLyricsText(parsed: ParsedChart): string {
-  // Extract lyrics from parsed structure for search
-  const lyrics: string[] = []
-  for (const section of parsed.sections) {
-    for (const line of section.lines) {
-      for (const segment of line.segments) {
-        if (segment.lyrics?.trim()) {
-          lyrics.push(segment.lyrics.trim())
-        }
-      }
-    }
-  }
-  return lyrics.join(' ').toLowerCase()
 }
 
 // Setlist utility functions

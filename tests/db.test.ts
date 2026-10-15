@@ -7,7 +7,7 @@ suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
-import { transactionError } from '../src/js/utils/idb.ts'
+import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
 import { must } from './must.ts'
 
 describe('ChordlessDB', () => {
@@ -236,5 +236,145 @@ describe('ChordlessDB usage aggregation', () => {
     expect(usage).to.have.lengthOf(2)
     expect(usage[0].leader).to.equal('Leader B') // sorted by date desc
     expect(usage[1].leader).to.equal('Leader A')
+  })
+})
+
+describe('transactionDone', () => {
+  const open = (name: string) =>
+    new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open(name, 1)
+      request.onupgradeneeded = () => {
+        request.result.createObjectStore('things', { keyPath: 'id' }).createIndex('name', 'name', {
+          unique: true,
+        })
+      }
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+
+  it('resolves with what it is given once the transaction has committed', async () => {
+    const name = `idb-test-${crypto.randomUUID()}`
+    const db = await open(name)
+    const tx = db.transaction('things', 'readwrite')
+    tx.objectStore('things').put({ id: 1, name: 'one' })
+    expect(await transactionDone(tx, 'kept')).to.equal('kept')
+    const again = db.transaction('things', 'readwrite')
+    again.objectStore('things').put({ id: 2, name: 'two' })
+    expect(await transactionDone(again)).to.equal(undefined)
+    db.close()
+    await deleteDatabase(name)
+  })
+
+  it('rejects with why the transaction failed', async () => {
+    const name = `idb-test-${crypto.randomUUID()}`
+    const db = await open(name)
+    const tx = db.transaction('things', 'readwrite')
+    tx.objectStore('things').put({ id: 1, name: 'same' })
+    tx.objectStore('things').put({ id: 2, name: 'same' })
+    let error: unknown
+    try {
+      await transactionDone(tx)
+    } catch (caught) {
+      error = caught
+    }
+    db.close()
+    await deleteDatabase(name)
+    expect((error as DOMException).name).to.equal('ConstraintError')
+  })
+})
+
+describe('ChordlessDB opening', () => {
+  it('fails when the database cannot be opened', async () => {
+    const name = `TEST-${uniqueName()}`
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(name, 99)
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+      request.onerror = () => reject(request.error)
+    })
+    let message = ''
+    try {
+      await new ChordlessDB(name).init()
+    } catch (error) {
+      message = (error as Error).message
+    }
+    await deleteDatabase(name)
+    expect(message).to.equal('Failed to open IndexedDB')
+  })
+
+  it('needs an organisation, and to be opened before it is used', async () => {
+    expect(() => new ChordlessDB('')).to.throw('organisationId is required')
+    let message = ''
+    try {
+      await new ChordlessDB('never-opened').getSetlist('x')
+    } catch (error) {
+      message = (error as Error).message
+    }
+    expect(message).to.contain('not initialised')
+  })
+
+  it('removes a store an earlier version had, when it upgrades', async () => {
+    const name = `TEST-${uniqueName()}`
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(name, 5)
+      request.onupgradeneeded = () => {
+        const old = request.result
+        old.createObjectStore('songs', { keyPath: 'uuid' })
+        old.createObjectStore('chordpro', { keyPath: 'id' })
+        old.createObjectStore('setlists', { keyPath: 'id' })
+        old.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+        old.createObjectStore('song_usage', { keyPath: 'id' })
+      }
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+      request.onerror = () => reject(request.error)
+    })
+    const db = new ChordlessDB(name)
+    await db.init()
+    expect([...(db.db?.objectStoreNames ?? [])]).to.not.include('song_usage')
+    db.db?.close()
+    await deleteDatabase(name)
+  })
+})
+
+describe('ChordlessDB storing what IndexedDB cannot', () => {
+  let db: ChordlessDB
+  afterEach(async () => {
+    db.db?.close()
+    await deleteDatabase(db.dbName)
+  })
+
+  it('stores dates as text, and leaves out functions, promises and symbols', async () => {
+    db = new ChordlessDB(`TEST-${uniqueName()}`)
+    await db.init()
+    const setlist = {
+      ...createSetlist({ date: '2026-10-11' }),
+      id: 'odd',
+      extras: {
+        when: new Date('2026-10-11T10:00:00Z'),
+        later: Promise.resolve(1),
+        run: () => 1,
+        mark: Symbol('s'),
+        big: 10n,
+        list: [new Date('2026-01-01T00:00:00Z'), { fine: true }],
+        nothing: undefined,
+        zero: null,
+      },
+    }
+    await db.saveSetlist(setlist as never)
+    const stored = must(await db.getSetlist('odd')) as unknown as {
+      extras: Record<string, unknown>
+    }
+    expect(stored.extras).to.deep.equal({
+      when: '2026-10-11T10:00:00.000Z',
+      later: null,
+      big: '10',
+      list: ['2026-01-01T00:00:00.000Z', { fine: true }],
+      zero: null,
+    })
   })
 })

@@ -299,7 +299,31 @@ describe('the library view', () => {
         title: 'Placeholder',
       })
       await open({ name: 'songs', songUuid: song.uuid })
-      expect(heading()).to.not.equal('Song Library')
+      expect(heading()).to.equal('Untitled')
+    })
+
+    it('goes back to the list when its chart has nothing in it', async () => {
+      const song = await addChart(db, ALPHA, ADD)
+      await db.saveChordPro({
+        id: song.chordproFileId,
+        content: '',
+        contentHash: 'empty',
+        lastModified: Date.now(),
+      })
+      await open({ name: 'songs', songUuid: song.uuid })
+      expect(visited).to.deep.equal([{ url: '/songs', replace: true }])
+    })
+
+    it('is not shown when the route moves on while it is being found', async () => {
+      const song = await addChart(db, ALPHA, ADD)
+      await open()
+      view.route = { name: 'songs', songUuid: song.uuid }
+      await view.updateComplete
+      view.route = { name: 'songs' }
+      await view.updateComplete
+      await wait(200)
+      expect(heading()).to.equal('Song Library')
+      expect(visited).to.deep.equal([])
     })
   })
 

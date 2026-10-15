@@ -46,9 +46,9 @@
     "unloaded": 0
   },
   "src/js/db.ts": {
-    "lines": 103,
+    "lines": 15,
     "branches": 0,
-    "functions": 28
+    "functions": 1
   },
   "src/js/drive-sync.ts": {
     "lines": 205,
@@ -66,8 +66,8 @@
     "functions": 35
   },
   "src/js/views/library-view.ts": {
-    "lines": 5,
-    "branches": 27,
+    "lines": 2,
+    "branches": 20,
     "functions": 0
   },
   "worker/src/index.ts": {

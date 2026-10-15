@@ -15,3 +15,14 @@ export function requestResult<T>(request: IDBRequest<T>): Promise<T> {
     request.onerror = () => reject(request.error)
   })
 }
+
+/**
+ * A promise for the end of a transaction: it resolves with `value` once the changes are
+ * committed, or rejects with why the transaction failed
+ */
+export function transactionDone<T = void>(tx: IDBTransaction, value?: T): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    tx.oncomplete = () => resolve(value as T)
+    tx.onerror = event => reject(transactionError(event, tx))
+  })
+}

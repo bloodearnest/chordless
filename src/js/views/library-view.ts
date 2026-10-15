@@ -40,8 +40,7 @@ import {
   getSongsElsewhere,
   withSongsFromElsewhere,
 } from '../other-songs.ts'
-import { ChordProParser } from '../parser.ts'
-import { buildUrl } from '../router.ts'
+import { buildUrl, type Route } from '../router.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
@@ -64,7 +63,6 @@ export class LibraryView extends PageView {
   /** Where the open song is from, if not this organisation's library */
   declare _source: string
 
-  #parser = new ChordProParser()
   #libraryList = createRef<HTMLElement>()
   #songView = createRef<HTMLElement>()
   #content = createRef<HTMLElement>()
@@ -119,7 +117,7 @@ export class LibraryView extends PageView {
 
   override firstUpdated(): void {
     // Opened on a song: show it straight away, without sliding in from the list
-    if (this.route?.name === 'songs' && this.route.songUuid) {
+    if (this.#route.songUuid) {
       this.#scrollTo(this.#songView.value, 'instant')
     }
     this.#observeScrollBack()
@@ -142,6 +140,11 @@ export class LibraryView extends PageView {
 
   // ==================== Route ====================
 
+  /** The route it is shown for (the router only gives this view its own) */
+  get #route(): Extract<Route, { name: 'songs' }> {
+    return this.route as Extract<Route, { name: 'songs' }>
+  }
+
   /**
    * What is searched for is in the URL (/songs?q=...), so it survives a reload, can be
    * linked to, and comes back with the back button. Typing replaces the entry, after a
@@ -156,8 +159,8 @@ export class LibraryView extends PageView {
     clearTimeout(this.#searchTimeout)
     this.#searchTimeout = setTimeout(() => {
       const search = value.trim()
-      const route = this.route?.name === 'songs' ? this.route : undefined
-      if (route?.songUuid || (route?.search ?? '') === search) return
+      const route = this.#route
+      if (route.songUuid || (route.search ?? '') === search) return
       this.#searchEcho = search
       goTo(buildUrl({ name: 'songs', search }), { replace: true })
     }, 250)
@@ -165,9 +168,9 @@ export class LibraryView extends PageView {
 
   /** A route that names a search other than one this view put there (a link, reload, back) sets the box */
   #searchFromRoute(): void {
-    const route = this.route?.name === 'songs' ? this.route : undefined
-    if (route?.songUuid) return
-    const search = route?.search ?? ''
+    const route = this.#route
+    if (route.songUuid) return
+    const search = route.search ?? ''
     const echo = this.#searchEcho
     this.#searchEcho = null
     if (search === echo) return
@@ -176,8 +179,7 @@ export class LibraryView extends PageView {
 
   /** Show the song the route names, or the list if it names none */
   async #syncSong(): Promise<void> {
-    const route = this.route?.name === 'songs' ? this.route : undefined
-    const uuid = route?.songUuid ?? null
+    const uuid = this.#route.songUuid ?? null
     if (uuid === this.#openUuid) return
     const sync = ++this.#syncing
 
@@ -215,8 +217,7 @@ export class LibraryView extends PageView {
       entries => {
         for (const entry of entries) {
           if (this.#suppressScrollReset) continue
-          const route = this.route?.name === 'songs' ? this.route : undefined
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && route?.songUuid) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && this.#route.songUuid) {
             goTo(buildUrl({ name: 'songs' }))
           }
         }
@@ -267,8 +268,7 @@ export class LibraryView extends PageView {
       throw new Error('Song has no ChordPro content')
     }
 
-    // Already-parsed data if there is any
-    const parsed = song.parsed || this.#parser.parse(song.chordpro)
+    const { parsed } = song
     this.#parsed = parsed
     this.#key = parsed.metadata.key
     this._heading = parsed.metadata.title || 'Untitled'
