@@ -535,7 +535,7 @@ export class SongImport extends LitElement {
 
   async _onFilesChosen(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement
-    const files = [...(input.files ?? [])]
+    const files = [...(input.files as FileList)]
     input.value = '' // so choosing the same files again still imports
     if (files.length) await this.importFiles(files)
   }

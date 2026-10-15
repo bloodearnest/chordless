@@ -14,11 +14,6 @@
     "branches": 3,
     "functions": 0
   },
-  "src/components/song-import.ts": {
-    "lines": 18,
-    "branches": 17,
-    "functions": 0
-  },
   "src/components/song-section.ts": {
     "lines": 0,
     "branches": 5,
