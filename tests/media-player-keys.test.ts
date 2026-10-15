@@ -52,6 +52,30 @@ describe('the media player and the keyboard', () => {
     }
   }
 
+  it('leaves the keys to a modal dialog that is open', () => {
+    const dialog = document.createElement('dialog')
+    const inside = document.createElement('button')
+    dialog.append(inside)
+    document.body.append(dialog)
+    dialog.showModal()
+    try {
+      for (const code of ['Space', 'Escape']) {
+        const event = new KeyboardEvent('keydown', {
+          code,
+          bubbles: true,
+          composed: true,
+          cancelable: true,
+        })
+        inside.dispatchEvent(event)
+        expect(event.defaultPrevented, code).to.equal(false)
+        expect(press(code), `${code} outside it`).to.equal(true)
+      }
+    } finally {
+      dialog.close()
+      dialog.remove()
+    }
+  })
+
   describe('Space', () => {
     let started
     let stopped

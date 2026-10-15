@@ -325,7 +325,8 @@ export class DriveSyncPanel extends LitElement {
       `
     }
 
-    const { stage, message } = this.syncProgress ?? { stage: '', message: '' }
+    // (with no progress and no error, it is ready: above)
+    const { stage, message } = this.syncProgress as PanelProgress
     const isError = stage === 'error'
     const isSuccess = stage === 'complete' || stage === 'success'
     const statusClass = isError ? 'error' : isSuccess ? 'success' : 'syncing'
@@ -342,7 +343,7 @@ export class DriveSyncPanel extends LitElement {
   }
 
   _renderProgressBar() {
-    const { current, total } = this.syncProgress ?? {}
+    const { current, total } = this.syncProgress as PanelProgress
     const hasProgress = typeof current === 'number' && typeof total === 'number' && total > 0
     const percent = hasProgress ? Math.min(100, Math.round((current / total) * 100)) : null
     const width = percent !== null ? `${percent}%` : '50%'

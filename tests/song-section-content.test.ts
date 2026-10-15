@@ -239,18 +239,5 @@ describe('song-section content', () => {
         'Section 4'
       )
     })
-
-    it('ignores a control with no action', async () => {
-      const el = await show([sung('G', 'Words')], { label: 'Verse' })
-      let acted = 0
-      el.addEventListener('song-section:action', () => acted++)
-      const button = document.createElement('button')
-      el._onControlClick({
-        stopPropagation() {},
-        preventDefault() {},
-        currentTarget: button,
-      } as unknown as Event)
-      expect(acted).to.equal(0)
-    })
   })
 })

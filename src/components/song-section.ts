@@ -617,7 +617,8 @@ export class SongSection extends LitElement {
   }
 
   _renderControlButton(action: string, label: string, active: boolean, disabled = false) {
-    const sectionLabel = (this.label || '').trim() || `Section ${this.sectionIndex + 1}`
+    // (the controls are only in a section with a label)
+    const sectionLabel = this.label.trim()
     const ariaLabel = `Show ${label} in ${sectionLabel}`
     return html`
       <button
@@ -722,7 +723,7 @@ export class SongSection extends LitElement {
     })
 
     const lyricsText = hasLyrics
-      ? this._formatLyricsText(segment.lyrics || '', previousHadLyrics, joinWithPrev)
+      ? this._formatLyricsText(segment.lyrics as string, previousHadLyrics, joinWithPrev)
       : ''
 
     // If the line has no chords at all, don't render chord placeholders
@@ -766,8 +767,7 @@ export class SongSection extends LitElement {
   _onControlClick(event: Event): void {
     event.stopPropagation()
     event.preventDefault()
-    const action = (event.currentTarget as HTMLElement).dataset.action
-    if (!action) return
+    const action = (event.currentTarget as HTMLElement).dataset.action as string
     this.dispatchEvent(new SectionActionEvent(this.songIndex, this.sectionIndex, action))
   }
 
@@ -888,8 +888,7 @@ export class SongSection extends LitElement {
       return measures
     })
 
-    const maxMeasures =
-      measuresPerLine.reduce((max, measures) => Math.max(max, measures.length), 0) || 1
+    const maxMeasures = Math.max(1, ...measuresPerLine.map(measures => measures.length))
     return { measuresPerLine, maxMeasures }
   }
 

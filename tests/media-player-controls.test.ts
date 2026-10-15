@@ -11,7 +11,6 @@ import { RouteChangeEvent } from '../src/js/app-router.ts'
 import { ensurePadSetFolder } from '../src/js/drive-api.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { listPadSets, PadSetChangedEvent } from '../src/js/pad-set-service.ts'
-import { isInModalDialog } from '../src/js/utils/keyboard.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -668,39 +667,6 @@ describe('the media player', () => {
       await show()
       player.currentKey = ''
       expect(await player._updateAudioSource()).to.equal(false)
-    })
-
-    it('leaves the keys to a modal dialog that is open', async () => {
-      await show()
-      player._startSong = async () => {
-        throw new Error('should not start')
-      }
-      const dialog = document.createElement('dialog')
-      const button = document.createElement('button')
-      dialog.append(button)
-      document.body.append(dialog)
-      dialog.showModal()
-      try {
-        expect(player.getClientRects().length).to.be.greaterThan(0)
-        const event = new KeyboardEvent('keydown', {
-          code: 'Space',
-          bubbles: true,
-          composed: true,
-          cancelable: true,
-        })
-        let seenInModal: boolean | null = null
-        const probe = (e: Event) => {
-          seenInModal = isInModalDialog(e)
-        }
-        document.addEventListener('keydown', probe)
-        button.dispatchEvent(event)
-        document.removeEventListener('keydown', probe)
-        expect(seenInModal).to.equal(true)
-        expect(event.defaultPrevented).to.equal(false)
-      } finally {
-        dialog.close()
-        dialog.remove()
-      }
     })
 
     it('does nothing to the audio routing before there is any audio', async () => {

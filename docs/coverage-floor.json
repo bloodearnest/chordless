@@ -1,19 +1,4 @@
 {
-  "src/components/drive-sync-panel.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
-  "src/components/media-player.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/components/song-section.ts": {
-    "lines": 0,
-    "branches": 5,
-    "functions": 0
-  },
   "src/js/app.ts": {
     "lines": 0,
     "branches": 0,
