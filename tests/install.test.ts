@@ -1,5 +1,11 @@
 import { expect } from '@open-wc/testing'
-import { type InstallEnvironment, installModeFor } from '../src/js/install.ts'
+import {
+  currentInstallMode,
+  INSTALL_CHANGE_EVENT,
+  type InstallEnvironment,
+  installModeFor,
+  promptInstall,
+} from '../src/js/install.ts'
 
 const { describe, it } = window
 
@@ -44,5 +50,59 @@ describe('installModeFor', () => {
     expect(installModeFor(env({ userAgent: FIREFOX }))).to.equal('none')
     // Chrome on a Mac without a prompt (already installed elsewhere, say) is not Safari
     expect(installModeFor(env({ userAgent: MAC_CHROME }))).to.equal('none')
+  })
+})
+
+describe('the install prompt', () => {
+  /** The event Chromium fires when the app can be installed */
+  const promptEvent = (outcome: 'accepted' | 'dismissed') => {
+    const event = new Event('beforeinstallprompt', { cancelable: true }) as Event & {
+      prompt(): Promise<void>
+      userChoice: Promise<{ outcome: string }>
+      shown: number
+    }
+    event.shown = 0
+    event.prompt = async () => {
+      event.shown++
+    }
+    event.userChoice = Promise.resolve({ outcome })
+    return event
+  }
+
+  const changes = () => {
+    const seen: number[] = []
+    window.addEventListener(INSTALL_CHANGE_EVENT, () => seen.push(1))
+    return seen
+  }
+
+  it('has nothing to show before the browser offers one', async () => {
+    expect(await promptInstall()).to.equal(false)
+  })
+
+  it('is kept when the browser offers it, and shown when asked for, once', async () => {
+    const seen = changes()
+    const event = promptEvent('accepted')
+    window.dispatchEvent(event)
+    expect(event.defaultPrevented, 'the browser’s own prompt is held back').to.equal(true)
+    expect(seen).to.have.length(1)
+    expect(currentInstallMode()).to.equal('prompt')
+
+    expect(await promptInstall()).to.equal(true)
+    expect(event.shown).to.equal(1)
+    expect(await promptInstall(), 'it can be used once').to.equal(false)
+  })
+
+  it('says no when the user turns the prompt down', async () => {
+    window.dispatchEvent(promptEvent('dismissed'))
+    expect(await promptInstall()).to.equal(false)
+  })
+
+  it('is installed once the browser says so, whatever the prompt', async () => {
+    window.dispatchEvent(promptEvent('accepted'))
+    const seen = changes()
+    window.dispatchEvent(new Event('appinstalled'))
+    expect(seen).to.have.length(1)
+    expect(currentInstallMode()).to.equal('installed')
+    expect(await promptInstall()).to.equal(false)
   })
 })

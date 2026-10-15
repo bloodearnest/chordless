@@ -116,6 +116,13 @@ function mergeReports(reports: Map<string, FileCoverage>[]) {
   return merged
 }
 
+/**
+ * V8 reports the field initialisers of a class (`static readonly type = ...`, `#timer = ...`) as
+ * functions, and the ones it never calls are reported as not run when the class has run them
+ * every time: they are not code of the app's to cover
+ */
+const FIELD_INITIALISER = /^<(static|instance_members)_initializer>@/
+
 const IGNORE =
   /\/\*\s*(?:v8|c8|node:coverage)\s+(?:ignore\s+)?(next|start|stop|disable|enable)\b([^*]*)\*\//
 
@@ -261,7 +268,9 @@ for (const file of sourceFiles()) {
       .filter(([line, count]) => kept(line) && count.hit < count.total)
       .map(([l]) => l),
     functions: [...coverage.functions]
-      .filter(([id, hits]) => kept(Number(id.split('@')[1])) && hits === 0)
+      .filter(
+        ([id, hits]) => kept(Number(id.split('@')[1])) && hits === 0 && !FIELD_INITIALISER.test(id)
+      )
       .map(([id]) => id),
   }
   for (const [line] of coverage.lines) if (kept(line)) totals.lines[1]++
@@ -272,7 +281,7 @@ for (const file of sourceFiles()) {
     totals.branches[0] += count.hit
   }
   for (const [id, hits] of coverage.functions) {
-    if (!kept(Number(id.split('@')[1]))) continue
+    if (!kept(Number(id.split('@')[1])) || FIELD_INITIALISER.test(id)) continue
     totals.functions[1]++
     if (hits > 0) totals.functions[0]++
   }

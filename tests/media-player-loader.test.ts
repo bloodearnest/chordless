@@ -54,6 +54,11 @@ describe('loadMediaPlayer', () => {
     expect(await loadMediaPlayer(async () => {})).to.equal(true)
   })
 
+  it('loads the player itself by default, which defines its element', async () => {
+    expect(await loadMediaPlayer()).to.equal(true)
+    expect(customElements.get('media-player')).to.be.ok
+  })
+
   it('carries on if the module cannot be loaded, saying so', async () => {
     const warnings: unknown[][] = []
     const original = console.warn

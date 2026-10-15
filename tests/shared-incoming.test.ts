@@ -131,7 +131,7 @@ describe('what is shared, when it is not tidy', () => {
     const cache = await caches.open(SHARED_CACHE_NAME)
     await cache.put(
       new Request(new URL('/shared/file/0', location.href)),
-      new Response('words', { headers: { 'Content-Type': '' } })
+      new Response(new Uint8Array([1, 2, 3]))
     )
     const shared = await takeShared()
     expect(shared?.files.map(file => file.name)).to.deep.equal(['shared'])

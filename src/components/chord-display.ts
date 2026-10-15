@@ -98,11 +98,7 @@ export class ChordDisplay extends LitElement {
   }
 
   _buildStandardSegments(text: string): ChordDisplaySegment[] {
-    const segments = splitChordDisplaySegments(text)
-    if (!segments.length) {
-      return [{ type: 'base', value: text }]
-    }
-    return segments
+    return splitChordDisplaySegments(text)
   }
 
   _buildNashvilleSegments(text: string): ChordDisplaySegment[] {

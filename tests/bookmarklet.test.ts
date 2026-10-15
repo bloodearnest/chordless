@@ -146,6 +146,51 @@ describe('importFromSongSelect', () => {
     expect(must(page.log.at(-1))[1].type).to.equal('CHORDLESS_IMPORT_FAILED')
   })
 
+  it('asks for a SongSelect page when run on another site, and opens nothing', async () => {
+    const page = fakePage()
+    page.location.href = 'https://example.com/songs/1234567'
+    await importFromSongSelect(CHORDLESS, page)
+    expect(page.log).to.deep.equal([['alert', 'Please navigate to a SongSelect song page first.']])
+  })
+
+  it('says so when the page is a SongSelect one with no song number', async () => {
+    const page = fakePage()
+    page.location.href = 'https://songselect.ccli.com/search?q=grace'
+    await importFromSongSelect(CHORDLESS, page)
+    expect(page.log).to.deep.equal([['alert', '❌ Could not extract song number from URL']])
+  })
+
+  it('asks for the key C when the page does not say one', async () => {
+    const page = fakePage()
+    page.document.body.textContent = 'No key here'
+    await run(page)
+    expect(page.log[1][1]).to.contain('key=C')
+  })
+
+  it('tells Chordless the text of a failure that is not an Error', async () => {
+    const page = fakePage()
+    page.fetch = async () => {
+      throw 'offline'
+    }
+    await run(page)
+    expect(must(page.log.at(-1))[1]).to.deep.equal({
+      type: 'CHORDLESS_IMPORT_FAILED',
+      data: { message: 'offline' },
+    })
+  })
+
+  it('gives up with a message when Chordless never says it is ready', async () => {
+    const page = fakePage()
+    page.setTimeout = ((handler: () => void) => {
+      handler()
+      return 0
+    }) as unknown as () => number
+    await importFromSongSelect(CHORDLESS, page)
+    expect(must(page.log.at(-1))).to.deep.equal(['alert', '⚠️ Timeout waiting for Chordless'])
+    expect(page.log.some(entry => entry[0] === 'post')).to.equal(false)
+    expect(page.listeners.size).to.equal(0)
+  })
+
   it("stops without downloading if the tab can't be opened", async () => {
     const page = fakePage({ popupBlocked: true })
     await importFromSongSelect(CHORDLESS, page)

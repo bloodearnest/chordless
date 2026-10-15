@@ -4,6 +4,7 @@ import {
   forUpdate,
   setlistFileMetadata,
   setlistFilename,
+  shareFileMetadata,
   songFileDetails,
   songFileMetadata,
 } from '../src/js/drive-metadata.ts'
@@ -105,6 +106,11 @@ describe('Drive file metadata, with less recorded', () => {
       { organisationId: null }
     )
     expect(metadata.appProperties.organisationId).to.equal('')
+  })
+
+  it('has no organisation in a share file’s details when there is none', () => {
+    const metadata = shareFileMetadata({ id: 'x' }, { organisationId: null, expires: '2026-10-25' })
+    expect(metadata.appProperties).to.include({ organisationId: '', expires: '2026-10-25' })
   })
 
   it('titles a song’s file by its record, else its chart, else “Untitled”', () => {

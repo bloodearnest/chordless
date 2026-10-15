@@ -270,6 +270,19 @@ describe('WakeLockController', () => {
         expect(idler.state).to.equal('active')
       })
 
+      it('applies the limit where asking about the battery is refused', async () => {
+        Object.defineProperty(navigator, 'getBattery', {
+          configurable: true,
+          value: async () => {
+            throw new DOMException('blocked', 'NotAllowedError')
+          },
+        })
+        const refused = new WakeLockController(80)
+        await settle()
+        expect(refused.onMains).to.equal(null)
+        refused.dispose()
+      })
+
       it('applies the limit where the device cannot say whether it is charging', async () => {
         // As in a browser with no Battery Status API
         Object.defineProperty(navigator, 'getBattery', { configurable: true, value: undefined })
@@ -297,6 +310,47 @@ describe('WakeLockController', () => {
       expect(idler.state).to.equal('idle')
       expect(locks).to.have.length(1)
     })
+  })
+
+  it('lets a lock go that arrives after it was no longer wanted', async () => {
+    let arrive: (lock: FakeLock) => void = () => {}
+    const late = new FakeLock()
+    Object.defineProperty(navigator, 'wakeLock', {
+      configurable: true,
+      value: { request: () => new Promise<FakeLock>(resolve => (arrive = resolve)) },
+    })
+    controller.hold()
+    await settle()
+    controller.letGo()
+    arrive(late)
+    await settle()
+    expect(late.released).to.equal(true)
+    expect(controller.state).to.equal('idle')
+  })
+
+  it('carries on, and says so, when a lock will not be let go', async () => {
+    const stuck = new FakeLock()
+    stuck.release = async () => {
+      throw new DOMException('stuck', 'InvalidStateError')
+    }
+    Object.defineProperty(navigator, 'wakeLock', {
+      configurable: true,
+      value: { request: async () => stuck },
+    })
+    const warn = console.warn
+    const warnings: unknown[][] = []
+    console.warn = (...args) => warnings.push(args)
+    try {
+      controller.hold()
+      await settle()
+      expect(controller.state).to.equal('active')
+      controller.letGo()
+      await settle()
+    } finally {
+      console.warn = warn
+    }
+    expect(warnings.some(args => String(args[0]).includes('release failed'))).to.equal(true)
+    expect(controller.state).to.equal('idle')
   })
 
   it("is 'unsupported' where the browser has no wake lock", async () => {

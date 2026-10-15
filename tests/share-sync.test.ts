@@ -223,6 +223,50 @@ describe('Share links: sync', () => {
     expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
   })
 
+  it('shares a song the library has lost by the chart edited into the setlist, and leaves out one with none', async () => {
+    const { phone, setlist } = await sharedSetlist()
+    const lost = (songId: string, order: number, chordproEdits?: string) =>
+      makeEntry({ order, songId, songUuid: songId, key: 'G', notes: '', chordproEdits })
+    const changed = {
+      ...setlist,
+      songs: [
+        ...setlist.songs,
+        lost('title-lost-with-edits', 3, '{title: Lost}\n[G]Edited here'),
+        lost('title-lost-without', 4),
+      ],
+    }
+    const share = await createShare(changed, ctx(phone))
+
+    const bundle = await openShare(share.fileId, share.key)
+    expect(bundle.setlist.songs.map(song => song.title)).to.deep.equal([
+      'Alpha',
+      'Beta',
+      'title-lost-with-edits',
+    ])
+    expect(bundle.setlist.songs[2].chordpro).to.contain('Edited here')
+  })
+
+  it('leaves a share file that will not end, and ends it the next time', async () => {
+    const { phone, setlist, share } = await sharedSetlist()
+    await phone.db.saveSetlist({
+      ...(await phone.db.getSetlist(setlist.id)),
+      share: null,
+    } as Setlist)
+    const later = { now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) }
+    rig.drive.failRequests({
+      method: 'DELETE',
+      path: new RegExp(`${share.fileId}/permissions`),
+      status: 500,
+      times: 1,
+    })
+
+    await syncShares(ctx(phone, later))
+    expect(rig.drive.anonymousDownload(share.fileId).status, 'still there').to.equal(200)
+
+    await syncShares(ctx(phone, later))
+    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
+  })
+
   it('does not make a shares folder for an organisation that never shares', async () => {
     const phone = await makeDevice('phone')
     await addSetlist(phone, [])

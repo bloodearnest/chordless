@@ -151,6 +151,36 @@ describe('AppRouter', () => {
       expect(window.history.length).to.equal(before)
     })
 
+    it('keeps the history entry’s key when replacing it, and gives one if it has none', async () => {
+      const key = window.history.state.key
+      await router.navigate('/songs', { replace: true })
+      expect(window.history.state.key).to.equal(key)
+
+      window.history.replaceState(null, '', '/songs')
+      await router.navigate('/storage', { replace: true })
+      expect(window.history.state.key).to.be.a('string')
+    })
+
+    it('keeps the view when moving within a view with no say in it', async () => {
+      await router.navigate('/songs')
+      const view = outlet.firstElementChild
+      await router.navigate({ name: 'songs', songUuid: 'abc' })
+      expect(outlet.firstElementChild).to.equal(view)
+    })
+
+    it('shows only the last of two moves made at once, in a view transition', async () => {
+      if (!document.startViewTransition) return
+      const title = document.title
+      makeRouter({ transitions: true })
+      await router.start()
+      const first = router.navigate('/songs')
+      const second = router.navigate('/setlist/abc')
+      await Promise.all([first, second])
+      expect(outlet.children).to.have.length(1)
+      expect(outlet.firstElementChild.dataset.view).to.equal('setlist')
+      document.title = title
+    })
+
     it('tells the document, with the route it left', async () => {
       const changed = routeChanged()
       router.navigate('/songs')
@@ -171,6 +201,25 @@ describe('AppRouter', () => {
       await router.start()
       await router.navigate('/songs')
       expect(outlet.firstElementChild.dataset.view).to.equal('songs')
+    })
+  })
+
+  describe('with no session storage', () => {
+    it('carries on without remembering the state of views', async () => {
+      const own = Object.getOwnPropertyDescriptor(window, 'sessionStorage')
+      Object.defineProperty(window, 'sessionStorage', {
+        configurable: true,
+        get() {
+          throw new DOMException('denied', 'SecurityError')
+        },
+      })
+      try {
+        window.history.replaceState(null, '', '/storage')
+        router = new AppRouter({ outlet, views, transitions: false })
+        expect(await router.start()).to.equal(true)
+      } finally {
+        if (own) Object.defineProperty(window, 'sessionStorage', own)
+      }
     })
   })
 

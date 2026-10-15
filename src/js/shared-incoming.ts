@@ -59,6 +59,7 @@ export async function takeShared(cacheStorage: CacheStorage = caches): Promise<S
   for (const request of await cache.keys()) {
     const path = new URL(request.url).pathname
     const response = await cache.match(request)
+    /* v8 ignore next -- only if the entry went between listing the cache and reading it */
     if (!response) continue
     if (path === TEXT_PATH) {
       text = await response.text()

@@ -248,6 +248,11 @@ test('links hold the file id, then the key and the setlist code after the #, and
   assert.equal(parseShareUrl('https://chordless.app/s/abc#short'), null, 'bad key')
 })
 
+test('a link that is not a URL at all is not a share link', () => {
+  assert.equal(parseShareUrl('http://['), null)
+  assert.equal(parseShareUrl('/not-a-share'), null)
+})
+
 test('an id that is not a UUID has no setlist code, and so matches nothing', () => {
   assert.equal(setlistCode('not-a-uuid'), '')
   assert.equal(matchesSetlistCode('', 'not-a-uuid'), false)

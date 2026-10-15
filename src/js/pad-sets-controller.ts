@@ -62,18 +62,13 @@ export class PadSetsController implements ReactiveController {
     this.loading = true
     this.error = ''
     this.host.requestUpdate()
-    try {
-      this.list = await listPadSets(force)
-      if (!this.list.some(set => set.id === this.activeId)) {
-        this.activeId = getActivePadSet().id
-      }
-    } catch (error) {
-      console.error('[PadSets] Failed to load pad sets:', error)
-      this.error = (error instanceof Error && error.message) || 'Unable to load pad sets.'
-    } finally {
-      this.loading = false
-      this.host.requestUpdate()
+    // (listPadSets does not fail: a list it cannot get from Drive is just the built-in set)
+    this.list = await listPadSets(force)
+    if (!this.list.some(set => set.id === this.activeId)) {
+      this.activeId = getActivePadSet().id
     }
+    this.loading = false
+    this.host.requestUpdate()
   }
 
   /**

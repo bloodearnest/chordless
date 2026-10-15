@@ -1,19 +1,18 @@
 {
   "src/components/app-about.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 312
+    "lines": 305,
+    "branches": 1,
+    "functions": 16
   },
   "src/components/app-header.ts": {
     "lines": 19,
     "branches": 7,
-    "functions": 13
+    "functions": 7
   },
   "src/components/app-modal.ts": {
-    "lines": 7,
-    "branches": 7,
-    "functions": 4
+    "lines": 2,
+    "branches": 1,
+    "functions": 0
   },
   "src/components/app-preferences.ts": {
     "lines": 77,
@@ -25,16 +24,6 @@
     "branches": 0,
     "functions": 5
   },
-  "src/components/capo-selector.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
-  },
-  "src/components/chord-display.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
-  },
   "src/components/drive-sync-panel.ts": {
     "lines": 116,
     "branches": 12,
@@ -43,17 +32,12 @@
   "src/components/help-tooltip.ts": {
     "lines": 49,
     "branches": 1,
-    "functions": 9
-  },
-  "src/components/key-selector.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
+    "functions": 8
   },
   "src/components/media-player-settings.ts": {
     "lines": 25,
     "branches": 8,
-    "functions": 8
+    "functions": 6
   },
   "src/components/media-player.ts": {
     "lines": 307,
@@ -63,12 +47,12 @@
   "src/components/musical-metadata-display.ts": {
     "lines": 19,
     "branches": 5,
-    "functions": 4
+    "functions": 3
   },
   "src/components/nav-menu.ts": {
     "lines": 42,
     "branches": 7,
-    "functions": 12
+    "functions": 8
   },
   "src/components/select-organisation.ts": {
     "lines": 81,
@@ -78,18 +62,17 @@
   "src/components/setlist-details-form.ts": {
     "lines": 3,
     "branches": 8,
-    "functions": 3
+    "functions": 0
   },
   "src/components/setlist-email-import.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 0,
-    "unloaded": 522
+    "lines": 503,
+    "branches": 2,
+    "functions": 31
   },
   "src/components/setlist-info-dialog.ts": {
     "lines": 52,
     "branches": 6,
-    "functions": 15
+    "functions": 11
   },
   "src/components/setlist-info.ts": {
     "lines": 23,
@@ -99,19 +82,14 @@
   "src/components/setlist-overview.ts": {
     "lines": 21,
     "branches": 3,
-    "functions": 15
+    "functions": 8
   },
   "src/components/setlist-share.ts": {
     "lines": 83,
     "branches": 8,
-    "functions": 9
+    "functions": 8
   },
   "src/components/song-card.ts": {
-    "lines": 52,
-    "branches": 12,
-    "functions": 14
-  },
-  "src/components/song-display.ts": {
     "lines": 0,
     "branches": 2,
     "functions": 0
@@ -119,7 +97,7 @@
   "src/components/song-import.ts": {
     "lines": 133,
     "branches": 16,
-    "functions": 12
+    "functions": 10
   },
   "src/components/song-info-dialog.ts": {
     "lines": 22,
@@ -131,20 +109,15 @@
     "branches": 12,
     "functions": 2
   },
-  "src/components/song-list.ts": {
-    "lines": 9,
-    "branches": 1,
-    "functions": 4
-  },
   "src/components/song-section.ts": {
     "lines": 115,
     "branches": 30,
-    "functions": 9
+    "functions": 5
   },
   "src/components/song-settings-popover.ts": {
     "lines": 41,
     "branches": 4,
-    "functions": 19
+    "functions": 14
   },
   "src/components/storage-page.ts": {
     "lines": 158,
@@ -167,20 +140,10 @@
     "functions": 0,
     "unloaded": 166
   },
-  "src/js/app-events.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 2
-  },
   "src/js/app-router.ts": {
-    "lines": 10,
-    "branches": 6,
-    "functions": 2
-  },
-  "src/js/app-update.ts": {
     "lines": 0,
-    "branches": 0,
-    "functions": 2
+    "branches": 2,
+    "functions": 0
   },
   "src/js/app.ts": {
     "lines": 0,
@@ -197,32 +160,17 @@
   "src/js/db.ts": {
     "lines": 111,
     "branches": 24,
-    "functions": 48
+    "functions": 47
   },
   "src/js/drive-api.ts": {
-    "lines": 36,
+    "lines": 34,
     "branches": 21,
     "functions": 1
-  },
-  "src/js/drive-metadata.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
   },
   "src/js/drive-sync.ts": {
     "lines": 260,
     "branches": 111,
-    "functions": 5
-  },
-  "src/js/email-mime.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
-  },
-  "src/js/email-setlist.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
+    "functions": 3
   },
   "src/js/first-time-auth.ts": {
     "lines": 92,
@@ -245,30 +193,15 @@
     "branches": 0,
     "functions": 4
   },
-  "src/js/install.ts": {
-    "lines": 18,
-    "branches": 0,
-    "functions": 1
-  },
-  "src/js/media-player-loader.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
-  },
   "src/js/metronome-controller.ts": {
     "lines": 21,
     "branches": 5,
     "functions": 0
   },
-  "src/js/models/song-model.ts": {
+  "src/js/organisation-db.ts": {
     "lines": 0,
     "branches": 1,
-    "functions": 0
-  },
-  "src/js/organisation-db.ts": {
-    "lines": 4,
-    "branches": 4,
-    "functions": 11
+    "functions": 10
   },
   "src/js/organisation.ts": {
     "lines": 54,
@@ -283,22 +216,17 @@
   "src/js/pad-set-service.ts": {
     "lines": 36,
     "branches": 31,
-    "functions": 1
+    "functions": 0
   },
   "src/js/pad-sets-controller.ts": {
-    "lines": 20,
-    "branches": 2,
-    "functions": 1
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/js/preferences.ts": {
     "lines": 63,
     "branches": 19,
-    "functions": 16
-  },
-  "src/js/read-only-controller.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
+    "functions": 6
   },
   "src/js/samples.ts": {
     "lines": 0,
@@ -316,25 +244,10 @@
     "branches": 16,
     "functions": 0
   },
-  "src/js/share-crypto.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
-  },
-  "src/js/share-manager.ts": {
-    "lines": 13,
-    "branches": 3,
-    "functions": 0
-  },
   "src/js/share-receiver.ts": {
     "lines": 26,
     "branches": 8,
     "functions": 2
-  },
-  "src/js/shared-incoming.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
   },
   "src/js/song-model-factory.ts": {
     "lines": 11,
@@ -351,20 +264,15 @@
     "branches": 11,
     "functions": 0
   },
-  "src/js/songselect-bookmarklet.ts": {
-    "lines": 9,
-    "branches": 5,
-    "functions": 0
-  },
   "src/js/sync-orchestrator.ts": {
     "lines": 81,
     "branches": 12,
-    "functions": 5
+    "functions": 4
   },
   "src/js/theme-manager.ts": {
     "lines": 58,
     "branches": 10,
-    "functions": 6
+    "functions": 4
   },
   "src/js/transpose.ts": {
     "lines": 83,
@@ -377,15 +285,14 @@
     "functions": 0
   },
   "src/js/utils/persistence.ts": {
-    "lines": 10,
-    "branches": 6,
-    "functions": 0
-  },
-  "src/js/views/about-view.ts": {
     "lines": 0,
     "branches": 0,
-    "functions": 0,
-    "unloaded": 27
+    "functions": 1
+  },
+  "src/js/views/about-view.ts": {
+    "lines": 18,
+    "branches": 0,
+    "functions": 1
   },
   "src/js/views/home-view.ts": {
     "lines": 59,
@@ -393,31 +300,24 @@
     "functions": 5
   },
   "src/js/views/import-setlist-view.ts": {
-    "lines": 0,
+    "lines": 16,
     "branches": 0,
-    "functions": 0,
-    "unloaded": 25
+    "functions": 1
   },
   "src/js/views/library-view.ts": {
     "lines": 78,
-    "branches": 37,
+    "branches": 36,
     "functions": 9
   },
   "src/js/views/registry.ts": {
-    "lines": 7,
-    "branches": 0,
-    "functions": 13
-  },
-  "src/js/views/share-view.ts": {
     "lines": 0,
     "branches": 0,
-    "functions": 0,
-    "unloaded": 134
-  },
-  "src/js/wake-lock.ts": {
-    "lines": 9,
-    "branches": 4,
     "functions": 1
+  },
+  "src/js/views/share-view.ts": {
+    "lines": 103,
+    "branches": 0,
+    "functions": 6
   },
   "src/service-worker.ts": {
     "lines": 0,
@@ -430,10 +330,5 @@
     "branches": 0,
     "functions": 0,
     "unloaded": 14
-  },
-  "worker/src/router.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
   }
 }

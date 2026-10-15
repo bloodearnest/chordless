@@ -169,7 +169,7 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
     for (const file of await listShareFiles(sharesFolder)) {
       const expires = file.appProperties?.expires
       const pointedAt = live.has(file.id)
-      const old = Date.parse(file.modifiedTime ?? '') < now.getTime() - ORPHAN_GRACE_MS
+      const old = Date.parse(file.modifiedTime as string) < now.getTime() - ORPHAN_GRACE_MS
       const expired = expires !== undefined && isExpired(expires, today)
       if (expired || (!pointedAt && old)) {
         try {

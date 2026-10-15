@@ -1,8 +1,15 @@
 import { expect } from '@open-wc/testing'
 import { LitElement } from 'lit'
-import { PadSetChangedEvent, PadSetListUpdatedEvent } from '../src/js/pad-set-service.ts'
+import { ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
+import {
+  getActivePadSet,
+  listPadSets,
+  PadSetChangedEvent,
+  PadSetListUpdatedEvent,
+} from '../src/js/pad-set-service.ts'
 import { PadSetsController } from '../src/js/pad-sets-controller.ts'
 import { makePadSet } from './builders.ts'
+import { installFakeDrive } from './fake-drive.ts'
 
 const { describe, it, afterEach } = window
 
@@ -69,5 +76,51 @@ describe('PadSetsController', () => {
     host.remove()
     window.dispatchEvent(new PadSetChangedEvent(makePadSet({ id: 'drive-other', name: 'Other' })))
     expect(padSets.activeId).to.equal(before)
+  })
+
+  it('goes back to the active pad set when the one it showed as active is not in the list', async () => {
+    const padSets = await setUp()
+    padSets.activeId = 'drive-gone'
+    await padSets.load()
+    expect(padSets.activeId).to.equal(getActivePadSet().id)
+  })
+
+  describe('choosing a pad set', () => {
+    let drive: ReturnType<typeof installFakeDrive>
+    afterEach(async () => {
+      await caches.delete('padsets-cache-v1')
+      localStorage.removeItem('padset-cache-state')
+      localStorage.removeItem('padset-selection')
+      await listPadSets(true)
+      drive?.uninstall()
+    })
+
+    it('shows the chosen set as active, and is not switching once it is', async () => {
+      const padSets = await setUp()
+      await padSets.select('builtin')
+      expect(padSets.activeId).to.equal('builtin')
+      expect(padSets.switching).to.equal(false)
+      expect(padSets.error).to.equal('')
+    })
+
+    it('goes back to the set it had, and says why, when the new one cannot be used', async () => {
+      drive = installFakeDrive()
+      const folderId = await ensurePadSetFolder('Half a set')
+      await uploadPadFile(folderId, 'A', new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }))
+      const padSets = await setUp()
+      await padSets.load(true)
+      const before = padSets.activeId
+      expect(padSets.list.map(set => set.id)).to.include(folderId)
+
+      let failure: unknown
+      await padSets.select(folderId).catch(error => {
+        failure = error
+      })
+
+      expect((failure as Error).message).to.contain('missing files')
+      expect(padSets.activeId).to.equal(before)
+      expect(padSets.error).to.contain('missing files')
+      expect(padSets.switching).to.equal(false)
+    })
   })
 })

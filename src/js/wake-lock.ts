@@ -111,7 +111,8 @@ export class WakeLockController {
   }
 
   #onChargingChange = (): void => {
-    const charging = this.#battery?.charging ?? null
+    // (only listened for once there is a battery)
+    const charging = (this.#battery as BatteryManager).charging
     const changed = charging !== this.#onMains
     this.#onMains = charging
     // Unplugging is someone being there: the limit counts from now

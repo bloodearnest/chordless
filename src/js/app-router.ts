@@ -248,6 +248,7 @@ export class AppRouter {
 
   #onPopState = (): void => {
     const route = matchRoute(window.location)
+    /* v8 ignore next 6 -- reloading the page would end the test run */
     if (this.handles(route)) {
       this.#show(route)
     } else {
@@ -292,7 +293,8 @@ export class AppRouter {
     // search put in the URL after a pause would when the user has just tapped a link)
     const navigation = keep ? this.#navigation : ++this.#navigation
 
-    let view: ShownView | null = this.#view
+    // (When it is kept there is one to keep)
+    let view = this.#view as ShownView
     if (!keep) {
       try {
         view = await entry.load(route)
@@ -304,7 +306,6 @@ export class AppRouter {
       if (navigation !== this.#navigation) return
     }
 
-    if (!view) return
     commit()
     view.route = route
     if (!keep) {

@@ -461,6 +461,18 @@ describe('LibrarySong, with little recorded about the song', () => {
     expect(prefs?.sectionDefaults?.[1]).to.include({ hideMode: 'chords' })
   })
 
+  it('keeps a capo to a whole number from 0 to 11, and 0 for what is not a number', () => {
+    const song = bare()
+    song.setCapo(40)
+    expect(song.getCapo()).to.equal(11)
+    song.setCapo(-3)
+    expect(song.getCapo()).to.equal(0)
+    song.setCapo('x')
+    expect(song.getCapo()).to.equal(0)
+    song.setCapo('4')
+    expect(song.getCapo()).to.equal(4)
+  })
+
   it('can be reset when it has no key or tempo at all', async () => {
     const song = bare()
     await song.reset()

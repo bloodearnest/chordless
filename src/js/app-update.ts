@@ -49,6 +49,7 @@ export class AppUpdate {
 
   constructor(
     container: UpdateContainer | undefined = navigator.serviceWorker,
+    /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
     // biome-ignore lint/plugin: a new version has to be loaded afresh: the page's own files are the old version's
     reload: () => void = () => location.reload(),
     now: () => number = Date.now

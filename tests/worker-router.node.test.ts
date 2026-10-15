@@ -14,10 +14,9 @@ const ORIGIN = 'https://chordless.test'
 
 const HTML = '<!doctype html><html><head><title>Chordless</title></head><body></body></html>'
 
-/** The static assets: records what was asked of them, and answers HTML (or a script, for .js) */
-function setup(env: Partial<Env> = {}) {
-  const assetRequests: string[] = []
-  const full = {
+/** The Worker's bindings, with static assets that answer HTML */
+function setupEnv(env: Partial<Env> = {}, assetRequests: string[] = []) {
+  return {
     GOOGLE_CLIENT_ID: 'client-id',
     GOOGLE_CLIENT_SECRET: 'client-secret',
     JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
@@ -34,6 +33,12 @@ function setup(env: Partial<Env> = {}) {
     },
     ...env,
   } satisfies Env
+}
+
+/** The static assets: records what was asked of them, and answers HTML (or a script, for .js) */
+function setup(env: Partial<Env> = {}) {
+  const assetRequests: string[] = []
+  const full = setupEnv(env, assetRequests)
   const cache: ShareCache = { match: async () => undefined, put: async () => {} }
   const ctx = { waitUntil() {} }
   const send = (path: string, init: RequestInit = {}) =>
@@ -170,4 +175,30 @@ test('everything else is the static assets, whose answer is passed on as it is',
   assert.equal(response.status, 200)
   assert.equal(await response.text(), HTML)
   assert.deepEqual(assetRequests, ['GET /setlist/some-id'])
+})
+
+test('a share download is cached in the background: the runtime is asked to wait for it', async () => {
+  const waiting: Promise<unknown>[] = []
+  const cached: string[] = []
+  const cache: ShareCache = {
+    match: async () => undefined,
+    put: async request => void cached.push(new URL(request.url).pathname),
+  }
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async () => new Response(new Uint8Array([1, 2, 3]))) as typeof fetch
+  try {
+    const env = { ...setupEnv(), GOOGLE_API_KEY: 'key' }
+    const response = await handleRequest(
+      new Request(`${ORIGIN}/api/share/1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y`),
+      env,
+      { waitUntil: promise => waiting.push(promise) },
+      cache
+    )
+    assert.equal(response.status, 200)
+  } finally {
+    globalThis.fetch = realFetch
+  }
+  assert.equal(waiting.length, 1)
+  await Promise.all(waiting)
+  assert.deepEqual(cached, ['/api/share/1gaujHBXmLfJDPtBn5plrCrTukHnkIB8Y'])
 })

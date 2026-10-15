@@ -5,6 +5,9 @@ import type { ChartSection, ParsedChart } from '../js/data-types.ts'
 import { displayPreferencesContext } from '../js/display-preferences.ts'
 import { transposeKeyName } from '../js/transpose.ts'
 
+/** How chords are shown before the page has said */
+const NO_DISPLAY_PREFERENCES = { nashville: false, unicodeAccidentals: false }
+
 /**
  * Song Display Component
  * Renders a parsed song's sections
@@ -61,6 +64,8 @@ export class SongDisplay extends LitElement {
   }
 
   _renderSection(section: ChartSection, index: number) {
+    /* v8 ignore next -- the page provides these as soon as display-preferences loads */
+    const { nashville, unicodeAccidentals } = this._display.value ?? NO_DISPLAY_PREFERENCES
     const displayKey = this.parsed?.metadata?.key || ''
     const capoValue = Number.isFinite(this.capo)
       ? Math.min(Math.max(Math.round(this.capo), 0), 11)
@@ -73,8 +78,8 @@ export class SongDisplay extends LitElement {
         .note=${section.note || ''}
         .songIndex=${this.songIndex}
         .sectionIndex=${index}
-        .displayAsNashville=${this._display.value?.nashville ?? false}
-        .unicodeAccidentals=${this._display.value?.unicodeAccidentals ?? false}
+        .displayAsNashville=${nashville}
+        .unicodeAccidentals=${unicodeAccidentals}
         .displayKey=${displayKey}
         .capo=${capoValue}
         .capoKey=${capoKey}

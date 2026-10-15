@@ -145,7 +145,8 @@ export function innermostForward(body: string): (ForwardedHeaders & { text: stri
     }
   }
   return {
-    from: headers.from ?? '',
+    // (a block starts at its From: line)
+    from: headers.from as string,
     date: headers.date ?? headers.sent ?? '',
     subject: headers.subject ?? '',
     text: lines.slice(end).join('\n'),
@@ -377,7 +378,7 @@ export function parseChartText(text: string, filename: string): ChartInfo {
   const generic =
     !/\p{L}{3,}/u.test(fromName.title) ||
     /^(scan|img|image|document|untitled)\b/i.test(fromName.title)
-  const title = (generic ? textTitle || fromName.title : fromName.title) || textTitle
+  const title = generic ? textTitle || fromName.title : fromName.title
   const find = (pattern: RegExp) => head.map(line => pattern.exec(line)?.[1]).find(Boolean)
   const key = find(/\bKey\s*(?:[-:–]|of)\s*([^\s|]+)/i)
   const tempo = find(/\bTempo\s*[-:–]\s*(\d+)/i)
