@@ -443,14 +443,10 @@ export class SetlistPage {
 
       // If going directly to a song, scroll to it immediately (before layout/paint)
       if (shouldShowSongDirectly) {
-        const targetSection = container.querySelector<HTMLElement>(`#song-${songIndex}`)
-        if (targetSection) {
-          // Set scroll position immediately, before browser paints
-          // scrollTo, not scrollLeft: the stylesheet's smooth scrolling would animate that
-          container.scrollTo({ left: targetSection.offsetLeft, behavior: 'instant' })
-        } else {
-          console.warn(`[Initial Load] Could not find target section song-${songIndex}`)
-        }
+        const targetSection = container.querySelector(`#song-${songIndex}`) as HTMLElement
+        // Set scroll position immediately, before browser paints
+        // scrollTo, not scrollLeft: the stylesheet's smooth scrolling would animate that
+        container.scrollTo({ left: targetSection.offsetLeft, behavior: 'instant' })
       }
 
       // Set up initial view state (no scrolling on page load)
@@ -633,11 +629,10 @@ export class SetlistPage {
         return
       }
       const state = this._resolveSectionState(songIndex, sectionIndex, section)
-      const hideMode = state.hideMode || 'none'
       // Apply state via reactive properties
-      section.hideMode = hideMode
-      section.isCollapsed = state.isCollapsed || false
-      section.isHidden = state.isHidden || false
+      section.hideMode = state.hideMode
+      section.isCollapsed = state.isCollapsed
+      section.isHidden = state.isHidden
       section.editMode = isEditMode
     })
   }
@@ -799,7 +794,7 @@ export class SetlistPage {
 
       if (capoSelector) {
         if (this._capoEnabled) {
-          this.updateCapoSelector(song.currentCapo ?? 0, song.currentKey)
+          this.updateCapoSelector(song.currentCapo, song.currentKey)
         }
       }
 
@@ -1113,10 +1108,6 @@ export class SetlistPage {
       const setlistSongEntry = this.currentSetlist?.songs?.[index]
       if (!setlistSongEntry) return
 
-      // Get canonical song to compare keys
-      const canonicalSong = this.songs[index]
-      if (!canonicalSong) return
-
       // Check if setlist key matches what the user's prefs are based on
       // We need to compare against the canonical song's current key
       // The song user prefs capo is based on the canonical key at the time they set it
@@ -1158,7 +1149,7 @@ export class SetlistPage {
       song,
       song._setlistEntry,
       song._canonicalSong,
-      this.currentSetlistId ?? '',
+      this.currentSetlistId as string,
       this._database(),
       this._database().organisationId
     )
@@ -1215,17 +1206,8 @@ export class SetlistPage {
       isHidden: false,
     }
 
-    // Merge priorities
-    if (!override && !songUserPrefsDefaults) {
-      return appDefaults
-    }
-
-    return {
-      hideMode: override?.hideMode ?? songUserPrefsDefaults?.hideMode ?? appDefaults.hideMode,
-      isCollapsed:
-        override?.isCollapsed ?? songUserPrefsDefaults?.isCollapsed ?? appDefaults.isCollapsed,
-      isHidden: override?.isHidden ?? songUserPrefsDefaults?.isHidden ?? appDefaults.isHidden,
-    }
+    // Merge priorities, field by field
+    return { ...appDefaults, ...songUserPrefsDefaults, ...override }
   }
 
   _getSongUserPrefsSectionDefaults(songIndex: number, sectionIndex: number): SectionState | null {
@@ -1287,10 +1269,7 @@ export class SetlistPage {
     if (!sectionElement) {
       sectionElement = this._getSongSectionComponent(songIndex, sectionIndex)
     }
-    const recommended =
-      sectionElement && typeof sectionElement.getRecommendedHideMode === 'function'
-        ? sectionElement.getRecommendedHideMode() || 'none'
-        : 'none'
+    const recommended = sectionElement ? sectionElement.getRecommendedHideMode() : 'none'
     let defaultsConfig = this._getSectionDefaultsConfig()
     if (!defaultsConfig || typeof defaultsConfig !== 'object') {
       defaultsConfig = { all: 'all' }
@@ -1313,7 +1292,7 @@ export class SetlistPage {
     }
 
     if (!hideMode || hideMode === 'none') {
-      return recommended || 'none'
+      return recommended
     }
 
     if (hideMode === 'chords' && recommended === 'lyrics') {
@@ -1407,7 +1386,7 @@ export class SetlistPage {
     }
 
     if (isExplicit || mappedMode === 'none') {
-      state.hideMode = mappedMode || 'none'
+      state.hideMode = mappedMode
     } else {
       state.hideMode = state.hideMode === mappedMode ? 'none' : mappedMode
     }
@@ -1503,9 +1482,9 @@ export class SetlistPage {
     const state = this._resolveSectionState(songIndex, sectionIndex, component)
     const isEditMode = document.body.classList.contains('edit-mode')
     // Apply state via reactive properties
-    component.hideMode = state.hideMode || 'none'
-    component.isCollapsed = state.isCollapsed || false
-    component.isHidden = state.isHidden || false
+    component.hideMode = state.hideMode
+    component.isCollapsed = state.isCollapsed
+    component.isHidden = state.isHidden
     component.editMode = isEditMode
   }
 
@@ -1797,9 +1776,9 @@ export class SetlistPage {
       capoSelector.addEventListener(CapoChangeEvent.type, this._capoChangeHandler)
     }
 
-    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    const currentCapo = currentSong?.currentCapo || 0
-    this.updateCapoSelector(currentCapo, currentSong?.currentKey || null)
+    // (no song is current on the overview: its index is -1)
+    const currentSong = this.songs[this.currentSongIndex] as RuntimeSong | undefined
+    this.updateCapoSelector(currentSong?.currentCapo, currentSong?.currentKey)
   }
 
   updateSongSettingsPopover() {
@@ -1857,7 +1836,7 @@ export class SetlistPage {
       song,
       song._setlistEntry,
       song._canonicalSong,
-      this.currentSetlistId ?? '',
+      this.currentSetlistId as string,
       this._database(),
       this._database().organisationId
     )
@@ -1895,7 +1874,7 @@ export class SetlistPage {
       song,
       song._setlistEntry,
       song._canonicalSong,
-      this.currentSetlistId ?? '',
+      this.currentSetlistId as string,
       this._database(),
       this._database().organisationId
     )
@@ -1924,7 +1903,6 @@ export class SetlistPage {
     console.log(`Key changed to: ${newKey} for song ${this.currentSongIndex}`)
 
     const song = this.songs[this.currentSongIndex]
-    if (!song) return
 
     // Update key in runtime song object
     song.currentKey = newKey
@@ -1935,7 +1913,7 @@ export class SetlistPage {
       song,
       song._setlistEntry,
       song._canonicalSong,
-      this.currentSetlistId ?? '',
+      this.currentSetlistId as string,
       this._database(),
       this._database().organisationId
     )
@@ -2062,10 +2040,7 @@ export class SetlistPage {
       console.log('[resetCurrentSong] Key already correct, just updating displays')
       // Key is already correct, just update displays
       const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-      if (musicalMetadata) {
-        musicalMetadata.keyValue = originalKey
-        musicalMetadata.bpm = song.currentBPM || null
-      }
+      if (musicalMetadata) musicalMetadata.keyValue = originalKey
     } else {
       console.warn('[resetCurrentSong] No original key found in metadata!')
     }
@@ -2127,27 +2102,8 @@ export class SetlistPage {
         this.root.querySelectorAll<HTMLElement>('.section[id^="song-"]')
       )
 
-      // Insert at the new position
-      if (newIndex === 0) {
-        // Insert at the beginning (after overview)
-        const overview = this.root.querySelector<HTMLElement>('#overview')
-        if (overview?.nextSibling) {
-          container.insertBefore(sectionToMove, overview.nextSibling)
-        } else {
-          container.insertBefore(sectionToMove, container.firstChild)
-        }
-      } else if (newIndex >= remainingSections.length) {
-        // Insert at the end
-        container.appendChild(sectionToMove)
-      } else {
-        // Insert before the section that's currently at the target position
-        const targetSection = remainingSections[newIndex]
-        if (targetSection && targetSection.parentNode === container) {
-          container.insertBefore(sectionToMove, targetSection)
-        } else {
-          container.appendChild(sectionToMove)
-        }
-      }
+      // Insert before the section now at the new position (at the end when there is none)
+      container.insertBefore(sectionToMove, remainingSections[newIndex] ?? null)
 
       // Now update all section IDs and data-song-index attributes to match new order
       const updatedSections = Array.from(
@@ -2156,11 +2112,6 @@ export class SetlistPage {
       const displays: SongDisplay[] = []
       updatedSections.forEach((section, index) => {
         section.id = `song-${index}`
-
-        // Update data-song-index on all wrappers inside this section
-        section.querySelectorAll<HTMLElement>('[data-song-index]').forEach(el => {
-          el.dataset.songIndex = String(index)
-        })
 
         // The song display and its sections look songs up by their index
         for (const display of section.querySelectorAll<SongDisplay>('song-display')) {
@@ -2242,13 +2193,10 @@ export class SetlistPage {
     // Normalize tempo + signature so media player gets consistent payloads
     const parsedTempoInfo = parseTempoMetadata(parsed.metadata.tempo ?? song.metadata?.tempo)
     const currentBPM = parsedTempoInfo.bpm ?? song.currentBPM ?? null
-    let tempoNote = parsedTempoInfo.tempoNote ?? song.metadata?.tempoNote ?? null
+    let tempoNote = parsedTempoInfo.tempoNote ?? song.metadata?.tempoNote ?? '1/4'
     const timeSignature = parsed.metadata.time || song.metadata?.timeSignature || null
 
-    if (!tempoNote) {
-      tempoNote = '1/4'
-    }
-    if (timeSignature && (!tempoNote || tempoNote === '1/4')) {
+    if (timeSignature && tempoNote === '1/4') {
       const [, denominator] = timeSignature.split('/').map(s => s.trim())
       if (denominator) {
         tempoNote = `1/${denominator}`
@@ -2592,7 +2540,7 @@ export class SetlistPage {
     if (capoSelector) {
       capoSelector.style.display = this._capoEnabled ? '' : 'none'
       if (this._capoEnabled && currentSong) {
-        this.updateCapoSelector(currentSong.currentCapo ?? 0, currentSong.currentKey)
+        this.updateCapoSelector(currentSong.currentCapo, currentSong.currentKey)
       } else {
         capoSelector.referenceKey = ''
       }

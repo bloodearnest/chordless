@@ -40,11 +40,6 @@
     "branches": 10,
     "functions": 0
   },
-  "src/js/setlist-page.ts": {
-    "lines": 30,
-    "branches": 47,
-    "functions": 4
-  },
   "src/js/views/library-view.ts": {
     "lines": 2,
     "branches": 20,
