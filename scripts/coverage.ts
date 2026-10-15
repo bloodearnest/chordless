@@ -106,13 +106,20 @@ function mergeReports(reports: Map<string, FileCoverage>[]) {
       for (const [line, hits] of file.lines) {
         into.lines.set(line, Math.max(into.lines.get(line) ?? 0, hits))
       }
+      // V8 lists a block that did not run, so a line that ran with no branch listed has all of
+      // its branches taken: the other report's branch there is not to count against it (as Node's
+      // for a class declaration)
+      const alone = (_from: FileCoverage, other: FileCoverage, line: number) =>
+        !other.branches.has(line) && (other.lines.get(line) ?? 0) > 0
+      for (const line of [...into.branches.keys()]) {
+        if (alone(into, file, line) && !file.branches.has(line)) into.branches.delete(line)
+      }
       for (const [line, count] of file.branches) {
         const have = into.branches.get(line)
-        if (!have) into.branches.set(line, count)
-        else {
+        if (have) {
           have.total = Math.max(have.total, count.total)
           have.hit = Math.max(have.hit, count.hit)
-        }
+        } else if (!alone(file, into, line)) into.branches.set(line, count)
       }
       // Functions are named and placed differently by Node and by V8, so two reports of one file
       // cannot be added up: the one that ran more of them is taken
