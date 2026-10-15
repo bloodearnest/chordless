@@ -1,6 +1,5 @@
 import type {
   ChordProRecord,
-  ParsedChart,
   Setlist,
   SetlistLocalState,
   SongInput,
@@ -554,20 +553,6 @@ export async function getCurrentDB(): Promise<ChordlessDB> {
   const db = new ChordlessDB(id)
   await db.init()
   return db
-}
-
-export function generateSongId(parsed: ParsedChart): string {
-  // Prefer CCLI number as deterministic ID
-  if (parsed.metadata.ccliSongNumber || parsed.metadata.ccli) {
-    const ccli = parsed.metadata.ccliSongNumber || parsed.metadata.ccli
-    return `ccli-${ccli}`
-  }
-  // Fallback to normalized title
-  if (parsed.metadata.title) {
-    return `title-${normalizeTitle(parsed.metadata.title)}`
-  }
-  // Last resort: random ID
-  return `song-${crypto.randomUUID()}`
 }
 
 // Setlist utility functions

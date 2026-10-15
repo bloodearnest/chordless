@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.ts'
 import {
   addChart,
+  chartIdentity,
   createSong,
   createVariant,
   findExistingSong,
@@ -366,3 +367,33 @@ describe('songs that are not as they should be', () => {
 })
 
 const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' } as const
+
+describe('who a chart is', () => {
+  it('is its CCLI number, else its title, whatever the fallback says', () => {
+    expect(chartIdentity({ ccli: '123', title: 'Grace' }, { title: 'Other' })).to.include({
+      id: 'ccli-123',
+      ccliNumber: '123',
+      title: 'Grace',
+    })
+    expect(chartIdentity({ title: 'Amazing Grace' }, { ccliNumber: '9' })).to.include({
+      id: 'ccli-9',
+      ccliNumber: '9',
+    })
+    expect(chartIdentity({ title: 'Amazing Grace' }).id).to.equal('title-amazinggrace')
+  })
+
+  it('takes the title, and the id, from the fallback for what the chart lacks', () => {
+    expect(chartIdentity({}, { title: 'From Drive' })).to.include({
+      id: 'title-fromdrive',
+      title: 'From Drive',
+    })
+    expect(chartIdentity({}, { title: 'From Drive', id: 'kept-id' }).id).to.equal('kept-id')
+  })
+
+  it('is a new id for each chart with no title at all: untitled songs are not one song', () => {
+    const first = chartIdentity({})
+    expect(first.title).to.equal('Untitled')
+    expect(first.id).to.match(/^song-/)
+    expect(chartIdentity({}).id).to.not.equal(first.id)
+  })
+})

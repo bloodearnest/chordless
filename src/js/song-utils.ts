@@ -14,7 +14,7 @@ import type {
   SongWithContent,
 } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import { generateSongId, getCurrentDB, normalizeTitle } from './db.ts'
+import { getCurrentDB, normalizeTitle } from './db.ts'
 import { ChordProParser } from './parser.ts'
 import { hashText } from './utils/hash.ts'
 
@@ -242,6 +242,80 @@ async function saveNewChordPro(db: ChordlessDB, content: string, contentHash: st
   return id
 }
 
+/** Who a chart is: the CCLI number and title that identify its song, and the song's id */
+export interface ChartIdentity {
+  ccliNumber: string | null
+  title: string
+  titleNormalized: string
+  id: string
+}
+
+/**
+ * The identity of a chart's song. The chart's own CCLI number and title win; `fallback` is what
+ * to use for those it lacks, and `fallback.id` an id the song already has. The id is the CCLI
+ * number's, else the title's, else (no title at all) a new one: untitled songs are not one song.
+ */
+export function chartIdentity(
+  metadata: ChartMetadata,
+  fallback: { ccliNumber?: string | null; title?: string | null; id?: string | null } = {}
+): ChartIdentity {
+  const ccliNumber = metadata.ccliSongNumber || metadata.ccli || fallback.ccliNumber || null
+  const named = metadata.title || fallback.title
+  const title = named || 'Untitled'
+  const titleNormalized = normalizeTitle(title)
+  const derivedId = ccliNumber
+    ? `ccli-${ccliNumber}`
+    : named
+      ? `title-${titleNormalized}`
+      : `song-${crypto.randomUUID()}`
+  return { ccliNumber, title, titleNormalized, id: fallback.id || derivedId }
+}
+
+/** Where a new song stands among the variants of its song */
+interface Placement {
+  variantOf: string | null
+  isDefault: boolean
+  variantLabel: string
+}
+
+/** Where a new song came from */
+interface Provenance {
+  importUser: string | null
+  importSource: string
+  sourceUrl: string | null
+}
+
+/** Store a chart as a new song (and its chordpro file) */
+async function insertSong(
+  db: ChordlessDB,
+  chordpro: string,
+  metadata: ChartMetadata,
+  identity: ChartIdentity,
+  placement: Placement,
+  provenance: Provenance
+): Promise<SongRecord> {
+  const contentHash = hashText(chordpro)
+  const chordproFileId = await saveNewChordPro(db, chordpro, contentHash)
+  const now = new Date().toISOString()
+  return db.saveSong({
+    uuid: crypto.randomUUID(),
+    id: identity.id,
+    ...placement,
+    chordproFileId,
+    ccliNumber: identity.ccliNumber,
+    title: identity.title,
+    titleNormalized: identity.titleNormalized,
+    ...chartFields(metadata),
+    importDate: now,
+    ...provenance,
+    modifiedDate: now,
+    driveFileId: null,
+    driveModifiedTime: null,
+    lastSyncedAt: null,
+    contentHash,
+  })
+}
+
 /** What createSong (and createVariant) can be told beyond the chart itself */
 export interface CreateSongOptions {
   ccliNumber?: string | null
@@ -256,73 +330,40 @@ export interface CreateSongOptions {
 }
 
 /**
- * Create a new song with chordpro content
- *
- * @param chordproContent - ChordPro text
- * @param options - Additional options
- * @returns Created song
+ * Create a new song from a chart in the current organisation's database. Throws if the song
+ * is already there, unless forceNew makes this a variant of it.
  */
 export async function createSong(
   chordproContent: string,
   options: CreateSongOptions = {}
 ): Promise<SongRecord> {
   const db = await getCurrentDB()
+  const { metadata } = parser.parse(chordproContent)
+  const identity = chartIdentity(metadata, options)
 
-  // Parse chordpro to extract metadata
-  const parsed = parser.parse(chordproContent)
-  const metadata = parsed.metadata
-
-  // Generate deterministic ID
-  const ccliNumber = metadata.ccliSongNumber || metadata.ccli || options.ccliNumber
-  const title = metadata.title || options.title || 'Untitled'
-  const titleNormalized = normalizeTitle(title)
-
-  let songId: string
-  if (ccliNumber) {
-    songId = `ccli-${ccliNumber}`
-  } else {
-    songId = `title-${titleNormalized}`
-  }
-
-  // Check if song already exists
-  const existing = await findExistingSong(ccliNumber, title, db)
+  const existing = await findExistingSong(identity.ccliNumber, identity.title, db)
   if (existing && !options.forceNew) {
     throw new Error(
       `Song already exists: ${existing.title} (${existing.id}). Use forceNew option to create variant.`
     )
   }
 
-  const contentHash = hashText(chordproContent)
-  const chordproFileId = await saveNewChordPro(db, chordproContent, contentHash)
-
-  // Create song
-  const song: SongInput = {
-    uuid: crypto.randomUUID(),
-    id: songId,
-    variantOf: options.variantOf || null,
-    isDefault: !existing, // Only first variant is default
-    variantLabel: options.variantLabel || 'Original',
-
-    chordproFileId: chordproFileId,
-
-    ccliNumber: ccliNumber || null,
-    title: title,
-    titleNormalized: titleNormalized,
-    ...chartFields(metadata),
-
-    importDate: new Date().toISOString(),
-    importUser: options.importUser || 'default-user',
-    importSource: options.importSource || 'manual',
-    sourceUrl: options.sourceUrl || null,
-    modifiedDate: new Date().toISOString(),
-
-    driveFileId: null,
-    driveModifiedTime: null,
-    lastSyncedAt: null,
-    contentHash: contentHash,
-  }
-
-  return db.saveSong(song)
+  return insertSong(
+    db,
+    chordproContent,
+    metadata,
+    identity,
+    {
+      variantOf: options.variantOf || null,
+      isDefault: !existing, // Only first variant is default
+      variantLabel: options.variantLabel || 'Original',
+    },
+    {
+      importUser: options.importUser || 'default-user',
+      importSource: options.importSource || 'manual',
+      sourceUrl: options.sourceUrl || null,
+    }
+  )
 }
 
 /** How addChart treats a chart of a song the database already has in another form */
@@ -343,46 +384,32 @@ export interface AddChartOptions {
 export async function addChart(
   db: ChordlessDB,
   chordpro: string,
-  { variantLabel, importSource, makeDefault, title: fallbackTitle }: AddChartOptions
+  { variantLabel, importSource, makeDefault, title }: AddChartOptions
 ): Promise<SongRecord> {
   const contentHash = hashText(chordpro)
   const known = await db.getAllSongs()
   const same = known.find(existing => existing.contentHash === contentHash)
   if (same) return same
 
-  const parsed = parser.parse(chordpro)
-  const metadata = parsed.metadata
-  const now = new Date().toISOString()
-  const chordproFileId = await saveNewChordPro(db, chordpro, contentHash)
-
-  const title = metadata.title || fallbackTitle || 'Untitled'
-  const id = generateSongId(parsed)
-  const sameSong = known.filter(existing => existing.id === id)
+  const { metadata } = parser.parse(chordpro)
+  const identity = chartIdentity(metadata, { title })
+  const sameSong = known.filter(existing => existing.id === identity.id)
   const currentDefault = sameSong.find(existing => existing.isDefault)
   const isDefault = makeDefault === 'newest' || !currentDefault
   if (isDefault && currentDefault) await db.saveSong({ ...currentDefault, isDefault: false })
 
-  return db.saveSong({
-    uuid: crypto.randomUUID(),
-    id,
-    variantOf: sameSong.length > 0 && !isDefault ? (currentDefault?.uuid ?? null) : null,
-    isDefault,
-    variantLabel,
-    chordproFileId,
-    ccliNumber: metadata.ccliSongNumber || metadata.ccli || null,
-    title,
-    titleNormalized: normalizeTitle(title),
-    ...chartFields(metadata),
-    importDate: now,
-    importUser: null,
-    importSource,
-    sourceUrl: null,
-    modifiedDate: now,
-    driveFileId: null,
-    driveModifiedTime: null,
-    lastSyncedAt: null,
-    contentHash,
-  })
+  return insertSong(
+    db,
+    chordpro,
+    metadata,
+    identity,
+    {
+      variantOf: sameSong.length > 0 && !isDefault ? (currentDefault?.uuid ?? null) : null,
+      isDefault,
+      variantLabel,
+    },
+    { importUser: null, importSource, sourceUrl: null }
+  )
 }
 
 /** The song fields that come from its chart's metadata */

@@ -23,7 +23,7 @@ import type {
   SongInput,
   SongRecord,
 } from './data-types.ts'
-import { type ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.ts'
+import { type ChordlessDB, getCurrentDB, withNumericTempos } from './db.ts'
 import * as DriveAPI from './drive-api.ts'
 import {
   batchUploadFiles,
@@ -42,7 +42,7 @@ import { setOrganisationReadOnly } from './organisation.ts'
 import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
-import { chartFields, hashText } from './song-utils.ts'
+import { chartFields, chartIdentity, hashText } from './song-utils.ts'
 import { setlistContent, setlistContentHash } from './sync/setlist-hash.ts'
 import { md5Hex } from './utils/md5.ts'
 
@@ -1138,23 +1138,23 @@ export class DriveSyncManager {
 
     const parsed = this.parser.parse(chordproContent)
     const { metadata } = parsed
-    const ccliNumber =
-      metadata.ccliSongNumber || metadata.ccli || props.ccliNumber || localSong?.ccliNumber || null
-    const title =
-      metadata.title || props.title || localSong?.title || this.getTitleFromFilename(file.name)
-    const titleNormalized = normalizeTitle(title)
-    const deterministicId =
-      props.songId ||
-      localSong?.id ||
-      (ccliNumber ? `ccli-${ccliNumber}` : `title-${titleNormalized}`)
+    // What Drive's file properties and this device's copy know of the song fill in what the
+    // chart lacks
+    const { ccliNumber, title, titleNormalized, id } = chartIdentity(metadata, {
+      ccliNumber: props.ccliNumber || localSong?.ccliNumber,
+      title: props.title || localSong?.title || this.getTitleFromFilename(file.name),
+      id: props.songId || localSong?.id,
+    })
     const variantLabel = props.variantLabel || localSong?.variantLabel || 'Original'
     const contentHash = remoteHash
 
+    const now = new Date().toISOString()
     await this.#db.saveChordPro({
       id: chordproFileId,
       content: chordproContent,
       contentHash,
-      lastModified: new Date(file.modifiedTime || Date.now()).getTime(),
+      createdDate: localChart?.createdDate ?? file.createdTime ?? now,
+      modifiedDate: file.modifiedTime ?? now,
     })
 
     // The chart's fields, as for an imported song, falling back to this device's copy for
@@ -1162,7 +1162,7 @@ export class DriveSyncManager {
     const chart = chartFields(metadata)
     const songRecord: SongInput = {
       uuid: songUuid,
-      id: deterministicId,
+      id,
       variantOf: props.variantOf || localSong?.variantOf || null,
       isDefault: props.isDefault === 'true' || localSong?.isDefault || !props.variantOf,
       variantLabel,
@@ -1188,7 +1188,7 @@ export class DriveSyncManager {
       lastSyncedAt: new Date().toISOString(),
       syncedContentHash: remoteHash,
       driveProperties: {
-        songId: deterministicId,
+        songId: id,
         songUuid,
         contentHash,
         ccliNumber: ccliNumber || '',
