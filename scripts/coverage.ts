@@ -51,22 +51,28 @@ const emptyFile = (): FileCoverage => ({
 
 function parseLcov(path: string, into: Map<string, FileCoverage>) {
   let file: FileCoverage | undefined
-  const names = new Map<string, number>()
+  // The lines of the functions of each name, in the order they were declared: the hits that
+  // follow name them again, in the same order, and more than one function can have a name
+  const declared = new Map<string, number[]>()
+  const answered = new Map<string, number>()
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     const colon = line.indexOf(':')
     const key = colon < 0 ? line : line.slice(0, colon)
     const value = colon < 0 ? '' : line.slice(colon + 1)
     if (key === 'SF') {
       file = emptyFile()
-      names.clear()
+      declared.clear()
+      answered.clear()
       into.set(value, file)
     } else if (file && key === 'FN') {
       const [at, name] = value.split(',')
-      names.set(name, Number(at))
+      declared.set(name, [...(declared.get(name) ?? []), Number(at)])
       file.functions.set(`${name}@${at}`, file.functions.get(`${name}@${at}`) ?? 0)
     } else if (file && key === 'FNDA') {
       const [hits, name] = value.split(',')
-      const id = `${name}@${names.get(name)}`
+      const nth = answered.get(name) ?? 0
+      answered.set(name, nth + 1)
+      const id = `${name}@${declared.get(name)?.[nth]}`
       file.functions.set(id, Math.max(file.functions.get(id) ?? 0, Number(hits)))
     } else if (file && key === 'DA') {
       const [at, hits] = value.split(',').map(Number)

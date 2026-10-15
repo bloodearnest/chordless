@@ -475,8 +475,8 @@ export class PadAudioController {
       currentStep++
       const progress = currentStep / steps
       const newVolume = Math.min(currentVolume + volumeRange * (progress * progress), this._volume)
-      const gain = this._padGain
-      if (!gain) return
+      // (cleanup() clears the interval before it lets go of the gain)
+      const gain = this._padGain as GainNode
       gain.gain.value = newVolume
 
       if (currentStep >= steps || newVolume >= this._volume) {
@@ -509,7 +509,7 @@ export class PadAudioController {
 
     const steps = 60
     const stepDuration = fadeDuration / steps
-    const startVolume = this._padGain?.gain.value ?? 0
+    const startVolume = (this._padGain as GainNode).gain.value
 
     let currentStep = 0
     return new Promise<void>(resolve => {
@@ -518,8 +518,7 @@ export class PadAudioController {
         const progress = currentStep / steps
         const remaining = 1 - progress
         const newVolume = Math.max(startVolume * (remaining * remaining), 0)
-        const gain = this._padGain
-        if (!gain) return
+        const gain = this._padGain as GainNode
         gain.gain.value = newVolume
 
         if (currentStep >= steps || newVolume < 0.01) {

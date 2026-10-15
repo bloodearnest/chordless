@@ -1,13 +1,14 @@
 import { expect } from '@open-wc/testing'
-import type { SetlistEntry, TempoInput } from '../src/js/data-types.ts'
+import type { SectionState, SetlistEntry, TempoInput } from '../src/js/data-types.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
+import type { SongModel } from '../src/js/models/song-model.ts'
 import { ChordProParser } from '../src/js/parser.ts'
 import {
   buildRuntimeSongs,
   parseTempoMetadata,
   type RuntimeSong,
 } from '../src/js/setlist/runtime-songs.ts'
-import { createSetlistSongModel } from '../src/js/song-model-factory.ts'
+import { createSetlistSongModel, syncSectionStates } from '../src/js/song-model-factory.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -232,5 +233,53 @@ describe('createSetlistSongModel', () => {
     expect(model.getOriginalKey()).to.equal('D')
     expect(model.getKey()).to.equal('E')
     expect(model.getCapo()).to.equal(0)
+  })
+
+  it('takes the tempo and capo the page has set on the song, when they differ from the setlist’s', () => {
+    const parsed = new ChordProParser().parse('{title: A}\n{key: G}\n\n[G]One')
+    const entry = makeEntry({ songId: 'title-a', songUuid: 'uuid-a', key: 'G', tempo: 80 })
+    const runtimeSong = {
+      title: 'A',
+      parsed,
+      songIndex: 0,
+      originalKey: 'G',
+      currentKey: 'G',
+      currentCapo: 3,
+      metadata: { tempo: 100 },
+    } as unknown as RuntimeSong
+    const model = createSetlistSongModel(
+      runtimeSong,
+      entry,
+      null,
+      'setlist-1',
+      new ChordlessDB('unused'),
+      'org-1'
+    )
+    expect(model.getTempo()).to.equal(100)
+    expect(model.getCapo()).to.equal(3)
+  })
+})
+
+describe('syncSectionStates', () => {
+  const modelWith = (states: [number, Partial<SectionState>][]) =>
+    ({
+      setSectionState: (index: number, state: Partial<SectionState>) => states.push([index, state]),
+    }) as unknown as SongModel
+
+  it('gives the model the state of each section by its number', () => {
+    const given: [number, Partial<SectionState>][] = []
+    syncSectionStates(modelWith(given), {
+      0: { hideMode: 'chords', isCollapsed: false, isHidden: false },
+      2: { hideMode: 'hide', isCollapsed: false, isHidden: true },
+    })
+    expect(given.map(([index]) => index)).to.deep.equal([0, 2])
+    expect(given[1][1].isHidden).to.equal(true)
+  })
+
+  it('has nothing to give for no states', () => {
+    const given: [number, Partial<SectionState>][] = []
+    syncSectionStates(modelWith(given), null)
+    syncSectionStates(modelWith(given), undefined)
+    expect(given).to.deep.equal([])
   })
 })

@@ -7,6 +7,7 @@ import {
   PadSetListUpdatedEvent,
   selectPadSet,
 } from './pad-set-service.ts'
+import { errorMessage } from './utils/errors.ts'
 
 /**
  * PadSetsController: the pad sets and which one is active, for a component
@@ -85,7 +86,7 @@ export class PadSetsController implements ReactiveController {
       await selectPadSet(id)
     } catch (error) {
       this.activeId = previous
-      this.error = (error instanceof Error && error.message) || 'Unable to switch pad set.'
+      this.error = errorMessage(error)
       throw error
     } finally {
       this.switching = false

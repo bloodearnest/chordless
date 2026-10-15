@@ -174,6 +174,8 @@ describe('AppRouter', () => {
       makeRouter({ transitions: true })
       await router.start()
       const first = router.navigate('/songs')
+      // Let the first get as far as swapping the view, which the transition takes a frame over
+      await new Promise(resolve => setTimeout(resolve))
       const second = router.navigate('/setlist/abc')
       await Promise.all([first, second])
       expect(outlet.children).to.have.length(1)

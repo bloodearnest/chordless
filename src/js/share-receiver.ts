@@ -282,8 +282,7 @@ export async function tidySharedWithMe({
     }
 
     for (const setlist of received) {
-      const share = setlist.received
-      if (!share) continue
+      const share = setlist.received as ReceivedShare
       if (isExpired(share.expires, today)) {
         await forgetSetlist(db, share.fileId)
         tidied.expired++

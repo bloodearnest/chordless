@@ -224,4 +224,68 @@ describe('OverviewReorder', () => {
     await drag(3, -50)
     expect(moves).to.have.length(2)
   })
+
+  it('has nothing to listen to when the overview has no cards', () => {
+    const empty = new OverviewReorder({
+      root: document.createElement('div'),
+      isEnabled: () => true,
+      onMove: () => {},
+    })
+    expect(() => empty.enable()).to.not.throw()
+  })
+
+  it('ignores the moves of a pointer it is not following', async () => {
+    await drag(0, 400, { release: false })
+    document.dispatchEvent(pointer('pointermove', { clientY: -100, pointerId: 2 }))
+    document.dispatchEvent(pointer('pointerup', { clientY: -100, pointerId: 2 }))
+    document.dispatchEvent(pointer('pointercancel', { clientY: -100, pointerId: 2 }))
+    expect(reorder.isDragging).to.equal(true)
+    document.dispatchEvent(pointer('pointerup', { clientY: 400 }))
+    await nextFrame()
+    expect(moves).to.deep.equal([[0, 3]])
+  })
+
+  it('ignores a pointer coming down on another handle while a card is being dragged', async () => {
+    await drag(0, 100, { release: false })
+    handle(2).dispatchEvent(pointer('pointerdown', { pointerId: 2, clientY: 125 }))
+    document.dispatchEvent(pointer('pointerup', { clientY: 100 }))
+    await nextFrame()
+    expect(moves.every(([from]) => from === 0)).to.equal(true)
+  })
+
+  it('works out the place for a move only once a frame, however many moves there are', async () => {
+    handle(0).dispatchEvent(pointer('pointerdown', { clientY: 5 }))
+    for (const y of [50, 100, 150, 400])
+      document.dispatchEvent(pointer('pointermove', { clientY: y }))
+    // The card follows the pointer at once; the drop place is worked out in the frame after
+    expect(card(0).style.transform).to.contain('395px')
+    await nextFrame()
+    document.dispatchEvent(pointer('pointerup', { clientY: 400 }))
+    await nextFrame()
+    expect(moves).to.deep.equal([[0, 3]])
+  })
+
+  it('lets go of a frame it was waiting for when the drag ends first', async () => {
+    handle(0).dispatchEvent(pointer('pointerdown', { clientY: 5 }))
+    document.dispatchEvent(pointer('pointermove', { clientY: 400 }))
+    document.dispatchEvent(pointer('pointerup', { clientY: 400 }))
+    await nextFrame()
+    expect(reorder.isDragging).to.equal(false)
+  })
+
+  it('lets go of a frame it was waiting for when a mouse drag is cancelled', async () => {
+    handle(0).dispatchEvent(pointer('pointerdown', { clientY: 5 }))
+    document.dispatchEvent(pointer('pointermove', { clientY: 400 }))
+    document.dispatchEvent(pointer('pointercancel', { clientY: 400 }))
+    await nextFrame()
+    expect(reorder.isDragging).to.equal(false)
+    expect(moves).to.deep.equal([])
+  })
+
+  it('ignores the cancelling of a touch drag, which comes as the page takes over', async () => {
+    handle(0).dispatchEvent(pointer('pointerdown', { clientY: 5, pointerType: 'touch' }))
+    document.dispatchEvent(pointer('pointercancel', { pointerType: 'touch' }))
+    expect(reorder.isDragging).to.equal(true)
+    reorder.disable()
+  })
 })

@@ -211,10 +211,9 @@ export class SetlistDetailsForm extends LitElement {
   _guessType(): void {
     if (!this.autoType) return
     const date = this._dateField.value?.value
-    const name = this._nameField.value?.value
     const typeField = this._typeField.value
     if (date && typeField) {
-      typeField.value = determineSetlistType(date, name)
+      typeField.value = determineSetlistType(date, this._nameField.value?.value)
     }
   }
 
@@ -231,7 +230,7 @@ export class SetlistDetailsForm extends LitElement {
     if (changed.has('setlist') || changed.has('people')) {
       const typeField = this._typeField.value
       const leaderField = this._leaderField.value
-      if (typeField) typeField.value = this.setlist?.type || SETLIST_TYPES[0]
+      if (typeField) typeField.value = this.setlist.type || SETLIST_TYPES[0]
       if (leaderField) leaderField.value = this._leaders.selected
     }
   }
@@ -244,8 +243,8 @@ export class SetlistDetailsForm extends LitElement {
   _leader(data: FormData): { owner: string; ownerId: string } {
     const value = data.get('leader')
     if (value === OTHER_LEADER) {
-      const other = data.get('leaderOther')
-      return { owner: (typeof other === 'string' && other.trim()) || '', ownerId: '' }
+      // (a typed-in name, when "Other…" is chosen; the field is there then)
+      return { owner: (data.get('leaderOther') as string).trim(), ownerId: '' }
     }
     const person = this._leaders.options.find(o => o.value === value)?.person
     return { owner: person?.name || '', ownerId: person?.id || '' }
@@ -259,10 +258,8 @@ export class SetlistDetailsForm extends LitElement {
   _submit(event: Event): void {
     event.preventDefault()
     const data = new FormData(event.target as HTMLFormElement)
-    const field = (name: string): string => {
-      const value = data.get(name)
-      return typeof value === 'string' ? value : ''
-    }
+    // (every field of the form is text)
+    const field = (name: string) => data.get(name) as string
     this.dispatchEvent(
       new SetlistDetailsSaveEvent({
         date: field('date'),
@@ -279,7 +276,7 @@ export class SetlistDetailsForm extends LitElement {
   }
 
   override render() {
-    const s: Partial<Setlist> = this.setlist || {}
+    const s: Partial<Setlist> = this.setlist
     const types =
       !s.type || SETLIST_TYPES.includes(s.type) ? SETLIST_TYPES : [...SETLIST_TYPES, s.type]
     return html`

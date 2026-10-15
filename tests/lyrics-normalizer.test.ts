@@ -124,3 +124,60 @@ describe('lyrics-normalizer utilities', () => {
     ])
   })
 })
+
+describe('lyrics-normalizer, with less to go on', () => {
+  it('sees no visible lyrics in no segment, or one with none', () => {
+    expect(segmentHasVisibleLyrics(null)).to.equal(false)
+    expect(segmentHasVisibleLyrics(undefined)).to.equal(false)
+    expect(segmentHasVisibleLyrics({})).to.equal(false)
+    expect(segmentHasVisibleLyrics({ lyrics: null })).to.equal(false)
+    expect(segmentHasVisibleLyrics({ lyrics: '' })).to.equal(false)
+  })
+
+  it('gives nothing for no segments', () => {
+    expect(normalizeSegmentsForHiddenChords([])).to.deep.equal([])
+  })
+
+  it('joins across a segment with no lyrics, or only a glue mark, to the one after', () => {
+    const normalized = normalizeSegmentsForHiddenChords([
+      { lyrics: 'Ho' },
+      { lyrics: null },
+      { lyrics: ' - ' },
+      { lyrics: 'san' },
+      { lyrics: 'na' },
+    ])
+    expect(normalized.map(s => s.lyrics)).to.deep.equal(['Ho', '', '', 'san', 'na'])
+    expect(normalized.map(s => s.__joinWithPrev)).to.deep.equal([false, false, true, true, false])
+  })
+
+  it('says nothing for no text, however the lyrics were joined', () => {
+    expect(formatHiddenLyricsText('')).to.equal('')
+    expect(formatHiddenLyricsText('', true, false)).to.equal('')
+    expect(formatHiddenLyricsText('word')).to.equal('word')
+  })
+
+  it('splits no chord into no parts, and a chord in brackets with its brackets', () => {
+    expect(splitChordDisplaySegments('')).to.deep.equal([])
+    expect(splitChordDisplaySegments('(G)').map(s => s.value)).to.deep.equal(['(', 'G', ')'])
+    expect(splitChordDisplaySegments('(Gsus4)')).to.deep.equal([
+      { type: 'base', value: '(' },
+      { type: 'base', value: 'G' },
+      { type: 'extension', value: 'sus4' },
+      { type: 'base', value: ')' },
+    ])
+  })
+
+  it('keeps what is not a chord in brackets as it is, still bracketed', () => {
+    expect(splitChordDisplaySegments('(x)').map(s => s.value)).to.deep.equal(['(', 'x', ')'])
+    expect(splitChordDisplaySegments('N.C.')).to.deep.equal([{ type: 'base', value: 'N.C.' }])
+  })
+
+  it('keeps the plain text between and after extensions', () => {
+    expect(splitChordDisplaySegments('Gm7/B').map(s => s.value)).to.deep.equal([
+      'G',
+      'm',
+      '7',
+      '/B',
+    ])
+  })
+})

@@ -10,8 +10,11 @@ import {
 import { PadSetsController } from '../src/js/pad-sets-controller.ts'
 import { makePadSet } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
+
+suppressConsoleLogs()
 
 class PadSetsHost extends LitElement {
   padSets: any

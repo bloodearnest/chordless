@@ -484,4 +484,103 @@ describe('PadAudioController', () => {
       expect(failed).to.equal(true)
     })
   })
+
+  describe('what is not as expected', () => {
+    it('keeps the stereo mode for when there is something to route', () => {
+      const controller = make()
+      expect(() => controller.setStereoMode('left')).to.not.throw()
+    })
+
+    it('has no URL for no key', async () => {
+      expect(await make()._resolvePadUrl(null, null)).to.equal(null)
+    })
+
+    it('fades nothing in or out when there is no pad loaded', async () => {
+      const controller = make()
+      await controller._fadeIn()
+      await controller._fadeOut()
+      await controller._fadeOutPadGain(null, null)
+      expect(clock.pending).to.equal(0)
+    })
+
+    it('lets go of the stereo nodes when cleaned up in a stereo mode', async () => {
+      const controller = make()
+      await controller.loadPad('C')
+      controller.setStereoMode('right')
+      const [splitter] = context.splitters
+      const [merger] = context.mergers
+      controller.cleanup()
+      expect(splitter.connections).to.deep.equal([])
+      expect(merger.connections).to.deep.equal([])
+    })
+
+    it('waits for the playing event of audio that has not got going', async () => {
+      const controller = make()
+      await controller.loadPad('C')
+      audios[0].play = async () => {
+        audios[0].paused = false
+      }
+      const started = controller.play()
+      await clock.tick(0)
+      audios[0].fire('playing')
+      await started
+      expect(audios[0].hasListener('playing')).to.equal(false)
+    })
+
+    it('starts a fade in again, ending the one under way, when played twice', async () => {
+      const controller = make()
+      await controller.loadPad('C')
+      await controller.play()
+      await clock.tick(FADE / 2)
+      await controller.play()
+      expect(clock.pending).to.equal(1)
+      await clock.tick(FADE)
+      expect(context.gains[0].gain.value).to.equal(0.7)
+    })
+
+    it('names the pad that would not load by whichever of its sources it has', () => {
+      const controller = make()
+      const warn = console.warn
+      const warned: unknown[][] = []
+      console.warn = (...args) => warned.push(args)
+      try {
+        controller._handleAudioError({
+          target: { currentSrc: 'a.mp3', src: 'b.mp3', paused: true },
+        } as never)
+        controller._handleAudioError({ target: { src: 'b.mp3', paused: true } } as never)
+        controller._handleAudioError({ error: 'broken' } as never)
+        controller._handleAudioError(undefined as never)
+      } finally {
+        console.warn = warn
+      }
+      expect(warned.map(args => args[1])).to.deep.equal([
+        'a.mp3',
+        'b.mp3',
+        'unknown source',
+        'unknown source',
+      ])
+      expect(warned[2][2]).to.equal('broken')
+    })
+
+    it('carries on when audio that failed will not pause', () => {
+      const controller = make()
+      const debug = console.debug
+      const logged: unknown[][] = []
+      console.debug = (...args) => logged.push(args)
+      try {
+        controller._handleAudioError({
+          target: {
+            paused: false,
+            pause() {
+              throw new Error('cannot')
+            },
+          },
+        } as never)
+      } finally {
+        console.debug = debug
+      }
+      expect(controller.loadFailed).to.equal(true)
+      expect(logged).to.have.length(1)
+    })
+  })
 })

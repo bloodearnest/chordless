@@ -1,11 +1,20 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { buildShareBundle } from '../src/js/share-bundle.ts'
-import { encryptBundle, generateShareKey } from '../src/js/share-crypto.ts'
 import {
+  createOrganisation,
+  deleteOrganisation,
+  getCurrentOrganisation,
+  setCurrentOrganisation,
+} from '../src/js/organisation.ts'
+import { buildShareBundle } from '../src/js/share-bundle.ts'
+import { encryptBundle, generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
+import {
+  databaseExists,
+  forgetShare,
   LEGACY_SHARE_DB_PREFIX,
   listSharedWithMe,
   openShare,
+  ownSetlistFor,
   SHARED_DB_ID,
   shareSetlistId,
   tidySharedWithMe,
@@ -210,6 +219,110 @@ describe('Receiving a share link', () => {
     expect(await open(key, html)).to.deep.equal({ state: 'unavailable', offline: false })
   })
 
+  it('keeps the share with no ETag when the worker sent none', async () => {
+    const body = await encryptBundle(key, bundle())
+    const fetchFile = (async () =>
+      new Response(body, {
+        headers: { 'Content-Type': 'application/octet-stream' },
+      })) as unknown as typeof fetch
+    const result = await open(key, fetchFile)
+    expect(result.state).to.equal('ready')
+    const { setlists } = await inside()
+    expect(setlists[0].received?.etag).to.equal('')
+  })
+
+  describe('forgetting a share', () => {
+    it('removes its setlist from the database it is given', async () => {
+      const result = await openShare(FILE, key, {
+        fetchFile: (await worker()).fetchFile,
+        today: '2026-10-12',
+      })
+      if (result.state !== 'ready') throw new Error(result.state)
+      await forgetShare(FILE, result.db)
+      expect(await result.db.getSetlist(shareSetlistId(FILE))).to.equal(undefined)
+      result.db.db?.close()
+    })
+
+    it('removes it from the shared database when not given one, and does nothing if there is none', async () => {
+      await forgetShare(FILE)
+      expect((await indexedDB.databases()).map(database => database.name)).to.not.include(
+        SHARED_DB_ID
+      )
+
+      await open(key, (await worker()).fetchFile)
+      await forgetShare(FILE)
+      expect((await inside()).setlists).to.deep.equal([])
+    })
+  })
+
+  describe('finding the setlist a link is of in the organisation', () => {
+    let organisationId: string
+    let before: { id: string | null; name: string }
+
+    afterEach(async () => {
+      if (organisationId) {
+        await deleteOrganisation(organisationId)
+        await deleteDatabase(organisationId)
+        organisationId = ''
+      }
+      if (before?.id) await setCurrentOrganisation(before.id, before.name)
+    })
+
+    async function organisationWith(setlistId: string) {
+      before = getCurrentOrganisation()
+      const organisation = await createOrganisation(`Share ${crypto.randomUUID().slice(0, 8)}`)
+      organisationId = organisation.id
+      await setCurrentOrganisation(organisation.id, organisation.name)
+      const db = new ChordlessDB(organisation.id)
+      await db.init()
+      await db.saveSetlist({ ...createSetlist({ date: '2026-10-11' }), id: setlistId })
+      db.db?.close()
+    }
+
+    it('gives its id, for a link made from it', async () => {
+      const id = crypto.randomUUID()
+      await organisationWith(id)
+      expect(await ownSetlistFor(setlistCode(id))).to.equal(id)
+      expect(await ownSetlistFor(setlistCode(crypto.randomUUID()))).to.equal(null)
+    })
+
+    it('gives nothing when the organisation has no database yet', async () => {
+      before = getCurrentOrganisation()
+      const organisation = await createOrganisation(`Share ${crypto.randomUUID().slice(0, 8)}`)
+      organisationId = organisation.id
+      await setCurrentOrganisation(organisation.id, organisation.name)
+      expect(await ownSetlistFor('abcdef')).to.equal(null)
+    })
+
+    it('gives nothing, and says why, when the database will not open', async () => {
+      await organisationWith(crypto.randomUUID())
+      const realInit = ChordlessDB.prototype.init
+      const realError = console.error
+      const errors: unknown[][] = []
+      console.error = (...args) => errors.push(args)
+      ChordlessDB.prototype.init = async () => {
+        throw new Error('damaged')
+      }
+      try {
+        expect(await ownSetlistFor('abcdef')).to.equal(null)
+      } finally {
+        ChordlessDB.prototype.init = realInit
+        console.error = realError
+      }
+      expect(errors).to.have.length(1)
+    })
+  })
+
+  it('takes a database to exist where the browser cannot list them', async () => {
+    const real = indexedDB.databases
+    ;(indexedDB as { databases?: unknown }).databases = undefined
+    try {
+      expect(await databaseExists('anything')).to.equal(true)
+    } finally {
+      indexedDB.databases = real
+    }
+  })
+
   describe('tidying what was received', () => {
     it('removes the setlists of expired shares at start-up, and only those, never songs', async () => {
       await open(key, (await worker(bundle({ expires: '2026-10-20' }))).fetchFile)
@@ -256,6 +369,58 @@ describe('Receiving a share link', () => {
       const { setlists, songs } = await inside()
       expect(setlists.map(setlist => setlist.id)).to.deep.equal([shareSetlistId(OTHER_FILE)])
       expect(songs).to.have.length(1)
+    })
+
+    it('looks past an organisation that has no database here, or one that will not open', async () => {
+      const ours = new ChordlessDB(`org-${crypto.randomUUID()}`)
+      const broken = new ChordlessDB(`org-${crypto.randomUUID()}`)
+      extraDatabases.push(ours.dbName, broken.dbName)
+      await ours.init()
+      const mine = await ours.saveSetlist(createSetlist({ date: '2026-10-11' }))
+      ours.db?.close()
+      await broken.init()
+      broken.db?.close()
+      await open(key, (await worker(bundle({ setlistId: mine.id }))).fetchFile)
+
+      const realInit = ChordlessDB.prototype.init
+      const realError = console.error
+      const errors: unknown[][] = []
+      console.error = (...args) => errors.push(args)
+      ChordlessDB.prototype.init = async function () {
+        if (this.dbName === broken.dbName) throw new Error('damaged')
+        return realInit.call(this)
+      }
+      try {
+        const tidied = await tidySharedWithMe({
+          today: '2026-10-12',
+          organisationIds: ['org-with-no-database', broken.dbName, ours.dbName],
+        })
+        expect(tidied).to.deep.equal({ expired: 0, joined: 1 })
+      } finally {
+        ChordlessDB.prototype.init = realInit
+        console.error = realError
+      }
+      expect(errors).to.have.length(1)
+    })
+
+    it('gives up quietly, and keeps what was received, if it cannot tidy', async () => {
+      await open(key, (await worker()).fetchFile)
+      const realError = console.error
+      const realList = ChordlessDB.prototype.getAllSetlists
+      const errors: unknown[][] = []
+      console.error = (...args) => errors.push(args)
+      ChordlessDB.prototype.getAllSetlists = async () => {
+        throw new Error('database closed')
+      }
+      try {
+        const tidied = await tidySharedWithMe({ today: '2026-10-12', organisationIds: [] })
+        expect(tidied).to.deep.equal({ expired: 0, joined: 0 })
+      } finally {
+        ChordlessDB.prototype.getAllSetlists = realList
+        console.error = realError
+      }
+      expect(errors).to.have.length(1)
+      expect((await inside()).setlists).to.have.length(1)
     })
 
     it('deletes the per-share databases of before there was one for all', async () => {

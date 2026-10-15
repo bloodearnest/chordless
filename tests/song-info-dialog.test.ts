@@ -39,6 +39,17 @@ function fakeDb() {
     },
     getSongUsageFromSetlists: async id => {
       if (id === 'slow') await wait(100)
+      if (id === 'fast') {
+        return [
+          {
+            setlistId: 'setlist-1',
+            setlistDate: '2026-10-11',
+            playedInKey: 'A',
+            leader: 'Ann Smith',
+            setlistName: 'Harvest',
+          },
+        ]
+      }
       return []
     },
   }
@@ -106,6 +117,58 @@ describe('song-info-dialog', () => {
     const message = dialog.shadowRoot.querySelector('status-message')
     expect(message.state).to.equal('error')
     expect(message.detail).to.contain('Song not found')
+  })
+
+  it('lists where the song has been played, with the key and who led it', async () => {
+    await setUp()
+    await dialog.show('fast')
+    await wait(100)
+    expect(dialog.shadowRoot.querySelector('song-info').appearances).to.deep.equal([
+      {
+        setlistId: 'setlist-1',
+        date: '2026-10-11',
+        playedInKey: 'A',
+        leader: 'Ann Smith',
+        setlistName: 'Harvest',
+      },
+    ])
+  })
+
+  it('shows the title it is given in place of the song’s own', async () => {
+    await setUp()
+    await dialog.show('fast', { title: 'Fast Song (our version)' })
+    await wait(100)
+    expect(modal().heading).to.equal('Fast Song (our version)')
+  })
+
+  it('looks in the organisation’s database when it is not given one', async () => {
+    dialog = document.createElement('song-info-dialog')
+    document.body.appendChild(dialog)
+    await dialog.updateComplete
+    await dialog.show('title-not-in-any-library')
+    await wait(100)
+    expect(dialog.shadowRoot.querySelector('status-message').state).to.equal('error')
+  })
+
+  it('shows data it is given, with “Song info” as the heading when there is no song', async () => {
+    await setUp()
+    await dialog.showData({ song: { title: 'Given Song' }, appearances: [] })
+    expect(modal().heading).to.equal('Given Song')
+    expect(dialog.shadowRoot.querySelector('song-info').song.title).to.equal('Given Song')
+
+    await dialog.showData({ song: null, loading: true })
+    expect(modal().heading).to.equal('Song info')
+    expect(dialog.shadowRoot.querySelector('song-info').loading).to.equal(true)
+  })
+
+  it('closes when asked', async () => {
+    await setUp()
+    await dialog.showData({ song: { title: 'Given Song' } })
+    await modal().updateComplete
+    expect(modal().open).to.equal(true)
+    dialog.close()
+    await modal().updateComplete
+    expect(modal().open).to.equal(false)
   })
 
   it('is accessible once loaded', async () => {

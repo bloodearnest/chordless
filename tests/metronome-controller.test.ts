@@ -238,3 +238,79 @@ describe('MetronomeController, tracking the clicks that are sounding', () => {
     expect(controller._activeOscillators).to.have.length(0)
   })
 })
+
+describe('MetronomeController, the details of timing and stopping', () => {
+  const make = (ctx = new MockAudioContext()) => new MetronomeController(ctx, new MockGainNode())
+
+  it('clicks by itself, one beat after another, until stopped', async () => {
+    const ctx = new MockAudioContext()
+    const controller = make(ctx)
+    controller.start(600, '4/4', '1/4')
+    expect(ctx.oscillators).to.have.length(1)
+    await wait(260)
+    controller.stop()
+    const clicks = ctx.oscillators.length
+    expect(clicks).to.be.at.least(3)
+    await wait(200)
+    expect(ctx.oscillators.length, 'no more once stopped').to.equal(clicks)
+  })
+
+  it('does not schedule a click when it is not running', () => {
+    const controller = make()
+    controller._scheduleNextClick()
+    expect(controller._metronomeInterval).to.equal(null)
+  })
+
+  it('does not click when it has not been started', () => {
+    const ctx = new MockAudioContext()
+    make(ctx)._playClick()
+    expect(ctx.oscillators).to.have.length(0)
+  })
+
+  it('takes the beat to be another note than a quarter when told, and keeps a quarter for no note', () => {
+    const interval = (note: string | null | undefined) => {
+      const controller = make()
+      controller.start(120, '4/4', note as string)
+      const result = controller.beatInterval
+      controller.stop()
+      return result
+    }
+    expect(interval('1/4')).to.equal(500)
+    expect(interval('1/8')).to.equal(1000)
+    expect(interval('1/2')).to.equal(250)
+    expect(interval('x/y'), 'a note it cannot read').to.equal(500)
+    expect(interval(null)).to.equal(500)
+    expect(interval('undefined')).to.equal(500)
+    expect(interval('null')).to.equal(500)
+  })
+
+  it('takes a dotted-quarter tempo in compound time as three eighths, clicking on each', () => {
+    const controller = make()
+    controller.start(60, '6/8', '1/4')
+    expect(controller.beatInterval).to.be.closeTo(60000 / 90 / 2, 0.01)
+    controller.stop()
+  })
+
+  it('accents the beats of 12/8 as 4/4: medium on the third, sixth and ninth', () => {
+    const ctx = new MockAudioContext()
+    const controller = make(ctx)
+    controller.start(100, '12/8', '1/4')
+    for (let i = 1; i < 12; i++) controller._playClick()
+    controller.stop()
+    const pitches = ctx.oscillators.map(oscillator => oscillator.frequency.value)
+    expect(pitches[0]).to.equal(1000)
+    expect([pitches[3], pitches[6], pitches[9]]).to.deep.equal([900, 900, 900])
+    expect(pitches.filter(pitch => pitch === 900)).to.have.length(3)
+  })
+
+  it('stops the clicks that are sounding even if one will not stop', () => {
+    const ctx = new MockAudioContext()
+    const controller = make(ctx)
+    controller.start(100, '4/4', '1/4')
+    ctx.oscillators[0].stop = () => {
+      throw new Error('already stopped')
+    }
+    expect(() => controller.stop()).to.not.throw()
+    expect(controller.isRunning).to.equal(false)
+  })
+})

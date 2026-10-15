@@ -149,6 +149,16 @@ describe('song-card', () => {
       expect(card.shadowRoot?.querySelector('.lyric-match mark')?.textContent).to.equal('blind but')
     })
 
+    it('quotes nothing when the lyrics matched but no line can be quoted', async () => {
+      // (“İ” is two characters in lower case, so a place in a line cannot be found)
+      const odd = new ChordProParser().parse('{title: X}\n\n[G]İstanbul grace')
+      const card = await show({
+        song: song({ parsed: odd, title: 'Y', artist: 'Z' }),
+        search: 'grace',
+      })
+      expect(part(card, 'lyric-match')).to.equal(null)
+    })
+
     it('does not quote them when the title matched, or the song has no chart', async () => {
       expect(
         part(await show({ song: song({ parsed, title: 'Blind' }), search: 'blind' }), 'lyric-match')

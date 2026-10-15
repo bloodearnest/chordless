@@ -83,9 +83,9 @@ export function nextDropIndex(
 
   // Only switch once the pointer has moved past where the accepted position is
   let acceptedY: number
-  if (lastAccepted === 0) acceptedY = cards[0]?.top || 0
-  else if (lastAccepted >= cards.length) acceptedY = cards[cards.length - 1]?.bottom || clientY
-  else acceptedY = cards[lastAccepted]?.top || clientY
+  if (lastAccepted === 0) acceptedY = cards[0].top
+  else if (lastAccepted >= cards.length) acceptedY = cards[cards.length - 1].bottom
+  else acceptedY = cards[lastAccepted].top
 
   return Math.abs(clientY - acceptedY) > POSITION_THRESHOLD ? proposed : lastAccepted
 }
@@ -254,7 +254,7 @@ export class OverviewReorder {
     const drag = this.#drag
     drag.active = true
     drag.button = card
-    drag.startIndex = Number.parseInt(card.dataset.songIndex ?? '', 10)
+    drag.startIndex = Number.parseInt(card.dataset.songIndex as string, 10)
     drag.currentIndex = drag.startIndex
     drag.lastAcceptedIndex = drag.startIndex
     drag.startY = clientY
@@ -277,8 +277,6 @@ export class OverviewReorder {
 
   #updateDrag(clientY: number): void {
     const drag = this.#drag
-    if (!drag.active) return
-
     drag.currentY = clientY
 
     // Update dragged button position IMMEDIATELY (no throttling for smooth following)
@@ -296,20 +294,18 @@ export class OverviewReorder {
 
   #performDragUpdate(): void {
     const drag = this.#drag
-    if (!drag.active) return
-
     const buttons = this.#cards()
     const target = nextDropIndex(
       buttons.map(card => {
-        const index = Number.parseInt(card.dataset.songIndex ?? '', 10)
+        const index = Number.parseInt(card.dataset.songIndex as string, 10)
         if (card === drag.button) return { index, top: drag.startTop, bottom: drag.startBottom }
         const { top, bottom } = card.getBoundingClientRect()
         return { index, top, bottom }
       }),
       {
-        dragged: drag.button ? buttons.indexOf(drag.button) : -1,
+        dragged: buttons.indexOf(drag.button as HTMLElement),
         clientY: drag.currentY,
-        lastAccepted: drag.lastAcceptedIndex ?? 0,
+        lastAccepted: drag.lastAcceptedIndex as number,
       }
     )
     drag.lastAcceptedIndex = target
@@ -320,25 +316,25 @@ export class OverviewReorder {
   }
 
   /** Mark where the card will land, and the cards that will move out of its way */
-  #showDropIndicator(buttons: HTMLElement[], target: number | null): void {
+  #showDropIndicator(buttons: HTMLElement[], target: number): void {
     const drag = this.#drag
-    if (target === null || drag.startIndex === null) return
+    const startIndex = drag.startIndex as number
 
     // Determine which button to show the indicator on
     let indicatorButton: HTMLElement | null = null
     let indicatorClass: string | null = null
 
-    if (target === drag.startIndex || target === drag.startIndex + 1) {
+    if (target === startIndex || target === startIndex + 1) {
       // At (or beside) the original position: show the placeholder where it was,
       // above the next button, or below the previous if it was the last
-      if (drag.startIndex < buttons.length - 1) {
-        indicatorButton = buttons[drag.startIndex + 1]
+      if (startIndex < buttons.length - 1) {
+        indicatorButton = buttons[startIndex + 1]
         indicatorClass = 'drag-over-above'
-      } else if (drag.startIndex > 0) {
-        indicatorButton = buttons[drag.startIndex - 1]
+      } else if (startIndex > 0) {
+        indicatorButton = buttons[startIndex - 1]
         indicatorClass = 'drag-over-below'
       }
-    } else if (target < drag.startIndex) {
+    } else if (target < startIndex) {
       // Moving up - show above the target position
       indicatorButton = buttons[target]
       indicatorClass = 'drag-over-above'
@@ -356,17 +352,17 @@ export class OverviewReorder {
     }
 
     // Apply preview animations only if position actually changes
-    if (target !== drag.startIndex && target !== drag.startIndex + 1) {
+    if (target !== startIndex && target !== startIndex + 1) {
       for (const button of buttons) {
-        const index = Number.parseInt(button.dataset.songIndex ?? '', 10)
-        if (index === drag.startIndex) continue // Skip dragged item
+        const index = Number.parseInt(button.dataset.songIndex as string, 10)
+        if (index === startIndex) continue // Skip dragged item
 
-        if (target < drag.startIndex) {
+        if (target < startIndex) {
           // Moving up in list
-          if (index >= target && index < drag.startIndex) button.classList.add('will-move-down')
+          if (index >= target && index < startIndex) button.classList.add('will-move-down')
         } else {
           // Moving down in list
-          if (index > drag.startIndex && index < target) button.classList.add('will-move-up')
+          if (index > startIndex && index < target) button.classList.add('will-move-up')
         }
       }
     }
@@ -381,7 +377,6 @@ export class OverviewReorder {
 
   async #endDrag(): Promise<void> {
     const drag = this.#drag
-    if (!drag.active) return
 
     const button = drag.button
     const startIndex = drag.startIndex

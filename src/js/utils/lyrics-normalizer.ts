@@ -28,10 +28,6 @@ export function segmentHasVisibleLyrics(segment: LyricSegment | null | undefined
 export function normalizeSegmentsForHiddenChords<T extends LyricSegment>(
   segments: T[]
 ): NormalizedSegment<T>[] {
-  if (!Array.isArray(segments) || segments.length === 0) {
-    return []
-  }
-
   const normalized: NormalizedSegment<T>[] = []
   let carryJoin = false
 
@@ -43,13 +39,10 @@ export function normalizeSegmentsForHiddenChords<T extends LyricSegment>(
 
     const joinWithPrev = carryJoin || hasLeadingGlue
 
-    let text = original
-    if (text) {
-      text = text.replace(/\s*-\s*/g, '')
-      text = text.replace(/\s+/g, ' ').trim()
-    } else {
-      text = ''
-    }
+    const text = original
+      .replace(/\s*-\s*/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
 
     normalized.push({ ...segment, lyrics: text, __joinWithPrev: joinWithPrev })
 
@@ -122,22 +115,16 @@ export function splitChordDisplaySegments(chordText: string): ChordDisplaySegmen
   CHORD_EXTENSION_PATTERN.lastIndex = 0
 
   for (const extMatch of rest.matchAll(CHORD_EXTENSION_PATTERN)) {
-    const index = extMatch.index ?? 0
+    const index = extMatch.index
     if (index > lastIndex) {
-      const between = rest.slice(lastIndex, index)
-      if (between) {
-        segments.push({ type: 'base', value: between })
-      }
+      segments.push({ type: 'base', value: rest.slice(lastIndex, index) })
     }
     segments.push({ type: 'extension', value: extMatch[0] })
     lastIndex = index + extMatch[0].length
   }
 
   if (lastIndex < rest.length) {
-    const tail = rest.slice(lastIndex)
-    if (tail) {
-      segments.push({ type: 'base', value: tail })
-    }
+    segments.push({ type: 'base', value: rest.slice(lastIndex) })
   }
 
   if (hasWrapper) {

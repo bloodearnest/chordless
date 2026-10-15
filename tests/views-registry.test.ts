@@ -50,3 +50,19 @@ describe('the views of the app shell', () => {
     expect(same?.(share('a'), { name: 'home' })).to.equal(false)
   })
 })
+
+describe('the about page', () => {
+  it('shows the app’s name and what it is, and the policies', async () => {
+    const element = await views.about.load({ name: 'about' } as Route)
+    document.body.append(element)
+    await (element as unknown as { updateComplete: Promise<unknown> }).updateComplete
+    expect(element.querySelector('#about-blurb')?.textContent).to.contain(
+      'Chordless shows the lyrics'
+    )
+    expect(element.querySelector('app-about')).to.not.equal(null)
+    expect(
+      Array.from(element.querySelectorAll('a'), link => link.getAttribute('href'))
+    ).to.deep.equal(['/privacy.html', '/terms.html'])
+    element.remove()
+  })
+})

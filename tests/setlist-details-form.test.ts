@@ -41,6 +41,12 @@ describe('leaderChoices', () => {
       name: 'Visiting Leader',
     })
 
+    const byIdOnly = leaderChoices({ ownerId: 'cara@example.com' }, [ann])
+    expect(must(byIdOnly.options.find(o => o.value === byIdOnly.selected)).person).to.deep.equal({
+      id: 'cara@example.com',
+      name: 'cara@example.com',
+    })
+
     const byId = leaderChoices({ owner: 'Cara', ownerId: 'cara@example.com' }, [ann])
     expect(must(byId.options.find(o => o.value === byId.selected)).person).to.deep.equal({
       id: 'cara@example.com',
@@ -152,6 +158,31 @@ describe('setlist-details-form', () => {
     const detail = await save()
     expect(detail.owner).to.equal('Visiting Leader')
     expect(detail.ownerId).to.equal('')
+  })
+
+  it('guesses the type from the date and name as they change, for a new setlist', async () => {
+    await makeForm({ date: '', name: '' })
+    form.autoType = true
+    await form.updateComplete
+
+    await choose('date', '2026-10-18')
+    expect(field('type').value, 'a Sunday').to.equal('Church Service')
+    await choose('date', '2026-10-14')
+    expect(field('type').value, 'a Wednesday').to.equal('Prayer Meeting')
+    type('name', 'Harvest')
+    await choose('date', '2026-10-14')
+    expect(field('type').value, 'a named one').to.equal('Event')
+  })
+
+  it('leaves the type as chosen when it is not guessing, or the date is cleared', async () => {
+    await makeForm({ date: '2026-10-18', type: 'Prayer Meeting' })
+    await choose('date', '2026-10-14')
+    expect(field('type').value).to.equal('Prayer Meeting')
+
+    form.autoType = true
+    await form.updateComplete
+    await choose('date', '')
+    expect(field('type').value).to.equal('Prayer Meeting')
   })
 
   it('saves no leader', async () => {

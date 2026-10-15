@@ -317,7 +317,8 @@ export class AppRouter {
       if (navigation !== this.#navigation) return
       this.#view = view
     }
-    this.#shownKey = window.history.state?.key ?? null
+    // (the entry has a key by now: start() and commit() give it one)
+    this.#shownKey = window.history.state.key
     this.#route = route
 
     // A view's own title belongs to that view: a new view starts with its entry's

@@ -1,18 +1,13 @@
 {
   "src/components/app-about.ts": {
-    "lines": 305,
-    "branches": 1,
-    "functions": 16
+    "lines": 123,
+    "branches": 28,
+    "functions": 7
   },
   "src/components/app-header.ts": {
     "lines": 19,
     "branches": 7,
     "functions": 7
-  },
-  "src/components/app-modal.ts": {
-    "lines": 2,
-    "branches": 1,
-    "functions": 0
   },
   "src/components/app-preferences.ts": {
     "lines": 77,
@@ -44,11 +39,6 @@
     "branches": 71,
     "functions": 14
   },
-  "src/components/musical-metadata-display.ts": {
-    "lines": 19,
-    "branches": 5,
-    "functions": 3
-  },
   "src/components/nav-menu.ts": {
     "lines": 42,
     "branches": 7,
@@ -58,11 +48,6 @@
     "lines": 81,
     "branches": 3,
     "functions": 6
-  },
-  "src/components/setlist-details-form.ts": {
-    "lines": 3,
-    "branches": 8,
-    "functions": 0
   },
   "src/components/setlist-email-import.ts": {
     "lines": 503,
@@ -89,25 +74,15 @@
     "branches": 8,
     "functions": 8
   },
-  "src/components/song-card.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
   "src/components/song-import.ts": {
     "lines": 133,
     "branches": 16,
     "functions": 10
   },
-  "src/components/song-info-dialog.ts": {
-    "lines": 22,
-    "branches": 1,
-    "functions": 2
-  },
   "src/components/song-info.ts": {
-    "lines": 99,
-    "branches": 12,
-    "functions": 2
+    "lines": 34,
+    "branches": 10,
+    "functions": 0
   },
   "src/components/song-section.ts": {
     "lines": 115,
@@ -140,11 +115,6 @@
     "functions": 0,
     "unloaded": 166
   },
-  "src/js/app-router.ts": {
-    "lines": 0,
-    "branches": 2,
-    "functions": 0
-  },
   "src/js/app.ts": {
     "lines": 0,
     "branches": 0,
@@ -158,9 +128,9 @@
     "unloaded": 179
   },
   "src/js/db.ts": {
-    "lines": 111,
-    "branches": 24,
-    "functions": 47
+    "lines": 106,
+    "branches": 22,
+    "functions": 28
   },
   "src/js/drive-api.ts": {
     "lines": 34,
@@ -193,34 +163,19 @@
     "branches": 0,
     "functions": 4
   },
-  "src/js/metronome-controller.ts": {
-    "lines": 21,
-    "branches": 5,
-    "functions": 0
-  },
   "src/js/organisation-db.ts": {
     "lines": 0,
     "branches": 1,
-    "functions": 10
+    "functions": 0
   },
   "src/js/organisation.ts": {
     "lines": 54,
     "branches": 4,
     "functions": 2
   },
-  "src/js/pad-audio-controller.ts": {
-    "lines": 19,
-    "branches": 16,
-    "functions": 1
-  },
   "src/js/pad-set-service.ts": {
     "lines": 36,
     "branches": 31,
-    "functions": 0
-  },
-  "src/js/pad-sets-controller.ts": {
-    "lines": 0,
-    "branches": 1,
     "functions": 0
   },
   "src/js/preferences.ts": {
@@ -239,30 +194,15 @@
     "branches": 120,
     "functions": 36
   },
-  "src/js/setlist/overview-reorder.ts": {
-    "lines": 0,
-    "branches": 16,
-    "functions": 0
-  },
   "src/js/share-receiver.ts": {
-    "lines": 26,
-    "branches": 8,
-    "functions": 2
-  },
-  "src/js/song-model-factory.ts": {
-    "lines": 11,
-    "branches": 1,
-    "functions": 1
+    "lines": 0,
+    "branches": 3,
+    "functions": 0
   },
   "src/js/song-user-prefs.ts": {
     "lines": 32,
     "branches": 8,
     "functions": 2
-  },
-  "src/js/song-utils.ts": {
-    "lines": 13,
-    "branches": 11,
-    "functions": 0
   },
   "src/js/sync-orchestrator.ts": {
     "lines": 81,
@@ -279,16 +219,6 @@
     "branches": 57,
     "functions": 0
   },
-  "src/js/utils/lyrics-normalizer.ts": {
-    "lines": 20,
-    "branches": 10,
-    "functions": 0
-  },
-  "src/js/views/about-view.ts": {
-    "lines": 18,
-    "branches": 0,
-    "functions": 1
-  },
   "src/js/views/home-view.ts": {
     "lines": 59,
     "branches": 6,
@@ -303,11 +233,6 @@
     "lines": 78,
     "branches": 36,
     "functions": 9
-  },
-  "src/js/views/registry.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
   },
   "src/js/views/share-view.ts": {
     "lines": 103,

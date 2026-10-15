@@ -332,19 +332,16 @@ export class AppModal extends LitElement {
       `
     }
 
-    if (this.heading) {
-      return html`
-        <div class="modal-header" part="header">
-          <h2 class="modal-title" id="modal-title" part="title">${this.heading}</h2>
-          <div class="header-actions" part="header-actions">
-            <slot name="header-actions"></slot>
-          </div>
-          ${this._renderCloseButton()}
+    // (Only called when there is a header or a heading)
+    return html`
+      <div class="modal-header" part="header">
+        <h2 class="modal-title" id="modal-title" part="title">${this.heading}</h2>
+        <div class="header-actions" part="header-actions">
+          <slot name="header-actions"></slot>
         </div>
-      `
-    }
-
-    return ''
+        ${this._renderCloseButton()}
+      </div>
+    `
   }
 
   _renderActions() {

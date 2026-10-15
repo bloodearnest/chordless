@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.ts'
 import {
+  addChart,
   createSong,
   createVariant,
   findExistingSong,
@@ -14,7 +15,7 @@ import {
   overwriteSong,
   setDefaultVariant,
 } from '../src/js/song-utils.ts'
-import { makeEntry, makeSetlist } from './builders.ts'
+import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -267,3 +268,101 @@ describe('getLibrarySongs', () => {
     expect(entry.lastUsageInfo).to.equal(undefined)
   })
 })
+
+describe('songs that are not as they should be', () => {
+  const failure = async (promise: Promise<unknown>) => {
+    try {
+      await promise
+    } catch (error) {
+      return (error as Error).message
+    }
+    return null
+  }
+
+  it('says so when a song is not there, or its chart is gone', async () => {
+    expect(await failure(getSongWithContent('no-such-song'))).to.equal(
+      'Song not found: no-such-song'
+    )
+
+    const db = await getCurrentDB()
+    const lost = makeSong({ uuid: unique('lost'), chordproFileId: 'chordpro-gone' })
+    await db.saveSong(lost)
+    expect(await failure(getSongWithContent(lost.uuid))).to.equal(
+      'ChordPro content not found: chordpro-gone'
+    )
+  })
+
+  it('leaves out of the library a song whose chart is gone, and says so', async () => {
+    const db = await getCurrentDB()
+    const lost = makeSong({
+      uuid: unique('lost'),
+      id: unique('title-lost'),
+      chordproFileId: 'chordpro-gone',
+    })
+    await db.saveSong(lost)
+    const realError = console.error
+    const errors: unknown[][] = []
+    console.error = (...args) => errors.push(args)
+    try {
+      const songs = await getLibrarySongs(db)
+      expect(songs.some(song => song.uuid === lost.uuid)).to.equal(false)
+    } finally {
+      console.error = realError
+    }
+    expect(errors.some(args => String(args[0]).includes(lost.uuid))).to.equal(true)
+  })
+
+  it('finds the first of the songs of a title when none is the default', async () => {
+    const db = await getCurrentDB()
+    const title = unique('No default')
+    const normalized = title.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const ccli = String(Math.floor(Math.random() * 1e9))
+    for (const label of ['One', 'Two']) {
+      await db.saveSong(
+        makeSong({
+          uuid: unique(label),
+          id: unique('title-nodefault'),
+          title,
+          titleNormalized: normalized,
+          ccliNumber: ccli,
+          isDefault: false,
+          chordproFileId: 'chordpro-x',
+        })
+      )
+    }
+    expect(must(await findExistingSong(ccli, null)).isDefault).to.equal(false)
+    expect(must(await findExistingSong(null, title)).isDefault).to.equal(false)
+  })
+
+  it('titles a chart that has no title by the title it is given, else Untitled', async () => {
+    const body = '{key: G}\n[G]Words with no title'
+    expect((await createSong(`${body} ${unique('a')}`, { title: 'Given title' })).title).to.equal(
+      'Given title'
+    )
+    expect((await createSong(`${body} ${unique('b')}`)).title).to.equal('Untitled')
+
+    const db = await getCurrentDB()
+    expect((await addChart(db, `${body} ${unique('c')}`, ADD)).title).to.equal('Untitled')
+    expect(
+      (await addChart(db, `${body} ${unique('d')}`, { ...ADD, title: 'Fallback' })).title
+    ).to.equal('Fallback')
+  })
+
+  it('says so when asked to change, vary or make default a song that is not there', async () => {
+    expect(await failure(overwriteSong('nobody', chart('x')))).to.equal('Song not found: nobody')
+    expect(await failure(createVariant('nobody', 'Label', chart('x')))).to.equal(
+      'Source song not found: nobody'
+    )
+    expect(await failure(setDefaultVariant('nobody'))).to.equal('Song not found: nobody')
+  })
+
+  it('keeps no more than a hundred parsed charts, letting the oldest go', async () => {
+    const songs: Awaited<ReturnType<typeof createSong>>[] = []
+    for (let i = 0; i < 103; i++) songs.push(await createSong(chart(unique(`Cached ${i}`))))
+    for (const song of songs) await getSongWithContent(song.uuid)
+    // The first has gone from the cache, and is parsed again without trouble
+    expect((await getSongWithContent(songs[0].uuid)).title).to.equal(songs[0].title)
+  })
+})
+
+const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' } as const

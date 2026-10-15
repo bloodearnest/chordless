@@ -458,7 +458,7 @@ export class SongCard extends LitElement {
   }
 
   _renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt, source } = this.song ?? {}
+    const { lastUsageInfo, lastUsedAt, source } = this.song as SongCardSong
 
     if (source) {
       return html`<div class="last-played" part="last-played">From ${source.label}</div>`

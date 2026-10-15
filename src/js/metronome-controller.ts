@@ -289,10 +289,8 @@ export class MetronomeController {
   _scheduleNextClick(): void {
     if (!this._beatInterval || !this._isRunning) return
 
+    // (stop() clears the timer, so this runs only while running)
     this._metronomeInterval = setTimeout(() => {
-      if (!this._isRunning) {
-        return
-      }
       this._playClick()
       this._scheduleNextClick()
     }, this._beatInterval)
