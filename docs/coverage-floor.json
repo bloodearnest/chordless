@@ -41,9 +41,9 @@
     "functions": 0
   },
   "src/js/setlist-page.ts": {
-    "lines": 887,
-    "branches": 117,
-    "functions": 35
+    "lines": 30,
+    "branches": 47,
+    "functions": 4
   },
   "src/js/views/library-view.ts": {
     "lines": 2,
