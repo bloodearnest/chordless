@@ -274,19 +274,6 @@ describe('the media player starting a song', () => {
       await player._togglePlay()
       expect(pads.log).to.deep.equal(['play'])
     })
-
-    it('shows what the pads are doing', () => {
-      player._fadingIn = true
-      expect(player._getStatusText()).to.equal('Fading in...')
-      player._fadingIn = false
-      player._fadingOut = true
-      expect(player._getStatusText()).to.equal('Fading out...')
-      player._fadingOut = false
-      player._padsOn = true
-      expect(player._getStatusText()).to.equal('Playing')
-      player._padsOn = false
-      expect(player._getStatusText()).to.equal('Stopped')
-    })
   })
 
   describe('the pads and click switches', () => {

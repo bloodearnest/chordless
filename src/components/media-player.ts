@@ -127,9 +127,6 @@ export class MediaPlayer extends LitElement {
   bpm: number
   tempoNote: string
   timeSignature: string
-  /** Whether the click is on (set by the master toggle; see _toggleMetronome) */
-  metronomeEnabled?: boolean
-  _fadeInterval?: ReturnType<typeof setInterval> | null
   _clickMerger?: ChannelMergerNode | null
   _clickSplitter?: ChannelSplitterNode | null
   _boundHandleKeydown?: (event: KeyboardEvent) => void
@@ -891,7 +888,6 @@ export class MediaPlayer extends LitElement {
       this._padController.cleanup()
     }
 
-    this._cleanup()
     if (this._boundHandleKeydown) document.removeEventListener('keydown', this._boundHandleKeydown)
     if (this._boundHandleRouteChange) {
       document.removeEventListener(RouteChangeEvent.type, this._boundHandleRouteChange)
@@ -946,10 +942,9 @@ export class MediaPlayer extends LitElement {
       }
     }
 
-    // Stop metronome if it was disabled globally
-    if (!this._metronomeGlobalEnabled && this.metronomeEnabled) {
+    // Stop the click if it was just turned off in the settings
+    if (!this._metronomeGlobalEnabled && this._metronomeRunning) {
       this._stopMetronome()
-      this.metronomeEnabled = false
     }
 
     // Update audio routing
@@ -1132,11 +1127,6 @@ export class MediaPlayer extends LitElement {
     return loaded
   }
 
-  _cleanup(): void {
-    // Cleanup is now handled by controllers in disconnectedCallback
-    // This method kept for compatibility
-  }
-
   _handleKeydown(event: KeyboardEvent): void {
     // Hidden (off a setlist with nothing playing, or turned off), the player has no
     // claim on the keys: Space belongs to the button or switch that has focus
@@ -1202,16 +1192,6 @@ export class MediaPlayer extends LitElement {
 
     // Force UI update
     this.requestUpdate()
-  }
-
-  _toggleMetronome(): void {
-    this.metronomeEnabled = !this.metronomeEnabled
-
-    if (this.metronomeEnabled) {
-      this._startMetronome()
-    } else {
-      this._stopMetronome()
-    }
   }
 
   _updateStereoMode(): void {
@@ -1284,7 +1264,7 @@ export class MediaPlayer extends LitElement {
     const timeSignature =
       this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature
     const tempoNote = this._normalizeTempoNote(
-      this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote ?? '1/4'
+      this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote
     )
 
     // Ensure audio is initialized
@@ -1392,10 +1372,6 @@ export class MediaPlayer extends LitElement {
     // If we're currently fading out, cancel it and fade back in
     if (this._fadingOut) {
       console.log('[MediaPlayer] Canceling fade-out and reversing to fade-in')
-      if (this._fadeInterval) {
-        clearInterval(this._fadeInterval)
-        this._fadeInterval = null
-      }
       this._fadingOut = false
 
       // Restart pads if they're toggled on
@@ -1586,10 +1562,6 @@ export class MediaPlayer extends LitElement {
       const wasFadingOut = this._fadingOut
 
       // Clear the current fade interval
-      if (this._fadeInterval) {
-        clearInterval(this._fadeInterval)
-        this._fadeInterval = null
-      }
       // Reset fading states
       this._fadingIn = false
       this._fadingOut = false
@@ -1628,29 +1600,6 @@ export class MediaPlayer extends LitElement {
     this._fadingOut = true
     await this._padController.stop()
     this._fadingOut = false
-  }
-
-  async _crossfadeToNewKey(): Promise<void> {
-    if (!this._padController || !this.currentKey) {
-      console.warn('[MediaPlayer] Cannot crossfade: controller not initialized')
-      return
-    }
-
-    this._fadingOut = true
-    this._fadingIn = true
-
-    await this._padController.crossfadeTo(this.currentKey, this._activePadSet)
-    this._padLoadFailed = this._padController.loadFailed
-
-    this._fadingOut = false
-    this._fadingIn = false
-  }
-
-  _getStatusText(): string {
-    if (this._fadingIn) return 'Fading in...'
-    if (this._fadingOut) return 'Fading out...'
-    if (this._padsOn) return 'Playing'
-    return 'Stopped'
   }
 
   _startVolumeControl(e: MouseEvent | TouchEvent, type: 'pad' | 'click'): void {

@@ -5,9 +5,9 @@
     "functions": 0
   },
   "src/components/media-player.ts": {
-    "lines": 307,
-    "branches": 71,
-    "functions": 14
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/components/setlist-email-import.ts": {
     "lines": 363,
