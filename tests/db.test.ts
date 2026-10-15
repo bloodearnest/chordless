@@ -5,7 +5,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-import { ChordlessDB, createSetlist } from '../src/js/db.ts'
+import { ChordlessDB, createSetlist, parseTempo } from '../src/js/db.ts'
 import { DriveSyncManager, setlistContentHash } from '../src/js/drive-sync.ts'
 import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
 import { must } from './must.ts'
@@ -360,7 +360,7 @@ describe('ChordlessDB storing what IndexedDB cannot', () => {
         run: () => 1,
         mark: Symbol('s'),
         big: 10n,
-        list: [new Date('2026-01-01T00:00:00Z'), { fine: true }],
+        list: [new Date('2026-01-01T00:00:00Z'), { fine: true }, () => 1],
         nothing: undefined,
         zero: null,
       },
@@ -373,8 +373,29 @@ describe('ChordlessDB storing what IndexedDB cannot', () => {
       when: '2026-10-11T10:00:00.000Z',
       later: null,
       big: '10',
-      list: ['2026-01-01T00:00:00.000Z', { fine: true }],
+      list: ['2026-01-01T00:00:00.000Z', { fine: true }, undefined],
       zero: null,
     })
+  })
+})
+
+describe('parseTempo', () => {
+  it('takes the beats per minute, with a quarter note unless it says otherwise', () => {
+    expect(parseTempo(null)).to.deep.equal({ bpm: null, note: '1/4' })
+    expect(parseTempo('')).to.deep.equal({ bpm: null, note: '1/4' })
+    expect(parseTempo(150)).to.deep.equal({ bpm: 150, note: '1/4' })
+    expect(parseTempo('61 bpm')).to.deep.equal({ bpm: 61, note: '1/4' })
+    expect(parseTempo('fast')).to.deep.equal({ bpm: null, note: '1/4' })
+  })
+
+  it('reads the note it is counted in, as a fraction or in words', () => {
+    expect(parseTempo('150 (1/8)').note).to.equal('1/8')
+    expect(parseTempo('150 (8th note)').note).to.equal('1/8')
+    expect(parseTempo('150 (Eighth)').note).to.equal('1/8')
+    expect(parseTempo('90 (16th)').note).to.equal('1/16')
+    expect(parseTempo('90 (sixteenth notes)').note).to.equal('1/16')
+    expect(parseTempo('60 (half note)').note).to.equal('1/2')
+    expect(parseTempo('30 (whole note)').note).to.equal('1/1')
+    expect(parseTempo('120 (swung)').note).to.equal('1/4')
   })
 })

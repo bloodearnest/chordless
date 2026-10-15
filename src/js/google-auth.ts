@@ -253,11 +253,13 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
             metadata.id_token = id_token
           }
 
-          // Store blob in Service Worker
-          await sendToServiceWorker('STORE_BLOB', {
+          // Store blob in Service Worker: with no blob kept the user is not signed in, whatever
+          // the page was told
+          const stored = await sendToServiceWorker('STORE_BLOB', {
             blob,
             metadata,
           })
+          if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
 
           // A new sign-in may be a different account, with different access to the folder
           import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>

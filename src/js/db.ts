@@ -74,12 +74,13 @@ function cloneForStorage(value: unknown, path = ''): unknown {
     return cloned
   }
 
-  // Anything else (e.g., BigInt) -> convert to string
+  // A BigInt is stored as a string
   if (type === 'bigint') {
-    return value.toString()
+    return (value as bigint).toString()
   }
 
-  return value
+  // A function or symbol, in a list (as a property it is dropped and warned about above)
+  return undefined
 }
 
 /** A time a song was played in a setlist (see getSongUsageFromSetlists) */
@@ -340,22 +341,18 @@ export class ChordlessDB {
     const tx = this.#transaction(['setlist_local'], 'readonly')
     const store = tx.objectStore('setlist_local')
     const request = store.get(setlistId)
-    return new Promise<SetlistLocalState>((resolve, reject) => {
-      request.onsuccess = () => {
-        // Return defaults if not found
-        resolve(
-          request.result || {
-            setlistId,
-            padsEnabled: false,
-            padSound: null,
-            clickEnabled: false,
-            sectionVisibility: {},
-            lastUsedDate: new Date().toISOString(),
-          }
-        )
-      }
-      request.onerror = () => reject(request.error)
-    })
+    // Defaults if not found
+    return requestResult(request).then(
+      result =>
+        result || {
+          setlistId,
+          padsEnabled: false,
+          padSound: null,
+          clickEnabled: false,
+          sectionVisibility: {},
+          lastUsedDate: new Date().toISOString(),
+        }
+    )
   }
 
   async saveLocalState(localState: SetlistLocalState): Promise<void> {

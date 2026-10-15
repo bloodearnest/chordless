@@ -40,6 +40,11 @@ export class StoragePage extends LitElement {
   declare _clearError: string
   declare _authMessage: AuthMessage | null
 
+  /** Starts the app afresh once everything stored has been cleared (a test gives its own) */
+  /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
+  // biome-ignore lint/plugin: everything stored was cleared, so start afresh
+  reload: () => void = () => window.location.reload()
+
   _logoutModal: Ref<AppModal>
   _clearDataModal: Ref<AppModal>
 
@@ -605,8 +610,7 @@ export class StoragePage extends LitElement {
       await db.clearAll()
       localStorage.clear()
       sessionStorage.clear()
-      // biome-ignore lint/plugin: everything stored was cleared, so start afresh
-      window.location.reload()
+      this.reload()
     } catch (error) {
       console.error('[Storage] Failed to clear local data:', error)
       this._clearError = errorMessage(error)

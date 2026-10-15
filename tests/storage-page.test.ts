@@ -8,6 +8,12 @@ import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/storage-page.ts'
 import type { StoragePage } from '../src/components/storage-page.ts'
+import {
+  createOrganisation,
+  deleteOrganisation,
+  getCurrentOrganisation,
+  setCurrentOrganisation,
+} from '../src/js/organisation.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -20,6 +26,7 @@ suppressConsoleLogs()
 describe('the storage page, signed in to Google', () => {
   let worker: FakeAuthWorker
   let uninstallWorker: () => void
+  let setController: (controller: unknown) => void
   let drive: ReturnType<typeof installFakeDrive>
   let page: StoragePage
   let realError: typeof console.error
@@ -75,7 +82,7 @@ describe('the storage page, signed in to Google', () => {
   }
 
   beforeEach(() => {
-    ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
+    ;({ worker, uninstall: uninstallWorker, setController } = installFakeAuthWorker())
     drive = installFakeDrive()
     realError = console.error
     console.error = () => {}
@@ -138,6 +145,255 @@ describe('the storage page, signed in to Google', () => {
 
       expect(page.isAuthenticated).to.equal(true)
       expect(worker.stored).to.not.equal(undefined)
+    })
+  })
+
+  describe('connecting', () => {
+    const realFetch = window.fetch
+    const realGoogle = (window as { google?: unknown }).google
+    let codeResponse: { code?: string; error?: string }
+    let exchange: () => Response
+
+    beforeEach(() => {
+      codeResponse = { code: 'the-code' }
+      exchange = () =>
+        Response.json({
+          blob: 'new-blob',
+          access_token: 'tok',
+          expires_in: 3600,
+          user: { name: 'Bea Singer', email: 'bea@example.com', picture: null },
+        })
+      const drivesFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/oauth/callback' ? exchange() : drivesFetch(input, init)) as typeof fetch
+      ;(window as { google?: unknown }).google = {
+        accounts: {
+          oauth2: {
+            initCodeClient: (config: { callback: (response: object) => void }) => ({
+              requestCode: () => config.callback(codeResponse),
+            }),
+          },
+        },
+      }
+    })
+
+    afterEach(() => {
+      window.fetch = realFetch
+      ;(window as { google?: unknown }).google = realGoogle
+    })
+
+    it('signs in with Google, and shows who has', async () => {
+      await open(false)
+      button('Connect with Google').click()
+      await until(() => text().includes('Authorization successful'), 'the sign-in to finish')
+      expect(page.isAuthenticated).to.equal(true)
+      expect(page.userInfo?.name).to.equal('Bea Singer')
+      expect(page.authStatus).to.equal('ready')
+    })
+
+    it('says so when Google refuses', async () => {
+      await open(false)
+      codeResponse = { error: 'access_denied' }
+      button('Connect with Google').click()
+      await until(() => text().includes('Authorization failed'), 'the failure to be shown')
+      expect(text()).to.contain('access_denied')
+      expect(page.isAuthenticated).to.equal(false)
+    })
+  })
+
+  describe('the auth backup', () => {
+    it('is downloaded, or its failure said', async () => {
+      await open()
+      const realClick = HTMLAnchorElement.prototype.click
+      let downloads = 0
+      HTMLAnchorElement.prototype.click = () => {
+        downloads++
+      }
+      try {
+        button('Download Auth Backup').click()
+        await until(() => downloads === 1, 'the download')
+        worker.failing.add('EXPORT_BLOB')
+        button('Download Auth Backup').click()
+        await until(
+          () => text().includes('Downloading the backup failed'),
+          'the failure to be shown'
+        )
+      } finally {
+        HTMLAnchorElement.prototype.click = realClick
+      }
+    })
+
+    describe('imported', () => {
+      let chosen: HTMLInputElement | null
+      const realClick = HTMLInputElement.prototype.click
+      beforeEach(() => {
+        chosen = null
+        HTMLInputElement.prototype.click = function () {
+          if (this.type === 'file') chosen = this
+        }
+      })
+      afterEach(() => {
+        HTMLInputElement.prototype.click = realClick
+      })
+
+      const choose = (file: File | null) =>
+        must(chosen).onchange?.({ target: { files: file ? [file] : [] } } as unknown as Event)
+
+      it('from a file, and signs the user in', async () => {
+        await open(false)
+        button('Import Auth Backup').click()
+        expect(chosen?.accept).to.contain('json')
+        await choose(
+          new File(
+            [
+              JSON.stringify({
+                version: 1,
+                blob: 'restored',
+                metadata: { user: { name: 'Cy', email: 'cy@example.com' } },
+              }),
+            ],
+            'backup.json'
+          )
+        )
+        await until(() => text().includes('imported successfully'), 'the import to finish')
+        expect(page.isAuthenticated).to.equal(true)
+        expect(worker.stored?.blob).to.equal('restored')
+      })
+
+      it('does nothing when no file was chosen', async () => {
+        await open(false)
+        button('Import Auth Backup').click()
+        await choose(null)
+        expect(page.isAuthenticated).to.equal(false)
+      })
+
+      it('says so when the file is not a backup', async () => {
+        await open(false)
+        button('Import Auth Backup').click()
+        await choose(new File(['not json'], 'backup.json'))
+        await until(() => text().includes('Importing the backup failed'), 'the failure to be shown')
+      })
+    })
+  })
+
+  describe('testing a token refresh', () => {
+    const realFetch = window.fetch
+    afterEach(() => {
+      window.fetch = realFetch
+    })
+
+    it('refreshes an expired token, and says so', async () => {
+      await open()
+      const drivesFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/session/refresh'
+          ? Response.json({ access_token: 'fresh', expires_in: 3600 })
+          : drivesFetch(input, init)) as typeof fetch
+      button('Test Token Refresh').click()
+      await until(() => text().includes('Token refresh test passed'), 'the test to pass')
+    })
+
+    it('says so when the refresh fails', async () => {
+      await open()
+      const drivesFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/session/refresh'
+          ? Response.json({ error: 'revoked' }, { status: 400 })
+          : drivesFetch(input, init)) as typeof fetch
+      button('Test Token Refresh').click()
+      await until(() => text().includes('Token refresh test failed'), 'the failure to be shown')
+      expect(text()).to.contain('revoked')
+    })
+
+    it('says when the service worker is not in control', async () => {
+      await open()
+      setController(null)
+      button('Test Token Refresh').click()
+      await until(() => text().includes('Service Worker not active'), 'the message')
+    })
+
+    it('says when nothing is connected any more', async () => {
+      await open()
+      worker.stored = undefined
+      button('Test Token Refresh').click()
+      await until(() => text().includes('Not connected'), 'the message')
+    })
+
+    it('says so when the new token is no better', async () => {
+      await open()
+      const drivesFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/session/refresh'
+          ? Response.json({ access_token: 'stale', expires_in: -3600 })
+          : drivesFetch(input, init)) as typeof fetch
+      button('Test Token Refresh').click()
+      await until(() => text().includes('Token refresh test failed'), 'the failure to be shown')
+      expect(text()).to.contain('still expired')
+    })
+  })
+
+  describe('clearing local data', () => {
+    let before: { id: string | null; name: string }
+    let organisationId: string
+    const realClear = Storage.prototype.clear
+    let cleared: number
+    let reloads: number
+
+    beforeEach(async () => {
+      before = getCurrentOrganisation()
+      const organisation = await createOrganisation(`Clear ${crypto.randomUUID().slice(0, 8)}`)
+      organisationId = organisation.id
+      await setCurrentOrganisation(organisation.id, organisation.name)
+      cleared = 0
+      reloads = 0
+      // (clearing the page's storage would take what the other tests have set with it)
+      Storage.prototype.clear = () => {
+        cleared++
+      }
+    })
+
+    afterEach(async () => {
+      Storage.prototype.clear = realClear
+      await deleteOrganisation(organisationId)
+      if (before.id) await setCurrentOrganisation(before.id, before.name)
+    })
+
+    it('asks first, then clears the database and storage and starts afresh', async () => {
+      await open()
+      page.reload = () => {
+        reloads++
+      }
+      must(page._clearDataModal.value).ask = async () => true
+      button('Clear Local Data').click()
+      await until(() => reloads === 1, 'the app to start afresh')
+      expect(cleared).to.equal(2)
+    })
+
+    it('does nothing when it is not confirmed', async () => {
+      await open()
+      page.reload = () => {
+        reloads++
+      }
+      must(page._clearDataModal.value).ask = async () => false
+      button('Clear Local Data').click()
+      await wait(100)
+      expect(reloads).to.equal(0)
+      expect(cleared).to.equal(0)
+    })
+
+    it('says so when it cannot', async () => {
+      await open()
+      page.reload = () => {
+        reloads++
+      }
+      must(page._clearDataModal.value).ask = async () => true
+      Storage.prototype.clear = () => {
+        throw new Error('blocked')
+      }
+      button('Clear Local Data').click()
+      await until(() => text().includes('Failed to clear data'), 'the failure to be shown')
+      expect(text()).to.contain('blocked')
+      expect(reloads).to.equal(0)
     })
   })
 })

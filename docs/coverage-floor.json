@@ -5,9 +5,9 @@
     "functions": 7
   },
   "src/components/drive-sync-panel.ts": {
-    "lines": 116,
-    "branches": 12,
-    "functions": 4
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
   },
   "src/components/media-player.ts": {
     "lines": 307,
@@ -30,14 +30,14 @@
     "functions": 10
   },
   "src/components/song-section.ts": {
-    "lines": 115,
-    "branches": 30,
-    "functions": 5
+    "lines": 0,
+    "branches": 5,
+    "functions": 0
   },
   "src/components/storage-page.ts": {
-    "lines": 158,
+    "lines": 9,
     "branches": 8,
-    "functions": 5
+    "functions": 0
   },
   "src/js/app.ts": {
     "lines": 0,
@@ -45,20 +45,15 @@
     "functions": 0,
     "unloaded": 0
   },
-  "src/js/db.ts": {
-    "lines": 15,
-    "branches": 0,
-    "functions": 1
-  },
   "src/js/drive-sync.ts": {
     "lines": 205,
-    "branches": 98,
+    "branches": 93,
     "functions": 0
   },
   "src/js/google-auth.ts": {
-    "lines": 167,
-    "branches": 12,
-    "functions": 11
+    "lines": 7,
+    "branches": 10,
+    "functions": 0
   },
   "src/js/setlist-page.ts": {
     "lines": 887,

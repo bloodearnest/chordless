@@ -34,6 +34,11 @@ export class DriveSyncPanel extends LitElement {
 
   declare syncAvailable: boolean
   declare syncing: boolean
+
+  /** Starts the app afresh once local data has been replaced (a test gives its own) */
+  /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
+  // biome-ignore lint/plugin: the database was replaced under every view, so start afresh
+  reload: () => void = () => window.location.reload()
   declare syncProgress: PanelProgress | null
   declare lastSyncTime: string | null
   declare syncError: string | null
@@ -198,8 +203,7 @@ export class DriveSyncPanel extends LitElement {
 
       // Local data changed underneath every page, so reload to show it
       this.syncProgress = { stage: 'success', message: '✓ Reset complete, reloading...' }
-      // biome-ignore lint/plugin: the database was replaced under every view, so start afresh
-      setTimeout(() => window.location.reload(), 1000)
+      setTimeout(() => this.reload(), 1000)
     } catch (error) {
       console.error('[DriveSyncPanel] Reset from Drive failed:', error)
       this.syncError = errorMessage(error)
@@ -219,7 +223,6 @@ export class DriveSyncPanel extends LitElement {
       await nameOrganisationBeforeSync()
       const { id, name } = getCurrentOrganisation()
 
-      // Use the SW-compatible orchestrator
       const orchestrator = await createSyncOrchestrator(name, id)
 
       await orchestrator.sync(progress => {
