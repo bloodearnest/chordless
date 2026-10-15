@@ -326,7 +326,8 @@ export interface DriveFile {
 
 /** One page of a Drive file listing */
 export interface DriveFileList {
-  files?: DriveFile[]
+  /** (Drive lists the files of a page, none if there are none) */
+  files: DriveFile[]
   nextPageToken?: string
 }
 

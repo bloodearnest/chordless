@@ -296,14 +296,12 @@ describe('drive-api, given what Drive answers', () => {
       expect(await findOrCreateRootFolder()).to.equal('root')
       script({ files: [] }, { id: 'new-root' })
       expect(await findOrCreateRootFolder()).to.equal('new-root')
-      script({}, { id: 'newer-root' })
-      expect(await findOrCreateRootFolder()).to.equal('newer-root')
     })
 
     it('finds an organisation folder by name, or none', async () => {
       script({ files: [{ id: 'root' }] }, { files: [{ id: 'org', name: 'Church' }] })
       expect((await findOrganisationFolderByName('Church'))?.id).to.equal('org')
-      script({ files: [{ id: 'root' }] }, {})
+      script({ files: [{ id: 'root' }] }, { files: [] })
       expect(await findOrganisationFolderByName('Nobody')).to.equal(null)
     })
 
@@ -357,11 +355,11 @@ describe('drive-api, given what Drive answers', () => {
     it('lists the pad sets and their files, with none when Drive lists none', async () => {
       script(...padsRoot, { files: [{ id: 'set1' }] })
       expect(await listPadSetFolders()).to.deep.equal([{ id: 'set1' }])
-      script(...padsRoot, {})
+      script(...padsRoot, { files: [] })
       expect(await listPadSetFolders()).to.deep.equal([])
       script({ files: [{ id: 'pad1' }] })
       expect(await listPadSetFiles('set')).to.deep.equal([{ id: 'pad1' }])
-      script({})
+      script({ files: [] })
       expect(await listPadSetFiles('set')).to.deep.equal([])
     })
 
@@ -369,7 +367,7 @@ describe('drive-api, given what Drive answers', () => {
       script(...padsRoot, { files: [{ id: 'set1' }] }, { id: 'set1' })
       expect(await ensurePadSetFolder('Warm')).to.equal('set1')
       expect(calls.at(-1)?.init?.method).to.equal('PATCH')
-      script(...padsRoot, {}, { id: 'set2' })
+      script(...padsRoot, { files: [] }, { id: 'set2' })
       expect(await ensurePadSetFolder('Cool')).to.equal('set2')
     })
 
@@ -399,14 +397,14 @@ describe('drive-api, given what Drive answers', () => {
     })
 
     it('has no setlists when Drive lists none', async () => {
-      script({ files: [{ id: 'sl-folder' }] }, {})
+      script({ files: [{ id: 'sl-folder' }] }, { files: [] })
       expect(await listSetlists('org')).to.deep.equal([])
     })
 
     it('follows the pages of the shares', async () => {
       script({ files: [{ id: 'a' }], nextPageToken: 'next' }, { files: [{ id: 'b' }] })
       expect((await listShareFiles('shares')).map(file => file.id)).to.deep.equal(['a', 'b'])
-      script({})
+      script({ files: [] })
       expect(await listShareFiles('shares')).to.deep.equal([])
     })
 
@@ -422,7 +420,7 @@ describe('drive-api, given what Drive answers', () => {
         }
       )
       expect((await listOrganisations()).map(file => file.id)).to.deep.equal(['o1'])
-      script({ files: [{ id: 'root' }] }, {})
+      script({ files: [{ id: 'root' }] }, { files: [] })
       expect(await listOrganisations()).to.deep.equal([])
     })
 

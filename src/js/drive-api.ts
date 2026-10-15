@@ -459,7 +459,7 @@ export async function findOrganisationFolderByName(
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
   )
-  return result.files?.[0] ?? null
+  return result.files[0] ?? null
 }
 
 export async function findOrCreateRootFolder(): Promise<string> {
@@ -471,7 +471,7 @@ export async function findOrCreateRootFolder(): Promise<string> {
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
   )
 
-  if (result.files && result.files.length > 0) {
+  if (result.files.length > 0) {
     console.log('[DriveAPI] Found existing Chordless folder:', result.files[0].id)
     return result.files[0].id
   }
@@ -508,7 +508,7 @@ export async function findOrCreateOrganisationFolder(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties)`
   )
 
-  if (result.files && result.files.length > 0) {
+  if (result.files.length > 0) {
     console.log('[DriveAPI] Found existing organisation folder:', result.files[0].id)
     return {
       folderId: result.files[0].id,
@@ -560,7 +560,7 @@ export async function listPadSetFolders(): Promise<DriveFile[]> {
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
   )
-  return result.files || []
+  return result.files
 }
 
 export async function ensurePadSetFolder(padSetName: string): Promise<string> {
@@ -570,7 +570,7 @@ export async function ensurePadSetFolder(padSetName: string): Promise<string> {
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime)`
   )
 
-  if (result.files && result.files.length > 0) {
+  if (result.files.length > 0) {
     const folder = result.files[0]
     await updatePadSetFolderMetadata(folder.id, padSetName)
     return folder.id
@@ -617,7 +617,7 @@ export async function listPadSetFiles(folderId: string): Promise<DriveFile[]> {
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime,md5Checksum,mimeType)`
   )
-  return result.files || []
+  return result.files
 }
 
 export async function deleteFilesInFolder(folderId: string): Promise<void> {
@@ -671,7 +671,7 @@ async function findSubfolder(parentId: string, name: string): Promise<string | n
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
   )
 
-  if (result.files && result.files.length > 0) {
+  if (result.files.length > 0) {
     return result.files[0].id
   }
 
@@ -789,7 +789,7 @@ export async function listShareFiles(sharesFolderId: string): Promise<DriveFile[
     const page = await driveRequest(
       `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=1000&fields=nextPageToken,files(id,name,appProperties,modifiedTime)${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
     )
-    files.push(...(page.files ?? []))
+    files.push(...page.files)
     pageToken = page.nextPageToken
   } while (pageToken)
   return files
@@ -836,7 +836,7 @@ export async function listSetlists(organisationFolderId: string): Promise<DriveF
     if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
 
     const result = await driveRequest(url)
-    files.push(...(result.files || []))
+    files.push(...result.files)
     pageToken = result.nextPageToken || null
   } while (pageToken)
 
@@ -862,9 +862,7 @@ export async function listOrganisations(): Promise<DriveFile[]> {
   )
 
   // Filter to only Chordless organisation folders
-  const organisations = (result.files || []).filter(
-    folder => folder.appProperties?.type === 'organisation'
-  )
+  const organisations = result.files.filter(folder => folder.appProperties?.type === 'organisation')
 
   console.log(`[DriveAPI] Found ${organisations.length} organisations`)
   return organisations

@@ -40,11 +40,6 @@
     "functions": 0,
     "unloaded": 0
   },
-  "src/js/drive-sync.ts": {
-    "lines": 205,
-    "branches": 93,
-    "functions": 0
-  },
   "src/js/google-auth.ts": {
     "lines": 7,
     "branches": 10,

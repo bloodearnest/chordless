@@ -23,7 +23,7 @@ import type {
   SongInput,
   SongRecord,
 } from './data-types.ts'
-import { ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.ts'
+import { type ChordlessDB, getCurrentDB, normalizeTitle, withNumericTempos } from './db.ts'
 import * as DriveAPI from './drive-api.ts'
 import {
   batchUploadFiles,
@@ -132,6 +132,16 @@ export class OrganisationFolderMismatchError extends Error {
     this.name = 'OrganisationFolderMismatchError'
     this.count = count
   }
+}
+
+/** The id of the setlist a Drive file holds: from its properties, or its name (`<id>.json`) */
+export function setlistIdOf(file: DriveFile): string {
+  return file.appProperties?.setlistId || (file.name ?? '').replace('.json', '')
+}
+
+/** What a record keeps of its Drive file: when it was modified, and its checksum */
+export function driveMarkers(file: DriveFile | null | undefined) {
+  return { driveModifiedTime: file?.modifiedTime ?? null, driveChecksum: file?.md5Checksum ?? null }
 }
 
 /** What makes two setlist records the same setlist, whatever their ids */
@@ -264,18 +274,17 @@ export class DriveSyncManager {
     // Initialize database
     if (this.organisationDb) {
       this.organisationId ??= this.organisationDb.organisationId
-    } else if (typeof window !== 'undefined') {
-      // In main thread we can reuse the same DB instance the UI uses
+    } else {
+      // Reuse the same DB instance the UI uses
       this.organisationDb = await getCurrentDB()
       // Ensure we keep the actual organisation ID from the DB (in case caller passed null)
       this.organisationId = this.organisationDb.organisationId
-    } else {
-      this.organisationDb = new ChordlessDB(this.organisationId ?? '')
-      await this.organisationDb.init()
     }
 
-    this.folderLink ??= organisationFolderLink(this.organisationId ?? '')
-    this.memberCache ??= organisationMemberCache(this.organisationId ?? '')
+    // (the id is known by now: given, or the database's)
+    const organisationId = this.organisationId as string
+    this.folderLink ??= organisationFolderLink(organisationId)
+    this.memberCache ??= organisationMemberCache(organisationId)
     const isNew = await this.resolveDriveFolder()
     console.log(`[DriveSync] Organisation folder ID: ${this.driveFolderId}`)
     return isNew
@@ -307,7 +316,7 @@ export class DriveSyncManager {
 
     const result = await DriveAPI.findOrCreateOrganisationFolder(
       this.organisationName,
-      this.organisationId ?? ''
+      this.organisationId as string
     )
     this.driveFolderId = result.folderId
     await this.#folderLink.set(result.folderId)
@@ -427,7 +436,6 @@ export class DriveSyncManager {
       }
 
       console.log('[DriveSync] Full sync complete')
-      return { success: true }
     } catch (error) {
       console.error('[DriveSync] Sync failed:', error)
       if (progressCallback) {
@@ -445,6 +453,7 @@ export class DriveSyncManager {
       this._pullIncomplete = false
       this.readOnly = null
     }
+    return { success: true }
   }
 
   /** Update and clean up this organisation's share links (see share-manager.ts) */
@@ -497,7 +506,7 @@ export class DriveSyncManager {
       if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
 
       const result = await driveRequest(url)
-      for (const file of result.files || []) {
+      for (const file of result.files) {
         fileIds.add(file.id)
 
         // Recursively process subfolders
@@ -577,8 +586,7 @@ export class DriveSyncManager {
 
     let elsewhere = 0
     for (const record of missing) {
-      if (!record.driveFileId) continue
-      const file = await DriveAPI.getFile(record.driveFileId, 'id,trashed')
+      const file = await DriveAPI.getFile(record.driveFileId as string, 'id,trashed')
       if (file && !file.trashed) elsewhere++
     }
     if (elsewhere > 0) {
@@ -658,10 +666,7 @@ export class DriveSyncManager {
    * setlist twice, so the push and the removal leave it until a pull succeeds.
    */
   hasLiveFileOfItsOwn(setlist: Setlist): boolean {
-    return (this._liveSetlistFiles ?? []).some(
-      file =>
-        (file.appProperties?.setlistId || (file.name ?? '').replace('.json', '')) === setlist.id
-    )
+    return (this._liveSetlistFiles ?? []).some(file => setlistIdOf(file) === setlist.id)
   }
 
   /**
@@ -838,8 +843,7 @@ export class DriveSyncManager {
 
     for (const driveFile of driveSetlists) {
       try {
-        const setlistId =
-          driveFile.appProperties?.setlistId || (driveFile.name ?? '').replace('.json', '')
+        const setlistId = setlistIdOf(driveFile)
 
         // Check if we have this setlist locally
         const localSetlist = await this.#db.getSetlist(setlistId)
@@ -1013,10 +1017,6 @@ export class DriveSyncManager {
       const props = file.appProperties || {}
       if (props.type && props.type !== 'chordpro') continue
       const songUuid = this.getDriveSongUuid(props, file.id)
-      if (!songUuid) {
-        console.warn(`[DriveSync] Skipping chord chart with no song UUID: ${file.name}`)
-        continue
-      }
       const driveModified = new Date(file.modifiedTime || file.createdTime || 0)
       const existing = latestByUuid.get(songUuid)
       if (existing && driveModified <= existing.driveModified) {
@@ -1136,17 +1136,15 @@ export class DriveSyncManager {
       }
 
       const result = await driveRequest(url)
-      if (result.files) {
-        files.push(...result.files)
-      }
+      files.push(...result.files)
       pageToken = result.nextPageToken || null
     } while (pageToken)
 
     return files
   }
 
-  getDriveSongUuid(props: Record<string, string>, fallbackId: string): string | null {
-    return props.songUuid || props.versionId || props.songId || fallbackId || null
+  getDriveSongUuid(props: Record<string, string>, fallbackId: string): string {
+    return props.songUuid || props.versionId || props.songId || fallbackId
   }
 
   getTitleFromFilename(filename: string | undefined): string {
@@ -1157,29 +1155,33 @@ export class DriveSyncManager {
   async downloadSongFromDrive({ songUuid, file, props, localSong }: SongDownload): Promise<void> {
     const chordproContent = await DriveAPI.downloadChordProFile(file.id)
     const remoteHash = hashText(chordproContent)
+    const localChart = localSong?.chordproFileId
+      ? await this.#db.getChordPro(localSong.chordproFileId)
+      : undefined
 
-    if (localSong?.driveFileId === file.id && localSong.syncedContentHash === remoteHash) {
+    // (with the chart gone from this device, it is restored from Drive's, whatever the hash)
+    if (
+      localChart &&
+      localSong?.driveFileId === file.id &&
+      localSong.syncedContentHash === remoteHash
+    ) {
       // Same chart as we last synced, e.g. a record from before checksums were
       // recorded. Not a remote change: keep local edits, record the checksum.
       await this.#db.saveSong({
         ...localSong,
-        driveModifiedTime: file.modifiedTime ?? null,
-        driveChecksum: file.md5Checksum,
+        ...driveMarkers(file),
       })
       return
     }
-    if (localSong?.chordproFileId) {
-      const localChart = await this.#db.getChordPro(localSong.chordproFileId)
-      if (localChart && this.songHasLocalChanges(localSong, localChart)) {
-        // Changed both here and in Drive. For now Drive wins.
-        console.warn(`[DriveSync] ⚠️ Conflict for song ${songUuid}, keeping Drive version`)
-      }
+    if (localSong && localChart && this.songHasLocalChanges(localSong, localChart)) {
+      // Changed both here and in Drive. For now Drive wins.
+      console.warn(`[DriveSync] ⚠️ Conflict for song ${songUuid}, keeping Drive version`)
     }
 
     const chordproFileId = localSong?.chordproFileId || `chordpro-${crypto.randomUUID()}`
 
     const parsed = this.parser.parse(chordproContent)
-    const metadata = parsed.metadata || {}
+    const { metadata } = parsed
     const ccliNumber =
       metadata.ccliSongNumber || metadata.ccli || props.ccliNumber || localSong?.ccliNumber || null
     const title =
@@ -1226,8 +1228,7 @@ export class DriveSyncManager {
       sourceUrl: localSong?.sourceUrl || null,
       modifiedDate: new Date(file.modifiedTime || file.createdTime || Date.now()).toISOString(),
       driveFileId: file.id,
-      driveModifiedTime: file.modifiedTime ?? null,
-      driveChecksum: file.md5Checksum,
+      ...driveMarkers(file),
       lastSyncedAt: new Date().toISOString(),
       syncedContentHash: remoteHash,
       driveProperties: {
@@ -1425,8 +1426,7 @@ export class DriveSyncManager {
 
             if (driveFile?.id) {
               setlist.driveFileId = driveFile.id
-              setlist.driveModifiedTime = driveFile.modifiedTime ?? null
-              setlist.driveChecksum = driveFile.md5Checksum ?? null
+              Object.assign(setlist, driveMarkers(driveFile))
               if (this.driveHolds(driveFile, files[j].content, `setlist ${setlist.id}`)) {
                 setlist.lastSyncedAt = new Date().toISOString()
                 setlist.syncedContentHash = setlistContentHash(setlist)
@@ -1510,8 +1510,7 @@ export class DriveSyncManager {
 
         // Update local record with Drive metadata
         setlist.driveFileId = driveFile.id
-        setlist.driveModifiedTime = driveFile.modifiedTime ?? null
-        setlist.driveChecksum = driveFile.md5Checksum ?? null
+        Object.assign(setlist, driveMarkers(driveFile))
         if (this.driveHolds(driveFile, content, `setlist ${setlist.id}`)) {
           setlist.lastSyncedAt = new Date().toISOString()
           setlist.syncedContentHash = setlistContentHash(setlist)
@@ -1533,8 +1532,7 @@ export class DriveSyncManager {
         )
 
         // Update sync metadata
-        setlist.driveModifiedTime = driveFile?.modifiedTime ?? null
-        setlist.driveChecksum = driveFile?.md5Checksum ?? null
+        Object.assign(setlist, driveMarkers(driveFile))
         if (this.driveHolds(driveFile, content, `setlist ${setlist.id}`)) {
           setlist.lastSyncedAt = new Date().toISOString()
           setlist.syncedContentHash = setlistContentHash(setlist)
@@ -1621,8 +1619,6 @@ export class DriveSyncManager {
         fileTracking.push({ song, chordproFile })
       }
 
-      if (files.length === 0) continue
-
       try {
         console.log(`[DriveSync] Uploading ${files.length} files...`)
         const uploadedFiles = await batchUploadFiles(files)
@@ -1634,15 +1630,16 @@ export class DriveSyncManager {
           if (!driveFile?.id) continue
 
           tracking.song.driveFileId = driveFile.id
-          tracking.song.driveProperties = this.songDriveProperties(
-            tracking.song,
-            tracking.chordproFile
-          )
-          tracking.song.driveModifiedTime = driveFile.modifiedTime ?? null
-          tracking.song.driveChecksum = driveFile.md5Checksum ?? null
+          Object.assign(tracking.song, driveMarkers(driveFile))
           if (
             this.driveHolds(driveFile, tracking.chordproFile.content, `song ${tracking.song.id}`)
           ) {
+            // (what Drive holds is kept only when it is what was sent: with other content in
+            // Drive, this song differs from it, and is uploaded again)
+            tracking.song.driveProperties = this.songDriveProperties(
+              tracking.song,
+              tracking.chordproFile
+            )
             tracking.song.lastSyncedAt = new Date().toISOString()
             tracking.song.syncedContentHash = hashText(tracking.chordproFile.content)
             tracking.song.contentHash = tracking.chordproFile.contentHash
@@ -1711,14 +1708,9 @@ export class DriveSyncManager {
   /**
    * Push a specific song variant to Drive
    */
-  async pushSongVariant(song: SongRecord, chordproFile: ChordProRecord | undefined): Promise<void> {
+  async pushSongVariant(song: SongRecord, chordproFile: ChordProRecord): Promise<void> {
     const songUuid = this.getSongUuid(song)
     try {
-      if (!chordproFile) {
-        console.warn(`[DriveSync] ChordPro file not found: ${song.chordproFileId}`)
-        return
-      }
-
       const { title } = songFileDetails(song, chordproFile)
       const contentHash = hashText(chordproFile.content)
       const metadata = this.songMetadata(song, chordproFile)
@@ -1742,10 +1734,9 @@ export class DriveSyncManager {
         )
       }
 
-      song.driveProperties = this.songDriveProperties(song, chordproFile)
-      song.driveModifiedTime = driveFile?.modifiedTime ?? null
-      song.driveChecksum = driveFile?.md5Checksum ?? null
+      Object.assign(song, driveMarkers(driveFile))
       if (this.driveHolds(driveFile, chordproFile.content, `song ${song.id}`)) {
+        song.driveProperties = this.songDriveProperties(song, chordproFile)
         song.lastSyncedAt = new Date().toISOString()
         song.syncedContentHash = contentHash
         song.contentHash = chordproFile.contentHash
@@ -1797,8 +1788,8 @@ export class DriveSyncManager {
     }
   }
 
-  getSongUuid(song: Pick<SongRecord, 'uuid' | 'id'> | null | undefined): string {
-    return song?.uuid || song?.id || ''
+  getSongUuid(song: Pick<SongRecord, 'uuid' | 'id'>): string {
+    return song.uuid || song.id
   }
 }
 
