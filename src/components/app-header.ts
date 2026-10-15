@@ -437,7 +437,6 @@ export class AppHeader extends LitElement {
   }
 
   async _animateTransition(): Promise<void> {
-    if (this._animating) return
     this._animating = true
 
     // Fade out the old title (Lit keeps the same element across renders)

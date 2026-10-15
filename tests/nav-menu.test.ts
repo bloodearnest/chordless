@@ -204,6 +204,15 @@ describe('nav-menu', () => {
     })
   })
 
+  it('is positioned under the button it is shown from', async () => {
+    const menu = await setUp(
+      `<button id="b" style="position: fixed; top: 10px; left: 20px; height: 30px">B</button><nav-menu></nav-menu>`
+    )
+    menu.show(container.querySelector('#b'))
+    await settle()
+    expect(menu.dialog.style.top).to.equal('44px')
+  })
+
   it('leaves out the ways of adding songs in a view-only organisation', async () => {
     localStorage.setItem('current-organisation-read-only', '1')
     try {

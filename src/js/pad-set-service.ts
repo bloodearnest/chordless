@@ -210,7 +210,7 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
       `[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name || padSet.id}`
     )
     const metadata = await ensurePadSetMetadata(padSet)
-    const entry = metadata?.[normalizedKey]
+    const entry: PadFile | undefined = metadata[normalizedKey]
     if (!entry) {
       throw new Error(`Pad set "${padSet.name}" is missing key: ${normalizedKey}`)
     }
@@ -307,9 +307,6 @@ export function derivePadSetName(filename = ''): string {
 }
 
 function getCacheState(): Record<string, PadSetMetadata> {
-  if (typeof localStorage === 'undefined') {
-    return {}
-  }
   try {
     return JSON.parse(localStorage.getItem(PAD_SET_CACHE_STATE_KEY) ?? 'null') || {}
   } catch {
@@ -330,11 +327,8 @@ async function clearPadSetCache(cache: Cache, padSetId: string): Promise<void> {
   await Promise.all(removals)
 }
 
-async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadFile> | null> {
-  if (padSet.type !== 'drive') {
-    return null
-  }
-
+/** The files of a Drive pad set, by key (listed from Drive, and then kept) */
+async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadFile>> {
   const cacheEntry = PAD_SET_METADATA_CACHE.get(padSet.id)
   if (cacheEntry && metadataMatches(cacheEntry, padSet)) {
     return cacheEntry.files
@@ -553,16 +547,10 @@ function findEndOfCentralDirectory(bytes: Uint8Array): number {
 }
 
 function readLocalStorage(key: string): string | null {
-  if (typeof localStorage === 'undefined') {
-    return null
-  }
   return localStorage.getItem(key)
 }
 
 function writeLocalStorage(key: string, value: string): void {
-  if (typeof localStorage === 'undefined') {
-    return
-  }
   localStorage.setItem(key, value)
 }
 

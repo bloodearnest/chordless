@@ -18,6 +18,7 @@ import {
 } from '../src/js/pad-set-service.ts'
 import { makePadSet } from './builders.ts'
 import { binaryStringToBytes, installFakeDrive } from './fake-drive.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip, type ZipEntry } from './zip.ts'
 
@@ -452,6 +453,133 @@ describe('pad sets in Drive', () => {
         )
         nothingMade()
       })
+    })
+  })
+
+  describe('when what it kept is damaged, or the browser lacks a cache', () => {
+    it('is the built-in set when the remembered choice is not readable', () => {
+      localStorage.setItem('padset-selection', '{not json')
+      expect(getActivePadSet().type).to.equal('builtin')
+    })
+
+    it('lists the set again when what it kept of the sets is not readable', async () => {
+      const padSet = await makeDrivePadSet()
+      localStorage.setItem('padset-cache-state', '{not json')
+      await ensurePadKeyCached(padSet, 'C')
+      expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
+    })
+
+    it('uses what it kept of a set, without asking Drive again', async () => {
+      const made = await makeDrivePadSet()
+      const padSet = must((await listPadSets(true)).find(set => set.id === made.id))
+      const files = Object.fromEntries(
+        PAD_FILE_KEYS.map(key => [key, { fileId: 'unknown', mimeType: 'audio/mpeg' }])
+      )
+      localStorage.setItem(
+        'padset-cache-state',
+        JSON.stringify({
+          [padSet.id]: { modifiedTime: padSet.modifiedTime, cachedAt: 'then', files },
+        })
+      )
+      const before = drive.requests.length
+      await selectPadSet(padSet.id)
+      const filesListed = drive.requests
+        .slice(before)
+        .some((r: any) => r.params?.get('fields')?.includes('md5Checksum'))
+      expect(filesListed).to.equal(false)
+    })
+
+    it('fails for a key a kept set has no file for', async () => {
+      const padSet = await makeDrivePadSet()
+      localStorage.setItem(
+        'padset-cache-state',
+        JSON.stringify({
+          [padSet.id]: { modifiedTime: padSet.modifiedTime, cachedAt: 'then', files: {} },
+        })
+      )
+      let message = ''
+      try {
+        await ensurePadKeyCached(padSet, 'C')
+      } catch (error) {
+        message = (error as Error).message
+      }
+      expect(message).to.equal(`Pad set "${padSet.name}" is missing key: C`)
+    })
+
+    describe('with no Cache Storage', () => {
+      const real = Object.getOwnPropertyDescriptor(window, 'caches')
+      beforeEach(() => {
+        Object.defineProperty(window, 'caches', { value: undefined, configurable: true })
+      })
+      afterEach(() => {
+        if (real) Object.defineProperty(window, 'caches', real)
+        else delete (window as unknown as { caches?: unknown }).caches
+      })
+
+      it('keeps nothing, and says no pad is kept', async () => {
+        const padSet = await makeDrivePadSet()
+        await ensurePadKeyCached(padSet, 'C')
+        expect(await isPadKeyCached(padSet, 'C')).to.equal(false)
+        expect(downloads()).to.have.length(0)
+      })
+    })
+
+    it('says no pad is kept for a key that is not one', async () => {
+      const padSet = await makeDrivePadSet()
+      expect(await isPadKeyCached(padSet, 'H#')).to.equal(false)
+    })
+  })
+
+  describe('fetching ahead, when a pad cannot be fetched', () => {
+    it('only warns', async () => {
+      const padSet = await makeDrivePadSet({ without: ['A'] })
+      expect(preloadPadKeys(['C'], padSet)).to.equal(1)
+      await new Promise(resolve => setTimeout(resolve, 150))
+    })
+  })
+
+  describe('refusing a zip that is damaged', () => {
+    const allKeys = PAD_FILE_KEYS.map(key => key as string)
+    const entries = (extra: Partial<ZipEntry> = {}) =>
+      allKeys.map(key => ({ name: `${key}.mp3`, data: audioOf(key), ...extra }))
+    const messageOf = async (promise: Promise<unknown>) => {
+      try {
+        await promise
+      } catch (error) {
+        return (error as Error).message
+      }
+      return null
+    }
+    /** The zip with some of its bytes overwritten, found by what is there now */
+    async function corrupted(zip: File, signature: number[]) {
+      const bytes = new Uint8Array(await zip.arrayBuffer())
+      for (let at = 0; at < bytes.length - 4; at++) {
+        if (signature.every((byte, i) => bytes[at + i] === byte)) {
+          bytes.fill(0, at, at + 4)
+          if (signature[2] === 0x03) break
+          at += 4
+          break
+        }
+      }
+      return new File([bytes], zip.name)
+    }
+
+    it('with no entries it can find, as having no keys', async () => {
+      // The central directory is not where it says it is
+      const zip = await corrupted(await buildZip(entries()), [0x50, 0x4b, 0x01, 0x02])
+      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.contain('Missing keys in pad set')
+    })
+
+    it('with a file whose own header is not there', async () => {
+      const zip = await corrupted(await buildZip(entries()), [0x50, 0x4b, 0x03, 0x04])
+      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.equal('Invalid ZIP local header')
+    })
+
+    it('with files that are not the deflated data they say', async () => {
+      const zip = await buildZip(entries({ data: new Uint8Array(40).fill(255), rawMethod: 8 }))
+      expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.equal(
+        'Browser does not support deflate decompression for ZIP uploads'
+      )
     })
   })
 })

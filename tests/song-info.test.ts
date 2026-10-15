@@ -102,6 +102,13 @@ describe('song-info', () => {
     expect(info.shadowRoot?.querySelector('.appearance-meta')).to.equal(null)
   })
 
+  it('knows when the copyright is not in the trailer, or there is no song', async () => {
+    const info = await show({ song: song({ metadata: { copyright: '© 2001 A Publisher' } }) })
+    expect(info._copyrightIsInTrailer()).to.equal(false)
+    info.song = null
+    expect(info._copyrightIsInTrailer()).to.equal(false)
+  })
+
   it('counts the plays of the last twelve months', async () => {
     const recent = new Date().toISOString().slice(0, 10)
     const info = await show({

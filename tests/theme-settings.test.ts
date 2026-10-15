@@ -54,6 +54,15 @@ describe('theme-settings', () => {
     expect(el._currentTheme).to.equal('dark')
   })
 
+  it('takes a font scale of 100% when the theme gives none', async () => {
+    const el = await show()
+    themeManager.root.style.setProperty('--font-scale', 'none')
+    themeManager.setTheme('dark')
+    await el.updateComplete
+    expect(el._fontScale).to.equal(1)
+    themeManager.root.style.removeProperty('--font-scale')
+  })
+
   it('sets the font scale with the slider, and keeps it', async () => {
     const el = await show()
     const slider = el.shadowRoot?.querySelector('.scale-slider') as HTMLInputElement

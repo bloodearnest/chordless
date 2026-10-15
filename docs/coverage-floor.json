@@ -4,11 +4,6 @@
     "branches": 28,
     "functions": 7
   },
-  "src/components/app-header.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "src/components/app-preferences.ts": {
     "lines": 77,
     "branches": 14,
@@ -24,20 +19,10 @@
     "branches": 12,
     "functions": 4
   },
-  "src/components/media-player-settings.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "src/components/media-player.ts": {
     "lines": 307,
     "branches": 71,
     "functions": 14
-  },
-  "src/components/nav-menu.ts": {
-    "lines": 0,
-    "branches": 3,
-    "functions": 0
   },
   "src/components/select-organisation.ts": {
     "lines": 81,
@@ -64,11 +49,6 @@
     "branches": 16,
     "functions": 10
   },
-  "src/components/song-info.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "src/components/song-section.ts": {
     "lines": 115,
     "branches": 30,
@@ -89,11 +69,6 @@
     "branches": 12,
     "functions": 4
   },
-  "src/components/theme-settings.ts": {
-    "lines": 0,
-    "branches": 1,
-    "functions": 0
-  },
   "src/js/app.ts": {
     "lines": 0,
     "branches": 0,
@@ -106,9 +81,9 @@
     "functions": 28
   },
   "src/js/drive-api.ts": {
-    "lines": 34,
-    "branches": 21,
-    "functions": 1
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
   },
   "src/js/drive-sync.ts": {
     "lines": 260,
@@ -130,14 +105,9 @@
     "branches": 0,
     "functions": 4
   },
-  "src/js/organisation.ts": {
-    "lines": 0,
-    "branches": 0,
-    "functions": 1
-  },
   "src/js/pad-set-service.ts": {
-    "lines": 36,
-    "branches": 31,
+    "lines": 0,
+    "branches": 13,
     "functions": 0
   },
   "src/js/preferences.ts": {

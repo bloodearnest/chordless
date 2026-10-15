@@ -127,6 +127,25 @@ describe('media-player-settings', () => {
     localStorage.removeItem('media-settings')
   })
 
+  it('switches to the pad set chosen', async () => {
+    await show()
+    const chosen: string[] = []
+    settings._padSets.list = [
+      { id: 'builtin', name: 'Built-in Pads' },
+      { id: 'drive-warm', name: 'Warm Pads' },
+    ]
+    settings._padSets.select = async (id: string) => {
+      chosen.push(id)
+    }
+    settings.requestUpdate()
+    await settings.updateComplete
+    const select = settings.shadowRoot.querySelector('select') as HTMLSelectElement
+    select.value = 'drive-warm'
+    select.dispatchEvent(new Event('change'))
+    expect(chosen).to.deep.equal(['drive-warm'])
+    localStorage.removeItem('media-settings')
+  })
+
   it('puts the pad set selection back when a pad set cannot be switched to', async () => {
     await show()
     settings._padSets.list = [

@@ -205,6 +205,7 @@ export async function setCurrentOrganisation(
  */
 export async function switchOrganisation(
   organisationId: string,
+  /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
   // biome-ignore lint/plugin: the database is another organisation's now, so start afresh
   reload: () => void = () => window.location.reload()
 ): Promise<void> {

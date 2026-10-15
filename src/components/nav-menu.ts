@@ -270,8 +270,7 @@ export class NavMenu extends LitElement {
   }
 
   _onNavMenuClick(e: Event): void {
-    const trigger = e instanceof HeaderMenuClickEvent ? e.trigger : undefined
-    this.toggle(trigger || (e.target as HTMLElement | null))
+    this.toggle((e as HeaderMenuClickEvent).trigger)
   }
 
   // Position the menu under the trigger button
