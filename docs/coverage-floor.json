@@ -24,11 +24,6 @@
     "branches": 12,
     "functions": 4
   },
-  "src/components/help-tooltip.ts": {
-    "lines": 49,
-    "branches": 1,
-    "functions": 8
-  },
   "src/components/media-player-settings.ts": {
     "lines": 0,
     "branches": 1,
@@ -40,9 +35,9 @@
     "functions": 14
   },
   "src/components/nav-menu.ts": {
-    "lines": 42,
-    "branches": 7,
-    "functions": 8
+    "lines": 0,
+    "branches": 3,
+    "functions": 0
   },
   "src/components/select-organisation.ts": {
     "lines": 81,
@@ -59,11 +54,6 @@
     "branches": 6,
     "functions": 11
   },
-  "src/components/setlist-info.ts": {
-    "lines": 23,
-    "branches": 18,
-    "functions": 2
-  },
   "src/components/setlist-share.ts": {
     "lines": 83,
     "branches": 8,
@@ -75,8 +65,8 @@
     "functions": 10
   },
   "src/components/song-info.ts": {
-    "lines": 34,
-    "branches": 10,
+    "lines": 0,
+    "branches": 1,
     "functions": 0
   },
   "src/components/song-section.ts": {
@@ -100,9 +90,9 @@
     "functions": 4
   },
   "src/components/theme-settings.ts": {
-    "lines": 34,
-    "branches": 6,
-    "functions": 5
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/js/app.ts": {
     "lines": 0,
@@ -141,9 +131,9 @@
     "functions": 4
   },
   "src/js/organisation.ts": {
-    "lines": 54,
+    "lines": 0,
     "branches": 0,
-    "functions": 2
+    "functions": 1
   },
   "src/js/pad-set-service.ts": {
     "lines": 36,
@@ -166,9 +156,9 @@
     "functions": 4
   },
   "src/js/theme-manager.ts": {
-    "lines": 58,
+    "lines": 53,
     "branches": 10,
-    "functions": 4
+    "functions": 3
   },
   "src/js/transpose.ts": {
     "lines": 83,

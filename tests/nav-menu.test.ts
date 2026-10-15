@@ -1,6 +1,12 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/app-header.ts'
 import '../src/components/nav-menu.ts'
+import {
+  MenuBackClickEvent,
+  MenuOverviewClickEvent,
+  MenuSongClickEvent,
+} from '../src/components/nav-menu.ts'
+import { AppUpdateChangeEvent, appUpdate } from '../src/js/app-update.ts'
 import { provideRoute } from '../src/js/route-context.ts'
 import { A11Y, settle } from './test-helpers.ts'
 
@@ -140,5 +146,71 @@ describe('nav-menu', () => {
     await settle()
     expect(menu.isOpen()).to.equal(true)
     await expect(menu).to.be.accessible(A11Y)
+  })
+
+  describe('the setlist section and the back item', () => {
+    it('says which of its items was chosen, and closes', async () => {
+      const menu = await setUp(
+        `<nav-menu show-back-button back-label="Back to setlists" show-overview-link setlist-title="Sunday"></nav-menu>`
+      )
+      menu.songs = [{ title: 'First' }, { title: 'Second' }]
+      await menu.updateComplete
+      const seen: string[] = []
+      menu.addEventListener(MenuBackClickEvent.type, () => seen.push('back'))
+      menu.addEventListener(MenuOverviewClickEvent.type, () => seen.push('overview'))
+      menu.addEventListener(MenuSongClickEvent.type, event => seen.push(`song ${event.index}`))
+      expect(menu.shadowRoot.querySelector('.section-title').textContent).to.equal('Sunday')
+
+      for (const selector of ['.back-button, [part~="back-button"]', '[part~="overview-item"]']) {
+        menu.show()
+        await settle()
+        menu.shadowRoot.querySelector(selector).click()
+        await settle()
+        expect(menu.isOpen()).to.equal(false)
+      }
+      menu.show()
+      await settle()
+      menu.shadowRoot.querySelectorAll('.song-item')[1].click()
+      await settle()
+      expect(seen).to.deep.equal(['back', 'overview', 'song 1'])
+      expect(menu.isOpen()).to.equal(false)
+    })
+
+    it('has none of that by default', async () => {
+      const menu = await setUp('<nav-menu></nav-menu>')
+      expect(menu.shadowRoot.querySelector('.setlist-section')).to.equal(null)
+      expect(menu.shadowRoot.querySelector('[part~="back-button"]')).to.equal(null)
+    })
+  })
+
+  describe('an update waiting', () => {
+    const realApply = appUpdate.apply
+    afterEach(() => {
+      appUpdate.apply = realApply
+      window.dispatchEvent(new AppUpdateChangeEvent(false))
+    })
+
+    it('offers to reload for it', async () => {
+      const menu = await setUp('<nav-menu></nav-menu>')
+      expect(menu.shadowRoot.querySelector('.update-item')).to.equal(null)
+      let applied = 0
+      appUpdate.apply = (async () => {
+        applied++
+      }) as typeof appUpdate.apply
+      window.dispatchEvent(new AppUpdateChangeEvent(true))
+      await menu.updateComplete
+      menu.shadowRoot.querySelector('.update-item').click()
+      expect(applied).to.equal(1)
+    })
+  })
+
+  it('leaves out the ways of adding songs in a view-only organisation', async () => {
+    localStorage.setItem('current-organisation-read-only', '1')
+    try {
+      const menu = await setUp('<nav-menu></nav-menu>')
+      expect(menu.shadowRoot.querySelector('a[href="/import-song"]')).to.equal(null)
+    } finally {
+      localStorage.removeItem('current-organisation-read-only')
+    }
   })
 })

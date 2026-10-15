@@ -201,8 +201,13 @@ export async function setCurrentOrganisation(
 /**
  * Switch to a different organisation (saves ID and reloads app)
  * @param organisationId - ID of organisation to switch to
+ * @param reload - starts the app afresh (the page reloads: a test gives its own)
  */
-export async function switchOrganisation(organisationId: string): Promise<void> {
+export async function switchOrganisation(
+  organisationId: string,
+  // biome-ignore lint/plugin: the database is another organisation's now, so start afresh
+  reload: () => void = () => window.location.reload()
+): Promise<void> {
   // Get the org to cache its name
   try {
     const db = await getOrgDB()
@@ -217,8 +222,7 @@ export async function switchOrganisation(organisationId: string): Promise<void> 
     await setCurrentOrganisation(organisationId)
   }
 
-  // biome-ignore lint/plugin: the database is another organisation's now, so start afresh
-  window.location.reload()
+  reload()
 }
 
 /**
