@@ -253,7 +253,7 @@ export class ThemeManager {
    * @returns 'light' or 'dark'
    */
   detectSystemPreference(): 'light' | 'dark' {
-    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) {
+    if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
       return 'dark'
     }
     return 'light'
@@ -337,19 +337,15 @@ export class ThemeManager {
    * @private
    */
   _setupSystemThemeListener(): void {
-    if (window.matchMedia) {
-      const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)')
-
-      darkModeQuery.addEventListener('change', e => {
-        // Auto-switch if user preference is 'system'
-        const userPreference = localStorage.getItem('theme')
-        if (!userPreference || userPreference === 'system') {
-          const newTheme = e.matches ? 'dark' : 'light'
-          console.log(`[ThemeManager] System theme changed to ${newTheme}`)
-          this.setTheme('system')
-        }
-      })
-    }
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      // Auto-switch if user preference is 'system'
+      const userPreference = localStorage.getItem('theme')
+      if (!userPreference || userPreference === 'system') {
+        const newTheme = e.matches ? 'dark' : 'light'
+        console.log(`[ThemeManager] System theme changed to ${newTheme}`)
+        this.setTheme('system')
+      }
+    })
   }
 
   /**
@@ -379,26 +375,6 @@ export class ThemeManager {
         console.error('[ThemeManager] Observer error:', e)
       }
     })
-  }
-
-  /**
-   * Export current theme configuration
-   */
-  exportTheme(): {
-    name: string
-    variables: Record<string, string> | undefined
-    fontScale: string
-    fontFamily: string
-  } {
-    const theme = this.getCurrentTheme()
-    const config = ThemeManager.themes[theme]
-
-    return {
-      name: theme,
-      variables: config,
-      fontScale: this.getVariable('font-scale'),
-      fontFamily: this.getVariable('font-family-base'),
-    }
   }
 
   /**

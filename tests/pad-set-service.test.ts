@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
+import { createFile, ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
@@ -12,7 +12,9 @@ import {
   type PadSet,
   PadSetChangedEvent,
   PadSetListUpdatedEvent,
+  preloadPadKey,
   preloadPadKeys,
+  preloadPadKeysForSongs,
   selectPadSet,
   uploadPadSet,
 } from '../src/js/pad-set-service.ts'
@@ -150,6 +152,13 @@ describe('pad sets in Drive', () => {
       const padSet = await makeDrivePadSet()
       await ensurePadKeyCached(padSet, 'Bb')
       expect(await cachedBytes(padSet, 'A#')).to.deep.equal(audioOf('A#'))
+    })
+
+    it('ignores a file in the folder that is not for a key', async () => {
+      const padSet = await makeDrivePadSet()
+      await createFile({ name: 'notes.txt', parents: [padSet.id] }, 'not a pad')
+      await ensurePadKeyCached(padSet, 'C')
+      expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
     })
 
     it('shares one download between asks that overlap', async () => {
@@ -580,6 +589,82 @@ describe('pad sets in Drive', () => {
       expect(await messageOf(uploadPadSet(zip, 'Broken'))).to.equal(
         'Browser does not support deflate decompression for ZIP uploads'
       )
+    })
+  })
+
+  describe('what Drive may leave out', () => {
+    /** Answers with these fields of each file taken out of them */
+    function withoutFields(...fields: string[]) {
+      const drivesFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        const response = await drivesFetch(input, init)
+        if (!String(input).includes('/files?')) return response
+        const body = await response.json()
+        for (const file of body.files ?? []) {
+          for (const field of fields) delete file[field]
+        }
+        return Response.json(body)
+      }) as typeof fetch
+      return () => {
+        window.fetch = drivesFetch
+      }
+    }
+
+    it('names a set by its folder, or its id, when it has no pad set name', async () => {
+      const made = await makeDrivePadSet()
+      let restore = withoutFields('appProperties')
+      try {
+        expect((await listPadSets(true)).find(set => set.id === made.id)?.name).to.equal(made.name)
+      } finally {
+        restore()
+      }
+      restore = withoutFields('appProperties', 'name')
+      try {
+        expect((await listPadSets(true)).find(set => set.id === made.id)?.name).to.equal(made.id)
+      } finally {
+        restore()
+        await listPadSets(true)
+      }
+    })
+
+    it('takes a file with no type to be audio', async () => {
+      const padSet = await makeDrivePadSet()
+      const restore = withoutFields('mimeType')
+      try {
+        await ensurePadKeyCached(padSet, 'C')
+      } finally {
+        restore()
+      }
+      const cache = await caches.open(PAD_CACHE_NAME)
+      const kept = await cache.match(getPadCacheUrl(padSet.id, 'C'))
+      expect(kept?.headers.get('Content-Type')).to.equal('audio/mpeg')
+    })
+
+    it('uses what it kept of a set that has no modified time, whatever it was', async () => {
+      const made = await makeDrivePadSet()
+      const padSet = { ...made, modifiedTime: null }
+      await ensurePadKeyCached(padSet, 'C')
+      const before = drive.requests.length
+      await ensurePadKeyCached(padSet, 'D')
+      const listed = drive.requests
+        .slice(before)
+        .filter((r: any) => r.params?.get('fields')?.includes('md5Checksum'))
+      expect(listed).to.have.length(0)
+    })
+  })
+
+  describe('fetching ahead for songs', () => {
+    it('fetches the pads for the key each song is in, from wherever it says', async () => {
+      const padSet = await makeDrivePadSet()
+      preloadPadKeysForSongs(
+        [{ currentKey: 'C' }, { metadata: { key: 'D' } }, { originalKey: 'E' }, {}],
+        padSet
+      )
+      preloadPadKey('', padSet)
+      for (let i = 0; i < 40 && downloads().length < 3; i++) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+      }
+      expect(downloads()).to.have.length(3)
     })
   })
 })

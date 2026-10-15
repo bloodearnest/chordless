@@ -125,7 +125,7 @@ export class StorageSummary extends LitElement {
     `
   }
 
-  _renderListStat(label: string, rows: { label: string; value: string | number | null }[]) {
+  _renderListStat(label: string, rows: { label: string; value: string | number }[]) {
     return html`
       <div class="stat-card">
         <span class="stat-label">${label}</span>
@@ -134,7 +134,7 @@ export class StorageSummary extends LitElement {
             row => html`
               <div class="stat-row">
                 <span>${row.label}</span>
-                <span>${row.value ?? '–'}</span>
+                <span>${row.value}</span>
               </div>
             `
           )}
@@ -173,7 +173,7 @@ export class StorageSummary extends LitElement {
         // usageDetails is not in the standard, but Chromium has it
         const estimate: StorageEstimate & { usageDetails?: { indexedDB?: number } } =
           await navigator.storage.estimate()
-        if (estimate?.usageDetails?.indexedDB) {
+        if (estimate.usageDetails?.indexedDB) {
           return estimate.usageDetails.indexedDB
         }
       } catch (error) {
@@ -243,35 +243,15 @@ export class StorageSummary extends LitElement {
 }
 
 function estimateRecordsSize(records: unknown): number {
-  if (!records) return 0
-  try {
-    const json = JSON.stringify(records)
-    return new Blob([json]).size
-  } catch (error) {
-    console.warn('[StorageSummary] Failed to measure record size', error)
-    return 0
-  }
+  return new Blob([JSON.stringify(records)]).size
 }
 
 const MEDIA_EXTENSIONS = new Set(['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'])
 
+/** Whether a cached request is for audio (anything without an extension is an app page) */
 function isMediaRequest(request: Request): boolean {
-  try {
-    const url = new URL(request.url)
-    const pathname = url.pathname || ''
-    const lastSegment = pathname.split('/').pop() || ''
-    const ext = lastSegment.includes('.') ? (lastSegment.split('.').pop() ?? '').toLowerCase() : ''
-
-    if (!ext) {
-      // Treat extensionless requests as app assets (HTML routes, etc.)
-      return false
-    }
-
-    return MEDIA_EXTENSIONS.has(ext)
-  } catch (error) {
-    console.warn('[StorageSummary] Failed to classify cache entry', error)
-    return false
-  }
+  const extension = new URL(request.url).pathname.match(/\.([^./]+)$/)?.[1]
+  return extension !== undefined && MEDIA_EXTENSIONS.has(extension.toLowerCase())
 }
 
 customElements.define('storage-summary', StorageSummary)

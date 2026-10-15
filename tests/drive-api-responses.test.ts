@@ -246,15 +246,23 @@ describe('drive-api, given what Drive answers', () => {
       script(
         failure(500, { error: { message: 'Quota' } }),
         failure(500),
+        failure(500, {}),
         failure(500, { error: { message: 'Quota' } }),
-        failure(500)
+        failure(500),
+        failure(500, {})
       )
       expect(await messageOf(createFile({ name: 'a' }, 'x'))).to.equal('Drive upload error: Quota')
       expect(await messageOf(createFile({ name: 'a' }, 'x'))).to.equal(
         'Drive upload error: Because'
       )
+      expect(await messageOf(createFile({ name: 'a' }, 'x'))).to.equal(
+        'Drive upload error: Because'
+      )
       expect(await messageOf(updateFile('id', { name: 'a' }, 'x'))).to.equal(
         'Drive update error: Quota'
+      )
+      expect(await messageOf(updateFile('id', { name: 'a' }, 'x'))).to.equal(
+        'Drive update error: Because'
       )
       expect(await messageOf(updateFile('id', { name: 'a' }, 'x'))).to.equal(
         'Drive update error: Because'

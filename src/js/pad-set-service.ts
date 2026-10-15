@@ -146,8 +146,8 @@ export async function uploadPadSet(
 
   // Upload each file
   for (const key of PAD_FILE_KEYS) {
-    const data = padFiles.get(key)
-    if (!data) throw new Error(`Missing key in pad set: ${key}`)
+    // (every key is there: checked above)
+    const data = padFiles.get(key) as Uint8Array<ArrayBuffer>
     const blob = new Blob([data], { type: 'audio/mpeg' })
     await uploadPadFile(folderId, key, blob)
   }
@@ -191,24 +191,20 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
   const request = new Request(getPadCacheUrl(padSet.id, normalizedKey))
   const cached = await cache.match(request)
   if (cached) {
-    console.log(
-      `[PadSetService] Pad key ${normalizedKey} already cached for set ${padSet.name || padSet.id}`
-    )
+    console.log(`[PadSetService] Pad key ${normalizedKey} already cached for set ${padSet.name}`)
     return
   }
 
   const inflightKey = `${padSet.id}:${normalizedKey}`
   if (INFLIGHT_PAD_DOWNLOADS.has(inflightKey)) {
     console.log(
-      `[PadSetService] Pad key ${normalizedKey} download already in progress for set ${padSet.name || padSet.id}`
+      `[PadSetService] Pad key ${normalizedKey} download already in progress for set ${padSet.name}`
     )
     return INFLIGHT_PAD_DOWNLOADS.get(inflightKey)
   }
 
   const downloadPromise = (async () => {
-    console.log(
-      `[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name || padSet.id}`
-    )
+    console.log(`[PadSetService] Caching pad key ${normalizedKey} for set ${padSet.name}`)
     const metadata = await ensurePadSetMetadata(padSet)
     const entry: PadFile | undefined = metadata[normalizedKey]
     if (!entry) {
@@ -216,12 +212,12 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
     }
 
     const buffer = await downloadFileBinary(entry.fileId)
-    const blob = new Blob([buffer], { type: entry.mimeType || 'audio/mpeg' })
+    const blob = new Blob([buffer], { type: entry.mimeType })
     await cache.put(
       request,
       new Response(blob, {
         headers: {
-          'Content-Type': entry.mimeType || 'audio/mpeg',
+          'Content-Type': entry.mimeType,
           'Cache-Control': 'public, max-age=31536000',
         },
       })
@@ -284,7 +280,6 @@ export function preloadPadKeys(keys: string[] = [], padSet: PadSet = getActivePa
 }
 
 export function preloadPadKey(key: string, padSet: PadSet = getActivePadSet()): void {
-  if (!key) return
   preloadPadKeys([key], padSet)
 }
 
@@ -292,7 +287,6 @@ export function preloadPadKeysForSongs(
   songs: { currentKey?: string; metadata?: { key?: string }; originalKey?: string | null }[] = [],
   padSet: PadSet = getActivePadSet()
 ): void {
-  if (!songs || songs.length === 0) return
   const keys = songs
     .map(song => song?.currentKey || song?.metadata?.key || song?.originalKey)
     .filter((key): key is string => !!key)
@@ -372,10 +366,9 @@ async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadF
   return fileMap
 }
 
-function metadataMatches(entry: PadSetMetadata | undefined, padSet: PadSet): boolean {
-  if (!entry?.files) return false
-  if (!padSet?.modifiedTime) return true
-  return entry.modifiedTime === padSet.modifiedTime
+/** Whether what was kept of a set is of the version of it Drive has (any, if Drive said none) */
+function metadataMatches(entry: PadSetMetadata, padSet: PadSet): boolean {
+  return !padSet.modifiedTime || entry.modifiedTime === padSet.modifiedTime
 }
 
 async function invalidatePadSetCache(padSetId: string): Promise<void> {

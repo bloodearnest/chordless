@@ -88,10 +88,6 @@ let cachedCapoPreference: boolean | null = null
 
 function readPreference(): boolean {
   if (cachedUseNashville !== null) return cachedUseNashville
-  if (typeof localStorage === 'undefined') {
-    cachedUseNashville = false
-    return cachedUseNashville
-  }
   const stored = localStorage.getItem(NASHVILLE_PREF_KEY)
   cachedUseNashville = stored === '1' || stored === 'true'
   return cachedUseNashville
@@ -104,20 +100,12 @@ export function getUseNashvilleNumbers(): boolean {
 export function setUseNashvilleNumbers(value: boolean) {
   const normalized = !!value
   cachedUseNashville = normalized
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(NASHVILLE_PREF_KEY, normalized ? '1' : '0')
-  }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new NashvillePreferenceEvent(normalized))
-  }
+  localStorage.setItem(NASHVILLE_PREF_KEY, normalized ? '1' : '0')
+  window.dispatchEvent(new NashvillePreferenceEvent(normalized))
 }
 
 function readAccidentalPreference(): boolean {
   if (cachedUseUnicodeAccidentals !== null) return cachedUseUnicodeAccidentals
-  if (typeof localStorage === 'undefined') {
-    cachedUseUnicodeAccidentals = false
-    return cachedUseUnicodeAccidentals
-  }
   const stored = localStorage.getItem(ACCIDENTAL_PREF_KEY)
   cachedUseUnicodeAccidentals = stored === '1' || stored === 'true'
   return cachedUseUnicodeAccidentals
@@ -130,20 +118,12 @@ export function getUseUnicodeAccidentals(): boolean {
 export function setUseUnicodeAccidentals(value: boolean) {
   const normalized = !!value
   cachedUseUnicodeAccidentals = normalized
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(ACCIDENTAL_PREF_KEY, normalized ? '1' : '0')
-  }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new AccidentalsPreferenceEvent(normalized))
-  }
+  localStorage.setItem(ACCIDENTAL_PREF_KEY, normalized ? '1' : '0')
+  window.dispatchEvent(new AccidentalsPreferenceEvent(normalized))
 }
 
 function readMusicianTypePreference(): MusicianType {
   if (cachedMusicianType !== null) return cachedMusicianType
-  if (typeof localStorage === 'undefined') {
-    cachedMusicianType = 'general'
-    return cachedMusicianType
-  }
   const stored = localStorage.getItem(MUSICIAN_TYPE_KEY)
   cachedMusicianType = isMusicianType(stored) ? stored : 'general'
   return cachedMusicianType
@@ -157,37 +137,18 @@ export function setMusicianType(value: string) {
   const normalized = isMusicianType(value) ? value : 'general'
   cachedMusicianType = normalized
 
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem(MUSICIAN_TYPE_KEY, normalized)
+  localStorage.setItem(MUSICIAN_TYPE_KEY, normalized)
 
-    // Update dependent settings based on musician type
-    if (normalized === 'general') {
-      localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'all' }))
-    } else if (normalized === 'singer' || normalized === 'drummer') {
-      localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'lyrics' }))
-    } else if (normalized === 'guitarist') {
-      localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify({ all: 'all' }))
-    }
+  // Update dependent settings based on musician type: the singer and the drummer read the
+  // words, the others have everything
+  const defaults: SectionDefaults = {
+    all: normalized === 'singer' || normalized === 'drummer' ? 'lyrics' : 'all',
   }
-
-  if (typeof window !== 'undefined') {
-    let defaultsDetail: SectionDefaults | null = null
-    if (typeof localStorage !== 'undefined') {
-      try {
-        const storedDefaults = localStorage.getItem(SECTION_DEFAULTS_KEY)
-        defaultsDetail = storedDefaults ? JSON.parse(storedDefaults) : null
-      } catch {
-        defaultsDetail = null
-      }
-    }
-    window.dispatchEvent(new SectionDefaultsEvent(normalized, defaultsDetail))
-  }
+  localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify(defaults))
+  window.dispatchEvent(new SectionDefaultsEvent(normalized, defaults))
 }
 
 function readCapoPreferenceFromStorage(): boolean {
-  if (typeof localStorage === 'undefined') {
-    return false
-  }
   const keys = [ENABLE_CAPO_KEY, ENABLED_CAPO_FLAG_KEY]
   return keys.some(key => {
     const value = localStorage.getItem(key)
@@ -205,18 +166,14 @@ export function getCapoPreference(): boolean {
 export function setCapoPreference(value: boolean) {
   const enabled = !!value
   cachedCapoPreference = enabled
-  if (typeof localStorage !== 'undefined') {
-    const storageValue = enabled ? 'true' : 'false'
-    try {
-      localStorage.setItem(ENABLE_CAPO_KEY, storageValue)
-      localStorage.setItem(ENABLED_CAPO_FLAG_KEY, storageValue)
-    } catch (error) {
-      console.error('Failed to save capo preference', error)
-    }
+  const storageValue = enabled ? 'true' : 'false'
+  try {
+    localStorage.setItem(ENABLE_CAPO_KEY, storageValue)
+    localStorage.setItem(ENABLED_CAPO_FLAG_KEY, storageValue)
+  } catch (error) {
+    console.error('Failed to save capo preference', error)
   }
-  if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CapoPreferenceEvent(enabled))
-  }
+  window.dispatchEvent(new CapoPreferenceEvent(enabled))
 }
 
 /** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */

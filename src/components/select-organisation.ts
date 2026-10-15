@@ -37,6 +37,9 @@ export class SelectOrganisation extends LitElement {
   declare _creating: boolean
   declare _formError: string
 
+  /** Makes another organisation the current one, and starts the app afresh (a test gives its own) */
+  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+
   _switchModal: Ref<AppModal>
   _orgs: Task<[], OrganisationList>
 
@@ -156,7 +159,7 @@ export class SelectOrganisation extends LitElement {
     if (!modal) return
     modal.message = `Switch to "${org.name}"? This reloads the page.`
     if (await modal.ask()) {
-      await switchOrganisation(org.id)
+      await this.switchTo(org.id)
     }
   }
 

@@ -160,7 +160,6 @@ export class BarGroup extends LitElement {
   }
 
   _renderBarMarker(barText: string) {
-    if (!barText) return html``
     return html`
       <span class="chord-segment chord-only bar-marker">
         <span class="chord bar">${barText}</span>
