@@ -94,7 +94,7 @@ describe('app-about', () => {
       let el = await show()
       el.shadowRoot?.querySelector<HTMLButtonElement>('.btn.primary')?.click()
       expect(applied).to.equal(1)
-      restores.splice(0).forEach(restore => restore())
+      for (const restore of restores.splice(0)) restore()
 
       pretend(appUpdate, 'available', true)
       let checks = 0
@@ -117,7 +117,7 @@ describe('app-about', () => {
           el.shadowRoot?.querySelector<HTMLButtonElement>('.actions .btn')?.disabled,
           flag
         ).to.equal(true)
-        restores.splice(0).forEach(restore => restore())
+        for (const restore of restores.splice(0)) restore()
       }
       pretend(appUpdate, 'ready', false)
       pretend(appUpdate, 'available', false)
