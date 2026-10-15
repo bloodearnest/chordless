@@ -303,7 +303,7 @@ export class SetlistEmailImport extends LitElement {
   async _review(email: ImportedSetlist, rows?: Decisions[], unlisted?: Decisions[]): Promise<void> {
     const db = await getCurrentDB()
     this._db = db
-    this._elsewhere = await this._songsElsewhere(db)
+    this._elsewhere = await getSongsElsewhere(db.dbName)
     this._library = await libraryForMatching(db, this._lyrics, this._elsewhere)
     this._email = email
     const make = (songs: ImportedSong[], include: boolean, kept?: Decisions[]) =>
@@ -353,21 +353,11 @@ export class SetlistEmailImport extends LitElement {
       .map(row => this._reviewed(row))
   }
 
-  async _songsElsewhere(db: ChordlessDB): Promise<SongWithContent[]> {
-    try {
-      return await getSongsElsewhere(db.dbName)
-    } catch (error) {
-      // The library is enough to go on without them
-      console.warn('[EmailImport] Could not read the other databases:', error)
-      return []
-    }
-  }
-
   /** Look at the library again, as songs may have been imported from SongSelect meanwhile */
   async _refresh(): Promise<void> {
     if (this._state !== 'review' || !this._db) return
     try {
-      this._elsewhere = await this._songsElsewhere(this._db)
+      this._elsewhere = await getSongsElsewhere(this._db.dbName)
       this._library = await libraryForMatching(this._db, this._lyrics, this._elsewhere)
     } catch (error) {
       console.warn('[EmailImport] Could not look at the library again:', error)

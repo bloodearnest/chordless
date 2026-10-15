@@ -9,11 +9,6 @@
     "branches": 1,
     "functions": 0
   },
-  "src/components/setlist-email-import.ts": {
-    "lines": 363,
-    "branches": 10,
-    "functions": 31
-  },
   "src/components/setlist-share.ts": {
     "lines": 6,
     "branches": 3,
