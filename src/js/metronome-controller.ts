@@ -37,6 +37,42 @@ export interface ClickAudioContext {
   createGain(): ClickEnvelope
 }
 
+/**
+ * A tempo's beat as a fraction of a whole note, as the metronome takes it: 8 and '1/8' and
+ * '120 (1/8)' are '1/8'; anything that isn't one is a quarter note
+ */
+export function normalizeTempoNote(value: string | number | null | undefined): string {
+  if (!value) return '1/4'
+  if (typeof value === 'number') {
+    return `1/${value}`
+  }
+
+  let candidate = `${value}`.trim()
+  const parenMatch = candidate.match(/\(([^)]+)\)/)
+  if (parenMatch) {
+    candidate = parenMatch[1].trim()
+  }
+
+  const fractionMatch = candidate.match(/(\d+)\s*\/\s*(\d+)/)
+  if (fractionMatch) {
+    const numerator = Number(fractionMatch[1])
+    const denominator = Number(fractionMatch[2])
+    if (numerator > 0 && denominator > 0) {
+      return `${numerator}/${denominator}`
+    }
+  }
+
+  const denomOnlyMatch = candidate.match(/^(\d+)$/)
+  if (denomOnlyMatch) {
+    const denom = Number(denomOnlyMatch[1])
+    if (denom > 0) {
+      return `1/${denom}`
+    }
+  }
+
+  return '1/4'
+}
+
 /** Where the clicks go: a gain node, whose volume the metronome sets */
 export interface ClickOutput {
   gain: { value: number }

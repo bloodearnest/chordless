@@ -9,6 +9,7 @@ import { MediaSettingsChangeEvent } from '../src/components/media-player-setting
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import { RouteChangeEvent } from '../src/js/app-router.ts'
 import { ensurePadSetFolder } from '../src/js/drive-api.ts'
+import { normalizeTempoNote } from '../src/js/metronome-controller.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { listPadSets, PadSetChangedEvent } from '../src/js/pad-set-service.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -355,13 +356,13 @@ describe('the media player', () => {
       expect(player._dragOffsetX).to.equal(10)
       expect(player._dragOffsetY).to.equal(20)
       document.dispatchEvent(touch('touchend', 60, 70))
-      expect(player._isDragging).to.equal(false)
     })
 
     it('is not dragged by pressing one of its buttons', async () => {
       await show()
       $('.title-bar-button')?.dispatchEvent(mouse('mousedown', 10, 10))
-      expect(player._isDragging).to.equal(false)
+      document.dispatchEvent(mouse('mousemove', 40, 40))
+      expect(player._dragOffsetX).to.equal(0)
     })
 
     it('starts where it was left', async () => {
@@ -516,15 +517,15 @@ describe('the media player', () => {
   describe('its tempo note', () => {
     it('is read from a number, a fraction, or words, and is a quarter note when it is nothing', async () => {
       await show()
-      expect(player._normalizeTempoNote(null)).to.equal('1/4')
-      expect(player._normalizeTempoNote(8)).to.equal('1/8')
-      expect(player._normalizeTempoNote('1/8')).to.equal('1/8')
-      expect(player._normalizeTempoNote('3 / 8')).to.equal('3/8')
-      expect(player._normalizeTempoNote('120 (1/8)')).to.equal('1/8')
-      expect(player._normalizeTempoNote('16')).to.equal('1/16')
-      expect(player._normalizeTempoNote('0')).to.equal('1/4')
-      expect(player._normalizeTempoNote('0/4')).to.equal('1/4')
-      expect(player._normalizeTempoNote('quarter')).to.equal('1/4')
+      expect(normalizeTempoNote(null)).to.equal('1/4')
+      expect(normalizeTempoNote(8)).to.equal('1/8')
+      expect(normalizeTempoNote('1/8')).to.equal('1/8')
+      expect(normalizeTempoNote('3 / 8')).to.equal('3/8')
+      expect(normalizeTempoNote('120 (1/8)')).to.equal('1/8')
+      expect(normalizeTempoNote('16')).to.equal('1/16')
+      expect(normalizeTempoNote('0')).to.equal('1/4')
+      expect(normalizeTempoNote('0/4')).to.equal('1/4')
+      expect(normalizeTempoNote('quarter')).to.equal('1/4')
     })
   })
 
@@ -676,12 +677,6 @@ describe('the media player', () => {
       player._audioContext = null
       player._updateClickRouting()
       expect(pads.modes).to.deep.equal([])
-    })
-
-    it('does not move for a drag that has not begun', async () => {
-      await show()
-      player._handleDrag(new MouseEvent('mousemove', { clientX: 50, clientY: 50 }))
-      expect(player._dragOffsetX).to.equal(0)
     })
   })
 })

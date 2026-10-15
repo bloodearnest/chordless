@@ -1,5 +1,5 @@
 import type { PropertyValues } from 'lit'
-import { css, html, LitElement } from 'lit'
+import { html, LitElement } from 'lit'
 import './help-tooltip.ts'
 import './app-modal.ts'
 import './icon.ts'
@@ -12,7 +12,7 @@ import {
   type MediaSettings,
   wantsDoubleClick,
 } from '../js/media-settings.ts'
-import { MetronomeController } from '../js/metronome-controller.ts'
+import { MetronomeController, normalizeTempoNote } from '../js/metronome-controller.ts'
 import { PadAudioController } from '../js/pad-audio-controller.ts'
 import {
   getActivePadSet,
@@ -21,14 +21,11 @@ import {
   PadSetChangedEvent,
 } from '../js/pad-set-service.ts'
 import { isInModalDialog, isTypingInField } from '../js/utils/keyboard.ts'
+import { pointerPosition, trackPointer } from '../js/utils/pointer-drag.ts'
 import { MediaSettingsChangeEvent } from './media-player-settings.ts'
+import { mediaPlayerStyles } from './media-player-styles.ts'
 
 type AudioWindow = Window & { webkitAudioContext?: typeof AudioContext }
-
-/** Where a mouse or touch is, whichever it is */
-function pointer(e: MouseEvent | TouchEvent): { clientX: number; clientY: number } {
-  return 'touches' in e ? e.touches[0] : e
-}
 
 /**
  * MediaPlayer Component
@@ -135,9 +132,6 @@ export class MediaPlayer extends LitElement {
   _boundHandleSettingsChange?: (event: MediaSettingsChangeEvent) => void
   _boundHandleSongChange?: (event: SongChangeEvent) => void
   _boundHandlePadSetChange?: (event?: PadSetChangedEvent) => void
-  _isDragging: boolean
-  _dragStartX: number
-  _dragStartY: number
   _activeVolumeControl: 'pad' | 'click' | null
   _sliderX: number
   _sliderY: number
@@ -146,633 +140,7 @@ export class MediaPlayer extends LitElement {
   _metronomeController: MetronomeController | null
   _padController: PadAudioController | null
 
-  static override styles = css`
-    :host {
-      display: inline-block;
-      /*
-       * The host keeps its box where the player is by default: dragging moves the player
-       * with a transform, which moves nothing of the layout. Left to take pointer events, that
-       * empty box would sit over the page. Only the player itself (and the settings modal) do.
-       */
-      pointer-events: none;
-    }
-
-    .player,
-    .collapsed-pill,
-    app-modal {
-      pointer-events: auto;
-    }
-
-    .player {
-      background: var(--player-bg, #34495e);
-      border-radius: 10px;
-      color: var(--player-text, white);
-      width: fit-content;
-      animation: fadeIn 0.2s ease-in-out;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-      to {
-        opacity: 1;
-      }
-    }
-
-    .title-bar {
-      display: flex;
-      align-items: stretch;
-      justify-content: space-between;
-      background: rgba(0, 0, 0, 0.2);
-      border-radius: 10px 10px 0 0;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-      cursor: move;
-      user-select: none;
-    }
-
-    .title-bar-content {
-      flex: 1;
-      font-size: var(--font-ui);
-      font-weight: 500;
-      opacity: 0.8;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      padding: 0.25rem 0.5rem;
-      display: flex;
-      align-items: center;
-    }
-
-    .title-bar-buttons {
-      display: flex;
-      gap: 0;
-      flex-shrink: 0;
-    }
-
-    .title-bar-button {
-      width: 3rem;
-      height: auto;
-      border-radius: 0;
-      border: none;
-      border-left: 3px solid rgba(255, 255, 255, 0.1);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      opacity: 0.7;
-      transition:
-        opacity 0.2s,
-        background 0.2s;
-      padding: 0;
-      line-height: 1;
-    }
-
-    .title-bar-button:last-child {
-      border-radius: 0 10px 0 0;
-    }
-
-    .title-bar-button:hover {
-      opacity: 1;
-      background: rgba(255, 255, 255, 0.1);
-    }
-
-    .title-bar-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .container {
-      display: grid;
-      grid-template-columns: auto 1px auto;
-      grid-template-rows: auto auto;
-      column-gap: 0.5rem;
-      row-gap: 0.8rem;
-      padding: 1rem;
-    }
-
-    .divider {
-      grid-column: 2;
-      grid-row: 1 / -1;
-      width: 1px;
-    }
-
-    .led-display-section {
-      grid-column: 1;
-      grid-row: 1;
-    }
-
-    .play-stop-section {
-      grid-column: 1;
-      grid-row: 2;
-    }
-
-    .knobs-section {
-      grid-column: 3;
-      grid-row: 1;
-      display: flex;
-      height: 100%;
-    }
-
-    .toggles-section {
-      grid-column: 3;
-      grid-row: 2;
-    }
-
-    .transport-row {
-      display: flex;
-      align-items: center;
-      gap: 0;
-    }
-
-    .cassette-buttons {
-      display: flex;
-      gap: 0;
-      width: 100%;
-      box-sizing: border-box;
-    }
-
-    .cassette-buttons .play-button {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-
-    .cassette-buttons .stop-button {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-      margin-left: -2px;
-    }
-
-    .cassette-buttons .stop-button:not(:last-child) {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-
-    .cassette-buttons .led-button {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-      margin-left: -2px;
-    }
-
-    .cassette-buttons .led-button.middle {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-    }
-
-    .toggles-section .cassette-buttons {
-      gap: 1rem;
-    }
-
-    .toggles-section .cassette-buttons .led-button {
-      border-radius: 4px;
-      margin-left: 0;
-    }
-
-    .toggles-section .cassette-buttons .led-button.middle {
-      border-radius: 4px;
-    }
-
-    .knobs-row {
-      display: flex;
-      align-items: stretch;
-      gap: 1rem;
-      height: 100%;
-    }
-
-    .led-display {
-      display: grid;
-      grid-template-columns: auto auto auto;
-      gap: 0.1rem 0.5rem;
-      background: #1a1a1a;
-      border: 2px solid var(--player-text, white);
-      border-radius: 4px;
-      padding: 0.25rem 0.5rem;
-      font-family: 'Courier New', monospace;
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-      width: 100%;
-      box-sizing: border-box;
-      font-size: var(--font-icon);
-      color: #00ff00;
-      text-shadow:
-        0 0 3px #00ff00,
-        0 0 6px #00ff00;
-    }
-
-    .led-label {
-      opacity: 0.5;
-      text-align: right;
-    }
-
-    .led-value {
-      text-align: center;
-    }
-
-    .led-value.pad-error {
-      color: #ff5c5c;
-      text-shadow:
-        0 0 3px #ff5c5c,
-        0 0 6px #ff5c5c;
-      font-weight: 700;
-    }
-
-    .led-value.status-downloading {
-      color: #ffd479;
-      animation: pad-download-blink 1s linear infinite;
-      font-weight: 700;
-    }
-
-    @keyframes pad-download-blink {
-      0% {
-        opacity: 1;
-      }
-      50% {
-        opacity: 0.25;
-      }
-      100% {
-        opacity: 1;
-      }
-    }
-
-    .led-header {
-      text-transform: uppercase;
-      font-weight: 600;
-    }
-
-    .play-button {
-      width: 5.4rem;
-      height: 3.6rem;
-      border-radius: 4px;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      line-height: 1;
-      box-sizing: border-box;
-      transition: all 0.2s;
-      outline: none;
-    }
-
-    .play-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .play-button.playing {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .play-button:disabled {
-      cursor: not-allowed;
-      background: transparent;
-    }
-
-    .play-button:disabled:active {
-      background: transparent;
-    }
-
-    .play-button.playing:disabled {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .play-button.playing:disabled:active {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .stop-button {
-      width: 5.4rem;
-      height: 3.6rem;
-      border-radius: 4px;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      line-height: 1;
-      box-sizing: border-box;
-      transition: all 0.2s;
-      outline: none;
-    }
-
-    .stop-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .stop-button:disabled {
-      cursor: not-allowed;
-      background: transparent;
-    }
-
-    .stop-button:disabled:active {
-      background: transparent;
-    }
-
-    .toggle-button {
-      width: 3.6rem;
-      height: 3.6rem;
-      border-radius: 50%;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      font-weight: 600;
-      line-height: 1;
-      box-sizing: border-box;
-      transition: all 0.2s;
-    }
-
-    .toggle-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .toggle-button.active {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .metronome-button {
-      width: 3.6rem;
-      height: 3.6rem;
-      border-radius: 50%;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-ui);
-      line-height: 1;
-      padding-left: 1.8rem;
-      padding-bottom: 0.12rem;
-      box-sizing: border-box;
-      transition: all 0.2s;
-    }
-
-    .metronome-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .metronome-button.active {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .split-button {
-      width: 3.6rem;
-      height: 3.6rem;
-      border-radius: 50%;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: var(--font-icon);
-      line-height: 1;
-      box-sizing: border-box;
-      transition: all 0.2s;
-    }
-
-    .split-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .split-button.active {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    .volume-knob {
-      position: relative;
-      width: 3.9rem;
-      height: 3.9rem;
-      border-radius: 50%;
-      border: 2px solid var(--player-text, white);
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(0, 0, 0, 0.2) 100%);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      user-select: none;
-      touch-action: none;
-      box-sizing: border-box;
-      transition: all 0.2s;
-      box-shadow:
-        inset 0 1px 2px rgba(255, 255, 255, 0.2),
-        inset 0 -1px 2px rgba(0, 0, 0, 0.3);
-    }
-
-    .volume-knob.dragging {
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(0, 0, 0, 0.1) 100%);
-    }
-
-    .volume-indicator {
-      position: absolute;
-      top: 0.25rem;
-      width: 2px;
-      height: 0.5rem;
-      background: var(--player-text, white);
-      border-radius: 1px;
-      transform-origin: center 1.7rem; /* the knob's centre: half its height, less the top */
-      transition: transform 0.1s;
-    }
-
-    .volume-value {
-      font-size: var(--font-icon);
-      font-weight: 600;
-      color: var(--player-text, white);
-      z-index: 1;
-    }
-
-    .led-button {
-      width: 3.6rem;
-      height: 3.6rem;
-      border-radius: 4px;
-      border: 2px solid var(--player-text, white);
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-sizing: border-box;
-      transition: all 0.2s;
-      position: relative;
-      outline: none;
-    }
-
-    .led-button:active {
-      background: rgba(255, 255, 255, 0.2);
-    }
-
-    .led-button.active {
-      background: rgba(0, 0, 0, 0.3);
-      box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-    }
-
-    /* The transport is as wide as the display above, less the 2× button at its right edge,
-       which reaches towards the click's buttons (it is a click setting) and away from Stop */
-    .play-stop-section {
-      display: flex;
-      align-items: stretch;
-    }
-
-    .play-stop-section .cassette-buttons {
-      flex: 1 1 0;
-      min-width: 0;
-    }
-
-    .play-stop-section .cassette-buttons .play-button,
-    .play-stop-section .cassette-buttons .stop-button {
-      flex: 1 1 0;
-      min-width: 0;
-      width: auto;
-    }
-
-    .speed-button {
-      flex: 0 0 3.6rem;
-      margin-left: 1.1rem;
-      margin-right: -0.75rem;
-    }
-
-    .speed-button:disabled {
-      opacity: 0.4;
-      cursor: not-allowed;
-    }
-
-    .led-button {
-      flex-direction: column;
-      gap: 0.3rem;
-    }
-
-    .led-caption {
-      font-size: var(--font-ui-small);
-      font-weight: 600;
-      line-height: 1;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      opacity: 0.8;
-    }
-
-    .led-light {
-      width: 1.6rem;
-      height: 1.6rem;
-      border-radius: 50%;
-      border: 1px solid var(--player-text, white);
-      background: rgba(255, 255, 255, 0.1);
-      transition: all 0.2s;
-      box-shadow: inset 0 0 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .led-light.pads-on {
-      background: #27ae60;
-      border-color: #27ae60;
-      box-shadow:
-        0 0 6px rgba(39, 174, 96, 0.8),
-        inset 0 0 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .led-light.click-on {
-      background: #3498db;
-      border-color: #3498db;
-      box-shadow:
-        0 0 6px rgba(52, 152, 219, 0.8),
-        inset 0 0 3px rgba(0, 0, 0, 0.3);
-    }
-
-    .button-group {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.3rem;
-    }
-
-    .button-info {
-      font-size: var(--font-icon);
-      color: var(--player-text, white);
-      opacity: 0.6;
-      text-align: center;
-    }
-
-    .knob-column {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: space-evenly;
-      width: 3.6rem;
-      height: 100%;
-    }
-
-    .knob-label {
-      font-size: var(--font-icon);
-      font-weight: 600;
-      color: var(--player-text, white);
-      opacity: 0.7;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    .collapsed-pill {
-      display: flex;
-      height: 4rem;
-      border-radius: 2rem;
-      overflow: hidden;
-      background: rgba(52, 73, 94, 0.4);
-      -webkit-backdrop-filter: blur(4px);
-      backdrop-filter: blur(4px);
-      animation: fadeIn 0.2s ease-in-out;
-    }
-
-    .pill-button {
-      width: 3.5rem;
-      border: 0;
-      background: transparent;
-      color: var(--player-text, white);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 0;
-      line-height: 1;
-      transition: background 0.2s;
-    }
-
-    /* The play side is the main target. A triangle's weight is at its base, so it sits right of
-       centre to look centred, and the pill's round end takes some of the room on the left */
-    .pill-button:first-child {
-      width: 4.5rem;
-      padding-left: 0.6rem;
-    }
-
-    .pill-button + .pill-button {
-      border-left: 1px solid rgba(255, 255, 255, 0.25);
-    }
-
-    .pill-button:active:not(:disabled) {
-      background: rgba(52, 73, 94, 0.8);
-    }
-
-    .pill-button:disabled {
-      opacity: 0.35;
-      cursor: default;
-    }
-  `
+  static override styles = mediaPlayerStyles
 
   constructor() {
     super()
@@ -807,11 +175,6 @@ export class MediaPlayer extends LitElement {
 
     this._collapsed = saved.collapsed
     this._showingSettings = false
-
-    // Drag state
-    this._isDragging = false
-    this._dragStartX = 0
-    this._dragStartY = 0
 
     this._dragOffsetX = saved.position.x
     this._dragOffsetY = saved.position.y
@@ -931,7 +294,7 @@ export class MediaPlayer extends LitElement {
     }
 
     // Update audio routing
-    this._updateAudioRouting()
+    this._updateStereoMode()
 
     this.requestUpdate()
   }
@@ -1019,7 +382,7 @@ export class MediaPlayer extends LitElement {
 
     // Handle stereo split changes
     if (changedProperties.has('_stereoSplitEnabled')) {
-      this._updateAudioRouting()
+      this._updateStereoMode()
     }
   }
 
@@ -1054,38 +417,6 @@ export class MediaPlayer extends LitElement {
         })
       }
     }
-  }
-
-  _normalizeTempoNote(value: string | number | null | undefined): string {
-    if (!value) return '1/4'
-    if (typeof value === 'number') {
-      return `1/${value}`
-    }
-
-    let candidate = `${value}`.trim()
-    const parenMatch = candidate.match(/\(([^)]+)\)/)
-    if (parenMatch) {
-      candidate = parenMatch[1].trim()
-    }
-
-    const fractionMatch = candidate.match(/(\d+)\s*\/\s*(\d+)/)
-    if (fractionMatch) {
-      const numerator = Number(fractionMatch[1])
-      const denominator = Number(fractionMatch[2])
-      if (numerator > 0 && denominator > 0) {
-        return `${numerator}/${denominator}`
-      }
-    }
-
-    const denomOnlyMatch = candidate.match(/^(\d+)$/)
-    if (denomOnlyMatch) {
-      const denom = Number(denomOnlyMatch[1])
-      if (denom > 0) {
-        return `1/${denom}`
-      }
-    }
-
-    return '1/4'
   }
 
   async _updateAudioSource(): Promise<boolean> {
@@ -1209,11 +540,6 @@ export class MediaPlayer extends LitElement {
     }
   }
 
-  _updateAudioRouting(): void {
-    // Legacy method - redirect to new method
-    this._updateStereoMode()
-  }
-
   /** Whether the click is doubled for a song with this tempo and this user's choice */
   _doubleClickFor(bpm: number | null | undefined, choice: boolean | undefined): boolean {
     return wantsDoubleClick(
@@ -1240,7 +566,7 @@ export class MediaPlayer extends LitElement {
     }
     const timeSignature =
       this._activeSongTimeSignature ?? this._currentTimeSignature ?? this.timeSignature
-    const tempoNote = this._normalizeTempoNote(
+    const tempoNote = normalizeTempoNote(
       this._activeSongTempoNote ?? this._currentTempoNote ?? this.tempoNote
     )
 
@@ -1413,52 +739,21 @@ export class MediaPlayer extends LitElement {
       return
     }
 
-    this._isDragging = true
-    const { clientX, clientY } = pointer(e)
-
-    this._dragStartX = clientX - this._dragOffsetX
-    this._dragStartY = clientY - this._dragOffsetY
+    const { clientX, clientY } = pointerPosition(e)
+    const startX = clientX - this._dragOffsetX
+    const startY = clientY - this._dragOffsetY
 
     // Prevent text selection during drag
     e.preventDefault()
 
-    // Add global event listeners
-    const handleMove = (moveEvent: MouseEvent | TouchEvent) => this._handleDrag(moveEvent)
-    const handleEnd = () => this._endDrag(handleMove, handleEnd)
-
-    document.addEventListener('mousemove', handleMove)
-    document.addEventListener('mouseup', handleEnd)
-    document.addEventListener('touchmove', handleMove)
-    document.addEventListener('touchend', handleEnd)
-  }
-
-  _handleDrag(e: MouseEvent | TouchEvent): void {
-    if (!this._isDragging) return
-
-    const { clientX, clientY } = pointer(e)
-
-    this._dragOffsetX = clientX - this._dragStartX
-    this._dragOffsetY = clientY - this._dragStartY
-
-    this._applyPosition()
-  }
-
-  _endDrag(handleMove: (e: MouseEvent | TouchEvent) => void, handleEnd: () => void): void {
-    this._isDragging = false
-
-    // Remove global event listeners
-    document.removeEventListener('mousemove', handleMove)
-    document.removeEventListener('mouseup', handleEnd)
-    document.removeEventListener('touchmove', handleMove)
-    document.removeEventListener('touchend', handleEnd)
-
-    saveMediaPlayerState('position', { x: this._dragOffsetX, y: this._dragOffsetY })
-  }
-
-  _applyPosition(): void {
-    // Position is now applied directly in the template via style binding
-    // Just trigger a re-render
-    this.requestUpdate()
+    trackPointer(
+      move => {
+        const { clientX, clientY } = pointerPosition(move)
+        this._dragOffsetX = clientX - startX
+        this._dragOffsetY = clientY - startY
+      },
+      () => saveMediaPlayerState('position', { x: this._dragOffsetX, y: this._dragOffsetY })
+    )
   }
 
   _isCurrentSongActive(): boolean {
@@ -1541,34 +836,20 @@ export class MediaPlayer extends LitElement {
     e.preventDefault()
     e.stopPropagation()
 
-    // Get initial touch/click position
-    const { clientX, clientY } = pointer(e)
-
-    // Position slider near the touch point
+    // Position the slider near the touch point
+    const { clientX, clientY } = pointerPosition(e)
     this._sliderX = clientX
     this._sliderY = clientY
     this._activeVolumeControl = type
     this._showingVolumeSlider = true
 
-    // Add move/end listeners
-    const handleMove = (moveEvent: MouseEvent | TouchEvent) => {
-      this._handleVolumeMove(moveEvent)
-    }
-
-    const handleEnd = () => {
-      this._showingVolumeSlider = false
-      this._activeVolumeControl = null
-      document.removeEventListener('mousemove', handleMove)
-      document.removeEventListener('mouseup', handleEnd)
-      document.removeEventListener('touchmove', handleMove)
-      document.removeEventListener('touchend', handleEnd)
-      this.requestUpdate()
-    }
-
-    document.addEventListener('mousemove', handleMove)
-    document.addEventListener('mouseup', handleEnd)
-    document.addEventListener('touchmove', handleMove)
-    document.addEventListener('touchend', handleEnd)
+    trackPointer(
+      move => this._handleVolumeMove(move),
+      () => {
+        this._showingVolumeSlider = false
+        this._activeVolumeControl = null
+      }
+    )
   }
 
   _handleVolumeMove(e: MouseEvent | TouchEvent): void {
@@ -1576,62 +857,101 @@ export class MediaPlayer extends LitElement {
 
     e.preventDefault()
 
-    // Get vertical position relative to initial touch
-    const { clientY } = pointer(e)
-
-    // Calculate delta from start (negative = up, positive = down)
-    const delta = this._sliderY - clientY
-
-    // Convert to percentage change (200px = full range)
-    const change = delta / 200
-
-    // Get current volume
-    const currentVolume = this._activeVolumeControl === 'pad' ? this._padVolume : this._clickVolume
-
-    // Calculate new volume
-    const newVolume = Math.max(0, Math.min(1, currentVolume + change))
-
-    // Update volume
-    if (this._activeVolumeControl === 'pad') {
-      this._padVolume = newVolume
-      // Update pad controller volume
-      if (this._padController) {
-        this._padController.setVolume(this._padVolume)
-      }
-      saveMediaPlayerState('padVolume', this._padVolume)
-    } else if (this._activeVolumeControl === 'click') {
-      this._clickVolume = newVolume
-      // Update metronome controller volume
-      if (this._metronomeController) {
-        this._metronomeController.setVolume(this._clickVolume)
-      }
-      saveMediaPlayerState('clickVolume', this._clickVolume)
-    }
-
-    // Update slider Y position for next calculation
+    // Move up from where the touch was last, and the volume follows (200px = full range)
+    const { clientY } = pointerPosition(e)
+    const change = (this._sliderY - clientY) / 200
     this._sliderY = clientY
 
-    this.requestUpdate()
+    if (this._activeVolumeControl === 'pad') {
+      this._padVolume = Math.max(0, Math.min(1, this._padVolume + change))
+      this._padController?.setVolume(this._padVolume)
+      saveMediaPlayerState('padVolume', this._padVolume)
+    } else {
+      this._clickVolume = Math.max(0, Math.min(1, this._clickVolume + change))
+      this._metronomeController?.setVolume(this._clickVolume)
+      saveMediaPlayerState('clickVolume', this._clickVolume)
+    }
   }
 
-  override render() {
-    const isPlaying = this._isPlaying()
+  /** One of the volume knobs: drag it up and down to turn it */
+  _renderKnob(type: 'pad' | 'click', label: string, volume: number) {
+    return html`
+      <div class="knob-column">
+        <div class="knob-label">${label}</div>
+        <div
+          class="volume-knob ${this._activeVolumeControl === type ? 'dragging' : ''}"
+          @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, type)}
+          @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, type)}
+          title="${type === 'pad' ? 'Pad' : 'Click'} Volume"
+        >
+          <div class="volume-indicator" style="transform: rotate(${(volume - 0.5) * 270}deg)"></div>
+          <div class="volume-value">${Math.round(volume * 11)}</div>
+        </div>
+      </div>
+    `
+  }
+
+  /** One of the on/off buttons, with its light */
+  _renderToggle(on: boolean, lightClass: string, title: string, toggle: () => void) {
+    return html`
+      <button
+        class="led-button ${on ? 'active' : ''}"
+        aria-pressed=${on ? 'true' : 'false'}
+        @click=${toggle}
+        title=${title}
+      >
+        <div class="led-light ${on ? lightClass : ''}"></div>
+        <span class="led-caption" aria-hidden="true">${on ? 'On' : 'Off'}</span>
+      </button>
+    `
+  }
+
+  /** Collapsed, it is just a pill (always bottom-right): play, stop, expand */
+  _renderPill() {
+    return html`
+      <div class="collapsed-pill">
+        <button
+          class="pill-button"
+          @click=${this._startSong}
+          aria-label="Start song"
+          title="Start song"
+          ?disabled=${!this.currentKey || this._isCurrentSongActive()}
+        >
+          <app-icon name="play" size="30"></app-icon>
+        </button>
+        <button
+          class="pill-button"
+          @click=${this._stop}
+          aria-label="Stop"
+          title="Stop"
+          ?disabled=${!this._isPlaying()}
+        >
+          <app-icon name="stop" size="24" style="--icon-stroke: 2.5"></app-icon>
+        </button>
+        <button
+          class="pill-button"
+          @click=${this._toggleCollapse}
+          aria-label="Expand player"
+          title="Expand player"
+        >
+          <app-icon name="chevron-up" size="28"></app-icon>
+        </button>
+      </div>
+    `
+  }
+
+  /** The display: what is playing, and what is next (the song being viewed) */
+  _renderDisplay() {
     const isDownloading = this._isPadLoading
-    const statusText = isDownloading ? 'DOWNLOAD' : isPlaying ? 'PLAYING' : 'STOPPED'
+    const statusText = isDownloading ? 'DOWNLOAD' : this._isPlaying() ? 'PLAYING' : 'STOPPED'
     const statusClass = isDownloading ? 'status-downloading' : ''
 
-    // Check if we're viewing a different song than what's playing
-    // Compare song IDs instead of individual properties
+    // Next shows the song being viewed, when nothing is active or it isn't the active one
     const viewingDifferentSong =
       this._currentSongId && this._activeSongId && this._currentSongId !== this._activeSongId
-
-    // Show Next column data if: we have a current song ID AND (nothing is active OR viewing different song)
     const showNextData = this._currentSongId && (!this._activeSongId || viewingDifferentSong)
+    const next = (value: string | number | null | undefined) => (showNextData ? value || '-' : '-')
 
-    const doubleClick = this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
-    // The button is always there with the click, so the player keeps its shape; it works on a
-    // setlist, where there is a song to be viewed
-    const canToggleSpeed = Boolean(this._currentSongId) && !this._isOffSetlist()
     const showPadError = this._padLoadFailed && !!this._activeSongKey
     const activeKeyDisplay = showPadError
       ? html`
@@ -1641,40 +961,90 @@ export class MediaPlayer extends LitElement {
         `
       : this._activeSongKey || '-'
 
-    // If collapsed, show just the pill (always bottom-right): play, stop, expand
-    if (this._collapsed) {
-      return html`
-        <div class="collapsed-pill">
+    return html`
+      <div class="led-display-section">
+        <div class="led-display">
+          <!-- Row 1: Headers -->
+          <div class="led-label"></div>
+          <div class="led-value led-header ${statusClass}">${statusText}</div>
+          <div class="led-value led-header">Next</div>
+
+          <!-- Row 2: Key -->
+          <div class="led-label">Key</div>
+          <div class="led-value ${showPadError ? 'pad-error' : ''}">${activeKeyDisplay}</div>
+          <div class="led-value">${next(this.currentKey)}</div>
+
+          <!-- Row 3: BPM -->
+          <div class="led-label">BPM</div>
+          <div class="led-value">${this._activeSongBpm || '-'}</div>
+          <div class="led-value">${next(this._currentBpm)}</div>
+
+          <!-- Row 4: Time -->
+          <div class="led-label">Time</div>
+          <div class="led-value">${this._activeSongTimeSignature || '-'}</div>
+          <div class="led-value">${next(this._currentTimeSignature)}</div>
+        </div>
+      </div>
+    `
+  }
+
+  /** Start and stop, and (with the click) the song's double-speed click */
+  _renderTransport() {
+    const doubleClick = this._doubleClickFor(this._currentBpm, this._currentDoubleClick)
+    // The button is always there with the click, so the player keeps its shape; it works on a
+    // setlist, where there is a song to be viewed
+    const canToggleSpeed = Boolean(this._currentSongId) && !this._isOffSetlist()
+    return html`
+      <div class="play-stop-section">
+        <div class="cassette-buttons">
           <button
-            class="pill-button"
+            class="play-button ${this._isPlaying() ? 'playing' : ''}"
+            part="start-song-button"
             @click=${this._startSong}
             aria-label="Start song"
-            title="Start song"
+            title="Start song (Space)"
             ?disabled=${!this.currentKey || this._isCurrentSongActive()}
           >
-            <app-icon name="play" size="30"></app-icon>
+            <app-icon name="play" size="32"></app-icon>
           </button>
           <button
-            class="pill-button"
+            class="stop-button"
+            part="stop-button"
             @click=${this._stop}
-            aria-label="Stop"
-            title="Stop"
-            ?disabled=${!this._isPlaying()}
+            aria-label="Stop (Escape)"
+            title="Stop - Press Escape"
           >
-            <app-icon name="stop" size="24" style="--icon-stroke: 2.5"></app-icon>
-          </button>
-          <button
-            class="pill-button"
-            @click=${this._toggleCollapse}
-            aria-label="Expand player"
-            title="Expand player"
-          >
-            <app-icon name="chevron-up" size="28"></app-icon>
+            <app-icon name="stop" size="32"></app-icon>
           </button>
         </div>
-      `
-    }
+        ${
+          this._metronomeGlobalEnabled
+            ? html`
+                <!-- At the end of the transport, by the click's buttons: the song's double-speed click -->
+                <button
+                  class="led-button speed-button ${doubleClick ? 'active' : ''}"
+                  @click=${this._toggleDoubleClick}
+                  aria-pressed=${doubleClick ? 'true' : 'false'}
+                  aria-label="Double-speed click for this song"
+                  title="Double-speed click for this song"
+                  ?disabled=${!canToggleSpeed}
+                >
+                  <div class="led-light ${doubleClick ? 'click-on' : ''}"></div>
+                  <span class="led-caption" aria-hidden="true">2×</span>
+                </button>
+              `
+            : ''
+        }
+      </div>
+    `
+  }
 
+  override render() {
+    // If collapsed, show just the pill
+    if (this._collapsed) return this._renderPill()
+
+    // With neither the pads nor the click on offer, there is only the title bar and the transport
+    const anything = this._padsEnabled || this._metronomeGlobalEnabled
     return html`
       <app-modal
         heading="Media Player Settings"
@@ -1714,185 +1084,49 @@ export class MediaPlayer extends LitElement {
           </div>
         </div>
 
-        <!-- Container with grid layout -->
         <div class="container" part="container">
-          <!-- Row 1, Column 1: LED display -->
+          ${anything ? this._renderDisplay() : ''}
+          ${this._renderTransport()}
+          ${anything ? html`<div class="divider"></div>` : ''}
+
+          <!-- The volume knobs (the click first, over the click's own buttons) -->
           ${
-            this._padsEnabled || this._metronomeGlobalEnabled
-              ? html`
-                <div class="led-display-section">
-                  <div class="led-display">
-                    <!-- Row 1: Headers -->
-                    <div class="led-label"></div>
-                    <div class="led-value led-header ${statusClass}">${statusText}</div>
-                    <div class="led-value led-header">Next</div>
-
-                    <!-- Row 2: Key -->
-                    <div class="led-label">Key</div>
-                    <div class="led-value ${showPadError ? 'pad-error' : ''}">
-                      ${activeKeyDisplay}
-                    </div>
-                    <div class="led-value">${showNextData ? this.currentKey || '-' : '-'}</div>
-
-                    <!-- Row 3: BPM -->
-                    <div class="led-label">BPM</div>
-                    <div class="led-value">${this._activeSongBpm || '-'}</div>
-                    <div class="led-value">${showNextData ? this._currentBpm || '-' : '-'}</div>
-
-                    <!-- Row 4: Time -->
-                    <div class="led-label">Time</div>
-                    <div class="led-value">${this._activeSongTimeSignature || '-'}</div>
-                    <div class="led-value">
-                      ${showNextData ? this._currentTimeSignature || '-' : '-'}
-                    </div>
-                  </div>
-                </div>
-              `
-              : ''
-          }
-
-          <!-- Row 2, Column 1: Play/Stop buttons -->
-          <div class="play-stop-section">
-            <div class="cassette-buttons">
-              <button
-                class="play-button ${isPlaying ? 'playing' : ''}"
-                part="start-song-button"
-                @click=${this._startSong}
-                aria-label="Start song"
-                title="Start song (Space)"
-                ?disabled=${!this.currentKey || this._isCurrentSongActive()}
-              >
-                <app-icon name="play" size="32"></app-icon>
-              </button>
-              <button
-                class="stop-button"
-                part="stop-button"
-                @click=${this._stop}
-                aria-label="Stop (Escape)"
-                title="Stop - Press Escape"
-              >
-                <app-icon name="stop" size="32"></app-icon>
-              </button>
-            </div>
-            ${
-              this._metronomeGlobalEnabled
-                ? html`
-                    <!-- At the end of the transport, by the click's buttons: the song's double-speed click -->
-                    <button
-                      class="led-button speed-button ${doubleClick ? 'active' : ''}"
-                      @click=${this._toggleDoubleClick}
-                      aria-pressed=${doubleClick ? 'true' : 'false'}
-                      aria-label="Double-speed click for this song"
-                      title="Double-speed click for this song"
-                      ?disabled=${!canToggleSpeed}
-                    >
-                      <div class="led-light ${doubleClick ? 'click-on' : ''}"></div>
-                      <span class="led-caption" aria-hidden="true">2×</span>
-                    </button>
-                  `
-                : ''
-            }
-          </div>
-
-          <!-- Divider spanning both rows -->
-          ${
-            this._padsEnabled || this._metronomeGlobalEnabled
-              ? html` <div class="divider"></div> `
-              : ''
-          }
-
-          <!-- Row 1, Column 3: Volume knobs (the click first, over the click's own buttons) -->
-          ${
-            this._padsEnabled || this._metronomeGlobalEnabled
+            anything
               ? html`
                 <div class="knobs-section">
                   <div class="knobs-row">
-                    ${
-                      this._metronomeGlobalEnabled
-                        ? html`
-                          <div class="knob-column">
-                            <div class="knob-label">Click</div>
-                            <div
-                              class="volume-knob ${
-                                this._activeVolumeControl === 'click' ? 'dragging' : ''
-                              }"
-                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'click')}
-                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'click')}
-                              title="Click Volume"
-                            >
-                              <div
-                                class="volume-indicator"
-                                style="transform: rotate(${(this._clickVolume - 0.5) * 270}deg)"
-                              ></div>
-                              <div class="volume-value">${Math.round(this._clickVolume * 11)}</div>
-                            </div>
-                          </div>
-                        `
-                        : ''
-                    }
-                    ${
-                      this._padsEnabled
-                        ? html`
-                          <div class="knob-column">
-                            <div class="knob-label">Pads</div>
-                            <div
-                              class="volume-knob ${
-                                this._activeVolumeControl === 'pad' ? 'dragging' : ''
-                              }"
-                              @mousedown=${(e: MouseEvent) => this._startVolumeControl(e, 'pad')}
-                              @touchstart=${(e: TouchEvent) => this._startVolumeControl(e, 'pad')}
-                              title="Pad Volume"
-                            >
-                              <div
-                                class="volume-indicator"
-                                style="transform: rotate(${(this._padVolume - 0.5) * 270}deg)"
-                              ></div>
-                              <div class="volume-value">${Math.round(this._padVolume * 11)}</div>
-                            </div>
-                          </div>
-                        `
-                        : ''
-                    }
+                    ${this._metronomeGlobalEnabled ? this._renderKnob('click', 'Click', this._clickVolume) : ''}
+                    ${this._padsEnabled ? this._renderKnob('pad', 'Pads', this._padVolume) : ''}
                   </div>
                 </div>
               `
               : ''
           }
 
-          <!-- Row 2, Column 3: LED toggle buttons -->
+          <!-- The on/off buttons -->
           ${
-            this._padsEnabled || this._metronomeGlobalEnabled
+            anything
               ? html`
                 <div class="toggles-section">
                   <div class="cassette-buttons">
                     ${
                       this._metronomeGlobalEnabled
-                        ? html`
-                          <button
-                            class="led-button ${this._clickOn ? 'active' : ''}"
-                            aria-pressed=${this._clickOn ? 'true' : 'false'}
-                            @click=${this._toggleClick}
-                            title="Toggle click on/off"
-                          >
-                            <div class="led-light ${this._clickOn ? 'click-on' : ''}"></div>
-                            <span class="led-caption" aria-hidden="true">${this._clickOn ? 'On' : 'Off'}</span>
-                          </button>
-                        `
+                        ? this._renderToggle(
+                            this._clickOn,
+                            'click-on',
+                            'Toggle click on/off',
+                            this._toggleClick
+                          )
                         : ''
                     }
                     ${
                       this._padsEnabled
-                        ? html`
-                          <button
-                            class="led-button ${this._padsOn ? 'active' : ''}"
-                            aria-pressed=${this._padsOn ? 'true' : 'false'}
-                            @click=${this._togglePads}
-                            title="Toggle pads on/off"
-                          >
-                            <div class="led-light ${this._padsOn ? 'pads-on' : ''}"></div>
-                            <span class="led-caption" aria-hidden="true">${this._padsOn ? 'On' : 'Off'}</span>
-                          </button>
-                        `
+                        ? this._renderToggle(
+                            this._padsOn,
+                            'pads-on',
+                            'Toggle pads on/off',
+                            this._togglePads
+                          )
                         : ''
                     }
                   </div>
@@ -1901,9 +1135,7 @@ export class MediaPlayer extends LitElement {
               : ''
           }
         </div>
-        <!-- End container -->
       </div>
-      <!-- End player -->
     `
   }
 }
