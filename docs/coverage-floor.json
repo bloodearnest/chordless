@@ -1,0 +1,639 @@
+{
+  "src/components/app-about.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 312
+  },
+  "src/components/app-header.ts": {
+    "lines": 19,
+    "branches": 7,
+    "functions": 13
+  },
+  "src/components/app-modal.ts": {
+    "lines": 7,
+    "branches": 7,
+    "functions": 4
+  },
+  "src/components/app-preferences.ts": {
+    "lines": 77,
+    "branches": 14,
+    "functions": 12
+  },
+  "src/components/bar-group.ts": {
+    "lines": 74,
+    "branches": 0,
+    "functions": 5
+  },
+  "src/components/bookmarklet-installer.ts": {
+    "lines": 5,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/components/capo-selector.ts": {
+    "lines": 0,
+    "branches": 3,
+    "functions": 1
+  },
+  "src/components/chord-display.ts": {
+    "lines": 61,
+    "branches": 12,
+    "functions": 3
+  },
+  "src/components/drive-sync-panel.ts": {
+    "lines": 116,
+    "branches": 12,
+    "functions": 4
+  },
+  "src/components/first-use-setup.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/components/help-tooltip.ts": {
+    "lines": 49,
+    "branches": 1,
+    "functions": 9
+  },
+  "src/components/icon.ts": {
+    "lines": 3,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/components/key-selector.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 1
+  },
+  "src/components/media-player-settings.ts": {
+    "lines": 25,
+    "branches": 8,
+    "functions": 8
+  },
+  "src/components/media-player.ts": {
+    "lines": 307,
+    "branches": 71,
+    "functions": 14
+  },
+  "src/components/musical-metadata-display.ts": {
+    "lines": 23,
+    "branches": 6,
+    "functions": 4
+  },
+  "src/components/nav-menu.ts": {
+    "lines": 42,
+    "branches": 7,
+    "functions": 12
+  },
+  "src/components/option-picker.ts": {
+    "lines": 2,
+    "branches": 8,
+    "functions": 1
+  },
+  "src/components/pad-set-manager.ts": {
+    "lines": 65,
+    "branches": 10,
+    "functions": 4
+  },
+  "src/components/select-organisation.ts": {
+    "lines": 81,
+    "branches": 3,
+    "functions": 6
+  },
+  "src/components/setlist-details-form.ts": {
+    "lines": 3,
+    "branches": 8,
+    "functions": 3
+  },
+  "src/components/setlist-email-import.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 522
+  },
+  "src/components/setlist-group.ts": {
+    "lines": 5,
+    "branches": 6,
+    "functions": 1
+  },
+  "src/components/setlist-info-dialog.ts": {
+    "lines": 52,
+    "branches": 6,
+    "functions": 15
+  },
+  "src/components/setlist-info.ts": {
+    "lines": 23,
+    "branches": 18,
+    "functions": 2
+  },
+  "src/components/setlist-overview.ts": {
+    "lines": 21,
+    "branches": 3,
+    "functions": 15
+  },
+  "src/components/setlist-share.ts": {
+    "lines": 83,
+    "branches": 8,
+    "functions": 9
+  },
+  "src/components/song-card.ts": {
+    "lines": 54,
+    "branches": 14,
+    "functions": 14
+  },
+  "src/components/song-display.ts": {
+    "lines": 3,
+    "branches": 7,
+    "functions": 0
+  },
+  "src/components/song-import.ts": {
+    "lines": 133,
+    "branches": 16,
+    "functions": 12
+  },
+  "src/components/song-info-dialog.ts": {
+    "lines": 22,
+    "branches": 1,
+    "functions": 2
+  },
+  "src/components/song-info.ts": {
+    "lines": 99,
+    "branches": 12,
+    "functions": 2
+  },
+  "src/components/song-list.ts": {
+    "lines": 9,
+    "branches": 1,
+    "functions": 4
+  },
+  "src/components/song-section.ts": {
+    "lines": 121,
+    "branches": 36,
+    "functions": 10
+  },
+  "src/components/song-settings-popover.ts": {
+    "lines": 41,
+    "branches": 4,
+    "functions": 19
+  },
+  "src/components/status-message.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/components/status-view.ts": {
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/components/storage-page.ts": {
+    "lines": 158,
+    "branches": 8,
+    "functions": 5
+  },
+  "src/components/storage-summary.ts": {
+    "lines": 54,
+    "branches": 12,
+    "functions": 4
+  },
+  "src/components/theme-settings.ts": {
+    "lines": 34,
+    "branches": 6,
+    "functions": 5
+  },
+  "src/components/welcome-card.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 166
+  },
+  "src/components/why-install.ts": {
+    "lines": 1,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/app-events.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 2
+  },
+  "src/js/app-router.ts": {
+    "lines": 10,
+    "branches": 6,
+    "functions": 2
+  },
+  "src/js/app-update.ts": {
+    "lines": 3,
+    "branches": 5,
+    "functions": 2
+  },
+  "src/js/app.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 29
+  },
+  "src/js/auth-db.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 179
+  },
+  "src/js/db.ts": {
+    "lines": 111,
+    "branches": 24,
+    "functions": 48
+  },
+  "src/js/drive-api.ts": {
+    "lines": 36,
+    "branches": 21,
+    "functions": 1
+  },
+  "src/js/drive-metadata.ts": {
+    "lines": 1,
+    "branches": 10,
+    "functions": 0
+  },
+  "src/js/drive-sync.ts": {
+    "lines": 260,
+    "branches": 111,
+    "functions": 5
+  },
+  "src/js/email-link.ts": {
+    "lines": 1,
+    "branches": 2,
+    "functions": 1
+  },
+  "src/js/email-mime.ts": {
+    "lines": 0,
+    "branches": 2,
+    "functions": 1
+  },
+  "src/js/email-setlist.ts": {
+    "lines": 5,
+    "branches": 15,
+    "functions": 1
+  },
+  "src/js/first-time-auth.ts": {
+    "lines": 92,
+    "branches": 0,
+    "functions": 5
+  },
+  "src/js/first-use.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 10
+  },
+  "src/js/google-auth.ts": {
+    "lines": 167,
+    "branches": 14,
+    "functions": 11
+  },
+  "src/js/import-plan.ts": {
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/import-setlist.ts": {
+    "lines": 106,
+    "branches": 0,
+    "functions": 4
+  },
+  "src/js/install.ts": {
+    "lines": 18,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/launch.ts": {
+    "lines": 3,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/media-player-loader.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/metronome-controller.ts": {
+    "lines": 21,
+    "branches": 5,
+    "functions": 0
+  },
+  "src/js/models/library-song.ts": {
+    "lines": 2,
+    "branches": 8,
+    "functions": 1
+  },
+  "src/js/models/setlist-song.ts": {
+    "lines": 10,
+    "branches": 11,
+    "functions": 1
+  },
+  "src/js/models/song-model.ts": {
+    "lines": 49,
+    "branches": 1,
+    "functions": 21
+  },
+  "src/js/navigation.ts": {
+    "lines": 3,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/organisation-access.ts": {
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/organisation-db.ts": {
+    "lines": 11,
+    "branches": 4,
+    "functions": 12
+  },
+  "src/js/organisation.ts": {
+    "lines": 57,
+    "branches": 4,
+    "functions": 2
+  },
+  "src/js/other-songs.ts": {
+    "lines": 8,
+    "branches": 4,
+    "functions": 0
+  },
+  "src/js/pad-audio-controller.ts": {
+    "lines": 19,
+    "branches": 16,
+    "functions": 1
+  },
+  "src/js/pad-keys.ts": {
+    "lines": 2,
+    "branches": 6,
+    "functions": 0
+  },
+  "src/js/pad-set-service.ts": {
+    "lines": 38,
+    "branches": 32,
+    "functions": 1
+  },
+  "src/js/pad-sets-controller.ts": {
+    "lines": 20,
+    "branches": 2,
+    "functions": 1
+  },
+  "src/js/parser.ts": {
+    "lines": 2,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/pdf-text.ts": {
+    "lines": 3,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/people.ts": {
+    "lines": 15,
+    "branches": 5,
+    "functions": 1
+  },
+  "src/js/preferences.ts": {
+    "lines": 64,
+    "branches": 20,
+    "functions": 16
+  },
+  "src/js/read-only-controller.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 1
+  },
+  "src/js/router.ts": {
+    "lines": 4,
+    "branches": 3,
+    "functions": 0
+  },
+  "src/js/samples.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 33
+  },
+  "src/js/setlist-page.ts": {
+    "lines": 1059,
+    "branches": 112,
+    "functions": 43
+  },
+  "src/js/setlist/add-song-modal.ts": {
+    "lines": 5,
+    "branches": 4,
+    "functions": 0
+  },
+  "src/js/setlist/overview-reorder.ts": {
+    "lines": 0,
+    "branches": 16,
+    "functions": 0
+  },
+  "src/js/setlist/runtime-songs.ts": {
+    "lines": 5,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/share-bundle.ts": {
+    "lines": 4,
+    "branches": 7,
+    "functions": 0
+  },
+  "src/js/share-crypto.ts": {
+    "lines": 5,
+    "branches": 5,
+    "functions": 0
+  },
+  "src/js/share-manager.ts": {
+    "lines": 13,
+    "branches": 3,
+    "functions": 0
+  },
+  "src/js/share-receiver.ts": {
+    "lines": 26,
+    "branches": 8,
+    "functions": 2
+  },
+  "src/js/shared-incoming.ts": {
+    "lines": 0,
+    "branches": 4,
+    "functions": 0
+  },
+  "src/js/song-model-factory.ts": {
+    "lines": 13,
+    "branches": 3,
+    "functions": 1
+  },
+  "src/js/song-user-prefs.ts": {
+    "lines": 32,
+    "branches": 8,
+    "functions": 2
+  },
+  "src/js/song-utils.ts": {
+    "lines": 13,
+    "branches": 11,
+    "functions": 0
+  },
+  "src/js/song-view-manager.ts": {
+    "lines": 0,
+    "branches": 2,
+    "functions": 0
+  },
+  "src/js/songselect-bookmarklet.ts": {
+    "lines": 9,
+    "branches": 5,
+    "functions": 0
+  },
+  "src/js/sync-orchestrator.ts": {
+    "lines": 81,
+    "branches": 12,
+    "functions": 5
+  },
+  "src/js/theme-manager.ts": {
+    "lines": 58,
+    "branches": 10,
+    "functions": 6
+  },
+  "src/js/transpose.ts": {
+    "lines": 87,
+    "branches": 64,
+    "functions": 0
+  },
+  "src/js/utils/chord-utils.ts": {
+    "lines": 2,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/utils/date-utils.ts": {
+    "lines": 2,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/utils/errors.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/utils/idb.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/utils/keyboard.ts": {
+    "lines": 0,
+    "branches": 3,
+    "functions": 0
+  },
+  "src/js/utils/lyrics-normalizer.ts": {
+    "lines": 23,
+    "branches": 10,
+    "functions": 0
+  },
+  "src/js/utils/persistence.ts": {
+    "lines": 10,
+    "branches": 6,
+    "functions": 0
+  },
+  "src/js/utils/song-filter.ts": {
+    "lines": 0,
+    "branches": 5,
+    "functions": 0
+  },
+  "src/js/utils/status-message.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/views/about-view.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 27
+  },
+  "src/js/views/home-view.ts": {
+    "lines": 59,
+    "branches": 6,
+    "functions": 5
+  },
+  "src/js/views/import-setlist-view.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 25
+  },
+  "src/js/views/import-song-view.ts": {
+    "lines": 1,
+    "branches": 1,
+    "functions": 0
+  },
+  "src/js/views/library-view.ts": {
+    "lines": 78,
+    "branches": 37,
+    "functions": 9
+  },
+  "src/js/views/registry.ts": {
+    "lines": 7,
+    "branches": 0,
+    "functions": 13
+  },
+  "src/js/views/setlist-view.ts": {
+    "lines": 2,
+    "branches": 2,
+    "functions": 1
+  },
+  "src/js/views/share-view.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 134
+  },
+  "src/js/wake-lock.ts": {
+    "lines": 9,
+    "branches": 4,
+    "functions": 1
+  },
+  "src/service-worker.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 276
+  },
+  "worker/src/blob.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "worker/src/email.ts": {
+    "lines": 8,
+    "branches": 11,
+    "functions": 2
+  },
+  "worker/src/http.ts": {
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
+  },
+  "worker/src/index.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 0,
+    "unloaded": 14
+  },
+  "worker/src/router.ts": {
+    "lines": 0,
+    "branches": 0,
+    "functions": 1
+  },
+  "worker/src/session.ts": {
+    "lines": 0,
+    "branches": 5,
+    "functions": 0
+  },
+  "worker/src/share.ts": {
+    "lines": 0,
+    "branches": 4,
+    "functions": 0
+  }
+}

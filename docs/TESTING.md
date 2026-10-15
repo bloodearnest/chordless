@@ -234,7 +234,25 @@ If you forward emails to yourself to import them, include your own address as a 
 
 ## Coverage
 
-`just coverage` runs the browser unit tests with coverage, printing a summary and
-writing an HTML report to `coverage/index.html`. Only files the tests load are
-counted, so a module no test imports doesn't appear at all. The end-to-end tests
-aren't included.
+`just coverage` runs the node tests and the browser unit tests with coverage, and `scripts/coverage.ts`
+merges the two: a line counts as covered if either suite ran it. It prints the totals and the files
+with the most missing, and lists the source files no test loads (they are in neither report).
+`node scripts/coverage.ts src/js/db.ts` lists the lines, branches and functions of one file that no
+test reaches; `--all` lists every file. (The browser suite's own report is `coverage/index.html`.)
+The end-to-end tests aren't measured.
+
+The goal is 100%, and `docs/coverage-floor.json` holds the way there: for each file, how much is
+still missing. `just test` fails if a file has more missing than that, or a new file has any, and
+lowers the file when coverage goes up, so commit it with the change that did it. A fully covered file
+drops out of the floor; when the floor is empty, coverage is 100%.
+
+Code that is not worth covering is marked, with the reason after `--`:
+
+    /* v8 ignore next -- iOS only: Chromium has no install prompt */      this line (`next 3`: three lines)
+    /* v8 ignore start -- why */ ... /* v8 ignore stop */                  a block
+
+(`node:coverage` and `c8` are read the same as `v8`.) The check fails for a mark with no reason.
+Fair reasons: a branch TypeScript makes us write that cannot happen; a browser feature Chromium
+cannot fake; start-up wiring that a Playwright test exercises. "Hard to test" is not one: change the
+code so it can be tested, or write the test. Marks are counted in the summary, so they stay
+visible in review.

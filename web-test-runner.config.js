@@ -14,8 +14,8 @@ export default {
     include: ['src/**/*.{js,ts}'],
     exclude: ['node_modules/**'],
     reportDir: 'coverage',
-    // json-summary is read by `just stats`
-    reporters: ['html', 'text-summary', 'json-summary'],
+    // json-summary is read by `just stats`, lcov by scripts/coverage.ts
+    reporters: ['html', 'text-summary', 'json-summary', 'lcov'],
   },
   // A full run for `just stats` (STATS=1) also writes its counts to .stats/unit.json
   ...(process.env.STATS && { reporters: [defaultReporter(), statsReporter()] }),

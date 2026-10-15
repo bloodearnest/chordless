@@ -5,7 +5,7 @@ default:
     @just --list
 
 # Run all tests: node, browser unit (Web Test Runner) and Playwright, then record the results
-test: test-node test-unit test-browser-headless && stats
+test: test-node test-unit test-browser-headless && coverage-check stats
 
 # Record the last full run's counts, times and coverage in docs/stats.jsonl (`just test` does it)
 stats:
@@ -29,16 +29,21 @@ format:
     @echo "Formatting with Biome..."
     npx @biomejs/biome format --write .
 
-# Browser unit test coverage of the app's code: a summary, and coverage/index.html.
-# Only files the tests load are counted, so untested modules don't show at all
-coverage:
-    npx web-test-runner --config web-test-runner.config.js --coverage
+# Coverage of the app's code by the node and browser unit tests together: a summary, the files with
+# the most missing, and a failure if any file has more missing than docs/coverage-floor.json allows
+# (it lowers the floor when coverage goes up). Detail of one file: node scripts/coverage.ts src/js/db.ts
+# The browser report alone is in coverage/index.html
+coverage: test-node test-unit coverage-check
 
-# Run the node tests (the workers, email and share code, event names); coverage is of worker/src only,
-# as the rest of src/ is measured by the browser suites
+# Check the coverage left by the last full node and browser unit runs (`just test` does it)
+coverage-check:
+    node scripts/coverage.ts
+
+# Run the node tests (the workers, email and share code, event names). Coverage is of worker/src and
+# of the src/ code they run, which `just coverage` adds to the browser suites
 test-node:
     @mkdir -p .stats
-    node --test --experimental-test-coverage --test-coverage-include='worker/src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.stats/node.junit.xml --test-reporter=lcov --test-reporter-destination=.stats/node.lcov "tests/*.node.test.{js,ts}"
+    node --test --experimental-test-coverage --test-coverage-include='worker/src/**' --test-coverage-include='src/**' --test-reporter=spec --test-reporter-destination=stdout --test-reporter=junit --test-reporter-destination=.stats/node.junit.xml --test-reporter=lcov --test-reporter-destination=.stats/node.lcov "tests/*.node.test.{js,ts}"
 
 serve:
     npm run dev

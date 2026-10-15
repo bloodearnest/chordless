@@ -51,10 +51,14 @@ function nodeStats(): SuiteStats {
     0
   )
   const total = { lines: [0, 0], branches: [0, 0], functions: [0, 0] }
+  // (the report also has the src/ code the node tests run: the numbers here are of the worker)
+  let inWorker = false
   for (const line of read('.stats/node.lcov').split('\n')) {
     const [key, value] = line.split(':')
     const number = Number(value)
-    if (key === 'LF') total.lines[1] += number
+    if (key === 'SF') inWorker = value.startsWith('worker/src/')
+    else if (!inWorker) continue
+    else if (key === 'LF') total.lines[1] += number
     else if (key === 'LH') total.lines[0] += number
     else if (key === 'BRF') total.branches[1] += number
     else if (key === 'BRH') total.branches[0] += number
