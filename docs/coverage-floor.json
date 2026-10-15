@@ -5,9 +5,9 @@
     "functions": 7
   },
   "src/components/app-header.ts": {
-    "lines": 19,
-    "branches": 7,
-    "functions": 7
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/components/app-preferences.ts": {
     "lines": 77,
@@ -30,9 +30,9 @@
     "functions": 8
   },
   "src/components/media-player-settings.ts": {
-    "lines": 25,
-    "branches": 8,
-    "functions": 6
+    "lines": 0,
+    "branches": 1,
+    "functions": 0
   },
   "src/components/media-player.ts": {
     "lines": 307,
@@ -50,7 +50,7 @@
     "functions": 6
   },
   "src/components/setlist-email-import.ts": {
-    "lines": 503,
+    "lines": 363,
     "branches": 10,
     "functions": 31
   },
@@ -63,11 +63,6 @@
     "lines": 23,
     "branches": 18,
     "functions": 2
-  },
-  "src/components/setlist-overview.ts": {
-    "lines": 21,
-    "branches": 3,
-    "functions": 8
   },
   "src/components/setlist-share.ts": {
     "lines": 83,
@@ -165,11 +160,6 @@
     "branches": 120,
     "functions": 36
   },
-  "src/js/song-user-prefs.ts": {
-    "lines": 32,
-    "branches": 8,
-    "functions": 2
-  },
   "src/js/sync-orchestrator.ts": {
     "lines": 81,
     "branches": 12,
@@ -189,11 +179,6 @@
     "lines": 59,
     "branches": 6,
     "functions": 5
-  },
-  "src/js/views/import-setlist-view.ts": {
-    "lines": 16,
-    "branches": 0,
-    "functions": 1
   },
   "src/js/views/library-view.ts": {
     "lines": 78,
