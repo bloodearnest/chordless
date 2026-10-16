@@ -112,6 +112,13 @@ storage/sync
   Left for now: with immediate sync of the changed record (below) two devices rarely edit the
   same setlist from the same base, so it matters much less. The random sync tests (`conflicts`
   mode, tests/drive-sync-random.test.ts) already check convergence, a safety net for this change
+- several people editing a setlist (designed 2026-10-16 in docs/SYNC_ARCHITECTURE.md, "Several
+  people editing a setlist"; not built). Decided: start by blocking the sync of writes from
+  non-owners (only the owner's edits to a setlist are uploaded); their edits stay on their device
+  in a layer over the shared setlist, which needs building first (same layer as the read-only
+  item under "editing"). Later: an editors list, then suggestions to the owner (accept or
+  reject). Open: which field is the owner (createdBy or ownerId); open to all in the organisation
+  by default or owner only. The Worker broker later enforces it and detects conflicts
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
   designed in docs/SYNC_ARCHITECTURE.md, not built
 - immediate background sync of just the changed record (setlist/song), in the

@@ -216,6 +216,78 @@ The UI follows: nothing that changes what syncs is offered, and what stays on th
   `organisation-read-only-change`; the setlist page's own header and popover on the next song
   or page).
 
+### Several people editing a setlist (design, not built)
+
+Written 2026-10-16. Today a setlist is one JSON file, whoever edits it writes the whole file, and
+a conflict (changed on this device and in Drive) is **Drive wins, the local edit silently
+dropped**. That was fine with one editor. It is a data-loss path for the case that matters most,
+a last-minute change on a band member's tablet that the next sync reverts. The principle behind
+the design is in CLAUDE.md, "be permissive in the moment": nobody is stopped from changing what
+they see; rights only decide **what reaches the shared setlist**.
+
+**Shared base plus a device layer.** A setlist the device shows is the *base* (what syncs) with
+the device's own changes applied over it:
+- The *layer* keeps this device's changes as changes (a song's key, BPM or notes, a song added
+  or removed, the order), not a copy of the setlist. It lives next to `setlist_local`, which
+  already holds the device-only capo and section state, so a pull never touches it.
+- A pull updates the base. What the person changed stays as they set it; anything they did not
+  touch follows the leader. A changed row shows a small "your change" marker with a reset, also
+  when someone else changed the same field meanwhile (their value stays, the marker says so).
+  Nothing is dropped silently.
+- A writer's layer is **promoted into the base** when it syncs. A reader's, or a non-owner's
+  (below), never is. So the same mechanism serves the read-only TODO (local key change for a
+  reader), unsynced offline edits and conflicts.
+- Merge by field and by song id. Per-song changes merge cleanly. The order is the hard part (two
+  people reordering): start from "base order, plus your additions and removals" and decide the
+  rest when it is built.
+
+**Ownership. First step: block the sync of writes from non-owners.** A setlist has an owner, and
+only the owner's edits to it are uploaded. Everyone else can still edit it on their device (the
+layer above), and nothing of theirs is pushed.
+- Which field is the owner is still to be decided: `createdBy` (who made it in Chordless; the
+  "owning user") or `ownerId` (the leader). `createdBy` is only a trace today ("nothing decides
+  by it yet", data-types.ts). Leaders who did not create the setlist are the case to settle,
+  probably with the editors list below.
+- It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
+  same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
+  as a reader of that setlist (no setlist edits).
+- Later, in this order: an optional `editors` list the owner grants (everyone in the
+  organisation editing stays the default only if open-by-default is what is wanted: undecided);
+  then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
+  rejects each change; accepted changes are applied to the base.
+- Drive's permissions are per folder, so an owner or editors rule inside the setlist file is
+  only advice to a client that follows it: anyone who can write the folder can write the file.
+  Real enforcement needs the Worker (below), so the client check comes first and is advisory.
+
+**With immediate sync** (the changed record is pushed at once when online, the expected normal
+case) conflicts get rare: the window shrinks from "since the last sync" to seconds, and edits can
+travel as small changes ("song 3 key to D") that merge by field. They do not go away: a tablet
+opened every few weeks on poor wifi is offline when it edits, and Drive has no compare-and-set
+(to check), so two pushes a moment apart can overwrite each other.
+
+**The Worker, when it brokers organisation writes** (SHARING.md, "The design: the Worker
+brokers the owner's access"). Every member's Drive call goes through it, so for an organisation
+it is the one place that can:
+1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
+   to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
+2. **Detect conflicts.** The client sends the checksum it last saw (it records `driveChecksum`
+   already); if Drive's differs the Worker answers 409 and nothing is overwritten.
+3. **Make that atomic.** Check-then-write is not atomic, so writes go through one Durable Object
+   per organisation, which serialises them. A new Cloudflare piece (wrangler.toml has none).
+
+The Worker detects and the client resolves: after a 409 the client fetches the current setlist,
+merges it with its layer by a three-way merge (it keeps the last-synced copy as the base) and
+tries again. The merge is a shared, tested TypeScript module, run on the device because an
+offline device has to merge there anyway (it is where the "your change" marker lives); the Worker
+could run the same module later. A solo user syncing straight to their own Drive (no Worker) has
+no server check, but the same layer and merge stop their phone and tablet dropping each other's
+edits.
+
+Order of work: (1) never drop a losing local edit silently (a conflict copy is the cheap first
+step, see the TODO); (2) the device layer and merge module; (3) block the sync of non-owners'
+writes, on the client; (4) the Worker's roles and conflict check, with the broker; (5) editors,
+then suggestions.
+
 ### Reset from Google Drive
 
 Storage page, only when sync is set up. Replaces the device's setlists, songs and
@@ -419,8 +491,9 @@ backstop.
   broadcast its progress to the pages with `postMessage` (today it calls a callback).
   Periodic Background Sync has the same platform limits.
 - **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
-  ideally merge setlist field changes.
-- **Restricting edits to a setlist's owner** (`ownerId`).
+  ideally merge setlist field changes. Designed above, "Several people editing a setlist".
+- **Restricting edits to a setlist's owner** (`createdBy` or `ownerId`: undecided): designed above,
+  first by blocking the sync of non-owners' writes.
 - **Inviting people to an organisation:** shared users can't see the folder under
   `drive.file`; the design (the Worker brokers the owner's access) is in SHARING.md.
 - **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
