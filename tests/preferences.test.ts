@@ -19,6 +19,7 @@ const KEYS = [
   'setup-done',
   'keep_screen_awake',
   'keep_awake_minutes',
+  'fullscreen_while_live',
 ]
 
 const fresh = (): Promise<Preferences> => Promise.resolve(preferencesModule)
@@ -143,6 +144,19 @@ describe('preferences', () => {
     })
   })
 
+  describe('fullscreen while live', () => {
+    it('is on unless turned off, and said on window when changed', async () => {
+      const preferences = await fresh()
+      expect(preferences.getFullscreenPreference()).to.equal(true)
+      const events = heard<InstanceType<Preferences['FullscreenPreferenceEvent']>>(
+        'preferences:fullscreen-changed',
+        () => preferences.setFullscreenPreference(false)
+      )
+      expect(events.map(event => event.enabled)).to.deep.equal([false])
+      expect(preferences.getFullscreenPreference()).to.equal(false)
+    })
+  })
+
   describe('keeping the screen awake', () => {
     it('is on unless turned off, and said on window when changed', async () => {
       const preferences = await fresh()
@@ -203,6 +217,8 @@ describe('preferences', () => {
       expect(preferences.getKeepAwakeMinutes()).to.equal(60)
       expect(() => preferences.setKeepAwakePreference(false)).to.not.throw()
       expect(() => preferences.setKeepAwakeMinutes(30)).to.not.throw()
+      expect(preferences.getFullscreenPreference()).to.equal(true)
+      expect(() => preferences.setFullscreenPreference(false)).to.not.throw()
     })
 
     it('has no capo when it cannot ask whether it is on', async () => {

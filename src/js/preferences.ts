@@ -67,6 +67,15 @@ export class KeepAwakeLimitEvent extends Event {
     this.minutes = minutes
   }
 }
+/** The fullscreen-while-live preference changed (sent on window) */
+export class FullscreenPreferenceEvent extends Event {
+  static readonly type = 'preferences:fullscreen-changed'
+  readonly enabled: boolean
+  constructor(enabled: boolean) {
+    super(FullscreenPreferenceEvent.type)
+    this.enabled = enabled
+  }
+}
 const NASHVILLE_PREF_KEY = 'use-nashville'
 const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
 const MUSICIAN_TYPE_KEY = 'musician_type'
@@ -76,6 +85,7 @@ const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
 const SETUP_DONE_KEY = 'setup-done'
 const KEEP_AWAKE_KEY = 'keep_screen_awake'
 const KEEP_AWAKE_MINUTES_KEY = 'keep_awake_minutes'
+const FULLSCREEN_KEY = 'fullscreen_while_live'
 
 /** The longest the screen is kept awake with no touch, in minutes: 0 is no limit */
 export const KEEP_AWAKE_LIMITS = [15, 30, 60, 120, 240, 0] as const
@@ -209,6 +219,25 @@ export function setKeepAwakePreference(value: boolean) {
   window.dispatchEvent(new KeepAwakePreferenceEvent(enabled))
 }
 
+/** Whether to go fullscreen while live: on unless the user turned it off */
+export function getFullscreenPreference(): boolean {
+  try {
+    return localStorage.getItem(FULLSCREEN_KEY) !== 'false'
+  } catch {
+    return true
+  }
+}
+
+export function setFullscreenPreference(value: boolean) {
+  const enabled = !!value
+  try {
+    localStorage.setItem(FULLSCREEN_KEY, enabled ? 'true' : 'false')
+  } catch (error) {
+    console.error('Failed to save fullscreen preference', error)
+  }
+  window.dispatchEvent(new FullscreenPreferenceEvent(enabled))
+}
+
 export function getKeepAwakeMinutes(): number {
   try {
     const stored = Number(localStorage.getItem(KEEP_AWAKE_MINUTES_KEY))
@@ -240,6 +269,7 @@ export function keepAwakeLimitMs(minutes = getKeepAwakeMinutes()): number {
 
 declare global {
   interface GlobalEventHandlersEventMap {
+    [FullscreenPreferenceEvent.type]: FullscreenPreferenceEvent
     [KeepAwakeLimitEvent.type]: KeepAwakeLimitEvent
     [KeepAwakePreferenceEvent.type]: KeepAwakePreferenceEvent
     [NashvillePreferenceEvent.type]: NashvillePreferenceEvent
