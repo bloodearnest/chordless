@@ -23,6 +23,7 @@ import {
 } from '../src/components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
+  OverviewSongBpmChangeEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
@@ -88,6 +89,13 @@ describe('the setlist page: header, menu and keys', () => {
       await wait(100)
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].key).to.equal('A')
       must(rig.page._overviewComponent).dispatchEvent(new OverviewSongKeyChangeEvent(0, ''))
+    })
+
+    it('changes the tempo of a song when told to', async () => {
+      const setlist = await rig.open()
+      must(rig.page._overviewComponent).dispatchEvent(new OverviewSongBpmChangeEvent(0, 88))
+      await wait(100)
+      expect(must(await rig.db.getSetlist(setlist.id)).songs[0].tempo).to.equal(88)
     })
 
     it('removes the listeners from a component it replaces', async () => {

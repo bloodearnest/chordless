@@ -58,6 +58,20 @@ export class SongCardKeyChangeEvent extends Event {
   }
 }
 
+/** A new tempo was chosen */
+export class SongCardBpmChangeEvent extends Event {
+  static readonly type = 'song-card:bpm-change'
+  readonly bpm: number
+  constructor(bpm: number) {
+    super(SongCardBpmChangeEvent.type, { bubbles: true, composed: true })
+    this.bpm = bpm
+  }
+}
+
+/** The tempos the player and the song's own BPM stepper allow */
+const BPM_MIN = 40
+const BPM_MAX = 240
+
 const MAJOR_KEYS = ['Ab', 'A', 'Bb', 'B', 'C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G']
 const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'Fm', 'F#m', 'Gm']
 
@@ -78,6 +92,7 @@ const MINOR_KEYS = ['Abm', 'Am', 'Bbm', 'Bm', 'Cm', 'C#m', 'Dm', 'Ebm', 'Em', 'F
  * @fires SongCardClickEvent - When the card is clicked, outside edit mode (song)
  * @fires SongCardDeleteEvent - When the delete button is pressed in edit mode (song)
  * @fires SongCardKeyChangeEvent - When a new key is chosen in edit mode (key)
+ * @fires SongCardBpmChangeEvent - When a new tempo is entered in edit mode, in a setlist (bpm)
  *
  * CSS Parts:
  * @csspart card - The main card container
@@ -335,6 +350,29 @@ export class SongCard extends LitElement {
       display: none;
     }
 
+    .bpm-edit {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0 0.5rem;
+      font-size: var(--font-ui-small);
+      color: var(--text-color, #1a1a1a);
+    }
+
+    .bpm-edit input {
+      box-sizing: border-box;
+      width: 4.5rem;
+      min-height: 2.5rem;
+      padding: 0.4rem 0.6rem;
+      border: 2px solid var(--border-light, #ecf0f1);
+      border-radius: 6px;
+      background: var(--bg-secondary, #ecf0f1);
+      color: inherit;
+      font: inherit;
+      font-size: var(--font-ui);
+      text-align: center;
+    }
+
     :host([variant='setlist']) .card-content {
       padding: 1.2rem 1.5rem;
     }
@@ -388,6 +426,7 @@ export class SongCard extends LitElement {
             >
               <app-icon name="delete" size="18" class="delete-icon"></app-icon>
             </button>
+            ${this._renderBpmEdit()}
             ${this._renderKeyEdit()}
             <div class="drag-handle" part="drag-handle">☰</div>
           </div>
@@ -512,6 +551,36 @@ export class SongCard extends LitElement {
     `
   }
 
+  /** In a setlist, the tempo can be changed too: a number box, which a touch screen gives a number pad */
+  _renderBpmEdit() {
+    if (this.variant !== 'setlist') return ''
+    const tempo = Number(this.song?.metadata?.tempo)
+    return html`
+      <label class="bpm-edit" @click=${(e: Event) => e.stopPropagation()}>
+        BPM
+        <input
+          type="number"
+          inputmode="numeric"
+          min=${BPM_MIN}
+          max=${BPM_MAX}
+          .value=${tempo > 0 ? String(tempo) : ''}
+          @change=${this._handleBpmEditChange}
+        />
+      </label>
+    `
+  }
+
+  _handleBpmEditChange(e: Event): void {
+    const input = e.target as HTMLInputElement
+    const bpm = Math.round(input.valueAsNumber)
+    // Anything else (empty, out of range) goes back to what the song has
+    if (!(bpm >= BPM_MIN && bpm <= BPM_MAX)) {
+      input.value = Number(this.song?.metadata?.tempo) > 0 ? String(this.song?.metadata?.tempo) : ''
+      return
+    }
+    this.dispatchEvent(new SongCardBpmChangeEvent(bpm))
+  }
+
   _handleKeyEditChange(e: KeyChangeEvent): void {
     e.stopPropagation()
     this.dispatchEvent(new SongCardKeyChangeEvent(e.value))
@@ -565,5 +634,6 @@ declare global {
     [SongCardClickEvent.type]: SongCardClickEvent
     [SongCardDeleteEvent.type]: SongCardDeleteEvent
     [SongCardKeyChangeEvent.type]: SongCardKeyChangeEvent
+    [SongCardBpmChangeEvent.type]: SongCardBpmChangeEvent
   }
 }

@@ -1,12 +1,14 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import {
   OverviewAddSongEvent,
+  OverviewSongBpmChangeEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
   type SetlistOverview,
 } from '../src/components/setlist-overview.ts'
 import {
+  SongCardBpmChangeEvent,
   SongCardClickEvent,
   SongCardDeleteEvent,
   SongCardKeyChangeEvent,
@@ -65,8 +67,13 @@ describe('setlist-overview', () => {
     })
     cardAt(overview, 1).dispatchEvent(new SongCardClickEvent(songs[1]))
     cardAt(overview, 0).dispatchEvent(new SongCardDeleteEvent(songs[0]))
+    overview.addEventListener(OverviewSongBpmChangeEvent.type, event => {
+      const { index, bpm } = event as OverviewSongBpmChangeEvent
+      seen.push(`bpm ${index} ${bpm}`)
+    })
     cardAt(overview, 1).dispatchEvent(new SongCardKeyChangeEvent('E'))
-    expect(seen).to.deep.equal(['click 1', 'delete 0', 'key 1 E'])
+    cardAt(overview, 0).dispatchEvent(new SongCardBpmChangeEvent(88))
+    expect(seen).to.deep.equal(['click 1', 'delete 0', 'key 1 E', 'bpm 0 88'])
   })
 
   it('says when Add Song is pressed', async () => {

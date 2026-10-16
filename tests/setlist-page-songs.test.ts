@@ -590,6 +590,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.page.addSongToSetlist({} as never)
       await rig.page.deleteSongFromSetlist(0)
       await rig.page.changeSongKeyInSetlist(0, 'A')
+      await rig.page.changeSongBpmInSetlist(0, 90)
     })
 
     it('are deleted after asking, and left when not', async () => {

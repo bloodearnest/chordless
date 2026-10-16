@@ -1,6 +1,6 @@
 import { html, LitElement } from 'lit'
 import './icon.ts'
-import type { SongCardKeyChangeEvent } from './song-card.ts'
+import type { SongCardBpmChangeEvent, SongCardKeyChangeEvent } from './song-card.ts'
 
 /** A song's card was clicked; index is its place in the setlist */
 export class OverviewSongClickEvent extends Event {
@@ -31,6 +31,18 @@ export class OverviewSongKeyChangeEvent extends Event {
     super(OverviewSongKeyChangeEvent.type, { bubbles: true, composed: true })
     this.index = index
     this.key = key
+  }
+}
+
+/** A song's tempo was changed */
+export class OverviewSongBpmChangeEvent extends Event {
+  static readonly type = 'setlist-overview:song-bpm-change'
+  readonly index: number
+  readonly bpm: number
+  constructor(index: number, bpm: number) {
+    super(OverviewSongBpmChangeEvent.type, { bubbles: true, composed: true })
+    this.index = index
+    this.bpm = bpm
   }
 }
 
@@ -83,6 +95,7 @@ export class SetlistOverview extends LitElement {
                 @song-card:click=${() => this._handleSongClick(index)}
                 @song-card:delete=${() => this._handleSongDelete(index)}
                 @song-card:key-change=${(e: SongCardKeyChangeEvent) => this._handleSongKeyChange(index, e.key)}
+                @song-card:bpm-change=${(e: SongCardBpmChangeEvent) => this._handleSongBpmChange(index, e.bpm)}
               ></song-card>
             `
           )}
@@ -117,6 +130,10 @@ export class SetlistOverview extends LitElement {
     this.dispatchEvent(new OverviewSongKeyChangeEvent(index, key))
   }
 
+  _handleSongBpmChange(index: number, bpm: number): void {
+    this.dispatchEvent(new OverviewSongBpmChangeEvent(index, bpm))
+  }
+
   _handleAddSong() {
     this.dispatchEvent(new OverviewAddSongEvent())
   }
@@ -135,6 +152,7 @@ declare global {
     [OverviewSongClickEvent.type]: OverviewSongClickEvent
     [OverviewSongDeleteEvent.type]: OverviewSongDeleteEvent
     [OverviewSongKeyChangeEvent.type]: OverviewSongKeyChangeEvent
+    [OverviewSongBpmChangeEvent.type]: OverviewSongBpmChangeEvent
     [OverviewAddSongEvent.type]: OverviewAddSongEvent
   }
 }

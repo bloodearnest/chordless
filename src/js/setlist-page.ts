@@ -19,6 +19,7 @@ import {
 } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
+  OverviewSongBpmChangeEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
@@ -143,6 +144,7 @@ export class SetlistPage {
   _onOverviewAddSong: () => void
   _onLiveChange: () => void
   _onOverviewSongKeyChange: (event: OverviewSongKeyChangeEvent) => void
+  _onOverviewSongBpmChange: (event: OverviewSongBpmChangeEvent) => void
   _reorder: OverviewReorder
   _addSongModal: AddSongModal
 
@@ -239,6 +241,9 @@ export class SetlistPage {
       if (typeof index === 'number' && key) {
         this.changeSongKeyInSetlist(index, key)
       }
+    }
+    this._onOverviewSongBpmChange = (event: OverviewSongBpmChangeEvent) => {
+      this.changeSongBpmInSetlist(event.index, event.bpm)
     }
   }
 
@@ -511,6 +516,10 @@ export class SetlistPage {
         OverviewSongKeyChangeEvent.type,
         this._onOverviewSongKeyChange
       )
+      this._overviewComponent.removeEventListener(
+        OverviewSongBpmChangeEvent.type,
+        this._onOverviewSongBpmChange
+      )
     }
 
     this._overviewComponent = component
@@ -520,6 +529,7 @@ export class SetlistPage {
       component.addEventListener(OverviewSongDeleteEvent.type, this._onOverviewSongDelete)
       component.addEventListener(OverviewAddSongEvent.type, this._onOverviewAddSong)
       component.addEventListener(OverviewSongKeyChangeEvent.type, this._onOverviewSongKeyChange)
+      component.addEventListener(OverviewSongBpmChangeEvent.type, this._onOverviewSongBpmChange)
     }
   }
 
@@ -1841,6 +1851,17 @@ export class SetlistPage {
     if (!setlist?.songs?.[index]) return
 
     setlist.songs[index].key = newKey
+    setlist.modifiedDate = new Date().toISOString()
+    await this._database().saveSetlist(setlist)
+
+    await this.renderSetlist(setlist.id)
+  }
+
+  async changeSongBpmInSetlist(index: number, bpm: number) {
+    const setlist = this.currentSetlist
+    if (!setlist?.songs?.[index]) return
+
+    setlist.songs[index].tempo = bpm
     setlist.modifiedDate = new Date().toISOString()
     await this._database().saveSetlist(setlist)
 

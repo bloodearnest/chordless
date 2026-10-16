@@ -104,7 +104,7 @@ const OVERVIEW: HelpPage = {
           image: 'overview-card-edit',
           wide: true,
           label: 'A song in edit mode',
-          text: 'Each song gets a button to remove it, its key, and a handle to move it by.',
+          text: 'Each song gets a button to remove it, its tempo and key, and a handle to move it by.',
         },
         {
           image: 'overview-reorder',
@@ -115,6 +115,10 @@ const OVERVIEW: HelpPage = {
           image: 'overview-key',
           label: 'Key',
           text: 'Choose the key a song will be played in, for this setlist.',
+        },
+        {
+          label: 'BPM',
+          text: 'Type the tempo a song will be played at, for this setlist.',
         },
         {
           image: 'overview-remove',

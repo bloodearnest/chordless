@@ -13,8 +13,6 @@ editing
   the same idea: a received setlist is kept on the device on its own, so a local key change
   there is harmless and should work too. Nothing is ever uploaded for a reader
 - song notes/stickies
-- setlist overview edit mode should allow bpm changes also.
-
 
 information UI
  - show leader in setlist page

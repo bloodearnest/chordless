@@ -3,6 +3,7 @@ import '../src/components/song-card.ts'
 import { KeyChangeEvent, type KeySelector } from '../src/components/key-selector.ts'
 import {
   type SongCard,
+  SongCardBpmChangeEvent,
   SongCardClickEvent,
   SongCardDeleteEvent,
   SongCardKeyChangeEvent,
@@ -209,6 +210,66 @@ describe('song-card', () => {
       expect(heard).to.deep.equal(['A'])
       document.removeEventListener(KeyChangeEvent.type, listener)
       expect(outside).to.have.length(0)
+    })
+
+    describe('the tempo', () => {
+      const box = (card: SongCard) =>
+        must(card.shadowRoot?.querySelector<HTMLInputElement>('.bpm-edit input'))
+      const type = (card: SongCard, value: string) => {
+        box(card).value = value
+        box(card).dispatchEvent(new Event('change'))
+      }
+      const bpmCard = () =>
+        show({
+          song: song({ metadata: { key: 'G', tempo: 72 } }),
+          editMode: true,
+          variant: 'setlist',
+        })
+
+      it('is a number box in a setlist, showing the song’s tempo', async () => {
+        expect(box(await bpmCard()).value).to.equal('72')
+      })
+
+      it('is not offered in the library, and is empty for a song with none', async () => {
+        const library = await show({ song: song(), editMode: true })
+        expect(library.shadowRoot?.querySelector('.bpm-edit')).to.equal(null)
+        const none = await show({
+          song: song({ metadata: { key: 'G' } }),
+          editMode: true,
+          variant: 'setlist',
+        })
+        expect(box(none).value).to.equal('')
+      })
+
+      it('says the tempo typed as its own event', async () => {
+        const card = await bpmCard()
+        const heard: number[] = []
+        card.addEventListener(SongCardBpmChangeEvent.type, event =>
+          heard.push((event as SongCardBpmChangeEvent).bpm)
+        )
+        type(card, '96')
+        expect(heard).to.deep.equal([96])
+      })
+
+      it('puts back the song’s tempo for one that is out of range or empty', async () => {
+        const card = await bpmCard()
+        const heard: number[] = []
+        card.addEventListener(SongCardBpmChangeEvent.type, event =>
+          heard.push((event as SongCardBpmChangeEvent).bpm)
+        )
+        type(card, '900')
+        expect(box(card).value).to.equal('72')
+        type(card, '')
+        expect(box(card).value).to.equal('72')
+        expect(heard).to.deep.equal([])
+        const none = await show({
+          song: song({ metadata: { key: 'G' } }),
+          editMode: true,
+          variant: 'setlist',
+        })
+        type(none, '5')
+        expect(box(none).value).to.equal('')
+      })
     })
 
     it('does not open the context menu, as a long press on a touch screen would', async () => {

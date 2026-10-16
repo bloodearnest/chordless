@@ -447,6 +447,27 @@ describe('the setlist page', () => {
     })
   })
 
+  describe("changing a song's tempo in the setlist", () => {
+    it('saves the tempo in the setlist entry and shows the song at it', async () => {
+      const setlist = await open()
+
+      await page.changeSongBpmInSetlist(1, 96)
+
+      const saved = must(await db.getSetlist(setlist.id))
+      expect(saved.songs.map(entry => entry.tempo)).to.deep.equal([90, 96, 90])
+      expect(page.songs[1].currentBPM).to.equal(96)
+    })
+
+    it('ignores a song that is not there', async () => {
+      const setlist = await open()
+      const before = must(await db.getSetlist(setlist.id)).modifiedDate
+
+      await page.changeSongBpmInSetlist(7, 96)
+
+      expect(must(await db.getSetlist(setlist.id)).modifiedDate).to.equal(before)
+    })
+  })
+
   describe('re-rendering a song', () => {
     it('shows the setlist key after the entry changes', async () => {
       const setlist = await open()
