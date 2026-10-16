@@ -605,7 +605,6 @@ body.edit-mode .edit-mode-control {
 }
 
 /* For flex containers (divs, buttons with flex layout) */
-body.edit-mode .font-size-controls,
 body.edit-mode .reset-button {
   display: flex;
 }
@@ -621,7 +620,6 @@ body.edit-mode .edit-mode-control.fade-in {
 }
 
 /* For flex containers during fade out */
-.font-size-controls:not(.fade-in),
 .reset-button:not(.fade-in) {
   display: flex;
 }
@@ -775,43 +773,6 @@ body.edit-mode .key-selector:focus {
   font-size: var(--font-ui);
   color: rgba(255, 255, 255, 0.5);
   margin-left: 1rem;
-}
-
-.font-size-controls {
-  align-items: center;
-  gap: 0.3rem;
-}
-
-.font-size-btn {
-  background: none;
-  border: 2px solid var(--header-text);
-  color: var(--header-text);
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: var(--font-ui);
-  font-weight: bold;
-  transition:
-    opacity 0.25s ease-in-out,
-    background-color 0.2s,
-    transform 0.2s,
-    border-color 0.2s,
-    color 0.2s;
-}
-
-.font-size-btn:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
-}
-
-.font-size-btn:active {
-  background-color: var(--button-bg);
-  border-color: var(--button-bg);
-  color: white;
 }
 
 .reset-button {

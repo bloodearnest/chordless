@@ -234,25 +234,6 @@ describe('the library view', () => {
       expect(visited).to.deep.equal([])
     })
 
-    it('has its font made larger and smaller, within limits', async () => {
-      const song = await addChart(db, ALPHA, ADD)
-      await open({ name: 'songs', songUuid: song.uuid })
-      const size = () => must(view.querySelector<HTMLElement>('.song-content')).style.fontSize
-      const start = size()
-      view.querySelector<HTMLButtonElement>('#library-font-size-increase')?.click()
-      expect(size()).to.not.equal(start)
-      for (let i = 0; i < 100; i++)
-        view.querySelector<HTMLButtonElement>('#library-font-size-increase')?.click()
-      const largest = size()
-      view.querySelector<HTMLButtonElement>('#library-font-size-increase')?.click()
-      expect(size()).to.equal(largest)
-      for (let i = 0; i < 200; i++)
-        view.querySelector<HTMLButtonElement>('#library-font-size-decrease')?.click()
-      const smallest = size()
-      view.querySelector<HTMLButtonElement>('#library-font-size-decrease')?.click()
-      expect(size()).to.equal(smallest)
-    })
-
     it('shows what is known of it in the info dialog', async () => {
       const song = await addChart(db, ALPHA, ADD)
       await open({ name: 'songs', songUuid: song.uuid })

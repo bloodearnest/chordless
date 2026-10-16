@@ -23,6 +23,33 @@ test.describe('Song library', () => {
       await expect(firstChord).toHaveText(key)
     }
   })
+
+  test('the reset button is there in edit mode only, and puts the song back in its key', async ({
+    page,
+  }) => {
+    await seedSong(page)
+    await page.goto('/songs/info-test-song')
+    await page.reload()
+    const header = page.locator('#library-app-header')
+    await expect(header).toContainText('Info Test Song')
+    const reset = page.locator('#library-reset-button')
+    const key = page.locator('#library-key-selector').getByRole('button', { name: /^Key/ })
+    await expect(reset).toBeHidden()
+
+    await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+    await expect(reset).toBeVisible()
+    await expect(reset).toHaveCSS('opacity', '1')
+
+    await key.click()
+    await page.locator('#library-key-selector').getByRole('option', { name: /^A\s/ }).click()
+    await expect(key).toHaveText('A')
+    await reset.click()
+    await page.getByRole('button', { name: 'Reset', exact: true }).click()
+    await expect(key).toHaveText('G')
+
+    await header.getByRole('button', { name: 'Toggle edit mode' }).click()
+    await expect(reset).toBeHidden()
+  })
 })
 
 test.describe('Song library navigation', () => {

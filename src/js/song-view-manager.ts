@@ -17,28 +17,6 @@ import type { LibrarySong } from './models/library-song.ts'
  * - Works for both MPA and future SPA architecture
  */
 
-// Configuration constants
-const CONFIG = {
-  // Font sizes
-  DEFAULT_FONT_SIZE: 1.6, // rem
-  MIN_FONT_SIZE: 0.8, // rem
-  MAX_FONT_SIZE: 3.0, // rem
-  FONT_SIZE_STEP: 0.1, // rem
-
-  // Drag and drop
-  POSITION_THRESHOLD: 20, // px - minimum movement to change target position
-  DRAG_START_THRESHOLD: 5, // px - movement before starting drag
-
-  // Scrolling
-  KEYBOARD_SCROLL_AMOUNT: 200, // px - scroll distance for up/down arrows
-
-  // Intersection Observer
-  VISIBILITY_THRESHOLD: 0.5, // 50% - section must be this visible to be considered "current"
-
-  // Import
-  DEFAULT_IMPORT_CUTOFF: '2000-01-01', // Default date for importing setlists (imports all)
-}
-
 /**
  * Render a song view into a container
  *
@@ -115,8 +93,3 @@ export function initializeSongSections(
     section.editMode = editMode
   })
 }
-
-/**
- * Default configuration
- */
-export { CONFIG }

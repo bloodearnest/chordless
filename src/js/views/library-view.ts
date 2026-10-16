@@ -49,8 +49,6 @@ import { getAvailableKeys, transposeSong } from '../transpose.ts'
 import { filterSongs } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
 
-const { CONFIG } = SongViewManager
-
 export class LibraryView extends PageView {
   static override properties = {
     ...PageView.properties,
@@ -79,7 +77,6 @@ export class LibraryView extends PageView {
   #song: SongWithContent | null = null
   #parsed: ParsedChart | null = null
   #key: string | undefined = undefined
-  #fontSize = CONFIG.DEFAULT_FONT_SIZE
   #syncing = 0
 
   constructor() {
@@ -250,9 +247,13 @@ export class LibraryView extends PageView {
   #showSongControls(show: boolean): void {
     this.#display('library-key-selector', show ? '' : 'none')
     this.#display('library-song-meta-header', show ? 'flex' : 'none')
-    // Shown by edit mode
-    this.#display('library-reset-button', 'none')
-    this.#display('library-font-size-controls', 'none')
+    this.#showResetButton(show && this.#editMode)
+  }
+
+  /** The reset button is for edit mode, with a song open: it fades in with the page's CSS */
+  #showResetButton(show: boolean): void {
+    this.#display('library-reset-button', show ? '' : 'none')
+    this.#control('library-reset-button')?.classList.toggle('fade-in', show)
   }
 
   // ==================== Single song ====================
@@ -282,9 +283,6 @@ export class LibraryView extends PageView {
     if (metaHeader) metaHeader.textContent = meta.join(' • ')
 
     await this.#renderSong(parsed, song)
-
-    this.#fontSize ||= CONFIG.DEFAULT_FONT_SIZE
-    this.#applyFontSize()
 
     this.#suppressScrollResetTemporarily()
     this.#scrollTo(this.#songView.value)
@@ -323,6 +321,7 @@ export class LibraryView extends PageView {
     if (header) header.editMode = on
     const keySelector = this.#control<KeySelector>('library-key-selector')
     if (keySelector) keySelector.editMode = on
+    this.#showResetButton(on && this.#song !== null)
     this.#sections().forEach(section => {
       section.editMode = on
     })
@@ -419,22 +418,6 @@ export class LibraryView extends PageView {
     this.#key = targetKey
 
     await this.#renderSong(parsed, this.#song as SongWithContent)
-    this.#applyFontSize()
-  }
-
-  // ==================== Font size ====================
-
-  #changeFontSize(delta: number): void {
-    this.#fontSize = Math.min(
-      CONFIG.MAX_FONT_SIZE,
-      Math.max(CONFIG.MIN_FONT_SIZE, this.#fontSize + delta)
-    )
-    this.#applyFontSize()
-  }
-
-  #applyFontSize(): void {
-    const songContent = this.#content.value?.querySelector<HTMLElement>('.song-content')
-    if (songContent) songContent.style.fontSize = `${this.#fontSize}rem`
   }
 
   // ==================== Sections ====================
@@ -498,12 +481,11 @@ export class LibraryView extends PageView {
     if (!(await this.#resetModal.value?.ask())) return
     if (!this.#parsed || !this.#song) return
 
-    // Back to the key it was imported in, and the default size. Drawing the song starts its
+    // Back to the key it was imported in. Drawing the song starts its
     // sections from what is saved, so forget that first: they start as the defaults
     const db = await getCurrentDB()
     setSongUserPref(this.#song.id, db.organisationId, 'sectionDefaults', undefined)
     const originalKey = this.#song.originalKey || this.#parsed.metadata.key
-    this.#fontSize = CONFIG.DEFAULT_FONT_SIZE
     await this.#renderInKey(originalKey || undefined)
     if (originalKey) this.#updateKeySelector(originalKey)
     await this.#saveSong()
@@ -567,28 +549,6 @@ export class LibraryView extends PageView {
           >
             ↺
           </button>
-          <div
-            class="font-size-controls edit-mode-control"
-            id="library-font-size-controls"
-            style="display: none"
-          >
-            <button
-              class="font-size-btn"
-              id="library-font-size-decrease"
-              aria-label="Decrease font size"
-              @click=${() => this.#changeFontSize(-CONFIG.FONT_SIZE_STEP)}
-            >
-              A−
-            </button>
-            <button
-              class="font-size-btn"
-              id="library-font-size-increase"
-              aria-label="Increase font size"
-              @click=${() => this.#changeFontSize(CONFIG.FONT_SIZE_STEP)}
-            >
-              A+
-            </button>
-          </div>
           <key-selector
             id="library-key-selector"
             label="Key"
@@ -664,7 +624,7 @@ export class LibraryView extends PageView {
         id="library-reset-confirm-modal"
         type="confirm"
         heading="Reset Song?"
-        message="This will reset the key, BPM, font size, and all section states back to defaults. This cannot be undone."
+        message="This will reset the key and all section states back to defaults. This cannot be undone."
         confirm-label="Reset"
         cancel-label="Cancel"
         ${ref(this.#resetModal)}

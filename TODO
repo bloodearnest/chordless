@@ -37,10 +37,6 @@ help
   time has no pictures. If that matters, a "Help downloaded" step after first load would do
 
 bugs
-- the song library's font size (A-/A+) and reset buttons never show in edit mode: library-view.ts
-  sets them to display: none inline (#showSongControls), which the `body.edit-mode` rule in
-  style.css cannot override. Either show them from edit mode, or remove them and their code. The
-  help leaves them out until this is decided
 - tests are checked with strict on except noImplicitAny (tsconfig.tests.json, tsconfig.node.json):
   about 1,000 untyped helper parameters and `let`s remain. Turn it on file by file (it was 721
   errors in 50 files when tried); typed builders (tests/builders.ts) and must() are in place
