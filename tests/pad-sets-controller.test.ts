@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { LitElement } from 'lit'
 import { ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
+import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
   getActivePadSet,
   listPadSets,
@@ -50,7 +51,7 @@ describe('PadSetsController', () => {
   it('loads the pad sets when its host connects', async () => {
     const padSets = await setUp()
     expect(padSets.loading).to.equal(false)
-    expect(padSets.list.map(set => set.id)).to.include('builtin')
+    expect(padSets.list).to.deep.equal([])
     expect(padSets.activeId).to.be.a('string')
   })
 
@@ -70,7 +71,7 @@ describe('PadSetsController', () => {
     padSets.list = []
     window.dispatchEvent(new PadSetListUpdatedEvent())
     await settle()
-    expect(padSets.list.map(set => set.id)).to.include('builtin')
+    expect(padSets.list).to.deep.equal([])
   })
 
   it('stops listening when its host disconnects', async () => {
@@ -85,7 +86,20 @@ describe('PadSetsController', () => {
     const padSets = await setUp()
     padSets.activeId = 'drive-gone'
     await padSets.load()
-    expect(padSets.activeId).to.equal(getActivePadSet().id)
+    expect(padSets.activeId).to.equal(getActivePadSet()?.id ?? '')
+  })
+
+  it('starts with the pad set chosen on this device, and goes back to it', async () => {
+    localStorage.setItem('padset-selection', JSON.stringify({ id: 'drive-chosen', name: 'Chosen' }))
+    try {
+      const padSets = await setUp()
+      expect(padSets.activeId).to.equal('drive-chosen')
+      padSets.activeId = 'drive-gone'
+      await padSets.load()
+      expect(padSets.activeId).to.equal('drive-chosen')
+    } finally {
+      localStorage.removeItem('padset-selection')
+    }
   })
 
   describe('choosing a pad set', () => {
@@ -99,9 +113,15 @@ describe('PadSetsController', () => {
     })
 
     it('shows the chosen set as active, and is not switching once it is', async () => {
+      drive = installFakeDrive()
+      const folderId = await ensurePadSetFolder('A whole set')
+      for (const key of PAD_FILE_KEYS) {
+        await uploadPadFile(folderId, key, new Blob([new Uint8Array([1])], { type: 'audio/mpeg' }))
+      }
       const padSets = await setUp()
-      await padSets.select('builtin')
-      expect(padSets.activeId).to.equal('builtin')
+      await padSets.load(true)
+      await padSets.select(folderId)
+      expect(padSets.activeId).to.equal(folderId)
       expect(padSets.switching).to.equal(false)
       expect(padSets.error).to.equal('')
     })

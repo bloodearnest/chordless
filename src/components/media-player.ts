@@ -120,7 +120,7 @@ export class MediaPlayer extends LitElement {
   declare _metronomeRunning: boolean
   declare _padLoadFailed: boolean
   declare _isPadLoading: boolean
-  declare _activePadSet: PadSet
+  declare _activePadSet: PadSet | null
 
   bpm: number
   tempoNote: string
@@ -341,11 +341,12 @@ export class MediaPlayer extends LitElement {
   /**
    * The pad set for the song being viewed: this user's own choice for it if that is still
    * there (a Drive pad set may not be on this device), else the one chosen for the device
+   * (null if there is none: pads are off until a pad set has been uploaded)
    */
   async _updatePadSetForSong(): Promise<void> {
     let padSet = getActivePadSet()
     const ownId = this._currentPadSetId
-    if (ownId && ownId !== padSet.id) {
+    if (ownId && ownId !== padSet?.id) {
       const own = (await listPadSets()).find(set => set.id === ownId)
       if (own) padSet = own
     }
@@ -617,7 +618,7 @@ export class MediaPlayer extends LitElement {
     // A different key, or this song's own pad set, is a different pad to play
     const needsKeyChange =
       oldActiveKey &&
-      (oldActiveKey !== this.currentKey || (oldPadSetId && oldPadSetId !== this._activePadSet.id))
+      (oldActiveKey !== this.currentKey || (oldPadSetId && oldPadSetId !== this._activePadSet?.id))
     const needsTempoChange =
       oldActiveBpm &&
       (this._activeSongBpm !== this._currentBpm ||
@@ -640,7 +641,7 @@ export class MediaPlayer extends LitElement {
     this._activeSongTimeSignature = this._currentTimeSignature
     this._activeDoubleClick = doubleClick
     this._activeDoubleClickChoice = this._currentDoubleClick
-    this._loadedPadSetId = this._activePadSet.id
+    this._loadedPadSetId = this._activePadSet?.id
     this._activeSongTitle = this._currentSongTitle
 
     // Handle click immediately so metronome isn't blocked by pad loading
@@ -765,7 +766,7 @@ export class MediaPlayer extends LitElement {
       this._activeDoubleClick ===
         this._doubleClickFor(this._currentBpm, this._currentDoubleClick) &&
       // A song with a pad set of its own is not the one playing, even in the same key
-      (this._loadedPadSetId === undefined || this._loadedPadSetId === this._activePadSet.id)
+      (this._loadedPadSetId === undefined || this._loadedPadSetId === this._activePadSet?.id)
     )
   }
 
@@ -955,7 +956,13 @@ export class MediaPlayer extends LitElement {
     const showPadError = this._padLoadFailed && !!this._activeSongKey
     const activeKeyDisplay = showPadError
       ? html`
-          <help-tooltip message="Could not load pad sound for this key">
+          <help-tooltip
+            message=${
+              this._activePadSet
+                ? 'Could not load pad sound for this key'
+                : 'No pad set yet: upload one in Storage'
+            }
+          >
             ${this._activeSongKey}!
           </help-tooltip>
         `

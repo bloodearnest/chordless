@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { loadMediaSettings, type MediaSettings, saveMediaSettings } from '../js/media-settings.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
 import { fieldStyles, switchStyles } from './shared-styles.ts'
@@ -263,7 +263,13 @@ export class MediaPlayerSettings extends LitElement {
           >
             <div style="flex: 1;">
               <label class="setting-label" for="padset-select">Pad Sound Set</label>
-              <div class="setting-description">Select which pad audio library to use</div>
+              <div class="setting-description">
+                ${
+                  this._padSets.list.length || this._padSets.loading
+                    ? 'Select which pad audio library to use'
+                    : html`Chordless has no pads of its own: upload a set you own in <a href="/storage">Storage</a>`
+                }
+              </div>
               <select
                 id="padset-select"
                 name="padset-select"
@@ -276,14 +282,21 @@ export class MediaPlayerSettings extends LitElement {
                   // select's value before rendering its options, so a value whose
                   // option is new in this render was ignored
                   this._padSets.list.length
-                    ? this._padSets.list.map(
-                        set => html`
-                          <option value=${set.id} .selected=${set.id === this._padSets.activeId}>
-                            ${set.name}
-                          </option>
-                        `
-                      )
-                    : html`<option value="builtin">Built-in Pads</option>`
+                    ? html`
+                        ${
+                          this._padSets.activeId
+                            ? nothing
+                            : html`<option value="" selected disabled>Choose a pad set</option>`
+                        }
+                        ${this._padSets.list.map(
+                          set => html`
+                            <option value=${set.id} .selected=${set.id === this._padSets.activeId}>
+                              ${set.name}
+                            </option>
+                          `
+                        )}
+                      `
+                    : html`<option value="" selected disabled>No pad sets yet</option>`
                 }
               </select>
               ${

@@ -24,6 +24,7 @@ import { errorMessage } from './utils/errors.ts'
 export class PadSetsController implements ReactiveController {
   host: ReactiveControllerHost
   list: PadSet[]
+  /** The chosen pad set's id; '' if none is chosen */
   activeId: string
   loading: boolean
   switching: boolean
@@ -34,14 +35,14 @@ export class PadSetsController implements ReactiveController {
   constructor(host: ReactiveControllerHost) {
     this.host = host
     this.list = []
-    this.activeId = getActivePadSet().id
+    this.activeId = getActivePadSet()?.id ?? ''
     this.loading = true
     this.switching = false
     this.error = ''
     this._onListUpdated = () => this.load(true)
     this._onChanged = event => {
       const padSet = event instanceof PadSetChangedEvent ? event.padSet : undefined
-      this.activeId = padSet?.id ?? getActivePadSet().id
+      this.activeId = padSet?.id ?? ''
       this.host.requestUpdate()
     }
     host.addController(this)
@@ -63,10 +64,10 @@ export class PadSetsController implements ReactiveController {
     this.loading = true
     this.error = ''
     this.host.requestUpdate()
-    // (listPadSets does not fail: a list it cannot get from Drive is just the built-in set)
+    // (listPadSets does not fail: a list it cannot get from Drive is just empty)
     this.list = await listPadSets(force)
     if (!this.list.some(set => set.id === this.activeId)) {
-      this.activeId = getActivePadSet().id
+      this.activeId = getActivePadSet()?.id ?? ''
     }
     this.loading = false
     this.host.requestUpdate()

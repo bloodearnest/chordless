@@ -423,35 +423,7 @@ export function startServiceWorker(
       return
     }
 
-    // Pad audio files - cache on demand for offline use
-    if (url.pathname.startsWith('/pads/') && url.pathname.endsWith('.mp3')) {
-      event.respondWith(
-        caches.match(event.request).then(cached => {
-          if (cached) {
-            return cached
-          }
-
-          // Not cached, fetch and cache it
-          return doFetch(event.request)
-            .then(response => {
-              // Only cache full responses (200), not partial responses (206)
-              if (response.ok && response.status === 200) {
-                const responseToCache = response.clone()
-                caches.open(RUNTIME_CACHE_NAME).then(cache => {
-                  cache.put(event.request, responseToCache)
-                })
-              }
-              return response
-            })
-            .catch(error => {
-              console.error('[SW] Failed to fetch pad:', url.pathname, error)
-              throw error
-            })
-        })
-      )
-      return
-    }
-
+    // The pads of a pad set the user uploaded: only what the app kept
     if (url.pathname.startsWith('/pad-sets/')) {
       event.respondWith(
         caches.open(PAD_CACHE_NAME).then(async cache => {

@@ -121,21 +121,21 @@ describe("the media player and this user's choices for a song", () => {
   })
 
   describe('the pad set', () => {
-    it("is the device's own unless the song has one", async () => {
+    it('is none until a pad set has been uploaded', async () => {
       await player._handleSongChange(new SongChangeEvent(song(100)))
-      expect(player._activePadSet.id).to.equal('builtin')
+      expect(player._activePadSet).to.equal(null)
     })
 
     it("falls back to the device's own when the song's is not on this device", async () => {
       await player._handleSongChange(
         new SongChangeEvent(song(100), { padSetId: 'drive-gone-missing' })
       )
-      expect(player._activePadSet.id).to.equal('builtin')
+      expect(player._activePadSet).to.equal(null)
     })
 
     it("does not change a song's pad set when the device's changes", async () => {
-      await player._handleSongChange(new SongChangeEvent(song(100), { padSetId: 'builtin' }))
-      expect(player._currentPadSetId).to.equal('builtin')
+      await player._handleSongChange(new SongChangeEvent(song(100), { padSetId: 'drive-pads' }))
+      expect(player._currentPadSetId).to.equal('drive-pads')
     })
   })
 })

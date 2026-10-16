@@ -79,21 +79,16 @@ describe('pad sets in Drive', () => {
   }
 
   describe('the list of sets', () => {
-    it('is the built-in set, then each pad set folder in Drive', async () => {
+    it('is each pad set folder in Drive, and nothing else: the app has none', async () => {
       const padSet = await makeDrivePadSet()
       const sets = await listPadSets(true)
-      expect(sets.map(s => [s.type, s.name])).to.deep.equal([
-        ['builtin', 'Built-in Pads'],
-        ['drive', padSet.name],
-      ])
-      expect(sets[1].id).to.equal(padSet.id)
+      expect(sets.map(s => [s.id, s.name])).to.deep.equal([[padSet.id, padSet.name]])
     })
 
-    it('is just the built-in set when Drive cannot be listed', async () => {
+    it('is empty when Drive cannot be listed', async () => {
       await makeDrivePadSet()
       drive.failRequests({ method: 'GET', path: /\/files\?q=/, times: 10 })
-      const sets = await listPadSets(true)
-      expect(sets.map(s => s.type)).to.deep.equal(['builtin'])
+      expect(await listPadSets(true)).to.deep.equal([])
     })
   })
 
@@ -101,7 +96,7 @@ describe('pad sets in Drive', () => {
     it('is remembered, and announced', async () => {
       const padSet = await makeDrivePadSet()
       await listPadSets(true)
-      const announced: PadSet[] = []
+      const announced: (PadSet | null)[] = []
       const listener = (event: Event) => announced.push((event as PadSetChangedEvent).padSet)
       window.addEventListener(PadSetChangedEvent.type, listener)
       try {
@@ -109,15 +104,18 @@ describe('pad sets in Drive', () => {
       } finally {
         window.removeEventListener(PadSetChangedEvent.type, listener)
       }
-      expect(getActivePadSet().id).to.equal(padSet.id)
-      expect(announced.map(s => s.id)).to.deep.equal([padSet.id])
+      expect(getActivePadSet()?.id).to.equal(padSet.id)
+      expect(announced.map(s => s?.id)).to.deep.equal([padSet.id])
     })
 
-    it('falls back to the built-in set for one that is gone', async () => {
+    it('refuses one that is gone, and keeps the old choice', async () => {
       await listPadSets(true)
-      const chosen = await selectPadSet('no-such-folder')
-      expect(chosen.type).to.equal('builtin')
-      expect(getActivePadSet().type).to.equal('builtin')
+      let error: Error | null = null
+      await selectPadSet('no-such-folder').catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.include('no longer in Google Drive')
+      expect(getActivePadSet()).to.equal(null)
     })
 
     it('refuses a Drive set that is missing a key, and keeps the old choice', async () => {
@@ -128,7 +126,7 @@ describe('pad sets in Drive', () => {
         error = e
       })
       expect((error as Error | null)?.message).to.include('missing files for: F#')
-      expect(getActivePadSet().type).to.equal('builtin')
+      expect(getActivePadSet()).to.equal(null)
     })
   })
 
@@ -208,6 +206,13 @@ describe('pad sets in Drive', () => {
       expect((error as Error | null)?.message).to.include('missing files for: C#')
     })
 
+    it('has nothing to keep for no key', async () => {
+      const padSet = await makeDrivePadSet()
+      const before = drive.requests.length
+      await ensurePadKeyCached(padSet, '')
+      expect(drive.requests).to.have.length(before)
+    })
+
     it('refuses a key that is not one', async () => {
       const padSet = await makeDrivePadSet()
       let failed = false
@@ -217,17 +222,15 @@ describe('pad sets in Drive', () => {
       expect(failed).to.equal(true)
     })
 
-    it('has nothing to keep for the built-in set, which is part of the app', async () => {
-      const builtin = makePadSet({ id: 'builtin', type: 'builtin' })
-      await ensurePadKeyCached(builtin, 'C')
+    it('has nothing to keep with no pad set', async () => {
+      expect(await isPadKeyCached(null, 'C')).to.equal(false)
       expect(drive.requests).to.have.length(0)
-      expect(await isPadKeyCached(builtin, 'C')).to.equal(false)
     })
   })
 
   describe('fetching ahead', () => {
-    it('does nothing for the built-in set', () => {
-      expect(preloadPadKeys(['C', 'D'], makePadSet({ id: 'builtin', type: 'builtin' }))).to.equal(0)
+    it('does nothing with no pad set', () => {
+      expect(preloadPadKeys(['C', 'D'], null)).to.equal(0)
     })
   })
 
@@ -259,12 +262,8 @@ describe('pad sets in Drive', () => {
       expect(pads.isLoading).to.equal(false)
     })
 
-    it('is the built-in file for the built-in set', async () => {
-      const url = await controller()._resolvePadUrl(
-        'Bb',
-        makePadSet({ id: 'builtin', type: 'builtin' })
-      )
-      expect(url).to.include('/pads/A%23')
+    it('is nothing with no pad set: the app ships none', async () => {
+      expect(await controller()._resolvePadUrl('Bb', null)).to.equal(null)
       expect(drive.requests).to.have.length(0)
     })
   })
@@ -298,12 +297,28 @@ describe('pad sets in Drive', () => {
 
       const padSet = await uploadPadSet(zip)
 
-      expect(padSet).to.deep.equal({ id: padSet.id, name: 'Warm Pad Set', type: 'drive' })
+      expect(padSet).to.deep.equal({ id: padSet.id, name: 'Warm Pad Set' })
+      // the first set uploaded is the one in use: there is no other
+      expect(getActivePadSet()?.id).to.equal(padSet.id)
       const files = filesIn(padSet.id)
       expect(Object.keys(files).sort()).to.deep.equal(allKeys.map(key => `${key}.mp3`).sort())
       for (const key of allKeys) {
         expect(files[`${key}.mp3`], key).to.deep.equal(audioOf(`Pads/Warm Pad - ${key}.mp3`))
       }
+    })
+
+    it('keeps the pads of a set that Drive gave no modified time for, as of when they were listed', async () => {
+      // (uploading forgets anything kept under the set's id, which a fake Drive repeats; and a
+      // set already in use means the upload does not choose this one, which would list it)
+      localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
+      const padSet = await uploadPadSet(await buildZip(entriesFor(allKeys), 'Fresh.zip'))
+      await caches.delete(PAD_CACHE_NAME)
+
+      await ensurePadKeyCached({ id: padSet.id, name: padSet.name }, 'C')
+
+      expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
+      const kept = JSON.parse(localStorage.getItem('padset-cache-state') ?? '{}')[padSet.id]
+      expect(Date.now() - Date.parse(kept.modifiedTime)).to.be.below(60_000)
     })
 
     it('names a set by its file: without the extension, with spaces for dashes and underscores', () => {
@@ -314,6 +329,8 @@ describe('pad sets in Drive', () => {
     })
 
     it('is listed once for two askers at the same time, after an upload cleared the list', async () => {
+      // (a set already in use, so the upload does not choose its set, and list the sets again)
+      localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
       await uploadPadSet(await buildZip(entriesFor(allKeys), 'Listed.zip'))
       const listings = () =>
         drive.requests.filter((r: any) => r.method === 'GET' && r.params?.has('q')).length
@@ -466,9 +483,9 @@ describe('pad sets in Drive', () => {
   })
 
   describe('when what it kept is damaged, or the browser lacks a cache', () => {
-    it('is the built-in set when the remembered choice is not readable', () => {
+    it('is no set when the remembered choice is not readable', () => {
       localStorage.setItem('padset-selection', '{not json')
-      expect(getActivePadSet().type).to.equal('builtin')
+      expect(getActivePadSet()).to.equal(null)
     })
 
     it('lists the set again when what it kept of the sets is not readable', async () => {

@@ -47,10 +47,7 @@ describe('media-player-settings', () => {
     await new Promise(resolve => setTimeout(resolve, 50))
 
     // As if the pad sets just loaded, with Warm Pads the active one
-    settings._padSets.list = [
-      { id: 'builtin', name: 'Built-in Pads' },
-      { id: 'drive-warm', name: 'Warm Pads' },
-    ]
+    settings._padSets.list = [{ id: 'drive-warm', name: 'Warm Pads' }]
     settings._padSets.activeId = 'drive-warm'
     settings.requestUpdate()
     await settings.updateComplete
@@ -130,10 +127,7 @@ describe('media-player-settings', () => {
   it('switches to the pad set chosen', async () => {
     await show()
     const chosen: string[] = []
-    settings._padSets.list = [
-      { id: 'builtin', name: 'Built-in Pads' },
-      { id: 'drive-warm', name: 'Warm Pads' },
-    ]
+    settings._padSets.list = [{ id: 'drive-warm', name: 'Warm Pads' }]
     settings._padSets.select = async (id: string) => {
       chosen.push(id)
     }
@@ -149,10 +143,10 @@ describe('media-player-settings', () => {
   it('puts the pad set selection back when a pad set cannot be switched to', async () => {
     await show()
     settings._padSets.list = [
-      { id: 'builtin', name: 'Built-in Pads' },
+      { id: 'drive-cold', name: 'Cold Pads' },
       { id: 'drive-warm', name: 'Warm Pads' },
     ]
-    settings._padSets.activeId = 'builtin'
+    settings._padSets.activeId = 'drive-cold'
     settings._padSets.select = async () => {
       throw new Error('no network')
     }
@@ -162,7 +156,7 @@ describe('media-player-settings', () => {
     select.value = 'drive-warm'
     select.dispatchEvent(new Event('change'))
     await new Promise(resolve => setTimeout(resolve, 20))
-    expect(select.value).to.equal('builtin')
+    expect(select.value).to.equal('drive-cold')
     localStorage.removeItem('media-settings')
   })
 })

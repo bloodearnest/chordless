@@ -82,7 +82,6 @@ export const makeSong = (overrides: Partial<SongInput> = {}): SongInput => ({
 export const makePadSet = (overrides: Partial<PadSet> = {}): PadSet => ({
   id: 'drive-pads',
   name: 'Pads',
-  type: 'drive',
   ...overrides,
 })
 

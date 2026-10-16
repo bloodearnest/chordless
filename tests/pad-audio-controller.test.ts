@@ -1,10 +1,14 @@
 import { expect } from '@open-wc/testing'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
+import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
+import { getPadCacheUrl, type PadSet } from '../src/js/pad-set-service.ts'
 import { installFakeTimers, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
+
+const realSetTimeout = window.setTimeout.bind(window)
 
 /** An audio element that plays at once, and tells its listeners what happens to it */
 class MockAudio {
@@ -95,6 +99,9 @@ class MockAudioContext {
   }
 }
 
+/** A pad set whose pads the app has already kept, so loading one needs no Drive */
+const PADS: PadSet = { id: 'pads', name: 'Pads' }
+
 describe('PadAudioController', () => {
   const realAudio = window.Audio
   let audios: MockAudio[]
@@ -118,15 +125,20 @@ describe('PadAudioController', () => {
     window.Audio = realAudio
   })
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    const kept = await caches.open('padsets-cache-v1')
+    for (const key of PAD_FILE_KEYS) {
+      await kept.put(getPadCacheUrl(PADS.id, key), new Response('pad'))
+    }
     audios = []
     MockAudio.failPlay = false
     context = new MockAudioContext()
     clock = installFakeTimers()
   })
 
-  afterEach(() => {
+  afterEach(async () => {
     clock.uninstall()
+    await caches.delete('padsets-cache-v1')
   })
 
   const make = () =>
@@ -135,7 +147,7 @@ describe('PadAudioController', () => {
   /** A controller with a pad loaded and faded in all the way */
   async function playing() {
     const controller = make()
-    await controller.loadPad('C')
+    await controller.loadPad('C', PADS)
     await controller.play()
     await clock.tick(FADE)
     return controller
@@ -150,18 +162,25 @@ describe('PadAudioController', () => {
 
     it('loads the pad for a key, looping, and remembers the key', async () => {
       const controller = make()
-      expect(await controller.loadPad('C')).to.equal(true)
+      expect(await controller.loadPad('C', PADS)).to.equal(true)
       expect(controller.currentKey).to.equal('C')
       expect(controller.loadFailed).to.equal(false)
       expect(audios).to.have.length(1)
-      expect(audios[0].src).to.include('/pads/C - WARM')
+      expect(audios[0].src).to.include('/pad-sets/pads/C.mp3')
       expect(audios[0].loop).to.equal(true)
     })
 
     it('uses the pad file of the sharp for a flat key', async () => {
       const controller = make()
-      await controller.loadPad('Bb')
-      expect(audios[0].src).to.include('/pads/A%23')
+      await controller.loadPad('Bb', PADS)
+      expect(audios[0].src).to.include('/pad-sets/pads/A%23.mp3')
+    })
+
+    it('has no pad to load without a pad set: the app ships none', async () => {
+      const controller = make()
+      expect(await controller.loadPad('C')).to.equal(false)
+      expect(controller.loadFailed).to.equal(true)
+      expect(audios[0].src).to.equal('')
     })
 
     it('does nothing without a key', async () => {
@@ -172,8 +191,8 @@ describe('PadAudioController', () => {
 
     it('says so when there is no pad for the key, and clears the old one', async () => {
       const controller = make()
-      await controller.loadPad('C')
-      expect(await controller.loadPad('xyz')).to.equal(false)
+      await controller.loadPad('C', PADS)
+      expect(await controller.loadPad('xyz', PADS)).to.equal(false)
       expect(controller.loadFailed).to.equal(true)
       expect(audios[0].src).to.equal('')
     })
@@ -182,7 +201,7 @@ describe('PadAudioController', () => {
   describe('playing', () => {
     it('starts silent and fades in on a curve that eases up to the volume', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       const gain = context.gains[0]
       await controller.play()
       expect(audios[0].paused).to.equal(false)
@@ -199,7 +218,7 @@ describe('PadAudioController', () => {
 
     it('takes a duration for one fade, not the usual', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play(200)
       await clock.tick(201)
       expect(context.gains[0].gain.value).to.equal(VOLUME)
@@ -217,7 +236,7 @@ describe('PadAudioController', () => {
 
     it('wakes a suspended audio context first', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       context.state = 'suspended'
       await controller.play()
       expect(context.resumed).to.equal(1)
@@ -225,7 +244,7 @@ describe('PadAudioController', () => {
 
     it('waits for the audio to start, but not for ever', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       // An element that is slow to start: it never says "playing"
       const play = audios[0].play.bind(audios[0])
       audios[0].play = async () => {
@@ -253,7 +272,7 @@ describe('PadAudioController', () => {
 
     it('marks the load as failed if the browser will not play it', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       MockAudio.failPlay = true
       const error = console.error
       console.error = () => {}
@@ -283,7 +302,7 @@ describe('PadAudioController', () => {
 
     it('starts from where a fade in had got to, with no jump', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play()
       await clock.tick(FADE / 2)
       const gain = context.gains[0]
@@ -314,7 +333,7 @@ describe('PadAudioController', () => {
 
     it('leaves a fade to finish at the new volume', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play()
       await clock.tick(FADE / 2)
       const before = context.gains[0].gain.value
@@ -331,10 +350,10 @@ describe('PadAudioController', () => {
       const [oldGain] = context.gains
       const [oldAudio] = audios
 
-      await controller.crossfadeTo('G')
+      await controller.crossfadeTo('G', PADS)
       expect(controller.currentKey).to.equal('G')
       expect(audios).to.have.length(2)
-      expect(audios[1].src).to.include('/pads/G - WARM')
+      expect(audios[1].src).to.include('/pad-sets/pads/G.mp3')
       expect(audios[1].paused).to.equal(false)
       const newGain = context.gains[1]
 
@@ -354,7 +373,7 @@ describe('PadAudioController', () => {
     it('fades the old pad out, and says so, when the new key has no pad', async () => {
       const controller = await playing()
       const [oldGain] = context.gains
-      const fading = controller.crossfadeTo('xyz')
+      const fading = controller.crossfadeTo('xyz', PADS)
       await clock.tick(FADE)
       await fading
       expect(controller.loadFailed).to.equal(true)
@@ -370,7 +389,9 @@ describe('PadAudioController', () => {
       MockAudio.failPlay = true
       const error = console.error
       console.error = () => {}
-      const fading = controller.crossfadeTo('G')
+      const fading = controller.crossfadeTo('G', PADS)
+      // (the pad is found in the cache, which the fake clock does not move)
+      await new Promise(resolve => realSetTimeout(resolve, 20))
       await clock.tick(FADE)
       await fading
       console.error = error
@@ -384,7 +405,7 @@ describe('PadAudioController', () => {
 
     it('goes straight to the output by default', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       expect(gainOf().connections).to.deep.equal([
         { to: context.destination, output: undefined, input: undefined },
       ])
@@ -392,7 +413,7 @@ describe('PadAudioController', () => {
 
     it('sends a pad to the left channel only', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       controller.setStereoMode('left')
       const [splitter] = context.splitters
       const [merger] = context.mergers
@@ -403,7 +424,7 @@ describe('PadAudioController', () => {
 
     it('sends a pad to the right channel only', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       controller.setStereoMode('right')
       expect(context.splitters[0].connections).to.deep.equal([
         { to: context.mergers[0], output: 0, input: 1 },
@@ -412,7 +433,7 @@ describe('PadAudioController', () => {
 
     it('goes back to both channels, and lets go of the extra nodes', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       controller.setStereoMode('left')
       controller.setStereoMode('both')
       expect(gainOf().connections.map(c => c.to)).to.deep.equal([context.destination])
@@ -422,7 +443,7 @@ describe('PadAudioController', () => {
 
     it('ignores a mode it does not know', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       controller.setStereoMode('sideways' as 'left')
       expect(context.splitters).to.have.length(0)
       expect(gainOf().connections.map(c => c.to)).to.deep.equal([context.destination])
@@ -431,7 +452,7 @@ describe('PadAudioController', () => {
     it('keeps the mode for the pad a crossfade brings in', async () => {
       const controller = await playing()
       controller.setStereoMode('right')
-      await controller.crossfadeTo('G')
+      await controller.crossfadeTo('G', PADS)
       expect(context.gains[1].connections[0].to).to.be.instanceOf(MockSplitter)
     })
   })
@@ -447,7 +468,7 @@ describe('PadAudioController', () => {
 
     it('ends a fade that was under way', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play()
       await clock.tick(FADE / 2)
       audios[0].fire('error')
@@ -458,7 +479,7 @@ describe('PadAudioController', () => {
   describe('cleaning up', () => {
     it('stops a fade, pauses, and lets go of the nodes', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play()
       await clock.tick(FADE / 2)
       const gain = context.gains[0]
@@ -478,7 +499,7 @@ describe('PadAudioController', () => {
       const controller = make()
       controller.cleanup()
       let failed = false
-      await controller.loadPad('C').catch(() => {
+      await controller.loadPad('C', PADS).catch(() => {
         failed = true
       })
       expect(failed).to.equal(true)
@@ -505,7 +526,7 @@ describe('PadAudioController', () => {
 
     it('lets go of the stereo nodes when cleaned up in a stereo mode', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       controller.setStereoMode('right')
       const [splitter] = context.splitters
       const [merger] = context.mergers
@@ -516,7 +537,7 @@ describe('PadAudioController', () => {
 
     it('waits for the playing event of audio that has not got going', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       audios[0].play = async () => {
         audios[0].paused = false
       }
@@ -529,7 +550,7 @@ describe('PadAudioController', () => {
 
     it('starts a fade in again, ending the one under way, when played twice', async () => {
       const controller = make()
-      await controller.loadPad('C')
+      await controller.loadPad('C', PADS)
       await controller.play()
       await clock.tick(FADE / 2)
       await controller.play()

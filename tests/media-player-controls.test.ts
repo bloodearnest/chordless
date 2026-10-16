@@ -200,9 +200,7 @@ describe('the media player', () => {
       player._padsOn = false
       player.currentKey = 'G'
       player._padLoadFailed = true
-      window.dispatchEvent(
-        new PadSetChangedEvent({ id: 'builtin', name: 'Built-in', type: 'builtin' } as never)
-      )
+      window.dispatchEvent(new PadSetChangedEvent({ id: 'drive-pads', name: 'Pads' }))
       await wait(20)
       expect(player._padLoadFailed).to.equal(false)
       expect(pads.log).to.include('load G')
@@ -442,10 +440,21 @@ describe('the media player', () => {
       player._isPadLoading = true
       player._padLoadFailed = true
       player._activeSongKey = 'G'
+      player._activePadSet = { id: 'drive-pads', name: 'Pads' }
       await player.updateComplete
       expect($('.led-header')?.textContent).to.contain('DOWNLOAD')
+      expect($('help-tooltip')?.getAttribute('message')).to.contain('Could not load pad sound')
       expect($('help-tooltip')).to.not.equal(null)
       expect($('.led-value.pad-error')).to.not.equal(null)
+    })
+
+    it('says there is no pad set, rather than a pad that failed, when none has been uploaded', async () => {
+      await show()
+      player._activePadSet = null
+      player._padLoadFailed = true
+      player._activeSongKey = 'G'
+      await player.updateComplete
+      expect($('help-tooltip')?.getAttribute('message')).to.contain('No pad set yet')
     })
 
     it('shows what is playing, and what is next', async () => {
@@ -655,7 +664,7 @@ describe('the media player', () => {
         await listPadSets(true)
         player._currentPadSetId = folderId
         await player._updatePadSetForSong()
-        expect(player._activePadSet.id).to.equal(folderId)
+        expect(player._activePadSet?.id).to.equal(folderId)
       } finally {
         drive.uninstall()
         localStorage.removeItem('padset-selection')

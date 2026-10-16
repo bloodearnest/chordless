@@ -17,7 +17,7 @@ wrong on stage (deleting a song, changing a key) is behind an explicit edit mode
   chorus, so the page shows only what the band needs.
 - **Transpose** into any key, and set a capo, per song.
 - **Smart layout:** text is sized to make the most of the screen.
-- **Pads and click:** a built-in media player for pad sounds and a metronome.
+- **Pads and click:** a media player for pad sounds (your own pad set, uploaded to your Drive; the app ships none) and a metronome.
 - **Live and edit modes:** live mode is minimal and hard to break. Edit mode is where
   you reorder, delete, and correct songs.
 - **Works offline.** Once loaded, Chordless doesn't need the internet, so a flaky

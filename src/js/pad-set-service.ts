@@ -10,11 +10,10 @@ import {
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
 
-/** A set of pads: the built-in one, or a folder of them in Drive */
+/** A set of pads: a folder of them in Drive (the app ships none: the pads are the user's own) */
 export interface PadSet {
   id: string
   name: string
-  type: 'builtin' | 'drive'
   modifiedTime?: string | null
 }
 
@@ -34,8 +33,9 @@ interface PadSetMetadata {
 /** A different pad set was chosen (sent on window) */
 export class PadSetChangedEvent extends Event {
   static readonly type = 'pad-sets:changed'
-  readonly padSet: PadSet
-  constructor(padSet: PadSet) {
+  /** The pad set now chosen, or null if the choice was cleared */
+  readonly padSet: PadSet | null
+  constructor(padSet: PadSet | null) {
     super(PadSetChangedEvent.type)
     this.padSet = padSet
   }
@@ -49,13 +49,6 @@ export class PadSetListUpdatedEvent extends Event {
   }
 }
 
-const BUILT_IN_PAD_SET: Readonly<PadSet> = Object.freeze({
-  id: 'builtin',
-  name: 'Built-in Pads',
-  type: 'builtin',
-  modifiedTime: null,
-})
-
 const PAD_SET_SELECTION_KEY = 'padset-selection'
 const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
@@ -67,7 +60,8 @@ const PAD_PRELOAD_DELAY_MS = 50
 let padSetListCache: PadSet[] | null = null
 let padSetListPromise: Promise<PadSet[]> | null = null
 
-export function getActivePadSet(): PadSet {
+/** The pad set chosen on this device, or null: there is none until one has been uploaded */
+export function getActivePadSet(): PadSet | null {
   const stored = readLocalStorage(PAD_SET_SELECTION_KEY)
   if (stored) {
     try {
@@ -77,7 +71,7 @@ export function getActivePadSet(): PadSet {
       console.warn('[PadSetService] Failed to parse active pad set from localStorage:', err)
     }
   }
-  return BUILT_IN_PAD_SET
+  return null
 }
 
 export async function listPadSets(force = false): Promise<PadSet[]> {
@@ -90,14 +84,13 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
   }
 
   padSetListPromise = (async () => {
-    const sets: PadSet[] = [BUILT_IN_PAD_SET]
+    const sets: PadSet[] = []
     try {
       const folders = await listPadSetFolders()
       for (const folder of folders) {
         const padSet: PadSet = {
           id: folder.id,
           name: folder.appProperties?.padSetName || folder.name || folder.id,
-          type: 'drive',
           modifiedTime: folder.modifiedTime,
         }
         sets.push(padSet)
@@ -155,20 +148,18 @@ export async function uploadPadSet(
   padSetListCache = null
   window.dispatchEvent(new PadSetListUpdatedEvent())
 
-  return {
-    id: folderId,
-    name: normalizedName,
-    type: 'drive',
-  }
+  const padSet: PadSet = { id: folderId, name: normalizedName }
+  // The first set uploaded is the one to use: there is no default to fall back on
+  if (!getActivePadSet()) await selectPadSet(folderId)
+  return padSet
 }
 
 export async function selectPadSet(padSetId: string): Promise<PadSet> {
   const padSets = await listPadSets()
-  const padSet = padSets.find(set => set.id === padSetId) || BUILT_IN_PAD_SET
+  const padSet = padSets.find(set => set.id === padSetId)
+  if (!padSet) throw new Error('That pad set is no longer in Google Drive.')
 
-  if (padSet.type === 'drive') {
-    await ensurePadSetMetadata(padSet)
-  }
+  await ensurePadSetMetadata(padSet)
 
   writeLocalStorage(PAD_SET_SELECTION_KEY, JSON.stringify(padSet))
   window.dispatchEvent(new PadSetChangedEvent(padSet))
@@ -176,7 +167,7 @@ export async function selectPadSet(padSetId: string): Promise<PadSet> {
 }
 
 export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<void> {
-  if (padSet.type !== 'drive' || !key) return
+  if (!key) return
   if (typeof caches === 'undefined') {
     console.warn('[PadSetService] Cache Storage is unavailable in this environment.')
     return
@@ -233,7 +224,7 @@ export async function isPadKeyCached(
   padSet: PadSet | null | undefined,
   key: string | null | undefined
 ): Promise<boolean> {
-  if (padSet?.type !== 'drive' || !key) return false
+  if (!padSet || !key) return false
   if (typeof caches === 'undefined') {
     return false
   }
@@ -255,12 +246,15 @@ function uniqueNormalizedPadKeys(keys: string[] = []): string[] {
 }
 
 /**
- * Fetch pads for these keys in the background, so they are there to play. Only a Drive pad
- * set needs it, and only if the player and its pads are on and the device can play them.
+ * Fetch pads for these keys in the background, so they are there to play. Only if there is a
+ * pad set, and the player and its pads are on and the device can play them.
  * @returns how many keys it set about fetching
  */
-export function preloadPadKeys(keys: string[] = [], padSet: PadSet = getActivePadSet()): number {
-  if (padSet?.type !== 'drive' || !wantsPads()) return 0
+export function preloadPadKeys(
+  keys: string[] = [],
+  padSet: PadSet | null = getActivePadSet()
+): number {
+  if (!padSet || !wantsPads()) return 0
   const normalizedKeys = uniqueNormalizedPadKeys(keys)
   if (normalizedKeys.length === 0) return 0
 
@@ -274,13 +268,13 @@ export function preloadPadKeys(keys: string[] = [], padSet: PadSet = getActivePa
   return normalizedKeys.length
 }
 
-export function preloadPadKey(key: string, padSet: PadSet = getActivePadSet()): void {
+export function preloadPadKey(key: string, padSet: PadSet | null = getActivePadSet()): void {
   preloadPadKeys([key], padSet)
 }
 
 export function preloadPadKeysForSongs(
   songs: { currentKey?: string; metadata?: { key?: string }; originalKey?: string | null }[] = [],
-  padSet: PadSet = getActivePadSet()
+  padSet: PadSet | null = getActivePadSet()
 ): void {
   const keys = songs
     .map(song => song?.currentKey || song?.metadata?.key || song?.originalKey)
@@ -316,7 +310,7 @@ async function clearPadSetCache(cache: Cache, padSetId: string): Promise<void> {
   await Promise.all(removals)
 }
 
-/** The files of a Drive pad set, by key (listed from Drive, and then kept) */
+/** The files of a pad set, by key (listed from Drive, and then kept) */
 async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadFile>> {
   const cacheEntry = PAD_SET_METADATA_CACHE.get(padSet.id)
   if (cacheEntry && metadataMatches(cacheEntry, padSet)) {

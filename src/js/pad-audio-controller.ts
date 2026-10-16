@@ -342,27 +342,26 @@ export class PadAudioController {
     const padKey = normalizePadKey(key)
     if (!padKey) return null
 
-    if (padSet && padSet.type === 'drive') {
-      const alreadyCached = await isPadKeyCached(padSet, padKey)
-      if (!alreadyCached) {
-        this._padLoadingCount++
-        this._isPadLoading = true
-        try {
-          await ensurePadKeyCached(padSet, padKey)
-        } catch (error) {
-          console.error('[PadAudioController] Failed to cache pad audio from Drive:', error)
-          return null
-        } finally {
-          this._padLoadingCount = Math.max(0, this._padLoadingCount - 1)
-          if (this._padLoadingCount === 0) {
-            this._isPadLoading = false
-          }
+    // No pad set (none uploaded yet) is no pad: the app ships none
+    if (!padSet) return null
+
+    const alreadyCached = await isPadKeyCached(padSet, padKey)
+    if (!alreadyCached) {
+      this._padLoadingCount++
+      this._isPadLoading = true
+      try {
+        await ensurePadKeyCached(padSet, padKey)
+      } catch (error) {
+        console.error('[PadAudioController] Failed to cache pad audio from Drive:', error)
+        return null
+      } finally {
+        this._padLoadingCount = Math.max(0, this._padLoadingCount - 1)
+        if (this._padLoadingCount === 0) {
+          this._isPadLoading = false
         }
       }
-      return getPadCacheUrl(padSet.id, padKey)
     }
-
-    return `/pads/${encodeURIComponent(padKey)} - WARM - CHURCHFRONT PADS.mp3`
+    return getPadCacheUrl(padSet.id, padKey)
   }
 
   /**

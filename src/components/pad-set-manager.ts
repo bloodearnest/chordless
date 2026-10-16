@@ -216,7 +216,10 @@ export class PadSetManager extends LitElement {
     }
 
     if (this._padSets.list.length === 0) {
-      return html`<div class="empty-state">No pad sets available yet.</div>`
+      return html`<div class="empty-state">
+          No pad sets yet, so there are no pads. Chordless has none of its own: upload a set you
+          own (a ZIP with all 12 keys), and it is used.
+        </div>`
     }
 
     return this._padSets.list.map(
@@ -233,7 +236,7 @@ export class PadSetManager extends LitElement {
             <div>
               <div class="padset-name">${set.name}</div>
               <div class="padset-meta">
-                ${set.type === 'builtin' ? 'Built-in' : 'Custom Drive Pad Set'}
+                Drive pad set
                 ${
                   set.modifiedTime
                     ? html` • Updated ${new Date(set.modifiedTime).toLocaleString()}`

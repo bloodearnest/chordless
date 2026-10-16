@@ -50,6 +50,13 @@ describe('the pad set manager', () => {
     await manager.updateComplete
   }
 
+  /** Show one pad set in the list (there are none until one is uploaded) */
+  async function showSets() {
+    manager._padSets.list = [{ id: 'drive-1', name: 'Warm Pads' }]
+    manager.requestUpdate()
+    await manager.updateComplete
+  }
+
   beforeEach(() => {
     drive = installFakeDrive()
     realError = console.error
@@ -68,13 +75,11 @@ describe('the pad set manager', () => {
   })
 
   describe('the list', () => {
-    it('shows the built-in set, as chosen', async () => {
+    it('shows no set, and says there are no pads, until one is uploaded', async () => {
       await show()
-      expect(text()).to.contain('Built-in Pads')
-      expect(text()).to.contain('Built-in')
-      expect(
-        root().querySelectorAll<HTMLInputElement>('input[type="radio"]:checked')
-      ).to.have.length(1)
+      expect(text()).to.not.contain('Built-in')
+      expect(text()).to.contain('No pad sets yet')
+      expect(root().querySelectorAll('input[type="radio"]')).to.have.length(0)
     })
 
     it('says it is loading, and shows an error if the list could not be had', async () => {
@@ -98,21 +103,21 @@ describe('the pad set manager', () => {
       manager._padSets.list = []
       manager.requestUpdate()
       await manager.updateComplete
-      expect(text()).to.contain('No pad sets available yet.')
+      expect(text()).to.contain('No pad sets yet')
     })
 
-    it('shows a set from Drive as custom, with when it was updated', async () => {
+    it('shows a set from Drive, with when it was updated', async () => {
       await show()
       manager._padSets.list = [
         ...manager._padSets.list,
-        { id: 'drive-1', name: 'Warm Pads', type: 'drive', modifiedTime: '2026-10-14T12:00:00Z' },
-        { id: 'drive-2', name: 'Cold Pads', type: 'drive' },
+        { id: 'drive-1', name: 'Warm Pads', modifiedTime: '2026-10-14T12:00:00Z' },
+        { id: 'drive-2', name: 'Cold Pads' },
       ]
       manager.requestUpdate()
       await manager.updateComplete
 
       expect(text()).to.contain('Warm Pads')
-      expect(text()).to.match(/Custom Drive Pad Set • Updated/)
+      expect(text()).to.match(/Drive pad set • Updated/)
       expect(text()).to.contain('Cold Pads')
       expect(text().match(/Updated/g)).to.have.length(1)
     })
@@ -121,6 +126,7 @@ describe('the pad set manager', () => {
   describe('choosing the default', () => {
     it('says it was updated', async () => {
       await show()
+      await showSets()
       manager._padSets.select = async () => {}
       root()
         .querySelector<HTMLInputElement>('input[type="radio"]')
@@ -132,6 +138,7 @@ describe('the pad set manager', () => {
 
     it('says why not when it could not be changed, or a general reason if there is none', async () => {
       await show()
+      await showSets()
       const radio = must(root().querySelector<HTMLInputElement>('input[type="radio"]'))
 
       manager._padSets.select = async () => {

@@ -6,6 +6,7 @@ import {
   wantsMediaPlayer,
   wantsPads,
 } from '../src/js/media-player-loader.ts'
+import type { PadSet } from '../src/js/pad-set-service.ts'
 import { preloadPadKeys } from '../src/js/pad-set-service.ts'
 import { makePadSet } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -138,7 +139,7 @@ describe('preloading pads', () => {
   })
 
   /** Run with these settings saved and timers held back, so no fetching starts */
-  function preload(settings, keys = ['C', 'G'], padSet = drive) {
+  function preload(settings, keys = ['C', 'G'], padSet: PadSet | null = drive) {
     originalSettings = localStorage.getItem('media-settings')
     originalSetTimeout = window.setTimeout
     ;(window as { setTimeout: unknown }).setTimeout = () => 0
@@ -159,8 +160,8 @@ describe('preloading pads', () => {
     expect(preload({ padsEnabled: false })).to.equal(0)
   })
 
-  it('does nothing for a pad set that is not on Drive', () => {
-    expect(preload(null, ['C'], makePadSet({ id: 'built-in', type: 'builtin' }))).to.equal(0)
+  it('does nothing with no pad set', () => {
+    expect(preload(null, ['C'], null)).to.equal(0)
   })
 
   it('does nothing without keys', () => {

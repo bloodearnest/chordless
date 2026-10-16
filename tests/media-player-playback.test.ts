@@ -14,8 +14,8 @@ class FakePads {
   /** What loading a pad or crossfading to one finds */
   padAvailable = true
 
-  async loadPad(key: string, padSet: { id: string }) {
-    this.log.push(`load ${key} (${padSet.id})`)
+  async loadPad(key: string, padSet: { id: string } | null) {
+    this.log.push(`load ${key} (${padSet?.id})`)
     this.loadFailed = !this.padAvailable
     return this.padAvailable
   }
@@ -27,8 +27,8 @@ class FakePads {
     this.log.push('stop')
     this.isPlaying = false
   }
-  async crossfadeTo(key: string, padSet: { id: string }) {
-    this.log.push(`crossfade ${key} (${padSet.id})`)
+  async crossfadeTo(key: string, padSet: { id: string } | null) {
+    this.log.push(`crossfade ${key} (${padSet?.id})`)
     this.loadFailed = !this.padAvailable
     if (this.padAvailable) this.isPlaying = true
   }
@@ -70,7 +70,8 @@ describe('the media player starting a song', () => {
     player._handleSongChange(new SongChangeEvent(song(songId, key, tempo)))
 
   beforeEach(async () => {
-    localStorage.removeItem('padset-selection')
+    // (the pad set the device uses: the app has none of its own)
+    localStorage.setItem('padset-selection', JSON.stringify({ id: 'pads', name: 'Pads' }))
     player = document.createElement('media-player')
     document.body.append(player)
     await player.updateComplete
@@ -95,7 +96,7 @@ describe('the media player starting a song', () => {
     it('loads the pad for the key and fades it in, and starts the click at the song tempo', async () => {
       await view('a', 'G', 90)
       await player._startSong()
-      expect(pads.log).to.deep.equal(['load G (builtin)', 'play'])
+      expect(pads.log).to.deep.equal(['load G (pads)', 'play'])
       expect(click.log).to.deep.equal(['start 90 4/4 1/4'])
       expect(player._activeSongKey).to.equal('G')
       expect(player._isCurrentSongActive()).to.equal(true)
@@ -124,7 +125,7 @@ describe('the media player starting a song', () => {
       await player._startSong()
       await Promise.resolve()
       expect(pads.log).to.not.include('play')
-      expect(pads.log).to.include('load G (builtin)')
+      expect(pads.log).to.include('load G (pads)')
       expect(click.log).to.have.length(1)
     })
 
@@ -156,7 +157,7 @@ describe('the media player starting a song', () => {
     it('crossfades the pad when the key is different, and retimes the click', async () => {
       await view('b', 'D', 120)
       await player._startSong()
-      expect(pads.log).to.deep.equal(['crossfade D (builtin)'])
+      expect(pads.log).to.deep.equal(['crossfade D (pads)'])
       expect(click.log).to.deep.equal(['stop', 'start 120 4/4 1/4'])
       expect(player._activeSongKey).to.equal('D')
     })
@@ -193,7 +194,7 @@ describe('the media player starting a song', () => {
       await view('b', 'D', 100)
       await player._startSong()
       expect(pads.log).to.not.include('play')
-      expect(pads.log).to.not.include('crossfade D (builtin)')
+      expect(pads.log).to.not.include('crossfade D (pads)')
     })
 
     it('switching the click off stops it at once, and the next song does not start it', async () => {
@@ -234,7 +235,7 @@ describe('the media player starting a song', () => {
       await Promise.resolve()
       await Promise.resolve()
 
-      expect(pads.log).to.deep.equal(['crossfade A (builtin)'])
+      expect(pads.log).to.deep.equal(['crossfade A (pads)'])
     })
 
     it('does nothing about another song changing while one plays', async () => {

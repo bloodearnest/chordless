@@ -562,47 +562,6 @@ describe('the service worker', () => {
       })
     })
 
-    describe('pad audio', () => {
-      beforeEach(() => start())
-
-      it('serves a pad it has kept', async () => {
-        await (await caches.open('runtime-v1')).put(
-          new Request('https://app.test/pads/c.mp3'),
-          new Response('kept')
-        )
-        expect(await textOf(await fetchEvent('/pads/c.mp3'))).to.equal('kept')
-        expect(fetched).to.deep.equal([])
-      })
-
-      it('fetches and keeps a pad it has not', async () => {
-        expect(await textOf(await fetchEvent('/pads/d.mp3'))).to.equal('from the network')
-        await until(async () => (await (await caches.open('runtime-v1')).keys()).length === 1)
-      })
-
-      it('does not keep a partial response, or a failure', async () => {
-        fetchImpl = async () => new Response('part', { status: 206 })
-        expect((await fetchEvent('/pads/e.mp3'))?.status).to.equal(206)
-        fetchImpl = async () => new Response('no', { status: 404 })
-        expect((await fetchEvent('/pads/f.mp3'))?.status).to.equal(404)
-        await wait(30)
-        expect((await (await caches.open('runtime-v1')).keys()).length).to.equal(0)
-      })
-
-      it('fails when it cannot fetch a pad', async () => {
-        fetchImpl = async () => {
-          throw new TypeError('offline')
-        }
-        const response = fetchEvent('/pads/g.mp3')
-        let failed = false
-        try {
-          await await response
-        } catch {
-          failed = true
-        }
-        expect(failed).to.equal(true)
-      })
-    })
-
     describe('pad sets', () => {
       it('serves a kept asset, or says it is not available offline', async () => {
         start()
