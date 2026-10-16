@@ -48,8 +48,11 @@ import { AddSongModal } from './setlist/add-song-modal.ts'
 import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
+  afterMove,
+  afterRemoval,
   clearSetlistLocalState,
   loadSetlistLocalState,
+  renumberSongs,
   saveSetlistLocalState,
 } from './setlist/local-state.ts'
 import { OverviewReorder } from './setlist/overview-reorder.ts'
@@ -1449,6 +1452,10 @@ export class SetlistPage {
     const movedRuntimeSong = this.songs.splice(startIndex, 1)[0]
     this.songs.splice(newIndex, 0, movedRuntimeSong)
 
+    // What was set for each song (its sections shown, its capo) goes with it
+    this.sections.states = renumberSongs(this.sections.states, afterMove(startIndex, newIndex))
+    this.saveState()
+
     // Save to database
     setlist.modifiedDate = new Date().toISOString()
     await this._database().saveSetlist(setlist)
@@ -1802,6 +1809,13 @@ export class SetlistPage {
 
       // Save to database
       await this._database().saveSetlist(setlist)
+
+      // The songs after it are one place earlier, with what was set for them
+      const kept = loadSetlistLocalState(setlist.id)
+      saveSetlistLocalState(setlist.id, {
+        sectionState: renumberSongs(kept.sectionState, afterRemoval(index)),
+        capoValues: renumberSongs(kept.capoValues, afterRemoval(index)),
+      })
 
       // Reload the setlist
       await this.renderSetlist(setlist.id)

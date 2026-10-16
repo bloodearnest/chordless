@@ -44,6 +44,36 @@ export function saveSetlistLocalState(setlistId: string | null, state: SetlistLo
   }
 }
 
+/**
+ * Where a song was is where another may be now: a record kept by song index with its keys
+ * renumbered (null drops the key). The states and capos go with the song they were set for.
+ */
+export function renumberSongs<T>(
+  record: Record<number | string, T>,
+  newIndex: (index: number) => number | null
+): Record<number, T> {
+  const renumbered: Record<number, T> = {}
+  for (const [key, value] of Object.entries(record)) {
+    const index = newIndex(Number(key))
+    if (index !== null) renumbered[index] = value
+  }
+  return renumbered
+}
+
+/** The new place of each song index when the song at `from` is moved to `to` */
+export const afterMove = (from: number, to: number) => (index: number) => {
+  if (index === from) return to
+  if (from < to && index > from && index <= to) return index - 1
+  if (from > to && index >= to && index < from) return index + 1
+  return index
+}
+
+/** The new place of each song index when the song at `removed` is deleted (it has none) */
+export const afterRemoval = (removed: number) => (index: number) => {
+  if (index === removed) return null
+  return index > removed ? index - 1 : index
+}
+
 /** Forget it all: the setlist has been deleted */
 export function clearSetlistLocalState(setlistId: string) {
   localStorage.removeItem(keyFor(setlistId))

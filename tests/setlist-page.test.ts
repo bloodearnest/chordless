@@ -20,6 +20,7 @@ import { setRouter } from '../src/js/navigation.ts'
 import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
+import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
@@ -215,6 +216,27 @@ describe('the setlist page', () => {
       }
     })
 
+    it('moves the sections shown and hidden with the song, and keeps them', async () => {
+      const setlist = await open()
+      const hidden = { hideMode: 'none' as const, isCollapsed: true, isHidden: true }
+      page.sections.states = { 0: { 0: hidden } }
+
+      await page.moveSong(0, 2)
+
+      expect(page.sections.states).to.deep.equal({ 2: { 0: hidden } })
+      expect(loadSetlistLocalState(setlist.id).sectionState).to.deep.equal({ 2: { 0: hidden } })
+    })
+
+    it('shifts the states of the songs it passes over by one place', async () => {
+      await open()
+      const hidden = { hideMode: 'none' as const, isCollapsed: true, isHidden: true }
+      page.sections.states = { 1: { 0: hidden } }
+
+      await page.moveSong(2, 0)
+
+      expect(page.sections.states).to.deep.equal({ 2: { 0: hidden } })
+    })
+
     it('changes the setlist modified date', async () => {
       const setlist = await open(3, { modifiedDate: '2020-01-01T00:00:00.000Z' })
 
@@ -296,6 +318,22 @@ describe('the setlist page', () => {
       const saved = must(await db.getSetlist(setlist.id))
       expect(saved.songs.map(entry => entry.order)).to.deep.equal([0, 1])
       expect(titles(page.songs)).to.deep.equal(['Alpha', 'Charlie'])
+    })
+
+    it('keeps the sections shown and the capos of the songs after it, which move up', async () => {
+      const setlist = await open()
+      const hidden = { hideMode: 'none' as const, isCollapsed: true, isHidden: true }
+      saveSetlistLocalState(setlist.id, {
+        sectionState: { 0: { 0: hidden }, 1: { 0: hidden }, 2: { 1: hidden } },
+        capoValues: { 1: 2, 2: 3 },
+      })
+
+      await page.deleteSongFromSetlist(1)
+
+      expect(loadSetlistLocalState(setlist.id)).to.deep.equal({
+        sectionState: { 0: { 0: hidden }, 1: { 1: hidden } },
+        capoValues: { 1: 3 },
+      })
     })
 
     it('says so when the save fails', async () => {
