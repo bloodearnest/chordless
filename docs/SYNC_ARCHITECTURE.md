@@ -232,20 +232,13 @@ the device's own changes applied over it:
   already holds the device-only capo and section state, so a pull never touches it.
 - A pull updates the base. What the person changed stays as they set it; anything they did not
   touch follows the leader. Nothing is dropped silently.
-- **It must show.** Someone with local edits should always be able to see that what is on screen
-  is not the official version, and where it differs:
-  - On the setlist: a badge near the title ("Your changes", with how many) that opens a list of
-    them with a reset for each and for all. It also says when the official version has changed
-    since.
-  - On each changed row (a song's key, BPM, a song added, removed or moved): a small marker, with
-    the official value shown as a reminder ("D, officially G").
-  - Two levels, drawn differently: a **local change** (yours differs from the official version,
-    which is unchanged) is an informational tint; a **conflict** (the official value changed too,
-    since you changed it) is a warning colour and says so ("Changed by the leader to A, yours
-    stays D"), until you keep yours, take theirs or reset. For a person who is not allowed to
-    write it, every local change stays marked, because it never becomes official.
-  - On a song page, in live use, it must not get in the way: a small marker by the key that
-    shows the official value on a tap, nothing that covers the lyrics.
+- **It must show, and no more than that.** An indication that something here differs from the
+  official version, and an option to view what. One small indicator on the setlist (nothing on
+  each row, nothing on a song page, nothing over the lyrics); opening it lists the differences
+  (yours, the official value, and whether the official one has changed since) with a way to
+  reset. A conflict is one more line in that list, not another look for the indicator. For
+  someone who is not allowed to write the setlist the indicator stays, because their changes
+  never become official.
 - A writer's layer is **promoted into the base** when it syncs. A reader's, or a non-owner's
   (below), never is. So the same mechanism serves the read-only TODO (local key change for a
   reader), unsynced offline edits and conflicts.
