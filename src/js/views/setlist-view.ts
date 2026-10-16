@@ -13,9 +13,9 @@ import '../../components/song-info-dialog.ts'
 import '../../components/song-section.ts'
 import '../../components/song-settings-popover.ts'
 import { isReadOnlyOrganisation } from '../organisation.ts'
-import { SetlistPage } from '../setlist-page.ts'
 import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
+import { SetlistPageHost } from './setlist-page-host.ts'
 
 /**
  * The elements the setlist page works with, for a setlist view and for a share's (which can't
@@ -141,7 +141,7 @@ export function setlistTemplate({
  * it is left, so nothing it did to the window, <body> or the menu is left behind.
  */
 export class SetlistView extends PageView {
-  #page: SetlistPage | null = null
+  #page = new SetlistPageHost()
 
   /** This view is only shown for the setlist route */
   #setlistRoute() {
@@ -154,34 +154,25 @@ export class SetlistView extends PageView {
   override firstUpdated() {
     wakeLock.hold()
     const { setlistId, songIndex } = this.#setlistRoute()
-    this.#page = new SetlistPage({
-      root: this,
-      setlistId,
-      songIndex,
-      restoredState: this.restoredState,
-    })
-    this.#page
-      .start()
-      // The route may have moved on while the setlist was loading
-      .then(() => this.#page?.routeChanged(this.#setlistRoute()))
-      .catch(error => console.error('[SetlistView] Failed to start:', error))
+    this.#page.start({ root: this, setlistId, songIndex, restoredState: this.restoredState }, () =>
+      this.#setlistRoute()
+    )
   }
 
   /** How far each song (and the overview) was scrolled */
   override captureViewState() {
-    return this.#page?.captureViewState()
+    return this.#page.captureViewState()
   }
 
   override updated(changed: PropertyValues<this>) {
     // Moves within this setlist (the first route was given to the page at the start)
-    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.#setlistRoute())
+    if (changed.get('route') !== undefined) this.#page.routeChanged(this.#setlistRoute())
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback()
     wakeLock.letGo()
-    this.#page?.dispose()
-    this.#page = null
+    this.#page.dispose()
   }
 
   override render() {

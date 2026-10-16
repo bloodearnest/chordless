@@ -4,12 +4,12 @@ import type { ChordlessDB } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import type { Route } from '../router.ts'
 import { buildUrl } from '../router.ts'
-import { SetlistPage } from '../setlist-page.ts'
 import { parseShareFragment } from '../share-crypto.ts'
 import { openShare, ownSetlistFor, type ShareOpening, shareSetlistId } from '../share-receiver.ts'
 import { formatSetlistDate } from '../utils/date-utils.ts'
 import { wakeLock } from '../wake-lock.ts'
 import { PageView } from './page-view.ts'
+import { SetlistPageHost } from './setlist-page-host.ts'
 import { setlistTemplate } from './setlist-view.ts'
 
 type ShareRoute = Extract<Route, { name: 'share' }>
@@ -51,7 +51,7 @@ export class ShareView extends PageView {
   declare _opening: ShareOpening | 'loading'
   /** How a share is opened (a test gives its own) */
   receiver = { openShare, ownSetlistFor }
-  #page: SetlistPage | null = null
+  #page = new SetlistPageHost()
   #db: ChordlessDB | null = null
 
   constructor() {
@@ -97,34 +97,32 @@ export class ShareView extends PageView {
 
     this.#db = opening.db
     await this.updateComplete
-    this.#page = new SetlistPage({
-      root: this,
-      setlistId: shareSetlistId(fileId),
-      songIndex,
-      restoredState: this.restoredState,
-      db: opening.db,
-      readOnly: true,
-      routeFor: index => ({ name: 'share', fileId, songIndex: index }),
-    })
-    this.#page
-      .start()
-      .then(() => this.#page?.routeChanged(this.#shareRoute()))
-      .catch(error => console.error('[ShareView] Failed to start:', error))
+    this.#page.start(
+      {
+        root: this,
+        setlistId: shareSetlistId(fileId),
+        songIndex,
+        restoredState: this.restoredState,
+        db: opening.db,
+        readOnly: true,
+        routeFor: index => ({ name: 'share', fileId, songIndex: index }),
+      },
+      () => this.#shareRoute()
+    )
   }
 
   override captureViewState() {
-    return this.#page?.captureViewState()
+    return this.#page.captureViewState()
   }
 
   override updated(changed: Map<string, unknown>) {
-    if (changed.get('route') !== undefined) this.#page?.routeChanged(this.#shareRoute())
+    if (changed.get('route') !== undefined) this.#page.routeChanged(this.#shareRoute())
   }
 
   override disconnectedCallback() {
     super.disconnectedCallback()
     wakeLock.letGo()
-    this.#page?.dispose()
-    this.#page = null
+    this.#page.dispose()
     this.#db?.db?.close()
     this.#db = null
   }
