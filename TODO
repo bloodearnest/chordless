@@ -13,6 +13,8 @@ editing
   the same idea: a received setlist is kept on the device on its own, so a local key change
   there is harmless and should work too. Nothing is ever uploaded for a reader
 - song notes/stickies
+- setlist overview edit mode should allow bpm changes also.
+
 
 information UI
  - show leader in setlist page
@@ -22,7 +24,25 @@ song edit UI
 - pads on/off and the click on/off for this song (the pad set is in the edit box and the double click is a 2× button on the player: both in song-user-prefs.ts, kept on this device)
 - on first render, the key/capo drop downs render to the left for split second, then move to the right place
 
+help
+- Help pages exist for the setlist overview, a setlist song and the song library (Menu > Help,
+  src/js/help-content.ts, pictures from `just help-images`). Still to do: home, preferences,
+  import, storage and the other views (a page has a Help item once helpFor() returns some)
+- check the wording that was written from the code, not from the app: what the library's
+  Information button shows, how swiping between the list and a song works in the library, and
+  what the Player's expanded settings do
+- link the help to longer docs, when there are some (item text takes [text](/path) links to
+  places in the app only so far)
+- check the help at phone width on a real device: the pictures are shown at half their pixels
+  and wrapped in a 90% wide modal
+- pictures are not precached (not core: see docs/BUILD.md), so Help opened offline for the first
+  time has no pictures. If that matters, a "Help downloaded" step after first load would do
+
 bugs
+- the song library's font size (A-/A+) and reset buttons never show in edit mode: library-view.ts
+  sets them to display: none inline (#showSongControls), which the `body.edit-mode` rule in
+  style.css cannot override. Either show them from edit mode, or remove them and their code. The
+  help leaves them out until this is decided
 - tests are checked with strict on except noImplicitAny (tsconfig.tests.json, tsconfig.node.json):
   about 1,000 untyped helper parameters and `let`s remain. Turn it on file by file (it was 721
   errors in 50 files when tried); typed builders (tests/builders.ts) and must() are in place
@@ -180,6 +200,9 @@ live mode
  - webrtc sync (live session: following the leader's song/section)
 
 tests
+ - tests/songs.playwright.ts "choosing a song opens it at its own URL, and back returns to the
+   list" failed twice in full runs (not alone, 8 of 8 passed): undiagnosed, so not in
+   docs/test-catches.jsonl. Run it with --repeat-each under load to find the cause
  - coverage: just coverage covers the browser unit tests only, and counts only the files
    they load. Playwright coverage (page.coverage, Chromium) would show what the
    end-to-end tests reach
