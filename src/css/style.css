@@ -1055,19 +1055,20 @@ body.edit-mode .key-selector:focus {
   margin: 0 auto;
 }
 
-/* Go live / Live now, above the songs */
-.overview-live {
+/* The row above the songs: Add Song (in edit mode) on the left, Go live on the right */
+.overview-actions {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 1rem;
   max-width: 900px;
   margin: 0 auto 1rem;
 }
 
-.overview-live[data-live='none'],
-.overview-live[data-live='other'] {
-  justify-content: flex-end;
+.overview-live {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-left: auto;
 }
 
 .live-status {
@@ -1084,7 +1085,7 @@ body.edit-mode .key-selector:focus {
   background: var(--color-danger);
 }
 
-.live-button {
+.overview-button {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
@@ -1098,7 +1099,11 @@ body.edit-mode .key-selector:focus {
   cursor: pointer;
 }
 
-.live-button.go {
+.overview-button[hidden] {
+  display: none;
+}
+
+.overview-button.go {
   background: var(--button-bg);
   color: var(--button-text, white);
 }
@@ -1531,24 +1536,6 @@ body.edit-mode .key-selector:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* Add Song button */
-.add-song-button {
-  margin-top: 1.5rem;
-  border: 2px dashed var(--border-color, #bdc3c7) !important;
-  background-color: var(--bg-tertiary, #f8f9fa) !important;
-  color: var(--text-secondary, #7f8c8d);
-}
-
-.add-song-button:hover {
-  background-color: var(--bg-secondary, white) !important;
-  border-color: var(--button-bg) !important;
-  color: var(--button-bg);
-}
-
-.add-song-button .song-card-title {
-  color: inherit;
 }
 
 /* Song library */

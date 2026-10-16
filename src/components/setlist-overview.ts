@@ -93,7 +93,18 @@ export class SetlistOverview extends LitElement {
   override render() {
     return html`
       <div class="setlist-overview">
-        ${this._renderLive()}
+        <div class="overview-actions">
+          <button
+            type="button"
+            class="overview-button add-song-button"
+            ?hidden=${!this.editMode}
+            @click=${this._handleAddSong}
+          >
+            <app-icon name="add" size="20"></app-icon>
+            Add Song
+          </button>
+          ${this._renderLive()}
+        </div>
         <div class="overview-songs">
           ${this.songs.map(
             (song, index) => html`
@@ -109,21 +120,6 @@ export class SetlistOverview extends LitElement {
               ></song-card>
             `
           )}
-
-          <button
-            class="song-card add-song-button"
-            ?hidden=${!this.editMode}
-            @click=${this._handleAddSong}
-          >
-            <div class="song-card-info">
-              <div class="song-card-title-row">
-                <div class="song-card-title">
-                  <app-icon name="add" size="20" style="vertical-align: middle; margin-right: 8px;"></app-icon>
-                  Add Song
-                </div>
-              </div>
-            </div>
-          </button>
         </div>
       </div>
     `
@@ -134,7 +130,7 @@ export class SetlistOverview extends LitElement {
       return html`
         <div class="overview-live" id="overview-live" data-live="this">
           <span class="live-status"><span class="live-dot" aria-hidden="true"></span>Live now</span>
-          <button type="button" class="live-button" id="leave-live-button" @click=${this._handleLeaveLive}>
+          <button type="button" class="overview-button" id="leave-live-button" @click=${this._handleLeaveLive}>
             Leave live
           </button>
         </div>
@@ -142,7 +138,7 @@ export class SetlistOverview extends LitElement {
     }
     return html`
       <div class="overview-live" id="overview-live" data-live=${this.liveState}>
-        <button type="button" class="live-button go" id="go-live-button" @click=${this._handleGoLive}>
+        <button type="button" class="overview-button go" id="go-live-button" @click=${this._handleGoLive}>
           <app-icon name="sun" size="20"></app-icon>
           ${this.liveState === 'other' ? 'Take over live here' : 'Go live'}
         </button>
