@@ -231,9 +231,21 @@ the device's own changes applied over it:
   or removed, the order), not a copy of the setlist. It lives next to `setlist_local`, which
   already holds the device-only capo and section state, so a pull never touches it.
 - A pull updates the base. What the person changed stays as they set it; anything they did not
-  touch follows the leader. A changed row shows a small "your change" marker with a reset, also
-  when someone else changed the same field meanwhile (their value stays, the marker says so).
-  Nothing is dropped silently.
+  touch follows the leader. Nothing is dropped silently.
+- **It must show.** Someone with local edits should always be able to see that what is on screen
+  is not the official version, and where it differs:
+  - On the setlist: a badge near the title ("Your changes", with how many) that opens a list of
+    them with a reset for each and for all. It also says when the official version has changed
+    since.
+  - On each changed row (a song's key, BPM, a song added, removed or moved): a small marker, with
+    the official value shown as a reminder ("D, officially G").
+  - Two levels, drawn differently: a **local change** (yours differs from the official version,
+    which is unchanged) is an informational tint; a **conflict** (the official value changed too,
+    since you changed it) is a warning colour and says so ("Changed by the leader to A, yours
+    stays D"), until you keep yours, take theirs or reset. For a person who is not allowed to
+    write it, every local change stays marked, because it never becomes official.
+  - On a song page, in live use, it must not get in the way: a small marker by the key that
+    shows the official value on a tap, nothing that covers the lyrics.
 - A writer's layer is **promoted into the base** when it syncs. A reader's, or a non-owner's
   (below), never is. So the same mechanism serves the read-only TODO (local key change for a
   reader), unsynced offline edits and conflicts.
@@ -244,16 +256,16 @@ the device's own changes applied over it:
 **Ownership. First step: block the sync of writes from non-owners.** A setlist has an owner, and
 only the owner's edits to it are uploaded. Everyone else can still edit it on their device (the
 layer above), and nothing of theirs is pushed.
-- Which field is the owner is still to be decided: `createdBy` (who made it in Chordless; the
-  "owning user") or `ownerId` (the leader). `createdBy` is only a trace today ("nothing decides
-  by it yet", data-types.ts). Leaders who did not create the setlist are the case to settle,
-  probably with the editors list below.
+- **Who may write:** both `createdBy` (who made it in Chordless) and `ownerId` (the leader), when
+  they differ, have edit rights: the leader who did not create the setlist is not shut out.
+  (`createdBy` is only a trace today: "nothing decides by it yet", data-types.ts.) Later an
+  **organisation admin** role can edit any setlist of the organisation (roles come with the
+  Worker broker, SHARING.md). The `editors` list below adds named people.
 - It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
   same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
   as a reader of that setlist (no setlist edits).
-- Later, in this order: an optional `editors` list the owner grants (everyone in the
-  organisation editing stays the default only if open-by-default is what is wanted: undecided);
-  then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
+- Later, in this order: an optional `editors` list the owner grants (whether everyone in the
+  organisation may edit by default, or only the people above, is undecided); then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
   rejects each change; accepted changes are applied to the base.
 - Drive's permissions are per folder, so an owner or editors rule inside the setlist file is
   only advice to a client that follows it: anyone who can write the folder can write the file.
@@ -492,7 +504,7 @@ backstop.
   Periodic Background Sync has the same platform limits.
 - **Conflict resolution:** today Drive wins. At least surface conflicts to the user;
   ideally merge setlist field changes. Designed above, "Several people editing a setlist".
-- **Restricting edits to a setlist's owner** (`createdBy` or `ownerId`: undecided): designed above,
+- **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
   first by blocking the sync of non-owners' writes.
 - **Inviting people to an organisation:** shared users can't see the folder under
   `drive.file`; the design (the Worker brokers the owner's access) is in SHARING.md.
