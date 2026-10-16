@@ -16,7 +16,9 @@ Goals
   "doesn't belong" in a mode. A last-minute addition must not be blocked: Add Song is always
   there, on the overview, in or out of edit mode, live or not. A feature for groups (a leader
   adding a song and it reaching every follower, over a future WebRTC session) is opt-in, and
-  adds to what one person can do alone.
+  adds to what one person can do alone. Read-only only means "can't write back to sync": local
+  edits, such as a last-minute key change, should work for a reader or a share too (not yet:
+  see the TODO).
 
 2. webapp not website
 

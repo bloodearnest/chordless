@@ -1,4 +1,17 @@
 editing
+- Read-only should only stop writing back to sync, not local edits (decided 2026-10-16: a last
+  minute change of key, a late song, must work for a reader too; users are grown-ups, see "be
+  permissive in the moment" in CLAUDE.md). Today (SYNC_ARCHITECTURE.md, "Read-only access") a
+  reader gets no edit mode on the overview, no key or BPM change, no add song, no setlist
+  details edit, because a pull would drop such an edit: so it is blocked rather than kept. To
+  allow them: keep a reader's setlist edits in a device-only overlay that a pull doesn't
+  overwrite and that is applied over the pulled setlist, like `setlist_local` already is for the
+  capo and the sections shown (and per-song preferences in localStorage). Work out what the
+  overlay does when the leader changes the same setlist (theirs wins for what the reader
+  didn't touch? a "your changes" marker with a reset?), then remove the isReadOnlyOrganisation()
+  gates in setlist-page.ts, library-view.ts and the header. A share (readOnly page option) is
+  the same idea: a received setlist is kept on the device on its own, so a local key change
+  there is harmless and should work too. Nothing is ever uploaded for a reader
 - song notes/stickies
 
 information UI
