@@ -35,16 +35,21 @@ describe('setlist-overview', () => {
   const cardAt = (overview: SetlistOverview, index: number) =>
     overview.querySelectorAll('song-card')[index]
 
-  it('has no songs to start with, and a hidden Add Song button', async () => {
+  it('has no songs to start with, and an Add Song button', async () => {
     const overview = await fixture<SetlistOverview>(html`<setlist-overview></setlist-overview>`)
     expect(overview.querySelectorAll('song-card')).to.have.length(0)
-    expect(overview.querySelector<HTMLElement>('.add-song-button')?.hidden).to.equal(true)
+    expect(overview.querySelector<HTMLElement>('.add-song-button')?.hidden).to.equal(false)
   })
 
-  it('shows a card for each song, and the Add Song button in edit mode', async () => {
+  it('shows a card for each song, and the Add Song button whether or not it is in edit mode', async () => {
     const overview = await show(true)
     expect(overview.querySelectorAll('song-card')).to.have.length(2)
     expect(overview.querySelector<HTMLElement>('.add-song-button')?.hidden).to.equal(false)
+    overview.editMode = false
+    await overview.updateComplete
+    expect(overview.querySelector<HTMLElement>('.add-song-button')?.checkVisibility()).to.equal(
+      true
+    )
   })
 
   it('says which song was clicked, deleted or given another key, by its place', async () => {

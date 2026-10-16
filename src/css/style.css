@@ -1055,7 +1055,7 @@ body.edit-mode .key-selector:focus {
   margin: 0 auto;
 }
 
-/* The row above the songs: Add Song (in edit mode) on the left, Go live on the right */
+/* The row above the songs: Add Song on the left, Go live on the right */
 .overview-actions {
   display: flex;
   align-items: center;
@@ -1097,10 +1097,6 @@ body.edit-mode .key-selector:focus {
   color: var(--button-bg);
   font: inherit;
   cursor: pointer;
-}
-
-.overview-button[hidden] {
-  display: none;
 }
 
 .overview-button.go {

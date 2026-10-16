@@ -159,6 +159,8 @@ test.describe('Editing a setlist', () => {
     await page.goto(await seedSetlist(page))
     const cards = page.locator('setlist-overview song-card')
     await expect(cards).toHaveCount(3)
+    // Adding a song is not an edit: it is there outside edit mode, for a late change
+    await expect(page.getByRole('button', { name: 'Add Song' })).toBeVisible()
     await enterEditMode(page)
 
     await page.getByRole('button', { name: 'Add Song' }).click()

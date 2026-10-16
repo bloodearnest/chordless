@@ -97,7 +97,6 @@ export class SetlistOverview extends LitElement {
           <button
             type="button"
             class="overview-button add-song-button"
-            ?hidden=${!this.editMode}
             @click=${this._handleAddSong}
           >
             <app-icon name="add" size="20"></app-icon>
