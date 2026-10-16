@@ -25,6 +25,8 @@ lint:
     npx tsc -b
     @echo "Running knip (unused files, exports and dependencies)..."
     npx knip --no-progress
+    @echo "Checking wrangler.toml (a warning fails)..."
+    scripts/lint-wrangler.sh
 
 # Format project files with Biome
 format:

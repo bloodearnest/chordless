@@ -46,6 +46,21 @@ run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/s/*", "/dev", "/
 # Local development settings: `npm run dev` runs `wrangler dev --env dev`.
 # Secrets still come from .dev.vars.
 [env.dev]
+# Not the production domain: an environment inherits `routes`, and deploying it would take the
+# custom domain from the top-level worker
+routes = []
+
+# Environments don't inherit ratelimits, so the email handler has them here too (same limits)
+[[env.dev.ratelimits]]
+name = "EMAIL_PER_SENDER"
+namespace_id = "7301"
+simple = { limit = 5, period = 60 }
+
+[[env.dev.ratelimits]]
+name = "EMAIL_OVERALL"
+namespace_id = "7302"
+simple = { limit = 30, period = 60 }
+
 [env.dev.vars]
 # Serve the component playgrounds in src/dev/ (404 in production)
 DEV_PAGES = "true"
