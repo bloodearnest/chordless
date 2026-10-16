@@ -59,6 +59,7 @@ import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { toast } from './toast.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
@@ -817,7 +818,7 @@ export class SetlistPage {
       await this._database().deleteUnsyncedSetlist(setlist.id)
     } catch (error) {
       console.error('[SetlistInfo] Failed to delete the setlist:', error)
-      alert(`Couldn't delete the setlist: ${errorMessage(error)}`)
+      toast("Couldn't delete the setlist.", { kind: 'error', details: errorMessage(error) })
       return
     }
     // The section states and capos this device kept for it
@@ -845,7 +846,10 @@ export class SetlistPage {
     } catch (error) {
       Object.assign(setlist, previous)
       console.error('[SetlistInfo] Failed to save setlist details:', error)
-      alert(`Couldn't save the setlist details: ${errorMessage(error)}`)
+      toast("Couldn't save the setlist details. They are as they were.", {
+        kind: 'error',
+        details: errorMessage(error),
+      })
       return
     }
 
@@ -1723,6 +1727,7 @@ export class SetlistPage {
   }
 
   async addSongToSetlist(song: SongWithContent) {
+    let undo: () => unknown = () => undefined // what puts the setlist back if the save fails
     try {
       // Get current setlist
       const setlist = this.currentSetlist
@@ -1753,6 +1758,8 @@ export class SetlistPage {
 
       // Add to setlist
       setlist.songs.push(newSongEntry)
+      // Not saved: not in the setlist, or trying again would add it twice
+      undo = () => setlist.songs.splice(setlist.songs.indexOf(newSongEntry), 1)
       setlist.modifiedDate = new Date().toISOString()
 
       // Save to database
@@ -1764,7 +1771,12 @@ export class SetlistPage {
       await this.renderSetlist(setlist.id)
     } catch (error) {
       console.error('Error adding song to setlist:', error)
-      alert('Failed to add song to setlist. Please try again.')
+      undo()
+      toast("Couldn't add the song to the setlist.", {
+        kind: 'error',
+        details: errorMessage(error),
+        action: { label: 'Try again', run: () => this.addSongToSetlist(song) },
+      })
     }
   }
 
@@ -1790,6 +1802,7 @@ export class SetlistPage {
   }
 
   async deleteSongFromSetlist(index: number) {
+    let undo: () => unknown = () => undefined // what puts the setlist back if the save fails
     try {
       const setlist = this.currentSetlist
       if (!setlist) {
@@ -1798,7 +1811,14 @@ export class SetlistPage {
       }
 
       // Remove song from array
-      setlist.songs.splice(index, 1)
+      const removed = setlist.songs.splice(index, 1)[0]
+      // Not saved: it is still in the setlist, or trying again would remove the next song
+      undo = () => {
+        setlist.songs.splice(index, 0, removed)
+        setlist.songs.forEach((entry, i) => {
+          entry.order = i
+        })
+      }
 
       // Update order for remaining songs
       setlist.songs.forEach((song, i) => {
@@ -1821,7 +1841,12 @@ export class SetlistPage {
       await this.renderSetlist(setlist.id)
     } catch (error) {
       console.error('Error deleting song from setlist:', error)
-      alert('Failed to delete song. Please try again.')
+      undo()
+      toast("Couldn't remove the song from the setlist.", {
+        kind: 'error',
+        details: errorMessage(error),
+        action: { label: 'Try again', run: () => this.deleteSongFromSetlist(index) },
+      })
     }
   }
 

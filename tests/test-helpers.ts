@@ -111,3 +111,20 @@ export function installFakeTimers() {
     },
   }
 }
+
+/** The toast showing now (js/toast.ts), or null */
+export function shownToast() {
+  const element = document.querySelector('app-toast')
+  if (!element?.isOpen) return null
+  return {
+    message: element._message,
+    kind: element._kind,
+    details: element._details,
+    action: element._action,
+  }
+}
+
+/** Take the toast away, so the next test starts without one (call it in afterEach) */
+export function clearToasts() {
+  document.querySelector('app-toast')?.remove()
+}

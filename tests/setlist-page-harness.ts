@@ -16,7 +16,7 @@ import { SetlistPage } from '../src/js/setlist-page.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { clearToasts, suppressConsoleLogs } from './test-helpers.ts'
 
 const { before, beforeEach, afterEach } = window
 
@@ -40,7 +40,6 @@ export function useSetlistPage() {
     page: undefined as unknown as SetlistPage,
     /** Where goTo() was asked to go, as {url, replace} */
     visited: [] as { url: string; replace?: boolean }[],
-    alerts: [] as string[],
     errors: [] as unknown[][],
     /** Save a song (and its chart) to the library */
     saveSong,
@@ -50,7 +49,6 @@ export function useSetlistPage() {
     flush,
   }
   let run = ''
-  let realAlert: typeof window.alert
   let realError: typeof console.error
 
   async function saveSong(title: string, key = 'G', tempo = 90) {
@@ -134,12 +132,7 @@ export function useSetlistPage() {
     rig.root = document.createElement('div')
     document.body.append(rig.root)
     render(setlistTemplate({ editable: true, shareable: true }), rig.root)
-    rig.alerts = []
     rig.errors = []
-    realAlert = window.alert
-    window.alert = (message?: string) => {
-      rig.alerts.push(String(message))
-    }
     realError = console.error
     console.error = (...args: unknown[]) => {
       rig.errors.push(args)
@@ -150,7 +143,7 @@ export function useSetlistPage() {
     rig.page?.dispose()
     setRouter(null)
     rig.root.remove()
-    window.alert = realAlert
+    clearToasts()
     console.error = realError
     setCapoPreference(false)
     localStorage.removeItem('section_defaults')

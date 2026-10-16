@@ -18,13 +18,13 @@ import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
+import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongUserPrefs } from '../src/js/song-user-prefs.ts'
-import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { setlistTemplate } from '../src/js/views/setlist-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
-import { settle, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { clearToasts, settle, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, before, beforeEach, afterEach } = window
 
@@ -39,8 +39,6 @@ describe('the setlist page', () => {
   let songs: { uuid: string; id: string; title: string }[]
   let root: HTMLElement
   let page: SetlistPage
-  let realAlert: typeof window.alert
-  let alerts: string[]
   let realError: typeof console.error
   let errors: unknown[][]
 
@@ -89,6 +87,11 @@ describe('the setlist page', () => {
     return setlist
   }
 
+  /** Wait for something to come true (the page saves in the background) */
+  async function until(check: () => Promise<boolean>) {
+    for (let i = 0; i < 100 && !(await check()); i++) await wait(20)
+  }
+
   const titles = (list: { title: string }[]) => list.map(song => song.title)
   const savedTitles = async (id: string) => {
     const saved = must(await db.getSetlist(id))
@@ -119,12 +122,7 @@ describe('the setlist page', () => {
     root = document.createElement('div')
     document.body.append(root)
     render(setlistTemplate({ editable: true }), root)
-    alerts = []
     errors = []
-    realAlert = window.alert
-    window.alert = (message?: string) => {
-      alerts.push(String(message))
-    }
     realError = console.error
     console.error = (...args: unknown[]) => {
       errors.push(args)
@@ -135,7 +133,7 @@ describe('the setlist page', () => {
     page?.dispose()
     setRouter(null)
     root.remove()
-    window.alert = realAlert
+    clearToasts()
     console.error = realError
     setCapoPreference(false)
     document.body.classList.remove('edit-mode')
@@ -293,9 +291,33 @@ describe('the setlist page', () => {
         db.saveSetlist = realSave
       }
 
-      expect(alerts).to.deep.equal(['Failed to add song to setlist. Please try again.'])
+      expect(shownToast()).to.include({
+        message: "Couldn't add the song to the setlist.",
+        kind: 'error',
+        details: 'disk full',
+      })
+      expect(shownToast()?.action?.label).to.equal('Try again')
       expect(errors.some(args => String(args[0]).includes('Error adding song'))).to.equal(true)
       expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo'])
+    })
+
+    it('adds the song once, not twice, when Try again is pressed after a failed save', async () => {
+      const setlist = await open(2)
+      const realSave = db.saveSetlist
+      db.saveSetlist = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        await page.addSongToSetlist(asLibrarySong(songs[3]))
+      } finally {
+        db.saveSetlist = realSave
+      }
+      expect(page.currentSetlist?.songs).to.have.length(2)
+
+      must(shownToast()?.action).run()
+      await until(async () => (await savedTitles(setlist.id)).length === 3)
+
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo', 'Delta'])
     })
 
     it('does nothing, and says so in the log, before a setlist is shown', async () => {
@@ -303,7 +325,7 @@ describe('the setlist page', () => {
 
       await unstarted.addSongToSetlist(asLibrarySong(songs[3]))
 
-      expect(alerts).to.deep.equal([])
+      expect(shownToast()).to.equal(null)
       expect(errors.map(args => args[0])).to.deep.equal(['No current setlist'])
     })
   })
@@ -347,7 +369,60 @@ describe('the setlist page', () => {
       } finally {
         db.saveSetlist = realSave
       }
-      expect(alerts).to.deep.equal(['Failed to delete song. Please try again.'])
+      expect(shownToast()).to.include({
+        message: "Couldn't remove the song from the setlist.",
+        kind: 'error',
+        details: 'disk full',
+      })
+    })
+  })
+
+  describe('a song that fails before anything is changed', () => {
+    it('is said so, with nothing to put back, when it cannot be added', async () => {
+      const setlist = await open(2)
+      const broken = {
+        get metadata(): never {
+          throw new Error('unreadable chart')
+        },
+      }
+
+      await page.addSongToSetlist(broken as never)
+
+      expect(shownToast()?.details).to.equal('unreadable chart')
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo'])
+    })
+
+    it('is said so, with nothing to put back, when it cannot be removed', async () => {
+      await open()
+      must(page.currentSetlist).songs.splice = () => {
+        throw new Error('frozen')
+      }
+
+      await page.deleteSongFromSetlist(0)
+
+      expect(shownToast()?.details).to.equal('frozen')
+    })
+  })
+
+  describe('removing a song that cannot be saved', () => {
+    it('keeps it in place, and Try again removes that song and not the next', async () => {
+      const setlist = await open()
+      const realSave = db.saveSetlist
+      db.saveSetlist = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        await page.deleteSongFromSetlist(0)
+      } finally {
+        db.saveSetlist = realSave
+      }
+      expect(page.currentSetlist?.songs.map(entry => entry.order)).to.deep.equal([0, 1, 2])
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo', 'Charlie'])
+
+      must(shownToast()?.action).run()
+      await until(async () => (await savedTitles(setlist.id)).length === 2)
+
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Bravo', 'Charlie'])
     })
   })
 

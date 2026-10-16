@@ -17,7 +17,7 @@ import { type HomeView, sharedGroup } from '../src/js/views/home-view.ts'
 import { makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, wait } from './test-helpers.ts'
+import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -54,15 +54,9 @@ describe('the home view', () => {
   let outlet: HTMLElement
   let view: HomeView
   let visited: string[]
-  const realAlert = window.alert
-  let alerts: string[]
 
   beforeEach(async () => {
     visited = []
-    alerts = []
-    window.alert = (message?: string) => {
-      alerts.push(String(message))
-    }
     setRouter({
       navigate: async (url: string) => {
         visited.push(url)
@@ -82,7 +76,7 @@ describe('the home view', () => {
     view?.remove()
     outlet.remove()
     setRouter(null)
-    window.alert = realAlert
+    clearToasts()
     await setOrganisationReadOnly(organisationId, false)
     await deleteOrganisation(organisationId)
     if (before.id) await setCurrentOrganisation(before.id, before.name)
@@ -242,8 +236,39 @@ describe('the home view', () => {
       } finally {
         Object.getPrototypeOf(db).saveSetlist = real
       }
-      expect(alerts).to.deep.equal(['Failed to create setlist: disk full'])
+      expect(shownToast()).to.include({
+        message: "Couldn't create the setlist.",
+        kind: 'error',
+        details: 'disk full',
+      })
       expect(visited).to.deep.equal([])
+    })
+
+    it('makes the setlist when Try again is pressed once it can be saved', async () => {
+      await open()
+      const real = Object.getPrototypeOf(db).saveSetlist
+      Object.getPrototypeOf(db).saveSetlist = () => Promise.reject(new Error('disk full'))
+      try {
+        form().dispatchEvent(
+          new SetlistDetailsSaveEvent({
+            date: '2026-11-01',
+            time: '',
+            type: 'Other',
+            name: '',
+            owner: '',
+            ownerId: '',
+          })
+        )
+        await wait(100)
+      } finally {
+        Object.getPrototypeOf(db).saveSetlist = real
+      }
+
+      must(shownToast()?.action).run()
+      await wait(200)
+
+      expect(visited).to.have.length(1)
+      expect(visited[0]).to.match(/^\/setlist\//)
     })
   })
 })

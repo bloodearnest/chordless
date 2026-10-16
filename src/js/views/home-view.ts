@@ -20,6 +20,7 @@ import { goTo } from '../navigation.ts'
 import { getCurrentOrganisation, isReadOnlyOrganisation } from '../organisation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getOrganisationPeople } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
+import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
 import { PageView, type ViewState } from './page-view.ts'
@@ -136,7 +137,11 @@ export class HomeView extends PageView {
       await goTo(`/setlist/${newSetlist.id}`)
     } catch (error) {
       console.error('Failed to create setlist:', error)
-      alert(`Failed to create setlist: ${errorMessage(error)}`)
+      toast("Couldn't create the setlist.", {
+        kind: 'error',
+        details: errorMessage(error),
+        action: { label: 'Try again', run: () => this.#create(event) },
+      })
     }
   }
 

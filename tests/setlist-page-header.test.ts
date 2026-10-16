@@ -32,7 +32,7 @@ import { SongChangeEvent } from '../src/js/app-events.ts'
 import { getCurrentOrganisation, setOrganisationReadOnly } from '../src/js/organisation.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { wait } from './test-helpers.ts'
+import { shownToast, wait } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -543,7 +543,8 @@ describe('the setlist page: header, menu and keys', () => {
         Object.getPrototypeOf(rig.db).saveSetlist = real
       }
       expect(rig.page.currentSetlist?.name).to.equal('Original')
-      expect(rig.alerts.at(-1)).to.contain("Couldn't save the setlist details: disk full")
+      expect(shownToast()).to.include({ kind: 'error', details: 'disk full' })
+      expect(shownToast()?.message).to.contain("Couldn't save the setlist details")
     })
 
     it('are not saved with no setlist', async () => {
@@ -586,7 +587,7 @@ describe('the setlist page: header, menu and keys', () => {
       await rig.db.saveSetlist({ ...setlist, driveFileId: 'in-drive' })
       must($<AppModal>('#delete-setlist-modal')).ask = async () => true
       await rig.page.deleteSetlist()
-      expect(rig.alerts.at(-1)).to.contain("Couldn't delete the setlist")
+      expect(shownToast()?.message).to.contain("Couldn't delete the setlist")
       expect(await rig.db.getSetlist(setlist.id)).to.not.equal(undefined)
     })
 
