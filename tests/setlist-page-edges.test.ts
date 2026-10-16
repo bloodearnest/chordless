@@ -7,13 +7,14 @@ import { EditModeToggleEvent } from '../src/components/app-header.ts'
 import { SongSettingsClickEvent } from '../src/components/musical-metadata-display.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import type { SongSettingsPopover } from '../src/components/song-settings-popover.ts'
+import { getLive, goLive, leaveLive } from '../src/js/live.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongWithContent } from '../src/js/song-utils.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { wait } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, afterEach } = window
 
 describe('the setlist page: corners', () => {
   const rig = useSetlistPage()
@@ -268,5 +269,63 @@ describe('the setlist page: corners', () => {
       parsed: { ...library.parsed, metadata: {} },
     } as never)
     expect(rig.page.songs.length).to.be.greaterThan(3)
+  })
+
+  describe('going live from the overview', () => {
+    afterEach(() => localStorage.removeItem('live_state'))
+    const button = (id: string) => must($<HTMLButtonElement>(id))
+
+    it('goes live on this setlist, shows Live now, and leaves again', async () => {
+      const setlist = await rig.open()
+      expect(button('#go-live-button').textContent).to.contain('Go live')
+      button('#go-live-button').click()
+      expect(getLive()?.url).to.equal(`/setlist/${setlist.id}`)
+      await rig.flush()
+      expect($('#overview-live')?.getAttribute('data-live')).to.equal('this')
+
+      button('#leave-live-button').click()
+      expect(getLive()).to.equal(null)
+      await rig.flush()
+      expect($('#overview-live')?.getAttribute('data-live')).to.equal('none')
+    })
+
+    it('offers to take over when another setlist is live, and keeps up with other windows', async () => {
+      await rig.open()
+      goLive('/setlist/another', 'Other')
+      await rig.flush()
+      expect($('#overview-live')?.getAttribute('data-live')).to.equal('other')
+      leaveLive()
+      await rig.flush()
+      expect($('#overview-live')?.getAttribute('data-live')).to.equal('none')
+    })
+
+    it('has nothing to update when there is no overview to show it on', async () => {
+      await rig.open()
+      rig.page._setOverviewComponent(null)
+      expect(() => goLive('/setlist/another', 'Other')).to.not.throw()
+    })
+
+    it('is live from the start when this setlist already is', async () => {
+      const first = await rig.open()
+      goLive(`/setlist/${first.id}`, 'Sunday')
+      rig.page.dispose()
+      rig.page = new SetlistPage({ root: rig.root, setlistId: first.id, db: rig.db })
+      await rig.page.start()
+      await rig.flush()
+      expect($('#overview-live')?.getAttribute('data-live')).to.equal('this')
+    })
+
+    it("keeps a share's key, which is in the link's fragment, with its address", async () => {
+      await rig.open()
+      const original = location.href
+      history.replaceState(null, '', '#key=abc')
+      try {
+        rig.page._routeFor = index => ({ name: 'share', fileId: 'file 1', songIndex: index })
+        button('#go-live-button').click()
+        expect(getLive()?.url).to.equal('/s/file%201#key=abc')
+      } finally {
+        history.replaceState(null, '', original)
+      }
+    })
   })
 })

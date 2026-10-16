@@ -1,7 +1,10 @@
 import { css, html, LitElement } from 'lit'
+import { FullscreenController } from '../js/fullscreen.ts'
 import type { IconName } from '../js/icons.ts'
 import {
+  FullscreenPreferenceEvent,
   getCapoPreference,
+  getFullscreenPreference,
   getKeepAwakeMinutes,
   getKeepAwakePreference,
   getMusicianType,
@@ -12,6 +15,7 @@ import {
   KeepAwakePreferenceEvent,
   type MusicianType,
   setCapoPreference,
+  setFullscreenPreference,
   setKeepAwakeMinutes,
   setKeepAwakePreference,
   setMusicianType,
@@ -40,6 +44,7 @@ export class AppPreferences extends LitElement {
     capoEnabled: { type: Boolean, attribute: false },
     keepAwake: { type: Boolean, attribute: false },
     keepAwakeMinutes: { type: Number, attribute: false },
+    fullscreen: { type: Boolean, attribute: false },
   }
 
   declare useNashville: boolean
@@ -48,6 +53,7 @@ export class AppPreferences extends LitElement {
   declare capoEnabled: boolean
   declare keepAwake: boolean
   declare keepAwakeMinutes: number
+  declare fullscreen: boolean
 
   static override styles = [
     panelStyles,
@@ -150,6 +156,7 @@ export class AppPreferences extends LitElement {
     this.capoEnabled = getCapoPreference()
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
+    this.fullscreen = getFullscreenPreference()
   }
 
   override connectedCallback() {
@@ -158,14 +165,17 @@ export class AppPreferences extends LitElement {
     // The menu's modal outlives each visit, and the setting can change elsewhere meanwhile
     window.addEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.addEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
+    window.addEventListener(FullscreenPreferenceEvent.type, this._onFullscreenChanged)
     this.keepAwake = getKeepAwakePreference()
     this.keepAwakeMinutes = getKeepAwakeMinutes()
+    this.fullscreen = getFullscreenPreference()
   }
 
   override disconnectedCallback() {
     window.removeEventListener(WakeLockStateEvent.type, this._onWakeLockState)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this._onKeepAwakeChanged)
     window.removeEventListener(KeepAwakeLimitEvent.type, this._onKeepAwakeLimitChanged)
+    window.removeEventListener(FullscreenPreferenceEvent.type, this._onFullscreenChanged)
     super.disconnectedCallback()
   }
 
@@ -173,6 +183,10 @@ export class AppPreferences extends LitElement {
 
   _onKeepAwakeChanged = (event: KeepAwakePreferenceEvent): void => {
     this.keepAwake = event.enabled
+  }
+
+  _onFullscreenChanged = (event: FullscreenPreferenceEvent): void => {
+    this.fullscreen = event.enabled
   }
 
   _onKeepAwakeLimitChanged = (event: KeepAwakeLimitEvent): void => {
@@ -349,8 +363,11 @@ export class AppPreferences extends LitElement {
         </div>
 
         <div class="panel">
-          <h3>Screen</h3>
-          <p>Keep the screen from turning off while a setlist is open, so you needn't touch it.</p>
+          <h3>Screen and live mode</h3>
+          <p>
+            Keep the screen from turning off while a setlist is open, and on any page while you
+            are live (Go live is on a setlist's overview), so you needn't touch it.
+          </p>
           <label class="toggle" for="toggle-keep-awake">
             <input
               type="checkbox"
@@ -385,6 +402,20 @@ export class AppPreferences extends LitElement {
             ${this._powerStatus()}
           </p>
           ${this._renderWakeLockAction()}
+          ${
+            FullscreenController.supported
+              ? html`<label class="toggle" for="toggle-fullscreen">
+                <input
+                  type="checkbox"
+                  id="toggle-fullscreen"
+                  name="fullscreen-while-live"
+                  ?checked=${this.fullscreen}
+                  @change=${this._onFullscreenToggle}
+                />
+                <span>Fullscreen while live</span>
+              </label>`
+              : ''
+          }
         </div>
 
         <div class="panel">
@@ -448,6 +479,12 @@ export class AppPreferences extends LitElement {
     const value = (event.currentTarget as HTMLInputElement).checked
     this.keepAwake = value
     setKeepAwakePreference(value)
+  }
+
+  _onFullscreenToggle(event: Event): void {
+    const value = (event.currentTarget as HTMLInputElement).checked
+    this.fullscreen = value
+    setFullscreenPreference(value)
   }
 
   _onKeepAwakeLimitChange(event: Event): void {

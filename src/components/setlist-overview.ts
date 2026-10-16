@@ -42,6 +42,25 @@ export class OverviewAddSongEvent extends Event {
   }
 }
 
+/** Go live was pressed (the tap is the gesture fullscreen needs: handle it at once) */
+export class OverviewGoLiveEvent extends Event {
+  static readonly type = 'setlist-overview:go-live'
+  constructor() {
+    super(OverviewGoLiveEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** Leave live was pressed */
+export class OverviewLeaveLiveEvent extends Event {
+  static readonly type = 'setlist-overview:leave-live'
+  constructor() {
+    super(OverviewLeaveLiveEvent.type, { bubbles: true, composed: true })
+  }
+}
+
+/** Whether this setlist is the one that is live, another is, or none */
+export type OverviewLiveState = 'this' | 'other' | 'none'
+
 /**
  * SetlistOverview Component
  *
@@ -52,15 +71,18 @@ export class SetlistOverview extends LitElement {
   static override properties = {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
+    liveState: { attribute: false },
   }
 
   declare songs: unknown[] /* TYPE */
   declare editMode: boolean
+  declare liveState: OverviewLiveState
 
   constructor() {
     super()
     this.songs = []
     this.editMode = false
+    this.liveState = 'none'
   }
 
   // Render into light DOM so existing CSS/selectors keep working
@@ -71,6 +93,7 @@ export class SetlistOverview extends LitElement {
   override render() {
     return html`
       <div class="setlist-overview">
+        ${this._renderLive()}
         <div class="overview-songs">
           ${this.songs.map(
             (song, index) => html`
@@ -104,6 +127,35 @@ export class SetlistOverview extends LitElement {
         </div>
       </div>
     `
+  }
+
+  _renderLive() {
+    if (this.liveState === 'this') {
+      return html`
+        <div class="overview-live" id="overview-live" data-live="this">
+          <span class="live-status"><span class="live-dot" aria-hidden="true"></span>Live now</span>
+          <button type="button" class="live-button" id="leave-live-button" @click=${this._handleLeaveLive}>
+            Leave live
+          </button>
+        </div>
+      `
+    }
+    return html`
+      <div class="overview-live" id="overview-live" data-live=${this.liveState}>
+        <button type="button" class="live-button go" id="go-live-button" @click=${this._handleGoLive}>
+          <app-icon name="sun" size="20"></app-icon>
+          ${this.liveState === 'other' ? 'Take over live here' : 'Go live'}
+        </button>
+      </div>
+    `
+  }
+
+  _handleGoLive(): void {
+    this.dispatchEvent(new OverviewGoLiveEvent())
+  }
+
+  _handleLeaveLive(): void {
+    this.dispatchEvent(new OverviewLeaveLiveEvent())
   }
 
   _handleSongClick(index: number): void {

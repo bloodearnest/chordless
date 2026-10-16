@@ -19,6 +19,8 @@ import {
 } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
+  OverviewGoLiveEvent,
+  OverviewLeaveLiveEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
@@ -36,6 +38,7 @@ import {
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import type { Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
+import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { isReadOnlyOrganisation } from './organisation.ts'
@@ -139,6 +142,9 @@ export class SetlistPage {
   _onOverviewSongClick: (event: OverviewSongClickEvent) => void
   _onOverviewSongDelete: (event: OverviewSongDeleteEvent) => void
   _onOverviewAddSong: () => void
+  _onOverviewGoLive: () => void
+  _onOverviewLeaveLive: () => void
+  _onLiveChange: () => void
   _onOverviewSongKeyChange: (event: OverviewSongKeyChangeEvent) => void
   _reorder: OverviewReorder
   _addSongModal: AddSongModal
@@ -217,6 +223,13 @@ export class SetlistPage {
       this._addSongModal.open()
     }
 
+    this._onOverviewGoLive = () => {
+      // Synchronously, in the tap: that is the user gesture fullscreen needs
+      goLive(this._liveUrl(), this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : '')
+    }
+    this._onOverviewLeaveLive = () => leaveLive()
+    this._onLiveChange = () => this._refreshOverviewLive()
+
     this._reorder = new OverviewReorder({
       root: this.root,
       isEnabled: () => this.overviewEditMode,
@@ -264,6 +277,7 @@ export class SetlistPage {
     window.addEventListener(SectionDefaultsEvent.type, this._onSectionDefaultsChanged, { signal })
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
+    window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
   }
 
   /** The route changed within this setlist: show the song it names */
@@ -499,6 +513,11 @@ export class SetlistPage {
         OverviewAddSongEvent.type,
         this._onOverviewAddSong
       )
+      this._overviewComponent.removeEventListener(OverviewGoLiveEvent.type, this._onOverviewGoLive)
+      this._overviewComponent.removeEventListener(
+        OverviewLeaveLiveEvent.type,
+        this._onOverviewLeaveLive
+      )
       this._overviewComponent.removeEventListener(
         OverviewSongKeyChangeEvent.type,
         this._onOverviewSongKeyChange
@@ -511,6 +530,9 @@ export class SetlistPage {
       component.addEventListener(OverviewSongClickEvent.type, this._onOverviewSongClick)
       component.addEventListener(OverviewSongDeleteEvent.type, this._onOverviewSongDelete)
       component.addEventListener(OverviewAddSongEvent.type, this._onOverviewAddSong)
+      component.addEventListener(OverviewGoLiveEvent.type, this._onOverviewGoLive)
+      component.addEventListener(OverviewLeaveLiveEvent.type, this._onOverviewLeaveLive)
+      this._refreshOverviewLive()
       component.addEventListener(OverviewSongKeyChangeEvent.type, this._onOverviewSongKeyChange)
     }
   }
@@ -519,6 +541,24 @@ export class SetlistPage {
     if (this._overviewComponent) {
       this._overviewComponent.songs = [...this.songs]
     }
+  }
+
+  /** Where this setlist is live: its URL, and for a share its key, which is in the fragment */
+  _liveUrl(): string {
+    const route = this._routeFor(-1)
+    // biome-ignore lint/plugin: the share key is the link's fragment
+    return buildUrl(route) + (route.name === 'share' ? location.hash : '')
+  }
+
+  /** Whether this setlist, another or none is live, for the overview's button */
+  _refreshOverviewLive() {
+    if (!this._overviewComponent) return
+    const live = getLive()
+    this._overviewComponent.liveState = !live
+      ? 'none'
+      : isLiveSetlist(live, buildUrl(this._routeFor(-1)))
+        ? 'this'
+        : 'other'
   }
 
   _refreshOverviewComponentEditMode() {

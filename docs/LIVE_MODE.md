@@ -1,7 +1,8 @@
 # Live mode
 
-**Status: being built.** Built so far: the state (`js/live.ts`). Still to build: the wake lock
-following it, fullscreen, the overview button, the shell indicator and the preferences.
+**Status: built.** The state (`js/live.ts`), the wake lock following it, fullscreen
+(`js/fullscreen.ts`), the Go live button on the overview, the shell chip
+(`components/live-indicator.ts`) and the Preferences toggle. Not yet tried on a real tablet.
 
 Live mode is an explicit "we are performing from this setlist" state. It is the place for
 anything that should last for the length of a service, not for the length of one page view.
@@ -105,11 +106,19 @@ In the existing wake lock section, which becomes "Screen and live mode":
 
 ## Changes to the code
 
-- `js/live.ts`: the state and events (built).
-- `WakeLockController`: `setManual()` goes; `#wanted()` also asks whether the device is live.
-  `hold()` and `letGo()` stay, for the open setlist.
-- A fullscreen service, the overview button, the shell indicator, and the preferences.
-- `app-preferences.ts`: the wake lock status and "Ask again" UI becomes live mode status.
+- `js/live.ts`: the state and events.
+- `WakeLockController`: `setManual()` is gone; `#wanted()` also asks whether the device is live
+  (and a page opened while live takes the lock at once). `hold()` and `letGo()` stay, for the
+  open setlist.
+- `js/fullscreen.ts`: asked for in the tap that goes live (the overview's button handler runs
+  synchronously, so the browser sees the gesture), again on the next gesture after a refusal or
+  coming back to the page, never after the user left it themselves. Started from `app.ts`.
+- `setlist-overview.ts` has the button (`liveState`: this, other or none), and `SetlistPage`
+  does the going and leaving, and keeps `liveState` current.
+- `live-indicator.ts` is in `index.html`: a chip, bottom left, with a menu (open the setlist,
+  leave live). It stays out of the way on a song of the live setlist.
+- `app-preferences.ts`: the "Screen and live mode" panel has the Fullscreen while live toggle;
+  "Keep awake now" is gone.
 - `SetlistView` and `ShareView` share `SetlistPageHost` (built), so the setlist lifecycle is
   in one place.
 
@@ -120,5 +129,6 @@ In the existing wake lock section, which becomes "Screen and live mode":
   it can be tried, and can be turned off in Preferences.
 - What happens when a share expires while live (the plan: a toast, and leave live).
 - Whether going live should also be reachable from somewhere other than the overview.
-- What the shell indicator looks like in a song, where the whole screen is the song.
+- The indicator is hidden on a song of the live setlist, where the whole screen is the song. If
+  a stale live state is missed there, show it some other way.
 - What Sync needs from the live record (session id, role) before it is designed.

@@ -1,6 +1,8 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import {
   OverviewAddSongEvent,
+  OverviewGoLiveEvent,
+  OverviewLeaveLiveEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
@@ -70,5 +72,39 @@ describe('setlist-overview', () => {
     overview.addEventListener(OverviewAddSongEvent.type, () => added++)
     overview.querySelector<HTMLButtonElement>('.add-song-button')?.click()
     expect(added).to.equal(1)
+  })
+
+  describe('live', () => {
+    const live = (overview: SetlistOverview) => overview.querySelector('#overview-live')
+
+    it('offers Go live, which says when it is pressed', async () => {
+      const overview = await show()
+      expect(live(overview)?.getAttribute('data-live')).to.equal('none')
+      expect(overview.querySelector('#go-live-button')?.textContent).to.contain('Go live')
+      let pressed = 0
+      overview.addEventListener(OverviewGoLiveEvent.type, () => pressed++)
+      overview.querySelector<HTMLButtonElement>('#go-live-button')?.click()
+      expect(pressed).to.equal(1)
+    })
+
+    it('offers to take over when another setlist is live', async () => {
+      const overview = await show()
+      overview.liveState = 'other'
+      await overview.updateComplete
+      expect(live(overview)?.getAttribute('data-live')).to.equal('other')
+      expect(overview.querySelector('#go-live-button')?.textContent).to.contain('Take over')
+    })
+
+    it('says Live now when this setlist is live, with a way to leave, which says when it is pressed', async () => {
+      const overview = await show()
+      overview.liveState = 'this'
+      await overview.updateComplete
+      expect(live(overview)?.textContent).to.contain('Live now')
+      expect(overview.querySelector('#go-live-button')).to.equal(null)
+      let left = 0
+      overview.addEventListener(OverviewLeaveLiveEvent.type, () => left++)
+      overview.querySelector<HTMLButtonElement>('#leave-live-button')?.click()
+      expect(left).to.equal(1)
+    })
   })
 })

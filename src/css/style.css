@@ -1055,6 +1055,54 @@ body.edit-mode .key-selector:focus {
   margin: 0 auto;
 }
 
+/* Go live / Live now, above the songs */
+.overview-live {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 900px;
+  margin: 0 auto 1rem;
+}
+
+.overview-live[data-live='none'],
+.overview-live[data-live='other'] {
+  justify-content: flex-end;
+}
+
+.live-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.live-dot {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--color-danger);
+}
+
+.live-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 1.25rem;
+  border: 1px solid var(--button-bg);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--button-bg);
+  font: inherit;
+  cursor: pointer;
+}
+
+.live-button.go {
+  background: var(--button-bg);
+  color: var(--button-text, white);
+}
+
 /* Override song card styles for setlist overview context */
 .overview-song-card {
   position: relative; /* Needed for drag and drop pseudo-elements */
