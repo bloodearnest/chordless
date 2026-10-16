@@ -31,6 +31,23 @@ To do that, you have to enter edit mode explicitly. This has several goals
 - common UI pattern for the app
 - edit mode UI can be more complex/cluttered, and the normal mode is simple and minimal, to maximise information.
 
+### Pragmatic, not dogmatic: be permissive in the moment
+
+Edit mode guards against *accidents*; it is not a rule about what users may do. People use the app
+in ways we can't all model, and they are grown-ups: if they want to make a change, even mid-service,
+they must be able to. Overly restrictive is an antipattern here.
+
+- Don't remove an option because it "doesn't belong" in a mode. A late song, a key change, a
+  fix to a chart: all must stay possible while live. Adding a song is always available, not
+  behind edit mode.
+- Protect with friction, not prohibition: a confirmation, a second tap, an undo, or edit mode for
+  the risky or destructive things (delete, reorder). Never a dead end.
+- Edit mode is for editing the setlist's contents (order, keys, and later BPM), not a gate in
+  front of every change.
+- Features that depend on how a group works (a leader pushing changes over a future WebRTC
+  session) are opt-in: they add to what a lone user can do and never take it away.
+- What is not up to us stays: a read-only Drive folder, or a share link, can't be written to.
+
 ## Tech Stack
 
 - we are using an offline first approach, with proper url navigation and page reload, handled by a service worker

@@ -10,6 +10,14 @@ Goals
   - some things are so core (e.g. authentication, choosing band) that they should probably force a reload
   - probably want an explicit live mode to enable this
 
+- be permissive *in the moment*: pragmatic, not dogmatic. Users use the app in ways we can't
+  all model, and they are grown-ups. Add friction to guard against accidents (confirmations,
+  a second tap, edit mode for the risky things), but never take an option away because it
+  "doesn't belong" in a mode. A last-minute addition must not be blocked: Add Song is always
+  there, on the overview, in or out of edit mode, live or not. A feature for groups (a leader
+  adding a song and it reaching every follower, over a future WebRTC session) is opt-in, and
+  adds to what one person can do alone.
+
 2. webapp not website
 
 3. Messages
