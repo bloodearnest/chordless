@@ -31,6 +31,20 @@ test.beforeEach(async ({ page }) => {
   })
 })
 
+/** This device goes live (or leaves), as another window of the browser would say */
+const setLive = (page, on: boolean) =>
+  page.evaluate(isLive => {
+    if (isLive) {
+      localStorage.setItem(
+        'live_state',
+        JSON.stringify({ url: '/setlist/seeded-setlist', title: 'Sunday', startedAt: Date.now() })
+      )
+    } else {
+      localStorage.removeItem('live_state')
+    }
+    window.dispatchEvent(new StorageEvent('storage', { key: 'live_state' }))
+  }, on)
+
 const log = page => page.evaluate(() => (window as unknown as { wakeLockLog: object }).wakeLockLog)
 
 test('a setlist keeps the screen awake, and leaving it lets go', async ({ page }) => {
@@ -56,7 +70,7 @@ test('the library and the home page do not ask for the screen', async ({ page })
   expect(await log(page)).toMatchObject({ requested: 0 })
 })
 
-test('the Preferences panel shows the state, and keeps the screen awake on request', async ({
+test('the Preferences panel shows the state, and keeps the screen awake while live', async ({
   page,
 }) => {
   await openApp(page, '/preferences')
@@ -65,13 +79,13 @@ test('the Preferences panel shows the state, and keeps the screen awake on reque
   await expect(status).toHaveAttribute('data-state', 'idle')
   await expect(status).toContainText('Ready')
 
-  // Asked for here, it is held on this page, and let go when stopped
-  await panel.getByRole('button', { name: 'Keep awake now' }).click()
+  // Live, it is held on this page, and let go when live ends
+  await setLive(page, true)
   await expect(status).toHaveAttribute('data-state', 'active')
   await expect(status).toHaveAttribute('data-look', 'good')
   await expect(status).toContainText('Awake')
   expect(await log(page)).toMatchObject({ requested: 1, released: 0 })
-  await panel.getByRole('button', { name: 'Stop keeping awake' }).click()
+  await setLive(page, false)
   await expect(status).toHaveAttribute('data-state', 'idle')
   expect(await log(page)).toMatchObject({ released: 1 })
 
@@ -79,7 +93,7 @@ test('the Preferences panel shows the state, and keeps the screen awake on reque
   await page.evaluate(() => {
     ;(window as unknown as { wakeLockLog: { refuse: boolean } }).wakeLockLog.refuse = true
   })
-  await panel.getByRole('button', { name: 'Keep awake now' }).click()
+  await setLive(page, true)
   await expect(status).toHaveAttribute('data-state', 'failed')
   await expect(status).toHaveAttribute('data-look', 'bad')
   await expect(status).toContainText('NotAllowedError')
@@ -105,7 +119,7 @@ test('the longest time with no touch is chosen in Preferences, and is an hour at
     'No limit',
   ])
 
-  await panel.getByRole('button', { name: 'Keep awake now' }).click()
+  await setLive(page, true)
   await expect(panel.locator('#wake-lock-status')).toContainText('1 hour')
   await limit.selectOption('30')
   await expect(panel.locator('#wake-lock-status')).toContainText('30 minutes')
@@ -119,7 +133,7 @@ test('there is no time limit on mains power', async ({ page }) => {
   const panel = page.locator('app-preferences')
   const status = panel.locator('#wake-lock-status')
   await expect(panel.locator('#wake-power')).toContainText('On battery')
-  await panel.getByRole('button', { name: 'Keep awake now' }).click()
+  await setLive(page, true)
   await expect(status).toContainText('until there is no touch for 1 hour')
 
   await page.evaluate(() => {

@@ -216,12 +216,12 @@ export class AppPreferences extends LitElement {
           icon: 'sun',
           label: 'Awake',
           detail:
-            (wakeLock.manual
-              ? 'The screen is being kept awake, on any page, until you stop it'
+            (wakeLock.live
+              ? 'The screen is being kept awake, on any page, while you are live'
               : 'The screen is being kept awake') +
             (this.keepAwakeMinutes === 0 || wakeLock.onMains
               ? '.'
-              : `${wakeLock.manual ? ', or' : ','} until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`),
+              : `, until there is no touch for ${this._limitLabel(this.keepAwakeMinutes)}.`),
         }
       case 'released':
         return {
@@ -245,7 +245,8 @@ export class AppPreferences extends LitElement {
           look: 'idle',
           icon: 'sun',
           label: 'Ready',
-          detail: 'The screen is kept awake while a setlist is open, or when you ask for it here.',
+          detail:
+            'The screen is kept awake while a setlist is open, and on any page while you are live.',
         }
       }
     }
@@ -278,18 +279,13 @@ export class AppPreferences extends LitElement {
     )
   }
 
-  /** What the button does: ask again after a drop or a refusal, else start or stop keeping awake */
+  /** What the button does: ask again after a drop or a refusal */
   _wakeLockAction(): { label: string; run: () => void } | null {
     if (!WakeLockController.supported) return null
     if (['released', 'failed', 'expired'].includes(wakeLock.state)) {
       return { label: 'Ask again', run: () => void wakeLock.requestAgain() }
     }
-    if (wakeLock.manual) {
-      return { label: 'Stop keeping awake', run: () => wakeLock.setManual(false) }
-    }
-    // Over a setlist it is already held; otherwise it can be asked for here
-    if (wakeLock.state === 'active') return null
-    return { label: 'Keep awake now', run: () => wakeLock.setManual(true) }
+    return null
   }
 
   override render() {

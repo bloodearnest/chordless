@@ -1,3 +1,4 @@
+import { getLive, LiveChangeEvent } from './live.ts'
 import {
   getKeepAwakePreference,
   KeepAwakeLimitEvent,
@@ -6,14 +7,15 @@ import {
 } from './preferences.ts'
 
 /**
- * Keeps the screen awake while a setlist is open, with the Screen Wake Lock API.
+ * Keeps the screen awake while a setlist is open, or the device is live (see live.ts), with the
+ * Screen Wake Lock API.
  *
  * There is no permission to ask for: the browser grants a lock to a visible page, and refuses
  * it when the device will not (Battery Saver, say). It drops the lock whenever the page is
  * hidden (another app, the screen off), and sometimes when the battery is low, so the lock
  * is asked for again each time the page is visible. It is held while a setlist is open (see
- * SetlistView) if the user has not turned that off in Preferences, and on any page when the
- * user asks for it there ("Keep awake now"); never otherwise, to spare the battery.
+ * SetlistView), and on any page while live, if the user has not turned that off in Preferences;
+ * never otherwise, to spare the battery.
  *
  * It is also let go after a time with no touch, key press or scroll (an hour unless the user
  * chose another: see keepAwakeLimitMs), so a tablet left on a stand overnight does not stay
@@ -28,7 +30,7 @@ export type WakeLockState =
   | 'unsupported'
   /** Switched off in Preferences */
   | 'off'
-  /** On, with no setlist open to keep awake */
+  /** On, with no setlist open and not live */
   | 'idle'
   /** Held now */
   | 'active'
@@ -66,8 +68,8 @@ export class WakeLockController {
   #requesting = false
   #state: WakeLockState
   #error = ''
-  /** Kept awake from Preferences, whatever page this is, until it is turned off */
-  #manual = false
+  /** The device is live: kept awake whatever page this is */
+  #live = getLive() !== null
 
   /** Whether the device is on mains power: unknown (null) where there is no Battery Status API */
   #onMains: boolean | null = null
@@ -84,10 +86,13 @@ export class WakeLockController {
     document.addEventListener('visibilitychange', this.#onVisibility)
     window.addEventListener(KeepAwakePreferenceEvent.type, this.#sync)
     window.addEventListener(KeepAwakeLimitEvent.type, this.#onLimitChanged)
+    window.addEventListener(LiveChangeEvent.type, this.#onLiveChange)
     for (const type of ACTIVITY_EVENTS) {
       document.addEventListener(type, this.#onActivity, { capture: true, passive: true })
     }
     void this.#watchBattery()
+    // A page opened while live (a reload, the app opened again) keeps the screen awake at once
+    if (this.#live) void this.#sync()
   }
 
   /** Whether the device is on mains power, when it can tell: there is no idle limit then */
@@ -130,9 +135,9 @@ export class WakeLockController {
     return this.#error
   }
 
-  /** Whether it was asked for from Preferences, for any page */
-  get manual(): boolean {
-    return this.#manual
+  /** Whether the device is live, so the screen is kept awake on any page */
+  get live(): boolean {
+    return this.#live
   }
 
   static get supported(): boolean {
@@ -152,10 +157,10 @@ export class WakeLockController {
     void this.#sync()
   }
 
-  /** Keep the screen awake on any page, until turned off (or the idle limit passes) */
-  setManual(on: boolean): void {
-    this.#manual = on
-    if (on) this.#lastActivity = Date.now()
+  #onLiveChange = (event: LiveChangeEvent): void => {
+    this.#live = event.live !== null
+    // Going live is someone being there: the limit counts from now
+    if (this.#live) this.#lastActivity = Date.now()
     this.#emit()
     void this.#sync()
   }
@@ -171,6 +176,7 @@ export class WakeLockController {
     document.removeEventListener('visibilitychange', this.#onVisibility)
     window.removeEventListener(KeepAwakePreferenceEvent.type, this.#sync)
     window.removeEventListener(KeepAwakeLimitEvent.type, this.#onLimitChanged)
+    window.removeEventListener(LiveChangeEvent.type, this.#onLiveChange)
     for (const type of ACTIVITY_EVENTS) {
       document.removeEventListener(type, this.#onActivity, { capture: true })
     }
@@ -179,9 +185,9 @@ export class WakeLockController {
     void this.#release()
   }
 
-  /** Whether it should be held now: asked for from Preferences, or a setlist is open and it is on */
+  /** Whether it should be held now: a setlist is open or the device is live, and it is on */
   #wanted(): boolean {
-    return this.#manual || (this.#holders > 0 && getKeepAwakePreference())
+    return (this.#live || this.#holders > 0) && getKeepAwakePreference()
   }
 
   /** The state when nothing is held: why not */

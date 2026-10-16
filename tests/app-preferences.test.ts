@@ -146,30 +146,30 @@ describe('app-preferences', () => {
     })
 
     it('says it is awake, with what applies: a limit on battery, none on mains or with no limit', async () => {
-      pretend(wakeLock, 'manual', false)
+      pretend(wakeLock, 'live', false)
       pretend(wakeLock, 'onMains', false)
       expect((await display('active')).detail).to.match(
         /awake, until there is no touch for 1 hour\.$/
       )
       restores.pop()
-      pretend(wakeLock, 'manual', true)
+      pretend(wakeLock, 'live', true)
       expect((await display('active')).detail).to.contain(
-        'until you stop it, or until there is no touch'
+        'while you are live, until there is no touch'
       )
     })
 
     it('has no limit to speak of on mains power', async () => {
-      pretend(wakeLock, 'manual', false)
+      pretend(wakeLock, 'live', false)
       pretend(wakeLock, 'onMains', true)
       expect((await display('active')).detail).to.equal('The screen is being kept awake.')
     })
 
     it('has no limit to speak of when there is none chosen', async () => {
       localStorage.setItem('keep_awake_minutes', '0')
-      pretend(wakeLock, 'manual', true)
+      pretend(wakeLock, 'live', true)
       pretend(wakeLock, 'onMains', false)
       expect((await display('active')).detail).to.equal(
-        'The screen is being kept awake, on any page, until you stop it.'
+        'The screen is being kept awake, on any page, while you are live.'
       )
     })
 
@@ -201,31 +201,20 @@ describe('app-preferences', () => {
       }
     })
 
-    it('stops keeping awake what was asked for, or asks for it', async () => {
+    it('is not offered when nothing was let go, live or not', async () => {
       pretend(WakeLockController, 'supported', true)
-      const calls: unknown[] = []
-      const realSet = wakeLock.setManual
-      wakeLock.setManual = ((on: boolean) => calls.push(on)) as typeof wakeLock.setManual
-      restores.push(() => {
-        wakeLock.setManual = realSet
-      })
       pretend(wakeLock, 'state', 'idle')
-      pretend(wakeLock, 'manual', true)
-      let el = await show()
-      expect(el._wakeLockAction()?.label).to.equal('Stop keeping awake')
-      el._wakeLockAction()?.run()
-      restores.pop()
-      pretend(wakeLock, 'manual', false)
-      el = await show()
-      expect(el._wakeLockAction()?.label).to.equal('Keep awake now')
-      el._wakeLockAction()?.run()
-      expect(calls).to.deep.equal([false, true])
+      for (const live of [true, false]) {
+        pretend(wakeLock, 'live', live)
+        const el = await show()
+        expect(el._wakeLockAction()).to.equal(null)
+      }
     })
 
     it('is not needed while a setlist holds it', async () => {
       pretend(WakeLockController, 'supported', true)
       pretend(wakeLock, 'state', 'active')
-      pretend(wakeLock, 'manual', false)
+      pretend(wakeLock, 'live', false)
       const el = await show()
       expect(el._wakeLockAction()).to.equal(null)
     })

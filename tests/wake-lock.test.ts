@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { LiveChangeEvent } from '../src/js/live.ts'
 import {
   getKeepAwakeMinutes,
   keepAwakeLimitMs,
@@ -142,13 +143,19 @@ describe('WakeLockController', () => {
     expect(locks[0].released).to.equal(true)
   })
 
-  describe('asked for from Preferences', () => {
-    it('holds a lock on any page, until it is turned off', async () => {
-      controller.setManual(true)
+  describe('while live', () => {
+    const live = (on: boolean) =>
+      window.dispatchEvent(
+        new LiveChangeEvent(on ? { url: '/setlist/a', title: 'A', startedAt: 1 } : null)
+      )
+
+    it('holds a lock on any page, until live ends', async () => {
+      live(true)
       await settle()
       expect(controller.state).to.equal('active')
-      expect(controller.manual).to.equal(true)
-      expect(locks).to.have.length(1)
+      expect(controller.live).to.equal(true)
+      // (the app's own controller hears it too, so there may be a second lock)
+      expect(locks.length).to.be.greaterThan(0)
 
       // A setlist opening and closing meanwhile does not drop it
       controller.hold()
@@ -156,28 +163,45 @@ describe('WakeLockController', () => {
       await settle()
       expect(controller.state).to.equal('active')
 
-      controller.setManual(false)
+      live(false)
       await settle()
       expect(controller.state).to.equal('idle')
-      expect(locks[0].released).to.equal(true)
+      expect(controller.live).to.equal(false)
+      expect(locks.every(lock => lock.released)).to.equal(true)
     })
 
-    it('works with the setlist setting off', async () => {
+    it('is held from the start when the device was live already', async () => {
+      localStorage.setItem(
+        'live_state',
+        JSON.stringify({ url: '/setlist/a', title: 'A', startedAt: 1 })
+      )
+      const reloaded = new WakeLockController()
+      try {
+        await settle()
+        expect(reloaded.live).to.equal(true)
+        expect(reloaded.state).to.equal('active')
+      } finally {
+        reloaded.dispose()
+        localStorage.removeItem('live_state')
+      }
+    })
+
+    it('keeps to the setting: with the screen setting off it is not held', async () => {
       setKeepAwakePreference(false)
-      controller.setManual(true)
-      await settle()
-      expect(controller.state).to.equal('active')
-      controller.setManual(false)
+      live(true)
       await settle()
       expect(controller.state).to.equal('off')
+      expect(locks.length).to.equal(0)
+      live(false)
     })
 
     it('says why the device refused it', async () => {
       refuse = 'NotAllowedError'
-      controller.setManual(true)
+      live(true)
       await settle()
       expect(controller.state).to.equal('failed')
       expect(controller.error).to.equal('NotAllowedError')
+      live(false)
     })
   })
 
