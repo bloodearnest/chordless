@@ -14,6 +14,7 @@ const ISSUER = 'https://accounts.google.com'
 // Google also issues ID tokens with the issuer written without the scheme
 const ISSUERS = [ISSUER, 'accounts.google.com']
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
+const REVOCATION_ENDPOINT = 'https://oauth2.googleapis.com/revoke'
 const JWKS_URI = 'https://www.googleapis.com/oauth2/v3/certs'
 const TIMEOUT_MS = 10_000
 
@@ -26,6 +27,7 @@ export interface GoogleEnv {
 const authorizationServer: oauth.AuthorizationServer = {
   issuer: ISSUER,
   token_endpoint: TOKEN_ENDPOINT,
+  revocation_endpoint: REVOCATION_ENDPOINT,
   jwks_uri: JWKS_URI,
   id_token_signing_alg_values_supported: ['RS256'],
 }
@@ -116,4 +118,25 @@ export async function refreshAccessToken(
     requestOptions(hooks)
   )
   return oauth.processRefreshTokenResponse(authorizationServer, client, response)
+}
+
+/**
+ * Revoke a refresh token at Google, which ends this app's access to the account's Drive (for
+ * every access token made from it). Throws if Google refuses; a token that is already revoked
+ * is `invalid_token` (error.error). The endpoint needs no client secret, so none is sent.
+ */
+export async function revokeToken(
+  token: string,
+  env: GoogleEnv,
+  hooks: GoogleTestHooks = {}
+): Promise<void> {
+  const client: oauth.Client = { client_id: env.GOOGLE_CLIENT_ID }
+  const response = await oauth.revocationRequest(
+    authorizationServer,
+    client,
+    oauth.None(),
+    token,
+    requestOptions(hooks)
+  )
+  await oauth.processRevocationResponse(response)
 }

@@ -436,7 +436,7 @@ export class StoragePage extends LitElement {
         size="small"
         heading="Log out of Google Drive?"
         confirm-label="Log Out"
-        message="This revokes Chordless's access to your Google Drive on this device. You'll need to connect again to sync."
+        message="This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Other devices signed in with this Google account will need to connect again too. Your setlists and songs stay on this device and in Drive."
       ></app-modal>
     `
   }
@@ -468,13 +468,21 @@ export class StoragePage extends LitElement {
 
     try {
       const { logout } = await import('../js/google-auth.ts')
-      await logout()
+      const { revoked } = await logout()
 
       this.isAuthenticated = false
       this.userInfo = null
       this.requestUpdate()
 
-      this._authMessage = { text: '✓ Successfully logged out', type: 'success' }
+      this._authMessage = revoked
+        ? {
+            text: "✓ Successfully logged out, and Chordless's access to your Drive was revoked",
+            type: 'success',
+          }
+        : {
+            text: "✓ Logged out on this device, but Google could not be reached to revoke Chordless's access. You can remove it at myaccount.google.com/permissions",
+            type: 'success',
+          }
     } catch (error) {
       console.error('[StoragePage] Logout failed:', error)
       this._authMessage = { text: `✗ Logging out failed: ${errorMessage(error)}`, type: 'error' }

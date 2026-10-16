@@ -13,6 +13,7 @@ import {
   type GoogleApi,
   handleOAuthCallback,
   handleSessionInvite,
+  handleSessionLogout,
   handleSessionRevoke,
   handleTokenRefresh,
 } from '../worker/src/session.ts'
@@ -62,6 +63,7 @@ function fakeGoogle(over: Partial<GoogleApi> = {}) {
       access_token: 'access-2',
       expires_in: 1800,
     })),
+    revokeToken: record('revokeToken', async (_token: string) => undefined),
     verifyIdToken: record('verifyIdToken', async () => ({
       email: 'ann@example.com',
       sub: 'sub-1',
@@ -547,4 +549,52 @@ describe('the invite and revoke routes (groundwork for sharing a folder with oth
       assert.equal(body.details, 'nope')
     })
   }
+})
+
+describe('POST /session/logout', () => {
+  const logout = async (body: Record<string, unknown>, google = fakeGoogle().google) =>
+    handleSessionLogout(post('/session/logout', body), env, google)
+
+  test('revokes the refresh token in the blob at Google', async () => {
+    const { google, calls } = fakeGoogle()
+    const blob = await encryptBlob(blobData(), env)
+
+    const response = await logout({ blob }, google)
+
+    assert.equal(response.status, 200)
+    assert.deepEqual(await bodyOf(response), { success: true })
+    const revoked = calls.filter(call => call.name === 'revokeToken')
+    assert.equal(revoked.length, 1)
+    assert.equal(revoked[0].args[0], REFRESH_TOKEN)
+  })
+
+  test('wants a blob, and a real one', async () => {
+    const { google, calls } = fakeGoogle()
+    assert.equal((await logout({}, google)).status, 400)
+    assert.equal((await logout({ blob: 'not-a-blob' }, google)).status, 400)
+    assert.equal(calls.length, 0, 'nothing was asked of Google')
+  })
+
+  test('is done when Google says the token is already revoked', async () => {
+    const { google } = fakeGoogle({
+      revokeToken: async () => {
+        throw Object.assign(new Error('invalid_token'), { error: 'invalid_token' })
+      },
+    })
+    const response = await logout({ blob: await encryptBlob(blobData(), env) }, google)
+    assert.equal(response.status, 200)
+  })
+
+  test('says so when Google cannot be asked, or refuses', async () => {
+    const { google } = fakeGoogle({
+      revokeToken: async () => {
+        throw new TypeError('network down')
+      },
+    })
+    const response = await logout({ blob: await encryptBlob(blobData(), env) }, google)
+    assert.equal(response.status, 502)
+    const body = await bodyOf(response)
+    assert.equal(body.error, 'Google did not revoke the access')
+    assert.ok(!JSON.stringify(body).includes(REFRESH_TOKEN))
+  })
 })

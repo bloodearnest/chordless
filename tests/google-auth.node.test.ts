@@ -7,7 +7,12 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import * as jose from 'jose'
-import { exchangeCode, refreshAccessToken, verifyIdToken } from '../worker/src/google-auth.ts'
+import {
+  exchangeCode,
+  refreshAccessToken,
+  revokeToken,
+  verifyIdToken,
+} from '../worker/src/google-auth.ts'
 
 const env = {
   GOOGLE_CLIENT_ID: 'client-123.apps.googleusercontent.com',
@@ -260,5 +265,26 @@ test('refreshing is refused when Google has revoked the refresh token', async ()
   await assert.rejects(
     () => refreshAccessToken('revoked', secretEnv, { fetch: google.fetch }),
     (error: Error & { error?: string }) => error.error === 'invalid_grant'
+  )
+})
+
+test('revoking a token asks the revocation endpoint, with the token and no secret', async () => {
+  const google = fakeGoogle(() => new Response('', { status: 200 }))
+
+  await revokeToken('refresh-1', secretEnv, { fetch: google.fetch })
+
+  const [request] = google.requests
+  assert.equal(request.url, 'https://oauth2.googleapis.com/revoke')
+  assert.equal(request.method, 'POST')
+  assert.equal(request.form.get('token'), 'refresh-1')
+  assert.equal(request.form.get('client_secret'), null)
+})
+
+test('revoking is refused, as invalid_token, when the token is already revoked', async () => {
+  const google = fakeGoogle(() => tokenResponse({ error: 'invalid_token' }, 400))
+
+  await assert.rejects(
+    () => revokeToken('revoked', secretEnv, { fetch: google.fetch }),
+    (error: Error & { error?: string }) => error.error === 'invalid_token'
   )
 })

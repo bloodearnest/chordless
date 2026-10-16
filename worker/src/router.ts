@@ -10,6 +10,7 @@ import {
   type GoogleApi,
   handleOAuthCallback,
   handleSessionInvite,
+  handleSessionLogout,
   handleSessionRevoke,
   handleTokenRefresh,
 } from './session.ts'
@@ -44,6 +45,11 @@ export async function handleRequest(
     // Token refresh endpoint
     if (path === '/session/refresh' && request.method === 'POST') {
       return await handleTokenRefresh(request, env, google)
+    }
+
+    // Signing out: the refresh token is revoked at Google
+    if (path === '/session/logout' && request.method === 'POST') {
+      return await handleSessionLogout(request, env, google)
     }
 
     // Session endpoints (require encrypted blob) - for future Drive collaboration features

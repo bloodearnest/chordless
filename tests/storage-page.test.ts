@@ -150,7 +150,25 @@ describe('the storage page, signed in to Google', () => {
   })
 
   describe('logging out', () => {
-    it('asks first, then deletes the sign-in and says so', async () => {
+    /** Google (through the auth proxy) answers the revoke: ok, or not */
+    let revokeStatus: number
+    let revoked: string[]
+    let driveFetch: typeof fetch
+    beforeEach(() => {
+      revokeStatus = 200
+      revoked = []
+      driveFetch = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) !== '/session/logout') return driveFetch(input, init)
+        revoked.push(JSON.parse(String(init?.body)).blob)
+        return new Response('{}', { status: revokeStatus })
+      }) as typeof fetch
+    })
+    afterEach(() => {
+      window.fetch = driveFetch
+    })
+
+    it('asks first, then deletes the sign-in, revokes the access at Google, and says so', async () => {
       await open()
 
       button('Logout').click()
@@ -161,6 +179,21 @@ describe('the storage page, signed in to Google', () => {
       expect(worker.stored).to.equal(undefined)
       expect(page.isAuthenticated).to.equal(false)
       expect(text()).to.contain('Successfully logged out')
+      expect(text()).to.contain('access to your Drive was revoked')
+      expect(revoked).to.deep.equal(['encrypted-blob'])
+    })
+
+    it('says the access was not revoked when Google could not be reached, but is logged out', async () => {
+      await open()
+      revokeStatus = 502
+
+      button('Logout').click()
+      await answerLogout(true)
+      await until(() => text().includes('Not Connected'), 'the page to show it is signed out')
+
+      expect(text()).to.contain('could not be reached to revoke')
+      expect(text()).to.contain('myaccount.google.com/permissions')
+      expect(worker.stored).to.equal(undefined)
     })
 
     it('does nothing when it is not confirmed', async () => {
@@ -174,6 +207,7 @@ describe('the storage page, signed in to Google', () => {
       expect(worker.stored).to.not.equal(undefined)
       expect(text()).to.contain('Connected')
       expect(text()).not.to.contain('Successfully logged out')
+      expect(revoked).to.deep.equal([])
     })
 
     it('says so, and stays connected, when the service worker cannot do it', async () => {

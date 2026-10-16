@@ -174,11 +174,36 @@ describe('google-auth', () => {
       expect(await isAuthenticated()).to.equal(false)
     })
 
-    it('logs out by having the worker forget the blob', async () => {
-      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
-      await logout()
+    it('logs out by having the worker forget the blob, and Google revoke the access', async () => {
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) }, 'the-blob')
+      respondTo = () => json({ success: true })
+
+      expect(await logout()).to.deep.equal({ revoked: true })
+
       expect(worker.stored).to.equal(undefined)
       expect(await isAuthenticated()).to.equal(false)
+      expect(fetches).to.have.length(1)
+      expect(fetches[0].url).to.equal('/session/logout')
+      expect(fetches[0].body).to.deep.equal({ blob: 'the-blob' })
+    })
+
+    it('is logged out all the same, and says the access is not revoked, when Google cannot be asked', async () => {
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
+      respondTo = () => {
+        throw new TypeError('offline')
+      }
+      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(worker.stored).to.equal(undefined)
+
+      signIn({ access_token: 'a', expires_at: inFromNow(MINUTE) })
+      respondTo = () => json({ error: 'Google did not revoke the access' }, 502)
+      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(worker.stored).to.equal(undefined)
+    })
+
+    it('asks Google for nothing when nobody is signed in', async () => {
+      expect(await logout()).to.deep.equal({ revoked: false })
+      expect(fetches).to.have.length(0)
     })
 
     it('says so when the worker cannot forget the blob, and stays signed in', async () => {
@@ -192,6 +217,7 @@ describe('google-auth', () => {
 
       expect((error as Error | null)?.message).to.equal('worker failed')
       expect(await isAuthenticated()).to.equal(true)
+      expect(fetches, 'and the access is not revoked').to.have.length(0)
     })
 
     it('exports the blob for a backup, or says why not', async () => {

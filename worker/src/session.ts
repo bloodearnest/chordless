@@ -7,17 +7,18 @@
 
 import { type BlobData, decryptBlob, encryptBlob } from './blob.ts'
 import type { Env } from './env.ts'
-import { exchangeCode, refreshAccessToken, verifyIdToken } from './google-auth.ts'
+import { exchangeCode, refreshAccessToken, revokeToken, verifyIdToken } from './google-auth.ts'
 import { jsonResponse, message } from './http.ts'
 
 /** The calls to Google that the routes make */
 export interface GoogleApi {
   exchangeCode: typeof exchangeCode
   refreshAccessToken: typeof refreshAccessToken
+  revokeToken: typeof revokeToken
   verifyIdToken: typeof verifyIdToken
 }
 
-const realGoogle: GoogleApi = { exchangeCode, refreshAccessToken, verifyIdToken }
+const realGoogle: GoogleApi = { exchangeCode, refreshAccessToken, revokeToken, verifyIdToken }
 
 /**
  * POST /oauth/callback
@@ -172,6 +173,47 @@ export async function handleTokenRefresh(
   const { access_token, expires_in } = await google.refreshAccessToken(blobData.refresh_token, env)
 
   return jsonResponse({ access_token, expires_in })
+}
+
+/**
+ * POST /session/logout
+ *
+ * Revoke the refresh token in the blob at Google, so signing out ends Chordless's access to the
+ * Drive and does not only forget it on this device. The blob proves ownership, as for a refresh.
+ * Other devices signed in with the same Google account may need to sign in again.
+ *
+ * Request body: { blob: string }
+ * Response: { success: true }, or 502 if Google could not be asked or refused
+ */
+export async function handleSessionLogout(
+  request: Request,
+  env: Env,
+  google: GoogleApi = realGoogle
+) {
+  const { blob } = await request.json()
+  if (!blob) {
+    return jsonResponse({ error: 'Missing blob' }, 400)
+  }
+
+  let blobData: BlobData
+  try {
+    blobData = await decryptBlob(blob, env)
+  } catch {
+    return jsonResponse({ error: 'Invalid blob' }, 400)
+  }
+
+  try {
+    await google.revokeToken(blobData.refresh_token, env)
+  } catch (error) {
+    // (Google says invalid_token for one that is already revoked: that is what was wanted)
+    if ((error as { error?: string }).error !== 'invalid_token') {
+      return jsonResponse(
+        { error: 'Google did not revoke the access', details: message(error) },
+        502
+      )
+    }
+  }
+  return jsonResponse({ success: true })
 }
 
 /**
