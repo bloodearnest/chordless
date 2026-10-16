@@ -273,8 +273,8 @@ ccli import
 sharing
 - share links: built (docs/SHARING.md Part 2): create/update/stop from a share button in the overview header (a modal with the link and QR code),
   QR code, sync keeps them current and ends them, /s/<id> opens one read-only and offline.
-  Needs a real run: deploy, then share from a signed-in device and open the link on a phone
-  with no account, offline too. Not tried against a Workspace account.
+  Tried on several devices, with no account and offline (2026-10-16). Not tried against a
+  Workspace account.
 - share links, later: key changes and other view settings on a received set are lost when it
   updates; keep them per device.
 - share links, later: an "Add songs to my library" action on the share page (and for the
