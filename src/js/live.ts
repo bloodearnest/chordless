@@ -9,7 +9,7 @@
 export interface LiveState {
   /** Where the live setlist is: its path, and a share's fragment */
   url: string
-  /** The setlist's name, for the indicator */
+  /** The setlist's name, to say what is live */
   title: string
   startedAt: number
 }

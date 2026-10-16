@@ -3,7 +3,6 @@
  * The app shell: starts the router, which shows the view for the URL in
  * #view-outlet. The menu and the media player stay while views come and go.
  */
-import '../components/live-indicator.ts'
 import '../components/nav-menu.ts'
 import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { appUpdate } from './app-update.ts'

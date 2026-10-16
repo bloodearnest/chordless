@@ -106,7 +106,7 @@ app's own modules, imported directly: there's no build step to test around.
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`
   also checks there is a view for every route.
-- **Live mode**: the state (`live.test.ts`: the record in localStorage, its events, another window's changes), the fullscreen service (`fullscreen.test.ts`, against a fake Fullscreen API), the shell chip (`live-indicator.test.ts`), and the header's button with what the setlist page does with it (`setlist-page-edges.test.ts`).
+- **Live mode**: the state (`live.test.ts`: the record in localStorage, its events, another window's changes), the fullscreen service (`fullscreen.test.ts`, against a fake Fullscreen API), and the header's button with what the setlist page does with it (`setlist-page-edges.test.ts`).
 - **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
   failure names the chord and key.
 - Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,
@@ -128,7 +128,7 @@ parallel, each in its own browser context.
 | File | Covers |
 | --- | --- |
 | `views.playwright.ts` | Moving between views in place: history, titles, the menu, leaving a setlist or the library cleanly, the media player carrying on |
-| `live-mode.playwright.ts` | Go live from the header, the indicator, the screen and fullscreen following live across pages, leaving, reloading, taking over |
+| `live-mode.playwright.ts` | Go live from the header, the screen and fullscreen following live across pages, leaving, reloading, taking over |
 | `live.playwright.ts` | A setlist in use: moving between songs, scrolling, sections, reordering, deleting, keys |
 | `app.playwright.ts` | Themes, loading, display preferences, the menu, modals, the storage page |
 | `songs.playwright.ts` | The library, song and setlist info, importing, the bookmarklet page |

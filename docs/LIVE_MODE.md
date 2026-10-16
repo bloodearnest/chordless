@@ -1,8 +1,7 @@
 # Live mode
 
 **Status: built.** The state (`js/live.ts`), the wake lock following it, fullscreen
-(`js/fullscreen.ts`), the Go live button in the setlist header, the shell chip
-(`components/live-indicator.ts`) and the Preferences toggle. Not yet tried on a real tablet.
+(`js/fullscreen.ts`), the Go live button in the setlist header and the Preferences toggle. Not yet tried on a real tablet.
 
 Live mode is an explicit "we are performing from this setlist" state. It is the place for
 anything that should last for the length of a service, not for the length of one page view.
@@ -28,10 +27,10 @@ performing: so the wake lock does not need live mode (below), and live mode adds
 
 ### What is on when
 
-| | Screen awake | Fullscreen | Indicator |
-| --- | --- | --- | --- |
-| A setlist (or share) is open | yes, if "Keep the screen awake" is on (the default) | no | no |
-| Live | yes, **on every page**, if "Keep the screen awake" is on | yes, if "Fullscreen while live" is on (the default) | yes |
+| | Screen awake | Fullscreen |
+| --- | --- | --- |
+| A setlist (or share) is open | yes, if "Keep the screen awake" is on (the default) | no |
+| Live | yes, **on every page**, if "Keep the screen awake" is on | yes, if "Fullscreen while live" is on (the default) |
 
 So the screen is wanted when a setlist is open **or** the device is live. Live does not
 override the preference: someone who turned keeping awake off (to spare the battery) gets
@@ -52,7 +51,7 @@ interface LiveState { url: string; title: string; startedAt: number }
   the record.
 - It stores a *URL* (`/setlist/<id>`, or `/s/<id>#<key>` for a share), not a setlist id,
   because a shared setlist is not in the library and its key is in the fragment. See
-  [SHARING.md](SHARING.md). `title` is the setlist's name, for the indicator.
+  [SHARING.md](SHARING.md). `title` is the setlist's name, to say what is live.
 - It is not synced through Drive. It describes this device. (Cross-device sync is the WebRTC
   idea below, and would be separate.)
 
@@ -64,8 +63,9 @@ interface LiveState { url: string; title: string; startedAt: number }
   setlist is live it offers to take over.
 - The user leaves explicitly (**Leave live**). Nothing ends it for them: not a route change,
   not switching apps, not edit mode, not an idle timeout.
-- While live, the shell shows a small indicator ("Live: Sunday AM") that links back to the
-  setlist and holds the **Leave** action, so a stale live state can't go unnoticed.
+- The header button is the indicator: red while this setlist is live. There is no other one
+  (a footer chip that showed on every page was tried and dropped: the header makes it obvious).
+  So live is left from the live setlist's overview.
 
 ### Services
 
@@ -120,8 +120,6 @@ In the existing wake lock section, which becomes "Screen and live mode":
 - The button (`#live-button`) is in `setlistTemplate`, with the share button; `SetlistPage`
   shows it on the overview only, does the going and leaving, and keeps its look and label
   (`aria-pressed`, red when live) current.
-- `live-indicator.ts` is in `index.html`: a chip, bottom left, with a menu (open the setlist,
-  leave live). It stays out of the way on a song of the live setlist.
 - `app-preferences.ts`: the "Screen and live mode" panel has the Fullscreen while live toggle;
   "Keep awake now" is gone.
 - `SetlistView` and `ShareView` share `SetlistPageHost` (built), so the setlist lifecycle is
@@ -134,6 +132,7 @@ In the existing wake lock section, which becomes "Screen and live mode":
   it can be tried, and can be turned off in Preferences.
 - What happens when a share expires while live (the plan: a toast, and leave live).
 - Whether going live should also be reachable from a song (the header there is crowded).
-- The indicator is hidden on a song of the live setlist, where the whole screen is the song. If
-  a stale live state is missed there, show it some other way.
+- Nothing shows that the device is live on other pages (the library, Preferences), so a stale
+  live state could go unnoticed there until the setlist's overview is opened. If that matters,
+  something small is needed there.
 - What Sync needs from the live record (session id, role) before it is designed.
