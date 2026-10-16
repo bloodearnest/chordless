@@ -106,6 +106,7 @@ app's own modules, imported directly: there's no build step to test around.
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`
   also checks there is a view for every route.
+- **Live mode** state (`live.test.ts`): the record in localStorage, its events, and another window's changes.
 - **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
   failure names the chord and key.
 - Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,

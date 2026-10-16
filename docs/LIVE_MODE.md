@@ -1,21 +1,13 @@
 # Live mode
 
-**Status: design only. Nothing here is built yet.**
+**Status: being built.** Built so far: the state (`js/live.ts`). Still to build: the wake lock
+following it, fullscreen, the overview button, the shell indicator and the preferences.
 
-Live mode is an explicit "we are performing from this setlist" state. While it is on, the
-app uses the whole screen and keeps it lit. It is the place for anything that should happen
-for the length of a service or rehearsal, not for the length of one page view.
+Live mode is an explicit "we are performing from this setlist" state. It is the place for
+anything that should last for the length of a service, not for the length of one page view.
 
-## Why
-
-Today the screen is kept awake because a setlist view is open: `SetlistView` and `ShareView`
-each call `wakeLock.hold()` and `letGo()` (see `js/wake-lock.ts`). That ties a performance
-setting to a route, and it breaks down when:
-
-- the player switches to another app and comes back, or browses the library to find a song
-  mid-service: the "performance" has not ended, but the route has changed;
-- we want other things to follow the same switch: fullscreen now, and maybe synchronising
-  songs between instances over WebRTC later.
+Practice is not live. Someone working through a setlist wants the screen kept awake, but is not
+performing: so the wake lock does not need live mode (below), and live mode adds to it.
 
 ## What the web platform allows
 
@@ -33,28 +25,40 @@ setting to a route, and it breaks down when:
 
 ## The model
 
+### What is on when
+
+| | Screen awake | Fullscreen | Indicator |
+| --- | --- | --- | --- |
+| A setlist (or share) is open | yes, if "Keep the screen awake" is on (the default) | no | no |
+| Live | yes, **on every page**, if "Keep the screen awake" is on | yes, if "Fullscreen while live" is on (the default) | yes |
+
+So the screen is wanted when a setlist is open **or** the device is live. Live does not
+override the preference: someone who turned keeping awake off (to spare the battery) gets
+fullscreen only.
+
 ### State
 
-One record, per device:
+One record, per device (`js/live.ts`):
 
 ```ts
-type LiveState = { route: Route; startedAt: number }
+interface LiveState { url: string; title: string; startedAt: number }
 ```
 
 - It is kept in `localStorage`, next to the other preferences, and survives reloads and
-  switching apps. A `storage` event (or `BroadcastChannel`) keeps two windows of one browser
-  in agreement.
+  switching apps. A `storage` event keeps two windows of one browser in agreement; both send
+  `LiveChangeEvent` on `window`.
 - **One live setlist at a time; the last one wins.** Going live on another setlist overwrites
   the record.
-- It stores a *route* (`/setlist/<id>`, or a share's URL), not a setlist id, because a shared
-  setlist is not in the library. See [SHARING.md](SHARING.md).
+- It stores a *URL* (`/setlist/<id>`, or `/s/<id>#<key>` for a share), not a setlist id,
+  because a shared setlist is not in the library and its key is in the fragment. See
+  [SHARING.md](SHARING.md). `title` is the setlist's name, for the indicator.
 - It is not synced through Drive. It describes this device. (Cross-device sync is the WebRTC
   idea below, and would be separate.)
 
 ### Entering and leaving
 
-- The overview page has a **Go live** button. On the live setlist it reads **Live now**; on
-  any other setlist it offers to take over.
+- The overview page has a **Go live** button, which is the gesture fullscreen needs. On the
+  live setlist it reads **Live now**; on any other setlist it offers to take over.
 - The user leaves explicitly (**Leave live**). Nothing ends it for them: not a route change,
   not switching apps, not edit mode, not an idle timeout.
 - While live, the shell shows a small indicator ("Live: Sunday AM") that links back to the
@@ -62,33 +66,26 @@ type LiveState = { route: Route; startedAt: number }
 
 ### Services
 
-Live mode is a small module that holds the state and sends an event when it changes.
-Features register as *services* with a `start()` and `stop()`, and check their own
-preference. It is not a plugin framework: a short list, wired by hand.
+Live mode starts and stops what should happen for its length. It is not a plugin framework: a
+short list, wired by hand.
 
 | Service | Needs a gesture | Notes |
 | --- | --- | --- |
-| Wake lock | no | Re-acquired when the page is visible (`visibilitychange`). |
+| Wake lock, on every page | no | The existing `WakeLockController`: the lock is wanted when a setlist is open or live. Re-acquired when the page is visible (`visibilitychange`). |
 | Fullscreen | yes | Wanted but not active (after switching apps, or Esc) is re-requested on the next tap, key or swipe, once per entry: if the user left it themselves, don't fight them. Hidden where `document.fullscreenEnabled` is false. |
 | Sync (future) | no | WebRTC link between instances. Probably wants its own settings (a session, leader or follower). |
 
 Services run while live **and** the page is visible, on every page, not just the live
 setlist: searching the library mid-service shouldn't drop fullscreen or let the screen sleep.
 
-The controller handles `visibilitychange` and the first-gesture hook once; a service says
-whether it needs a gesture, rather than attaching its own listeners.
-
 ### Idle expiry
 
-The wake lock's existing idle limit (`keepAwakeLimitMs`, default an hour; unlimited on mains
-power where the Battery Status API says so) moves up into live mode, and applies to all
-services:
-
-- after the limit with no touch, key press or scroll, the services **let go** (the screen may
-  sleep, fullscreen is dropped);
-- the live state is **kept**. The next touch starts the services again, as the wake lock's
-  `expired` state does now;
-- so a tablet left on a stand overnight goes dark, and comes back when someone picks it up.
+The wake lock's idle limit (`keepAwakeLimitMs`, default an hour; unlimited on mains power where
+the Battery Status API says so) stays where it is and applies to the lock whether it is wanted
+by an open setlist or by live mode. After the limit with no touch, key press or scroll the lock
+is let go (state `expired`) and the next touch takes it again. The live state is kept: a tablet
+left on a stand overnight goes dark, and is still live when someone picks it up. Fullscreen has
+no timer.
 
 ### Edit mode
 
@@ -98,31 +95,30 @@ destructive changes. No blocking, no warning.
 
 ### Preferences
 
-In the existing wake lock section, which becomes "Live mode":
+In the existing wake lock section, which becomes "Screen and live mode":
 
-- Keep the screen awake while live (today's toggle).
-- Fullscreen while live (new; shown only where fullscreen is supported).
+- Keep the screen awake (today's toggle; while a setlist is open, and while live).
+- Fullscreen while live (new, **on by default**; shown only where fullscreen is supported).
 - The idle limit (today's "Keep awake limit").
 
 "Keep awake now" goes: **Go live** replaces it.
 
 ## Changes to the code
 
-- A `live` module (state, events, expiry), replacing the holder counting in `WakeLockController`
-  (`hold()` / `letGo()`, `setManual()`). The controller keeps the Screen Wake Lock handling
-  (acquire, release, visibility) and the battery check, as a service.
-- `SetlistView` and `ShareView` stop calling `wakeLock.hold()` and `letGo()`.
-- `ShareView` and `SetlistView` both repeat the `SetlistPage` lifecycle (`new SetlistPage`,
-  `start`, `routeChanged`, `dispose`, `captureViewState`). `ShareView` only differs in its
-  source (`openShare`), `readOnly: true`, `routeFor`, and its error and banner states. Move the
-  repeated lifecycle into a shared helper in the same change.
+- `js/live.ts`: the state and events (built).
+- `WakeLockController`: `setManual()` goes; `#wanted()` also asks whether the device is live.
+  `hold()` and `letGo()` stay, for the open setlist.
 - A fullscreen service, the overview button, the shell indicator, and the preferences.
 - `app-preferences.ts`: the wake lock status and "Ask again" UI becomes live mode status.
+- `SetlistView` and `ShareView` share `SetlistPageHost` (built), so the setlist lifecycle is
+  in one place.
 
 ## Open questions
 
-- Which route a share's live record holds (the `/share/...` URL with its key fragment), and
-  what happens when the share expires while live.
+- **Fullscreen on a ChromeOS tablet with two apps side by side** (Chordless and a pedals app):
+  does the request keep the split, or take over the screen? Not known; it is on by default so
+  it can be tried, and can be turned off in Preferences.
+- What happens when a share expires while live (the plan: a toast, and leave live).
 - Whether going live should also be reachable from somewhere other than the overview.
 - What the shell indicator looks like in a song, where the whole screen is the song.
 - What Sync needs from the live record (session id, role) before it is designed.
