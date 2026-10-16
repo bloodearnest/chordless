@@ -359,6 +359,22 @@ describe('the library view, with a song open', () => {
       expect(control<KeySelector>('library-key-selector').value).to.equal('G')
     })
 
+    it('puts the sections back to how they start, in the page and as saved', async () => {
+      await open()
+      toggleEditMode()
+      section(1).dispatchEvent(new SectionActionEvent(0, 1, 'show-lyrics'))
+      toggleEditMode()
+      await until(() => prefs()?.sectionDefaults, 'the sections to be saved')
+      toggleEditMode()
+
+      control('library-reset-button').click()
+      await answer(true)
+
+      await until(() => sections()[1]?.hideMode === 'none', 'the section to be shown as it starts')
+      await wait(100)
+      expect(prefs()?.sectionDefaults).to.equal(undefined)
+    })
+
     it('changes nothing when it is not confirmed', async () => {
       await open()
       toggleEditMode()

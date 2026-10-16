@@ -42,6 +42,7 @@ import {
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
+import { setSongUserPref } from '../song-user-prefs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
@@ -497,7 +498,10 @@ export class LibraryView extends PageView {
     if (!(await this.#resetModal.value?.ask())) return
     if (!this.#parsed || !this.#song) return
 
-    // Back to the key it was imported in, and the default size
+    // Back to the key it was imported in, and the default size. Drawing the song starts its
+    // sections from what is saved, so forget that first: they start as the defaults
+    const db = await getCurrentDB()
+    setSongUserPref(this.#song.id, db.organisationId, 'sectionDefaults', undefined)
     const originalKey = this.#song.originalKey || this.#parsed.metadata.key
     this.#fontSize = CONFIG.DEFAULT_FONT_SIZE
     await this.#renderInKey(originalKey || undefined)
