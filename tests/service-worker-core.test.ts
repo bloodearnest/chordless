@@ -536,9 +536,18 @@ describe('the service worker', () => {
 
       it('does not replace the cached shell of a precached version', async () => {
         start({ precache: ['/'] })
+        fetchImpl = async () => new Response('the shell')
         await textOf(await fetchEvent('/', { mode: 'navigate' }))
         await wait(30)
         expect((await (await caches.open('cache-v1')).keys()).length).to.equal(0)
+      })
+
+      it('serves the cached shell of a precached version without waiting for the network', async () => {
+        start({ precache: ['/'] })
+        await (await caches.open('cache-v1')).put('/', new Response('cached shell'))
+        fetchImpl = () => new Promise<Response>(() => {})
+        expect(await textOf(await fetchEvent('/x', { mode: 'navigate' }))).to.equal('cached shell')
+        expect(fetched).to.deep.equal([])
       })
 
       it('gives a failed shell as it is, without keeping it', async () => {

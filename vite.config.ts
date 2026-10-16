@@ -2,6 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { cloudflare } from '@cloudflare/vite-plugin'
 import { defineConfig } from 'vite'
 import { devManifest } from './vite-plugins/dev-manifest.ts'
+import { preloadHome } from './vite-plugins/preload-home.ts'
 import { serviceWorker } from './vite-plugins/service-worker.ts'
 
 // The floor, the same as .browserslistrc (which Vite does not read)
@@ -46,6 +47,7 @@ export default defineConfig(({ command, isPreview }) => {
     },
     plugins: [
       devManifest(),
+      preloadHome(),
       serviceWorker({ target: TARGET }),
       cloudflare({ configPath: '../wrangler.toml' }),
     ],

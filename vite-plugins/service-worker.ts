@@ -18,7 +18,8 @@ import { build, type Plugin } from 'vite'
 const FILE = 'service-worker.js'
 // Never precached: the worker itself, Cloudflare's asset filter and headers file (which it
 // reads and does not serve), source maps, and the PDF reader (1.6 MB, for the one case of a PDF
-// shared to the app: the worker caches it when it is first fetched) and the Help pictures (public/help:
+// shared to the app: the worker caches it when it is first fetched), the iOS startup images (iOS
+// reads them itself when the app is launched from the home screen) and the Help pictures (public/help:
 // 240 KB, for something that is not core: the app is normally online, and the setlist is what has
 // to work offline. Opened offline before ever being seen, Help shows its words without them)
 const NOT_PRECACHED = (path: string) =>
@@ -27,7 +28,8 @@ const NOT_PRECACHED = (path: string) =>
   path === '_headers' ||
   path.endsWith('.map') ||
   /^assets\/pdfjs-/.test(path) ||
-  path.startsWith('help/')
+  path.startsWith('help/') ||
+  path.startsWith('icons/splash/')
 
 async function bundle(
   root: string,

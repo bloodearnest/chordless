@@ -35,8 +35,9 @@ needs are unusual:
 - **Versioned by content.** `__CACHE_VERSION__` is a hash of the files, and names the cache
   (`cache-<hash>`). Any change to the build is a new worker, which installs its own cache, and on
   activation the old one is deleted. Files with hashes in their names are served from the cache;
-  the shell (`/`) is fetched from the network first, but the cached copy is not replaced, so it
-  always matches the cached files.
+  the shell (`/`) too, at once, so a slow or hung network can't hold up an app that is already on
+  the device. It is never replaced, so it always matches the cached files; a new version comes as a
+  new worker. (Without a precache, in dev, the shell is fetched from the network first.)
 - **Not precached:** the worker, source maps, the PDF reader and the Help pictures (`public/help/`,
   240 KB): the app is normally online, and what has to work offline is the core, setlist navigation.
   Those two are cached when first fetched, in `runtime-v1`. Pad audio, and

@@ -481,6 +481,14 @@ export function startServiceWorker(
     // have redirect: 'manual', so a redirected SW response causes an error.
     const htmlFile = '/'
 
+    // With a precache the cached shell is the one that goes with the cached files, so it is
+    // served at once: waiting for the network first made a slow or hung connection (a venue's
+    // wifi) hold up an app that was already on the device. A new version arrives as a new worker.
+    if (PRECACHE.length > 0) {
+      const cached = await (await caches.open(CACHE_NAME)).match(htmlFile)
+      if (cached) return cached
+    }
+
     try {
       const response = await doFetch(htmlFile)
       if (response.ok) {

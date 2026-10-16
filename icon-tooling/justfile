@@ -30,3 +30,7 @@ generate-pwa-icons: generate-apple-icon generate-icon-512 generate-icon-maskable
 # Generate all favicon variants at once
 generate-all: generate-svg generate-pwa-icons
 
+
+# Generate the iOS startup (splash) images and the <link> tags for them in src/index.html
+generate-splash:
+    ./generate-splash.sh

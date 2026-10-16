@@ -40,8 +40,11 @@ await router.start()
 
 // The one-time question of how they read a song, on whatever page they arrive at
 void maybeShowFirstUseSetup()
-// Optional, and not needed to show the first view, so after it
-startMediaPlayer()
+// Optional, and not needed to show the first view, so once the page is idle (a slow device is
+// busy with the view and the service worker's first install: Safari has no requestIdleCallback)
+if ('requestIdleCallback' in window)
+  requestIdleCallback(() => startMediaPlayer(), { timeout: 3000 })
+else setTimeout(startMediaPlayer, 1000)
 // Fullscreen while live
 startFullscreen()
 // Setlists shared by link are kept only until they end (their songs stay)
