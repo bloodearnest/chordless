@@ -1055,55 +1055,6 @@ body.edit-mode .key-selector:focus {
   margin: 0 auto;
 }
 
-/* The row above the songs: Add Song on the left, Go live on the right */
-.overview-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  max-width: 900px;
-  margin: 0 auto 1rem;
-}
-
-.overview-live {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-left: auto;
-}
-
-.live-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-.live-dot {
-  width: 0.7rem;
-  height: 0.7rem;
-  border-radius: 50%;
-  background: var(--color-danger);
-}
-
-.overview-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  min-height: 2.75rem;
-  padding: 0.5rem 1.25rem;
-  border: 1px solid var(--button-bg);
-  border-radius: 6px;
-  background: transparent;
-  color: var(--button-bg);
-  font: inherit;
-  cursor: pointer;
-}
-
-.overview-button.go {
-  background: var(--button-bg);
-  color: var(--button-text, white);
-}
-
 /* Override song card styles for setlist overview context */
 .overview-song-card {
   position: relative; /* Needed for drag and drop pseudo-elements */
@@ -1381,8 +1332,9 @@ body.edit-mode .key-selector:focus {
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* Share button in the setlist's header, a round icon button like the edit and info ones: lit while the setlist is shared */
-.share-button {
+/* Share and live buttons in the setlist's header, round icon buttons like the edit and info ones: share is lit while the setlist is shared, live is red while it is live */
+.share-button,
+.live-button {
   background: none;
   border: 2px solid var(--header-text, white);
   color: var(--header-text, white);
@@ -1400,12 +1352,20 @@ body.edit-mode .key-selector:focus {
   transition: all 0.2s;
 }
 
-.share-button[hidden] {
+.share-button[hidden],
+.live-button[hidden] {
   display: none;
 }
 
-.share-button:hover {
+.share-button:hover,
+.live-button:hover {
   background-color: rgba(255, 255, 255, 0.2);
+}
+
+.live-button.live {
+  background-color: var(--color-danger);
+  border-color: var(--color-danger);
+  color: white;
 }
 
 .share-button.shared {
@@ -1532,6 +1492,24 @@ body.edit-mode .key-selector:focus {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* Add Song button */
+.add-song-button {
+  margin-top: 1.5rem;
+  border: 2px dashed var(--border-color, #bdc3c7) !important;
+  background-color: var(--bg-tertiary, #f8f9fa) !important;
+  color: var(--text-secondary, #7f8c8d);
+}
+
+.add-song-button:hover {
+  background-color: var(--bg-secondary, white) !important;
+  border-color: var(--button-bg) !important;
+  color: var(--button-bg);
+}
+
+.add-song-button .song-card-title {
+  color: inherit;
 }
 
 /* Song library */

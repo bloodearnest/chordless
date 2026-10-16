@@ -39,6 +39,17 @@ export function setlistTemplate({
         ?show-edit-toggle=${editable}
         show-info-button
       >
+        <button
+          slot="tools"
+          class="live-button"
+          id="live-button"
+          aria-label="Go live"
+          title="Go live"
+          aria-pressed="false"
+          hidden
+        >
+          <app-icon name="radio" size="24"></app-icon>
+        </button>
         ${
           shareable
             ? html`<button

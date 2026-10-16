@@ -207,6 +207,7 @@ describe('the setlist page: corners', () => {
     rig.page.showSong(0, true)
     for (const selector of [
       '#share-button',
+      '#live-button',
       '#setlist-share',
       '#app-header',
       '#key-selector',
@@ -214,8 +215,10 @@ describe('the setlist page: corners', () => {
     ]) {
       $(selector)?.remove()
     }
-    rig.page._showShareButton(true)
+    rig.page._showHeaderButtons(true)
     rig.page._setupShare()
+    rig.page._setupLive()
+    rig.page._refreshLiveButton()
     rig.page._appHeaderEventsSetup = false
     rig.page.setupAppHeaderEvents()
     rig.page._editModeSetup = false
@@ -271,38 +274,40 @@ describe('the setlist page: corners', () => {
     expect(rig.page.songs.length).to.be.greaterThan(3)
   })
 
-  describe('going live from the overview', () => {
+  describe('going live from the header', () => {
     afterEach(() => localStorage.removeItem('live_state'))
-    const button = (id: string) => must($<HTMLButtonElement>(id))
+    const button = () => must($<HTMLButtonElement>('#live-button'))
 
-    it('goes live on this setlist, shows Live now, and leaves again', async () => {
+    it('is on the overview, not on a song, and goes live on this setlist and leaves again', async () => {
       const setlist = await rig.open()
-      expect(button('#go-live-button').textContent).to.contain('Go live')
-      button('#go-live-button').click()
+      expect(button().hidden).to.equal(false)
+      expect(button().getAttribute('aria-label')).to.equal('Go live')
+      expect(button().getAttribute('aria-pressed')).to.equal('false')
+      button().click()
       expect(getLive()?.url).to.equal(`/setlist/${setlist.id}`)
-      await rig.flush()
-      expect($('#overview-live')?.getAttribute('data-live')).to.equal('this')
+      expect(button().classList.contains('live')).to.equal(true)
+      expect(button().getAttribute('aria-pressed')).to.equal('true')
+      expect(button().getAttribute('aria-label')).to.equal('Leave live')
 
-      button('#leave-live-button').click()
+      rig.page.showSong(0, true)
+      await rig.page.updateHeader(rig.page.songs[0], true)
+      expect(button().hidden).to.equal(true)
+      await rig.page.updateHeader(null, true)
+      expect(button().hidden).to.equal(false)
+
+      button().click()
       expect(getLive()).to.equal(null)
-      await rig.flush()
-      expect($('#overview-live')?.getAttribute('data-live')).to.equal('none')
+      expect(button().classList.contains('live')).to.equal(false)
+      expect(button().getAttribute('aria-label')).to.equal('Go live')
     })
 
     it('offers to take over when another setlist is live, and keeps up with other windows', async () => {
       await rig.open()
       goLive('/setlist/another', 'Other')
-      await rig.flush()
-      expect($('#overview-live')?.getAttribute('data-live')).to.equal('other')
+      expect(button().getAttribute('aria-label')).to.equal('Take over live here')
+      expect(button().classList.contains('live')).to.equal(false)
       leaveLive()
-      await rig.flush()
-      expect($('#overview-live')?.getAttribute('data-live')).to.equal('none')
-    })
-
-    it('has nothing to update when there is no overview to show it on', async () => {
-      await rig.open()
-      rig.page._setOverviewComponent(null)
-      expect(() => goLive('/setlist/another', 'Other')).to.not.throw()
+      expect(button().getAttribute('aria-label')).to.equal('Go live')
     })
 
     it('is live from the start when this setlist already is', async () => {
@@ -312,7 +317,7 @@ describe('the setlist page: corners', () => {
       rig.page = new SetlistPage({ root: rig.root, setlistId: first.id, db: rig.db })
       await rig.page.start()
       await rig.flush()
-      expect($('#overview-live')?.getAttribute('data-live')).to.equal('this')
+      expect(button().classList.contains('live')).to.equal(true)
     })
 
     it("keeps a share's key, which is in the link's fragment, with its address", async () => {
@@ -321,11 +326,17 @@ describe('the setlist page: corners', () => {
       history.replaceState(null, '', '#key=abc')
       try {
         rig.page._routeFor = index => ({ name: 'share', fileId: 'file 1', songIndex: index })
-        button('#go-live-button').click()
+        button().click()
         expect(getLive()?.url).to.equal('/s/file%201#key=abc')
       } finally {
         history.replaceState(null, '', original)
       }
+    })
+
+    it('has nothing to update when the page has no live button', async () => {
+      await rig.open()
+      button().remove()
+      expect(() => goLive('/setlist/another', 'Other')).to.not.throw()
     })
   })
 })

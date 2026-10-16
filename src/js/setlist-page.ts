@@ -19,8 +19,6 @@ import {
 } from '../components/setlist-info-dialog.ts'
 import {
   OverviewAddSongEvent,
-  OverviewGoLiveEvent,
-  OverviewLeaveLiveEvent,
   OverviewSongClickEvent,
   OverviewSongDeleteEvent,
   OverviewSongKeyChangeEvent,
@@ -132,6 +130,7 @@ export class SetlistPage {
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
   _shareSetup = false
+  _liveSetup = false
   _editModeSetup?: boolean
   _appHeaderEventsSetup?: boolean
   _lastVisibleSection?: string | null
@@ -142,8 +141,6 @@ export class SetlistPage {
   _onOverviewSongClick: (event: OverviewSongClickEvent) => void
   _onOverviewSongDelete: (event: OverviewSongDeleteEvent) => void
   _onOverviewAddSong: () => void
-  _onOverviewGoLive: () => void
-  _onOverviewLeaveLive: () => void
   _onLiveChange: () => void
   _onOverviewSongKeyChange: (event: OverviewSongKeyChangeEvent) => void
   _reorder: OverviewReorder
@@ -223,12 +220,7 @@ export class SetlistPage {
       this._addSongModal.open()
     }
 
-    this._onOverviewGoLive = () => {
-      // Synchronously, in the tap: that is the user gesture fullscreen needs
-      goLive(this._liveUrl(), this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : '')
-    }
-    this._onOverviewLeaveLive = () => leaveLive()
-    this._onLiveChange = () => this._refreshOverviewLive()
+    this._onLiveChange = () => this._refreshLiveButton()
 
     this._reorder = new OverviewReorder({
       root: this.root,
@@ -371,6 +363,7 @@ export class SetlistPage {
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
         this._setupShare()
+        this._setupLive()
         this._setOverviewComponent(null)
 
         // Update header to show setlist info
@@ -407,6 +400,7 @@ export class SetlistPage {
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
       this._setupShare()
+      this._setupLive()
 
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs)
@@ -513,11 +507,6 @@ export class SetlistPage {
         OverviewAddSongEvent.type,
         this._onOverviewAddSong
       )
-      this._overviewComponent.removeEventListener(OverviewGoLiveEvent.type, this._onOverviewGoLive)
-      this._overviewComponent.removeEventListener(
-        OverviewLeaveLiveEvent.type,
-        this._onOverviewLeaveLive
-      )
       this._overviewComponent.removeEventListener(
         OverviewSongKeyChangeEvent.type,
         this._onOverviewSongKeyChange
@@ -530,9 +519,6 @@ export class SetlistPage {
       component.addEventListener(OverviewSongClickEvent.type, this._onOverviewSongClick)
       component.addEventListener(OverviewSongDeleteEvent.type, this._onOverviewSongDelete)
       component.addEventListener(OverviewAddSongEvent.type, this._onOverviewAddSong)
-      component.addEventListener(OverviewGoLiveEvent.type, this._onOverviewGoLive)
-      component.addEventListener(OverviewLeaveLiveEvent.type, this._onOverviewLeaveLive)
-      this._refreshOverviewLive()
       component.addEventListener(OverviewSongKeyChangeEvent.type, this._onOverviewSongKeyChange)
     }
   }
@@ -550,15 +536,33 @@ export class SetlistPage {
     return buildUrl(route) + (route.name === 'share' ? location.hash : '')
   }
 
-  /** Whether this setlist, another or none is live, for the overview's button */
-  _refreshOverviewLive() {
-    if (!this._overviewComponent) return
+  /** The header's live button: red while this setlist is live, and what pressing it does */
+  _refreshLiveButton() {
+    const button = this.root.querySelector<HTMLElement>('#live-button')
+    if (!button) return
     const live = getLive()
-    this._overviewComponent.liveState = !live
-      ? 'none'
-      : isLiveSetlist(live, buildUrl(this._routeFor(-1)))
-        ? 'this'
-        : 'other'
+    const here = isLiveSetlist(live, buildUrl(this._routeFor(-1)))
+    const label = here ? 'Leave live' : live ? 'Take over live here' : 'Go live'
+    button.classList.toggle('live', here)
+    button.setAttribute('aria-pressed', String(here))
+    button.setAttribute('aria-label', label)
+    button.title = label
+  }
+
+  /** Go live from the header's button, or leave, in the tap: that is the gesture fullscreen needs */
+  _setupLive() {
+    const button = this.root.querySelector<HTMLElement>('#live-button')
+    if (!button) return
+    this._refreshLiveButton()
+    if (this._liveSetup) return
+    this._liveSetup = true
+    button.addEventListener('click', () => {
+      if (button.getAttribute('aria-pressed') === 'true') {
+        leaveLive()
+        return
+      }
+      goLive(this._liveUrl(), this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : '')
+    })
   }
 
   _refreshOverviewComponentEditMode() {
@@ -762,7 +766,7 @@ export class SetlistPage {
 
       // Store current song for info button handler
       this._currentSongForInfo = song
-      this._showShareButton(false)
+      this._showHeaderButtons(false)
     } else {
       // Overview - hide musical metadata
       if (musicalMetadata) {
@@ -780,12 +784,14 @@ export class SetlistPage {
 
       // Store that we're on overview for info button handler
       this._currentSongForInfo = null
-      this._showShareButton(true)
+      this._showHeaderButtons(true)
     }
   }
 
-  /** The header's share button: on the overview only, lit while the setlist is shared */
-  _showShareButton(show: boolean) {
+  /** The header's share and live buttons: on the overview only. Share is lit while the setlist is shared */
+  _showHeaderButtons(show: boolean) {
+    const live = this.root.querySelector<HTMLElement>('#live-button')
+    if (live) live.hidden = !show
     const button = this.root.querySelector<HTMLElement>('#share-button')
     if (!button) return
     button.hidden = !show
