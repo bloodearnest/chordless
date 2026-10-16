@@ -10,6 +10,8 @@ import { AppUpdateChangeEvent } from '../src/js/app-update.ts'
 import { wait } from './test-helpers.ts'
 import '../src/components/app-header.ts'
 
+import { must } from './must.ts'
+
 const { describe, it } = window
 
 describe('app-header', () => {
@@ -88,6 +90,16 @@ describe('app-header', () => {
       button(header, '.edit-toggle')?.click()
       button(header, '.info-button')?.click()
       expect(seen).to.deep.equal(['edit', 'info'])
+    })
+
+    it('draws the info button’s i without a circle of its own: the button is the circle', async () => {
+      const header = await fixture<AppHeader>(
+        html`<app-header heading="Page" show-info-button></app-header>`
+      )
+      const icon = must(button(header, '.info-button')?.querySelector('app-icon'))
+      await icon.updateComplete
+      expect(icon.shadowRoot?.querySelector('svg circle')).to.equal(null)
+      expect(icon.shadowRoot?.querySelector('svg path')).to.not.equal(null)
     })
 
     it('marks the edit button while in edit mode', async () => {

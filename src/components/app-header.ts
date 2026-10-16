@@ -352,6 +352,11 @@ export class AppHeader extends LitElement {
       display: flex;
     }
 
+    /* The i alone, bolder, to match the weight of the circle round it */
+    .info-button app-icon {
+      --icon-stroke: 3.5;
+    }
+
     .icon-button:hover {
       background-color: rgba(255, 255, 255, 0.2);
       transform: scale(1.05);
@@ -545,7 +550,7 @@ export class AppHeader extends LitElement {
                   @click=${this._handleInfoClick}
                   aria-label="Information"
                 >
-                  <app-icon name="info"></app-icon>
+                  <app-icon name="info-mark"></app-icon>
                 </button>
               `
               : ''
