@@ -20,6 +20,12 @@ reads in `.stats/` and `coverage/` when they run in full, so a run of some files
 record anything. `docs/test-catches.jsonl` is the other record: the real bugs the tests found,
 which the agent logs as it works (see CLAUDE.md).
 
+The Help pages show pictures of the real controls (`public/help/`, light and dark). `just test`
+retakes them first, with `tests/help-images.shots.ts` (`just help-images` alone does the same), so
+they follow how the controls look: commit what changes. It is not one of the Playwright tests (it
+writes files); `tests/help-images.node.test.ts` checks every picture the help names exists, and
+`tests/help.playwright.ts` that the help shows the one for the theme.
+
 Tests are TypeScript, type-checked by `tsc -b` (part of `just lint`) with `strict` on, except
 `noImplicitAny` (`tsconfig.tests.json`, `tsconfig.node.json`): helper parameters and `let`s need no
 annotations, but everything the tests call is checked against the app's types, including null

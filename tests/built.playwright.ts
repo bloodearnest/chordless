@@ -63,6 +63,8 @@ test('the files it caches are the files the build made', async ({ page }) => {
   expect(cached).not.toContain('/service-worker.js')
   // Reading a PDF (a chart shared to the app) is loaded when first needed, not precached
   expect(cached.filter(path => /pdfjs/.test(path))).toEqual([])
+  // ...and so are the Help pictures: not core, so not part of the first visit's download
+  expect(cached.filter(path => path.startsWith('/help/'))).toEqual([])
 })
 
 test('the security headers are on the page, its deep links and the service worker', async ({

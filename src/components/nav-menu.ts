@@ -6,6 +6,7 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
+import { type HelpPage, helpFor } from '../js/help-content.ts'
 import { isReadOnlyOrganisation } from '../js/organisation.ts'
 import { FollowsReadOnly } from '../js/read-only-controller.ts'
 import { routeContext } from '../js/route-context.ts'
@@ -81,6 +82,7 @@ export class NavMenu extends LitElement {
     // Preferences are only rendered once first opened: they load pad sets from Drive
     _preferencesOpened: { state: true },
     _updateReady: { state: true }, // whether a new version of the app is waiting
+    _helpPage: { state: true }, // the help for the page being shown, if there is some
   }
 
   declare triggerId: string
@@ -92,9 +94,11 @@ export class NavMenu extends LitElement {
   declare setlistTitle: string
   declare _preferencesOpened: boolean
   declare _updateReady: boolean
+  declare _helpPage: HelpPage | undefined
 
   _popup: DialogPopup
   _preferencesModal: Ref<AppModal>
+  _helpModal: Ref<AppModal>
   triggerButton: HTMLElement | null
   _root?: Node
 
@@ -211,6 +215,7 @@ export class NavMenu extends LitElement {
     super()
     this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
     this._preferencesModal = createRef()
+    this._helpModal = createRef()
     this.showBackButton = false
     this.backLabel = 'Back'
     this.popoverId = 'nav-menu-popover'
@@ -227,6 +232,7 @@ export class NavMenu extends LitElement {
       context: routeContext,
       subscribe: true,
       callback: route => {
+        this._helpPage = helpFor(route)
         if (route?.name !== viewName) this.close()
         viewName = route?.name
       },
@@ -368,6 +374,15 @@ export class NavMenu extends LitElement {
             <span>Song Library</span>
           </a>
 
+          ${
+            this._helpPage
+              ? html`<button class="nav-menu-item" part="nav-item" @click=${this._handleHelpClick}>
+                <app-icon name="help" size="20" class="nav-icon"></app-icon>
+                <span>Help: ${this._helpPage.title}</span>
+              </button>`
+              : nothing
+          }
+
           <button class="nav-menu-item" part="nav-item" @click=${this._handlePreferencesClick}>
             <app-icon name="settings" size="20" class="nav-icon"></app-icon>
             <span>Preferences</span>
@@ -398,6 +413,19 @@ export class NavMenu extends LitElement {
           </a>
         </nav>
       </dialog>
+
+      ${
+        this._helpPage
+          ? html`<app-modal
+            ${ref(this._helpModal)}
+            size="large"
+            heading=${this._helpPage.title}
+            @click=${this._onHelpClick}
+          >
+            <app-help .page=${this._helpPage}></app-help>
+          </app-modal>`
+          : nothing
+      }
 
       <app-modal ${ref(this._preferencesModal)} size="fullscreen" heading="Preferences">
         ${this._preferencesOpened ? html`<app-preferences></app-preferences>` : ''}
@@ -430,6 +458,30 @@ export class NavMenu extends LitElement {
 
     // Close the menu after song is clicked
     this.close()
+  }
+
+  /**
+   * A link in the help: leave the help for where it goes. Preferences is a modal, not a page, so
+   * that a setlist is not left to read them: open it over the page.
+   */
+  _onHelpClick(event: MouseEvent): void {
+    const link = event
+      .composedPath()
+      .find((node): node is HTMLAnchorElement => node instanceof HTMLAnchorElement)
+    if (!link) return
+    this._helpModal.value?.close()
+    if (new URL(link.href).pathname === '/preferences') {
+      event.preventDefault()
+      this._handlePreferencesClick()
+    }
+  }
+
+  /** Help for the page being shown, in a modal */
+  async _handleHelpClick(): Promise<void> {
+    this.close()
+    await import('./app-help.ts')
+    // Wait for next frame to ensure the menu is closed before showing the modal
+    requestAnimationFrame(() => this._helpModal.value?.show())
   }
 
   async _handlePreferencesClick(): Promise<void> {

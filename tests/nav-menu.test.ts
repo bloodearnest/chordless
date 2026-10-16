@@ -28,6 +28,80 @@ describe('nav-menu', () => {
 
   afterEach(() => container?.remove())
 
+  it('has a Help item only on a page that has help, and it opens that help', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    const helpItem = () =>
+      [...menu.shadowRoot.querySelectorAll('.nav-menu-item')].find(item =>
+        item.textContent.trim().startsWith('Help')
+      )
+    provideRoute({ name: 'about' })
+    await settle()
+    expect(helpItem()).to.equal(undefined)
+
+    provideRoute({ name: 'songs' })
+    await settle()
+    container.querySelector('#menu-button').click()
+    await settle()
+    helpItem().click()
+    await waitUntil(() =>
+      menu.shadowRoot.querySelector('app-help')?.shadowRoot?.textContent.includes('Finding a song')
+    )
+    expect(menu.shadowRoot.querySelector('app-modal[heading="Song Library"]').open).to.equal(true)
+    menu.shadowRoot.querySelector('app-modal[heading="Song Library"]').close()
+    provideRoute(null)
+  })
+
+  it('follows a link in the help: Preferences opens over the page, other links go where they go', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    provideRoute({ name: 'songs' })
+    await settle()
+    container.querySelector('#menu-button').click()
+    await settle()
+    const helpButton = [...menu.shadowRoot.querySelectorAll('.nav-menu-item')].find(item =>
+      item.textContent.trim().startsWith('Help')
+    )
+    helpButton.click()
+    const modal = () => menu.shadowRoot.querySelector('app-modal[heading="Song Library"]')
+    await waitUntil(() => modal()?.open)
+    const preferences = () => menu.shadowRoot.querySelector('app-modal[heading="Preferences"]')
+
+    // Not a link: the help stays
+    modal().querySelector('app-help').shadowRoot.querySelector('.text').click()
+    expect(modal().open).to.equal(true)
+
+    // A link to Preferences: the help gives way to the Preferences modal, and the page is not left
+    const link = modal()
+      .querySelector('app-help')
+      .shadowRoot.querySelector('a[href="/preferences"]')
+    const click = new MouseEvent('click', { bubbles: true, composed: true, cancelable: true })
+    link.dispatchEvent(click)
+    expect(click.defaultPrevented).to.equal(true)
+    expect(modal().open).to.equal(false)
+    await waitUntil(() => preferences()?.open)
+    preferences().close()
+
+    // Any other link is the router's: the help closes, and the click is left alone
+    container.querySelector('#menu-button').click()
+    await settle()
+    ;[...menu.shadowRoot.querySelectorAll('.nav-menu-item')]
+      .find(item => item.textContent.trim().startsWith('Help'))
+      .click()
+    await waitUntil(() => modal()?.open)
+    const other = document.createElement('a')
+    other.href = '/songs'
+    other.addEventListener('click', event => event.preventDefault())
+    modal().append(other)
+    other.click()
+    expect(modal().open).to.equal(false)
+    provideRoute(null)
+  })
+
   it('closes when the route changes, as it outlives the views', async () => {
     const menu = await setUp(`
       <button id="menu-button">Menu</button>

@@ -4,8 +4,9 @@
 default:
     @just --list
 
-# Run all tests: node, browser unit (Web Test Runner) and Playwright, then record the results
-test: test-node test-unit test-browser-headless && coverage-check stats
+# Run all tests: retake the Help pictures, then node, browser unit (Web Test Runner) and Playwright,
+# then record the results
+test: help-images test-node test-unit test-browser-headless && coverage-check stats
 
 # Record the last full run's counts, times and coverage in docs/stats.jsonl (`just test` does it)
 stats:
@@ -72,6 +73,11 @@ funnel:
     @tailscale funnel status 2>/dev/null | grep -q "8787" \
         && tailscale funnel status \
         || sudo tailscale funnel --bg 8787
+
+# Retake the pictures the Help pages show (public/help/), from the real app, light and dark, so they
+# follow how the controls look. `just test` does it: commit what changes
+help-images:
+    npx playwright test --config=playwright.help-images.config.ts
 
 # Run browser tests with Playwright (headless), optionally with files/options: just test-browser-headless tests/live.playwright.ts --repeat-each=5
 test-browser-headless *args:

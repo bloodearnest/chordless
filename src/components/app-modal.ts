@@ -133,7 +133,7 @@ export class AppModal extends LitElement {
     }
 
     :host([size='large']) .modal-content {
-      max-width: min(900px, calc(var(--app-width) - 2rem));
+      max-width: min(900px, 90%, calc(var(--app-width) - 2rem));
     }
 
     :host([size='fullscreen']) .modal-content {

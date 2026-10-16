@@ -190,7 +190,7 @@ test.describe('Navigation menu', () => {
         await button.click()
         await expect(menu).toBeVisible({ timeout: 500 })
       }, path).toPass()
-      await expect(menu.getByText('Song Library'), path).toBeVisible()
+      await expect(menu.getByText('Song Library', { exact: true }), path).toBeVisible()
       // The page behind the menu is inert, so tapping the button again lands on the
       // backdrop over it, which closes the menu
       const box = must(await button.boundingBox())

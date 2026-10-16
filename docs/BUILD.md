@@ -37,7 +37,9 @@ needs are unusual:
   activation the old one is deleted. Files with hashes in their names are served from the cache;
   the shell (`/`) is fetched from the network first, but the cached copy is not replaced, so it
   always matches the cached files.
-- **Not precached:** the worker and source maps. Pad audio, and
+- **Not precached:** the worker, source maps, the PDF reader and the Help pictures (`public/help/`,
+  240 KB): the app is normally online, and what has to work offline is the core, setlist navigation.
+  Those two are cached when first fetched, in `runtime-v1`. Pad audio, and
   other things fetched while running, go in `runtime-v1` and `padsets-cache-v1`, which survive
   an update.
 
