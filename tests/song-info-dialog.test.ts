@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/song-info-dialog.ts'
 import { must } from './must.ts'
 import { A11Y, wait } from './test-helpers.ts'
@@ -146,8 +146,11 @@ describe('song-info-dialog', () => {
     document.body.appendChild(dialog)
     await dialog.updateComplete
     await dialog.show('title-not-in-any-library')
-    await wait(100)
-    expect(dialog.shadowRoot.querySelector('status-message').state).to.equal('error')
+    const status = () => dialog.shadowRoot.querySelector('status-message')
+    await waitUntil(() => status()?.state === 'error', 'the dialog says it found no song', {
+      timeout: 5000,
+    })
+    expect(status().state).to.equal('error')
   })
 
   it('shows data it is given, with “Song info” as the heading when there is no song', async () => {

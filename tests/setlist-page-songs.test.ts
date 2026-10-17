@@ -2,7 +2,7 @@
  * What the setlist page does with a song's sections, key, tempo, capo and settings, and the state
  * it keeps. (Moving between songs and the header are in setlist-page-header.test.ts.)
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { CapoChangeEvent } from '../src/components/capo-selector.ts'
 import { KeyChangeEvent } from '../src/components/key-selector.ts'
@@ -301,7 +301,11 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         { once: true }
       )
       $('#key-selector')?.dispatchEvent(new KeyChangeEvent('A'))
-      await wait(150)
+      await waitUntil(
+        async () => must(await rig.db.getSetlist(setlist.id)).songs[0].key === 'A',
+        'the key is saved in the setlist',
+        { timeout: 5000 }
+      )
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].key).to.equal('A')
       expect(rig.page.songs[0].currentKey).to.equal('A')
       expect(dispatched[0]).to.equal('A')

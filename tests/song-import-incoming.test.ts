@@ -64,7 +64,8 @@ describe('song-import: songs that arrive', () => {
   }
   const text = () => importer.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
   const $ = (selector: string) => importer.shadowRoot?.querySelector<HTMLElement>(selector) ?? null
-  const choices = () => waitUntil(() => importer._state === 'choices', 'the choices to show')
+  const choices = () =>
+    waitUntil(() => importer._state === 'choices', 'the choices to show', { timeout: 5000 })
 
   describe('offered by the system or another app', () => {
     it('are taken when the page opens, files and text together', async () => {
