@@ -1,4 +1,7 @@
 editing
+- Test PDFs we can commit: generate made-up charts (our own words, no CCLI number) as PDFs in the shapes
+  leaders send, so the email importer's PDF reading is tested on every machine and in CI, and
+  tests/emails-private.node.test.ts (real emails, newest 5 by default) is no longer the only test of it
 - Read-only should only stop writing back to sync, not local edits (decided 2026-10-16: a last
   minute change of key, a late song, must work for a reader too; users are grown-ups, see "be
   permissive in the moment" in CLAUDE.md). Today (SYNC_ARCHITECTURE.md, "Read-only access") a

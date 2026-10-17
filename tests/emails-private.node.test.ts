@@ -4,6 +4,8 @@
  * charts are copyrighted and the emails have other people's addresses in them, so this skips
  * when there are none.
  *
+ * By default it reads the newest 5 only; CHORDLESS_ALL_EMAILS=1 reads them all.
+ *
  * It can't know what each email should give, so it checks what must be true of any: nothing
  * throws, and what comes out is well formed. A new kind of email that breaks one of these is a
  * case to add to email-setlist.node.test.ts, as a made-up email of the same shape.
@@ -16,7 +18,16 @@ import { importFromEmail } from '../src/js/email-setlist.ts'
 import { readPdfText } from '../src/js/pdf-text.ts'
 
 const DIR = new URL('./fixtures/private/emails/', import.meta.url)
-const files = existsSync(DIR) ? readdirSync(DIR).filter(name => name.endsWith('.eml')) : []
+const everyEmail = existsSync(DIR)
+  ? readdirSync(DIR)
+      .filter(name => name.endsWith('.eml'))
+      .sort()
+  : []
+// Reading the PDFs takes ~8s for all of them, so by default only the newest few (the names start
+// with the date), which are the formats leaders use now. CHORDLESS_ALL_EMAILS=1 reads every one:
+// do that when the importer changes
+const SAMPLE = 5
+const files = process.env.CHORDLESS_ALL_EMAILS ? everyEmail : everyEmail.slice(-SAMPLE)
 
 test('real emails: every one reads as a well formed setlist', {
   skip: !files.length && 'no real emails in tests/fixtures/private/emails',

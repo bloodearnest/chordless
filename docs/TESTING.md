@@ -193,6 +193,8 @@ The email importer (`src/js/email-setlist.ts`) is tuned on real emails from othe
 can't be committed: the PDFs are copyrighted, and the emails have other people's addresses in
 them. So they live in `tests/fixtures/private/`, which git ignores. Tests that read them skip when
 it is empty, and committed tests use made-up emails of the same shapes.
+`emails-private.node.test.ts` reads only the newest 5 (reading every PDF takes ~8s); set
+`CHORDLESS_ALL_EMAILS=1` to read them all, as you should when the importer changes.
 
 `scripts/download-emails.ts` fetches them from Gmail. It only reads: the token needs the
 `gmail.readonly` scope and nothing else.
