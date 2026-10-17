@@ -313,8 +313,10 @@ export class MediaPlayer extends LitElement {
       this.currentKey = null
     }
     // Store current song's tempo/time signature metadata
-    if (song?.metadata && 'tempo' in song.metadata) {
-      this._currentBpm = song.metadata.tempo ? Number(song.metadata.tempo) : null
+    // (currentBPM is the one a tempo change sets at once; metadata.tempo only follows a re-render)
+    if (song && (song.currentBPM !== undefined || (song.metadata && 'tempo' in song.metadata))) {
+      const tempo = song.currentBPM ?? song.metadata?.tempo
+      this._currentBpm = tempo ? Number(tempo) : null
     }
     if (song?.metadata && 'tempoNote' in song.metadata) {
       this._currentTempoNote = song.metadata.tempoNote || '1/4'

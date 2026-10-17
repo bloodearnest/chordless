@@ -238,6 +238,22 @@ describe('the media player starting a song', () => {
       expect(pads.log).to.deep.equal(['crossfade A (pads)'])
     })
 
+    it('restarts the click at the new tempo when the tempo of the song that plays is changed', async () => {
+      // The setlist page sets currentBPM at once; metadata.tempo only follows a re-render
+      const withBpm = (currentBPM: number) =>
+        ({ ...(song('a', 'G', 100) as object), currentBPM }) as never
+      await player._handleSongChange(new SongChangeEvent(withBpm(100)))
+      await player._startSong()
+      click.log.length = 0
+
+      await player._handleSongChange(new SongChangeEvent(withBpm(140)))
+      await Promise.resolve()
+      await Promise.resolve()
+
+      expect(player._currentBpm).to.equal(140)
+      expect(click.log[click.log.length - 1]).to.equal('start 140 4/4 1/4')
+    })
+
     it('does nothing about another song changing while one plays', async () => {
       await view('a', 'G')
       await player._startSong()
