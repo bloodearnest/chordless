@@ -1,4 +1,5 @@
-import { html, LitElement } from 'lit'
+import { html, LitElement, nothing } from 'lit'
+import { type ListedSong, songListText } from '../js/setlist/song-list-text.ts'
 import './icon.ts'
 import type { SongCardBpmChangeEvent, SongCardKeyChangeEvent } from './song-card.ts'
 
@@ -64,15 +65,21 @@ export class SetlistOverview extends LitElement {
   static override properties = {
     songs: { type: Array, attribute: false },
     editMode: { type: Boolean, attribute: 'edit-mode' },
+    _copied: { state: true },
   }
+
+  /** How long the button says Copied */
+  static copiedMs = 2000
 
   declare songs: unknown[] /* TYPE */
   declare editMode: boolean
+  declare _copied: boolean
 
   constructor() {
     super()
     this.songs = []
     this.editMode = false
+    this._copied = false
   }
 
   // Render into light DOM so existing CSS/selectors keep working
@@ -113,9 +120,30 @@ export class SetlistOverview extends LitElement {
               </div>
             </div>
           </button>
+          ${
+            this.songs.length
+              ? html`<button class="copy-song-list" @click=${this._copySongList}>
+                  <app-icon name=${this._copied ? 'check' : 'copy'} size="18"></app-icon>
+                  ${this._copied ? 'Copied' : 'Copy song list'}
+                </button>`
+              : nothing
+          }
         </div>
       </div>
     `
+  }
+
+  /** The titles with their CCLI numbers, as text to paste (to the media team, say) */
+  async _copySongList() {
+    try {
+      await navigator.clipboard.writeText(songListText(this.songs as ListedSong[]))
+      this._copied = true
+      setTimeout(() => {
+        this._copied = false
+      }, SetlistOverview.copiedMs)
+    } catch {
+      // Clipboard access can be refused: nothing else to do
+    }
   }
 
   _handleSongClick(index: number): void {
