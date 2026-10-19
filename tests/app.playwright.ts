@@ -276,9 +276,7 @@ test.describe('Storage page', () => {
     await expect(summary.locator('.stat-row', { hasText: 'Songs' })).toContainText('1')
   })
 
-  test('organisations: a duplicate name is refused in the form, and switching asks first', async ({
-    page,
-  }) => {
+  test('spaces: switching asks first, and no space is made from the page', async ({ page }) => {
     const dialogs: string[] = []
     page.on('dialog', dialog => {
       dialogs.push(dialog.message())
@@ -291,13 +289,13 @@ test.describe('Storage page', () => {
       .locator('.organisation-item.current .organisation-name')
       .innerText()
 
-    await organisations.getByRole('button', { name: 'Create New Space' }).click()
-    await organisations.getByPlaceholder('New space name...').fill(current)
-    await organisations.getByRole('button', { name: 'Create Space' }).click()
-    await expect(organisations.getByRole('alert')).toContainText('already exists')
-
-    await organisations.getByPlaceholder('New space name...').fill('Second Org')
-    await organisations.getByRole('button', { name: 'Create Space' }).click()
+    // (nothing on the page makes a space: that comes with a team; this one is made in code)
+    await expect(organisations.getByRole('button', { name: /Create/ })).toHaveCount(0)
+    await page.evaluate(async () => {
+      const { createOrganisation } = await import('/js/organisation.ts')
+      await createOrganisation('Second Org')
+    })
+    await page.goto('/storage')
     await expect(organisations.locator('.organisation-item')).toHaveCount(2)
 
     await organisations.getByRole('button', { name: 'Switch' }).click()

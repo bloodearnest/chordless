@@ -8,12 +8,8 @@ import {
   restoreBackup,
   restorePadSets,
 } from '../js/backup.ts'
-import { ChordlessDB, getCurrentDB } from '../js/db.ts'
-import {
-  createOrganisation,
-  getCurrentOrganisation,
-  listOrganisations,
-} from '../js/organisation.ts'
+import { getCurrentDB } from '../js/db.ts'
+import { getCurrentOrganisation } from '../js/organisation.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
@@ -27,20 +23,12 @@ interface PadSetChoice {
 /** A restore the user has chosen a file for and not yet confirmed */
 interface PendingRestore {
   backup: Backup
-  into: 'current' | 'new'
   pads: boolean
 }
 
 export function megabytes(bytes: number): string {
   const mb = bytes / (1024 * 1024)
   return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
-}
-
-/** "Name (restored)", or with a number if the space already has one of that name */
-export function restoredName(name: string, taken: string[]): string {
-  let candidate = `${name} (restored)`
-  for (let n = 2; taken.includes(candidate); n++) candidate = `${name} (restored ${n})`
-  return candidate
 }
 
 /**
@@ -179,7 +167,7 @@ export class BackupPanel extends LitElement {
     this._message = null
     try {
       const backup = await readBackup(file)
-      this._pending = { backup, into: 'current', pads: false }
+      this._pending = { backup, pads: false }
     } catch (error) {
       this._pending = null
       this._message = { text: errorMessage(error), kind: 'error' }
@@ -193,23 +181,8 @@ export class BackupPanel extends LitElement {
     this._message = null
     try {
       const { backup } = pending
-      let into: ChordlessDB
-      let where = `this space (${getCurrentOrganisation().name})`
-      if (pending.into === 'new') {
-        const taken = (await listOrganisations()).map(space => space.name)
-        const space = await createOrganisation(restoredName(backup.manifest.space, taken))
-        into = new ChordlessDB(space.id)
-        await into.init()
-        where = `a new space, ${space.name}: switch to it in the Space section above`
-      } else {
-        into = await getCurrentDB()
-      }
-      let report: Awaited<ReturnType<typeof restoreBackup>>
-      try {
-        report = await restoreBackup(backup, into)
-      } finally {
-        if (pending.into === 'new') into.db?.close()
-      }
+      const where = getCurrentOrganisation().name
+      const report = await restoreBackup(backup, await getCurrentDB())
       const pads =
         pending.pads && this.signedIn
           ? await restorePadSets(
@@ -220,7 +193,7 @@ export class BackupPanel extends LitElement {
       this._pending = null
       this._message = {
         text:
-          `Restored into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
+          `Restored into this space (${where}): ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
           `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
           (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
           '.',
@@ -239,37 +212,13 @@ export class BackupPanel extends LitElement {
     const when = new Date(manifest.created).toLocaleString()
     return html`
       <fieldset>
-        <legend>Restore this backup</legend>
+        <legend>Restore this backup into ${getCurrentOrganisation().name}</legend>
         <p class="meta">
           Backup of ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
             padSets > 0 ? html`, ${padSets} pad sets` : nothing
           }. Nothing is deleted: only what is missing is added.
         </p>
         <div class="row">
-          <label>
-            <input
-              type="radio"
-              name="into"
-              id="restore-current"
-              .checked=${pending.into === 'current'}
-              @change=${() => {
-                this._pending = { ...pending, into: 'current' }
-              }}
-            />
-            Into this space (${getCurrentOrganisation().name})
-          </label>
-          <label>
-            <input
-              type="radio"
-              name="into"
-              id="restore-new"
-              .checked=${pending.into === 'new'}
-              @change=${() => {
-                this._pending = { ...pending, into: 'new' }
-              }}
-            />
-            Into a new space, ${manifest.space} (restored)
-          </label>
           ${
             padSets > 0
               ? html`<label>

@@ -1,12 +1,11 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import { type BackupPanel, megabytes, restoredName } from '../src/components/backup-panel.ts'
+import { type BackupPanel, megabytes } from '../src/components/backup-panel.ts'
 import { createBackup } from '../src/js/backup.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import {
   createOrganisation,
   deleteOrganisation,
   getCurrentOrganisation,
-  listOrganisations,
   setCurrentOrganisation,
 } from '../src/js/organisation.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
@@ -32,7 +31,6 @@ describe('the backup panel', () => {
   let drive: ReturnType<typeof installFakeDrive>
   let realClick: typeof HTMLAnchorElement.prototype.click
   let downloads: { name: string; size: number }[]
-  const created: string[] = []
 
   beforeEach(async () => {
     drive = installFakeDrive()
@@ -58,10 +56,6 @@ describe('the backup panel', () => {
     localStorage.removeItem('padset-cache-state')
     localStorage.removeItem('padset-selection')
     await deleteOrganisation(spaceId)
-    for (const id of created.splice(0)) {
-      await deleteOrganisation(id)
-      await deleteDatabase(id)
-    }
     if (before.id) await setCurrentOrganisation(before.id, before.name)
   })
 
@@ -99,14 +93,6 @@ describe('the backup panel', () => {
     input.dispatchEvent(new Event('change'))
   }
 
-  it('names the unnamed restored space, and a number when that is taken', () => {
-    expect(restoredName('Grace', [])).to.equal('Grace (restored)')
-    expect(restoredName('Grace', ['Grace (restored)'])).to.equal('Grace (restored 2)')
-    expect(restoredName('Grace', ['Grace (restored)', 'Grace (restored 2)'])).to.equal(
-      'Grace (restored 3)'
-    )
-  })
-
   it('gives sizes in megabytes, with a decimal only for small ones', () => {
     expect(megabytes(1.5 * 1024 * 1024)).to.equal('1.5 MB')
     expect(megabytes(48.6 * 1024 * 1024)).to.equal('49 MB')
@@ -116,18 +102,6 @@ describe('the backup panel', () => {
     const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
     await el._restore()
     expect(text(el)).to.not.contain('Restored')
-  })
-
-  it('goes back to this space when that is chosen again', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    await choose(el, await backupOf('Elsewhere', false))
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-    must(el.shadowRoot?.querySelector<HTMLInputElement>('#restore-new')).click()
-    await el.updateComplete
-    expect(el._pending?.into).to.equal('new')
-    must(el.shadowRoot?.querySelector<HTMLInputElement>('#restore-current')).click()
-    await el.updateComplete
-    expect(el._pending?.into).to.equal('current')
   })
 
   it('offers no pad sets when not signed in', async () => {
@@ -184,26 +158,6 @@ describe('the backup panel', () => {
     button(el, 'restore').click()
     await waitUntil(() => text(el).includes('0 charts and 0 setlists added'), 'the second restore')
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
-  })
-
-  it('restores into a new space when asked, leaving this one alone', async () => {
-    const file = await backupOf('Elsewhere')
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    await choose(el, file)
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-    must(el.shadowRoot?.querySelector<HTMLInputElement>('#restore-new')).click()
-    await el.updateComplete
-    button(el, 'restore').click()
-    await waitUntil(() => text(el).includes('Restored into a new space'), 'the restore')
-
-    const space = must((await listOrganisations()).find(s => s.name === 'Elsewhere (restored)'))
-    created.push(space.id)
-    const db = new ChordlessDB(space.id)
-    await db.init()
-    expect(await db.getAllSongs()).to.have.length(1)
-    db.db?.close()
-    expect(await (await getCurrentDB()).getAllSongs()).to.have.length(0)
-    expect(getCurrentOrganisation().id).to.equal(spaceId)
   })
 
   it('goes back to the choice of file when the question is cancelled', async () => {

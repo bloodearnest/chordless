@@ -125,87 +125,11 @@ describe('select-organisation', () => {
     })
   })
 
-  describe('making a new one', () => {
-    const open = async (el: SelectOrganisation) => {
-      el.shadowRoot?.querySelector<HTMLButtonElement>('.btn.block')?.click()
-      await el.updateComplete
-    }
-    const type = async (el: SelectOrganisation, value: string) => {
-      const input = el.shadowRoot?.querySelector('input') as HTMLInputElement
-      input.value = value
-      input.dispatchEvent(new Event('input'))
-      await el.updateComplete
-    }
-    const submit = async (el: SelectOrganisation) => {
-      el.shadowRoot?.querySelector('form')?.dispatchEvent(new Event('submit', { cancelable: true }))
-      await new Promise(resolve => setTimeout(resolve, 50))
-      await el.updateComplete
-    }
-
-    it('shows a form, and hides it again on cancel', async () => {
-      const el = await show()
-      await open(el)
-      expect(el.shadowRoot?.querySelector('form')).to.not.equal(null)
-      el.shadowRoot
-        ?.querySelector<HTMLButtonElement>('.create-form-buttons .btn:not(.primary)')
-        ?.click()
-      await el.updateComplete
-      expect(el.shadowRoot?.querySelector('form')).to.equal(null)
-    })
-
-    it('asks for a name, and refuses one that is taken', async () => {
-      const el = await show()
-      await open(el)
-      await type(el, '   ')
-      await submit(el)
-      expect(text(el)).to.contain('Please enter a space name')
-      await type(el, other.name)
-      await submit(el)
-      expect(text(el)).to.contain('A space with this name already exists')
-    })
-
-    it('makes it, and lists it', async () => {
-      const el = await show()
-      await open(el)
-      const name = unique('Brand new')
-      await type(el, name)
-      await submit(el)
-      await waitUntil(() => itemFor(el, name), 'the new one is listed')
-      made.push(
-        (await (await import('../src/js/organisation.ts')).getOrganisationByName(name))
-          ?.id as string
-      )
-      expect(el.shadowRoot?.querySelector('form')).to.equal(null)
-    })
-
-    it('says why it could not be made', async () => {
-      const el = await show()
-      await open(el)
-      const realCreate = OrganisationDB.prototype.createOrganisation
-      OrganisationDB.prototype.createOrganisation = () => Promise.reject(new Error('disk full'))
-      try {
-        await type(el, unique('Fails'))
-        await submit(el)
-      } finally {
-        OrganisationDB.prototype.createOrganisation = realCreate
-      }
-      expect(text(el)).to.contain('Failed to create space: disk full')
-      expect(el._creating).to.equal(false)
-    })
-
-    it('says a failure that is not an Error as it is', async () => {
-      const el = await show()
-      await open(el)
-      const realCreate = OrganisationDB.prototype.createOrganisation
-      OrganisationDB.prototype.createOrganisation = () => Promise.reject('plain text')
-      try {
-        await type(el, unique('Fails'))
-        await submit(el)
-      } finally {
-        OrganisationDB.prototype.createOrganisation = realCreate
-      }
-      expect(text(el)).to.contain('Failed to create space: plain text')
-    })
+  it('has no way to make a space: that comes with a team', async () => {
+    const el = await show()
+    expect(el.shadowRoot?.querySelector('form')).to.equal(null)
+    expect(el.shadowRoot?.querySelector('input')).to.equal(null)
+    expect(text(el)).to.not.contain('Create')
   })
 
   describe('when the list cannot be read', () => {

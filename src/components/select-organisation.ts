@@ -3,7 +3,6 @@ import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Organisation } from '../js/data-types.ts'
 import {
-  createOrganisation,
   getCurrentOrganisation,
   listOrganisations,
   switchOrganisation,
@@ -11,7 +10,7 @@ import {
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
-import { buttonStyles, fieldStyles } from './shared-styles.ts'
+import { buttonStyles } from './shared-styles.ts'
 
 /** What the component loads: the organisations, and the name of the current one */
 interface OrganisationList {
@@ -22,21 +21,10 @@ interface OrganisationList {
 /**
  * SelectOrganisation Component
  *
- * Displays current organisation and allows switching between them.
+ * Shows the spaces on this device and the current one, and switches between them. It does not
+ * make one: a space is made for a team (docs/SPACES.md), which comes with its folder and members.
  */
 export class SelectOrganisation extends LitElement {
-  static override properties = {
-    _showCreateForm: { state: true },
-    _newOrganisationName: { state: true },
-    _creating: { state: true },
-    _formError: { state: true }, // why the new organisation wasn't created
-  }
-
-  declare _showCreateForm: boolean
-  declare _newOrganisationName: string
-  declare _creating: boolean
-  declare _formError: string
-
   /** Makes another organisation the current one, and starts the app afresh (a test gives its own) */
   switchTo: (organisationId: string) => Promise<void> = switchOrganisation
 
@@ -45,7 +33,6 @@ export class SelectOrganisation extends LitElement {
 
   static override styles = [
     buttonStyles,
-    fieldStyles,
     css`
       :host {
         display: block;
@@ -96,28 +83,10 @@ export class SelectOrganisation extends LitElement {
         padding: 0.5rem 1rem;
       }
 
-      .create-form {
-        display: flex;
-        flex-direction: column;
-        gap: 0.75rem;
-        padding: 0.75rem;
-        background: var(--tint-subtle);
-        border-radius: 4px;
-      }
-
       .form-error {
         margin: 0;
         color: var(--color-danger, #e74c3c);
         font-size: var(--font-ui-small);
-      }
-
-      .create-form-buttons {
-        display: flex;
-        gap: 0.5rem;
-      }
-
-      .create-form-buttons .btn {
-        flex: 1;
       }
 
       .loading,
@@ -135,8 +104,7 @@ export class SelectOrganisation extends LitElement {
   constructor() {
     super()
     this._switchModal = createRef()
-    // The organisations, and which is current: loaded when first rendered, and
-    // again after one is created
+    // The organisations, and which is current: loaded when first rendered
     this._orgs = new Task(this, {
       task: async () => ({
         organisations: await listOrganisations(),
@@ -145,9 +113,6 @@ export class SelectOrganisation extends LitElement {
       args: () => [],
       onError: error => console.error('Failed to load organisations:', error),
     })
-    this._showCreateForm = false
-    this._newOrganisationName = ''
-    this._creating = false
   }
 
   async _handleSwitch(org: Organisation): Promise<void> {
@@ -160,48 +125,6 @@ export class SelectOrganisation extends LitElement {
     modal.message = `Switch to "${org.name}"? This reloads the page.`
     if (await modal.ask()) {
       await this.switchTo(org.id)
-    }
-  }
-
-  _toggleCreateForm(): void {
-    this._showCreateForm = !this._showCreateForm
-    this._newOrganisationName = ''
-    this._formError = ''
-  }
-
-  _handleNameInput(e: Event): void {
-    this._newOrganisationName = (e.target as HTMLInputElement).value
-  }
-
-  async _handleCreate(e: Event): Promise<void> {
-    e.preventDefault()
-
-    const name = this._newOrganisationName.trim()
-    if (!name) {
-      this._formError = 'Please enter a space name'
-      return
-    }
-    if (this._orgs.value?.organisations.some(org => org.name === name)) {
-      this._formError = 'A space with this name already exists'
-      return
-    }
-
-    this._creating = true
-    this._formError = ''
-
-    try {
-      await createOrganisation(name)
-      // The new organisation shows in the list
-      await this._orgs.run()
-
-      // Hide form
-      this._showCreateForm = false
-      this._newOrganisationName = ''
-    } catch (error) {
-      console.error('Failed to create organisation:', error)
-      this._formError = `Failed to create space: ${error instanceof Error ? error.message : error}`
-    } finally {
-      this._creating = false
     }
   }
 
@@ -222,7 +145,7 @@ export class SelectOrganisation extends LitElement {
         ${
           organisations.length === 0
             ? html`<div class="empty-state">
-                <p>No spaces found. Create your first space to get started.</p>
+                <p>No spaces found.</p>
               </div>`
             : ''
         }
@@ -252,46 +175,6 @@ export class SelectOrganisation extends LitElement {
           )}
         </div>
 
-        ${
-          this._showCreateForm
-            ? html`
-              <form class="create-form" @submit=${this._handleCreate}>
-                <input
-                  class="field"
-                  type="text"
-                  placeholder="New space name..."
-                  .value=${this._newOrganisationName}
-                  @input=${this._handleNameInput}
-                  ?disabled=${this._creating}
-                  required
-                />
-                ${
-                  this._formError
-                    ? html`<p class="form-error" role="alert">${this._formError}</p>`
-                    : ''
-                }
-                <div class="create-form-buttons">
-                  <button
-                    type="button"
-                    class="btn"
-                    @click=${this._toggleCreateForm}
-                    ?disabled=${this._creating}
-                  >
-                    Cancel
-                  </button>
-                  <button type="submit" class="btn primary" ?disabled=${this._creating}>
-                    ${this._creating ? 'Creating...' : 'Create Space'}
-                  </button>
-                </div>
-              </form>
-            `
-            : html`
-              <button class="btn block success" @click=${this._toggleCreateForm}>
-                <app-icon name="add" size="20"></app-icon>
-                Create New Space
-              </button>
-            `
-        }
         <app-modal
           id="switch-modal"
           ${ref(this._switchModal)}

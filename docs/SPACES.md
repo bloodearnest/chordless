@@ -36,6 +36,11 @@ members of their church. Each space is self-contained, so copyright compliance i
 
 ## The model
 
+A space is made for a team: there is no button that makes an empty one. The personal space is made
+automatically, and a team space comes with its folder, its sharing and its members (not built). The
+Storage page's Space section therefore only lists the spaces on this device and switches between
+them; it no longer has "Create New Space".
+
 A space is a local IndexedDB plus a Drive folder; what changes between the kinds is who owns the
 folder and how data reaches Drive.
 
@@ -325,8 +330,10 @@ account, which also makes it the way to move data between two Google accounts.
 - **Restore** adds what the space lacks and deletes nothing, and can be run again (the second run
   adds nothing): a chart is the same chart by content hash, a different chart of a song the space has
   arrives as a variant, a setlist is skipped if the space has its id (`transferSpace` in `restore` mode:
-  the setlist ids are kept and the file is not touched). Into this space, or a new one named
-  "<name> (restored)". A restored setlist is local until the space syncs, like any other.
+  the setlist ids are kept and the file is not touched). Always into the current space: there is no
+  "restore into a new space", as a restore only adds, so merging cannot harm the space, and keeping
+  libraries apart is what team spaces are for. A restored setlist is local until the space syncs,
+  like any other.
 - **Restoring pads** uploads them to Drive and is a separate tick; a pad set with the same name there
   is replaced.
 - **Refused with a reason:** not a zip, no manifest, another kind of file, a backup from a newer
