@@ -362,6 +362,11 @@ behaviour). Pass/fail, in order:
 
 If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My Drive).
 
+**Run 2026-10-19 on a real My Drive (empty parent):** every file call passed with the flags (create,
+list, get, update, download, permissions, batch delete, trash), and `/about` accepted the flag too.
+`changes.list` saw nothing at once (0 changes): the probe now retries for 20 s to tell a lagging
+feed from `drive.file` hiding it. A shared-drive folder is still untested.
+
 **Ready to run:** `/dev/shared-drive-probe.html` (served by `just serve`, signed in on the Storage
 page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
 deletes and trashes with the app's own `drive-api.ts` calls, and also tries `/about` with the flag.

@@ -51,8 +51,9 @@ export function setAccessTokenProvider(provider?: AccessTokenProvider | null) {
 /**
  * Every call on files (and their permissions) says it may meet files in a shared drive, which
  * Drive otherwise refuses or leaves out; a listing also asks for the shared drives' items.
- * A team space's folder may be on one (docs/SPACES.md). Not for other endpoints, which don't
- * take these parameters. Without a shared drive involved, nothing changes.
+ * A team space's folder may be on one (docs/SPACES.md). Not for other endpoints, which have no use
+ * for them (the probe found /about accepts them, but there is no reason to send them).
+ * Without a shared drive involved, nothing changes (checked on a real My Drive, 2026-10-19).
  */
 const ALL_DRIVES = 'supportsAllDrives=true'
 const ALL_DRIVES_LIST = `${ALL_DRIVES}&includeItemsFromAllDrives=true`

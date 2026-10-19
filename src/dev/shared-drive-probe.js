@@ -139,18 +139,27 @@ async function run() {
 
   await step('changes.list (what a periodic pull could use)', async () => {
     const start = await driveRequest('/changes/startPageToken?supportsAllDrives=true')
-    // Make a change after the token, then ask what changed since
+    // Make a change after the token, then ask what changed since. The feed can lag the change by
+    // a few seconds, so ask again for a while before deciding it never shows it.
     const file = await createFile({ name: 'probe-change.txt', parents: [folderId] }, 'x')
-    const changes = await driveRequest(
-      `/changes?pageToken=${encodeURIComponent(start.startPageToken)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=newStartPageToken,changes(fileId,removed,file(name))`
-    )
-    const seen = (changes.changes || []).some(change => change.fileId === file.id)
+    const asked = Date.now()
+    let seen = false
+    let total = 0
+    while (!seen && Date.now() - asked < 20000) {
+      const changes = await driveRequest(
+        `/changes?pageToken=${encodeURIComponent(start.startPageToken)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=newStartPageToken,changes(fileId,removed,file(name))`
+      )
+      total = (changes.changes || []).length
+      seen = (changes.changes || []).some(change => change.fileId === file.id)
+      if (!seen) await new Promise(resolve => setTimeout(resolve, 2000))
+    }
     await batchDeleteFiles([file.id])
+    const seconds = ((Date.now() - asked) / 1000).toFixed(1)
     return {
       ok: seen,
       detail: seen
-        ? `saw the new file among ${changes.changes.length} change(s)`
-        : `did not see the new file (${(changes.changes || []).length} change(s)): poll by listing instead`,
+        ? `saw the new file after ${seconds}s (${total} change(s))`
+        : `did not see the new file in ${seconds}s (${total} change(s)): poll by listing instead`,
     }
   })
 
