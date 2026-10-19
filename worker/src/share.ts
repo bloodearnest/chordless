@@ -77,7 +77,7 @@ export async function handleShareDownload(
     let drive: Response
     try {
       drive = await fetchDrive(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&key=${encodeURIComponent(env.GOOGLE_API_KEY)}`
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&key=${encodeURIComponent(env.GOOGLE_API_KEY)}`
       )
     } catch {
       return text('Could not reach Drive', 502)

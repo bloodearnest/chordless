@@ -48,6 +48,21 @@ export function setAccessTokenProvider(provider?: AccessTokenProvider | null) {
   getAccessToken = provider || (() => GoogleAuth.getAccessToken())
 }
 
+/**
+ * Every call on files (and their permissions) says it may meet files in a shared drive, which
+ * Drive otherwise refuses or leaves out; a listing also asks for the shared drives' items.
+ * A team space's folder may be on one (docs/SPACES.md). Not for other endpoints, which don't
+ * take these parameters. Without a shared drive involved, nothing changes.
+ */
+const ALL_DRIVES = 'supportsAllDrives=true'
+const ALL_DRIVES_LIST = `${ALL_DRIVES}&includeItemsFromAllDrives=true`
+
+export function allDrivesUrl(endpoint: string, method = 'GET'): string {
+  if (!/^\/files(\/|\?|$)/.test(endpoint)) return endpoint
+  const isList = method === 'GET' && /^\/files(\?|$)/.test(endpoint)
+  return `${endpoint}${endpoint.includes('?') ? '&' : '?'}${isList ? ALL_DRIVES_LIST : ALL_DRIVES}`
+}
+
 /** A failed Drive request, with the HTTP status */
 export interface DriveError extends Error {
   status: number
@@ -110,7 +125,7 @@ export async function driveRequest<T = DriveFileList>(
     ...options.headers,
   }
 
-  const response = await fetch(`${DRIVE_API_BASE}${endpoint}`, {
+  const response = await fetch(`${DRIVE_API_BASE}${allDrivesUrl(endpoint, options.method)}`, {
     ...options,
     headers,
   })
@@ -193,7 +208,7 @@ export async function batchDeleteFiles(fileIds: string[]): Promise<number | unde
     batchBody += `--${boundary}\r\n`
     batchBody += `Content-Type: application/http\r\n`
     batchBody += `Content-ID: <item${index}>\r\n\r\n`
-    batchBody += `DELETE /drive/v3/files/${fileId}\r\n\r\n`
+    batchBody += `DELETE /drive/v3/files/${fileId}?${ALL_DRIVES}\r\n\r\n`
   })
   batchBody += `--${boundary}--`
 
@@ -255,7 +270,7 @@ export async function batchUploadFiles(files: DriveUpload[]): Promise<(DriveFile
           closeDelimiter
 
         const response = await fetch(
-          `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
+          `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}&${ALL_DRIVES}`,
           {
             method: 'POST',
             headers: {
@@ -302,7 +317,7 @@ export async function createFile(
   const { body, boundary } = multipartBody(metadata, content, contentType)
 
   const response = await fetch(
-    `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}`,
+    `${UPLOAD_API_BASE}/files?uploadType=multipart&fields=${WRITE_FIELDS}&${ALL_DRIVES}`,
     {
       method: 'POST',
       headers: {
@@ -375,7 +390,7 @@ export async function updateFile(
   const { body, boundary } = multipartBody(metadata, content, contentType)
 
   const response = await fetch(
-    `${UPLOAD_API_BASE}/files/${fileId}?uploadType=multipart&fields=${WRITE_FIELDS}`,
+    `${UPLOAD_API_BASE}/files/${fileId}?uploadType=multipart&fields=${WRITE_FIELDS}&${ALL_DRIVES}`,
     {
       method: 'PATCH',
       headers: {
@@ -403,7 +418,7 @@ export async function updateFile(
 async function downloadFile(fileId: string): Promise<string> {
   const token = await getAccessToken()
 
-  const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+  const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media&${ALL_DRIVES}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -419,7 +434,7 @@ async function downloadFile(fileId: string): Promise<string> {
 export async function downloadFileBinary(fileId: string): Promise<ArrayBuffer> {
   const token = await getAccessToken()
 
-  const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media`, {
+  const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media&${ALL_DRIVES}`, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

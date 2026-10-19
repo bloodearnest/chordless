@@ -55,7 +55,7 @@ test('relays the ciphertext, fetched from Drive with the key', async () => {
   assert.ok(res.headers.get('ETag'))
   assert.equal(
     drive.urls[0],
-    `https://www.googleapis.com/drive/v3/files/${ID}?alt=media&key=test-key`
+    `https://www.googleapis.com/drive/v3/files/${ID}?alt=media&supportsAllDrives=true&key=test-key`
   )
 })
 

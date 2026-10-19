@@ -272,7 +272,9 @@ export class FakeDrive {
     }
     if (path === '/batch/drive/v3' && method === 'POST') {
       // Only deletes are batched by the app: answer each as Drive does, in one multipart body
-      const ids = [...body.matchAll(/^DELETE \/drive\/v3\/files\/(\S+)\r?$/gm)].map(m => m[1])
+      const ids = [...body.matchAll(/^DELETE \/drive\/v3\/files\/([^\s?]+)(?:\?\S*)?\r?$/gm)].map(
+        m => m[1]
+      )
       if (ids.length === 0) this._unsupported('a batch of anything but deletes')
       const parts = ids.map((id, index) => {
         const gone = this.files.delete(id)
