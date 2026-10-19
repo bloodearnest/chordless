@@ -201,7 +201,7 @@ redesign. Not now: per-team accounts need Chordless to hold a key-minting creden
 Account/Key Admin) and many keys in Durable Objects under one master secret, so a Worker compromise
 still reaches them all; they'd mainly help against a single leaked key, per-team revocation, audit
 clarity and per-identity rate limits (Google's 100-accounts-per-project default is a further limit).
-For the real service account, use a **dedicated project with a tidy id** (the address a team admin
+For the real service account, use a **dedicated project with a tidy id** (the move is planned in docs/CLOUD_MIGRATION.md) (the address a team admin
 sees in their shared drive's members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id
 cannot be renamed: the app's own project is `setalight`, from its first name), separate from the project
 that holds the OAuth client and the verified brand, so the key that can reach every connected team's drive

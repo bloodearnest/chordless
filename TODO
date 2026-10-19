@@ -124,6 +124,9 @@ offline
   DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
+- BEFORE GOING LIVE: move to a new Google Cloud project with a tidy id, with Terraform for what it covers: plan in
+  docs/CLOUD_MIGRATION.md (the consent screen's brand verification is the long pole, so start it early; the
+  data moves by export and import, since drive.file files of the old client are invisible to the new one)
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). Still to do:
   applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
