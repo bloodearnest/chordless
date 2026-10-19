@@ -18,7 +18,12 @@ export interface GoogleApi {
   verifyIdToken: typeof verifyIdToken
 }
 
-const realGoogle: GoogleApi = { exchangeCode, refreshAccessToken, revokeToken, verifyIdToken }
+export const realGoogle: GoogleApi = {
+  exchangeCode,
+  refreshAccessToken,
+  revokeToken,
+  verifyIdToken,
+}
 
 /**
  * POST /oauth/callback

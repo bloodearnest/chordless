@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Broker spike - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 60rem;
+        margin: 0 auto;
+      }
+      fieldset {
+        margin-block: 1.5rem;
+      }
+      label {
+        display: block;
+        margin-block: 0.5rem;
+      }
+      input[type='text'],
+      textarea {
+        width: 100%;
+        max-width: 40rem;
+        font: inherit;
+      }
+      textarea {
+        min-height: 5rem;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+      }
+      td,
+      th {
+        border: 1px solid #ccc;
+        padding: 0.2rem 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      .pass {
+        color: #27ae60;
+        font-weight: 600;
+      }
+      .fail {
+        color: #c0392b;
+        font-weight: 600;
+      }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-all;
+        font-size: 0.8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Broker spike</h1>
+      <p>
+        Spike item 1 (docs/SPACES.md): can the Worker give a second person the files in the owner's
+        team folder, using the owner's token, with their role enforced? Throwaway, dev only. Two
+        accounts: the <strong>owner</strong> part runs where the owner is signed in, the
+        <strong>member</strong> part where the other account is signed in (another browser profile).
+        Both parts need the app's normal Google sign-in first (Storage page).
+      </p>
+
+      <fieldset>
+        <legend>1. Owner</legend>
+        <label>
+          Parent folder id (empty: My Drive root). A folder in a shared drive needs the Picker.
+          <input type="text" id="parent" placeholder="empty for My Drive" />
+        </label>
+        <label>
+          API key for the Picker (kept in this browser) <input type="text" id="api-key" autocomplete="off" />
+        </label>
+        <button id="pick">Pick a folder…</button> <span id="picked"></span>
+        <label>
+          Who may use it, one per line: an email, then reader or writer
+          <textarea id="members">bea@example.com reader
+cal@example.com writer</textarea>
+        </label>
+        <button id="enable">Make a team folder and enable sharing</button>
+        <button id="cleanup" disabled>Trash the folder again</button>
+        <div id="owner-status"></div>
+        <p>The member code, to paste in the member part:</p>
+        <pre id="member-code"></pre>
+        <button id="copy-code" disabled>Copy the member code</button>
+      </fieldset>
+
+      <fieldset>
+        <legend>2. Member (the other account)</legend>
+        <label>
+          Member code
+          <textarea id="code" placeholder="paste the member code"></textarea>
+        </label>
+        <label>
+          This account should be
+          <select id="expect">
+            <option value="reader">a reader</option>
+            <option value="writer">a writer</option>
+            <option value="none">not a member (everything refused)</option>
+          </select>
+        </label>
+        <button id="run">Run the member checks</button>
+        <button id="copy-report" disabled>Copy report JSON</button>
+        <div id="member-status"></div>
+        <table id="results" hidden>
+          <thead>
+            <tr>
+              <th>Step</th>
+              <th>Result</th>
+              <th>Detail</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </fieldset>
+    </main>
+
+    <script type="module" src="/dev/broker-spike.js"></script>
+  </body>
+</html>

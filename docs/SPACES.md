@@ -399,6 +399,25 @@ behaviour). Pass/fail, in order:
 
 If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My Drive).
 
+**Ready to run, item 1 (2026-10-19):** `/dev/broker-spike.html` and a throwaway Worker route
+(`worker/src/spike-broker.ts`, `POST /dev/spike/enable` and `/dev/spike/drive`; 404 unless
+`DEV_PAGES`, so dev only; the owner's token is kept in the dev server's memory and nowhere else).
+- *Owner* (browser profile signed in as account A): optionally pick a parent folder (Picker), list
+  the people allowed (an email and `reader` or `writer` per line), press "Make a team folder and
+  enable sharing". It makes a folder with a file, a subfolder with a file, and a file outside it,
+  hands the Worker the owner's blob and folder, and gives a member code to copy.
+- *Member* (another browser profile signed in as account B, on the same dev server): paste the code,
+  say what role B should have, press "Run the member checks". It lists the folder, reads a file in it
+  and one in a folder inside it (timed), asks for the file outside (must be refused), and tries to
+  write (a writer may, a reader must be refused). Running it as account A, who is not in the list,
+  with "not a member" should be refused everywhere.
+- The member's calls carry only their own Google ID token (`getIdToken`, a Google sign-in prompt, which
+  has not been used this way before: if the browser suppresses it, that is the first thing to report).
+  The Worker checks the token, the member's role, and that the file is inside the team folder
+  (walking up its parents), then calls Drive with the owner's access token and streams the answer.
+- It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
+  Manager, since the app only ever trashes.
+
 **Run 2026-10-19 on a real My Drive (empty parent):** every file call passed with the flags (create,
 list, get, update, download, permissions, batch delete, trash), and `/about` accepted the flag too.
 `changes.list` saw nothing at once but did after 5.7 s on a retry: it works under `drive.file`, and
