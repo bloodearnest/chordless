@@ -446,6 +446,13 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   counts compute, not time spent waiting on a stream. A pad set is 12 files of a few MB each, well
   inside that. Whether a request that long is cut off at the edge on a real deployment is the thing
   only a deployed Worker can say.
+- **Item 4 result (2026-10-19): passed, 20 MB.** Up through the Worker to the shared drive: 200, 9.7 s,
+  2.1 MB/s, Drive reports exactly 20,971,520 bytes. Back down through the Worker: the answer started
+  after 1.2 s and ended after 1.9 s (10.3 MB/s), 20,971,520 bytes, SHA-256 identical to what was
+  sent. So streaming works end to end with nothing kept in the Worker. The speeds are those of the
+  dev machine's own connection (the dev Worker runs there), not of a deployed Worker, so they are a
+  pessimistic guide; the plan's production limits are still unchecked on a real deployment. A pad
+  set (12 files of a few MB) would take tens of seconds to upload on a slow link, once.
 - It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
   Manager, since the app only ever trashes.
 
