@@ -117,7 +117,7 @@ The Worker keeps no per-user state (until the broker adds its Durable Objects).
 - **Expired access tokens:** the service worker refreshes them with `/session/refresh`. The Worker
   decrypts the blob only for that request.
 - **Expired sign-in:** when Google answers `invalid_grant` to a refresh (the refresh token expired
-  or was revoked; it dies after 7 days while the consent screen is "Testing"), the Worker answers
+  or was revoked; it dies after 7 days if it was made while the consent screen was "Testing"), the Worker answers
   `401 invalid_grant` and the client throws `SignInExpiredError`. `getSignInState()` is
   `signed-out`, `signed-in` or `expired`; only Google's refusal makes it `expired` (no network, or
   any other failure, counts as signed in). The Storage page then says "Sign-in expired", offers
@@ -452,7 +452,12 @@ users, leaders, permissions; join/invite/remove user; restrict editing others' s
 
 ## Risks
 
-- Consent screen must be "In production" or refresh tokens die in 7 days.
+- Consent screen must be "In production" or refresh tokens die in 7 days. **Met:** it has been In
+  production for over a week with the brand verified (2026-10-19). A sign-in made before that kept its
+  7-day life and expired; reconnecting made one under production. If an `invalid_grant` comes again,
+  the other causes are access revoked, six months unused, the per-account limit on refresh tokens for
+  one client, and a Workspace admin's session-length policy (which could affect a team owner's
+  account, and the broker holds that token).
 - The Worker carries team-space traffic including pad audio (cost, limits).
 - Owner-token mode: the owner leaves or revokes and sync stops; succession is a copy. (Solved by
   team-managed storage for teams on a shared drive.)
