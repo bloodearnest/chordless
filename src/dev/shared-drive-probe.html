@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Shared-drive probe - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body {
+        overflow: auto;
+        padding: 2rem;
+      }
+      main {
+        max-width: 60rem;
+        margin: 0 auto;
+      }
+      label {
+        display: block;
+        margin-block: 0.5rem;
+      }
+      input[type='text'] {
+        width: 100%;
+        max-width: 30rem;
+      }
+      table {
+        border-collapse: collapse;
+        font-size: 0.85rem;
+        margin-top: 1rem;
+      }
+      td,
+      th {
+        border: 1px solid #ccc;
+        padding: 0.2rem 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      .pass {
+        color: #27ae60;
+        font-weight: 600;
+      }
+      .fail {
+        color: #c0392b;
+        font-weight: 600;
+      }
+      .skip {
+        color: #7f8c8d;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Shared-drive probe</h1>
+      <p>
+        Checks that the <code>supportsAllDrives</code> and <code>includeItemsFromAllDrives</code> flags
+        the app now puts on every Drive call (<code>allDrivesUrl</code> in
+        <code>drive-api.ts</code>) are accepted by real Drive, and that each kind of call works.
+        It makes a folder named <code>chordless-probe-…</code>, works inside it and trashes it
+        at the end. Sign in first (Storage page). docs/SPACES.md, "Spike first", items 2 and 3.
+      </p>
+      <label>
+        Parent folder id (empty: your My Drive root, which checks the flags do no harm; a folder
+        in a shared drive checks spike item 2)
+        <input type="text" id="parent" placeholder="empty for My Drive" />
+      </label>
+      <label
+        ><input type="checkbox" id="public" /> Also make the probe file readable by anyone with
+        the link, then remove that (what a share link does; a Workspace admin may block it)</label
+      >
+      <button id="run">Run probe</button>
+      <button id="copy" disabled>Copy report JSON</button>
+      <div id="status"></div>
+      <table id="results" hidden>
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Result</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </main>
+
+    <script type="module" src="/dev/shared-drive-probe.js"></script>
+  </body>
+</html>

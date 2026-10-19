@@ -349,6 +349,12 @@ behaviour). Pass/fail, in order:
 
 If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My Drive).
 
+**Ready to run:** `/dev/shared-drive-probe.html` (served by `just serve`, signed in on the Storage
+page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
+deletes and trashes with the app's own `drive-api.ts` calls, and also tries `/about` with the flag.
+Empty parent: your My Drive (checks the flags do no harm to everyone's sync). A folder id in a shared
+drive: item 2, for the owner's token. Needs one account; items 1, 5 and 6 still need two.
+
 ## Order of work and status
 
 1. [ ] Principle in CLAUDE.md; this doc and the consolidation.
