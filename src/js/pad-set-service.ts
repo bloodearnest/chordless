@@ -9,6 +9,7 @@ import {
 } from './drive-api.ts'
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
+import { readZip, type ZipArchive } from './utils/zip.ts'
 
 /** A set of pads: a folder of them in Drive (the app ships none: the pads are the user's own) */
 export interface PadSet {
@@ -120,8 +121,7 @@ export async function uploadPadSet(
     throw new Error('Please provide a pad set name.')
   }
 
-  const zipEntries = await readZipEntries(zipFile)
-  const padFiles = await extractPadFiles(zipEntries)
+  const padFiles = await extractPadFiles(await readZip(zipFile))
 
   // Validate key coverage
   const missingKeys = PAD_FILE_KEYS.filter(key => !padFiles.has(key))
@@ -152,6 +152,22 @@ export async function uploadPadSet(
   // The first set uploaded is the one to use: there is no default to fall back on
   if (!getActivePadSet()) await selectPadSet(folderId)
   return padSet
+}
+
+/** How many bytes of audio a pad set holds in Drive (for a backup to say how big it would be) */
+export async function padSetSize(padSet: PadSet): Promise<number> {
+  const files = await listPadSetFiles(padSet.id)
+  return files.reduce((total, file) => total + Number(file.size ?? 0), 0)
+}
+
+/** A pad set's audio, by key, read from Drive (or what was kept of it) */
+export async function readPadSetAudio(padSet: PadSet): Promise<Map<string, ArrayBuffer>> {
+  const files = await ensurePadSetMetadata(padSet)
+  const audio = new Map<string, ArrayBuffer>()
+  for (const key of PAD_FILE_KEYS) {
+    audio.set(key, await downloadFileBinary((files[key] as PadFile).fileId))
+  }
+  return audio
 }
 
 export async function selectPadSet(padSetId: string): Promise<PadSet> {
@@ -374,77 +390,10 @@ async function invalidatePadSetCache(padSetId: string): Promise<void> {
   }
 }
 
-/** A zip file read far enough to find its entries */
-interface ZipContext {
-  bytes: Uint8Array
-  view: DataView
-  entries: ZipEntry[]
-}
-
-interface ZipEntry {
-  fileName: string
-  flags: number
-  compression: number
-  compressedSize: number
-  uncompressedSize: number
-  localHeaderOffset: number
-}
-
-async function readZipEntries(file: Blob): Promise<ZipContext> {
-  const buffer = await file.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  const view = new DataView(buffer)
-
-  const eocdOffset = findEndOfCentralDirectory(bytes)
-  if (eocdOffset < 0) {
-    throw new Error('Invalid ZIP file (EOCD not found)')
-  }
-
-  const centralDirOffset = view.getUint32(eocdOffset + 16, true)
-  const totalEntries = view.getUint16(eocdOffset + 10, true)
-
-  const entries: ZipEntry[] = []
-  let cursor = centralDirOffset
-
-  for (let i = 0; i < totalEntries; i++) {
-    const signature = view.getUint32(cursor, true)
-    if (signature !== 0x02014b50) {
-      break
-    }
-
-    const flags = view.getUint16(cursor + 8, true)
-    const compression = view.getUint16(cursor + 10, true)
-    const compressedSize = view.getUint32(cursor + 20, true)
-    const uncompressedSize = view.getUint32(cursor + 24, true)
-    const fileNameLength = view.getUint16(cursor + 28, true)
-    const extraLength = view.getUint16(cursor + 30, true)
-    const commentLength = view.getUint16(cursor + 32, true)
-    const localHeaderOffset = view.getUint32(cursor + 42, true)
-
-    const fileNameBytes = bytes.slice(cursor + 46, cursor + 46 + fileNameLength)
-    const fileName = new TextDecoder().decode(fileNameBytes)
-
-    entries.push({
-      fileName,
-      flags,
-      compression,
-      compressedSize,
-      uncompressedSize,
-      localHeaderOffset,
-    })
-
-    cursor += 46 + fileNameLength + extraLength + commentLength
-  }
-
-  return { bytes, view, entries }
-}
-
-async function extractPadFiles(
-  zipContext: ZipContext
-): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
+async function extractPadFiles(zip: ZipArchive): Promise<Map<string, Uint8Array<ArrayBuffer>>> {
   const padFiles = new Map<string, { data: Uint8Array<ArrayBuffer>; pathLength: number }>()
 
-  for (const entry of zipContext.entries) {
+  for (const entry of zip.entries) {
     if (!entry.fileName || entry.fileName.endsWith('/')) continue
     if (!entry.fileName.toLowerCase().endsWith('.mp3')) continue
     if (entry.flags & 0x01) {
@@ -454,7 +403,7 @@ async function extractPadFiles(
     const key = normalizePadKey(extractPadKeyFromFilename(entry.fileName))
     if (!key) continue
 
-    const data = await extractEntryData(zipContext, entry)
+    const data = await zip.read(entry)
     const existing = padFiles.get(key)
     if (!existing || entry.fileName.length < existing.pathLength) {
       padFiles.set(key, { data, pathLength: entry.fileName.length })
@@ -466,66 +415,6 @@ async function extractPadFiles(
     normalized.set(key, value.data)
   }
   return normalized
-}
-
-async function extractEntryData(
-  zipContext: ZipContext,
-  entry: ZipEntry
-): Promise<Uint8Array<ArrayBuffer>> {
-  const { bytes, view } = zipContext
-  const { localHeaderOffset } = entry
-
-  const signature = view.getUint32(localHeaderOffset, true)
-  if (signature !== 0x04034b50) {
-    throw new Error('Invalid ZIP local header')
-  }
-
-  const fileNameLength = view.getUint16(localHeaderOffset + 26, true)
-  const extraLength = view.getUint16(localHeaderOffset + 28, true)
-  const dataStart = localHeaderOffset + 30 + fileNameLength + extraLength
-  const dataEnd = dataStart + entry.compressedSize
-  const compressedData = bytes.slice(dataStart, dataEnd)
-
-  if (entry.compression === 0) {
-    return compressedData
-  }
-
-  if (entry.compression === 8) {
-    return await inflateRaw(compressedData)
-  }
-
-  throw new Error(`Unsupported ZIP compression method: ${entry.compression}`)
-}
-
-async function inflateRaw(data: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
-  const blob = new Blob([data])
-  const streams: CompressionFormat[] = ['deflate-raw', 'deflate']
-
-  for (const algo of streams) {
-    try {
-      const decompressedStream = blob.stream().pipeThrough(new DecompressionStream(algo))
-      const arrayBuffer = await new Response(decompressedStream).arrayBuffer()
-      return new Uint8Array(arrayBuffer)
-    } catch {
-      // Try next algorithm
-    }
-  }
-
-  throw new Error('Browser does not support deflate decompression for ZIP uploads')
-}
-
-function findEndOfCentralDirectory(bytes: Uint8Array): number {
-  for (let i = bytes.length - 22; i >= 0; i--) {
-    if (
-      bytes[i] === 0x50 &&
-      bytes[i + 1] === 0x4b &&
-      bytes[i + 2] === 0x05 &&
-      bytes[i + 3] === 0x06
-    ) {
-      return i
-    }
-  }
-  return -1
 }
 
 function readLocalStorage(key: string): string | null {

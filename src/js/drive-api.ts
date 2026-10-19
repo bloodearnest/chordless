@@ -612,7 +612,7 @@ export async function updatePadSetFolderMetadata(
 export async function listPadSetFiles(folderId: string): Promise<DriveFile[]> {
   const query = `'${folderId}' in parents and trashed=false`
   const result = await driveRequest(
-    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime,md5Checksum,mimeType)`
+    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,modifiedTime,md5Checksum,mimeType,size)`
   )
   return result.files
 }

@@ -309,6 +309,31 @@ Drive-capabilities trigger and the refusal counting can go. Anyone (a writer too
 this set local" later. A received share (the `readOnly` page option) should allow local edits the
 same way: it is kept on the device on its own, so a key change there is harmless.
 
+## Backup and restore
+
+**Built (2026-10-19).** Storage page, "Backup" (`backup-panel.ts`, `backup.ts`). A backup is a zip of
+the current space that needs no Google account, and can be restored into any space on any device or
+account, which also makes it the way to move data between two Google accounts.
+- **Contents:** `manifest.json` (format, version, date, the space's name, counts), `songs.json` (each
+  chart's record: id, variant, label, key, tempo, origin), `songs/<title>-<id>.cho` (the charts as
+  ChordPro text, readable on their own), `setlists/<date>-<name>-<id>.json`. Nothing of Drive is in it
+  (no file ids or checksums), no share links, no received shares, no deleted setlists. A device's own
+  state (the capo, the sections shown) is not in it.
+- **Pads are optional**, off by default, with the size shown beside the choice (`padSetSize`): they are
+  large, and they live in the signed-in account's Drive, so they need the user signed in and online.
+  They go in as `pads/<set>/<KEY>.mp3`, stored not compressed.
+- **Restore** adds what the space lacks and deletes nothing, and can be run again (the second run
+  adds nothing): a chart is the same chart by content hash, a different chart of a song the space has
+  arrives as a variant, a setlist is skipped if the space has its id (`transferSpace` in `restore` mode:
+  the setlist ids are kept and the file is not touched). Into this space, or a new one named
+  "<name> (restored)". A restored setlist is local until the space syncs, like any other.
+- **Restoring pads** uploads them to Drive and is a separate tick; a pad set with the same name there
+  is replaced.
+- **Refused with a reason:** not a zip, no manifest, another kind of file, a backup from a newer
+  version (`version` is 1), a chart the list names but the zip lacks.
+- `utils/zip.ts` reads and writes zip files with CompressionStream and a CRC-32 (the reader was in the
+  pad-set service); checked against `unzip -t`.
+
 ## Sync: what differs per space
 
 - **Transport per space** (the `setAccessTokenProvider` seam): personal/owner → googleapis with the
@@ -388,7 +413,8 @@ step is the scope, not the flags. Needs one account; items 1, 5 and 6 still need
    after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
    The UI now says "space" (Storage page, creating and switching, sync errors, the share and differs
    dialogs); code, tests' identifiers and older docs still say "organisation".
-4. [ ] Copy/move between spaces (songs, setlists, pads, whole space); migrate personal data.
+4. [ ] Copy/move between spaces (a backup and restore, above, is built and does the hop between
+   accounts) (songs, setlists, pads, whole space); migrate personal data.
    Done: the core for songs, setlists and whole spaces (`src/js/space-transfer.ts`, tested on local
    databases). A move leaves a setlist that is in Drive in the source (deleting those is not built).
    Not done: the UI, and pads (Drive calls).

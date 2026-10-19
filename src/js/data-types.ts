@@ -317,6 +317,8 @@ export interface DriveFile {
   modifiedTime?: string
   createdTime?: string
   md5Checksum?: string
+  /** Bytes, as a string (only a file with content has one) */
+  size?: string
   parents?: string[]
   trashed?: boolean
   appProperties?: Record<string, string>
