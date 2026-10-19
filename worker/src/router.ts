@@ -89,6 +89,11 @@ export async function handleRequest(
       if (!env.DEV_PAGES) {
         return new Response('Not Found', { status: 404 })
       }
+      // The bare /dev (and /dev/) is the index of the pages: assets are served at the URL they
+      // have (html_handling = "none"), so it would otherwise fall through to the app
+      if (path === '/dev' || path === '/dev/') {
+        return env.ASSETS.fetch(new Request(new URL('/dev/index.html', url), request))
+      }
       return env.ASSETS.fetch(request)
     }
 

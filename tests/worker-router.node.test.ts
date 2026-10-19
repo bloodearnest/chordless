@@ -174,6 +174,14 @@ test('the dev pages are there only when the environment turns them on', async ()
   assert.deepEqual(on.assetRequests, ['GET /dev/components.html'])
 })
 
+test('the bare /dev is the index of the dev pages, when they are on', async () => {
+  for (const path of ['/dev', '/dev/']) {
+    const on = setup({ DEV_PAGES: '1' })
+    assert.equal((await on.send(path)).status, 200)
+    assert.deepEqual(on.assetRequests, ['GET /dev/index.html'])
+  }
+})
+
 test('a path that only starts like /dev is an ordinary one', async () => {
   const { send, assetRequests } = setup()
   assert.equal((await send('/devices')).status, 200)
