@@ -35,7 +35,7 @@ export function qrDataUrl(text: string): string {
 }
 
 /**
- * Sharing a setlist by link (docs/SHARING.md Part 2): make the link, show it with a QR code
+ * Sharing a setlist by link (docs/SHARING.md): make the link, show it with a QR code
  * for the room, copy or send it, and stop sharing. The setlist's `share` is saved on the
  * setlist itself; sync keeps the shared copy up to date and ends it when the setlist is past.
  *

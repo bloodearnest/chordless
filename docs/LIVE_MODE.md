@@ -96,7 +96,7 @@ Edit mode stays fully available while live. Fixes mid-performance (a wrong capo,
 are exactly what it is for, and the edit/live split already protects against accidental
 destructive changes. No blocking, no warning. Live mode never takes an option away (Add Song is
 on the overview in or out of edit mode): see "be permissive in the moment" in
-[UI_DESIGN.md](UI_DESIGN.md).
+[CLAUDE.md](../CLAUDE.md).
 
 ### Preferences
 

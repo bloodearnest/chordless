@@ -1,16 +1,11 @@
 # Sharing
 
-Chordless has two kinds of sharing:
+Share links: one setlist, with its charts, sent as a link to people who may have no account.
+Built (see "Status"). Replaces the earlier link sharing (`share.html`,
+`share-setlist.js` and the worker's `/api/share`), which only sent song ids and never worked.
 
-1. **Organisation sharing** (permanent): the organisation's Drive folder is shared
-   with the people in the worship team, so their devices sync the same setlists and
-   songs. Exists today, set up by hand in Google Drive.
-2. **Share links** (temporary): one setlist, with its charts, sent as a link to
-   people who may have no account. Built (see "Status" in Part 2). Replaces the earlier
-   link sharing (`share.html`, `share-setlist.js` and the worker's `/api/share`),
-   which only sent song ids and never worked.
-
-Sync itself is described in SYNC_ARCHITECTURE.md.
+Permanent sharing of a whole space with a team (invites, roles, the Worker broker) and the
+sign-in model are in SPACES.md. Sync itself is described in SYNC_ARCHITECTURE.md.
 
 ## Licensing and why links expire
 
@@ -29,31 +24,7 @@ a crawler finding a link and a copyright takedown notice following. Two defences
 
 ---
 
-## Part 1: Organisation sharing
-
-### Today
-
-- Each organisation is a folder `Chordless/<organisation>/` in the owner's Drive.
-- The owner shares it with team members in the Google Drive UI.
-- At each sync the app lists the folder's permissions and caches them on the
-  organisation record (`members`). The setlist form's Leader list comes from there.
-
-### Planned
-
-- **Invite dialog:** share the organisation folder with an email address, as read
-  (musicians) or write (leaders) access. The worker's `/session/invite` and
-  `/session/revoke` were written for this and are unused.
-- **Shared users can't find the folder yet.** The app has only the `drive.file`
-  scope, which covers files the app created for that user, so a member's device
-  can't see a folder shared with them. Needs the Google Picker (the user picks the
-  folder once, which grants access to it) or a wider scope.
-- **Restrict edits to a setlist's leader**, using `ownerId`.
-
----
-
-## Part 2: Share links
-
-### Status
+## Status
 
 Built: the bundle and encryption (`share-bundle.ts`, `share-crypto.ts`), making, updating and
 ending a share (`share-manager.ts`, called by a sync step in `DriveSyncManager.sync()`), the
@@ -208,7 +179,7 @@ Two new steps in `DriveSyncManager.sync()`, after setlists and songs are pushed:
    - Any leader's sync can do this, not just the sharer's.
 
 Later:
-- **Immediate background sync** (SYNC_ARCHITECTURE.md Part 2) pushes share updates
+- **Immediate background sync** (SYNC_ARCHITECTURE.md, "Planned work") pushes share updates
   moments after a change.
 - **Scheduled sync** would make cleanup more regular. Periodic Background Sync only
   exists in Chromium-based browsers, for installed apps, so until then cleanup runs
@@ -377,95 +348,3 @@ worker's download and blocks service workers; the offline path is in `share-rece
 - **Also removed:** the worker's `POST /api/share` and `GET /api/share/:id`, and the
   `SETLISTS` KV binding (the old link sharing was never finished). The KV namespace itself
   is still in the Cloudflare account and can be deleted there.
-
----
-
-## Appendix: inviting people to an organisation (design, not built)
-
-**The problem (verified 2026-10-13 with a real second account).** The app's scope is
-`drive.file`, which gives access to files the signed-in user's app created, or that the
-user picked with Google's Picker. Sharing the organisation's Drive folder with another
-person does not help: they cannot find it by name, and picking the folder in the Picker
-gives them the folder and **nothing inside it** (the folder listed 0 items, though it has
-`songs/` and `setlists/`). The folder's `capabilities` (`canAddChildren: false`) do show
-a reader correctly, so read-only detection works, but a second person cannot sync from a
-folder someone else made. Access is per user and per file, shared drives included (not
-tested there; expected the same).
-
-**Ruled out.**
-- A folder-scoped token: Google has none. The scopes are `drive.file` (per file), then
-  `drive.readonly` and `drive` (whole Drive, restricted).
-- The restricted scopes: they need verification, and an app that reaches the data through
-  its own server (the Worker holds refresh tokens) needs an annual third-party security
-  assessment. An unverified app is capped at 100 users over the project's lifetime.
-  Marking the app "Internal" to a Workspace domain avoids this, but only people on that
-  domain could sign in, and most volunteers are not.
-- Picking each file: breaks when the owner adds a song.
-- A service account the folder is shared with: reads work, but service accounts have no
-  storage quota, so writes into a personal Drive typically fail.
-
-**The design: the Worker brokers the owner's access.**
-1. The organisation's owner presses "let Chordless serve this organisation to invited
-   people". The Worker keeps the owner's token (the encrypted blob it already issues) in
-   KV, with the organisation's member list and a role for each (reader, writer).
-2. A member signs in with the ordinary `drive.file` scope (no warning screen). Their app
-   sends its Drive calls to a Worker route, with their Google ID token. The Worker
-   checks the member list, and forwards the call with the **owner's** token, which
-   covers every file the owner's app created.
-3. The Worker enforces the role (readers: GET only) and keeps calls inside the
-   organisation folder's tree. So read-only is enforced on the server, and nobody needs
-   the Drive folder shared with them. The client change is small: `drive-api.ts` already
-   has `setAccessTokenProvider`.
-- Costs and risks: the Worker carries the song data and traffic; KV holds a token that
-  reaches everything the owner's app made; if the owner revokes the app or the token
-  expires, sync stops for everyone (check the consent screen is "In production", not
-  "Testing": refresh tokens last 7 days there); pad audio is large, so it stays out of
-  the proxy or is limited.
-
-**Several owners.** Not possible live: each token sees only its own files. Two
-mitigations, both accepted:
-- The owner can be an **organisation account** (for example `chordless@church.org`)
-  rather than a person, so whoever administers the account can always reach it.
-- **Copying one organisation to another**, which also serves as succession. It is a
-  general feature, not only for taking over: from any organisation to any other, for
-  example the personal library to a Workspace folder or shared drive. The copy runs
-  from the device's local copy of the source (the app is offline-first, so it needs no
-  access to the source's Drive) and writes to the destination through whichever
-  account owns it, so the two can belong to different Google accounts. For taking over,
-  the new owner copies the old organisation into a folder their token owns, and the
-  Worker then uses that token. What is copied: songs (matched by `contentHash` as
-  `addChart` does, so the same chart is never added twice, and others arrive as
-  variants of the song with the source's origin kept), setlists (with their key and tempo
-  per song), and optionally pad sets. Setlists get new ids by default (a copy); "move"
-  keeps the ids and ends the source's copies. It reports what it added and skipped, and
-  can be run again to bring across later changes. A related note: the library's "Add to my
-  library" for a song from another database is the one-song version of this.
-
-**Where the folder lives.** The fixed `Chordless/<organisation>` in My Drive is only a
-default. The organisation already stores `driveFolderId`, and with the broker the folder is
-found by id, so the owner may pick the parent folder with the Picker (My Drive or a shared
-drive) when creating the organisation. Shared drives need `supportsAllDrives=true` and
-`includeItemsFromAllDrives=true` on the Drive calls. The Picker needs the Picker API
-enabled on the API key, an app id (the project number, `376758830135`), and
-`apis.google.com`, `docs.google.com` and `www.gstatic.com` in the Content-Security-Policy.
-
-**First step when built:** a proof that a second signed-in user can read the owner's
-organisation folder through a Worker route, before the rest.
-
-## Appendix: sign-in model
-
-The worker keeps no per-user state.
-
-- **Signing in:** Google sign-in (GSI) runs in a popup, and the page posts the code
-  and ID token to `/oauth/callback`. The worker:
-  - verifies the ID token
-  - exchanges the code for tokens
-  - encrypts the refresh token into a JWE blob (AES-256-GCM, with a `kid` for key
-    rotation)
-  - returns the blob, an access token and the user's profile
-- **The blob** is stored by the service worker, in the `auth` IndexedDB. Pages get
-  access tokens by messaging it.
-- **Expired access tokens:** the service worker refreshes them with
-  `/session/refresh`. The worker decrypts the blob only for that request.
-- **Scope:** `drive.file openid email profile`. Drive access is limited to files
-  the app created.

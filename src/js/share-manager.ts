@@ -1,5 +1,5 @@
 /**
- * Making, updating and ending a setlist's share link (docs/SHARING.md Part 2), against the
+ * Making, updating and ending a setlist's share link (docs/SHARING.md), against the
  * organisation's database and Drive folder. The bundle and encryption are in share-bundle.ts
  * and share-crypto.ts; the Drive calls in drive-api.ts.
  */

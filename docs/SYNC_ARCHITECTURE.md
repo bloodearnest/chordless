@@ -97,19 +97,13 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
      held-back record with the one in Drive. Two never-uploaded records made on one device are
      the user's own doing and are both uploaded.
 
-### Finding the organisation folder
+### Which folder, who may write
 
-- The first sync on a device finds the folder **by name** (so a new device can join
-  an existing organisation) and stores its id on the organisation record
-  (`driveFolderId`). Later syncs use the id, so renaming an organisation can't point
-  sync at a different folder.
-- After a rename, sync renames the Drive folder to match, unless another folder has
-  that name. If the device has nothing synced yet, it joins that existing folder
-  instead.
-- An organisation still called "Personal" (the pre-sign-in default) is renamed to the
-  Google account's name before any sync or reset.
-- If the linked folder is trashed or gone, sync stops with an explanation rather than
-  creating a new one.
+Finding a space's Drive folder (by name on the first sync, by `driveFolderId` after), the setlist
+leaders list and read-only access are per-space matters: see [SPACES.md](SPACES.md).
+In short: a read-only user pulls but does not push, today by a flag from Drive's folder
+capabilities, later (SPACES.md, "Read-only: local edits are never blocked") by the Worker role
+with local changes kept on the device.
 
 ### Change detection (no clock comparisons)
 
@@ -168,54 +162,6 @@ Every upload and update goes through it.
 - Updates send name and `appProperties` with the content in one multipart request,
   so file names follow edits; retired properties from older versions are removed.
 
-### Setlist leaders
-
-A setlist's leader is `owner` (name) + `ownerId` (Google account email; empty for a
-leader typed in by name with "Other…"). The Leader dropdown lists the organisation
-folder's members (cached at sync) plus the signed-in user, who is the default for new
-setlists.
-
-### Read-only access
-
-> **Status (2026-10-13):** the mode is built and needed, but today's *trigger* can never
-> fire. It is detected from the Drive folder's capabilities or a refused upload, and under
-> `drive.file` a person with only read access to someone else's folder cannot open it at
-> all (see SHARING.md, "inviting people to an organisation"). When the Worker broker is
-> built, the trigger becomes the member's role as the Worker reports it; the capability
-> check and the refusal counting can then go (or stay as a safety net). The flag, the UI
-> limits and the skipped uploads below stay as they are.
-
-A user the folder is shared with as a reader (or commenter) can pull but not push. It is asked
-at every `sync()`, when the app starts, and after a Google sign-in (`refreshOrganisationAccess()`,
-src/js/organisation-access.ts; an organisation switch reloads the app, and the flag is read from
-the organisation's record). A failure never makes anyone read-only. `refreshAccess()` asks Drive for the folder's `capabilities`; if
-`canAddChildren` is false the user is read-only. The result is kept on the organisation record
-(`readOnly`) and in localStorage (`isReadOnlyOrganisation()`, for the UI to ask at any moment).
-
-A read-only sync pulls, then stops: no share-link upkeep, no push (`pushToDrive` checks too, so
-the direct push path is covered), and it ends as "Sync complete (view-only ...)", not as an
-error. If Drive can't be asked, the user is taken to have write access, as before: failing closed
-would lock every writer out whenever they are offline. A reader whose check failed is found out
-by the push: when Drive refuses an upload for lack of permission (a 403 that isn't a rate limit;
-`countWriteRefusals()` in drive-api.ts, since the push code retries and gives up quietly on a
-failed write), `foundToBeReadOnly()` asks again and, if the answer is read-only, records it and
-ends the sync as view-only.
-
-The UI follows: nothing that changes what syncs is offered, and what stays on the device is.
-- Kept on the device, so still allowed: the capo, and which sections, chords and lyrics are
-  shown. They are in the organisation's database but not synced (the `setlist_local` store, and
-  the per-song preferences in localStorage), so a pull doesn't touch them.
-- Changes to the setlist, which sync, are not allowed: no edit mode on the setlist overview
-  (adding, removing and reordering songs, their keys), no key or BPM change on a song (the key
-  selector and the BPM buttons are locked, and `handleKeyChange` / `handleBPMChange` refuse),
-  no setlist details edit or delete, no new setlist, no share button. In the song library, the
-  key is not editable (it is saved on the song); no import menu items (the import page says
-  why) and no "Add to my library". Setlist and song edits are the ones a pull would drop, which
-  is why they are blocked rather than kept. Songs already on the device stay.
-- The controls follow a change at once (views, the menu and the song page re-render on
-  `organisation-read-only-change`; the setlist page's own header and popover on the next song
-  or page).
-
 ### Several people editing a setlist (design, not built)
 
 Written 2026-10-16. Today a setlist is one JSON file, whoever edits it writes the whole file, and
@@ -253,7 +199,7 @@ layer above), and nothing of theirs is pushed.
   they differ, have edit rights: the leader who did not create the setlist is not shut out.
   (`createdBy` is only a trace today: "nothing decides by it yet", data-types.ts.) Later an
   **organisation admin** role can edit any setlist of the organisation (roles come with the
-  Worker broker, SHARING.md). The `editors` list below adds named people.
+  Worker broker, SPACES.md). The `editors` list below adds named people.
 - It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
   same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
   as a reader of that setlist (no setlist edits).
@@ -270,8 +216,7 @@ travel as small changes ("song 3 key to D") that merge by field. They do not go 
 opened every few weeks on poor wifi is offline when it edits, and Drive has no compare-and-set
 (to check), so two pushes a moment apart can overwrite each other.
 
-**The Worker, when it brokers organisation writes** (SHARING.md, "The design: the Worker
-brokers the owner's access"). Every member's Drive call goes through it, so for an organisation
+**The Worker, when it brokers organisation writes** (SPACES.md, "Why the Worker brokers"). Every member's Drive call goes through it, so for an organisation
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
@@ -499,7 +444,7 @@ backstop.
   ideally merge setlist field changes. Designed above, "Several people editing a setlist".
 - **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
   first by blocking the sync of non-owners' writes.
-- **Inviting people to an organisation:** shared users can't see the folder under
-  `drive.file`; the design (the Worker brokers the owner's access) is in SHARING.md.
+- **Inviting people to a team space:** shared users can't see the folder under
+  `drive.file`; the design (the Worker brokers the owner's access) is in SPACES.md.
 - **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
 - **Real Drive integration tests** (see Tests above).

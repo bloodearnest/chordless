@@ -4,7 +4,7 @@ The Chordless data model is somewhat complex, primarily for one reason: Chordles
 cannot store the song data, as that is copyrighted. The users must store it, on
 their devices or on their own google drive.
 
-There are 3 core models stored per organisation. Each organisation has an IndexedDB
+There are 3 core models stored per space (called "organisation" in the code). Each space has an IndexedDB
 database named exactly after its `organisationId` containing four object stores:
 
 1. `songs` – flattened song variants (metadata only)
@@ -104,79 +104,8 @@ This state is stored in a separate object store `setlist_local` (not synced to D
 
 This state is populated from some per-user defaults when they first load the setlist.
 
-## Organisation
+## Space (organisation in the code)
 
-This is an entity to which a set of songs and setlists belongs, and is used as
-a target from where to sync data to remotely.
-
-Properties:
-
-- id: UUID (stable identifier, used as database name)
-- name: organisation name (can be renamed without data migration)
-- createdDate
-- modifiedDate
-
-### Storage Architecture
-
-Organisations use a hybrid storage approach for optimal performance:
-
-**Metadata Storage (organisations):**
-
-- Global IndexedDB database storing metadata for all organisations
-- Contains: id, name, timestamps
-- Used for listing available organisations and managing renames
-
-**Data Storage (per-organisation databases):**
-
-- Each organisation has its own IndexedDB database named exactly by its ID (e.g., `a1b2c3d4-...`)
-- Contains: songs, chordpro content, setlists, and local state
-- Database name never changes, even when organisation is renamed
-
-**localStorage Caching:**
-
-- Current organisation ID: `current-organisation-id`
-- Current organisation name: `current-organisation-name`
-- Allows synchronous access to org name for UI rendering without async DB calls
-
-### Default "Personal" Organisation
-
-On first app load, a default organisation named "Personal" is automatically created:
-
-- Created with a random UUID as its database name
-- Set as the current organisation in localStorage
-- Provides immediate storage for songs and setlists without setup
-
-**First-Time Google Auth:**
-
-- When a user authenticates with Google for the first time
-- If the current organisation is "Personal", it is automatically renamed to the user's name
-- This provides a personalized experience without requiring manual setup
-- The rename updates only the metadata; the database ID remains stable
-
-### Organisation Isolation
-
-Organisations are completely isolated:
-
-- Songs and setlists belong exclusively to one organisation
-- When a user switches organisations, the entire app reloads with the new organisation's IndexedDB
-- Other organisations' data is unavailable when viewing a different org
-- If two users in different orgs import the same CCLI song, they are treated as separate instances
-- Setlists cannot be shared across organisations
-- Each organisation has its own song index stored per-organisation in IndexedDB
-
-This allows you to ensure copyright compliance per-org, as each org is
-self-contained, but a user can be part of multiple orgs as needed.
-
-### Renaming Organisations
-
-Renaming an organisation is a lightweight operation:
-
-- Updates only the `name` field in the metadata database
-- Updates the cached name in localStorage if it's the current org
-- Database name (org ID) remains unchanged, so no data migration is required
-- All song, setlist, and state data remains accessible immediately
-
-### Future: Export/Import
-
-In the future, an export/import feature will allow moving songs/setlists between organisations,
-but this will be done at the application level, not at the database level.
+A space owns a set of songs and setlists and is the target they sync to. Its model (personal and
+team spaces, storage, isolation, rename, the default "Personal" space, copy/move) is in
+[SPACES.md](SPACES.md); the per-space IndexedDB is the one described at the top of this file.

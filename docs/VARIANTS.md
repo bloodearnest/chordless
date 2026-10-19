@@ -25,8 +25,8 @@ library has); sync sees the changed hash and uploads it.
 2. **The default is the organisation's.** It starts as the earliest import, and changes only
    when someone with write permission marks another variant as the default. "Write permission"
    is write access to the organisation's Drive folder, the only access control there is. The app
-   now knows it: a user who can only read has `readOnly` (docs/SYNC_ARCHITECTURE.md, "Read-only
-   access") and "make default" is not offered. A variant that arrives from a share
+   now knows it: a user who can only read has `readOnly` (docs/SPACES.md, "Read-only: local edits
+   are never blocked") and "make default" is not offered. A variant that arrives from a share
    or another organisation never becomes the default by arriving: today's rule (the newest
    chart wins) goes. Two people setting it at once: the later change wins. In the "Shared with
    me" database there is no organisation: the default is the earliest there too.
