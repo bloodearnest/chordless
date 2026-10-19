@@ -311,8 +311,14 @@ Checked with `/dev/share-spike.html` (a personal Google account, a file in My Dr
 
 Still to check:
 
-- **Workspace accounts:** an admin can block sharing outside the domain. The share dialog
-  then needs a clear error. Personal Google accounts are unaffected.
+- **Workspace accounts:** an admin can block sharing outside the domain. On 2026-10-19 sign-in,
+  sync and the probe's make-it-public step all passed on a Workspace account whose admin had not
+  blocked it. The blocked case is untested against real Google (it would need an organisational
+  unit with the setting off, so as not to touch real shares). The share dialog says it clearly
+  without knowing Google's text: a refusal (HTTP 4xx other than 401 and 429) of the step that
+  makes the file readable by anyone is reported as "your organisation may not allow links that
+  anyone can open; the song list to paste still works", with Google's message in brackets, and the
+  half-made file is trashed.
 - **Creating the file in the organisation's `shares/` folder** (the spike used My Drive).
 - **The proxy in production:** the Cache API behaves differently in `wrangler dev`.
 

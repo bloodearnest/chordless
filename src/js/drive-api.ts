@@ -738,9 +738,28 @@ export async function createShareFile(
   } catch (error) {
     // Best effort: a private leftover is harmless, and the error that matters is the original
     await trashFile(file.id).catch(e => console.warn('[DriveAPI] Could not trash share file:', e))
-    throw error
+    throw refusedPublicLink(error)
   }
   return file
+}
+
+/**
+ * Drive refused to make the share file readable by anyone with the link. Of everything a share
+ * does, only that step can be forbidden by policy (a Workspace admin can turn off sharing outside
+ * the domain), so a refusal there, other than a sign-in or a rate limit, is said to be that.
+ * Anything else (the network, a server error) is left as it was.
+ */
+function refusedPublicLink(error: unknown): unknown {
+  const status = (error as DriveError | undefined)?.status
+  if (status === undefined || status === 401 || status === 429 || status < 400 || status >= 500) {
+    return error
+  }
+  return Object.assign(
+    new Error(
+      `Google would not make the link public: your organisation may not allow links that anyone can open. The song list to paste still works. (${(error as Error).message})`
+    ),
+    { status, cause: error }
+  )
 }
 
 /** Replace a share file's content in place: the id, and so the link, stay the same */

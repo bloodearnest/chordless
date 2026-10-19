@@ -428,7 +428,9 @@ describe('drive-api, given what Drive answers', () => {
       script({ id: 'share' }, failure(403, { error: { message: 'Blocked' } }), failure(500))
       expect(
         await messageOf(createShareFile('folder', { name: 's' }, new Uint8Array([1])))
-      ).to.equal('Drive API error: Blocked')
+      ).to.equal(
+        'Google would not make the link public: your organisation may not allow links that anyone can open. The song list to paste still works. (Drive API error: Blocked)'
+      )
       expect(calls.at(-1)?.init?.body).to.contain('trashed')
     })
 

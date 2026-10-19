@@ -129,7 +129,32 @@ describe('Share files in Drive', () => {
       error = e as Error
     }
     expect(error?.message).to.match(/403/)
+    expect(error?.message).to.contain('your organisation may not allow links that anyone can open')
+    expect(error?.message).to.contain('song list to paste still works')
+    expect((error as Error & { status?: number }).status).to.equal(403)
     const [leftover] = drive.listFiles(f => f.name === 'setlist-1.share')
     expect(leftover.trashed).to.equal(true)
+  })
+
+  it('does not blame the organisation for a failure that is not a refusal', async () => {
+    for (const status of [401, 429, 500]) {
+      drive.failRequests({ method: 'POST', path: /permissions/, status })
+      let error: Error | undefined
+      try {
+        await createShareFile(folder, metadata, bytes(1))
+      } catch (e) {
+        error = e as Error
+      }
+      expect(error?.message, String(status)).to.contain(String(status))
+      expect(error?.message, String(status)).to.not.contain('organisation')
+    }
+    drive.failRequests({ method: 'POST', path: /permissions/, network: true })
+    let offline: Error | undefined
+    try {
+      await createShareFile(folder, metadata, bytes(1))
+    } catch (e) {
+      offline = e as Error
+    }
+    expect(offline?.message).to.not.contain('organisation')
   })
 })
