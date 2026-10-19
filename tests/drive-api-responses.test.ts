@@ -11,7 +11,6 @@ import {
   countWriteRefusals,
   createFile,
   createShareFile,
-  deleteFilesInFolder,
   downloadChordProFile,
   downloadFileBinary,
   downloadSetlist,
@@ -34,6 +33,7 @@ import {
   listSetlists,
   listShareFiles,
   setAccessTokenProvider,
+  trashFilesInFolder,
   updateFile,
 } from '../src/js/drive-api.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -371,16 +371,17 @@ describe('drive-api, given what Drive answers', () => {
       expect(await ensurePadSetFolder('Cool')).to.equal('set2')
     })
 
-    it('deletes the files of a pad set, or nothing when it has none', async () => {
-      script(
-        { files: [{ id: 'p1' }, { id: 'p2' }] },
-        new Response('HTTP/1.1 204 No Content\nHTTP/1.1 204 No Content')
-      )
-      await deleteFilesInFolder('set')
-      expect(calls).to.have.length(2)
+    it('moves the files of a pad set to the trash, or nothing when it has none', async () => {
+      script({ files: [{ id: 'p1' }, { id: 'p2' }] }, {}, {})
+      await trashFilesInFolder('set')
+      expect(calls).to.have.length(3)
+      expect(calls.slice(1).map(call => [call.init?.method, call.init?.body])).to.deep.equal([
+        ['PATCH', JSON.stringify({ trashed: true })],
+        ['PATCH', JSON.stringify({ trashed: true })],
+      ])
       calls = []
       script({ files: [] })
-      await deleteFilesInFolder('set')
+      await trashFilesInFolder('set')
       expect(calls).to.have.length(1)
     })
   })

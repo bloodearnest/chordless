@@ -279,7 +279,7 @@ describe('pad sets in Drive', () => {
     const filesIn = (folderId: string) =>
       Object.fromEntries(
         drive
-          .listFiles((file: any) => file.parents.includes(folderId))
+          .listFiles((file: any) => file.parents.includes(folderId) && !file.trashed)
           .map((file: any) => [file.name, binaryStringToBytes(file.content)])
       )
 
@@ -428,7 +428,13 @@ describe('pad sets in Drive', () => {
 
       expect(again.id).to.equal(first.id)
       const files = filesIn(first.id)
-      expect(drive.listFiles((file: any) => file.parents.includes(first.id))).to.have.length(12)
+      expect(
+        drive.listFiles((file: any) => file.parents.includes(first.id) && !file.trashed)
+      ).to.have.length(12)
+      // the old ones are in the trash, not gone
+      expect(
+        drive.listFiles((file: any) => file.parents.includes(first.id) && file.trashed)
+      ).to.have.length(12)
       expect(files['C.mp3']).to.deep.equal(audioOf('new'))
       expect(await cachedBytes(first as PadSet, 'C')).to.equal(null)
     })

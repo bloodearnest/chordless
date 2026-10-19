@@ -1,9 +1,9 @@
 import {
-  deleteFilesInFolder,
   downloadFileBinary,
   ensurePadSetFolder,
   listPadSetFiles,
   listPadSetFolders,
+  trashFilesInFolder,
   updatePadSetFolderMetadata,
   uploadPadFile,
 } from './drive-api.ts'
@@ -134,7 +134,7 @@ export async function uploadPadSet(
   await updatePadSetFolderMetadata(folderId, normalizedName)
 
   // Clear old contents and cached media
-  await deleteFilesInFolder(folderId)
+  await trashFilesInFolder(folderId)
   await invalidatePadSetCache(folderId)
 
   // Upload each file

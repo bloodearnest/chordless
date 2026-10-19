@@ -617,12 +617,14 @@ export async function listPadSetFiles(folderId: string): Promise<DriveFile[]> {
   return result.files
 }
 
-export async function deleteFilesInFolder(folderId: string): Promise<void> {
+/**
+ * Move the files of a folder to the Drive trash (recoverable, like everything else the app
+ * removes). Not a permanent delete: in a shared drive only a Manager may do that, and a Content
+ * manager, who may trash, would find it silently did nothing (checked 2026-10-19, docs/SPACES.md).
+ */
+export async function trashFilesInFolder(folderId: string): Promise<void> {
   const files = await listPadSetFiles(folderId)
-  const fileIds = files.map(file => file.id)
-  if (fileIds.length > 0) {
-    await batchDeleteFiles(fileIds)
-  }
+  await Promise.all(files.map(file => trashFile(file.id)))
 }
 
 export async function uploadPadFile(folderId: string, key: string, blob: Blob): Promise<DriveFile> {

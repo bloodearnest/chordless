@@ -179,9 +179,12 @@ what makes ownership disappear as a problem.
 
 **Upgrade flow (team space settings → "Team-managed storage"):**
 1. Choose or create the shared drive and move the team folder there if it isn't (the copy/move tool).
-2. Show the service-account address and the exact role to grant (Content manager; Contributor can't
-   delete, so pad delete rules would be Worker-only).
-3. "Verify" makes the Worker test read/write/delete with the service account.
+2. Show the service-account address and the exact role to grant: Content manager. Contributor can't
+   trash, so pad rules would be Worker-only. Content manager **can trash but not permanently delete**
+   (only a Manager can; checked 2026-10-19 with a Content manager's token: `canTrash` true,
+   `canDelete` false, and a permanent delete answers "File not found"), which is why the app only
+   ever trashes.
+3. "Verify" makes the Worker test read/write/trash with the service account.
 4. The Worker switches that team space's transport to the service account and **deletes the owner's
    stored token blob** (which also removes the broad personal token from the Durable Object).
 5. Rollback by re-adding an owner token. Members' experience doesn't change.
@@ -417,6 +420,14 @@ kept in that browser only (the Worker's `GOOGLE_API_KEY` is a different key and 
 browser). The app id is the project number, `376758830135`. The production CSP is not changed yet:
 it needs `apis.google.com`, `docs.google.com` and `www.gstatic.com` when the Picker goes in the app.
 Needs one account; items 1, 5 and 6 still need two.
+
+**Run 2026-10-19 on a picked shared-drive folder (spike item 2, owner's token): passed.** The Picker
+folder reads as a shared-drive folder the app may add to, shows 0 items (`drive.file`), and a folder
+made inside it takes create, list, get, update, download, subfolders, reading the permissions (3
+people: the shared drive's members), making a file public and removing that, and `changes.list` (about
+6 s behind). One failure found something real: a permanent delete does nothing for a Content manager,
+so the one place the app deleted permanently (replacing a pad set's files) now trashes them
+(`trashFilesInFolder`).
 
 ## Order of work and status
 
