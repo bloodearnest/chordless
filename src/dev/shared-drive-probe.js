@@ -6,6 +6,7 @@ import {
   listFolderPermissions,
   updateFile,
 } from '/js/drive-api.ts'
+import { getAccessToken } from '/js/google-auth.ts'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 const status = document.getElementById('status')
@@ -43,6 +44,91 @@ async function step(name, work) {
   return { result, value }
 }
 
+// ==================== The Google Picker ====================
+
+const apiKeyInput = document.getElementById('api-key')
+const appIdInput = document.getElementById('app-id')
+const parentInput = document.getElementById('parent')
+const picked = document.getElementById('picked')
+try {
+  apiKeyInput.value = localStorage.getItem('probe-picker-api-key') ?? ''
+} catch {
+  // (no storage: the key is typed each time)
+}
+
+/** Load Google's Picker, once */
+let pickerLoaded = null
+function loadPicker() {
+  pickerLoaded ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script')
+    script.src = 'https://apis.google.com/js/api.js'
+    script.onerror = () => reject(new Error('Could not load the Google Picker script'))
+    script.onload = () =>
+      window.gapi.load('picker', {
+        callback: resolve,
+        onerror: () => reject(new Error('The Picker would not load')),
+      })
+    document.head.append(script)
+  })
+  return pickerLoaded
+}
+
+/** Ask the user to pick a folder (in My Drive or a shared drive): resolves with it, or null */
+async function pickFolder(apiKey, appId) {
+  await loadPicker()
+  const token = await getAccessToken()
+  const { picker } = window.google
+  return new Promise(resolve => {
+    const view = new picker.DocsView(picker.ViewId.FOLDERS)
+      .setIncludeFolders(true)
+      .setSelectFolderEnabled(true)
+      .setMimeTypes(FOLDER)
+      .setEnableDrives(true)
+    new picker.PickerBuilder()
+      .addView(view)
+      .enableFeature(picker.Feature.SUPPORT_DRIVES)
+      .setOAuthToken(token)
+      .setDeveloperKey(apiKey)
+      .setAppId(appId)
+      .setCallback(data => {
+        if (data.action === picker.Action.PICKED) resolve(data.docs[0])
+        else if (data.action === picker.Action.CANCEL) resolve(null)
+      })
+      .build()
+      .setVisible(true)
+  })
+}
+
+document.getElementById('pick').addEventListener('click', async () => {
+  const apiKey = apiKeyInput.value.trim()
+  if (!apiKey) {
+    picked.textContent = 'Enter an API key first.'
+    return
+  }
+  try {
+    localStorage.setItem('probe-picker-api-key', apiKey)
+  } catch {
+    // (kept only for this visit)
+  }
+  try {
+    const folder = await pickFolder(apiKey, appIdInput.value.trim())
+    if (!folder) {
+      picked.textContent = 'Nothing picked.'
+      return
+    }
+    parentInput.value = folder.id
+    // What Drive says about it, as this app is allowed to see it
+    const info = await driveRequest(
+      `/files/${folder.id}?fields=id,name,driveId,capabilities(canAddChildren,canEdit)`
+    )
+    picked.textContent = `Picked "${info.name}" (${info.id}): ${
+      info.driveId ? `in the shared drive ${info.driveId}` : 'in My Drive'
+    }; this app may ${info.capabilities?.canAddChildren ? '' : 'NOT '}add to it.`
+  } catch (error) {
+    picked.textContent = `The Picker failed: ${error.message}`
+  }
+})
+
 async function run() {
   report = []
   rows.innerHTML = ''
@@ -53,6 +139,27 @@ async function run() {
   const where = parent === 'root' ? 'My Drive' : `folder ${parent}`
   let folderId = null
   let fileId = null
+
+  if (parent !== 'root') {
+    await step('read the parent folder (files.get)', async () => {
+      const info = await driveRequest(
+        `/files/${parent}?fields=id,name,driveId,mimeType,capabilities(canAddChildren)`
+      )
+      return {
+        ok: info.mimeType === FOLDER,
+        detail: `"${info.name}", ${info.driveId ? `shared drive ${info.driveId}` : 'My Drive'}, can add: ${info.capabilities?.canAddChildren}`,
+      }
+    })
+    await step('list the parent folder (what drive.file lets this app see in it)', async () => {
+      const query = `'${parent}' in parents and trashed=false`
+      const result = await driveRequest(
+        `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
+      )
+      return {
+        detail: `${result.files.length} item(s): ${result.files.map(f => f.name).join(', ')}`,
+      }
+    })
+  }
 
   const made = await step(`create a folder in ${where}`, async () => {
     const folder = await driveRequest('/files', {

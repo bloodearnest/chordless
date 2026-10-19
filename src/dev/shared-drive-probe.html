@@ -60,11 +60,28 @@
       <label>
         Parent folder id (empty: your My Drive root, which checks the flags do no harm). A folder in
         a shared drive only works if this app made it or you picked it with the Google Picker:
-        under <code>drive.file</code> any other folder is refused whatever the flags say, so a
-        failure on the first step there is the scope, not the flags (the Picker is not on this
-        page yet)
+        under <code>drive.file</code> any other folder is refused whatever the flags say. So pick
+        it here, and the id is filled in.
         <input type="text" id="parent" placeholder="empty for My Drive" />
       </label>
+      <fieldset>
+        <legend>Pick a folder with the Google Picker</legend>
+        <p>
+          Needs the Google Picker API enabled for the project, and a browser API key allowed to
+          use it (Google Cloud console: APIs &amp; Services → Credentials; restrict it to the
+          Picker API and to this page's address). The key is kept in this browser only.
+        </p>
+        <label>
+          API key
+          <input type="text" id="api-key" autocomplete="off" placeholder="AIza…" />
+        </label>
+        <label>
+          App id (the project number)
+          <input type="text" id="app-id" value="376758830135" />
+        </label>
+        <button id="pick">Pick a folder…</button>
+        <div id="picked"></div>
+      </fieldset>
       <label
         ><input type="checkbox" id="public" /> Also make the probe file readable by anyone with
         the link, then remove that (what a share link does; a Workspace admin may block it)</label

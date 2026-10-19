@@ -405,10 +405,18 @@ passed. A shared-drive folder is still untested.
 **Ready to run:** `/dev/shared-drive-probe.html` (served by `just serve`, signed in on the Storage
 page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
 deletes and trashes with the app's own `drive-api.ts` calls, and also tries `/about` with the flag.
-Empty parent: your My Drive (checks the flags do no harm to everyone's sync). A folder id in a shared
-drive is spike item 2, but under `drive.file` the token only sees a folder the app made or the user
-picked, so it needs the Google Picker first (not on the page yet): without it, a refusal on the first
-step is the scope, not the flags. Needs one account; items 1, 5 and 6 still need two.
+Empty parent: your My Drive (checks the flags do no harm to everyone's sync).
+
+**Picking a shared-drive folder (spike item 2):** under `drive.file` the token only sees a folder the
+app made or the user picked, so the page has a "Pick a folder…" button (Google Picker, with shared
+drives on). Picking fills in the parent; the probe then reads it, lists what the app can see in it
+(expected: nothing it did not make), and creates `chordless-probe-…` inside it, as the team folder
+would be. It needs, in the Google Cloud console, the Picker API enabled and a browser API key allowed
+for it (restrict it to the Picker API and to the page's address); the key is typed on the page and
+kept in that browser only (the Worker's `GOOGLE_API_KEY` is a different key and never reaches a
+browser). The app id is the project number, `376758830135`. The production CSP is not changed yet:
+it needs `apis.google.com`, `docs.google.com` and `www.gstatic.com` when the Picker goes in the app.
+Needs one account; items 1, 5 and 6 still need two.
 
 ## Order of work and status
 
