@@ -10,6 +10,7 @@
   "project": ["src/**/*.{ts,js}", "worker/src/**/*.ts", "scripts/**/*.{ts,js}", "tests/**/*.ts"],
   "paths": {
     "/components/*": ["src/components/*"],
+    "/dev/*": ["src/dev/*"],
     "/js/*": ["src/js/*"]
   },
   "ignoreExportsUsedInFile": true,
