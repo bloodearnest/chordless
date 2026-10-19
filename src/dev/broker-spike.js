@@ -249,6 +249,67 @@ $('run').addEventListener('click', async () => {
   }
 })
 
+/** SHA-256 of some bytes, as hex */
+async function sha256(bytes) {
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+const megabytesPerSecond = (bytes, ms) => (bytes / (1024 * 1024) / (ms / 1000)).toFixed(1)
+
+$('big').addEventListener('click', async () => {
+  const status = $('member-status')
+  $('results').hidden = false
+  try {
+    const code = JSON.parse($('code').value)
+    const mb = Math.min(140, Math.max(1, Number($('mb').value) || 20))
+    const size = Math.round(mb * 1024 * 1024)
+    status.textContent = `Making ${mb} MB of random bytes…`
+    const data = new Uint8Array(size)
+    for (let at = 0; at < size; at += 65536) {
+      crypto.getRandomValues(data.subarray(at, Math.min(at + 65536, size)))
+    }
+    const sent = await sha256(data)
+    const idToken = await idTokenWithin(30_000)
+
+    status.textContent = `Sending ${mb} MB through the Worker…`
+    let started = performance.now()
+    let response = await fetch(
+      `/dev/spike/upload?space=${encodeURIComponent(code.spaceId)}&name=big-${mb}mb-${Date.now()}.bin`,
+      { method: 'POST', headers: { 'X-Id-Token': idToken }, body: new Blob([data]) }
+    )
+    const uploadMs = performance.now() - started
+    const stored = await response.json().catch(() => ({}))
+    record(
+      `send ${mb} MB through the Worker to Drive`,
+      response.ok && Number(stored.size) === size,
+      `${response.status}, ${Math.round(uploadMs)} ms, ${megabytesPerSecond(size, uploadMs)} MB/s, as ${response.headers.get('X-Spike-Member')}, Drive says ${stored.size ?? JSON.stringify(stored)} bytes`
+    )
+    if (!response.ok) return
+
+    status.textContent = `Reading it back through the Worker…`
+    started = performance.now()
+    response = await post('/dev/spike/drive', {
+      spaceId: code.spaceId,
+      id_token: idToken,
+      op: 'read',
+      fileId: stored.id,
+    })
+    const firstByteMs = performance.now() - started
+    const back = new Uint8Array(await response.arrayBuffer())
+    const downloadMs = performance.now() - started
+    record(
+      `read ${mb} MB back through the Worker`,
+      response.ok && back.length === size && (await sha256(back)) === sent,
+      `${response.status}, answer started after ${Math.round(firstByteMs)} ms, all of it after ${Math.round(downloadMs)} ms, ${megabytesPerSecond(size, downloadMs)} MB/s, ${back.length} bytes, ${(await sha256(back)) === sent ? 'identical to what was sent' : 'DIFFERENT from what was sent'}`
+    )
+    status.textContent = 'Done'
+    $('copy-report').disabled = false
+  } catch (error) {
+    status.textContent = `Stopped: ${error.message}`
+  }
+})
+
 $('copy-report').addEventListener('click', () =>
   navigator.clipboard.writeText(JSON.stringify(report, null, 2))
 )

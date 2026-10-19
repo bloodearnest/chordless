@@ -434,6 +434,18 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   and sub, about an hour, signed with a Worker secret), renews it in `/session/refresh` (which has the
   encrypted blob as proof of identity), and the broker accepts that. No prompt, any browser, no
   per-call popup. (Current dates for Google's retirement not checked.)
+- **Item 4, a big file:** `POST /dev/spike/upload?space=…&name=…` takes the file as the raw body with
+  `X-Id-Token` and `Content-Length`, for a writer only. It opens a resumable upload to Drive with the
+  owner's token and passes the body on as it arrives, through a `FixedLengthStream` of exactly that
+  length where Workers has one, never holding it. The page makes random bytes of a chosen size (up to
+  140 MB), sends them, reads them back with the existing streamed `read`, and compares SHA-256, with
+  timings (when the answer starts, when it ends, MB/s). What this shows is that streaming works end to
+  end, not the production limits: the dev server does not enforce the plan's limits. From the
+  Cloudflare documentation as I remember it, and not checked today: a request body up to 100 MB on the
+  Free and Pro plans (more on Business and Enterprise), no limit on a response body, and CPU time
+  counts compute, not time spent waiting on a stream. A pad set is 12 files of a few MB each, well
+  inside that. Whether a request that long is cut off at the edge on a real deployment is the thing
+  only a deployed Worker can say.
 - It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
   Manager, since the app only ever trashes.
 

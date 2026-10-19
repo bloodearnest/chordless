@@ -108,6 +108,16 @@ cal@example.com writer</textarea>
         <button id="run">Run the member checks</button>
         <button id="copy-report" disabled>Copy report JSON</button>
         <div id="member-status"></div>
+        <p>
+          Spike item 4: a big file through the Worker, up and back down, as a <strong>writer</strong>
+          (the member code above, and an account that is a writer). The page makes random bytes of
+          this size, sends them with the Worker streaming them on to Drive, then reads them back
+          the same way, and compares them.
+        </p>
+        <label>
+          Size in MB <input type="number" id="mb" value="20" min="1" max="140" style="width: 6rem" />
+        </label>
+        <button id="big">Send and fetch a big file</button>
         <table id="results" hidden>
           <thead>
             <tr>

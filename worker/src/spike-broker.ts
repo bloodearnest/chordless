@@ -210,3 +210,88 @@ async function serve(
 
   return jsonResponse({ error: 'Unknown op' }, 400)
 }
+
+/** The biggest upload the spike accepts (Workers allow 100 MB a request on the free and pro plans) */
+const MAX_UPLOAD = 150 * 1024 * 1024
+
+/** A stream that must carry exactly this many bytes: a Workers global, absent in Node */
+const fixedLengthStream = () =>
+  (globalThis as { FixedLengthStream?: new (length: number) => TransformStream<Uint8Array> })
+    .FixedLengthStream
+
+/**
+ * POST /dev/spike/upload?space=<id>&name=<file name>, the file as the raw body, with
+ * Content-Length and X-Id-Token: a writer puts a big file in the folder. The body is streamed to
+ * Drive through a resumable upload session as it arrives, never held in memory (for the pad audio of
+ * spike item 4).
+ */
+export async function handleSpikeUpload(
+  request: Request,
+  env: Env,
+  google: GoogleApi = realGoogle,
+  fetcher: Fetcher = fetch
+) {
+  const url = new URL(request.url)
+  const space = spaces.get(url.searchParams.get('space') ?? '')
+  const idToken = request.headers.get('X-Id-Token')
+  const name = url.searchParams.get('name')
+  const size = Number(request.headers.get('Content-Length'))
+  if (!space || !idToken || !name) {
+    return jsonResponse({ error: 'No such space, no ID token, or no name' }, 404)
+  }
+
+  let email: string
+  try {
+    email = String((await google.verifyIdToken(idToken, env)).email ?? '').toLowerCase()
+  } catch (error) {
+    return jsonResponse({ error: 'Not signed in', details: message(error) }, 401)
+  }
+  const role = space.members.get(email)
+  const who = `${email} (${role ?? 'not a member'})`
+  const stamp = (answer: Response) => {
+    answer.headers.set('X-Spike-Member', who)
+    return answer
+  }
+  if (!role) return stamp(jsonResponse({ error: 'Not a member of this space' }, 403))
+  if (role !== 'writer') return stamp(jsonResponse({ error: 'A reader cannot write' }, 403))
+  if (!Number.isInteger(size) || size <= 0 || size > MAX_UPLOAD || !request.body) {
+    return stamp(jsonResponse({ error: 'Send the file with a Content-Length up to 150 MB' }, 400))
+  }
+
+  const token = await ownerToken(space, env, google)
+  const session = await fetcher(
+    `${UPLOAD}/files?uploadType=resumable&fields=id,name,size,md5Checksum&${ALL_DRIVES}`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+        'X-Upload-Content-Type': 'application/octet-stream',
+        'X-Upload-Content-Length': String(size),
+      },
+      body: JSON.stringify({ name, parents: [space.folderId] }),
+    }
+  )
+  const location = session.headers.get('Location')
+  if (!session.ok || !location) {
+    return stamp(
+      jsonResponse({ error: 'Drive would not start the upload' }, session.ok ? 502 : session.status)
+    )
+  }
+
+  // The body goes on as it comes in, through a stream of exactly its length where Workers has one
+  let body: ReadableStream<Uint8Array> = request.body
+  const FixedLength = fixedLengthStream()
+  if (FixedLength) {
+    const { readable, writable } = new FixedLength(size)
+    void request.body.pipeTo(writable)
+    body = readable
+  }
+  const stored = await fetcher(location, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/octet-stream', 'Content-Length': String(size) },
+    body,
+    duplex: 'half',
+  } as RequestInit)
+  return stamp(jsonResponse(await stored.json(), stored.status))
+}

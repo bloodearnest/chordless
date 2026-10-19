@@ -14,6 +14,7 @@ import {
   forgetSpikeSpaces,
   handleSpikeDrive,
   handleSpikeEnable,
+  handleSpikeUpload,
 } from '../worker/src/spike-broker.ts'
 
 const env = {
@@ -275,5 +276,160 @@ describe('the routes', () => {
     assert.equal((await send('/dev/spike/drive', true, json({}))).status, 404)
     const cross = await send('/dev/spike/drive', true, json({}, { Origin: 'https://evil.example' }))
     assert.equal(cross.status, 403)
+  })
+})
+
+describe('a big file streamed up through the Worker', () => {
+  const bytes = (n: number) => {
+    const data = new Uint8Array(n)
+    for (let at = 0; at < n; at += 65536) {
+      crypto.getRandomValues(data.subarray(at, Math.min(at + 65536, n)))
+    }
+    return data
+  }
+  let spaceId = ''
+  let sessionRequests: { url: string; headers: Headers; body: string }[] = []
+  let putBody: Uint8Array | null = null
+  let sessionStatus = 200
+  let locationHeader: string | null = 'https://upload.test/session/1'
+
+  const driveWithUploads = (async (input: RequestInfo | URL, init: RequestInit = {}) => {
+    const url = String(input)
+    if (init.method === 'POST') {
+      sessionRequests.push({
+        url,
+        headers: new Headers(init.headers),
+        body: String(init.body),
+      })
+      const headers: Record<string, string> = {}
+      if (locationHeader) headers.Location = locationHeader
+      return new Response('{}', { status: sessionStatus, headers })
+    }
+    // The file arrives as a stream: read it as it does
+    const chunks: Uint8Array[] = []
+    const reader = (init.body as ReadableStream<Uint8Array>).getReader()
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      chunks.push(value)
+    }
+    putBody = new Uint8Array(await new Blob(chunks as BlobPart[]).arrayBuffer())
+    return Response.json({ id: 'big-file', size: String(putBody.length) })
+  }) as typeof fetch
+
+  const upload = (
+    who: string,
+    data: Uint8Array | null,
+    over: { name?: string; length?: string } = {}
+  ) =>
+    handleSpikeUpload(
+      new Request(
+        `https://chordless.test/dev/spike/upload?space=${spaceId}${over.name === '' ? '' : `&name=${over.name ?? 'big.bin'}`}`,
+        {
+          method: 'POST',
+          headers: {
+            'X-Id-Token': who,
+            ...(data && { 'Content-Length': over.length ?? String(data.length) }),
+          },
+          body: data ? new Blob([data as BlobPart]) : null,
+        }
+      ),
+      env,
+      google,
+      driveWithUploads
+    )
+
+  beforeEach(async () => {
+    forgetSpikeSpaces()
+    refreshes = 0
+    sessionRequests = []
+    putBody = null
+    sessionStatus = 200
+    locationHeader = 'https://upload.test/session/1'
+    const response = await enable([
+      { email: 'bea@example.com', role: 'reader' },
+      { email: 'cal@example.com', role: 'writer' },
+    ])
+    spaceId = String((await bodyOf(response)).spaceId)
+  })
+
+  test('puts the file in Drive as it arrives, in the folder, with the owner’s token', async () => {
+    const data = bytes(3 * 1024 * 1024 + 17)
+    const response = await upload('cal@example.com', data)
+    assert.equal(response.status, 200)
+    assert.equal(response.headers.get('X-Spike-Member'), 'cal@example.com (writer)')
+    assert.equal((await bodyOf(response)).id, 'big-file')
+    assert.deepEqual(putBody, data)
+
+    const [session] = sessionRequests
+    assert.match(session?.url ?? '', /uploadType=resumable/)
+    assert.match(session?.url ?? '', /supportsAllDrives=true/)
+    assert.equal(session?.headers.get('Authorization'), 'Bearer access-1')
+    assert.equal(session?.headers.get('X-Upload-Content-Length'), String(data.length))
+    assert.match(session?.body ?? '', /"parents":\["team"\]/)
+  })
+
+  test('goes through a stream of exactly its length where Workers has one', async () => {
+    const lengths: number[] = []
+    ;(globalThis as { FixedLengthStream?: unknown }).FixedLengthStream = class extends (
+      TransformStream
+    ) {
+      constructor(length: number) {
+        super()
+        lengths.push(length)
+      }
+    }
+    try {
+      const data = bytes(1000)
+      const response = await upload('cal@example.com', data)
+      assert.equal(response.status, 200)
+      assert.deepEqual(lengths, [1000])
+      assert.deepEqual(putBody, data)
+    } finally {
+      delete (globalThis as { FixedLengthStream?: unknown }).FixedLengthStream
+    }
+  })
+
+  test('refuses a reader, a stranger and a bad ID token, before Drive is asked', async () => {
+    assert.equal((await upload('bea@example.com', bytes(10))).status, 403)
+    const stranger = await upload('dan@example.com', bytes(10))
+    assert.equal(stranger.status, 403)
+    assert.equal(stranger.headers.get('X-Spike-Member'), 'dan@example.com (not a member)')
+    assert.equal((await upload('bad', bytes(10))).status, 401)
+    assert.equal(sessionRequests.length, 0)
+  })
+
+  test('wants the space, the name, and a length it can accept', async () => {
+    assert.equal((await upload('cal@example.com', bytes(10), { name: '' })).status, 404)
+    assert.equal((await upload('cal@example.com', null)).status, 400)
+    assert.equal((await upload('cal@example.com', bytes(10), { length: 'lots' })).status, 400)
+    assert.equal((await upload('cal@example.com', bytes(10), { length: '999999999' })).status, 400)
+    assert.equal(sessionRequests.length, 0)
+  })
+
+  test('refuses a call with no space, and an ID token with no email', async () => {
+    const noSpace = await handleSpikeUpload(
+      new Request('https://chordless.test/dev/spike/upload?name=x', {
+        method: 'POST',
+        headers: { 'X-Id-Token': 'cal@example.com', 'Content-Length': '3' },
+        body: new Blob(['abc']),
+      }),
+      env,
+      google,
+      driveWithUploads
+    )
+    assert.equal(noSpace.status, 404)
+    assert.equal((await upload('no-email', bytes(10))).status, 403)
+    assert.equal(sessionRequests.length, 0)
+  })
+
+  test('says so when Drive will not start the upload', async () => {
+    sessionStatus = 403
+    assert.equal((await upload('cal@example.com', bytes(10))).status, 403)
+    sessionStatus = 200
+    locationHeader = null
+    assert.equal((await upload('cal@example.com', bytes(10))).status, 502)
+    sessionStatus = 0
+    locationHeader = null
   })
 })
