@@ -436,8 +436,10 @@ The intervals are named constants, not preferences.
 - **Cheap:** a live setlist polls its own file (`files.get` with `md5Checksum,modifiedTime`) and
   pulls only if it differs. The general poll can use Drive's `changes.list` from a stored page
   token (one request returns every file changed since, charts included) instead of listing the
-  folders. Unverified under `drive.file`: the shared-drive probe (`/dev/shared-drive-probe.html`)
-  checks it; the fallback is listing the folders. Via the Worker broker (docs/SPACES.md) the same
+  folders. Checked on a real My Drive under `drive.file` (2026-10-19, `/dev/shared-drive-probe.html`):
+  it works, and a change shows in the feed after about 5 s, so a tick can be that far behind (fine
+  at 60 s; the live 15 s tick checks the one file directly instead). Not yet checked on a shared
+  drive or through the Worker broker. Via the Worker broker (docs/SPACES.md) the same
   call is a Worker route.
 - **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
   `md5Checksum`, compared with the record's `driveChecksum`; only if it differs, `pullSetlistNow(id)`

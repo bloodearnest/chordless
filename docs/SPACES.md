@@ -364,8 +364,9 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
 
 **Run 2026-10-19 on a real My Drive (empty parent):** every file call passed with the flags (create,
 list, get, update, download, permissions, batch delete, trash), and `/about` accepted the flag too.
-`changes.list` saw nothing at once (0 changes): the probe now retries for 20 s to tell a lagging
-feed from `drive.file` hiding it. A shared-drive folder is still untested.
+`changes.list` saw nothing at once but did after 5.7 s on a retry: it works under `drive.file`, and
+trails a change by a few seconds. Making a file public and removing that (the share-link calls) also
+passed. A shared-drive folder is still untested.
 
 **Ready to run:** `/dev/shared-drive-probe.html` (served by `just serve`, signed in on the Storage
 page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
