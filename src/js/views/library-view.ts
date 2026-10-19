@@ -184,6 +184,9 @@ export class LibraryView extends PageView {
       return
     }
     this.#openUuid = uuid
+    // The list is still in view until the song has loaded and been scrolled to: that is not a
+    // swipe back to the list (going forward in history, under load, took it for one)
+    this.#suppressScrollResetTemporarily()
     try {
       const song = await getSongFromAnywhere(uuid, await getCurrentDB())
       if (sync !== this.#syncing) return
