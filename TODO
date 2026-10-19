@@ -20,6 +20,15 @@ editing
 information UI
  - show leader in setlist page
 
+organisations
+ - allow media team email config option
+ - define users, leaders, permissions
+ - join/invite/remove use
+
+preferences
+- Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
+  date format be chosen in preferences, and use it for the other dates too
+
 song edit UI
 - the click sound: choose it (a later change; the downbeat emphasis and the double click are done)
 - pads on/off and the click on/off for this song (the pad set is in the edit box and the double click is a 2× button on the player: both in song-user-prefs.ts, kept on this device)

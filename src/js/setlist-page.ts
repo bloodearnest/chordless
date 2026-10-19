@@ -815,11 +815,14 @@ export class SetlistPage {
     if (!button || !dialog || !this.currentSetlist) return
     dialog.setlist = this.currentSetlist
     dialog.db = this._database()
+    dialog.songs = this.songs
+    dialog.linkable = !isReadOnlyOrganisation()
     if (this._shareSetup) return
     this._shareSetup = true
     button.addEventListener('click', () => {
       // The page may have a newer copy of the setlist (after its details were edited)
       dialog.setlist = this.currentSetlist ?? null
+      dialog.songs = this.songs
       dialog.show()
     })
     dialog.addEventListener(SetlistShareChangeEvent.type, () => {

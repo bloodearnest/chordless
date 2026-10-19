@@ -1473,26 +1473,6 @@ body.edit-mode .key-selector:focus {
   color: inherit;
 }
 
-/* Copy song list: quiet, under Add Song */
-.copy-song-list {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 1rem auto 0;
-  padding: 0.5rem 1rem;
-  background: none;
-  border: 1px solid var(--border-color, #bdc3c7);
-  border-radius: 6px;
-  color: var(--text-secondary, #7f8c8d);
-  font-size: var(--font-ui-small);
-  cursor: pointer;
-}
-
-.copy-song-list:hover {
-  border-color: var(--button-bg);
-  color: var(--button-bg);
-}
-
 /* Song library */
 .song-library-header {
   max-width: 800px;

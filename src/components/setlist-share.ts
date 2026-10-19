@@ -5,6 +5,7 @@ import type { Setlist } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSyncManager, isSyncAvailable } from '../js/drive-sync.ts'
 import { getCurrentOrganisation } from '../js/organisation.ts'
+import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
@@ -13,6 +14,9 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
+
+/** Where the app lives, whatever host this copy runs on (localhost in development) */
+const APP_URL = 'https://chordless.app'
 
 /** The setlist was shared, updated or stopped: its `share` has changed */
 export class SetlistShareChangeEvent extends Event {
@@ -48,6 +52,9 @@ export class SetlistShare extends LitElement {
   static override properties = {
     setlist: { attribute: false },
     db: { attribute: false },
+    songs: { attribute: false },
+    linkable: { type: Boolean },
+    _mode: { state: true },
     _available: { state: true },
     _busy: { state: true },
     _error: { state: true },
@@ -118,6 +125,44 @@ export class SetlistShare extends LitElement {
         min-width: 0;
       }
 
+      /* Both panels share one cell, so the modal is as tall as the taller and does not jump */
+      .panels {
+        display: grid;
+      }
+
+      .panel {
+        grid-area: 1 / 1;
+      }
+
+      .panel[inert] {
+        visibility: hidden;
+      }
+
+      .modes {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+      }
+
+      .modes .btn[aria-pressed='true'] {
+        background: var(--button-bg);
+        color: #fff;
+      }
+
+      textarea {
+        width: 100%;
+        box-sizing: border-box;
+        min-height: 18rem;
+        padding: 0.6rem;
+        border-radius: 4px;
+        border: 1px solid var(--tint-strong);
+        background: var(--tint);
+        color: inherit;
+        font: inherit;
+        font-size: var(--font-ui-small);
+        resize: vertical;
+      }
+
       ul {
         margin: 0;
         padding-left: 1.25rem;
@@ -137,6 +182,11 @@ export class SetlistShare extends LitElement {
 
   declare setlist: Setlist | null
   declare db: ChordlessDB | null
+  /** The setlist's songs (RuntimeSongs), for the song list */
+  declare songs: ListedSong[]
+  /** The setlist can be shared by link (not for a read-only organisation) */
+  declare linkable: boolean
+  declare _mode: 'link' | 'list'
   declare _available: boolean
   declare _busy: boolean
   declare _error: string
@@ -149,6 +199,9 @@ export class SetlistShare extends LitElement {
     super()
     this.setlist = null
     this.db = null
+    this.songs = []
+    this.linkable = true
+    this._mode = 'link'
     this._available = false
     this._busy = false
     this._error = ''
@@ -244,6 +297,63 @@ export class SetlistShare extends LitElement {
     }
   }
 
+  /** The setlist's date, name, event and leader, then its songs with their CCLI numbers */
+  _songListText(setlist: Setlist) {
+    return songListText(this.songs, setlist)
+  }
+
+  /** The first line of the song list ("Songs for Sunday 18th October"): the email's subject */
+  _listSubject(setlist: Setlist) {
+    return this._songListText(setlist).split('\n')[0]
+  }
+
+  /** The email's body: no title line (the subject), links to SongSelect, and a signature */
+  _listEmailBody(setlist: Setlist) {
+    const list = songListText(this.songs, setlist, { title: false, links: true })
+    return `${list}\n\n--\nSent from Chordless: ${APP_URL}\n`
+  }
+
+  /**
+   * An email with the song list and no address, for the user to fill in. Gmail's compose window
+   * where there is no share sheet (a desktop: mailto: does nothing without a mail app set up),
+   * else mailto:, which phones and tablets handle.
+   */
+  _listEmail(setlist: Setlist) {
+    const subject = encodeURIComponent(this._listSubject(setlist))
+    const body = encodeURIComponent(this._listEmailBody(setlist))
+    return typeof navigator.share === 'function'
+      ? `mailto:?subject=${subject}&body=${body}`
+      : `https://mail.google.com/mail/?view=cm&su=${subject}&body=${body}`
+  }
+
+  /** Rich text (titles link to SongSelect) with the plain text as well, where the browser can */
+  async _writeList(setlist: Setlist) {
+    const text = this._songListText(setlist)
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'text/html': new Blob([songListHtml(this.songs, setlist)], { type: 'text/html' }),
+        }),
+      ])
+    } catch {
+      await navigator.clipboard.writeText(text)
+    }
+  }
+
+  async _copyList(setlist: Setlist) {
+    try {
+      await this._writeList(setlist)
+      this._copied = true
+      setTimeout(() => {
+        this._copied = false
+      }, SetlistShare.copiedMs)
+    } catch {
+      // Clipboard access can be refused: the text is in the box, selectable
+      this.renderRoot.querySelector('textarea')?.select()
+    }
+  }
+
   /** What to say with the link, in a message */
   get _message() {
     const setlist = this.setlist
@@ -278,6 +388,8 @@ export class SetlistShare extends LitElement {
 
   /** Open the dialog */
   show() {
+    // Without the link (read-only), the list is all there is
+    if (!this.linkable) this._mode = 'list'
     this._dialog.value?.show()
   }
 
@@ -285,8 +397,20 @@ export class SetlistShare extends LitElement {
     const setlist = this.setlist
     if (!setlist) return nothing
     return html`
-      <app-modal ${ref(this._dialog)} size="medium" heading="Share this setlist">
-        ${this._renderPanel(setlist.share)}
+      <app-modal ${ref(this._dialog)} size="large" heading="Share this setlist">
+        ${this.linkable ? this._renderModes() : nothing}
+        <div class="panels">
+          ${
+            this.linkable
+              ? html`<div class="panel" ?inert=${this._mode !== 'link'}>
+                  ${this._renderPanel(setlist.share)}
+                </div>`
+              : nothing
+          }
+          <div class="panel" ?inert=${this.linkable && this._mode !== 'list'}>
+            ${this._renderList(setlist)}
+          </div>
+        </div>
       </app-modal>
       <app-modal
         ${ref(this._stopModal)}
@@ -296,6 +420,43 @@ export class SetlistShare extends LitElement {
         confirm-label="Stop sharing"
         message="Anyone with the link will lose access, and their copy is removed the next time they open it. You can make a new link later."
       ></app-modal>
+    `
+  }
+
+  /** Link or song list */
+  _renderModes() {
+    const button = (mode: 'link' | 'list', label: string) => html`
+      <button
+        class="btn"
+        id="mode-${mode}"
+        aria-pressed=${this._mode === mode}
+        @click=${() => {
+          this._mode = mode
+          this._copied = false
+        }}
+      >${label}</button>
+    `
+    return html`<div class="modes" style="padding: 1rem 1rem 0">
+      ${button('link', 'Link / QR')} ${button('list', 'Song list')}
+    </div>`
+  }
+
+  /** The song list to paste (to the media team, say) */
+  _renderList(setlist: Setlist) {
+    return html`
+      <section>
+        <p>The details and songs as text, with CCLI numbers, to paste into a message.</p>
+        <textarea readonly aria-label="Song list" .value=${this._songListText(setlist)}></textarea>
+        <div class="actions center">
+          <button class="btn primary" id="copy-song-list" @click=${() => this._copyList(setlist)}>
+            <app-icon name=${this._copied ? 'check' : 'copy'} size="18"></app-icon>
+            ${this._copied ? 'Copied' : 'Copy song list'}
+          </button>
+          <a class="btn" id="email-song-list" href=${this._listEmail(setlist)} target="_blank" rel="noopener">
+            Email song list
+          </a>
+        </div>
+      </section>
     `
   }
 

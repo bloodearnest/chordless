@@ -7,7 +7,7 @@ import { expect, openApp, seedSetlist, test } from './fixtures.ts'
 const READ_ONLY_KEY = 'current-organisation-read-only'
 
 test.describe('An organisation the user can only read', () => {
-  test('offers no way to create, share or import, or to change the setlist itself', async ({
+  test('offers no way to create, share by link or import, or to change the setlist itself', async ({
     page,
   }) => {
     const url = await seedSetlist(page)
@@ -33,7 +33,11 @@ test.describe('An organisation the user can only read', () => {
     await page.goto(url)
     await expect(page.locator('setlist-overview')).toContainText('Alpha')
     await expect(page.locator('#app-header .edit-toggle')).toHaveCount(0)
-    await expect(page.locator('#share-button')).toHaveCount(0)
+    // Sharing by link is not offered, but the song list to paste still is
+    await page.locator('#share-button').click()
+    await expect(page.locator('setlist-share #copy-song-list')).toBeVisible()
+    await expect(page.locator('setlist-share #mode-link')).toHaveCount(0)
+    await page.keyboard.press('Escape')
 
     // A song: edit mode is there for the capo and the sections (kept on this device), but
     // not for the key or the tempo, which are in the setlist
