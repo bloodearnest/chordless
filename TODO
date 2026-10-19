@@ -293,6 +293,13 @@ sharing
   that when it's built. Not part of the first version.
 - email media team
 - invite people to a team space, copy/move between spaces: DESIGNED, not built (docs/SPACES.md)
+- team spaces for people with no Google account (raised 2026-10-19): members sign in to the Worker with a Google
+  ID token, so any Google account (not only Gmail or Workspace) can join, but not a person with none. Idea, later,
+  opt-in per team space: a read-only invite link (the Worker keeps a hash of a random token with the reader role and
+  accepts it in place of an ID token for reads, fetching through the owner's token; writes refused; edits stay on
+  the reader's device). Needs expiry, revoking one invite, a warning that the link is a bearer credential (it reads
+  the whole library, unlike a one-setlist share link), and no per-person identity. Share links and "Shared with me"
+  already cover a volunteer who only needs this week's set
 - restrict editing others' setlists, using the setlist's ownerId? (leader's Google email)
 
  - the pad sets are the user's own (Drive): the app ships none, so pads are off until one is
