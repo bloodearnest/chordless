@@ -87,6 +87,15 @@ describe('toast', () => {
       expect(shownToast()).to.equal(null)
     })
 
+    it('stays fifteen seconds when it offers something', async () => {
+      toast('Replaced', { action: { label: 'Undo', run: () => {} } })
+      await shown()
+      await clock.tick(14_000)
+      expect(shownToast()).to.not.equal(null)
+      await clock.tick(1100)
+      expect(shownToast()).to.equal(null)
+    })
+
     it('goes five seconds after the last time it was shown', async () => {
       toast('Saved')
       await clock.tick(4000)

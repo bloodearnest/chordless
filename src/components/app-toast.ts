@@ -4,6 +4,8 @@ import { buttonStyles } from './shared-styles.ts'
 
 /** How long an info toast stays (an error stays until it is dismissed) */
 const INFO_MS = 5000
+/** How long one that offers something stays: time to read it and decide */
+const OFFER_MS = 15000
 
 /** What a toast says, and can do */
 export interface ToastOptions {
@@ -217,7 +219,7 @@ export class AppToast extends LitElement {
     this.showPopover()
 
     clearTimeout(this._timer)
-    if (kind === 'info') this._timer = setTimeout(() => this.dismiss(), INFO_MS)
+    if (kind === 'info') this._timer = setTimeout(() => this.dismiss(), action ? OFFER_MS : INFO_MS)
   }
 
   get isOpen(): boolean {

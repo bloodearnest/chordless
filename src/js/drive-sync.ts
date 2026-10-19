@@ -31,7 +31,7 @@ import { pushSetlists, pushSongs } from './sync/push.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
-import type { ProgressCallback, SyncSession } from './sync/session.ts'
+import type { ProgressCallback, ResetSetlist, SyncSession } from './sync/session.ts'
 
 /** A local setlist or song with changes that are not in Drive */
 export interface UnsyncedChange {
@@ -163,7 +163,7 @@ export class DriveSyncManager implements SyncSession {
   /** How many records the last pull left alone, for a user who can only read (sync/pull.ts) */
   heldBack = 0
   /** The setlists the last pull replaced with Drive's, for a user who can only read */
-  resetSetlists: string[] = []
+  resetSetlists: ResetSetlist[] = []
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.

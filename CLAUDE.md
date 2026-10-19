@@ -60,7 +60,7 @@ they must be able to. Overly restrictive is an antipattern here.
   `src/js/toast.ts`, shown by `<app-toast>`. Never `alert()`: it stops everything, and a live
   setlist must not stop. One at a time, along the bottom (clear of the lyrics and the header),
   centred. An error stays until dismissed, with the reason behind "Details" and, where trying again
-  is safe, a "Try again" button; anything else goes by itself after five seconds. It takes no focus,
+  is safe, a "Try again" button; anything else goes by itself after five seconds (fifteen if it offers something, such as Undo). It takes no focus,
   so the arrow keys and swipes carry on moving through the setlist. Behind a modal dialog (which
   makes the rest of the page inert) it can be seen but not pressed until the dialog is closed.
 

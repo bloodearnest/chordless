@@ -5,9 +5,13 @@
  * time and the message of any error, and throws the error again.
  */
 
+import type { SetlistEntry } from './data-types.ts'
 import type { DriveSyncManager, SyncProgress } from './drive-sync.ts'
 import { createSyncManager, isSyncAvailable } from './drive-sync.ts'
+import type { ResetSetlist } from './sync/session.ts'
+import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { toast } from './toast.ts'
+import { setlistTitle } from './utils/date-utils.ts'
 
 /** Progress as this layer sends it: with the time, and the error's message on failure */
 export interface SyncBroadcast extends SyncProgress {
@@ -21,19 +25,56 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+/** How much of what changed a toast spells out */
+const SUMMARY_LIMIT = 4
+
 /**
  * A user who can only read never uploads, so the leader's version replaced the setlists they
- * had changed on this device: tell them (docs/SPACES.md, "Read-only: local edits are never blocked")
+ * had changed on this device: tell them what the leader's version has that theirs did not, and
+ * offer to put theirs back (docs/SPACES.md, "Read-only: local edits are never blocked")
  */
-function tellOfReset(manager: DriveSyncManager): void {
+async function tellOfReset(manager: DriveSyncManager): Promise<void> {
   const reset = manager.resetSetlists
   manager.resetSetlists = []
   if (reset.length === 0) return
+  const { db } = manager
+  const titles = new Map<string, string>()
+  for (const { before, after } of reset) {
+    for (const entry of [...before.songs, ...after.songs]) {
+      if (titles.has(entry.songUuid)) continue
+      titles.set(entry.songUuid, (await db.getSong(entry.songUuid))?.title ?? entry.songId)
+    }
+  }
+  const titleOf = (entry: SetlistEntry) => titles.get(entry.songUuid) ?? entry.songId
+
+  const summary = (change: ResetSetlist) => {
+    const changes = describeSetlistChange(change.before, change.after, titleOf)
+    const shown = changes.slice(0, SUMMARY_LIMIT).join(', ')
+    return changes.length > SUMMARY_LIMIT ? `${shown}, …` : shown
+  }
+  const only = reset.length === 1 ? reset[0] : null
+  const what = only ? summary(only) : ''
   toast(
-    reset.length === 1
-      ? `Your changes to ${reset[0]} were replaced by the leader's version.`
+    only
+      ? `Your changes to ${setlistTitle(only.before)} were replaced by the leader's version${what ? ` (${what})` : ''}.`
       : `Your changes to ${reset.length} setlists were replaced by the leader's versions.`,
-    { details: reset.join('\n') }
+    {
+      details: reset.map(change => `${setlistTitle(change.before)}: ${summary(change)}`).join('\n'),
+      action: {
+        label: 'Undo',
+        run: () => {
+          // Back to what this device had; it is still a change here that is never uploaded
+          for (const { before } of reset) {
+            db.saveSetlist(before).catch(error =>
+              toast("Couldn't put your changes back.", {
+                kind: 'error',
+                details: messageOf(error),
+              })
+            )
+          }
+        },
+      },
+    }
   )
 }
 
@@ -110,7 +151,7 @@ export class SyncOrchestrator {
       progressCallback,
       async (manager, progress) => {
         await manager.sync(progress)
-        tellOfReset(manager)
+        await tellOfReset(manager)
       }
     )
   }
@@ -153,7 +194,7 @@ export class SyncOrchestrator {
       progressCallback,
       async (manager, progress) => {
         await manager.pullFromDrive(progress)
-        tellOfReset(manager)
+        await tellOfReset(manager)
       }
     )
   }

@@ -30,6 +30,12 @@ export async function inGroups<T, R>(
   }
 }
 
+/** A setlist a pull replaced: what this device had, and what it has now */
+export interface ResetSetlist {
+  before: Setlist
+  after: Setlist
+}
+
 export interface SyncSession {
   readonly db: ChordlessDB
   readonly parser: ChordProParser
@@ -46,7 +52,7 @@ export interface SyncSession {
   /** How many charts the pull left alone because they have local changes that can't go back */
   heldBack: number
   /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
-  resetSetlists: string[]
+  resetSetlists: ResetSetlist[]
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete: boolean
 

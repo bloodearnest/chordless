@@ -10,7 +10,6 @@ import { withNumericTempos } from '../db.ts'
 import * as DriveAPI from '../drive-api.ts'
 import { driveRequest } from '../drive-api.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
-import { setlistTitle } from '../utils/date-utils.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -118,6 +117,7 @@ export async function pullSetlists(
 
   const downloadQueue: SetlistDownload[] = []
   const adopted = new Set<string>()
+  const resetting = new Map<string, Setlist>()
 
   for (const driveFile of driveSetlists) {
     try {
@@ -134,7 +134,7 @@ export async function pullSetlists(
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
           if (session.readOnly && setlistHasLocalChanges(localSetlist)) {
-            session.resetSetlists.push(setlistTitle(localSetlist))
+            resetting.set(setlistId, localSetlist)
           }
           downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
@@ -190,6 +190,10 @@ export async function pullSetlists(
 
   if (setlistsToSave.length > 0) {
     await session.db.saveSetlistsBatch(setlistsToSave)
+    for (const after of setlistsToSave) {
+      const before = resetting.get(after.id)
+      if (before) session.resetSetlists.push({ before, after })
+    }
   }
 }
 

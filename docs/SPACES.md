@@ -285,8 +285,15 @@ only what needs Drive: sharing by link (the song list to paste stays).
   back to the official setlist" (`sync/revert.ts`: Drive's copy replaces the local one, keeping the
   id and the device state). A held-back chart has no marker yet; "Reset from Google Drive" on the
   Storage page is its revert.
-- Not built, to consider: don't replace a setlist that is open or live (apply it at the next start),
-  and keep the replaced version for an Undo in the toast.
+- The toast says what the leader's version has that theirs did not (`sync/setlist-diff.ts`: songs
+  added and removed, a different order, a key or tempo, the details) and offers **Undo**, which puts
+  their version back (still never uploaded). Undo lasts as long as the toast (15 seconds).
+- **No guard for a setlist that is open or live, on purpose.** A leader's last-minute song must reach
+  a live follower: blocking it would go against "permissive in the moment". Today it cannot happen
+  mid-service anyway, because a sync only runs when the user presses it on the Storage page. When
+  updates can arrive while a setlist is open (immediate sync, or the leader pushing over WebRTC,
+  opt-in), apply them in place: keep the current song by its song id, say what changed with the same
+  summary, and keep Undo. The diff is pure so both sources can share it.
 - The marker does not yet list *what* differs (their value, the official one, whether the official
   one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
   "Several people editing a setlist".

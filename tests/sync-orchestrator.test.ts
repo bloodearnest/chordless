@@ -1,4 +1,5 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
+import { ChordlessDB } from '../src/js/db.ts'
 import type { DriveSyncManager, ProgressCallback } from '../src/js/drive-sync.ts'
 import {
   createOrganisation,
@@ -6,13 +7,16 @@ import {
   getCurrentOrganisation,
   setCurrentOrganisation,
 } from '../src/js/organisation.ts'
+import type { ResetSetlist } from '../src/js/sync/session.ts'
 import {
   createSyncOrchestrator,
   type SyncBroadcast,
   SyncOrchestrator,
 } from '../src/js/sync-orchestrator.ts'
+import { setlistTitle } from '../src/js/utils/date-utils.ts'
+import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -41,10 +45,12 @@ describe('SyncOrchestrator', () => {
     operation: Operation,
     reports: object[] = [],
     failure?: Error,
-    resetSetlists: string[] = []
+    resetSetlists: ResetSetlist[] = [],
+    db?: ChordlessDB
   ) {
     const manager = {
-      resetSetlists: resetSetlists as string[],
+      db,
+      resetSetlists,
       [operation]: async (progress: ProgressCallback) => {
         for (const report of reports) progress(report as Parameters<ProgressCallback>[0])
         if (failure) throw failure
@@ -102,22 +108,86 @@ describe('SyncOrchestrator', () => {
       expect(stages(messages)).to.deep.equal(['pulling'])
     })
 
-    it('tells a reader, once, that the leader’s version replaced their changes to setlists', async () => {
-      const toasts = () => [...document.querySelectorAll('app-toast')]
-      const text = () =>
-        toasts()
-          .map(el => el.shadowRoot?.textContent ?? '')
-          .join(' ')
-      const one = orchestratorWith('sync', [], undefined, ['Sunday 18 October'])
-      await one.sync()
-      expect(text()).to.contain('Your changes to Sunday 18 October were replaced')
-      const two = orchestratorWith('pullFromDrive', [], undefined, ['A', 'B'])
-      await two.pull()
-      expect(text()).to.contain('Your changes to 2 setlists were replaced')
-      // said once: the list is emptied
-      expect(
-        (two.syncManager as unknown as { resetSetlists: string[] }).resetSetlists
-      ).to.deep.equal([])
+    it('tells a reader, once, what the leader’s version changed in their setlists, and can undo it', async () => {
+      const db = new ChordlessDB(`reset-${crypto.randomUUID()}`)
+      await db.init()
+      try {
+        await db.saveSong(makeSong({ uuid: 'u-a', id: 'title-alpha', title: 'Alpha' }))
+        await db.saveSong(makeSong({ uuid: 'u-b', id: 'title-beta', title: 'Beta' }))
+        const entry = (songId: string, songUuid: string, key: string) =>
+          makeEntry({ songId, songUuid, key })
+        const mine = makeSetlist({
+          id: 's-1',
+          date: '2026-10-18',
+          songs: [entry('title-alpha', 'u-a', 'G')],
+        })
+        const theirs = {
+          ...mine,
+          songs: [entry('title-alpha', 'u-a', 'A'), entry('title-beta', 'u-b', 'D')],
+        }
+        const toasts = () => [...document.querySelectorAll('app-toast')]
+        const text = () =>
+          toasts()
+            .map(el => el.shadowRoot?.textContent ?? '')
+            .join(' ')
+
+        const one = orchestratorWith('sync', [], undefined, [{ before: mine, after: theirs }], db)
+        await one.sync()
+        expect(text()).to.contain(`Your changes to ${setlistTitle(mine)} were replaced`)
+        expect(text()).to.contain('+ Beta')
+        expect(text()).to.contain('Alpha: key G → A')
+        // said once: the list is emptied
+        expect(
+          (one.syncManager as unknown as { resetSetlists: unknown[] }).resetSetlists
+        ).to.deep.equal([])
+
+        // Undo puts back what this device had
+        await db.saveSetlist(theirs)
+        toasts().at(-1)?.shadowRoot?.querySelector<HTMLButtonElement>('button.btn')?.click()
+        await waitUntil(async () => (await db.getSetlist('s-1'))?.songs.length === 1, 'it is back')
+
+        const many = orchestratorWith(
+          'pullFromDrive',
+          [],
+          undefined,
+          [
+            { before: mine, after: theirs },
+            { before: { ...mine, id: 's-2' }, after: { ...theirs, id: 's-2' } },
+          ],
+          db
+        )
+        await many.pull()
+        expect(text()).to.contain('Your changes to 2 setlists were replaced')
+
+        // Nothing to name (only a field the diff does not describe): just that it was replaced
+        await orchestratorWith(
+          'sync',
+          [],
+          undefined,
+          [{ before: mine, after: { ...mine, modifiedDate: 'later' } }],
+          db
+        ).sync()
+        expect(text()).to.match(/were replaced by the leader's version\./)
+
+        // A changed song with a long list of changes is cut short; a failed Undo says so
+        const long = {
+          ...theirs,
+          date: '2026-10-19',
+          songs: [
+            entry('title-beta', 'u-b', 'C'),
+            entry('title-gamma', 'u-g', 'E'),
+            entry('title-delta', 'u-d', 'F'),
+          ],
+        }
+        db.saveSetlist = () => Promise.reject(new Error('disk full'))
+        await orchestratorWith('sync', [], undefined, [{ before: mine, after: long }], db).sync()
+        expect(text()).to.contain('…')
+        toasts().at(-1)?.shadowRoot?.querySelector<HTMLButtonElement>('button.btn')?.click()
+        await waitUntil(() => text().includes("Couldn't put your changes back"), 'it says so')
+      } finally {
+        db.db?.close()
+        await deleteDatabase(db.dbName)
+      }
     })
 
     it('each operation resolves to success', async () => {
