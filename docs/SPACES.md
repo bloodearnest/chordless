@@ -415,6 +415,20 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   has not been used this way before: if the browser suppresses it, that is the first thing to report).
   The Worker checks the token, the member's role, and that the file is inside the team folder
   (walking up its parents), then calls Drive with the owner's access token and streams the answer.
+- **Reader result (2026-10-19): passed** for a second account through the Worker, on a team folder in
+  the shared drive: list, read a file, read one in a folder inside it (about 1.1 to 1.4 s each on the
+  dev server), the file outside the folder refused, and the write refused. Writer and not-a-member
+  still to run.
+- **Do not build the real broker on One Tap.** The member's ID token here comes from
+  `google.accounts.id.prompt()`, which Chrome shows as a native FedCM popup ("Sign in as …"), not an
+  OAuth window. Other browsers show Google's own card in the page or nothing, Google is retiring that
+  fallback and the moment notifications `getIdToken` relies on, a few dismissals silence it for a
+  while, and an old iPad is the target. It was only the quickest way to make the spike run. The
+  design: the normal sign-in popup (`initCodeClient`, which works everywhere) already gives the
+  Worker a verified ID token, so the Worker issues its own short-lived signed session token (email
+  and sub, about an hour, signed with a Worker secret), renews it in `/session/refresh` (which has the
+  encrypted blob as proof of identity), and the broker accepts that. No prompt, any browser, no
+  per-call popup. (Current dates for Google's retirement not checked.)
 - It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
   Manager, since the app only ever trashes.
 
