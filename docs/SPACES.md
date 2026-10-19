@@ -453,6 +453,16 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   dev machine's own connection (the dev Worker runs there), not of a deployed Worker, so they are a
   pessimistic guide; the plan's production limits are still unchecked on a real deployment. A pad
   set (12 files of a few MB) would take tens of seconds to upload on a slow link, once.
+- **Item 6, no Worker** (run as the *other* account, a member of the shared drive, with the member
+  code from the owner part; the code now includes the team folder's id):
+  - **6a** "try my own token on the team's files": this account's own Chordless sign-in lists the team
+    folder and reads the folder, a file in it, and a file in a subfolder. All must be refused or empty.
+    A pass confirms `drive.file` is per app and per user on a shared drive too, so the broker is
+    needed (a "seen" would mean members could sync a shared drive directly, a much simpler design).
+  - **6b** "pick the team folder, and see what I get": the Picker (the API key in the owner part)
+    picks the team folder with this account. The pick grants the folder, but listing it must still
+    show nothing and the old owner's files must stay refused, which is why there is one live owner
+    per team space and succession is a copy.
 - It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
   Manager, since the app only ever trashes.
 

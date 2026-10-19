@@ -123,6 +123,7 @@ $('enable').addEventListener('click', async () => {
 
     const code = {
       spaceId: result.spaceId,
+      folderId: folder.id,
       songId: song.id,
       deepId: deep.id,
       outsideId: outside.id,
@@ -303,6 +304,96 @@ $('big').addEventListener('click', async () => {
       response.ok && back.length === size && (await sha256(back)) === sent,
       `${response.status}, answer started after ${Math.round(firstByteMs)} ms, all of it after ${Math.round(downloadMs)} ms, ${megabytesPerSecond(size, downloadMs)} MB/s, ${back.length} bytes, ${(await sha256(back)) === sent ? 'identical to what was sent' : 'DIFFERENT from what was sent'}`
     )
+    status.textContent = 'Done'
+    $('copy-report').disabled = false
+  } catch (error) {
+    status.textContent = `Stopped: ${error.message}`
+  }
+})
+
+// ==================== Item 6: my own token, no Worker ====================
+
+/** Ask Drive for a file with this account's own token: the answer, or the reason it was refused */
+async function ownAccess(id) {
+  try {
+    const file = await driveRequest(`/files/${id}?fields=id,name`)
+    return { seen: true, detail: `SEEN as "${file.name}"` }
+  } catch (error) {
+    return { seen: false, detail: `refused (HTTP ${error.status})` }
+  }
+}
+
+async function ownListing(folderId) {
+  try {
+    const query = encodeURIComponent(`'${folderId}' in parents and trashed=false`)
+    const result = await driveRequest(`/files?q=${query}&spaces=drive&fields=files(id,name)`)
+    return {
+      count: result.files.length,
+      detail: `${result.files.length} item(s): ${result.files.map(f => f.name).join(', ')}`,
+    }
+  } catch (error) {
+    return { count: 0, detail: `refused (HTTP ${error.status})` }
+  }
+}
+
+$('own').addEventListener('click', async () => {
+  const status = $('member-status')
+  $('results').hidden = false
+  try {
+    const code = JSON.parse($('code').value)
+    status.textContent = 'Trying my own token on the team folder…'
+    // 6a: this account's own Chordless sign-in cannot see what the owner's Chordless made
+    const listing = await ownListing(code.folderId)
+    record(
+      '6a: list the team folder with my own token (expect nothing)',
+      listing.count === 0,
+      listing.detail
+    )
+    for (const [label, id] of [
+      ['the team folder itself', code.folderId],
+      ['a file in it', code.songId],
+      ['a file in a folder inside it', code.deepId],
+    ]) {
+      const result = await ownAccess(id)
+      record(`6a: read ${label} with my own token (expect refused)`, !result.seen, result.detail)
+    }
+    status.textContent = 'Done'
+    $('copy-report').disabled = false
+  } catch (error) {
+    status.textContent = `Stopped: ${error.message}`
+  }
+})
+
+$('adopt').addEventListener('click', async () => {
+  const status = $('member-status')
+  $('results').hidden = false
+  try {
+    const code = JSON.parse($('code').value)
+    const apiKey = $('api-key').value.trim()
+    if (!apiKey) throw new Error('Enter the Picker API key in the owner part first')
+    status.textContent = 'Pick the team folder in the Google Picker…'
+    const folder = await pickFolder(apiKey, '376758830135')
+    if (!folder) throw new Error('Nothing picked')
+    record(
+      '6b: picked a folder',
+      folder.id === code.folderId,
+      `"${folder.name}" ${folder.id}${folder.id === code.folderId ? ' (the team folder)' : ' (NOT the team folder in the code)'}`
+    )
+    // A new owner would have this folder, and want its files
+    const seen = await ownAccess(folder.id)
+    record(
+      '6b: read the picked folder with my own token (the pick grants it)',
+      seen.seen,
+      seen.detail
+    )
+    const listing = await ownListing(folder.id)
+    record(
+      '6b: list the picked folder (expect nothing: the files are the old owner’s)',
+      listing.count === 0,
+      listing.detail
+    )
+    const song = await ownAccess(code.songId)
+    record('6b: read a file in it after picking (expect refused)', !song.seen, song.detail)
     status.textContent = 'Done'
     $('copy-report').disabled = false
   } catch (error) {
