@@ -121,14 +121,7 @@ export async function handleSpikeDrive(
   google: GoogleApi = realGoogle,
   fetcher: Fetcher = fetch
 ) {
-  const body = (await request.json()) as {
-    spaceId?: string
-    id_token?: string
-    op?: string
-    fileId?: string
-    name?: string
-    content?: string
-  }
+  const body = (await request.json()) as DriveBody
   const space = body.spaceId ? spaces.get(body.spaceId) : undefined
   if (!space || !body.id_token) return jsonResponse({ error: 'No such space, or no ID token' }, 404)
 
@@ -139,8 +132,33 @@ export async function handleSpikeDrive(
     return jsonResponse({ error: 'Not signed in', details: message(error) }, 401)
   }
   const role = space.members.get(email)
-  if (!role) return jsonResponse({ error: 'Not a member of this space' }, 403)
+  const answer = role
+    ? await serve(space, role, body, env, google, fetcher)
+    : jsonResponse({ error: 'Not a member of this space' }, 403)
+  // Who the Worker took the caller for, so a test can tell a refusal from a mix-up of accounts
+  answer.headers.set('X-Spike-Member', `${email} (${role ?? 'not a member'})`)
+  return answer
+}
 
+/** What a member's call to /dev/spike/drive carries */
+interface DriveBody {
+  spaceId?: string
+  id_token?: string
+  op?: string
+  fileId?: string
+  name?: string
+  content?: string
+}
+
+/** Do what a member of the space asked, with the owner's token */
+async function serve(
+  space: Space,
+  role: SpikeRole,
+  body: DriveBody,
+  env: Env,
+  google: GoogleApi,
+  fetcher: Fetcher
+): Promise<Response> {
   const token = await ownerToken(space, env, google)
   const auth = { Authorization: `Bearer ${token}` }
   const fileId = body.fileId ?? ''

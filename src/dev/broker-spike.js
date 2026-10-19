@@ -186,6 +186,12 @@ $('run').addEventListener('click', async () => {
     const allowed = expect !== 'none'
     status.textContent = 'Listing…'
     let response = await call('list')
+    const who = response.headers.get('X-Spike-Member') ?? 'unknown'
+    record(
+      'who the Worker took you for',
+      expect === 'none' ? who.endsWith('(not a member)') : who.endsWith(`(${expect})`),
+      `${who}; this page expected ${expect === 'none' ? 'a stranger' : `a ${expect}`}`
+    )
     let text = await response.text()
     const names =
       allowed && response.ok

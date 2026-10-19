@@ -167,6 +167,7 @@ describe('a member using a space', () => {
     assert.equal(response.status, 200)
     const names = ((await bodyOf(response)).files as { name: string }[]).map(f => f.name).sort()
     assert.deepEqual(names, ['chart.bin', 'song.cho', 'sub'])
+    assert.equal(response.headers.get('X-Spike-Member'), 'bea@example.com (reader)')
     assert.equal(driveCalls[0]?.auth, 'Bearer access-1')
     assert.match(driveCalls[0]?.url ?? '', /supportsAllDrives=true/)
   })
@@ -210,7 +211,9 @@ describe('a member using a space', () => {
   })
 
   test('is told apart by who they are: not a member, not signed in, no such space', async () => {
-    assert.equal((await asMember(spaceId, 'dan@example.com', 'list')).status, 403)
+    const stranger = await asMember(spaceId, 'dan@example.com', 'list')
+    assert.equal(stranger.status, 403)
+    assert.equal(stranger.headers.get('X-Spike-Member'), 'dan@example.com (not a member)')
     assert.equal((await asMember(spaceId, 'bad', 'list')).status, 401)
     assert.equal((await asMember('nope', 'bea@example.com', 'list')).status, 404)
     const noToken = await handleSpikeDrive(post('/dev/spike/drive', { spaceId }), env, google)

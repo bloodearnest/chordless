@@ -417,8 +417,13 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   (walking up its parents), then calls Drive with the owner's access token and streams the answer.
 - **Reader result (2026-10-19): passed** for a second account through the Worker, on a team folder in
   the shared drive: list, read a file, read one in a folder inside it (about 1.1 to 1.4 s each on the
-  dev server), the file outside the folder refused, and the write refused. Writer and not-a-member
-  still to run.
+  dev server), the file outside the folder refused, and the write refused. **Writer: passed** (the
+  write is accepted, the outside file still refused). **Not a member: passed** (a stranger who knows
+  the space id and the file ids gets 403 on everything). One run of "not a member" first showed
+  200s: the wrong account was behind the Google popup, a listed one. The Worker now stamps each answer
+  `X-Spike-Member: <email> (<role or not a member>)` and the page shows it first, so a mix-up of
+  accounts is visible. **Item 1 is done** for the owner's token, on a shared-drive folder, with a
+  Content manager.
 - **Do not build the real broker on One Tap.** The member's ID token here comes from
   `google.accounts.id.prompt()`, which Chrome shows as a native FedCM popup ("Sign in as …"), not an
   OAuth window. Other browsers show Google's own card in the page or nothing, Google is retiring that
