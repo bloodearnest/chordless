@@ -270,15 +270,23 @@ only what needs Drive: sharing by link (the song list to paste stays).
   `organisation-access.ts`), kept as `readOnly` on the space record and in localStorage. Under
   `drive.file` it cannot fire for a person with only read access to someone else's folder, so until
   the Worker reports a role this only covers a folder that really is read-only.
-- Their changes **stay on this device and are never pushed**. A pull leaves a record with local
-  changes alone, setlist or chart, even when Drive's copy has changed (`session.readOnly`,
-  `heldBack` in `sync/pull.ts`); a record they did not change follows Drive as usual. The sync says
-  "view-only: your changes stay on this device" and how many differ.
+- Their changes are **never pushed**. They last on this device until a pull finds Drive's copy
+  changed:
+  - a **setlist** they changed is then replaced by the leader's version (the official plan wins; it
+    is the order, keys and tempos that change at the last minute), and a toast tells them
+    ("Your changes to <setlist> were replaced by the leader's version", `tellOfReset` in
+    `sync-orchestrator.ts`; `resetSetlists` in `sync/pull.ts`). A setlist the leader did not change
+    keeps their edits.
+  - a **chart** they changed is left alone (`heldBack` counts it): chart edits are rare and
+    deliberate. The sync says "view-only: your changes stay on this device" and how many differ.
 - **Differs from official:** on the overview of a setlist the reader has changed, a small warning
-  button in the header (`#differs-button`) opens `setlist-differs`, which says so and offers "Put it
+  button in the header (`#differs-button`) opens `setlist-differs`, which says the change is not
+  uploaded and will be replaced if the leader changes the setlist, and offers "Put it
   back to the official setlist" (`sync/revert.ts`: Drive's copy replaces the local one, keeping the
   id and the device state). A held-back chart has no marker yet; "Reset from Google Drive" on the
   Storage page is its revert.
+- Not built, to consider: don't replace a setlist that is open or live (apply it at the next start),
+  and keep the replaced version for an Undo in the toast.
 - The marker does not yet list *what* differs (their value, the official one, whether the official
   one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
   "Several people editing a setlist".

@@ -78,8 +78,8 @@ export class SetlistDiffers extends LitElement {
       <app-modal ${ref(this._dialog)} size="medium" heading="Differs from the official setlist">
         <p>
           You can only read this organisation's Google Drive folder, so the changes you made to
-          this setlist stay on this device. Nothing is uploaded, and what the leader changes in
-          Drive does not replace them.
+          this setlist stay on this device and are not uploaded. If the leader changes the
+          setlist in Drive, their version replaces yours at the next sync.
         </p>
         <button class="btn" id="revert-to-official" ?disabled=${this._busy} @click=${() => this._revert()}>
           ${this._busy ? 'Putting it back…' : 'Put it back to the official setlist'}

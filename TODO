@@ -116,8 +116,9 @@ offline
   DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
-- read-only spaces: local edits work and are kept; the "differs from official" button lists only a setlist
-  (a held-back song has no marker; Reset from Drive is its revert); the Worker role replaces the Drive-capabilities
+- read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
+  toast); a changed chart is held back (Reset from Drive is its revert). Still to do: not replacing a setlist that is
+  open or live, and Undo; the Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)

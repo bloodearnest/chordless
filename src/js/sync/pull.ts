@@ -1,14 +1,16 @@
 /**
  * The pull of a Drive sync: what Drive holds that this device doesn't, or holds newer, comes
- * down to the local database. Drive wins a conflict, except for a user who can only read: their
- * local changes never go to Drive, so a pull leaves a record they changed as it is, and
- * `heldBack` counts it (docs/SPACES.md, "Read-only: local edits are never blocked").
+ * down to the local database. Drive wins a conflict. A user who can only read never uploads, so
+ * the leader's version replaces a setlist they changed here (`resetSetlists` says which, for the
+ * app to tell them), while a chart they changed is left as it is (`heldBack` counts it): see
+ * docs/SPACES.md, "Read-only: local edits are never blocked".
  */
 import type { DriveFile, Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
 import * as DriveAPI from '../drive-api.ts'
 import { driveRequest } from '../drive-api.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
+import { setlistTitle } from '../utils/date-utils.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -131,8 +133,10 @@ export async function pullSetlists(
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
-          if (session.readOnly && setlistHasLocalChanges(localSetlist)) session.heldBack++
-          else downloadQueue.push({ driveFile, setlistId, localSetlist })
+          if (session.readOnly && setlistHasLocalChanges(localSetlist)) {
+            session.resetSetlists.push(setlistTitle(localSetlist))
+          }
+          downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
       } else if (!adopted.has(setlistId) && session.isOrphaned(localSetlist)) {
         // The Drive file this device knew is gone (e.g. duplicates were cleaned up), yet

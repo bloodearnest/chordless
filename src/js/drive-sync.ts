@@ -162,6 +162,8 @@ export class DriveSyncManager implements SyncSession {
   readOnly: boolean | null
   /** How many records the last pull left alone, for a user who can only read (sync/pull.ts) */
   heldBack = 0
+  /** The setlists the last pull replaced with Drive's, for a user who can only read */
+  resetSetlists: string[] = []
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -330,6 +332,7 @@ export class DriveSyncManager implements SyncSession {
       await this.refreshMembers()
       await this.refreshAccess()
       this.heldBack = 0
+      this.resetSetlists = []
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })

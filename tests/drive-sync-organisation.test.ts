@@ -211,7 +211,7 @@ describe('Drive sync: organisations', () => {
       expect(member.memberCache.readOnly).to.equal(false)
     })
 
-    it('keeps a setlist it changed when the leader changed it too, and says so', async () => {
+    it('replaces a setlist it changed with the leader’s when the leader changed it too, and says which', async () => {
       const leader = await makeDevice('leader')
       const setlist = await addSetlist(leader, { name: 'Sunday' })
       await syncDevice(leader)
@@ -227,12 +227,10 @@ describe('Drive sync: organisations', () => {
       const said: string[] = []
       await member.sync.sync(progress => said.push(progress.message))
 
-      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('My key change')
-      expect(member.sync.heldBack).to.equal(1)
-      expect(said.at(-1)).to.contain('1 differ from Drive')
-      // Held back on every sync, until reverted: Drive's copy is still newer
-      await syncDevice(member)
-      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('My key change')
+      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
+      expect(member.sync.resetSetlists).to.have.length(1)
+      expect(member.sync.heldBack).to.equal(0)
+      expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
     })
 
     it('takes what the leader changed in a setlist it did not change', async () => {

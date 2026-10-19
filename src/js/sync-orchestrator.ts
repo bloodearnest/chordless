@@ -7,6 +7,7 @@
 
 import type { DriveSyncManager, SyncProgress } from './drive-sync.ts'
 import { createSyncManager, isSyncAvailable } from './drive-sync.ts'
+import { toast } from './toast.ts'
 
 /** Progress as this layer sends it: with the time, and the error's message on failure */
 export interface SyncBroadcast extends SyncProgress {
@@ -18,6 +19,22 @@ export type BroadcastCallback = (progress: SyncBroadcast) => void
 
 function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+/**
+ * A user who can only read never uploads, so the leader's version replaced the setlists they
+ * had changed on this device: tell them (docs/SPACES.md, "Read-only: local edits are never blocked")
+ */
+function tellOfReset(manager: DriveSyncManager): void {
+  const reset = manager.resetSetlists
+  manager.resetSetlists = []
+  if (reset.length === 0) return
+  toast(
+    reset.length === 1
+      ? `Your changes to ${reset[0]} were replaced by the leader's version.`
+      : `Your changes to ${reset.length} setlists were replaced by the leader's versions.`,
+    { details: reset.join('\n') }
+  )
 }
 
 /** What an operation says as it starts and ends (none for a reset, which has its own progress) */
@@ -91,7 +108,10 @@ export class SyncOrchestrator {
       'Sync',
       { starting: 'Starting sync...', complete: 'Sync complete!' },
       progressCallback,
-      (manager, progress) => manager.sync(progress)
+      async (manager, progress) => {
+        await manager.sync(progress)
+        tellOfReset(manager)
+      }
     )
   }
 
@@ -131,7 +151,10 @@ export class SyncOrchestrator {
       'Pull',
       { starting: 'Pulling from Drive...', complete: 'Pull complete!' },
       progressCallback,
-      (manager, progress) => manager.pullFromDrive(progress)
+      async (manager, progress) => {
+        await manager.pullFromDrive(progress)
+        tellOfReset(manager)
+      }
     )
   }
 }

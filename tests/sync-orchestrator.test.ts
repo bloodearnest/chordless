@@ -37,8 +37,14 @@ describe('SyncOrchestrator', () => {
   type Operation = 'sync' | 'pushToDrive' | 'pullFromDrive' | 'resetLocalFromDrive'
 
   /** A manager whose one operation reports `reports`, then fails with `failure` if given */
-  function orchestratorWith(operation: Operation, reports: object[] = [], failure?: Error) {
+  function orchestratorWith(
+    operation: Operation,
+    reports: object[] = [],
+    failure?: Error,
+    resetSetlists: string[] = []
+  ) {
     const manager = {
+      resetSetlists: resetSetlists as string[],
       [operation]: async (progress: ProgressCallback) => {
         for (const report of reports) progress(report as Parameters<ProgressCallback>[0])
         if (failure) throw failure
@@ -94,6 +100,24 @@ describe('SyncOrchestrator', () => {
       const messages = await reported(callback => orchestrator.resetLocalFromDrive(callback))
 
       expect(stages(messages)).to.deep.equal(['pulling'])
+    })
+
+    it('tells a reader, once, that the leader’s version replaced their changes to setlists', async () => {
+      const toasts = () => [...document.querySelectorAll('app-toast')]
+      const text = () =>
+        toasts()
+          .map(el => el.shadowRoot?.textContent ?? '')
+          .join(' ')
+      const one = orchestratorWith('sync', [], undefined, ['Sunday 18 October'])
+      await one.sync()
+      expect(text()).to.contain('Your changes to Sunday 18 October were replaced')
+      const two = orchestratorWith('pullFromDrive', [], undefined, ['A', 'B'])
+      await two.pull()
+      expect(text()).to.contain('Your changes to 2 setlists were replaced')
+      // said once: the list is emptied
+      expect(
+        (two.syncManager as unknown as { resetSetlists: string[] }).resetSetlists
+      ).to.deep.equal([])
     })
 
     it('each operation resolves to success', async () => {
