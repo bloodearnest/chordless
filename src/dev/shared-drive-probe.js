@@ -281,9 +281,24 @@ async function run() {
   })
 
   if (fileId) {
+    await step('what this account may do with the file (capabilities)', async () => {
+      const info = await driveRequest(
+        `/files/${fileId}?fields=capabilities(canDelete,canTrash,canEdit,canMoveItemWithinDrive),driveId`
+      )
+      return { detail: JSON.stringify(info.capabilities) }
+    })
     await step('delete the file in a batch (the batch endpoint)', async () => {
       const count = await batchDeleteFiles([fileId])
-      return { ok: count === 1, detail: `${count} deleted` }
+      if (count === 1) return { detail: '1 deleted' }
+      // The batch only says how many worked: ask for the reason with a single delete
+      let reason = ''
+      try {
+        await driveRequest(`/files/${fileId}`, { method: 'DELETE' })
+        reason = 'a single delete worked, so only the batch call was refused'
+      } catch (error) {
+        reason = `a single delete says: ${error.message} (HTTP ${error.status})`
+      }
+      return { ok: false, detail: `${count} deleted; ${reason}` }
     })
   }
 
