@@ -364,6 +364,20 @@ describe('POST /session/refresh', () => {
     )
   })
 
+  test('answers 401 invalid_grant, not a server error, when Google no longer honours the token', async () => {
+    const { google } = fakeGoogle({
+      refreshAccessToken: (async () => {
+        throw Object.assign(new Error('Token has been expired or revoked.'), {
+          error: 'invalid_grant',
+        })
+      }) as unknown as GoogleApi['refreshAccessToken'],
+    })
+    const blob = await encryptBlob(blobData(), env)
+    const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
+    assert.equal(response.status, 401)
+    assert.equal((await bodyOf(response)).error, 'invalid_grant')
+  })
+
   describe('with an ID token as well', () => {
     test('is refused when the blob belongs to someone else', async () => {
       const { google, calls } = fakeGoogle({

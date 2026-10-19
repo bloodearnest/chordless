@@ -4,8 +4,10 @@ import {
   exportBlobBackup,
   getAccessToken,
   getCurrentUserInfo,
+  getSignInState,
   isAuthenticated,
   logout,
+  SignInExpiredError,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -68,6 +70,28 @@ describe('google-auth', () => {
 
   const json = (body: object, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
+
+  describe('getSignInState', () => {
+    it('is signed out with no sign-in', async () => {
+      expect(await getSignInState()).to.equal('signed-out')
+    })
+
+    it('is signed in while the token is good, or can be refreshed', async () => {
+      signIn({ access_token: 'good', expires_at: inFromNow(30 * MINUTE) })
+      expect(await getSignInState()).to.equal('signed-in')
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
+      expect(await getSignInState()).to.equal('signed-in')
+    })
+
+    it('is expired only when Google refuses the sign-in', async () => {
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => json({ error: 'invalid_grant' }, 401)
+      expect(await getSignInState()).to.equal('expired')
+      respondTo = () => json({}, 500)
+      expect(await getSignInState()).to.equal('signed-in')
+    })
+  })
 
   describe('getAccessToken', () => {
     it('says so when nobody is signed in', async () => {
@@ -135,8 +159,29 @@ describe('google-auth', () => {
         error = e
       })
 
-      expect((error as Error | null)?.message).to.equal('invalid_grant')
+      expect(error).to.be.instanceOf(SignInExpiredError)
       expect(JSON.stringify(worker.stored)).to.equal(before)
+    })
+
+    it('does not take another 401 for an expired sign-in', async () => {
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => json({ error: 'Missing blob' }, 401)
+      let error: Error | null = null
+      await getAccessToken().catch(e => {
+        error = e
+      })
+      expect(error).to.not.be.instanceOf(SignInExpiredError)
+      expect((error as Error | null)?.message).to.equal('Missing blob')
+    })
+
+    it('has a reason of its own when the worker answers with something that is not JSON', async () => {
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => new Response('<html>', { status: 502 })
+      let error: Error | null = null
+      await getAccessToken().catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.equal('Failed to refresh access token')
     })
 
     it('has a reason of its own when the worker gives none', async () => {

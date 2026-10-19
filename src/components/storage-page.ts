@@ -1,4 +1,4 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { StoredBlob } from '../js/auth-db.ts'
 import type { UserInfo } from '../js/google-auth.ts'
@@ -28,6 +28,7 @@ interface AuthMessage {
 export class StoragePage extends LitElement {
   static override properties = {
     isAuthenticated: { type: Boolean, attribute: false },
+    signInExpired: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
@@ -35,6 +36,8 @@ export class StoragePage extends LitElement {
   }
 
   declare isAuthenticated: boolean
+  /** Signed in here, but Google no longer honours it: sync cannot work until the user reconnects */
+  declare signInExpired: boolean
   declare authStatus: string
   declare userInfo: UserInfo | null
   declare _clearError: string
@@ -208,6 +211,7 @@ export class StoragePage extends LitElement {
     this._logoutModal = createRef()
     this._clearDataModal = createRef()
     this.isAuthenticated = false
+    this.signInExpired = false
     this.authStatus = 'checking'
     this.userInfo = null
   }
@@ -219,8 +223,10 @@ export class StoragePage extends LitElement {
 
   async checkAuthStatus(): Promise<void> {
     // (neither of these throws: a failed check is a user who is not signed in)
-    const { isAuthenticated, getCurrentUserInfo } = await import('../js/google-auth.ts')
-    this.isAuthenticated = await isAuthenticated()
+    const { getSignInState, getCurrentUserInfo } = await import('../js/google-auth.ts')
+    const state = await getSignInState()
+    this.isAuthenticated = state !== 'signed-out'
+    this.signInExpired = state === 'expired'
     this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
     this.authStatus = 'ready'
   }
@@ -229,7 +235,7 @@ export class StoragePage extends LitElement {
     return html`
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
-        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated)}
+        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired)}
         ${this._renderPadSetSection()} ${this._renderDangerSection()}
       </div>
     `
@@ -251,7 +257,11 @@ export class StoragePage extends LitElement {
             : this.isAuthenticated
               ? html`
                 <div class="auth-status authenticated">
-                  <h4>✓ Connected</h4>
+                  ${
+                    this.signInExpired
+                      ? html`<h4>⚠ Sign-in expired</h4>`
+                      : html`<h4>✓ Connected</h4>`
+                  }
 
                   ${
                     this.userInfo
@@ -289,12 +299,27 @@ export class StoragePage extends LitElement {
                   }
                 </div>
 
-                <p>
-                  Cloud features are enabled for this device. Your setlists and songs can be synced
-                  to Google Drive.
-                </p>
+                ${
+                  this.signInExpired
+                    ? html`<p role="alert">
+                      Google no longer accepts the sign-in stored on this device (it expired or the
+                      access was removed), so nothing can sync until you connect again. Your setlists
+                      and songs on this device are not affected.
+                    </p>`
+                    : html`<p>
+                      Cloud features are enabled for this device. Your setlists and songs can be synced
+                      to Google Drive.
+                    </p>`
+                }
 
                 <div class="button-group">
+                  ${
+                    this.signInExpired
+                      ? html`<button class="btn block primary" @click=${this._authorize}>
+                        🔑 Reconnect with Google
+                      </button>`
+                      : nothing
+                  }
                   <button class="btn block" @click=${this._testTokenRefresh}>
                     🔄 Test Token Refresh
                   </button>
@@ -388,7 +413,13 @@ export class StoragePage extends LitElement {
           <drive-sync-panel ?disabled=${disabled}></drive-sync-panel>
           ${
             disabled
-              ? html` <p class="sync-hint">Connect with Google above to enable syncing features.</p> `
+              ? html`<p class="sync-hint">
+                ${
+                  this.signInExpired
+                    ? 'Reconnect with Google above to sync again.'
+                    : 'Connect with Google above to enable syncing features.'
+                }
+              </p>`
               : ''
           }
         </div>
@@ -452,6 +483,7 @@ export class StoragePage extends LitElement {
       this.userInfo = await getCurrentUserInfo()
 
       this.isAuthenticated = true
+      this.signInExpired = false
       this.authStatus = 'ready'
 
       this._authMessage = { text: '✓ Authorization successful!', type: 'success' }
@@ -471,6 +503,7 @@ export class StoragePage extends LitElement {
       const { revoked } = await logout()
 
       this.isAuthenticated = false
+      this.signInExpired = false
       this.userInfo = null
       this.requestUpdate()
 
@@ -596,6 +629,8 @@ export class StoragePage extends LitElement {
       }
     } catch (error) {
       console.error('[Test] ❌ Token refresh failed:', error)
+      const { SignInExpiredError } = await import('../js/google-auth.ts')
+      if (error instanceof SignInExpiredError) this.signInExpired = true
       this._authMessage = {
         text: `✗ Token refresh test failed: ${errorMessage(error)}`,
         type: 'error',

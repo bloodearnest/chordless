@@ -56,13 +56,13 @@ describe('the storage page, signed in to Google', () => {
     ).click()
   }
 
-  async function open(signedIn = true) {
+  async function open(signedIn = true, expiresInMs = 30 * 60 * 1000) {
     if (signedIn) {
       worker.stored = {
         blob: 'encrypted-blob',
         metadata: {
           access_token: 'token',
-          expires_at: new Date(Date.now() + 30 * 60 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + expiresInMs).toISOString(),
           user: {
             name: 'Ann Singer',
             email: 'ann@example.com',
@@ -264,6 +264,53 @@ describe('the storage page, signed in to Google', () => {
       expect(page.isAuthenticated).to.equal(true)
       expect(page.userInfo?.name).to.equal('Bea Singer')
       expect(page.authStatus).to.equal('ready')
+    })
+
+    it('says the sign-in has expired, with a way to reconnect, when Google no longer honours it', async () => {
+      const refresh = Response.json({ error: 'invalid_grant' }, { status: 401 })
+      const before = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/session/refresh'
+          ? refresh.clone()
+          : before(input, init)) as typeof fetch
+      await open(true, -60_000)
+
+      expect(page.isAuthenticated).to.equal(true)
+      expect(page.signInExpired).to.equal(true)
+      expect(text()).to.contain('Sign-in expired')
+      expect(text()).to.not.contain('✓ Connected')
+      expect(text()).to.contain('Reconnect with Google above to sync again')
+      expect(
+        must(page.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
+      ).to.equal(true)
+
+      button('Reconnect with Google').click()
+      await until(() => text().includes('Authorization successful'), 'the sign-in to finish')
+      expect(page.signInExpired).to.equal(false)
+      expect(text()).to.contain('Connected')
+    })
+
+    it('stays connected when the refresh fails for another reason, such as no network', async () => {
+      const before = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+        if (String(input) === '/session/refresh') throw new TypeError('Failed to fetch')
+        return before(input, init)
+      }) as typeof fetch
+      await open(true, -60_000)
+      expect(page.signInExpired).to.equal(false)
+      expect(text()).to.contain('Connected')
+    })
+
+    it('says so when the token refresh test finds the sign-in expired', async () => {
+      await open()
+      const before = window.fetch
+      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) =>
+        String(input) === '/session/refresh'
+          ? Response.json({ error: 'invalid_grant' }, { status: 401 })
+          : before(input, init)) as typeof fetch
+      button('Test Token Refresh').click()
+      await until(() => page.signInExpired, 'the page to notice')
+      expect(text()).to.contain('Token refresh test failed')
     })
 
     it('says so when Google refuses', async () => {

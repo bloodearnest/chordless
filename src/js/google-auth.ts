@@ -312,6 +312,31 @@ export async function getIdToken(): Promise<string> {
   })
 }
 
+/** Google no longer honours the stored sign-in (it expired or was revoked): sign in again */
+export class SignInExpiredError extends Error {
+  constructor() {
+    super('Your Google sign-in has expired: connect with Google again')
+    this.name = 'SignInExpiredError'
+  }
+}
+
+/**
+ * Where the sign-in stands: there is none ('signed-out'), it works ('signed-in'), or it is stored
+ * but Google refuses it ('expired'). Only Google saying so makes it expired: with no network, or
+ * any other failure, it is taken to work, as the access token may well still be good.
+ */
+export type SignInState = 'signed-out' | 'signed-in' | 'expired'
+
+export async function getSignInState(): Promise<SignInState> {
+  if (!(await isAuthenticated())) return 'signed-out'
+  try {
+    await getAccessToken()
+    return 'signed-in'
+  } catch (error) {
+    return error instanceof SignInExpiredError ? 'expired' : 'signed-in'
+  }
+}
+
 /**
  * Check if user is authenticated (has blob in SW)
  */
@@ -378,7 +403,8 @@ async function refreshAccessToken(
   })
 
   if (!response.ok) {
-    const error = await response.json()
+    const error = await response.json().catch(() => ({}))
+    if (response.status === 401 && error.error === 'invalid_grant') throw new SignInExpiredError()
     throw new Error(error.error || 'Failed to refresh access token')
   }
 

@@ -111,6 +111,12 @@ The Worker keeps no per-user state (until the broker adds its Durable Objects).
   messaging it.
 - **Expired access tokens:** the service worker refreshes them with `/session/refresh`. The Worker
   decrypts the blob only for that request.
+- **Expired sign-in:** when Google answers `invalid_grant` to a refresh (the refresh token expired
+  or was revoked; it dies after 7 days while the consent screen is "Testing"), the Worker answers
+  `401 invalid_grant` and the client throws `SignInExpiredError`. `getSignInState()` is
+  `signed-out`, `signed-in` or `expired`; only Google's refusal makes it `expired` (no network, or
+  any other failure, counts as signed in). The Storage page then says "Sign-in expired", offers
+  "Reconnect with Google", and disables the sync panel with the reason.
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
 

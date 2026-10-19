@@ -170,9 +170,24 @@ export async function handleTokenRefresh(
   // Decrypt blob and refresh access token
   const blobData = await decryptBlob(blob, env)
 
-  const { access_token, expires_in } = await google.refreshAccessToken(blobData.refresh_token, env)
-
-  return jsonResponse({ access_token, expires_in })
+  try {
+    const { access_token, expires_in } = await google.refreshAccessToken(
+      blobData.refresh_token,
+      env
+    )
+    return jsonResponse({ access_token, expires_in })
+  } catch (error) {
+    // Google no longer honours the refresh token (it expired, e.g. the consent screen is still
+    // in "Testing", or the access was revoked): the user has to sign in again, which is
+    // expected and not a server error
+    if ((error as { error?: string }).error === 'invalid_grant') {
+      return jsonResponse(
+        { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
+        401
+      )
+    }
+    throw error
+  }
 }
 
 /**
