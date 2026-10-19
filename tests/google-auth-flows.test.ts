@@ -24,7 +24,19 @@ const { describe, it, beforeEach, afterEach } = window
 suppressConsoleLogs()
 
 type CodeConfig = { callback: (response: { code?: string; error?: string }) => void }
-type PromptNotification = { isNotDisplayed(): boolean; isSkippedMoment(): boolean }
+type PromptNotification = {
+  isNotDisplayed(): boolean
+  isSkippedMoment(): boolean
+  isDismissedMoment(): boolean
+  getDismissedReason(): string
+}
+/** What Google tells of a prompt, apart from what a test changes */
+const shown: PromptNotification = {
+  isNotDisplayed: () => false,
+  isSkippedMoment: () => false,
+  isDismissedMoment: () => false,
+  getDismissedReason: () => '',
+}
 
 describe('google-auth: signing in', () => {
   let worker: FakeAuthWorker
@@ -36,6 +48,8 @@ describe('google-auth: signing in', () => {
   let codeResponse: { code?: string; error?: string }
   let idCredential: string | null
   let promptNotification: PromptNotification | null
+  /** The credential comes first, then the notification (the prompt closing after it) */
+  let credentialFirst: boolean
 
   const json = (body: object, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -54,6 +68,7 @@ describe('google-auth: signing in', () => {
     codeResponse = { code: 'the-code' }
     idCredential = 'id-credential'
     promptNotification = null
+    credentialFirst = false
     ;(window as { google?: unknown }).google = {
       accounts: {
         oauth2: {
@@ -72,6 +87,9 @@ describe('google-auth: signing in', () => {
                 __idCallback: (response: { credential?: string }) => void
               }
             ).__idCallback
+            if (promptNotification && credentialFirst) {
+              callbackInit({ credential: idCredential ?? undefined })
+            }
             if (promptNotification) callback(promptNotification)
             else callbackInit({ credential: idCredential ?? undefined })
           },
@@ -244,7 +262,7 @@ describe('google-auth: signing in', () => {
     })
 
     it('is not there when Google does not show its prompt', async () => {
-      promptNotification = { isNotDisplayed: () => true, isSkippedMoment: () => false }
+      promptNotification = { ...shown, isNotDisplayed: () => true }
       let message = ''
       try {
         await getIdToken()
@@ -255,7 +273,7 @@ describe('google-auth: signing in', () => {
     })
 
     it('is not there when Google skips its prompt', async () => {
-      promptNotification = { isNotDisplayed: () => false, isSkippedMoment: () => true }
+      promptNotification = { ...shown, isSkippedMoment: () => true }
       let message = ''
       try {
         await getIdToken()
@@ -263,6 +281,32 @@ describe('google-auth: signing in', () => {
         message = (error as Error).message
       }
       expect(message).to.equal('ID token not available')
+    })
+
+    it('is not there when the prompt is closed without a credential', async () => {
+      idCredential = null
+      promptNotification = {
+        ...shown,
+        isDismissedMoment: () => true,
+        getDismissedReason: () => 'cancel_called',
+      }
+      let message = ''
+      try {
+        await getIdToken()
+      } catch (error) {
+        message = (error as Error).message
+      }
+      expect(message).to.equal('ID token not available')
+    })
+
+    it('is the credential even though the prompt closes after giving it', async () => {
+      credentialFirst = true
+      promptNotification = {
+        ...shown,
+        isDismissedMoment: () => true,
+        getDismissedReason: () => 'credential_returned',
+      }
+      expect(await getIdToken()).to.equal('id-credential')
     })
 
     describe('asked for by the service worker', () => {

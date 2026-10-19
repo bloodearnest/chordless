@@ -304,8 +304,13 @@ export async function getIdToken(): Promise<string> {
 
     // Prompt for ID token
     google.accounts.id.prompt(notification => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        console.warn('[Auth] ID token prompt not shown, may need re-auth')
+      // (closing the prompt after it gave a credential is not a refusal; closing it without one is,
+      // and without this the promise would wait for ever)
+      const closed =
+        notification.isDismissedMoment() &&
+        notification.getDismissedReason() !== 'credential_returned'
+      if (notification.isNotDisplayed() || notification.isSkippedMoment() || closed) {
+        console.warn('[Auth] ID token prompt not shown or closed, may need re-auth')
         reject(new Error('ID token not available'))
       }
     })

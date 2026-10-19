@@ -13,6 +13,24 @@ const esc = s =>
     c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]
   )
 
+/** The ID token, or an error saying what to do if Google's popup does not answer */
+function idTokenWithin(ms) {
+  return Promise.race([
+    getIdToken(),
+    new Promise((_, reject) =>
+      setTimeout(
+        () =>
+          reject(
+            new Error(
+              'No answer from the Google popup. Look for "Sign in as …" near the profile icon, or reload and try again (Chrome holds off showing it after it has been closed a few times)'
+            )
+          ),
+        ms
+      )
+    ),
+  ])
+}
+
 async function post(path, body) {
   const response = await fetch(path, {
     method: 'POST',
@@ -89,12 +107,14 @@ $('enable').addEventListener('click', async () => {
     const outside = await createFile({ name: 'outside.txt', parents: [parent] }, 'secret')
     team = { folderId: folder.id, outsideId: outside.id }
 
-    status.textContent = 'Handing the Worker the folder…'
+    status.textContent = 'Getting your Google ID token: choose the account in the Google popup…'
     const stored = await getStoredBlob()
     if (!stored) throw new Error('Not signed in: connect with Google on the Storage page first')
+    const idToken = await idTokenWithin(30_000)
+    status.textContent = 'Handing the Worker the folder…'
     const response = await post('/dev/spike/enable', {
       blob: stored.blob,
-      id_token: await getIdToken(),
+      id_token: idToken,
       folderId: folder.id,
       members: parseMembers($('members').value),
     })
@@ -158,7 +178,7 @@ $('run').addEventListener('click', async () => {
     const code = JSON.parse($('code').value)
     const expect = $('expect').value
     status.textContent = 'Getting your Google ID token…'
-    const idToken = await getIdToken()
+    const idToken = await idTokenWithin(30_000)
     const call = (op, extra = {}) =>
       post('/dev/spike/drive', { spaceId: code.spaceId, id_token: idToken, op, ...extra })
 
