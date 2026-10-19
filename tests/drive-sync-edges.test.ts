@@ -811,7 +811,7 @@ describe('Drive sync: the less common turns', () => {
       rig.drive.readOnly = true
       const said: string[] = []
       await phone.sync.sync(progress => said.push(progress.message))
-      expect(said.at(-1)).to.equal('Sync complete (view-only: nothing uploaded)')
+      expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
     })
   })
 

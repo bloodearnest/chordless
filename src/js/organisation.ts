@@ -62,12 +62,19 @@ export function getCurrentOrganisation(): { id: string | null; name: string } {
 
 /**
  * Whether the user can only read the current organisation's Drive folder (known after a sync
- * has asked Drive). Then nothing that syncs is edited here: no setlist or song edits, imports
- * or share links; the user's own state (capo, shown sections) is still kept on the device.
- * Read from localStorage, so it can be asked at any moment.
+ * has asked Drive). Read from localStorage, so it can be asked at any moment.
  */
-export function isReadOnlyOrganisation(): boolean {
+function isReadOnlyOrganisation(): boolean {
   return localStorage.getItem(ORGANISATION_READ_ONLY_KEY) === '1'
+}
+
+/**
+ * Whether the current organisation's local changes go back to Drive. A user who can only read
+ * it still edits what they see (a late song, a key change); those changes stay on this device,
+ * and a pull leaves them (docs/SPACES.md, "Read-only: local edits are never blocked").
+ */
+export function syncsBack(): boolean {
+  return !isReadOnlyOrganisation()
 }
 
 /** Record that the user can (or can only read) an organisation's Drive folder */
@@ -81,10 +88,7 @@ export async function setOrganisationReadOnly(
     await db.updateOrganisation(organisationId, { readOnly })
   }
   if (getCurrentOrganisation().id === organisationId) {
-    const changed = isReadOnlyOrganisation() !== readOnly
     cacheReadOnly(readOnly)
-    // So what shows edits can follow (read-only-controller.ts)
-    if (changed) window.dispatchEvent(new Event('organisation-read-only-change'))
   }
 }
 

@@ -101,9 +101,9 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 
 Finding a space's Drive folder (by name on the first sync, by `driveFolderId` after), the setlist
 leaders list and read-only access are per-space matters: see [SPACES.md](SPACES.md).
-In short: a read-only user pulls but does not push, today by a flag from Drive's folder
-capabilities, later (SPACES.md, "Read-only: local edits are never blocked") by the Worker role
-with local changes kept on the device.
+In short: a read-only user pulls but does not push, and edits locally; a pull leaves a record they
+changed (SPACES.md, "Read-only: local edits are never blocked"). Today the flag comes from
+Drive's folder capabilities, later from the Worker role.
 
 ### Change detection (no clock comparisons)
 

@@ -33,7 +33,6 @@ import '../../components/status-message.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { getCurrentDB } from '../db.ts'
 import { goTo } from '../navigation.ts'
-import { isReadOnlyOrganisation } from '../organisation.ts'
 import {
   addToLibrary,
   getSongFromAnywhere,
@@ -353,7 +352,7 @@ export class LibraryView extends PageView {
       const db = await getCurrentDB()
       const model = createLibrarySongModel(this.#song, db, db.organisationId)
 
-      if (this.#key && this.#key !== model.getKey() && !isReadOnlyOrganisation()) {
+      if (this.#key && this.#key !== model.getKey()) {
         model.setKey(this.#key)
       }
 
@@ -388,7 +387,7 @@ export class LibraryView extends PageView {
     keySelector.keys = getAvailableKeys(selectedKey)
     keySelector.originalKey = (this.#song?.originalKey || this.#parsed?.metadata?.key) as string
     // The key is saved with the song, which a user who can only read can't change
-    keySelector.editMode = this.#editMode && !isReadOnlyOrganisation()
+    keySelector.editMode = this.#editMode
   }
 
   async #changeKey(newKey: string): Promise<void> {
@@ -595,13 +594,9 @@ export class LibraryView extends PageView {
               this._source
                 ? html`<div class="song-source" id="library-song-source">
                   <span>From ${this._source}: not in your library.</span>
-                  ${
-                    isReadOnlyOrganisation()
-                      ? nothing
-                      : html`<button type="button" id="add-to-library" @click=${() => this.#addToLibrary()}>
+                  <button type="button" id="add-to-library" @click=${() => this.#addToLibrary()}>
                         Add to my library
-                      </button>`
-                  }
+                      </button>
                 </div>`
                 : nothing
             }

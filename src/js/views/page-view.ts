@@ -1,5 +1,4 @@
 import { LitElement } from 'lit'
-import { FollowsReadOnly } from '../read-only-controller.ts'
 import type { Route } from '../router.ts'
 
 const nextFrame = () => new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
@@ -31,8 +30,6 @@ export class PageView extends LitElement {
   }
 
   declare route: Route | undefined
-  // Views show or hide edits by whether the user can write to the organisation's folder
-  _followsReadOnly = new FollowsReadOnly(this)
   declare restoredState: ViewState | undefined
 
   override connectedCallback() {

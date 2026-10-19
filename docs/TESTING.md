@@ -145,7 +145,7 @@ parallel, each in its own browser context.
 | `first-use.playwright.ts`, `welcome.playwright.ts` | The first-use setup modal, and the welcome card |
 | `import-setlist.playwright.ts` | Importing a setlist from an email's link |
 | `share.playwright.ts`, `share-button.playwright.ts`, `share-and-open.playwright.ts` | Opening a share link; the share button; songs shared to the app or opened with it |
-| `read-only.playwright.ts`, `setlist-title.playwright.ts` | A read-only organisation; a setlist's title in the header |
+| `read-only.playwright.ts`, `setlist-title.playwright.ts` | A read-only organisation (edits still work); a setlist's title in the header |
 | `wake-lock.playwright.ts` | Keeping the screen awake |
 | `built.playwright.ts` | The production build (the `built` project, port 8792): the precache, offline, security headers, CSP |
 

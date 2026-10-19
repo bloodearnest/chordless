@@ -36,10 +36,9 @@ describe('import-setlist-view', () => {
     expect(view.querySelector('setlist-email-import')).to.not.equal(null)
   })
 
-  it('says why it cannot import into a view-only organisation', async () => {
+  it('still imports into a view-only organisation: the setlist stays on this device', async () => {
     await setOrganisationReadOnly(organisationId, true)
     const view = await fixture<ImportSetlistView>(html`<import-setlist-view></import-setlist-view>`)
-    expect(view.querySelector('setlist-email-import')).to.equal(null)
-    expect(view.textContent).to.contain('view-only access')
+    expect(view.querySelector('setlist-email-import')).to.not.equal(null)
   })
 })

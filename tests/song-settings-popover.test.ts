@@ -44,13 +44,10 @@ describe('song-settings-popover', () => {
       expect(seen).to.deep.equal([])
     })
 
-    it('cannot be changed when it is locked, and shows a dash for none', async () => {
+    it('shows a dash for none', async () => {
       const el = await show()
-      el.bpmLocked = true
       el.bpmValue = 0
       await el.updateComplete
-      expect(button(el, 'Decrease BPM').disabled).to.equal(true)
-      expect(button(el, 'Increase BPM').disabled).to.equal(true)
       expect(el.shadowRoot?.querySelector('.bpm-value')?.textContent).to.equal('—')
     })
   })

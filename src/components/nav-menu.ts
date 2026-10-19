@@ -7,8 +7,6 @@ import './app-modal.ts'
 import './icon.ts'
 import { DialogPopup } from '../js/dialog-popup.ts'
 import { type HelpPage, helpFor } from '../js/help-content.ts'
-import { isReadOnlyOrganisation } from '../js/organisation.ts'
-import { FollowsReadOnly } from '../js/read-only-controller.ts'
 import { routeContext } from '../js/route-context.ts'
 import { HeaderMenuClickEvent } from './app-header.ts'
 
@@ -209,8 +207,6 @@ export class NavMenu extends LitElement {
     }
   `
 
-  _followsReadOnly = new FollowsReadOnly(this)
-
   constructor() {
     super()
     this._popup = new DialogPopup(this, { position: dialog => this._positionPopover(dialog) })
@@ -388,10 +384,7 @@ export class NavMenu extends LitElement {
             <span>Preferences</span>
           </button>
 
-          ${
-            isReadOnlyOrganisation()
-              ? nothing
-              : html`<a href="/import-song" class="nav-menu-item" part="nav-item">
+          <a href="/import-song" class="nav-menu-item" part="nav-item">
                 <app-icon name="upload" size="20" class="nav-icon"></app-icon>
                 <span>Import Songs</span>
               </a>
@@ -399,8 +392,7 @@ export class NavMenu extends LitElement {
               <a href="/bookmarklet" class="nav-menu-item" part="nav-item">
                 <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
                 <span>SongSelect Import</span>
-              </a>`
-          }
+              </a>
 
           <a href="/storage" class="nav-menu-item" part="nav-item">
             <app-icon name="layers" size="20" class="nav-icon"></app-icon>

@@ -12,6 +12,7 @@ import {
   SongSettingsClickEvent,
 } from '../components/musical-metadata-display.ts'
 import { MenuOverviewClickEvent, MenuSongClickEvent, type NavMenu } from '../components/nav-menu.ts'
+import { type SetlistDiffers, SetlistRevertedEvent } from '../components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
@@ -40,7 +41,7 @@ import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
-import { isReadOnlyOrganisation } from './organisation.ts'
+import { syncsBack } from './organisation.ts'
 import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getOrganisationPeople } from './people.ts'
@@ -61,6 +62,7 @@ import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { differsFromOfficial } from './sync/revert.ts'
 import { toast } from './toast.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
@@ -131,6 +133,7 @@ export class SetlistPage {
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
   _shareSetup = false
+  _differsSetup = false
   _liveSetup = false
   _editModeSetup?: boolean
   _appHeaderEventsSetup?: boolean
@@ -368,6 +371,7 @@ export class SetlistPage {
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
         this._setupShare()
+        this._setupDiffers()
         this._setupLive()
         this._setOverviewComponent(null)
 
@@ -405,6 +409,7 @@ export class SetlistPage {
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
       this._setupShare()
+      this._setupDiffers()
       this._setupLive()
 
       // Kick off background pad caching for all keys in this setlist
@@ -715,9 +720,7 @@ export class SetlistPage {
 
     if (!appHeader) return
 
-    // On the overview, edit mode changes the setlist itself (its songs, their keys): not for a
-    // user who can only read it. On a song it is the capo, the sections shown and so on.
-    if (!this._readOnly) appHeader.showEditToggle = !(isReadOnlyOrganisation() && !song)
+    if (!this._readOnly) appHeader.showEditToggle = true
 
     // Check if content is actually changing
     const titleChanged = appHeader.heading !== newTitle
@@ -802,10 +805,36 @@ export class SetlistPage {
   _showHeaderButtons(show: boolean) {
     const live = this.root.querySelector<HTMLElement>('#live-button')
     if (live) live.hidden = !show
+    const differs = this.root.querySelector<HTMLElement>('#differs-button')
+    if (differs) {
+      differs.hidden = !(
+        show &&
+        this.currentSetlist &&
+        differsFromOfficial(this.currentSetlist, syncsBack())
+      )
+    }
     const button = this.root.querySelector<HTMLElement>('#share-button')
     if (!button) return
     button.hidden = !show
     button.classList.toggle('shared', Boolean(this.currentSetlist?.share))
+  }
+
+  /** Open the "differs from official" dialog from the header's button, and show the setlist again once reverted */
+  _setupDiffers() {
+    const button = this.root.querySelector<HTMLElement>('#differs-button')
+    const dialog = this.root.querySelector<SetlistDiffers>('#setlist-differs')
+    if (!button || !dialog || !this.currentSetlist) return
+    dialog.setlist = this.currentSetlist
+    dialog.db = this._database()
+    if (this._differsSetup) return
+    this._differsSetup = true
+    button.addEventListener('click', () => {
+      dialog.setlist = this.currentSetlist ?? null
+      dialog.show()
+    })
+    dialog.addEventListener(SetlistRevertedEvent.type, () => {
+      if (this.currentSetlistId) void this.renderSetlist(this.currentSetlistId)
+    })
   }
 
   /** Hand the share dialog its setlist, and open it from the header's button */
@@ -816,7 +845,7 @@ export class SetlistPage {
     dialog.setlist = this.currentSetlist
     dialog.db = this._database()
     dialog.songs = this.songs
-    dialog.linkable = !isReadOnlyOrganisation()
+    dialog.linkable = syncsBack()
     if (this._shareSetup) return
     this._shareSetup = true
     button.addEventListener('click', () => {
@@ -859,7 +888,7 @@ export class SetlistPage {
       this._setlistDeleteHandler = () => this.deleteSetlist()
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
-    dialog.readonly = this._readOnly || isReadOnlyOrganisation()
+    dialog.readonly = this._readOnly
     dialog.people = dialog.readonly ? [] : (await getOrganisationPeople()).people
     await dialog.show(this.currentSetlist)
   }
@@ -1114,8 +1143,6 @@ export class SetlistPage {
       // We're on song view - handle song edit mode
       if (!document.body.classList.contains('edit-mode')) {
         enterEditMode(this.root, appHeader, {
-          // The key is part of the setlist: not for a user who can only read it
-          keyEditable: !isReadOnlyOrganisation(),
           capoEnabled: this._capoEnabled,
         })
         // Update all sections based on edit mode
@@ -1215,8 +1242,7 @@ export class SetlistPage {
     keySelector.value = selectedKey
     keySelector.keys = keys
     keySelector.originalKey = originalKey ?? ''
-    keySelector.editMode =
-      document.body.classList.contains('edit-mode') && !isReadOnlyOrganisation()
+    keySelector.editMode = document.body.classList.contains('edit-mode')
   }
 
   updateCapoSelector(value: unknown, currentKey: string | null | undefined = null) {
@@ -1282,7 +1308,6 @@ export class SetlistPage {
 
     // Update BPM value
     songSettingsPopover.bpmValue = song.currentBPM || 120
-    songSettingsPopover.bpmLocked = isReadOnlyOrganisation()
 
     // This user's media choices for the song (theirs alone: not in the setlist, so a user who
     // can only read it can make them too). Shown only where the media player is
@@ -1312,8 +1337,7 @@ export class SetlistPage {
   }
 
   async handleBPMChange(newValue: number) {
-    // The tempo is saved in the setlist, which a user who can only read can't change
-    if (this.currentSongIndex < 0 || isReadOnlyOrganisation()) return
+    if (this.currentSongIndex < 0) return
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentBPM === newValue) return
 
@@ -1366,8 +1390,7 @@ export class SetlistPage {
   }
 
   async handleKeyChange(newKey: string) {
-    // The key is saved in the setlist, which a user who can only read can't change
-    if (!newKey || this.currentSongIndex < 0 || isReadOnlyOrganisation()) return
+    if (!newKey || this.currentSongIndex < 0) return
 
     const song = this.songs[this.currentSongIndex]
 
@@ -1450,8 +1473,8 @@ export class SetlistPage {
 
     const originalKey = song.originalKey
 
-    // Reset BPM to original (it is in the setlist: not for a user who can only read it)
-    if (!isReadOnlyOrganisation()) song.currentBPM = song.metadata.tempo
+    // Reset BPM to original
+    song.currentBPM = song.metadata.tempo
 
     // Reset font size to default
     song.currentFontSize = CONFIG.DEFAULT_FONT_SIZE

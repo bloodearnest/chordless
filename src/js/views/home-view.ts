@@ -1,5 +1,5 @@
 import { Task } from '@lit/task'
-import { html, nothing } from 'lit'
+import { html } from 'lit'
 import { createRef, ref } from 'lit/directives/ref.js'
 import { repeat } from 'lit/directives/repeat.js'
 import '../../components/app-header.ts'
@@ -17,7 +17,7 @@ import '../../components/status-message.ts'
 import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
-import { getCurrentOrganisation, isReadOnlyOrganisation } from '../organisation.ts'
+import { getCurrentOrganisation } from '../organisation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getOrganisationPeople } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { toast } from '../toast.ts'
@@ -180,10 +180,7 @@ export class HomeView extends PageView {
     const { name } = getCurrentOrganisation()
     return html`
       <app-header id="home-app-header" heading="Setlists - ${name}">
-        ${
-          isReadOnlyOrganisation()
-            ? nothing
-            : html`<button
+        <button
               slot="actions"
               class="create-setlist-button"
               id="create-setlist-button"
@@ -191,8 +188,7 @@ export class HomeView extends PageView {
               @click=${() => this.#openCreate()}
             >
               <app-icon name="add" size="24"></app-icon>
-            </button>`
-        }
+            </button>
       </app-header>
 
       <main class="home-content">

@@ -1,6 +1,8 @@
 /**
  * The pull of a Drive sync: what Drive holds that this device doesn't, or holds newer, comes
- * down to the local database. Drive wins a conflict.
+ * down to the local database. Drive wins a conflict, except for a user who can only read: their
+ * local changes never go to Drive, so a pull leaves a record they changed as it is, and
+ * `heldBack` counts it (docs/SPACES.md, "Read-only: local edits are never blocked").
  */
 import type { DriveFile, Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
@@ -129,7 +131,8 @@ export async function pullSetlists(
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
-          downloadQueue.push({ driveFile, setlistId, localSetlist })
+          if (session.readOnly && setlistHasLocalChanges(localSetlist)) session.heldBack++
+          else downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
       } else if (!adopted.has(setlistId) && session.isOrphaned(localSetlist)) {
         // The Drive file this device knew is gone (e.g. duplicates were cleaned up), yet
@@ -258,7 +261,11 @@ export async function pullSongs(
     } else if (file.md5Checksum !== localSong.driveChecksum) {
       // Drive's content changed since our last sync: its md5Checksum (computed
       // by Drive) differs from the one we recorded
-      needsDownload = true
+      if (session.readOnly && chordproRecord && songHasLocalChanges(localSong, chordproRecord)) {
+        session.heldBack++
+      } else {
+        needsDownload = true
+      }
     } else if (!chordproRecord) {
       needsDownload = true
     }

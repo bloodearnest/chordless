@@ -2,19 +2,8 @@ editing
 - Test PDFs we can commit: generate made-up charts (our own words, no CCLI number) as PDFs in the shapes
   leaders send, so the email importer's PDF reading is tested on every machine and in CI, and
   tests/emails-private.node.test.ts (real emails, newest 5 by default) is no longer the only test of it
-- Read-only should only stop writing back to sync, not local edits (decided 2026-10-16: a last
-  minute change of key, a late song, must work for a reader too; users are grown-ups, see "be
-  permissive in the moment" in CLAUDE.md). Today (docs/SPACES.md, "Read-only: local edits are never blocked") a
-  reader gets no edit mode on the overview, no key or BPM change, no add song, no setlist
-  details edit, because a pull would drop such an edit: so it is blocked rather than kept. To
-  allow them: keep a reader's setlist edits in a device-only overlay that a pull doesn't
-  overwrite and that is applied over the pulled setlist, like `setlist_local` already is for the
-  capo and the sections shown (and per-song preferences in localStorage). Work out what the
-  overlay does when the leader changes the same setlist (theirs wins for what the reader
-  didn't touch? a "your changes" marker with a reset?), then remove the isReadOnlyOrganisation()
-  gates in setlist-page.ts, library-view.ts and the header. A share (readOnly page option) is
-  the same idea: a received setlist is kept on the device on its own, so a local key change
-  there is harmless and should work too. Nothing is ever uploaded for a reader
+- A received share (readOnly page option) should allow local edits too, kept on the device apart from the
+  set (a key change there is lost when the set updates): see docs/SPACES.md, "Read-only"
 - song notes/stickies
 
 information UI
@@ -127,7 +116,9 @@ offline
   DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
-- read-only spaces (built; being reworked, see docs/SPACES.md)
+- read-only spaces: local edits work and are kept; the "differs from official" button lists only a setlist
+  (a held-back song has no marker; Reset from Drive is its revert); the Worker role replaces the Drive-capabilities
+  trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is

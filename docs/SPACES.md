@@ -262,27 +262,31 @@ Google accounts.
 
 ## Read-only: local edits are never blocked
 
-Today (to be replaced): the mode is detected from the Drive folder's `capabilities` or a refused
-upload (`refreshAccess()`, `organisation-access.ts`) and kept as `readOnly` on the space record and
-in localStorage (`isReadOnlyOrganisation()`). A read-only sync pulls and stops; the UI offers
-nothing that changes what syncs (no edit mode, key or BPM change, add song, setlist details, new
-setlist, share button, import, "Add to my library"). This was built because a pull would drop such
-an edit, so it was blocked rather than kept. Under `drive.file` the trigger can never fire for a
-person with only read access to someone else's folder.
+**Built (2026-10-19).** A user who can only read the Drive folder edits everything a writer does:
+the `isReadOnlyOrganisation()` gates are gone (setlist page, library, home, imports, nav menu, the
+key and BPM controls). The one boolean left is `syncsBack()` (`organisation.ts`), and it removes
+only what needs Drive: sharing by link (the song list to paste stays).
+- The trigger is still Drive's folder `capabilities` or a refused upload (`refreshAccess()`,
+  `organisation-access.ts`), kept as `readOnly` on the space record and in localStorage. Under
+  `drive.file` it cannot fire for a person with only read access to someone else's folder, so until
+  the Worker reports a role this only covers a folder that really is read-only.
+- Their changes **stay on this device and are never pushed**. A pull leaves a record with local
+  changes alone, setlist or chart, even when Drive's copy has changed (`session.readOnly`,
+  `heldBack` in `sync/pull.ts`); a record they did not change follows Drive as usual. The sync says
+  "view-only: your changes stay on this device" and how many differ.
+- **Differs from official:** on the overview of a setlist the reader has changed, a small warning
+  button in the header (`#differs-button`) opens `setlist-differs`, which says so and offers "Put it
+  back to the official setlist" (`sync/revert.ts`: Drive's copy replaces the local one, keeping the
+  id and the device state). A held-back chart has no marker yet; "Reset from Google Drive" on the
+  Storage page is its revert.
+- The marker does not yet list *what* differs (their value, the official one, whether the official
+  one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
+  "Several people editing a setlist".
 
-The design (CLAUDE.md, "be permissive in the moment"): the Drive-capabilities trigger is removed;
-roles come from the Worker. The `isReadOnlyOrganisation()` gates (setlist-page, library, home,
-import views, nav-menu) are **removed**. The concept becomes one boolean, `syncsBack(space)`:
-- writer and up: local changes push by default.
-- reader: local changes **stay on this device and are not pushed or overwritten by default**. A pull
-  doesn't discard them: a record with local changes is skipped, marked "differs from official" with
-  a "revert to official" action. This is the minimal slice of the device-layer design
-  (SYNC_ARCHITECTURE.md, "Several people editing a setlist"); pull-skips-dirty is already the shape
-  of `songHasLocalChanges` / `setlistHasLocalChanges`.
-- Anyone (writer included) can choose "keep this set local" later; not in scope now.
-- The sync UI says "your changes stay on this device" rather than "view-only". A received share
-  (the `readOnly` page option) is the same idea: it is kept on the device on its own, so a local key
-  change there is harmless and should work too.
+**To do:** when the Worker reports roles, `syncsBack(space)` comes from the role and the
+Drive-capabilities trigger and the refusal counting can go. Anyone (a writer too) could choose "keep
+this set local" later. A received share (the `readOnly` page option) should allow local edits the
+same way: it is kept on the device on its own, so a key change there is harmless.
 
 ## Sync: what differs per space
 
@@ -347,7 +351,8 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
    Done: the core for songs, setlists and whole spaces (`src/js/space-transfer.ts`, tested on local
    databases). A move leaves a setlist that is in Drive in the source (deleting those is not built).
    Not done: the UI, and pads (Drive calls).
-5. [ ] Read-only rework: remove gates, `syncsBack`, pull-skips-dirty with "differs from official".
+5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
+   from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
 7. [ ] Worker broker: Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).

@@ -311,7 +311,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(dispatched[0]).to.equal('A')
     })
 
-    it('is not changed by a user who can only read, or with no song, or with no key', async () => {
+    it('is changed by a user who can only read too, but not with no song, or with no key', async () => {
       await rig.open()
       rig.page.showSong(0, true)
       await rig.page.handleKeyChange('')
@@ -319,12 +319,12 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(rig.page.songs[0].currentKey).to.equal('A')
       await setReadOnly()
       await rig.page.handleKeyChange('B')
-      expect(rig.page.songs[0].currentKey).to.equal('A')
+      expect(rig.page.songs[0].currentKey).to.equal('B')
       rig.page.showOverview(true)
       await rig.page.handleKeyChange('C')
     })
 
-    it('is shown on the selector, editable in edit mode and not by a reader', async () => {
+    it('is shown on the selector, editable in edit mode, for a reader too', async () => {
       await rig.open()
       rig.page.showSong(0, true)
       document.body.classList.add('edit-mode')
@@ -332,7 +332,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
       await setReadOnly()
       rig.page.updateKeySelector('D')
-      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(false)
+      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
     })
 
     it('has the selector set up once', async () => {
@@ -355,16 +355,14 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.page.handleBPMChange(100)
     })
 
-    it('is not changed by a user who can only read, or with no song', async () => {
+    it('is changed by a user who can only read too, but not with no song', async () => {
       await rig.open()
       await rig.page.handleBPMChange(80)
       expect(rig.page.songs[0].currentBPM).to.equal(90)
       rig.page.showSong(0, true)
       await setReadOnly()
       await rig.page.handleBPMChange(80)
-      expect(rig.page.songs[0].currentBPM).to.equal(90)
-      rig.page.updateSongSettingsPopover()
-      expect(popover().bpmLocked).to.equal(true)
+      expect(rig.page.songs[0].currentBPM).to.equal(80)
     })
   })
 
@@ -512,13 +510,13 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       expect(($('#musical-metadata') as unknown as { keyValue: string }).keyValue).to.equal('G')
     })
 
-    it('leaves the tempo of a user who can only read, and notes a song with no original key', async () => {
+    it('resets the tempo of a user who can only read too, and notes a song with no original key', async () => {
       await rig.open()
       rig.page.showSong(0, true)
       await setReadOnly()
       rig.page.songs[0].currentBPM = 111
       await rig.page.resetCurrentSong()
-      expect(rig.page.songs[0].currentBPM).to.equal(111)
+      expect(rig.page.songs[0].currentBPM).to.equal(rig.page.songs[0].metadata.tempo)
       rig.page.songs[0].originalKey = null
       await rig.page.resetCurrentSong()
     })

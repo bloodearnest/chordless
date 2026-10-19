@@ -4,12 +4,11 @@ import {
   createOrganisation,
   deleteOrganisation,
   getCurrentOrganisation,
-  isReadOnlyOrganisation,
   setCurrentOrganisation,
   setOrganisationReadOnly,
+  syncsBack,
 } from '../src/js/organisation.ts'
 import { refreshOrganisationAccess } from '../src/js/organisation-access.ts'
-import { READ_ONLY_CHANGE } from '../src/js/read-only-controller.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -40,48 +39,39 @@ describe('Knowing whether the user can write to the organisation folder', () => 
     if (before.id) await setCurrentOrganisation(before.id, before.name)
   })
 
-  it('asks Drive, keeps the answer, and says when it changes', async () => {
-    expect(isReadOnlyOrganisation()).to.equal(false)
-    const changes: number[] = []
-    const listener = () => changes.push(1)
-    window.addEventListener(READ_ONLY_CHANGE, listener)
+  it('asks Drive and keeps the answer', async () => {
+    expect(syncsBack()).to.equal(true)
 
     drive.readOnly = true
     await refreshOrganisationAccess()
-    expect(isReadOnlyOrganisation()).to.equal(true)
-    expect(changes).to.have.length(1)
-
-    await refreshOrganisationAccess()
-    expect(changes, 'no change, no event').to.have.length(1)
+    expect(syncsBack()).to.equal(false)
 
     drive.readOnly = false
     await refreshOrganisationAccess()
-    expect(isReadOnlyOrganisation()).to.equal(false)
-    expect(changes).to.have.length(2)
-    window.removeEventListener(READ_ONLY_CHANGE, listener)
+    expect(syncsBack()).to.equal(true)
   })
 
   it('is known again when the organisation is switched to', async () => {
     await setOrganisationReadOnly(organisationId, true)
-    expect(isReadOnlyOrganisation()).to.equal(true)
+    expect(syncsBack()).to.equal(false)
     await setCurrentOrganisation(before.id ?? organisationId, before.name)
-    if (before.id) expect(isReadOnlyOrganisation()).to.equal(false)
+    if (before.id) expect(syncsBack()).to.equal(true)
     await setCurrentOrganisation(organisationId)
-    expect(isReadOnlyOrganisation()).to.equal(true)
+    expect(syncsBack()).to.equal(false)
   })
 
   it('leaves what is known alone when Drive cannot be asked', async () => {
     await setOrganisationReadOnly(organisationId, true)
     drive.failRequests({ method: 'GET', status: 500, times: 5 })
     await refreshOrganisationAccess()
-    expect(isReadOnlyOrganisation()).to.equal(true)
+    expect(syncsBack()).to.equal(false)
   })
 
   it('leaves what is known alone when Drive does not say what the user can do', async () => {
     await setOrganisationReadOnly(organisationId, true)
     drive.omitCapabilities = true
     await refreshOrganisationAccess()
-    expect(isReadOnlyOrganisation()).to.equal(true)
+    expect(syncsBack()).to.equal(false)
   })
 
   it('does not ask Drive about an organisation that has no folder yet', async () => {

@@ -141,10 +141,10 @@ describe('the home view', () => {
     expect(view.querySelector('status-message[state="error"]')).to.not.equal(null)
   })
 
-  it('offers no way to create a setlist in a view-only organisation', async () => {
+  it('still offers a way to create a setlist in a view-only organisation', async () => {
     await setOrganisationReadOnly(organisationId, true)
     await open()
-    expect(view.querySelector('#create-setlist-button')).to.equal(null)
+    expect(view.querySelector('#create-setlist-button')).to.not.equal(null)
   })
 
   describe('creating a setlist', () => {

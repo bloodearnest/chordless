@@ -207,6 +207,8 @@ describe('the setlist page: corners', () => {
     rig.page.showSong(0, true)
     for (const selector of [
       '#share-button',
+      '#differs-button',
+      '#setlist-differs',
       '#live-button',
       '#setlist-share',
       '#app-header',
@@ -217,6 +219,7 @@ describe('the setlist page: corners', () => {
     }
     rig.page._showHeaderButtons(true)
     rig.page._setupShare()
+    rig.page._setupDiffers()
     rig.page._setupLive()
     rig.page._refreshLiveButton()
     rig.page._appHeaderEventsSetup = false

@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { useSyncRig } from './drive-harness.ts'
+import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
 
@@ -209,6 +209,66 @@ describe('Drive sync: organisations', () => {
       rig.drive.failRequests({ method: 'POST', path: /^\/upload\//, status: 500, times: 50 })
       await syncDevice(member)
       expect(member.memberCache.readOnly).to.equal(false)
+    })
+
+    it('keeps a setlist it changed when the leader changed it too, and says so', async () => {
+      const leader = await makeDevice('leader')
+      const setlist = await addSetlist(leader, { name: 'Sunday' })
+      await syncDevice(leader)
+      const member = await makeDevice('member')
+      await syncDevice(member)
+
+      rig.drive.readOnly = true
+      await editSetlist(member, setlist.id, { name: 'My key change' })
+      rig.drive.readOnly = false
+      await editSetlist(leader, setlist.id, { name: 'Leader change' })
+      await syncDevice(leader)
+      rig.drive.readOnly = true
+      const said: string[] = []
+      await member.sync.sync(progress => said.push(progress.message))
+
+      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('My key change')
+      expect(member.sync.heldBack).to.equal(1)
+      expect(said.at(-1)).to.contain('1 differ from Drive')
+      // Held back on every sync, until reverted: Drive's copy is still newer
+      await syncDevice(member)
+      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('My key change')
+    })
+
+    it('takes what the leader changed in a setlist it did not change', async () => {
+      const leader = await makeDevice('leader')
+      const setlist = await addSetlist(leader, { name: 'Sunday' })
+      await syncDevice(leader)
+      const member = await makeDevice('member')
+      await syncDevice(member)
+      await editSetlist(leader, setlist.id, { name: 'Leader change' })
+      await syncDevice(leader)
+      rig.drive.readOnly = true
+      await syncDevice(member)
+      expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
+      expect(member.sync.heldBack).to.equal(0)
+    })
+
+    it('keeps a chart it changed when the leader changed it too', async () => {
+      const leader = await makeDevice('leader')
+      await addSong(leader, { uuid: 'song-1', title: 'Alpha', content: '{title: Alpha}\n[G]one' })
+      await syncDevice(leader)
+      const member = await makeDevice('member')
+      await syncDevice(member)
+
+      rig.drive.readOnly = true
+      await editSong(member, 'song-1', '{title: Alpha}\n[G]mine')
+      rig.drive.readOnly = false
+      await editSong(leader, 'song-1', '{title: Alpha}\n[G]theirs')
+      await syncDevice(leader)
+      rig.drive.readOnly = true
+      const said: string[] = []
+      await member.sync.sync(progress => said.push(progress.message))
+
+      const song = must(await member.db.getSong('song-1'))
+      expect(must(await member.db.getChordPro(song.chordproFileId)).content).to.contain('mine')
+      expect(member.sync.heldBack).to.equal(1)
+      expect(said.at(-1)).to.contain('1 differ from Drive')
     })
 
     it('uploads again once the user is given write access', async () => {

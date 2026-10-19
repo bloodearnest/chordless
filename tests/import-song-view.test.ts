@@ -43,10 +43,9 @@ describe('the import song view', () => {
     expect(view.querySelector('song-import')).to.not.equal(null)
   })
 
-  it('says so, and offers no form, when the organisation is view-only', async () => {
+  it('still offers the form when the organisation is view-only', async () => {
     await setOrganisationReadOnly(organisationId, true)
     await show()
-    expect(view.querySelector('song-import')).to.equal(null)
-    expect(view.textContent).to.contain('view-only access')
+    expect(view.querySelector('song-import')).to.not.equal(null)
   })
 })

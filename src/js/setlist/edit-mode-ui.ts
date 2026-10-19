@@ -13,11 +13,11 @@ const FADE_MS = 250
 
 const all = (root: ParentNode, selector: string) => root.querySelectorAll<HTMLElement>(selector)
 
-/** Edit controls fade in, the normal ones out. `keyEditable` is false for a reader */
+/** Edit controls fade in, the normal ones out */
 export function enterEditMode(
   root: ParentNode,
   appHeader: AppHeader,
-  { keyEditable, capoEnabled }: { keyEditable: boolean; capoEnabled: boolean }
+  { capoEnabled }: { capoEnabled: boolean }
 ) {
   document.body.classList.add('edit-mode')
   document.body.setAttribute('data-edit-mode', '')
@@ -26,7 +26,7 @@ export function enterEditMode(
   const musicalMetadata = root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
   if (musicalMetadata) musicalMetadata.editMode = true
   const keySelector = root.querySelector<KeySelector>('#key-selector')
-  if (keySelector) keySelector.editMode = keyEditable
+  if (keySelector) keySelector.editMode = true
   const capoSelector = root.querySelector<CapoSelector>('#capo-selector')
   if (capoSelector && capoEnabled) capoSelector.editMode = true
 

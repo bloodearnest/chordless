@@ -47,8 +47,8 @@ they must be able to. Overly restrictive is an antipattern here.
 - Features that depend on how a group works (a leader pushing changes over a future WebRTC
   session) are opt-in: they add to what a lone user can do and never take it away.
 - Read-only (a reader of the Drive folder, or someone with a share link) should only stop writing
-  back to sync, never local edits: a last-minute key change must work for them too. (Today the
-  code blocks more than that: see the TODO.)
+  back to sync, never local edits: a last-minute key change must work for them too. (Built for a
+  reader of the Drive folder; a received share's page is still read-only, see the TODO.)
 
 ### Live use and messages
 

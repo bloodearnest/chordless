@@ -354,11 +354,11 @@ describe('the library view', () => {
       expect((await db.getAllSongs()).map(each => each.title)).to.deep.equal(['Beta Song'])
     })
 
-    it('is offered no copying in a view-only organisation', async () => {
+    it('is still offered copying in a view-only organisation', async () => {
       const song = await addChart(shared, BETA, ADD)
       await setOrganisationReadOnly(organisationId, true)
       await open({ name: 'songs', songUuid: song.uuid })
-      expect(view.querySelector('#add-to-library')).to.equal(null)
+      expect(view.querySelector('#add-to-library')).to.not.equal(null)
     })
 
     it('stays where it is when it cannot be copied', async () => {

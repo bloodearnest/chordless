@@ -287,11 +287,11 @@ describe('nav-menu', () => {
     expect(menu.dialog.style.top).to.equal('44px')
   })
 
-  it('leaves out the ways of adding songs in a view-only organisation', async () => {
+  it('keeps the ways of adding songs in a view-only organisation', async () => {
     localStorage.setItem('current-organisation-read-only', '1')
     try {
       const menu = await setUp('<nav-menu></nav-menu>')
-      expect(menu.shadowRoot.querySelector('a[href="/import-song"]')).to.equal(null)
+      expect(menu.shadowRoot.querySelector('a[href="/import-song"]')).to.not.equal(null)
     } finally {
       localStorage.removeItem('current-organisation-read-only')
     }

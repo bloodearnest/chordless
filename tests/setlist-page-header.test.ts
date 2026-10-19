@@ -16,6 +16,7 @@ import {
   MenuSongClickEvent,
   type NavMenu,
 } from '../src/components/nav-menu.ts'
+import { SetlistRevertedEvent } from '../src/components/setlist-differs.ts'
 import {
   SetlistInfoDeleteEvent,
   type SetlistInfoDialog,
@@ -303,13 +304,13 @@ describe('the setlist page: header, menu and keys', () => {
       expect(must(await rig.db.getSetlist(setlist.id)).modifiedDate).to.not.equal(before)
     })
 
-    it('does not let a user who can only read change a song’s key', async () => {
+    it('lets a user who can only read change a song’s key too', async () => {
       const { id } = getCurrentOrganisation()
       await setOrganisationReadOnly(must(id), true)
       await rig.open()
       rig.page.showSong(0, true)
       header().dispatchEvent(new EditModeToggleEvent())
-      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(false)
+      expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
       header().dispatchEvent(new EditModeToggleEvent())
       await wait(300)
     })
@@ -370,11 +371,11 @@ describe('the setlist page: header, menu and keys', () => {
       expect(($('.header-controls-slot') as HTMLElement).style.opacity).to.equal('1')
     })
 
-    it('offers the edit toggle on the overview only to one who can write the setlist', async () => {
+    it('offers the edit toggle on the overview to a user who can only read too', async () => {
       const { id } = getCurrentOrganisation()
       await setOrganisationReadOnly(must(id), true)
       await rig.open()
-      expect(header().showEditToggle).to.equal(false)
+      expect(header().showEditToggle).to.equal(true)
       await rig.page.updateHeader(rig.page.songs[0], true)
       expect(header().showEditToggle).to.equal(true)
     })
@@ -456,6 +457,53 @@ describe('the setlist page: header, menu and keys', () => {
     })
   })
 
+  describe('the differs-from-official button', () => {
+    const changedHere = { driveFileId: 'f', syncedContentHash: 'not-this' }
+
+    it('is on the overview of a changed setlist of a user who can only read, and opens its dialog', async () => {
+      const { id } = getCurrentOrganisation()
+      await setOrganisationReadOnly(must(id), true)
+      await rig.open(3, changedHere)
+      const button = must($<HTMLElement>('#differs-button'))
+      expect(button.hidden).to.equal(false)
+      rig.page.showSong(0, true)
+      await rig.page.updateHeader(rig.page.songs[0], true)
+      expect(button.hidden).to.equal(true)
+
+      const dialog = must($('#setlist-differs')) as unknown as HTMLElement & {
+        show(): void
+        setlist: unknown
+      }
+      let shown = 0
+      dialog.show = () => {
+        shown++
+      }
+      button.click()
+      expect(shown).to.equal(1)
+      expect((dialog.setlist as { id: string }).id).to.equal(rig.page.currentSetlistId)
+
+      const rendered: string[] = []
+      rig.page.renderSetlist = async (setlistId: string) => {
+        rendered.push(setlistId)
+      }
+      dialog.dispatchEvent(new SetlistRevertedEvent())
+      expect(rendered).to.deep.equal([rig.page.currentSetlistId])
+      // (and it is set up once)
+      rig.page._setupDiffers()
+      button.click()
+      expect(shown).to.equal(2)
+    })
+
+    it('is not there for a writer, or for a setlist that is as Drive has it', async () => {
+      await rig.open(3, changedHere)
+      expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
+      const { id } = getCurrentOrganisation()
+      await setOrganisationReadOnly(must(id), true)
+      await rig.open(3, { driveFileId: null })
+      expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
+    })
+  })
+
   describe('the info button', () => {
     it('shows the song’s info on a song, and the setlist’s on the overview', async () => {
       await rig.open()
@@ -490,7 +538,7 @@ describe('the setlist page: header, menu and keys', () => {
       await rig.page.showSetlistInfo()
     })
 
-    it('makes the setlist’s info read-only for a setlist received by link, or a reader', async () => {
+    it('makes the setlist’s info read-only for a setlist received by link', async () => {
       await rig.open(3, {}, { readOnly: true })
       const dialog = must($<SetlistInfoDialog>('#setlist-info-dialog'))
       dialog.show = async () => {}

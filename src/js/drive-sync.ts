@@ -160,6 +160,8 @@ export class DriveSyncManager implements SyncSession {
   pullIncomplete: boolean
   /** Whether the user can only read the folder, as the last check found (null: not asked) */
   readOnly: boolean | null
+  /** How many records the last pull left alone, for a user who can only read (sync/pull.ts) */
+  heldBack = 0
 
   /**
    * @param options.db - Database to sync. Defaults to the current organisation's database.
@@ -327,6 +329,7 @@ export class DriveSyncManager implements SyncSession {
       // Who the organisation's folder is shared with, for choosing leaders
       await this.refreshMembers()
       await this.refreshAccess()
+      this.heldBack = 0
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
@@ -363,7 +366,9 @@ export class DriveSyncManager implements SyncSession {
 
       progressCallback?.({
         stage: 'complete',
-        message: this.readOnly ? 'Sync complete (view-only: nothing uploaded)' : 'Sync complete!',
+        message: this.readOnly
+          ? `Sync complete (view-only: your changes stay on this device${this.heldBack ? `, ${this.heldBack} differ from Drive` : ''})`
+          : 'Sync complete!',
       })
     } catch (error) {
       console.error('[DriveSync] Sync failed:', error)

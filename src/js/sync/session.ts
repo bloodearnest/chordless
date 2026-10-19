@@ -41,6 +41,10 @@ export interface SyncSession {
 
   /** The setlist files in Drive, as listed by the last pull */
   liveSetlistFiles: DriveFile[] | null
+  /** Whether the user can only read the folder (null: not asked yet) */
+  readOnly: boolean | null
+  /** How many records the pull left alone because they have local changes that can't go back */
+  heldBack: number
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete: boolean
 

@@ -44,7 +44,6 @@ export class SongSettingsPopover extends LitElement {
     bpmValue: { type: Number, attribute: 'bpm-value' },
     bpmMin: { type: Number, attribute: 'bpm-min' },
     bpmMax: { type: Number, attribute: 'bpm-max' },
-    bpmLocked: { type: Boolean, attribute: 'bpm-locked' },
     mediaAvailable: { type: Boolean, attribute: false },
     padSetId: { type: String, attribute: false },
     padSets: { type: Array, attribute: false },
@@ -54,8 +53,6 @@ export class SongSettingsPopover extends LitElement {
   declare bpmValue: number
   declare bpmMin: number
   declare bpmMax: number
-  /** The BPM can't be changed (it is part of the setlist, which this user can't edit) */
-  declare bpmLocked: boolean
   /** The media player is on this device and switched on: its choices are shown */
   declare mediaAvailable: boolean
   /** This user's pad set for the song, if not the device's own */
@@ -192,7 +189,6 @@ export class SongSettingsPopover extends LitElement {
     this.bpmValue = 120
     this.bpmMin = 40
     this.bpmMax = 240
-    this.bpmLocked = false
     this.mediaAvailable = false
     this.padSetId = undefined
     this.padSets = []
@@ -297,7 +293,7 @@ export class SongSettingsPopover extends LitElement {
           <button
             class="control-button"
             @click=${this._handleBPMDecrement}
-            ?disabled=${this.bpmLocked || !canDecrementBPM}
+            ?disabled=${!canDecrementBPM}
             aria-label="Decrease BPM"
             type="button"
           >
@@ -307,7 +303,7 @@ export class SongSettingsPopover extends LitElement {
           <button
             class="control-button"
             @click=${this._handleBPMIncrement}
-            ?disabled=${this.bpmLocked || !canIncrementBPM}
+            ?disabled=${!canIncrementBPM}
             aria-label="Increase BPM"
             type="button"
           >
