@@ -291,13 +291,13 @@ test.describe('Storage page', () => {
       .locator('.organisation-item.current .organisation-name')
       .innerText()
 
-    await organisations.getByRole('button', { name: 'Create New Organisation' }).click()
-    await organisations.getByPlaceholder('New organisation name...').fill(current)
-    await organisations.getByRole('button', { name: 'Create Organisation' }).click()
+    await organisations.getByRole('button', { name: 'Create New Space' }).click()
+    await organisations.getByPlaceholder('New space name...').fill(current)
+    await organisations.getByRole('button', { name: 'Create Space' }).click()
     await expect(organisations.getByRole('alert')).toContainText('already exists')
 
-    await organisations.getByPlaceholder('New organisation name...').fill('Second Org')
-    await organisations.getByRole('button', { name: 'Create Organisation' }).click()
+    await organisations.getByPlaceholder('New space name...').fill('Second Org')
+    await organisations.getByRole('button', { name: 'Create Space' }).click()
     await expect(organisations.locator('.organisation-item')).toHaveCount(2)
 
     await organisations.getByRole('button', { name: 'Switch' }).click()

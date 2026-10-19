@@ -158,10 +158,10 @@ describe('select-organisation', () => {
       await open(el)
       await type(el, '   ')
       await submit(el)
-      expect(text(el)).to.contain('Please enter an organisation name')
+      expect(text(el)).to.contain('Please enter a space name')
       await type(el, other.name)
       await submit(el)
-      expect(text(el)).to.contain('An organisation with this name already exists')
+      expect(text(el)).to.contain('A space with this name already exists')
     })
 
     it('makes it, and lists it', async () => {
@@ -189,7 +189,7 @@ describe('select-organisation', () => {
       } finally {
         OrganisationDB.prototype.createOrganisation = realCreate
       }
-      expect(text(el)).to.contain('Failed to create organisation: disk full')
+      expect(text(el)).to.contain('Failed to create space: disk full')
       expect(el._creating).to.equal(false)
     })
 
@@ -204,7 +204,7 @@ describe('select-organisation', () => {
       } finally {
         OrganisationDB.prototype.createOrganisation = realCreate
       }
-      expect(text(el)).to.contain('Failed to create organisation: plain text')
+      expect(text(el)).to.contain('Failed to create space: plain text')
     })
   })
 
@@ -244,7 +244,7 @@ describe('select-organisation', () => {
         const el = await fixture<SelectOrganisation>(
           html`<select-organisation></select-organisation>`
         )
-        await waitUntil(() => text(el).includes('No organisations found'), 'it says so')
+        await waitUntil(() => text(el).includes('No spaces found'), 'it says so')
       } finally {
         OrganisationDB.prototype.getAllOrganisations = realAll
       }

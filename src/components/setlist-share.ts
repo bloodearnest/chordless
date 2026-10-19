@@ -483,7 +483,7 @@ export class SetlistShare extends LitElement {
   _renderNotShared() {
     return html`
       <p>
-        Make a link to this setlist for people outside your Chordless organisation, whether or not
+        Make a link to this setlist for people outside your Chordless space, whether or not
         they use Chordless.
       </p>
       <ul>

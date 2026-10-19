@@ -88,7 +88,7 @@ export class OrganisationFolderMismatchError extends Error {
   constructor(count: number, folderName: string) {
     super(
       `${count} setlist(s)/song(s) on this device are stored in a different Google Drive ` +
-        `folder than "${folderName}", the one this organisation now syncs with. ` +
+        `folder than "${folderName}", the one this space now syncs with. ` +
         `Nothing was synced, to avoid uploading them again as duplicates.`
     )
     this.name = 'OrganisationFolderMismatchError'
@@ -250,8 +250,8 @@ export class DriveSyncManager implements SyncSession {
       const folder = await DriveAPI.getFile(linkedId, 'id,name,trashed')
       if (!folder || folder.trashed) {
         throw new Error(
-          `This organisation's Google Drive folder ${folder ? `"${folder.name}" is in the Drive trash` : 'no longer exists'}. ` +
-            'Restore it from the Drive trash, or reset this organisation, before syncing.'
+          `This space's Google Drive folder ${folder ? `"${folder.name}" is in the Drive trash` : 'no longer exists'}. ` +
+            'Restore it from the Drive trash, or reset this space, before syncing.'
         )
       }
       this.driveFolderId = folder.id

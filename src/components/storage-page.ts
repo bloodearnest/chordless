@@ -366,9 +366,9 @@ export class StoragePage extends LitElement {
   _renderOrganisationSection() {
     return html`
       <div class="panel">
-        <h3>🏢 Organisation</h3>
+        <h3>🏢 Space</h3>
         <p>
-          Select which organisation you're currently working with. Each organisation has its own
+          Select which space you're currently working with. Each space has its own
           setlists.
         </p>
         <select-organisation></select-organisation>
@@ -428,7 +428,7 @@ export class StoragePage extends LitElement {
         type="confirm"
         heading="Clear local data?"
         confirm-label="Clear Local Data"
-        message="This deletes this organisation's setlists and songs on this device, and all settings. Anything not yet synced to Google Drive is lost. This can't be undone."
+        message="This deletes this space's setlists and songs on this device, and all settings. Anything not yet synced to Google Drive is lost. This can't be undone."
       ></app-modal>
       <app-modal
         ${ref(this._logoutModal)}

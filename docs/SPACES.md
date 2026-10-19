@@ -355,6 +355,12 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
 2. [ ] Spike (above).
 3. [ ] Space abstraction: space id + `driveFolderId` identity, folder-location Picker on create,
    shared-drive flags, no name matching, per-space transport.
+   Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
+   `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
+   **not yet against a real shared drive**: spike 2). The folder is already found by `driveFolderId`
+   after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
+   The UI now says "space" (Storage page, creating and switching, sync errors, the share and differs
+   dialogs); code, tests' identifiers and older docs still say "organisation".
 4. [ ] Copy/move between spaces (songs, setlists, pads, whole space); migrate personal data.
    Done: the core for songs, setlists and whole spaces (`src/js/space-transfer.ts`, tested on local
    databases). A move leaves a setlist that is in Drive in the source (deleting those is not built).

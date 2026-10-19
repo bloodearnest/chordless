@@ -77,7 +77,7 @@ export class SetlistDiffers extends LitElement {
     return html`
       <app-modal ${ref(this._dialog)} size="medium" heading="Differs from the official setlist">
         <p>
-          You can only read this organisation's Google Drive folder, so the changes you made to
+          You can only read this space's Google Drive folder, so the changes you made to
           this setlist stay on this device and are not uploaded. If the leader changes the
           setlist in Drive, their version replaces yours at the next sync.
         </p>

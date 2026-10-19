@@ -178,11 +178,11 @@ export class SelectOrganisation extends LitElement {
 
     const name = this._newOrganisationName.trim()
     if (!name) {
-      this._formError = 'Please enter an organisation name'
+      this._formError = 'Please enter a space name'
       return
     }
     if (this._orgs.value?.organisations.some(org => org.name === name)) {
-      this._formError = 'An organisation with this name already exists'
+      this._formError = 'A space with this name already exists'
       return
     }
 
@@ -199,20 +199,20 @@ export class SelectOrganisation extends LitElement {
       this._newOrganisationName = ''
     } catch (error) {
       console.error('Failed to create organisation:', error)
-      this._formError = `Failed to create organisation: ${error instanceof Error ? error.message : error}`
+      this._formError = `Failed to create space: ${error instanceof Error ? error.message : error}`
     } finally {
       this._creating = false
     }
   }
 
   override render() {
-    const loading = () => html`<div class="loading">Loading organisations...</div>`
+    const loading = () => html`<div class="loading">Loading spaces...</div>`
     return this._orgs.render({
       initial: loading,
       pending: loading,
       complete: ({ organisations, current }) => this._renderOrganisations(organisations, current),
       error: error =>
-        html`<p class="form-error" role="alert">Couldn't load organisations: ${error instanceof Error ? error.message : error}</p>`,
+        html`<p class="form-error" role="alert">Couldn't load spaces: ${error instanceof Error ? error.message : error}</p>`,
     })
   }
 
@@ -222,7 +222,7 @@ export class SelectOrganisation extends LitElement {
         ${
           organisations.length === 0
             ? html`<div class="empty-state">
-                <p>No organisations found. Create your first organisation to get started.</p>
+                <p>No spaces found. Create your first space to get started.</p>
               </div>`
             : ''
         }
@@ -259,7 +259,7 @@ export class SelectOrganisation extends LitElement {
                 <input
                   class="field"
                   type="text"
-                  placeholder="New organisation name..."
+                  placeholder="New space name..."
                   .value=${this._newOrganisationName}
                   @input=${this._handleNameInput}
                   ?disabled=${this._creating}
@@ -280,7 +280,7 @@ export class SelectOrganisation extends LitElement {
                     Cancel
                   </button>
                   <button type="submit" class="btn primary" ?disabled=${this._creating}>
-                    ${this._creating ? 'Creating...' : 'Create Organisation'}
+                    ${this._creating ? 'Creating...' : 'Create Space'}
                   </button>
                 </div>
               </form>
@@ -288,7 +288,7 @@ export class SelectOrganisation extends LitElement {
             : html`
               <button class="btn block success" @click=${this._toggleCreateForm}>
                 <app-icon name="add" size="20"></app-icon>
-                Create New Organisation
+                Create New Space
               </button>
             `
         }
@@ -297,7 +297,7 @@ export class SelectOrganisation extends LitElement {
           ${ref(this._switchModal)}
           type="confirm"
           size="small"
-          heading="Switch organisation?"
+          heading="Switch space?"
           confirm-label="Switch"
         ></app-modal>
       </div>
