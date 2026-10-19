@@ -201,7 +201,12 @@ redesign. Not now: per-team accounts need Chordless to hold a key-minting creden
 Account/Key Admin) and many keys in Durable Objects under one master secret, so a Worker compromise
 still reaches them all; they'd mainly help against a single leaked key, per-team revocation, audit
 clarity and per-identity rate limits (Google's 100-accounts-per-project default is a further limit).
-Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
+For the real service account, use a **dedicated project with a tidy id** (the address a team admin
+sees in their shared drive's members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id
+cannot be renamed: the app's own project is `setalight`, from its first name), separate from the project
+that holds the OAuth client and the verified brand, so the key that can reach every connected team's drive
+sits apart from the sign-in project. The spike uses `chordless-broker@setalight…` in the app's own
+project, which is fine for a test. Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
 service account (the team uploads its own key; isolation, but real setup friction for a church).
 
 Roles, pads and conflicts are identical in both modes (the Worker enforces them either way); only
