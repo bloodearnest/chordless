@@ -58,8 +58,11 @@
         at the end. Sign in first (Storage page). docs/SPACES.md, "Spike first", items 2 and 3.
       </p>
       <label>
-        Parent folder id (empty: your My Drive root, which checks the flags do no harm; a folder
-        in a shared drive checks spike item 2)
+        Parent folder id (empty: your My Drive root, which checks the flags do no harm). A folder in
+        a shared drive only works if this app made it or you picked it with the Google Picker:
+        under <code>drive.file</code> any other folder is refused whatever the flags say, so a
+        failure on the first step there is the scope, not the flags (the Picker is not on this
+        page yet)
         <input type="text" id="parent" placeholder="empty for My Drive" />
       </label>
       <label

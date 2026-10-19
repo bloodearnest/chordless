@@ -353,7 +353,9 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
 page) makes a folder, then creates, lists, gets, updates, downloads, reads permissions, batch
 deletes and trashes with the app's own `drive-api.ts` calls, and also tries `/about` with the flag.
 Empty parent: your My Drive (checks the flags do no harm to everyone's sync). A folder id in a shared
-drive: item 2, for the owner's token. Needs one account; items 1, 5 and 6 still need two.
+drive is spike item 2, but under `drive.file` the token only sees a folder the app made or the user
+picked, so it needs the Google Picker first (not on the page yet): without it, a refusal on the first
+step is the scope, not the flags. Needs one account; items 1, 5 and 6 still need two.
 
 ## Order of work and status
 
