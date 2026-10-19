@@ -137,6 +137,23 @@ async function run() {
     })
   }
 
+  await step('changes.list (what a periodic pull could use)', async () => {
+    const start = await driveRequest('/changes/startPageToken?supportsAllDrives=true')
+    // Make a change after the token, then ask what changed since
+    const file = await createFile({ name: 'probe-change.txt', parents: [folderId] }, 'x')
+    const changes = await driveRequest(
+      `/changes?pageToken=${encodeURIComponent(start.startPageToken)}&supportsAllDrives=true&includeItemsFromAllDrives=true&fields=newStartPageToken,changes(fileId,removed,file(name))`
+    )
+    const seen = (changes.changes || []).some(change => change.fileId === file.id)
+    await batchDeleteFiles([file.id])
+    return {
+      ok: seen,
+      detail: seen
+        ? `saw the new file among ${changes.changes.length} change(s)`
+        : `did not see the new file (${(changes.changes || []).length} change(s)): poll by listing instead`,
+    }
+  })
+
   await step('/about (no flags: what checkDriveAccess sends)', async () => {
     const about = await driveRequest('/about?fields=user')
     return { detail: about.user?.emailAddress }

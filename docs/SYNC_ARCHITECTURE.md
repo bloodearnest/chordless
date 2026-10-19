@@ -415,6 +415,38 @@ going back home. In the service worker it completes regardless.
   will include it.
 - Skipped silently when offline, not signed in, or sync isn't set up.
 
+#### Pulling while the app is open (designed 2026-10-19, not built)
+
+Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
+only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
+be pressed, so pulls must come on their own. The pull is a **timer in the open page** (or the
+service worker while a page is open), not a browser background task: Periodic Background Sync is
+Chromium-only, for installed apps, with an interval the browser picks (hours), and absent on iPad.
+It can be an optional extra for a closed, installed app.
+
+| State | Pull |
+|---|---|
+| App open | about every 60 s |
+| A setlist is **live** | about every 15 s, and at once when the tab becomes visible or the device comes back online |
+| Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
+| A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
+
+The intervals are named constants, not preferences.
+
+- **Cheap:** a live setlist polls its own file (`files.get` with `md5Checksum,modifiedTime`) and
+  pulls only if it differs. The general poll can use Drive's `changes.list` from a stored page
+  token (one request returns every file changed since, charts included) instead of listing the
+  folders. Unverified under `drive.file`: the shared-drive probe (`/dev/shared-drive-probe.html`)
+  checks it; the fallback is listing the folders. Via the Worker broker (docs/SPACES.md) the same
+  call is a Worker route.
+- **Same lock and guards as the push:** the Web Lock `chordless-sync`, skipped when offline or
+  signed out; never alongside a full sync.
+- **A pull that changes the open setlist applies in place:** the page follows its setlist record.
+  It stays on the current song by song id, says what changed with the same summary as the reader's
+  toast (`sync/setlist-diff.ts`), and a reader whose changes were replaced can Undo. A leader's
+  late song must never be held back, in or out of live mode (CLAUDE.md, "permissive in the
+  moment"). WebRTC pushes feed the same step.
+
 #### Why nothing new needs storing
 
 A dropped push leaves the record "changed since last sync" (its content hash differs

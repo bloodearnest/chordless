@@ -126,7 +126,8 @@ offline
 storage/sync
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). Still to do:
-  applying a setlist that arrives while it is open or live (immediate sync, WebRTC), see docs/SPACES.md; the Worker role replaces the Drive-capabilities
+  applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
+  app is open: docs/SYNC_ARCHITECTURE.md, "Pulling while the app is open"; the Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)
