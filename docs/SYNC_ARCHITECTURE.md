@@ -439,6 +439,14 @@ The intervals are named constants, not preferences.
   folders. Unverified under `drive.file`: the shared-drive probe (`/dev/shared-drive-probe.html`)
   checks it; the fallback is listing the folders. Via the Worker broker (docs/SPACES.md) the same
   call is a Worker route.
+- **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
+  `md5Checksum`, compared with the record's `driveChecksum`; only if it differs, `pullSetlistNow(id)`
+  (the pull-side twin of `pushSetlistNow`: the same conflict rule as the full pull, nothing else is
+  listed or touched). The setlist may now use a song this device has never had, so that pull also
+  fetches the charts the setlist needs and the device lacks, found by their `songUuid` property
+  (`files.list` with `appProperties has { key='songUuid' and value='…' }`), as there is no Drive
+  file id for them yet. A chart already in the setlist that the leader fixed does not change the
+  setlist's file: the 60 s general poll picks that up.
 - **Same lock and guards as the push:** the Web Lock `chordless-sync`, skipped when offline or
   signed out; never alongside a full sync.
 - **A pull that changes the open setlist applies in place:** the page follows its setlist record.
