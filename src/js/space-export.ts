@@ -1,8 +1,8 @@
 /**
- * Backing up a space to a zip file, and restoring one (docs/SPACES.md, "Backup and restore").
+ * Exporting a space to a zip file, and importing one (docs/SPACES.md, "Export and import").
  * The zip holds what the user would want back: every chart as a `.cho` file, the setlists as JSON,
  * and (only if asked, as they are large) the pad sets. Nothing of Drive is in it (no file ids, no
- * share links), so it can be restored into any space, on any account.
+ * share links), so it can be imported into any space, on any account.
  *
  *   manifest.json                what and when, and how much
  *   songs.json                   each chart's record (its identity, variant, key, tempo)
@@ -10,7 +10,7 @@
  *   setlists/<date>-<name>-<id>.json
  *   pads/<set>/<KEY>.mp3
  *
- * A restore adds what the space lacks and skips what it has (charts by content, setlists by id),
+ * An import adds what the space lacks and skips what it has (charts by content, setlists by id),
  * so running it twice adds nothing; it deletes nothing.
  */
 import type { Setlist, SongRecord } from './data-types.ts'
@@ -22,24 +22,24 @@ import { setlistContent } from './sync/setlist-hash.ts'
 import { hashText } from './utils/hash.ts'
 import { readZip, writeZip, type ZipFile } from './utils/zip.ts'
 
-export const BACKUP_FORMAT = 'chordless-backup'
-const BACKUP_VERSION = 1
+export const EXPORT_FORMAT = 'chordless-export'
+const EXPORT_VERSION = 1
 
 /** What manifest.json says */
-export interface BackupManifest {
-  format: typeof BACKUP_FORMAT
+export interface ExportManifest {
+  format: typeof EXPORT_FORMAT
   version: number
-  /** ISO time the backup was made */
+  /** ISO time the export was made */
   created: string
-  /** The space's name, to name a new space it is restored into */
+  /** The name of the space it was exported from */
   space: string
   counts: { songs: number; setlists: number; padSets: number }
   /** The pad sets in the file, by name (their files are under `pads/<dir>/`) */
   padSets: { name: string; dir: string }[]
 }
 
-/** The fields of a chart's record that a backup keeps */
-type BackupSong = Pick<
+/** The fields of a chart's record that an export keeps */
+type ExportSong = Pick<
   SongRecord,
   | 'uuid'
   | 'id'
@@ -63,9 +63,9 @@ type BackupSong = Pick<
   | 'modifiedDate'
 > & { file: string }
 
-/** A backup file read into memory */
-export interface Backup {
-  manifest: BackupManifest
+/** An export file read into memory */
+export interface SpaceExport {
+  manifest: ExportManifest
   songs: SongRecord[]
   chordpro: Map<string, string>
   setlists: Setlist[]
@@ -86,33 +86,33 @@ function slug(text: string): string {
 
 const shortId = (id: string) => id.replace(/[^A-Za-z0-9]/g, '').slice(0, 8)
 
-/** A pad set to put in a backup: its name and its audio by key */
-export interface BackupPadSet {
+/** A pad set to put in an export: its name and its audio by key */
+export interface ExportPadSet {
   name: string
   audio: Map<string, ArrayBuffer | Uint8Array>
 }
 
-/** Read pad sets from Drive for a backup (the user is signed in, and online) */
-export async function readPadSetsForBackup(padSets: PadSet[]): Promise<BackupPadSet[]> {
-  const read: BackupPadSet[] = []
+/** Read pad sets from Drive for an export (the user is signed in, and online) */
+export async function readPadSetsForExport(padSets: PadSet[]): Promise<ExportPadSet[]> {
+  const read: ExportPadSet[] = []
   for (const padSet of padSets)
     read.push({ name: padSet.name, audio: await readPadSetAudio(padSet) })
   return read
 }
 
 /**
- * Make the backup zip of a space: all its charts and setlists, and the given pad sets (none by
+ * Make the export zip of a space: all its charts and setlists, and the given pad sets (none by
  * default).
  */
-export async function createBackup(
+export async function createExport(
   db: ChordlessDB,
   spaceName: string,
-  padSets: BackupPadSet[] = [],
+  padSets: ExportPadSet[] = [],
   now = new Date()
 ): Promise<Blob> {
   const files: ZipFile[] = []
 
-  const songs: BackupSong[] = []
+  const songs: ExportSong[] = []
   for (const song of await db.getAllSongs()) {
     const chordpro = await db.getChordPro(song.chordproFileId)
     if (!chordpro) continue
@@ -153,7 +153,7 @@ export async function createBackup(
     setlistCount++
   }
 
-  const padEntries: BackupManifest['padSets'] = []
+  const padEntries: ExportManifest['padSets'] = []
   for (const padSet of padSets) {
     const dir = `${slug(padSet.name)}-${padEntries.length + 1}`
     padEntries.push({ name: padSet.name, dir })
@@ -168,9 +168,9 @@ export async function createBackup(
     }
   }
 
-  const manifest: BackupManifest = {
-    format: BACKUP_FORMAT,
-    version: BACKUP_VERSION,
+  const manifest: ExportManifest = {
+    format: EXPORT_FORMAT,
+    version: EXPORT_VERSION,
     created: now.toISOString(),
     space: spaceName,
     counts: { songs: songs.length, setlists: setlistCount, padSets: padEntries.length },
@@ -186,41 +186,41 @@ export async function createBackup(
   )
 }
 
-/** The file name to offer for a backup */
-export function backupFileName(spaceName: string, now = new Date()): string {
-  return `chordless-backup-${slug(spaceName)}-${now.toISOString().slice(0, 10)}.zip`
+/** The file name to offer for an export */
+export function exportFileName(spaceName: string, now = new Date()): string {
+  return `chordless-export-${slug(spaceName)}-${now.toISOString().slice(0, 10)}.zip`
 }
 
-/** Read a backup zip. Throws, with a reason, if it is not one this version can read. */
-export async function readBackup(file: Blob): Promise<Backup> {
+/** Read an export zip. Throws, with a reason, if it is not one this version can read. */
+export async function readExport(file: Blob): Promise<SpaceExport> {
   let zip: Awaited<ReturnType<typeof readZip>>
   try {
     zip = await readZip(file)
   } catch {
-    throw new Error('That file is not a backup: it is not a ZIP file')
+    throw new Error('That file is not a Chordless export: it is not a ZIP file')
   }
   const byName = new Map(zip.entries.map(entry => [entry.fileName, entry]))
   const text = async (name: string) => {
     const entry = byName.get(name)
-    if (!entry) throw new Error(`That file is not a Chordless backup: ${name} is missing`)
+    if (!entry) throw new Error(`That file is not a Chordless export: ${name} is missing`)
     return new TextDecoder().decode(await zip.read(entry))
   }
 
-  let manifest: BackupManifest
+  let manifest: ExportManifest
   try {
     manifest = JSON.parse(await text('manifest.json'))
   } catch (error) {
     if ((error as Error).message.includes('missing')) throw error
-    throw new Error('That file is not a Chordless backup: its manifest cannot be read')
+    throw new Error('That file is not a Chordless export: its manifest cannot be read')
   }
-  if (manifest.format !== BACKUP_FORMAT) throw new Error('That file is not a Chordless backup')
-  if (manifest.version > BACKUP_VERSION) {
-    throw new Error('That backup was made by a newer Chordless: update the app to restore it')
+  if (manifest.format !== EXPORT_FORMAT) throw new Error('That file is not a Chordless export')
+  if (manifest.version > EXPORT_VERSION) {
+    throw new Error('That export was made by a newer Chordless: update the app to import it')
   }
 
   const chordpro = new Map<string, string>()
   const songs: SongRecord[] = []
-  for (const song of JSON.parse(await text('songs.json')) as BackupSong[]) {
+  for (const song of JSON.parse(await text('songs.json')) as ExportSong[]) {
     const content = await text(song.file)
     chordpro.set(song.file, content)
     const { file: chordproFileId, ...record } = song
@@ -257,40 +257,43 @@ export async function readBackup(file: Blob): Promise<Backup> {
   }
 }
 
-/** What a restore reads from */
-function sourceOf(backup: Backup): TransferSource {
+/** What an import reads from */
+function sourceOf(exported: SpaceExport): TransferSource {
   return {
-    getAllSongs: async () => backup.songs,
+    getAllSongs: async () => exported.songs,
     getChordPro: async id => {
-      const content = backup.chordpro.get(id)
+      const content = exported.chordpro.get(id)
       return content === undefined ? undefined : { content }
     },
-    getAllSetlists: async () => backup.setlists,
+    getAllSetlists: async () => exported.setlists,
   }
 }
 
 /**
- * Add what a backup holds to a space: the charts it lacks (the same chart is never added twice),
+ * Add what an export holds to a space: the charts it lacks (the same chart is never added twice),
  * and the setlists whose ids it lacks, with their ids. Deletes nothing, and can be run again.
  */
-export function restoreBackup(backup: Backup, destination: ChordlessDB): Promise<TransferReport> {
-  return transferSpace(sourceOf(backup), destination, 'restore', 'backup')
+export function importIntoSpace(
+  exported: SpaceExport,
+  destination: ChordlessDB
+): Promise<TransferReport> {
+  return transferSpace(sourceOf(exported), destination, 'import', 'import')
 }
 
 /**
- * Put pad sets from a backup into Drive (the user is signed in). A pad set with the same name as
- * one in Drive replaces it. Returns the names restored.
+ * Put pad sets from an export into Drive (the user is signed in). A pad set with the same name as
+ * one in Drive replaces it. Returns the names imported.
  */
-export async function restorePadSets(backup: Backup, names: string[]): Promise<string[]> {
-  const restored: string[] = []
-  for (const { name, dir } of backup.manifest.padSets) {
+export async function importPadSets(exported: SpaceExport, names: string[]): Promise<string[]> {
+  const imported: string[] = []
+  for (const { name, dir } of exported.manifest.padSets) {
     if (!names.includes(name)) continue
-    const audio = await backup.padAudio(dir)
+    const audio = await exported.padAudio(dir)
     const zip = await writeZip(
       [...audio].map(([key, data]) => ({ name: `${key}.mp3`, data, compress: false }))
     )
     await uploadPadSet(new File([zip], `${name}.zip`), name)
-    restored.push(name)
+    imported.push(name)
   }
-  return restored
+  return imported
 }

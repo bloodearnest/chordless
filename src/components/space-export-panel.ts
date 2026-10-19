@@ -1,28 +1,28 @@
 import { css, html, LitElement, nothing } from 'lit'
-import {
-  type Backup,
-  backupFileName,
-  createBackup,
-  readBackup,
-  readPadSetsForBackup,
-  restoreBackup,
-  restorePadSets,
-} from '../js/backup.ts'
 import { getCurrentDB } from '../js/db.ts'
 import { getCurrentOrganisation } from '../js/organisation.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
+import {
+  createExport,
+  exportFileName,
+  importIntoSpace,
+  importPadSets,
+  readExport,
+  readPadSetsForExport,
+  type SpaceExport,
+} from '../js/space-export.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
-/** The pad sets in Drive that a backup could include, with their sizes */
+/** The pad sets in Drive that an export could include, with their sizes */
 interface PadSetChoice {
   padSet: PadSet
   bytes: number
 }
 
-/** A restore the user has chosen a file for and not yet confirmed */
-interface PendingRestore {
-  backup: Backup
+/** An import the user has chosen a file for and not yet confirmed */
+interface PendingImport {
+  exported: SpaceExport
   pads: boolean
 }
 
@@ -32,11 +32,11 @@ export function megabytes(bytes: number): string {
 }
 
 /**
- * Backing up the current space to a zip file, and restoring one (docs/SPACES.md, "Backup and
- * restore"). The pad sets are large, so they go in only if the user ticks them, with their size
+ * Exporting the current space to a zip file, and importing one (docs/SPACES.md, "Export and
+ * import"). The pad sets are large, so they go in only if the user ticks them, with their size
  * shown; they live in the signed-in account's Drive, so they need the user signed in.
  */
-export class BackupPanel extends LitElement {
+export class SpaceExportPanel extends LitElement {
   static override properties = {
     signedIn: { type: Boolean, attribute: 'signed-in' },
     _padSets: { state: true },
@@ -89,7 +89,7 @@ export class BackupPanel extends LitElement {
   declare _includePads: boolean
   declare _busy: boolean
   declare _message: { text: string; kind: 'info' | 'error' } | null
-  declare _pending: PendingRestore | null
+  declare _pending: PendingImport | null
 
   constructor() {
     super()
@@ -123,7 +123,7 @@ export class BackupPanel extends LitElement {
         sets.map(async padSet => ({ padSet, bytes: await padSetSize(padSet) }))
       )
     } catch {
-      // (offline, or Drive would not say: the backup is then of the space alone)
+      // (offline, or Drive would not say: the export is then of the space alone)
       this._padSets = []
       this._includePads = false
     }
@@ -140,20 +140,20 @@ export class BackupPanel extends LitElement {
       const db = await getCurrentDB()
       const name = getCurrentOrganisation().name
       const pads = this._includePads
-        ? await readPadSetsForBackup(this._padSets.map(set => set.padSet))
+        ? await readPadSetsForExport(this._padSets.map(set => set.padSet))
         : []
-      const blob = await createBackup(db, name, pads)
+      const blob = await createExport(db, name, pads)
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
-      link.download = backupFileName(name)
+      link.download = exportFileName(name)
       link.click()
       setTimeout(() => URL.revokeObjectURL(link.href), 10_000)
       this._message = {
-        text: `Backup saved as ${link.download} (${megabytes(blob.size)}).`,
+        text: `Exported as ${link.download} (${megabytes(blob.size)}).`,
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: `Making the backup failed: ${errorMessage(error)}`, kind: 'error' }
+      this._message = { text: `Exporting failed: ${errorMessage(error)}`, kind: 'error' }
     } finally {
       this._busy = false
     }
@@ -166,55 +166,55 @@ export class BackupPanel extends LitElement {
     if (!file) return
     this._message = null
     try {
-      const backup = await readBackup(file)
-      this._pending = { backup, pads: false }
+      const exported = await readExport(file)
+      this._pending = { exported, pads: false }
     } catch (error) {
       this._pending = null
       this._message = { text: errorMessage(error), kind: 'error' }
     }
   }
 
-  async _restore() {
+  async _import() {
     const pending = this._pending
     if (!pending) return
     this._busy = true
     this._message = null
     try {
-      const { backup } = pending
+      const { exported } = pending
       const where = getCurrentOrganisation().name
-      const report = await restoreBackup(backup, await getCurrentDB())
+      const report = await importIntoSpace(exported, await getCurrentDB())
       const pads =
         pending.pads && this.signedIn
-          ? await restorePadSets(
-              backup,
-              backup.manifest.padSets.map(set => set.name)
+          ? await importPadSets(
+              exported,
+              exported.manifest.padSets.map(set => set.name)
             )
           : []
       this._pending = null
       this._message = {
         text:
-          `Restored into this space (${where}): ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
+          `Imported into this space (${where}): ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
           `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
           (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
           '.',
         kind: 'info',
       }
     } catch (error) {
-      this._message = { text: `Restoring failed: ${errorMessage(error)}`, kind: 'error' }
+      this._message = { text: `Importing failed: ${errorMessage(error)}`, kind: 'error' }
     } finally {
       this._busy = false
     }
   }
 
-  _renderPending(pending: PendingRestore) {
-    const { manifest } = pending.backup
+  _renderPending(pending: PendingImport) {
+    const { manifest } = pending.exported
     const { songs, setlists, padSets } = manifest.counts
     const when = new Date(manifest.created).toLocaleString()
     return html`
       <fieldset>
-        <legend>Restore this backup into ${getCurrentOrganisation().name}</legend>
+        <legend>Import this export into ${getCurrentOrganisation().name}</legend>
         <p class="meta">
-          Backup of ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
+          Exported from ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
             padSets > 0 ? html`, ${padSets} pad sets` : nothing
           }. Nothing is deleted: only what is missing is added.
         </p>
@@ -224,7 +224,7 @@ export class BackupPanel extends LitElement {
               ? html`<label>
                 <input
                   type="checkbox"
-                  id="restore-pads"
+                  id="import-pads"
                   .checked=${pending.pads}
                   ?disabled=${!this.signedIn}
                   @change=${(event: Event) => {
@@ -238,10 +238,10 @@ export class BackupPanel extends LitElement {
               : nothing
           }
           <div>
-            <button class="btn primary" id="restore" ?disabled=${this._busy} @click=${() => this._restore()}>
-              ${this._busy ? 'Restoring…' : 'Restore'}
+            <button class="btn primary" id="import" ?disabled=${this._busy} @click=${() => this._import()}>
+              ${this._busy ? 'Importing…' : 'Import'}
             </button>
-            <button class="btn" id="restore-cancel" ?disabled=${this._busy} @click=${() => {
+            <button class="btn" id="import-cancel" ?disabled=${this._busy} @click=${() => {
               this._pending = null
             }}>
               Cancel
@@ -271,11 +271,11 @@ export class BackupPanel extends LitElement {
             : nothing
         }
         <div>
-          <button class="btn primary" id="download-backup" ?disabled=${this._busy} @click=${() => this._download()}>
-            ${this._busy && !this._pending ? 'Making the backup…' : '💾 Download a backup'}
+          <button class="btn primary" id="export-space" ?disabled=${this._busy} @click=${() => this._download()}>
+            ${this._busy && !this._pending ? 'Exporting…' : '📦 Export this space'}
           </button>
-          <button class="btn" id="choose-backup" ?disabled=${this._busy} @click=${() => this.shadowRoot?.querySelector<HTMLInputElement>('input[type=file]')?.click()}>
-            📤 Restore from a backup…
+          <button class="btn" id="choose-export" ?disabled=${this._busy} @click=${() => this.shadowRoot?.querySelector<HTMLInputElement>('input[type=file]')?.click()}>
+            📥 Import a Chordless export…
           </button>
           <input type="file" accept=".zip,application/zip" @change=${(event: Event) => this._fileChosen(event)} />
         </div>
@@ -294,10 +294,10 @@ export class BackupPanel extends LitElement {
     `
   }
 }
-customElements.define('backup-panel', BackupPanel)
+customElements.define('space-export-panel', SpaceExportPanel)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'backup-panel': BackupPanel
+    'space-export-panel': SpaceExportPanel
   }
 }

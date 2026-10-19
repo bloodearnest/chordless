@@ -1,16 +1,16 @@
 import { expect } from '@open-wc/testing'
-import {
-  backupFileName,
-  createBackup,
-  readBackup,
-  readPadSetsForBackup,
-  restoreBackup,
-  restorePadSets,
-} from '../src/js/backup.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { listPadSets, padSetSize, uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
+import {
+  createExport,
+  exportFileName,
+  importIntoSpace,
+  importPadSets,
+  readExport,
+  readPadSetsForExport,
+} from '../src/js/space-export.ts'
 import { readZip, writeZip } from '../src/js/utils/zip.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { binaryStringToBytes, installFakeDrive } from './fake-drive.ts'
@@ -27,7 +27,7 @@ const ALPHA_EDITED = '{title: Alpha}\n{key: G}\n[G]Alpha line, edited'
 const BETA = '{title: Beta}\n{key: D}\n[D]Beta line'
 const ADD = { variantLabel: 'Original', importSource: 'test', makeDefault: 'first' } as const
 
-describe('Backing up a space, and restoring one', () => {
+describe('Exporting a space, and importing one', () => {
   const sourceId = `space-${crypto.randomUUID()}`
   const destinationId = `space-${crypto.randomUUID()}`
   let source: ChordlessDB
@@ -79,7 +79,7 @@ describe('Backing up a space, and restoring one', () => {
 
   it('makes a zip of the charts and setlists, with nothing of Drive in it', async () => {
     await fill()
-    const zip = await readZip(await createBackup(source, 'Grace Church'))
+    const zip = await readZip(await createExport(source, 'Grace Church'))
     const names = zip.entries.map(entry => entry.fileName)
     expect(names).to.include('manifest.json')
     expect(names).to.include('songs.json')
@@ -102,11 +102,11 @@ describe('Backing up a space, and restoring one', () => {
 
   it('says in its manifest what it holds and where from', async () => {
     await fill()
-    const backup = await readBackup(
-      await createBackup(source, 'Grace Church', [], new Date('2026-10-19T21:00:00Z'))
+    const exported = await readExport(
+      await createExport(source, 'Grace Church', [], new Date('2026-10-19T21:00:00Z'))
     )
-    expect(backup.manifest).to.deep.include({
-      format: 'chordless-backup',
+    expect(exported.manifest).to.deep.include({
+      format: 'chordless-export',
       version: 1,
       space: 'Grace Church',
       created: '2026-10-19T21:00:00.000Z',
@@ -114,10 +114,10 @@ describe('Backing up a space, and restoring one', () => {
     })
   })
 
-  it('restores the charts, their variants and keys, and the setlist with its id and songs', async () => {
+  it('imports the charts, their variants and keys, and the setlist with its id and songs', async () => {
     await fill()
-    const backup = await readBackup(await createBackup(source, 'Grace Church'))
-    const report = await restoreBackup(backup, destination)
+    const exported = await readExport(await createExport(source, 'Grace Church'))
+    const report = await importIntoSpace(exported, destination)
     expect(report.songsAdded).to.equal(3)
     expect(report.setlistsAdded).to.equal(1)
 
@@ -125,7 +125,7 @@ describe('Backing up a space, and restoring one', () => {
     expect(songs.map(song => song.title).sort()).to.deep.equal(['Alpha', 'Alpha', 'Beta'])
     expect(songs.filter(song => song.id === 'title-alpha' && song.isDefault)).to.have.length(1)
     expect(songs.find(song => song.title === 'Beta')?.key).to.equal('E')
-    expect(songs.every(song => song.importSource === 'backup')).to.equal(true)
+    expect(songs.every(song => song.importSource === 'import')).to.equal(true)
 
     const setlist = must(await destination.getSetlist('set-1'))
     expect(setlist.name).to.equal('Harvest')
@@ -141,9 +141,9 @@ describe('Backing up a space, and restoring one', () => {
 
   it('adds nothing the second time, and leaves what the space has', async () => {
     await fill()
-    const backup = await readBackup(await createBackup(source, 'Grace Church'))
-    await restoreBackup(backup, destination)
-    const again = await restoreBackup(backup, destination)
+    const exported = await readExport(await createExport(source, 'Grace Church'))
+    await importIntoSpace(exported, destination)
+    const again = await importIntoSpace(exported, destination)
     expect(again.songsAdded).to.equal(0)
     expect(again.songsSkipped).to.equal(3)
     expect(again.setlistsAdded).to.equal(0)
@@ -153,7 +153,7 @@ describe('Backing up a space, and restoring one', () => {
 
     // A setlist the space has under that id is left as it is
     await destination.saveSetlist({ ...must(await destination.getSetlist('set-1')), name: 'Mine' })
-    await restoreBackup(backup, destination)
+    await importIntoSpace(exported, destination)
     expect(must(await destination.getSetlist('set-1')).name).to.equal('Mine')
   })
 
@@ -166,43 +166,43 @@ describe('Backing up a space, and restoring one', () => {
         received: { key: 'k', etag: 'e', expires: '2026-11-01', setlistId: 's' } as never,
       })
     )
-    const backup = await readBackup(await createBackup(source, 'Grace Church'))
-    expect(backup.setlists.map(setlist => setlist.id)).to.deep.equal(['set-1'])
+    const exported = await readExport(await createExport(source, 'Grace Church'))
+    expect(exported.setlists.map(setlist => setlist.id)).to.deep.equal(['set-1'])
   })
 
-  it('leaves out a chart whose text is missing, and restores a list that names one that is', async () => {
+  it('leaves out a chart whose text is missing, and imports a list that names one that is', async () => {
     await fill()
     await source.saveSong({ ...must((await source.getAllSongs())[0]), chordproFileId: 'nowhere' })
-    const backup = await readBackup(await createBackup(source, 'Grace Church'))
-    expect(backup.songs).to.have.length(2)
+    const exported = await readExport(await createExport(source, 'Grace Church'))
+    expect(exported.songs).to.have.length(2)
 
-    // A backup in memory whose list names a chart it does not hold: that chart is skipped
-    const damaged = { ...backup, chordpro: new Map() }
-    const report = await restoreBackup(damaged, destination)
+    // An export in memory whose list names a chart it does not hold: that chart is skipped
+    const damaged = { ...exported, chordpro: new Map() }
+    const report = await importIntoSpace(damaged, destination)
     expect(report.songsAdded).to.equal(0)
     expect(await destination.getAllSongs()).to.have.length(0)
   })
 
   it('names the file by the space and the day', () => {
-    expect(backupFileName('Grace Church – Évry!', new Date('2026-10-19T21:00:00Z'))).to.equal(
-      'chordless-backup-Grace-Church-Evry-2026-10-19.zip'
+    expect(exportFileName('Grace Church – Évry!', new Date('2026-10-19T21:00:00Z'))).to.equal(
+      'chordless-export-Grace-Church-Evry-2026-10-19.zip'
     )
-    expect(backupFileName('???', new Date('2026-10-19T21:00:00Z'))).to.equal(
-      'chordless-backup-untitled-2026-10-19.zip'
+    expect(exportFileName('???', new Date('2026-10-19T21:00:00Z'))).to.equal(
+      'chordless-export-untitled-2026-10-19.zip'
     )
   })
 
-  describe('refuses a file that is not a backup of this version', () => {
+  describe('refuses a file that is not an export of this version', () => {
     const reason = async (blob: Blob) => {
       try {
-        await readBackup(blob)
+        await readExport(blob)
       } catch (error) {
         return (error as Error).message
       }
       return null
     }
     const manifest = (changes: object = {}) => ({
-      format: 'chordless-backup',
+      format: 'chordless-export',
       version: 1,
       created: 'x',
       space: 'S',
@@ -228,7 +228,7 @@ describe('Backing up a space, and restoring one', () => {
           { name: 'songs.json', data: '[]' },
         ])
       expect(await reason(await zip(manifest({ format: 'something-else' })))).to.contain(
-        'not a Chordless backup'
+        'not a Chordless export'
       )
       expect(await reason(await zip(manifest({ version: 2 })))).to.contain('newer Chordless')
       expect(await reason(await zip(manifest()))).to.equal(null)
@@ -274,30 +274,30 @@ describe('Backing up a space, and restoring one', () => {
       expect(await padSetSize(set)).to.equal(
         PAD_FILE_KEYS.reduce((total, key) => total + audioOf(key).length, 0)
       )
-      const zip = await readZip(await createBackup(source, 'S'))
+      const zip = await readZip(await createExport(source, 'S'))
       expect(zip.entries.some(entry => entry.fileName.startsWith('pads/'))).to.equal(false)
     })
 
-    it('are put in the zip when asked, and restored to Drive from it', async () => {
+    it('are put in the zip when asked, and imported to Drive from it', async () => {
       await fill()
       const set = await uploadSet('Warm Pad')
-      const blob = await createBackup(source, 'S', await readPadSetsForBackup([set]))
-      const backup = await readBackup(blob)
-      expect(backup.manifest.counts.padSets).to.equal(1)
-      expect(backup.manifest.padSets.map(each => each.name)).to.deep.equal(['Warm Pad'])
-      const audio = await backup.padAudio(must(backup.manifest.padSets[0]).dir)
+      const blob = await createExport(source, 'S', await readPadSetsForExport([set]))
+      const exported = await readExport(blob)
+      expect(exported.manifest.counts.padSets).to.equal(1)
+      expect(exported.manifest.padSets.map(each => each.name)).to.deep.equal(['Warm Pad'])
+      const audio = await exported.padAudio(must(exported.manifest.padSets[0]).dir)
       expect([...audio.keys()].sort()).to.deep.equal([...PAD_FILE_KEYS].sort())
 
-      // Gone from Drive, then restored from the backup (only the sets asked for)
+      // Gone from Drive, then imported from the export (only the sets asked for)
       for (const file of drive.listFiles((f: any) => f.parents?.includes(set.id))) {
         drive.files.delete(file.id)
       }
       drive.files.delete(set.id)
-      expect(await restorePadSets(backup, ['Not in it'])).to.deep.equal([])
-      expect(await restorePadSets(backup, ['Warm Pad'])).to.deep.equal(['Warm Pad'])
+      expect(await importPadSets(exported, ['Not in it'])).to.deep.equal([])
+      expect(await importPadSets(exported, ['Warm Pad'])).to.deep.equal(['Warm Pad'])
 
-      const restored = must((await listPadSets(true)).find(each => each.name === 'Warm Pad'))
-      const files = drive.listFiles((f: any) => f.parents?.includes(restored.id))
+      const imported = must((await listPadSets(true)).find(each => each.name === 'Warm Pad'))
+      const files = drive.listFiles((f: any) => f.parents?.includes(imported.id))
       expect(files).to.have.length(PAD_FILE_KEYS.length)
       for (const file of files) {
         const key = file.name.replace('.mp3', '')
@@ -305,13 +305,13 @@ describe('Backing up a space, and restoring one', () => {
       }
     })
 
-    it('has a pad set with a pad missing in the zip restored as far as the set allows', async () => {
-      const backup = await readBackup(
-        await createBackup(source, 'S', [{ name: 'Short', audio: new Map([['C', audioOf('C')]]) }])
+    it('has a pad set with a pad missing in the zip imported as far as the set allows', async () => {
+      const exported = await readExport(
+        await createExport(source, 'S', [{ name: 'Short', audio: new Map([['C', audioOf('C')]]) }])
       )
       let message = ''
       try {
-        await restorePadSets(backup, ['Short'])
+        await importPadSets(exported, ['Short'])
       } catch (error) {
         message = (error as Error).message
       }

@@ -154,7 +154,7 @@ export async function uploadPadSet(
   return padSet
 }
 
-/** How many bytes of audio a pad set holds in Drive (for a backup to say how big it would be) */
+/** How many bytes of audio a pad set holds in Drive (for an export to say how big it would be) */
 export async function padSetSize(padSet: PadSet): Promise<number> {
   const files = await listPadSetFiles(padSet.id)
   return files.reduce((total, file) => total + Number(file.size ?? 0), 0)

@@ -1,6 +1,5 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import { type BackupPanel, megabytes } from '../src/components/backup-panel.ts'
-import { createBackup } from '../src/js/backup.ts'
+import { megabytes, type SpaceExportPanel } from '../src/components/space-export-panel.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import {
   createOrganisation,
@@ -11,6 +10,7 @@ import {
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
+import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -25,7 +25,7 @@ const ALPHA = '{title: Alpha}\n{key: G}\n[G]Alpha line'
 const ADD = { variantLabel: 'Original', importSource: 'test', makeDefault: 'first' } as const
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
-describe('the backup panel', () => {
+describe('the export panel', () => {
   let before: { id: string | null; name: string }
   let spaceId: string
   let drive: ReturnType<typeof installFakeDrive>
@@ -35,7 +35,7 @@ describe('the backup panel', () => {
   beforeEach(async () => {
     drive = installFakeDrive()
     before = getCurrentOrganisation()
-    const space = await createOrganisation(`Backup ${crypto.randomUUID().slice(0, 8)}`)
+    const space = await createOrganisation(`Export ${crypto.randomUUID().slice(0, 8)}`)
     spaceId = space.id
     await setCurrentOrganisation(space.id, space.name)
     downloads = []
@@ -59,12 +59,12 @@ describe('the backup panel', () => {
     if (before.id) await setCurrentOrganisation(before.id, before.name)
   })
 
-  const text = (el: BackupPanel) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
-  const button = (el: BackupPanel, id: string) =>
+  const text = (el: SpaceExportPanel) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
+  const button = (el: SpaceExportPanel, id: string) =>
     must(el.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
 
-  /** A space's backup file, from a database made for it */
-  async function backupOf(name: string, fill = true) {
+  /** A space's export file, from a database made for it */
+  async function exportOf(name: string, fill = true) {
     const id = `source-${crypto.randomUUID()}`
     const db = new ChordlessDB(id)
     await db.init()
@@ -78,14 +78,14 @@ describe('the backup panel', () => {
           })
         )
       }
-      return new File([await createBackup(db, name)], 'backup.zip')
+      return new File([await createExport(db, name)], 'export.zip')
     } finally {
       db.db?.close()
       await deleteDatabase(id)
     }
   }
 
-  async function choose(el: BackupPanel, file: File) {
+  async function choose(el: SpaceExportPanel, file: File) {
     const input = must(el.shadowRoot?.querySelector<HTMLInputElement>('input[type=file]'))
     const transfer = new DataTransfer()
     transfer.items.add(file)
@@ -98,55 +98,55 @@ describe('the backup panel', () => {
     expect(megabytes(48.6 * 1024 * 1024)).to.equal('49 MB')
   })
 
-  it('does nothing when asked to restore with no backup chosen', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    await el._restore()
-    expect(text(el)).to.not.contain('Restored')
+  it('does nothing when asked to import with no export chosen', async () => {
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    await el._import()
+    expect(text(el)).to.not.contain('Imported')
   })
 
   it('offers no pad sets when not signed in', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
     expect(el.shadowRoot?.querySelector('#include-pads')).to.equal(null)
-    expect(text(el)).to.contain('Download a backup')
+    expect(text(el)).to.contain('Export this space')
   })
 
-  it('downloads a backup of the current space, named by space and day', async () => {
+  it('downloads an export of the current space, named by space and day', async () => {
     const db = await getCurrentDB()
     await addChart(db, ALPHA, ADD)
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    button(el, 'download-backup').click()
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    button(el, 'export-space').click()
     await waitUntil(() => downloads.length === 1, 'the download')
     expect(downloads[0]?.name).to.match(
-      /^chordless-backup-Backup-[0-9a-f]{8}-\d{4}-\d{2}-\d{2}\.zip$/
+      /^chordless-export-Export-[0-9a-f]{8}-\d{4}-\d{2}-\d{2}\.zip$/
     )
     expect(downloads[0]?.size).to.be.greaterThan(100)
-    expect(text(el)).to.contain('Backup saved as chordless-backup-')
+    expect(text(el)).to.contain('Exported as chordless-export-')
   })
 
-  it('says why a backup could not be made', async () => {
+  it('says why an export could not be made', async () => {
     const db = await getCurrentDB()
     const real = Object.getPrototypeOf(db).getAllSongs
     Object.getPrototypeOf(db).getAllSongs = () => Promise.reject(new Error('disk full'))
     try {
-      const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-      button(el, 'download-backup').click()
-      await waitUntil(() => text(el).includes('Making the backup failed'), 'the failure')
+      const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+      button(el, 'export-space').click()
+      await waitUntil(() => text(el).includes('Exporting failed'), 'the failure')
       expect(text(el)).to.contain('disk full')
     } finally {
       Object.getPrototypeOf(db).getAllSongs = real
     }
   })
 
-  it('restores into this space, and says what was added and what was already there', async () => {
-    const file = await backupOf('Elsewhere')
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
+  it('imports into this space, and says what was added and what was already there', async () => {
+    const file = await exportOf('Elsewhere')
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
     await choose(el, file)
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-    expect(text(el)).to.contain('Backup of Elsewhere')
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
+    expect(text(el)).to.contain('Exported from Elsewhere')
     expect(text(el)).to.contain('1 charts, 1 setlists')
 
-    button(el, 'restore').click()
-    await waitUntil(() => text(el).includes('Restored into this space'), 'the restore')
+    button(el, 'import').click()
+    await waitUntil(() => text(el).includes('Imported into this space'), 'the import')
     expect(text(el)).to.contain('1 charts and 1 setlists added')
     const db = await getCurrentDB()
     expect(await db.getAllSongs()).to.have.length(1)
@@ -154,41 +154,41 @@ describe('the backup panel', () => {
 
     // Again: nothing to add
     await choose(el, file)
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-    button(el, 'restore').click()
-    await waitUntil(() => text(el).includes('0 charts and 0 setlists added'), 'the second restore')
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
+    button(el, 'import').click()
+    await waitUntil(() => text(el).includes('0 charts and 0 setlists added'), 'the second import')
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
   })
 
   it('goes back to the choice of file when the question is cancelled', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    await choose(el, await backupOf('Elsewhere', false))
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-    button(el, 'restore-cancel').click()
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    await choose(el, await exportOf('Elsewhere', false))
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
+    button(el, 'import-cancel').click()
     await el.updateComplete
-    expect(text(el)).to.not.contain('Restore this backup')
+    expect(text(el)).to.not.contain('Import this export')
   })
 
-  it('says a file that is not a backup is not one, and asks nothing', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
+  it('says a file that is not an export is not one, and asks nothing', async () => {
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
     await choose(el, new File(['hello'], 'notes.zip'))
     await waitUntil(() => text(el).includes('not a ZIP file'), 'the reason')
-    expect(text(el)).to.not.contain('Restore this backup')
+    expect(text(el)).to.not.contain('Import this export')
     // Choosing nothing does nothing
     const input = must(el.shadowRoot?.querySelector<HTMLInputElement>('input[type=file]'))
     input.dispatchEvent(new Event('change'))
   })
 
-  it('says why a restore failed, and changes nothing', async () => {
-    const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
-    await choose(el, await backupOf('Elsewhere'))
-    await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
+  it('says why an import failed, and changes nothing', async () => {
+    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    await choose(el, await exportOf('Elsewhere'))
+    await waitUntil(() => text(el).includes('Import this export'), 'the question')
     const db = await getCurrentDB()
     const real = Object.getPrototypeOf(db).saveSong
     Object.getPrototypeOf(db).saveSong = () => Promise.reject(new Error('disk full'))
     try {
-      button(el, 'restore').click()
-      await waitUntil(() => text(el).includes('Restoring failed'), 'the failure')
+      button(el, 'import').click()
+      await waitUntil(() => text(el).includes('Importing failed'), 'the failure')
       expect(text(el)).to.contain('disk full')
     } finally {
       Object.getPrototypeOf(db).saveSong = real
@@ -209,30 +209,32 @@ describe('the backup panel', () => {
       )
     }
 
-    it('shows their size, and puts them in the backup only when ticked', async () => {
+    it('shows their size, and puts them in the export only when ticked', async () => {
       await uploadSet('Warm')
-      const el = await fixture<BackupPanel>(html`<backup-panel signed-in></backup-panel>`)
+      const el = await fixture<SpaceExportPanel>(
+        html`<space-export-panel signed-in></space-export-panel>`
+      )
       await waitUntil(() => el.shadowRoot?.querySelector('#include-pads'), 'the choice')
       expect(text(el)).to.contain('Include my pad sets (1, about')
 
-      button(el, 'download-backup').click()
-      await waitUntil(() => downloads.length === 1, 'the plain backup')
+      button(el, 'export-space').click()
+      await waitUntil(() => downloads.length === 1, 'the plain export')
       const plain = must(downloads[0]).size
 
       must(el.shadowRoot?.querySelector<HTMLInputElement>('#include-pads')).click()
       await el.updateComplete
-      button(el, 'download-backup').click()
-      await waitUntil(() => downloads.length === 2, 'the backup with pads')
+      button(el, 'export-space').click()
+      await waitUntil(() => downloads.length === 2, 'the export with pads')
       expect(must(downloads[1]).size).to.be.greaterThan(plain)
     })
 
-    it('restores them to Drive only when ticked', async () => {
+    it('imports them to Drive only when ticked', async () => {
       const set = await uploadSet('Warm')
       const db = new ChordlessDB(`with-pads-${crypto.randomUUID()}`)
       await db.init()
-      const { readPadSetsForBackup } = await import('../src/js/backup.ts')
+      const { readPadSetsForExport } = await import('../src/js/space-export.ts')
       const file = new File(
-        [await createBackup(db, 'S', await readPadSetsForBackup([set]))],
+        [await createExport(db, 'S', await readPadSetsForExport([set]))],
         'b.zip'
       )
       db.db?.close()
@@ -242,45 +244,49 @@ describe('the backup panel', () => {
       }
       drive.files.delete(set.id)
 
-      const el = await fixture<BackupPanel>(html`<backup-panel signed-in></backup-panel>`)
+      const el = await fixture<SpaceExportPanel>(
+        html`<space-export-panel signed-in></space-export-panel>`
+      )
       await choose(el, file)
-      await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
       expect(text(el)).to.contain('1 pad sets')
-      button(el, 'restore').click()
-      await waitUntil(() => text(el).includes('Restored into'), 'the restore')
+      button(el, 'import').click()
+      await waitUntil(() => text(el).includes('Imported into'), 'the import')
       expect(text(el)).to.not.contain('pad sets uploaded')
 
       await choose(el, file)
-      await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
-      must(el.shadowRoot?.querySelector<HTMLInputElement>('#restore-pads')).click()
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      must(el.shadowRoot?.querySelector<HTMLInputElement>('#import-pads')).click()
       await el.updateComplete
-      button(el, 'restore').click()
+      button(el, 'import').click()
       await waitUntil(() => text(el).includes('1 pad sets uploaded to Drive'), 'the pads')
     })
 
-    it('cannot restore pad sets when not signed in', async () => {
+    it('cannot import pad sets when not signed in', async () => {
       const set = await uploadSet('Warm')
       const db = new ChordlessDB(`with-pads-${crypto.randomUUID()}`)
       await db.init()
-      const { readPadSetsForBackup } = await import('../src/js/backup.ts')
+      const { readPadSetsForExport } = await import('../src/js/space-export.ts')
       const file = new File(
-        [await createBackup(db, 'S', await readPadSetsForBackup([set]))],
+        [await createExport(db, 'S', await readPadSetsForExport([set]))],
         'b.zip'
       )
       db.db?.close()
       await deleteDatabase(db.dbName)
-      const el = await fixture<BackupPanel>(html`<backup-panel></backup-panel>`)
+      const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
       await choose(el, file)
-      await waitUntil(() => text(el).includes('Restore this backup'), 'the question')
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
       expect(
-        must(el.shadowRoot?.querySelector<HTMLInputElement>('#restore-pads')).disabled
+        must(el.shadowRoot?.querySelector<HTMLInputElement>('#import-pads')).disabled
       ).to.equal(true)
       expect(text(el)).to.contain('connect with Google first')
     })
 
     it('leaves out the pad sets when Drive cannot be asked', async () => {
       drive.failRequests({ method: 'GET', status: 500, times: 50 })
-      const el = await fixture<BackupPanel>(html`<backup-panel signed-in></backup-panel>`)
+      const el = await fixture<SpaceExportPanel>(
+        html`<space-export-panel signed-in></space-export-panel>`
+      )
       await wait(100)
       expect(el.shadowRoot?.querySelector('#include-pads')).to.equal(null)
       // and when the user signs out

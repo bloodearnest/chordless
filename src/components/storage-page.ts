@@ -7,7 +7,7 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './drive-sync-panel.ts'
 import './storage-summary.ts'
-import './backup-panel.ts'
+import './space-export-panel.ts'
 import './pad-set-manager.ts'
 import './select-organisation.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
@@ -237,7 +237,7 @@ export class StoragePage extends LitElement {
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired)}
-        ${this._renderPadSetSection()} ${this._renderBackupSection()} ${this._renderDangerSection()}
+        ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
     `
   }
@@ -441,16 +441,16 @@ export class StoragePage extends LitElement {
     `
   }
 
-  _renderBackupSection() {
+  _renderExportSection() {
     return html`
       <div class="panel">
-        <h3>💾 Backup</h3>
+        <h3>📦 Export and import</h3>
         <p>
-          Save this space's setlists and songs as a zip file, and restore one, on this device or
-          another: it needs no Google account. Pad sets are large, so they are included only if you
-          choose.
+          Export this space's setlists and songs as a zip file, and import an export into this
+          space, on this device or another: it needs no Google account, and an import only adds
+          what is missing. Pad sets are large, so they are included only if you choose.
         </p>
-        <backup-panel ?signed-in=${this.isAuthenticated && !this.signInExpired}></backup-panel>
+        <space-export-panel ?signed-in=${this.isAuthenticated && !this.signInExpired}></space-export-panel>
       </div>
     `
   }

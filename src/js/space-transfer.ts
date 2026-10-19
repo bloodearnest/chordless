@@ -14,11 +14,11 @@ import { addChart } from './song-utils.ts'
 /**
  * - copy: new setlist ids
  * - move: the ids are kept, and the source's setlist is deleted once it is in the destination
- * - restore: the ids are kept and the source is left alone (a backup is read from a file)
+ * - import: the ids are kept and the source is left alone (an export is read from a file)
  */
-export type TransferMode = 'copy' | 'move' | 'restore'
+export type TransferMode = 'copy' | 'move' | 'import'
 
-/** What a transfer reads from: a space's database, or a backup file read into memory */
+/** What a transfer reads from: a space's database, or an export file read into memory */
 export interface TransferSource {
   getAllSongs(): Promise<SongRecord[]>
   getChordPro(id: string): Promise<{ content: string } | undefined>
