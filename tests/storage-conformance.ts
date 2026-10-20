@@ -181,6 +181,36 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
         expect(await space.list('songs')).to.have.length(3)
       })
 
+      it('reads many files at once, in order, with null for one that is gone', async () => {
+        const a = await space.create('songs', input('a.txt'), 'one')
+        const b = await space.create('songs', input('b.txt'), 'two')
+        const c = await space.create('songs', input('c.txt'), 'three')
+        harness.remove(b.file.ref)
+        expect(await space.readMany([c.file.ref, a.file.ref, b.file.ref])).to.deep.equal([
+          'three',
+          'one',
+          null,
+        ])
+        expect(await space.readMany([])).to.deep.equal([])
+      })
+
+      it('updates many files at once, in order, with null for one that is gone', async () => {
+        const a = await space.create('songs', input('a.txt'), 'one')
+        const b = await space.create('songs', input('b.txt'), 'two')
+        harness.remove(b.file.ref)
+        const results = await space.updateMany([
+          { ref: a.file.ref, input: input('a2.txt', { songUuid: '1' }), body: 'uno' },
+          { ref: b.file.ref, input: input('b.txt'), body: 'dos' },
+        ])
+        expect(results[1]).to.equal(null)
+        const first = must(results[0])
+        expect(first.file.ref).to.equal(a.file.ref)
+        expect(first.file.name).to.equal('a2.txt')
+        expect(first.file.rev).to.not.equal(a.file.rev)
+        expect(await space.readText(a.file.ref)).to.equal('uno')
+        expect(await space.updateMany([])).to.deep.equal([])
+      })
+
       it('lists every file, past the size of one page', async () => {
         harness.pageSize?.(10)
         const items = Array.from({ length: 35 }, (_, i) => ({

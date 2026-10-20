@@ -28,8 +28,8 @@ one space's files in two **collections**, `songs` and `setlists`.
 | `list(collection)` | the live files of a collection |
 | `inventory()` | the refs of every live file in the space (finding records whose file has gone) |
 | `status(ref)` | a file wherever it is: `{trashed}`, or null if it does not exist |
-| `readText(ref)` | a file's text |
-| `create`, `createMany`, `update` | write; each says whether the backend stored exactly what was sent (`intact`) |
+| `readText(ref)`, `readMany(refs)` | a file's text; many files' texts, one entry each in order, null for one that could not be read |
+| `create`, `createMany`, `update`, `updateMany` | write; each says whether the backend stored exactly what was sent (`intact`). The `Many` forms give one entry per item in order, null for one that failed |
 
 ## Pad sets
 
@@ -82,6 +82,53 @@ suite, and a way to keep `props` (see above).
 
 The Worker broker (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
+
+## The team backend (designed, not built)
+
+Team-space members get a second implementation of the same interface, `BrokerStorage`
+(`src/js/storage/broker-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
+session token (docs/SPACES.md). The engine, share manager and pad service are unchanged; which
+backend a space is given depends on its kind and on whether this person is its owner (the owner
+keeps `DriveStorage`, direct). `BrokerStorage` has to pass `tests/storage-conformance.ts` against
+the Worker running over `fake-drive.ts`.
+
+On the Worker each call is: check the session token, look up the member's role in the space's
+Durable Object, check it against the collection and ref, make the Drive call with the owner's token
+(later the service account's) and stream the answer back. Nothing is stored. The Worker may reuse
+`drive-storage.ts` with another token provider, so there stays one Drive implementation.
+
+How each call maps:
+- `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
+  writes need writer or above.
+- `members()`: from the Durable Object, not Drive permissions.
+- `inspectRoot`: answers with the member's role as `canWrite`, which replaces `writeRefusals()`
+  and the Drive-capabilities guess (the "role from the Worker" to-do in SPACES.md).
+- `findRootByName`, `ensureRoot`, `renameRoot`: first-sync-on-a-device calls that do not apply to
+  a member, whose space is issued an id and `rootRef`. Open question: a small "join an issued
+  space" call in the interface, so a broker backend is not left with stubs. Rename is admin-only.
+- Pads: `PadStorage` must first move from the backend to `SpaceStorage` ("Pad sets"), then the
+  Worker streams audio: any member uploads, admin and up deletes.
+- Share links: `publicLink` and `/api/share/<id>` are Drive-specific. Sharing from a team space
+  needs that generalised, or to go through the owner's direct path. Not settled.
+
+**Request volume and batching.** Each storage call is one Worker request plus one Drive
+subrequest. A steady-state sync is a few list calls plus one read or write per changed file, so
+roughly 5 to 15 requests; a first sync on a device is one read per file (hundreds for a big
+library). For a team of 30 that sync a few times a month this is thousands of requests a month,
+far inside Workers' limits (checked against the plan's numbers when the broker is built); quota
+is not the concern. The cost is latency: about 1.1 to 1.4 s per call was measured, and the proxy
+adds a hop to every call the direct path makes, so it cannot be faster than direct.
+
+Batching is therefore in the interface (built 2026-10-20): `readMany`, `createMany` and
+`updateMany`. The engine hands a backend a batch of 50 (`BATCH_SIZE`, `sync/session.ts`) and
+does not say how it is done. `DriveStorage` keeps what it had: 10 reads or updates in flight,
+30 uploads in flight (Google's Batch API cannot carry file content). `BrokerStorage` sends a
+batch as one request, which the Worker fans out to Drive, with one Durable Object role check for
+the whole batch. A batch call is still partial-failure tolerant (null in a slot), and a batch that
+throws is retried one record at a time on a push and counted as unread on a pull. Not batched:
+`trash` and `unpublish` (rare, small). "Send the revs I know, get back what changed" would be a
+pull-level operation, not a primitive: left out until a measurement on a deployed Worker says the
+primitives are not enough.
 
 ## What is left
 

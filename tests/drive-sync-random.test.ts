@@ -58,9 +58,11 @@ const FAILING_CALLS: StorageOp[] = [
   'inventory',
   'status',
   'readText',
+  'readMany',
   'create',
   'createMany',
   'update',
+  'updateMany',
 ]
 
 type Device = Awaited<ReturnType<ReturnType<typeof useSyncRig>['makeDevice']>>

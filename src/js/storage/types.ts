@@ -75,6 +75,12 @@ export interface SpaceStorage {
   status(ref: string): Promise<FileStatus | null>
   readText(ref: string): Promise<string>
   /**
+   * Read several files at once. One entry per ref, in order: null for a file that could not be
+   * read (gone, in the bin, or failed), so one bad file does not stop the others. A backend is free
+   * to read them in parallel, or in one request: the caller does not know which.
+   */
+  readMany(refs: string[]): Promise<(string | null)[]>
+  /**
    * Create a file. With `publicLink` it is readable by anyone who has its ref (a share link), and
    * if the backend will not allow that, nothing is left behind and the error says so.
    */
@@ -93,6 +99,13 @@ export interface SpaceStorage {
     items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]>
   update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult>
+  /**
+   * Update several files at once. One entry per item, in order: null for a file that could not be
+   * updated, so a bad file does not stop the others.
+   */
+  updateMany(
+    items: { ref: string; input: FileInput; body: string }[]
+  ): Promise<(WriteResult | null)[]>
   /** Take back a file's public link (the file stays). A file that is gone is fine. */
   unpublish(ref: string): Promise<void>
   /** Put a file in the backend's bin, where it can be recovered. A file that is gone is fine. */

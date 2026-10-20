@@ -16,7 +16,7 @@ import {
   setlistIdOf,
   songHasLocalChanges,
 } from './changes.ts'
-import { inGroups, type ProgressCallback, type SyncSession } from './session.ts'
+import { inBatches, type ProgressCallback, type SyncSession } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 
 /** A chord chart in Drive that a pull has decided to download */
@@ -38,13 +38,13 @@ interface SetlistDownload {
 
 /** The setlist record to keep for a downloaded file, with its local record (if any) in mind */
 async function downloadSetlist(
-  session: SyncSession,
-  { driveFile, setlistId, localSetlist, adopt }: SetlistDownload
+  { driveFile, setlistId, localSetlist, adopt }: SetlistDownload,
+  text: string
 ): Promise<Setlist> {
   // Older setlists in Drive may hold a chart's text as a tempo. Saving
   // converts it too, but convert first: the hash recorded as synced must
   // be of what's stored, or the setlist would look edited here
-  const remote = withNumericTempos(JSON.parse(await session.space.readText(driveFile.ref)))
+  const remote = withNumericTempos(JSON.parse(text))
   const remoteHash = setlistContentHash(remote)
 
   if (adopt && localSetlist) {
@@ -167,9 +167,11 @@ export async function pullSetlists(
 
   const setlistsToSave: Setlist[] = []
   let completed = 0
-  await inGroups(
+  await inBatches(
+    session.space,
     downloadQueue,
-    item => downloadSetlist(session, item),
+    item => item.driveFile.ref,
+    (item, text) => downloadSetlist(item, text),
     results => {
       for (const result of results) {
         if (result.status === 'fulfilled') {
@@ -302,9 +304,11 @@ export async function pullSongs(
     total: downloads.length,
   })
 
-  await inGroups(
+  await inBatches(
+    session.space,
     downloads,
-    item => downloadSong(session, item),
+    item => item.file.ref,
+    (item, text) => downloadSong(session, item, text),
     results => {
       const succeeded = results.filter(result => result.status === 'fulfilled').length
       downloaded += succeeded
@@ -336,9 +340,9 @@ export function titleFromFilename(filename: string | undefined): string {
 
 async function downloadSong(
   session: SyncSession,
-  { songUuid, file, props, localSong }: SongDownload
+  { songUuid, file, props, localSong }: SongDownload,
+  chordproContent: string
 ): Promise<void> {
-  const chordproContent = await session.space.readText(file.ref)
   const remoteHash = hashText(chordproContent)
   const localChart = localSong?.chordproFileId
     ? await session.db.getChordPro(localSong.chordproFileId)

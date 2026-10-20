@@ -1,6 +1,6 @@
 /**
- * The push of a Drive sync: what is new or changed on this device goes up to Drive (new files
- * in batches, changed ones one by one, several at a time).
+ * The push of a Drive sync: what is new or changed on this device goes up to Drive, new files
+ * and changed ones each in batches (the storage decides how a batch is sent).
  */
 import type { ChordProRecord, Setlist, SongFileProps, SongRecord } from '../data-types.ts'
 import {
@@ -19,7 +19,7 @@ import {
   songHasLocalChanges,
   songUuidOf,
 } from './changes.ts'
-import { inGroups, type ProgressCallback, type SyncSession } from './session.ts'
+import { BATCH_SIZE, type ProgressCallback, type SyncSession } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 
 /** A setlist's file content in Drive */
@@ -114,11 +114,11 @@ function syncedTwinOf(
 }
 
 /**
- * Upload new records in batches, each batch in one request. A batch that fails is uploaded one
- * record at a time, so one bad record doesn't stop the others.
+ * Upload records in batches, each batch in one call to the storage. A batch that fails is
+ * uploaded one record at a time, so one bad record doesn't stop the others.
  * @returns how many were uploaded
  */
-async function uploadNewInBatches<T>(
+async function uploadInBatches<T>(
   items: T[],
   batchSize: number,
   {
@@ -153,23 +153,6 @@ async function uploadNewInBatches<T>(
     onProgress(uploaded)
   }
   return uploaded
-}
-
-/**
- * Update changed records, several at a time (each is a request of its own).
- * @returns how many were updated
- */
-async function updateInParallel<T>(
-  items: T[],
-  update: (item: T) => Promise<void>,
-  onProgress: (updated: number) => void
-): Promise<number> {
-  let updated = 0
-  await inGroups(items, update, results => {
-    updated += results.filter(result => result.status === 'fulfilled').length
-    onProgress(updated)
-  })
-  return updated
 }
 
 /**
@@ -261,37 +244,56 @@ export async function pushSetlists(
   }
   const newSetlists = setlistsToCreate(session, created, localSetlists)
 
-  let uploaded = 0
-  if (newSetlists.length > 0) {
-    uploaded = await uploadNewInBatches(newSetlists, 50, {
-      uploadBatch: async batch => {
-        const results = await session.space.createMany(
+  const recordBatch = async (
+    batch: Setlist[],
+    results: (WriteResult | null)[]
+  ): Promise<number> => {
+    const saved: Setlist[] = []
+    batch.forEach((setlist, j) => {
+      const result = results[j]
+      if (!result) return
+      recordSetlistUpload(setlist, result)
+      saved.push(setlist)
+    })
+    if (saved.length > 0) await session.db.saveSetlistsBatch(saved)
+    return saved.length
+  }
+  const uploadOne = (setlist: Setlist) => pushSetlist(session, setlist)
+  const describe = (setlist: Setlist) => `setlist ${setlist.id}`
+
+  const uploaded = await uploadInBatches(newSetlists, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await session.space.createMany(
           'setlists',
           batch.map(setlist => ({
             input: fileInput(setlistMetadata(session, setlist)),
             body: setlistJson(setlist),
           }))
         )
-        const saved: Setlist[] = []
-        batch.forEach((setlist, j) => {
-          const result = results[j]
-          if (!result) return
-          recordSetlistUpload(setlist, result)
-          saved.push(setlist)
-        })
-        if (saved.length > 0) await session.db.saveSetlistsBatch(saved)
-        return saved.length
-      },
-      uploadOne: setlist => pushSetlist(session, setlist),
-      describe: setlist => `setlist ${setlist.id}`,
-      onProgress: report,
-    })
-  }
-  await updateInParallel(
-    updated,
-    setlist => pushSetlist(session, setlist),
-    count => report(uploaded + count)
-  )
+      ),
+    uploadOne,
+    describe,
+    onProgress: report,
+  })
+  await uploadInBatches(updated, BATCH_SIZE, {
+    // (metadata too, so the file name follows e.g. a changed date or leader)
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await session.space.updateMany(
+          batch.map(setlist => ({
+            ref: setlist.fileRef as string,
+            input: updateInput(setlistMetadata(session, setlist), 'setlist'),
+            body: setlistJson(setlist),
+          }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: count => report(uploaded + count),
+  })
 }
 
 /** Push a single setlist to Drive: a new file, or an update of its file */
@@ -361,34 +363,53 @@ export async function pushSongs(
     total: Math.max(1, total),
   })
 
-  const uploaded = await uploadNewInBatches(created, 25, {
-    uploadBatch: async batch => {
-      const results = await session.space.createMany(
-        'songs',
-        batch.map(({ song, chordproFile }) => ({
-          input: fileInput(songMetadata(session, song, chordproFile)),
-          body: chordproFile.content,
-        }))
-      )
-      const saved: SongRecord[] = []
-      batch.forEach(({ song, chordproFile }, j) => {
-        const result = results[j]
-        if (!result) return
-        recordSongUpload(song, chordproFile, result)
-        saved.push(song)
-      })
-      if (saved.length > 0) await session.db.saveSongsBatch(saved)
-      return saved.length
-    },
-    uploadOne: ({ song, chordproFile }) => pushSongVariant(session, song, chordproFile),
-    describe: ({ song }) => `song ${song.id}/${songUuidOf(song)}`,
+  const recordBatch = async (batch: SongUpload[], results: (WriteResult | null)[]) => {
+    const saved: SongRecord[] = []
+    batch.forEach(({ song, chordproFile }, j) => {
+      const result = results[j]
+      if (!result) return
+      recordSongUpload(song, chordproFile, result)
+      saved.push(song)
+    })
+    if (saved.length > 0) await session.db.saveSongsBatch(saved)
+    return saved.length
+  }
+  const uploadOne = ({ song, chordproFile }: SongUpload) =>
+    pushSongVariant(session, song, chordproFile)
+  const describe = ({ song }: SongUpload) => `song ${song.id}/${songUuidOf(song)}`
+
+  const uploaded = await uploadInBatches(created, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await session.space.createMany(
+          'songs',
+          batch.map(({ song, chordproFile }) => ({
+            input: fileInput(songMetadata(session, song, chordproFile)),
+            body: chordproFile.content,
+          }))
+        )
+      ),
+    uploadOne,
+    describe,
     onProgress: report,
   })
-  await updateInParallel(
-    updated,
-    ({ song, chordproFile }) => pushSongVariant(session, song, chordproFile),
-    count => report(uploaded + count)
-  )
+  await uploadInBatches(updated, BATCH_SIZE, {
+    uploadBatch: async batch =>
+      recordBatch(
+        batch,
+        await session.space.updateMany(
+          batch.map(({ song, chordproFile }) => ({
+            ref: song.fileRef as string,
+            input: updateInput(songMetadata(session, song, chordproFile), 'song'),
+            body: chordproFile.content,
+          }))
+        )
+      ),
+    uploadOne,
+    describe,
+    onProgress: count => report(uploaded + count),
+  })
 }
 
 /** Push a specific song variant to Drive: a new file, or an update of its file */

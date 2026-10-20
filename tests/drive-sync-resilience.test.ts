@@ -363,6 +363,20 @@ describe('Drive sync: errors and missing files', () => {
       expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Flaky')
     })
 
+    it('skips the setlists of a download batch that fails as a whole, and gets them next sync', async () => {
+      const phone = await makeDevice('phone')
+      const tablet = await makeDevice('tablet')
+      const setlist = await addSetlist(phone, { name: 'Flaky' })
+      await syncDevice(phone)
+      rig.storage.fail('readMany')
+
+      await syncDevice(tablet)
+      expect(await tablet.db.getSetlist(setlist.id)).to.equal(undefined)
+
+      await syncDevice(tablet)
+      expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('Flaky')
+    })
+
     it('fails the sync without pushing when the setlist listing fails', async () => {
       const phone = await makeDevice('phone')
       await addSetlist(phone)

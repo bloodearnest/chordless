@@ -75,9 +75,11 @@ export type StorageOp =
   | 'inventory'
   | 'status'
   | 'readText'
+  | 'readMany'
   | 'create'
   | 'createMany'
   | 'update'
+  | 'updateMany'
   | 'unpublish'
   | 'trash'
   | 'listPadSets'
@@ -102,6 +104,7 @@ const WRITES: StorageOp[] = [
   'create',
   'createMany',
   'update',
+  'updateMany',
   'unpublish',
   'trash',
   'ensurePadSet',
@@ -558,6 +561,20 @@ class MemorySpace implements SpaceStorage {
     return file.content
   }
 
+  async readMany(refs: string[]): Promise<(string | null)[]> {
+    this.#storage.enter('readMany')
+    const texts: (string | null)[] = []
+    for (const ref of refs) {
+      try {
+        texts.push(await this.readText(ref))
+      } catch (error) {
+        console.error('[MemoryStorage] Failed to read a file:', error)
+        texts.push(null)
+      }
+    }
+    return texts
+  }
+
   async create(
     collection: Collection,
     input: FileInput,
@@ -615,5 +632,21 @@ class MemorySpace implements SpaceStorage {
       await contentOf(body),
       ref
     )
+  }
+
+  async updateMany(
+    items: { ref: string; input: FileInput; body: string }[]
+  ): Promise<(WriteResult | null)[]> {
+    this.#storage.enter('updateMany')
+    const results: (WriteResult | null)[] = []
+    for (const { ref, input, body } of items) {
+      try {
+        results.push(await this.update(ref, input, body))
+      } catch (error) {
+        console.error('[MemoryStorage] Failed to update a file:', error)
+        results.push(null)
+      }
+    }
+    return results
   }
 }

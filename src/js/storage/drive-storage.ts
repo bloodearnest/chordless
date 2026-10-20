@@ -23,6 +23,25 @@ import type {
   WriteResult,
 } from './types.ts'
 
+/** How many files a many-at-once call has in flight at a time */
+const CONCURRENT_LIMIT = 10
+
+/** Do `work` for each item, CONCURRENT_LIMIT at a time; null for one that failed */
+async function inGroups<T, R>(items: T[], work: (item: T) => Promise<R>): Promise<(R | null)[]> {
+  const results: (R | null)[] = []
+  for (let i = 0; i < items.length; i += CONCURRENT_LIMIT) {
+    const group = await Promise.allSettled(items.slice(i, i + CONCURRENT_LIMIT).map(work))
+    for (const result of group) {
+      if (result.status === 'fulfilled') results.push(result.value)
+      else {
+        console.error('[DriveStorage] A file in a group failed:', result.reason)
+        results.push(null)
+      }
+    }
+  }
+  return results
+}
+
 /** A Drive file as the storage API shows it */
 function toStored(file: DriveFile): StoredFile {
   return {
@@ -129,6 +148,10 @@ class DriveSpace implements SpaceStorage {
     return DriveAPI.downloadFile(ref)
   }
 
+  readMany(refs: string[]): Promise<(string | null)[]> {
+    return inGroups(refs, ref => this.readText(ref))
+  }
+
   async create(
     collection: Collection,
     input: FileInput,
@@ -174,6 +197,12 @@ class DriveSpace implements SpaceStorage {
       contentTypeOf(input.type)
     )
     return { file: toStored(file), intact: holds(file, body, input.name) }
+  }
+
+  updateMany(
+    items: { ref: string; input: FileInput; body: string }[]
+  ): Promise<(WriteResult | null)[]> {
+    return inGroups(items, ({ ref, input, body }) => this.update(ref, input, body))
   }
 
   unpublish(ref: string): Promise<void> {
