@@ -17,6 +17,7 @@ import {
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { withSharePreview } from './share-page.ts'
 import { handleSpikeDrive, handleSpikeEnable, handleSpikeUpload } from './spike-broker.ts'
+import { handleSpikeService } from './spike-service-account.ts'
 
 export async function handleRequest(
   request: Request,
@@ -91,6 +92,7 @@ export async function handleRequest(
       if (path === '/dev/spike/enable') return await handleSpikeEnable(request, env, google)
       if (path === '/dev/spike/drive') return await handleSpikeDrive(request, env, google)
       if (path === '/dev/spike/upload') return await handleSpikeUpload(request, env, google)
+      if (path === '/dev/spike/service') return await handleSpikeService(request, env)
     }
 
     // Dev-only component playgrounds (src/dev/). DEV_PAGES is set only in [env.dev]

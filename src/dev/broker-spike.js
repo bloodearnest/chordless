@@ -401,6 +401,32 @@ $('adopt').addEventListener('click', async () => {
   }
 })
 
+$('service').addEventListener('click', async () => {
+  const status = $('member-status')
+  $('results').hidden = false
+  try {
+    let folderId = $('service-folder').value.trim()
+    if (!folderId) {
+      try {
+        folderId = JSON.parse($('code').value).folderId
+      } catch {
+        folderId = $('parent').value.trim()
+      }
+    }
+    if (!folderId) throw new Error('Give a folder id, or a member code, or pick a folder above')
+    status.textContent = 'Asking the Worker to use the service account…'
+    const response = await post('/dev/spike/service', { folderId })
+    const answer = await response.json()
+    if (!response.ok) throw new Error(answer.error)
+    record('7: the service account', true, answer.account)
+    for (const { step, ok, detail } of answer.steps) record(`7: ${step}`, ok, detail)
+    status.textContent = 'Done'
+    $('copy-report').disabled = false
+  } catch (error) {
+    status.textContent = `Stopped: ${error.message}`
+  }
+})
+
 $('copy-report').addEventListener('click', () =>
   navigator.clipboard.writeText(JSON.stringify(report, null, 2))
 )

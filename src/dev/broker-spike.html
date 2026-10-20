@@ -124,6 +124,15 @@ cal@example.com writer</textarea>
           Size in MB <input type="number" id="mb" value="20" min="1" max="140" style="width: 6rem" />
         </label>
         <button id="big">Send and fetch a big file</button>
+        <p>
+          Spike item 7, with <strong>no member and no owner's token</strong>: the Worker's own service
+          account (in <code>.dev.vars</code>), a member of the shared drive. It tries each operation
+          in the folder you give (the member code's folder, or the owner's parent folder, or paste one).
+        </p>
+        <label>
+          Folder id <input type="text" id="service-folder" placeholder="a folder in the shared drive" />
+        </label>
+        <button id="service">7: try the service account in this folder</button>
         <table id="results" hidden>
           <thead>
             <tr>
