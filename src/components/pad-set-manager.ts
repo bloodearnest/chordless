@@ -1,4 +1,5 @@
 import { css, html, LitElement } from 'lit'
+import { ifDefined } from 'lit/directives/if-defined.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { derivePadSetName, uploadPadSet } from '../js/pad-set-service.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
@@ -8,6 +9,7 @@ import { buttonStyles, fieldStyles } from './shared-styles.ts'
 export class PadSetManager extends LitElement {
   static override properties = {
     _uploading: { state: true },
+    _progress: { state: true },
     _error: { state: true },
     _successMessage: { state: true },
     _padSetName: { state: true },
@@ -17,6 +19,8 @@ export class PadSetManager extends LitElement {
   }
 
   declare _uploading: boolean
+  /** Pads uploaded so far and in all, or null before the upload has got as far as the pads */
+  declare _progress: { done: number; total: number } | null
   declare _error: string
   declare _successMessage: string
   declare _padSetName: string
@@ -120,6 +124,11 @@ export class PadSetManager extends LitElement {
         color: var(--color-success, #27ae60);
       }
 
+      progress {
+        width: 100%;
+        height: 0.5rem;
+      }
+
       .padset-message.error {
         color: var(--color-danger, #e74c3c);
       }
@@ -131,6 +140,7 @@ export class PadSetManager extends LitElement {
     this._fileInput = createRef()
     this._padSets = new PadSetsController(this)
     this._uploading = false
+    this._progress = null
     this._error = ''
     this._successMessage = ''
     this._padSetName = ''
@@ -178,7 +188,9 @@ export class PadSetManager extends LitElement {
 
     this._uploading = true
     try {
-      await uploadPadSet(this._selectedFile, this._padSetName)
+      await uploadPadSet(this._selectedFile, this._padSetName, (done, total) => {
+        this._progress = { done, total }
+      })
       this._successMessage = 'Pad set uploaded successfully.'
       this._selectedFile = null
       this._padSetName = ''
@@ -191,6 +203,7 @@ export class PadSetManager extends LitElement {
       this._error = errorMessage(error) || 'Failed to upload pad set.'
     } finally {
       this._uploading = false
+      this._progress = null
     }
   }
 
@@ -297,6 +310,16 @@ export class PadSetManager extends LitElement {
         ${
           this._successMessage
             ? html`<div class="status-message success">${this._successMessage}</div>`
+            : ''
+        }
+
+        ${
+          this._uploading
+            ? html`<progress
+              aria-label="Uploading pad set"
+              max=${this._progress?.total ?? 1}
+              value=${ifDefined(this._progress?.done)}
+            ></progress>`
             : ''
         }
 

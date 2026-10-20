@@ -239,6 +239,7 @@ describe('the pad set manager', () => {
       await manager.updateComplete
       expect(button().textContent).to.contain('Uploading…')
       expect(fileField().disabled).to.equal(true)
+      expect(root().querySelector('progress')).to.not.equal(null)
 
       for (let i = 0; i < 200 && !manager._successMessage; i++) await wait(10)
       await wait(20)
@@ -250,6 +251,17 @@ describe('the pad set manager', () => {
       expect(fileField().value).to.equal('')
       expect(text()).to.not.contain('Selected:')
       expect(button().textContent).to.contain('Upload Pad Set')
+      expect(root().querySelector('progress')).to.equal(null)
+    })
+
+    it('shows how many pads are uploaded as it goes', async () => {
+      await show()
+      manager._uploading = true
+      manager._progress = { done: 3, total: 12 }
+      await manager.updateComplete
+      const bar = must(root().querySelector('progress'))
+      expect(bar.value).to.equal(3)
+      expect(bar.max).to.equal(12)
     })
 
     it('says what went wrong when the upload fails', async () => {

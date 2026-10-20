@@ -104,7 +104,8 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
 
 export async function uploadPadSet(
   zipFile: File | null | undefined,
-  padSetName?: string
+  padSetName?: string,
+  onProgress?: (uploaded: number, total: number) => void
 ): Promise<PadSet> {
   if (!zipFile) {
     throw new Error('Please select a pad set ZIP file.')
@@ -131,11 +132,13 @@ export async function uploadPadSet(
   await invalidatePadSetCache(folderId)
 
   // Upload each file
-  for (const key of PAD_FILE_KEYS) {
+  onProgress?.(0, PAD_FILE_KEYS.length)
+  for (const [index, key] of PAD_FILE_KEYS.entries()) {
     // (every key is there: checked above)
     const data = padFiles.get(key) as Uint8Array<ArrayBuffer>
     const blob = new Blob([data], { type: 'audio/mpeg' })
     await padStorage.addFile(folderId, key, blob)
+    onProgress?.(index + 1, PAD_FILE_KEYS.length)
   }
 
   padSetListCache = null
