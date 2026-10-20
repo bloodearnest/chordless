@@ -71,13 +71,6 @@ export async function handleOAuthCallback(
   const email = payload.email as string | undefined
   const sub = payload.sub
 
-  if (!refresh_token) {
-    return jsonResponse(
-      { error: 'No refresh token received. User may need to revoke and re-authorize.' },
-      400
-    )
-  }
-
   // Validate that Drive scope was granted
   const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/drive.file'
   if (!scope?.includes(REQUIRED_SCOPE)) {
@@ -87,6 +80,13 @@ export async function handleOAuthCallback(
           'Drive access not granted. Please re-authorize and ensure you grant access to Google Drive files.',
         granted_scopes: scope || '',
       },
+      400
+    )
+  }
+
+  if (!refresh_token) {
+    return jsonResponse(
+      { error: 'No refresh token received. User may need to revoke and re-authorize.' },
       400
     )
   }

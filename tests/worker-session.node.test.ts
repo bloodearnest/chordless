@@ -205,6 +205,23 @@ describe('POST /oauth/callback', () => {
     assert.equal(body.granted_scopes, 'openid email')
   })
 
+  test('says Drive was not granted, not that a refresh token is missing, when it gave neither', async () => {
+    const { google } = fakeGoogle({
+      exchangeCode: (async () => ({
+        scope: 'openid email',
+        id_token: 'i',
+        claims: { sub: 's' },
+      })) as unknown as GoogleApi['exchangeCode'],
+    })
+    const response = await handleOAuthCallback(
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
+      env,
+      google
+    )
+    assert.equal(response.status, 400)
+    assert.equal((await bodyOf(response)).granted_scopes, 'openid email')
+  })
+
   test('says nothing was granted when Google names no scopes', async () => {
     const { google } = fakeGoogle({
       exchangeCode: (async () => ({

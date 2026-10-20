@@ -199,6 +199,12 @@ export interface AuthorizeResult {
   user: StoredUser | null
 }
 
+/** Said when Google's screen was passed with the Drive box unticked (it is optional there) */
+const DRIVE_NOT_TICKED =
+  "Chordless wasn't given access to Google Drive. On Google's screen, tick the Google Drive box " +
+  '(“See, edit, create and delete only the specific Google Drive files you use with this app”) ' +
+  'before you press Continue, then connect again.'
+
 /**
  * Start OAuth flow to get auth code and exchange for token blob
  */
@@ -234,6 +240,9 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
 
           if (!blobResponse.ok) {
             const error = await blobResponse.json()
+            // The Worker names the scopes Google did grant when the Drive one is not among them:
+            // the box for Drive was not ticked on Google's screen
+            if (typeof error.granted_scopes === 'string') throw new Error(DRIVE_NOT_TICKED)
             throw new Error(error.error || 'Failed to exchange code for tokens')
           }
 

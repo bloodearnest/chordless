@@ -266,6 +266,30 @@ describe('the storage page, signed in to Google', () => {
       expect(page.authStatus).to.equal('ready')
     })
 
+    it('says what to tick when the Drive box was left unticked, and can be tried again', async () => {
+      await open(false)
+      exchange = () =>
+        Response.json(
+          { error: 'Drive access not granted', granted_scopes: 'openid' },
+          { status: 400 }
+        )
+      button('Connect with Google').click()
+      await until(() => text().includes('Authorization failed'), 'the failure to be shown')
+      expect(text()).to.contain('tick the Google Drive box')
+      expect(page.isAuthenticated).to.equal(false)
+
+      exchange = () =>
+        Response.json({
+          blob: 'new-blob',
+          access_token: 'tok',
+          expires_in: 3600,
+          user: { name: 'Bea Singer', email: 'bea@example.com', picture: null },
+        })
+      button('Connect with Google').click()
+      await until(() => text().includes('Authorization successful'), 'the sign-in to finish')
+      expect(text()).to.not.contain('tick the Google Drive box')
+    })
+
     it('says the sign-in has expired, with a way to reconnect, when Google no longer honours it', async () => {
       const refresh = Response.json({ error: 'invalid_grant' }, { status: 401 })
       const before = window.fetch

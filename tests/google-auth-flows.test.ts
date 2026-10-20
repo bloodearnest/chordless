@@ -232,6 +232,26 @@ describe('google-auth: signing in', () => {
       expect(message).to.equal('Failed to exchange code for tokens')
     })
 
+    it('tells the user to tick the Drive box when Google was not allowed to give Drive access', async () => {
+      respondTo = () =>
+        json(
+          {
+            error: 'Drive access not granted. Please re-authorize.',
+            granted_scopes: 'openid email',
+          },
+          400
+        )
+      let message = ''
+      try {
+        await authorizeWithGoogle()
+      } catch (error) {
+        message = (error as Error).message
+      }
+      expect(message).to.contain('tick the Google Drive box')
+      expect(message).to.contain('then connect again')
+      expect(worker.stored).to.equal(undefined)
+    })
+
     it('fails when the worker cannot keep the blob', async () => {
       worker.failing.add('STORE_BLOB')
       let message = ''
