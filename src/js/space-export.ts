@@ -227,8 +227,8 @@ export async function readExport(file: Blob): Promise<SpaceExport> {
     songs.push({
       ...record,
       chordproFileId,
-      driveFileId: null,
-      driveModifiedTime: null,
+      fileRef: null,
+      fileModified: null,
       lastSyncedAt: null,
       contentHash: hashText(content),
     })

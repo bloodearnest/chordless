@@ -15,12 +15,10 @@ describe('A setlist that differs from the official one', () => {
   const { makeDevice, addSetlist, editSetlist, syncDevice } = rig
 
   it('is one a user who can only read has changed, and only that', () => {
-    const synced = makeSetlist({ driveFileId: 'file-1', syncedContentHash: 'old' })
+    const synced = makeSetlist({ fileRef: 'file-1', syncedContentHash: 'old' })
     expect(differsFromOfficial(synced, false)).to.equal(true)
     expect(differsFromOfficial(synced, true), 'a writer pushes it').to.equal(false)
-    expect(differsFromOfficial({ ...synced, driveFileId: null }, false), 'not in Drive').to.equal(
-      false
-    )
+    expect(differsFromOfficial({ ...synced, fileRef: null }, false), 'not in Drive').to.equal(false)
   })
 
   it('is put back to what Drive holds, keeping its id and marking it synced', async () => {
@@ -55,7 +53,7 @@ describe('A setlist that differs from the official one', () => {
     try {
       await revertSetlistToOfficial(
         member.db,
-        { ...local, driveFileId: 'no-such-file' },
+        { ...local, fileRef: 'no-such-file' },
         member.sync.space
       )
     } catch (error) {

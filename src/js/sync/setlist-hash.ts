@@ -10,9 +10,9 @@ import { hashText } from '../utils/hash.ts'
 // content. Excluded from content hashes and from the copy uploaded to Drive.
 // (_lastSyncHash is the pre-content-hash field, kept only for old records.)
 const SETLIST_SYNC_FIELDS = [
-  'driveFileId',
-  'driveModifiedTime',
-  'driveChecksum',
+  'fileRef',
+  'fileModified',
+  'fileRev',
   'lastSyncedAt',
   'syncedContentHash',
   '_lastSyncHash',
@@ -20,10 +20,15 @@ const SETLIST_SYNC_FIELDS = [
 
 type SyncField = (typeof SETLIST_SYNC_FIELDS)[number]
 
+// What those were called before 2026-10-20: a record not migrated yet, or a copy in Drive that
+// someone's older version wrote, may still carry them
+const LEGACY_SYNC_FIELDS = ['driveFileId', 'driveModifiedTime', 'driveChecksum']
+
 /** A setlist without this device's sync state: what gets stored in Drive */
 export function setlistContent(setlist: Setlist): Omit<Setlist, SyncField> {
   const content: Partial<Setlist> = { ...setlist }
   for (const field of SETLIST_SYNC_FIELDS) delete content[field]
+  for (const field of LEGACY_SYNC_FIELDS) delete (content as Record<string, unknown>)[field]
   return content as Omit<Setlist, SyncField>
 }
 

@@ -5,7 +5,7 @@
  * space's folder, lists what is in it, and runs the pull and the push in turn.
  *
  * Sync Strategy:
- * - Track sync state in local database (lastSyncedAt, driveFileId, driveModifiedTime)
+ * - Track sync state in local database (lastSyncedAt, fileRef, fileModified)
  * - Pull (sync/pull.ts): download what Drive has that is new or changed
  * - Push (sync/push.ts): upload local changes that haven't been synced
  * - Conflict: If both changed, Drive wins
@@ -44,7 +44,7 @@ export interface UnsyncedChange {
 /** Where the link to the space's Drive folder is kept */
 export interface FolderLink {
   get(): Promise<string | null>
-  set(driveFolderId: string): Promise<void>
+  set(rootRef: string): Promise<void>
   /** Let go of the folder, so the next sync finds or makes one by name */
   clear(): Promise<void>
 }
@@ -150,12 +150,12 @@ function spaceFolderLink(spaceId: string): FolderLink {
   return {
     async get() {
       const space = await (await getDb()).getSpace(spaceId)
-      return space?.driveFolderId ?? null
+      return space?.rootRef ?? null
     },
-    async set(driveFolderId: string) {
+    async set(rootRef: string) {
       try {
         await (await getDb()).updateSpace(spaceId, {
-          driveFolderId,
+          rootRef,
           driveClientId: GOOGLE_CLIENT_ID,
         })
       } catch (error) {
@@ -164,7 +164,7 @@ function spaceFolderLink(spaceId: string): FolderLink {
     },
     async clear() {
       await (await getDb()).updateSpace(spaceId, {
-        driveFolderId: null,
+        rootRef: null,
         driveClientId: null,
       })
     },
@@ -196,7 +196,7 @@ export class DriveSyncManager implements SyncSession {
   spaceDb: ChordlessDB | null
   folderLink: FolderLink | null
   memberCache: MemberCache | null
-  driveFolderId: string | null
+  rootRef: string | null
   parser: ChordProParser
   /** The storage backend (Google Drive unless a test says otherwise) */
   storage: StorageBackend
@@ -234,7 +234,7 @@ export class DriveSyncManager implements SyncSession {
     this.folderLink = folderLink
     this.memberCache = memberCache
     this.storage = storage ?? driveStorage
-    this.driveFolderId = null
+    this.rootRef = null
     this.parser = new ChordProParser()
 
     // Drive file inventory (for existence checks)
@@ -268,8 +268,8 @@ export class DriveSyncManager implements SyncSession {
 
   /** The space's Drive folder, once found */
   get folderId(): string {
-    if (!this.driveFolderId) throw new Error('The Drive folder is not known yet: call init()')
-    return this.driveFolderId
+    if (!this.rootRef) throw new Error('The Drive folder is not known yet: call init()')
+    return this.rootRef
   }
 
   async init(): Promise<boolean> {
@@ -305,9 +305,9 @@ export class DriveSyncManager implements SyncSession {
    */
   async startOver(): Promise<void> {
     await this.open()
-    await this.db.clearDriveLinks()
+    await this.db.clearFileLinks()
     await this.#folderLink.clear()
-    this.driveFolderId = null
+    this.rootRef = null
   }
 
   /**
@@ -324,7 +324,7 @@ export class DriveSyncManager implements SyncSession {
       if (!folder || folder.trashed) {
         throw new DriveFolderGoneError(folder)
       }
-      this.driveFolderId = folder.ref
+      this.rootRef = folder.ref
       if (folder.name !== this.spaceName) {
         await this.followRename(folder)
       }
@@ -332,7 +332,7 @@ export class DriveSyncManager implements SyncSession {
     }
 
     const result = await this.storage.ensureRoot(this.spaceName, this.spaceId as string)
-    this.driveFolderId = result.ref
+    this.rootRef = result.ref
     await this.#folderLink.set(result.ref)
     return result.isNew
   }
@@ -348,7 +348,7 @@ export class DriveSyncManager implements SyncSession {
 
     if (existing && existing.ref !== folder.ref) {
       if (!(await this.hasSyncedRecords())) {
-        this.driveFolderId = existing.ref
+        this.rootRef = existing.ref
         await this.#folderLink.set(existing.ref)
         return
       }
@@ -365,7 +365,7 @@ export class DriveSyncManager implements SyncSession {
   /** Whether any local setlist or song has been synced to Drive */
   async hasSyncedRecords(): Promise<boolean> {
     const records = [...(await this.db.getAllSetlists()), ...(await this.db.getAllSongs())]
-    return records.some(record => record.driveFileId)
+    return records.some(record => record.fileRef)
   }
 
   /**
@@ -528,12 +528,12 @@ export class DriveSyncManager implements SyncSession {
     if (!this._driveFileIds) return
 
     const missing = [...(await this.db.getAllSetlists()), ...(await this.db.getAllSongs())].filter(
-      record => record.driveFileId && !this.fileExistsInDrive(record.driveFileId)
+      record => record.fileRef && !this.fileExistsInDrive(record.fileRef)
     )
 
     let elsewhere = 0
     for (const record of missing) {
-      const file = await this.space.status(record.driveFileId as string)
+      const file = await this.space.status(record.fileRef as string)
       if (file && !file.trashed) elsewhere++
     }
     if (elsewhere > 0) {
@@ -554,7 +554,7 @@ export class DriveSyncManager implements SyncSession {
 
     let removed = 0
     for (const setlist of await this.db.getAllSetlists()) {
-      if (!setlist.driveFileId || this.fileExistsInDrive(setlist.driveFileId)) continue
+      if (!setlist.fileRef || this.fileExistsInDrive(setlist.fileRef)) continue
       if (this.hasLiveFileOfItsOwn(setlist)) continue
       if (setlistHasLocalChanges(setlist)) continue
       await this.db.deleteSetlist(setlist.id)
@@ -566,20 +566,20 @@ export class DriveSyncManager implements SyncSession {
   /**
    * Check if a Drive file ID actually exists in Drive
    */
-  fileExistsInDrive(driveFileId: string): boolean {
+  fileExistsInDrive(fileRef: string): boolean {
     if (!this._driveFileIds) {
       // Inventory not built, assume file exists (conservative)
       return true
     }
-    return this._driveFileIds.has(driveFileId)
+    return this._driveFileIds.has(fileRef)
   }
 
   /**
    * Whether a local record has no Drive file to be found: it never had one, or the one it
    * had is no longer in the folder. (With no inventory, any file is assumed to be there.)
    */
-  isOrphaned(record: { driveFileId?: string | null }): boolean {
-    return !record.driveFileId || !this.fileExistsInDrive(record.driveFileId)
+  isOrphaned(record: { fileRef?: string | null }): boolean {
+    return !record.fileRef || !this.fileExistsInDrive(record.fileRef)
   }
 
   /**

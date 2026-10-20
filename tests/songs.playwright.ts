@@ -255,7 +255,7 @@ test.describe('Song info', () => {
       const { getCurrentDB } = await import('/js/db.ts')
       const db = await getCurrentDB()
       const setlist = await db.getSetlist('drive-test-setlist')
-      if (setlist) await db.saveSetlist({ ...setlist, driveFileId: 'drive-file-1' })
+      if (setlist) await db.saveSetlist({ ...setlist, fileRef: 'drive-file-1' })
     })
     await page.goto('/setlist/drive-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)

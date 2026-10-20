@@ -102,8 +102,8 @@ async function test() {
       importSource: 'test',
       sourceUrl: null,
       modifiedDate: new Date().toISOString(),
-      driveFileId: null,
-      driveModifiedTime: null,
+      fileRef: null,
+      fileModified: null,
       lastSyncedAt: null,
       contentHash: 'test-hash-123',
     }
@@ -151,8 +151,8 @@ async function test() {
       ],
       createdDate: new Date().toISOString(),
       modifiedDate: new Date().toISOString(),
-      driveFileId: null,
-      driveModifiedTime: null,
+      fileRef: null,
+      fileModified: null,
       lastSyncedAt: null,
       _lastSyncHash: null,
     }

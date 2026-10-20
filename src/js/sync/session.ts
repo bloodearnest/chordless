@@ -56,9 +56,9 @@ export interface SyncSession {
   pullIncomplete: boolean
 
   /** Whether a Drive file is in the folder (with no inventory, any file is assumed to be) */
-  fileExistsInDrive(driveFileId: string): boolean
+  fileExistsInDrive(fileRef: string): boolean
   /** Whether a local record has no Drive file to be found: it never had one, or it is gone */
-  isOrphaned(record: { driveFileId?: string | null }): boolean
+  isOrphaned(record: { fileRef?: string | null }): boolean
   /**
    * Whether the last pull saw a live Drive file for this setlist id. When this device's record
    * has no file of its own that is still there, that file is the setlist's: the pull should have

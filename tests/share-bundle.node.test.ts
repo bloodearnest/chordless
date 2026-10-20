@@ -90,7 +90,7 @@ test('the bundle carries no ids, emails or sync fields', () => {
     ...setlist,
     id: 'setlist-uuid-1',
     ownerId: 'ann@example.com',
-    driveFileId: 'drive-file-1',
+    fileRef: 'drive-file-1',
     syncedContentHash: 'hash-1',
     share: { fileId: 'f', key: 'k', created: '', expires: '', bundleHash: '' },
   }

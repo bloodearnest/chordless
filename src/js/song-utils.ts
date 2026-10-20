@@ -309,8 +309,8 @@ async function insertSong(
     importDate: now,
     ...provenance,
     modifiedDate: now,
-    driveFileId: null,
-    driveModifiedTime: null,
+    fileRef: null,
+    fileModified: null,
     lastSyncedAt: null,
     contentHash,
   })

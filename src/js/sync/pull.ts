@@ -54,9 +54,9 @@ async function downloadSetlist(
       // The same content: only the file it points at changes
       return {
         ...localSetlist,
-        driveFileId: driveFile.ref,
-        driveModifiedTime: driveFile.modified,
-        driveChecksum: driveFile.rev,
+        fileRef: driveFile.ref,
+        fileModified: driveFile.modified,
+        fileRev: driveFile.rev,
         lastSyncedAt: new Date().toISOString(),
         syncedContentHash: remoteHash,
       }
@@ -66,9 +66,9 @@ async function downloadSetlist(
       console.warn(`[DriveSync] Setlist ${setlistId} has local changes: keeping them`)
       return {
         ...localSetlist,
-        driveFileId: driveFile.ref,
-        driveModifiedTime: driveFile.modified,
-        driveChecksum: driveFile.rev,
+        fileRef: driveFile.ref,
+        fileModified: driveFile.modified,
+        fileRev: driveFile.rev,
       }
     }
     // Unchanged here since it was synced, and Drive's copy differs: Drive's is newer
@@ -79,8 +79,8 @@ async function downloadSetlist(
     // were recorded. Not a remote change: keep local edits, record checksum.
     return {
       ...localSetlist,
-      driveModifiedTime: driveFile.modified,
-      driveChecksum: driveFile.rev,
+      fileModified: driveFile.modified,
+      fileRev: driveFile.rev,
     }
   }
   if (localSetlist && setlistHasLocalChanges(localSetlist)) {
@@ -92,9 +92,9 @@ async function downloadSetlist(
   return {
     ...setlistContent(remote),
     id: remote.id || setlistId,
-    driveFileId: driveFile.ref,
-    driveModifiedTime: driveFile.modified,
-    driveChecksum: driveFile.rev,
+    fileRef: driveFile.ref,
+    fileModified: driveFile.modified,
+    fileRev: driveFile.rev,
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
   }
@@ -126,10 +126,10 @@ export async function pullSetlists(
       if (!localSetlist) {
         // New setlist, download it
         downloadQueue.push({ driveFile, setlistId })
-      } else if (localSetlist.driveFileId === driveFile.ref) {
+      } else if (localSetlist.fileRef === driveFile.ref) {
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
-        if (driveFile.rev !== localSetlist.driveChecksum) {
+        if (driveFile.rev !== localSetlist.fileRev) {
           if (session.readOnly && setlistHasLocalChanges(localSetlist)) {
             resetting.set(setlistId, localSetlist)
           }
@@ -203,13 +203,13 @@ export async function pullSetlists(
  *
  * Validation: Handle user-copied files
  * When users copy files in Drive, appProperties are also copied, which can create
- * duplicate versionId values (multiple files with same versionId but different driveFileId)
+ * duplicate versionId values (multiple files with same versionId but different fileRef)
  *
  * Detection and auto-fix strategy:
  * 1. List all chordpro files in songs/ folder with appProperties
  * 2. Group by songId
  * 3. For each song, detect duplicate versionId values:
- *    - If multiple files have same versionId but different driveFileId
+ *    - If multiple files have same versionId but different fileRef
  *    - Generate new unique versionId for the duplicate
  *    - Update Drive file's appProperties with corrected versionId and versionLabel
  * 4. Download/update local database with corrected metadata
@@ -264,9 +264,9 @@ export async function pullSongs(
     let needsDownload = false
     if (!localSong) {
       needsDownload = true
-    } else if (!localSong.driveFileId || localSong.driveFileId !== file.ref) {
+    } else if (!localSong.fileRef || localSong.fileRef !== file.ref) {
       needsDownload = true
-    } else if (file.rev !== localSong.driveChecksum) {
+    } else if (file.rev !== localSong.fileRev) {
       // Drive's content changed since our last sync: its md5Checksum (computed
       // by Drive) differs from the one we recorded
       if (session.readOnly && chordproRecord && songHasLocalChanges(localSong, chordproRecord)) {
@@ -345,11 +345,7 @@ async function downloadSong(
     : undefined
 
   // (with the chart gone from this device, it is restored from Drive's, whatever the hash)
-  if (
-    localChart &&
-    localSong?.driveFileId === file.ref &&
-    localSong.syncedContentHash === remoteHash
-  ) {
+  if (localChart && localSong?.fileRef === file.ref && localSong.syncedContentHash === remoteHash) {
     // Same chart as we last synced, e.g. a record from before checksums were
     // recorded. Not a remote change: keep local edits, record the checksum.
     await session.db.saveSong({
@@ -412,11 +408,11 @@ async function downloadSong(
     importSource: 'drive',
     sourceUrl: localSong?.sourceUrl || null,
     modifiedDate: new Date(file.modified || file.created || Date.now()).toISOString(),
-    driveFileId: file.ref,
+    fileRef: file.ref,
     ...driveMarkers(file),
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
-    driveProperties: {
+    fileProps: {
       songId: id,
       songUuid,
       contentHash,

@@ -13,7 +13,7 @@ database named exactly after its `spaceId` containing four object stores:
 4. `setlist_local` – local-only per-user state (not synced)
 
 Drive sync stores JSON/ChordPro files inside the space’s Google Drive folder
-and tracks Drive metadata (`driveFileId`, `driveModifiedTime`, `lastSyncedAt`, `_lastSyncHash`, etc.)
+and tracks Drive metadata (`fileRef`, `fileModified`, `lastSyncedAt`, `_lastSyncHash`, etc.)
 on each record.
 
 ## Song
@@ -30,7 +30,7 @@ Fields stored in the `songs` store (per space):
 - Metadata extracted from chordpro: `ccliNumber`, `title`, `titleNormalized`, `author`, `copyright`, `key`, `tempo`, `time`
 - Import metadata: `importDate`, `importUser`, `importSource`, `sourceUrl`
 - `modifiedDate`: when this variant was last edited
-- Sync metadata: `driveFileId`, `driveModifiedTime`, `lastSyncedAt`, `driveProperties`, `contentHash`
+- Sync metadata: `fileRef`, `fileModified`, `lastSyncedAt`, `fileProps`, `contentHash`
 
 ### ChordPro Store
 
@@ -79,7 +79,7 @@ Each song in the setlist has metadata specific to this setlist:
 - tempo: tempo override for this setlist (optional)
 - notes: performance notes for this song in this setlist
 
-Setlists also store sync metadata: `driveFileId`, `driveModifiedTime`, `lastSyncedAt`,
+Setlists also store sync metadata: `fileRef`, `fileModified`, `lastSyncedAt`,
 `_lastSyncHash`. These fields are updated whenever a setlist is uploaded/downloaded from Drive.
 
 Notes:

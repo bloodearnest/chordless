@@ -37,7 +37,7 @@ describe('Drive sync: the less common turns', () => {
   const { makeDevice, addSetlist, editSetlist, syncDevice, replaceDriveFile } = rig
 
   const driveFileOf = async (device: { db: ChordlessDB }, setlistId: string) =>
-    must(must(await device.db.getSetlist(setlistId)).driveFileId)
+    must(must(await device.db.getSetlist(setlistId)).fileRef)
 
   describe('a manager that is not ready', () => {
     it('says it has not been initialised, whatever it is asked', async () => {
@@ -83,8 +83,8 @@ describe('Drive sync: the less common turns', () => {
 
   describe('records from before checksums were kept', () => {
     it('are judged by their dates', () => {
-      const base = makeSetlist({ id: 's', driveFileId: 'f', modifiedDate: '2026-10-05T10:00:00Z' })
-      expect(setlistHasLocalChanges({ ...base, driveFileId: null })).to.equal(true)
+      const base = makeSetlist({ id: 's', fileRef: 'f', modifiedDate: '2026-10-05T10:00:00Z' })
+      expect(setlistHasLocalChanges({ ...base, fileRef: null })).to.equal(true)
       // never synced by the clock, so edited
       expect(setlistHasLocalChanges(base)).to.equal(true)
       expect(setlistHasLocalChanges({ ...base, lastSyncedAt: '2026-10-06T10:00:00Z' })).to.equal(
@@ -97,19 +97,19 @@ describe('Drive sync: the less common turns', () => {
 
     it('are judged by their dates and hashes, for a song', () => {
       const song = makeSong({
-        driveFileId: 'f',
+        fileRef: 'f',
         modifiedDate: '2026-10-05T10:00:00Z',
       }) as never as SongRecord
       const chart = (extra: object = {}) =>
         ({ id: 'c', content: 'x', contentHash: 'h1', lastModified: 0, ...extra }) as ChordProRecord
-      expect(songHasLocalChanges({ ...song, driveFileId: null }, chart())).to.equal(true)
+      expect(songHasLocalChanges({ ...song, fileRef: null }, chart())).to.equal(true)
       // synced, the chart edited since by its own date
       expect(
         songHasLocalChanges(
           {
             ...song,
             lastSyncedAt: '2026-10-01T10:00:00Z',
-            driveProperties: { contentHash: 'h0' } as never,
+            fileProps: { contentHash: 'h0' } as never,
           },
           chart({ lastModified: new Date('2026-10-06T10:00:00Z').getTime() })
         )
@@ -120,7 +120,7 @@ describe('Drive sync: the less common turns', () => {
           {
             ...song,
             lastSyncedAt: '2026-10-01T10:00:00Z',
-            driveProperties: { contentHash: 'h1' } as never,
+            fileProps: { contentHash: 'h1' } as never,
           },
           chart({ lastModified: new Date('2026-10-06T10:00:00Z').getTime() })
         )
@@ -154,7 +154,7 @@ describe('Drive sync: the less common turns', () => {
       const { tablet, setlist } = await twoDevices()
       await syncDevice(tablet)
       const kept = must(await tablet.db.getSetlist(setlist.id))
-      expect(kept.driveFileId).to.equal('replacement')
+      expect(kept.fileRef).to.equal('replacement')
       expect(kept.name).to.equal('Original')
       expect(kept.syncedContentHash).to.be.a('string')
     })
@@ -207,7 +207,7 @@ describe('Drive sync: the less common turns', () => {
       try {
         const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
         await sync.init()
-        expect(sync.driveFolderId).to.be.a('string')
+        expect(sync.rootRef).to.be.a('string')
         sync.spaceDb?.db?.close()
       } finally {
         SpaceDB.prototype.updateSpace = realUpdate
@@ -215,12 +215,12 @@ describe('Drive sync: the less common turns', () => {
       // Kept for real, the next manager finds the folder by the link
       const again = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await again.init()
-      const linked = again.driveFolderId
+      const linked = again.rootRef
       expect(await again.hasSyncedRecords()).to.equal(false)
       again.spaceDb?.db?.close()
       const third = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await third.init()
-      expect(third.driveFolderId).to.equal(linked)
+      expect(third.rootRef).to.equal(linked)
       third.spaceDb?.db?.close()
       await deleteSpace(space.id)
       if (before.id) await setCurrentSpace(before.id, before.name)
@@ -254,7 +254,7 @@ describe('Drive sync: the less common turns', () => {
       rig.storage.copyFile(original.ref, { ref: 'same' })
       await syncDevice(tablet)
       const song = must(await tablet.db.getSong('song-1'))
-      expect(song.driveFileId).to.equal('copy')
+      expect(song.fileRef).to.equal('copy')
     })
 
     it('leaves a file that is not a chart alone', async () => {
@@ -285,9 +285,9 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const song = must(await phone.db.getSong('song-1'))
       // as if its checksum was never recorded
-      await phone.db.saveSong({ ...song, driveChecksum: 'old' })
+      await phone.db.saveSong({ ...song, fileRev: 'old' })
       await syncDevice(phone)
-      expect(must(await phone.db.getSong('song-1')).driveChecksum).to.not.equal('old')
+      expect(must(await phone.db.getSong('song-1')).fileRev).to.not.equal('old')
     })
 
     it('lets Drive win when a song was changed both here and in Drive', async () => {
@@ -435,7 +435,7 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const [again] = rig.storage.list(each => each.props.type === 'chordpro')
       expect(again.ref).to.not.equal(file.ref)
-      expect(must(await phone.db.getSong('song-1')).driveFileId).to.equal(again.ref)
+      expect(must(await phone.db.getSong('song-1')).fileRef).to.equal(again.ref)
     })
 
     it('are left out of an upload when their chart is not here, and when they have none', async () => {
@@ -473,7 +473,7 @@ describe('Drive sync: the less common turns', () => {
       }
       const real = phone.db.saveSong.bind(phone.db)
       phone.db.saveSong = async song => {
-        if (song.driveFileId) throw new Error('still full')
+        if (song.fileRef) throw new Error('still full')
         return real(song)
       }
       await syncDevice(phone)
@@ -502,7 +502,7 @@ describe('Drive sync: the less common turns', () => {
       }
       const real = phone.db.saveSetlist.bind(phone.db)
       phone.db.saveSetlist = async setlist => {
-        if (setlist.id === 'b' && setlist.driveFileId) throw new Error('still full')
+        if (setlist.id === 'b' && setlist.fileRef) throw new Error('still full')
         return real(setlist)
       }
       await syncDevice(phone)
@@ -536,14 +536,14 @@ describe('Drive sync: the less common turns', () => {
   describe('the markers a record keeps of its Drive file', () => {
     it('are its modified time and checksum, or nothing when Drive gave none', () => {
       expect(driveMarkers({ modified: 't', rev: 'm' })).to.deep.equal({
-        driveModifiedTime: 't',
-        driveChecksum: 'm',
+        fileModified: 't',
+        fileRev: 'm',
       })
       expect(driveMarkers({ modified: null, rev: null })).to.deep.equal({
-        driveModifiedTime: null,
-        driveChecksum: null,
+        fileModified: null,
+        fileRev: null,
       })
-      expect(driveMarkers(null)).to.deep.equal({ driveModifiedTime: null, driveChecksum: null })
+      expect(driveMarkers(null)).to.deep.equal({ fileModified: null, fileRev: null })
     })
   })
 
@@ -556,10 +556,10 @@ describe('Drive sync: the less common turns', () => {
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
       expect(await songNeedsSync(phone.sync, song, chart)).to.equal(false)
       await phone.sync.buildDriveInventory()
-      rig.storage.remove(must(song.driveFileId))
+      rig.storage.remove(must(song.fileRef))
       await phone.sync.buildDriveInventory()
       expect(await songNeedsSync(phone.sync, song, chart)).to.equal(true)
-      expect(await songNeedsSync(phone.sync, { ...song, driveFileId: null }, chart)).to.equal(true)
+      expect(await songNeedsSync(phone.sync, { ...song, fileRef: null }, chart)).to.equal(true)
     })
   })
 
@@ -605,9 +605,9 @@ describe('Drive sync: the less common turns', () => {
       const setlist = await addSetlist(phone, { name: 'Same' })
       await syncDevice(phone)
       const record = must(await phone.db.getSetlist(setlist.id))
-      await phone.db.saveSetlist({ ...record, driveChecksum: 'out of date' })
+      await phone.db.saveSetlist({ ...record, fileRev: 'out of date' })
       await pullSetlists(phone.sync)
-      expect(must(await phone.db.getSetlist(setlist.id)).driveChecksum).to.not.equal('out of date')
+      expect(must(await phone.db.getSetlist(setlist.id)).fileRev).to.not.equal('out of date')
     })
 
     it('say which could not be downloaded, and the pull is not trusted', async () => {
@@ -839,7 +839,7 @@ describe('Drive sync: the less common turns', () => {
         folderLink: phone.folderLink,
         storage: rig.storage,
       })
-      bare.driveFolderId = phone.sync.driveFolderId
+      bare.rootRef = phone.sync.rootRef
       expect(await bare.refreshMembers()).to.equal(null)
     })
 
@@ -908,7 +908,7 @@ describe('Drive sync: the less common turns', () => {
   describe('legacy songs, by date', () => {
     it('are judged by the song’s own date when there is none on the chart or the song', () => {
       const song = {
-        ...makeSong({ driveFileId: 'f', lastSyncedAt: '2026-10-01T00:00:00Z' }),
+        ...makeSong({ fileRef: 'f', lastSyncedAt: '2026-10-01T00:00:00Z' }),
         modifiedDate: '',
       }
       const chart = { id: 'c', content: 'x', contentHash: 'h', lastModified: 0 }

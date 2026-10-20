@@ -37,7 +37,7 @@ describe('Drive sync: reset from Drive', () => {
       await phone.sync.resetLocalFromDrive()
 
       expect((await phone.db.getAllSetlists()).map(s => s.name)).to.deep.equal(['Keep'])
-      expect(must(await phone.db.getSetlist(keep.id)).driveFileId).to.be.a('string')
+      expect(must(await phone.db.getSetlist(keep.id)).fileRef).to.be.a('string')
       // And a normal sync afterwards doesn't bring it back
       await syncDevice(phone)
       expect(driveSetlistFiles().filter(f => !f.trashed)).to.have.length(1)

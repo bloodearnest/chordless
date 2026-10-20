@@ -29,8 +29,8 @@ async function inspectFolder(): Promise<{
   folder: RootInfo | null
 } | null> {
   const space = await getCurrentSpaceFull()
-  if (!space.driveFolderId) return null
-  const folder = await driveStorage.inspectRoot(space.driveFolderId)
+  if (!space.rootRef) return null
+  const folder = await driveStorage.inspectRoot(space.rootRef)
   return { space, folder }
 }
 
@@ -38,9 +38,9 @@ async function inspectFolder(): Promise<{
 export async function driveSpaceStorage(spaceId: string): Promise<SpaceStorage> {
   const db = new SpaceDB()
   await db.init()
-  const driveFolderId = (await db.getSpace(spaceId))?.driveFolderId
-  if (!driveFolderId) throw new Error('This space is not in Google Drive')
-  return driveStorage.space(driveFolderId)
+  const rootRef = (await db.getSpace(spaceId))?.rootRef
+  if (!rootRef) throw new Error('This space is not in Google Drive')
+  return driveStorage.space(rootRef)
 }
 
 function problemWith(space: Space, folder: RootInfo | null): DriveFolderProblem | null {

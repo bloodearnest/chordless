@@ -6,7 +6,7 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-import { ChordlessDB, createSetlist, parseTempo } from '../src/js/db.ts'
+import { ChordlessDB, createSetlist, parseTempo, withFileFieldsRenamed } from '../src/js/db.ts'
 import { setlistContentHash } from '../src/js/sync/setlist-hash.ts'
 import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
 import { makeSetlist, makeSong } from './builders.ts'
@@ -78,9 +78,9 @@ describe('ChordlessDB forgetting Drive', () => {
 
   it('leaves every setlist and song as one Drive has never seen, with its content', async () => {
     const synced = {
-      driveFileId: 'file-1',
-      driveModifiedTime: '2026-10-11T10:00:00.000Z',
-      driveChecksum: 'abc',
+      fileRef: 'file-1',
+      fileModified: '2026-10-11T10:00:00.000Z',
+      fileRev: 'abc',
       lastSyncedAt: '2026-10-11T10:00:00.000Z',
       syncedContentHash: 'hash',
     }
@@ -98,21 +98,19 @@ describe('ChordlessDB forgetting Drive', () => {
         },
       })
     )
-    await db.saveSong(
-      makeSong({ uuid: 'song-1', title: 'Amazing', ...synced, driveProperties: null })
-    )
+    await db.saveSong(makeSong({ uuid: 'song-1', title: 'Amazing', ...synced, fileProps: null }))
 
-    await db.clearDriveLinks()
+    await db.clearFileLinks()
 
     const setlist = must(await db.getSetlist('setlist-1'))
     expect(setlist.name).to.equal('Sunday')
-    expect(setlist.driveFileId).to.equal(null)
+    expect(setlist.fileRef).to.equal(null)
     expect(setlist.syncedContentHash).to.equal(null)
     expect(setlist.share).to.equal(null)
     const song = must(await db.getSong('song-1'))
     expect(song.title).to.equal('Amazing')
-    expect(song.driveFileId).to.equal(null)
-    expect(song.driveChecksum).to.equal(null)
+    expect(song.fileRef).to.equal(null)
+    expect(song.fileRev).to.equal(null)
     expect(song.lastSyncedAt).to.equal(null)
   })
 })
@@ -209,7 +207,113 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
     const migratedEdited = must(await db.getSetlist('edited'))
     expect(migratedEdited.songs[0].tempo).to.equal(80)
     expect(setlistHasLocalChanges(migratedEdited)).to.equal(true)
+    // (and on through the next version: the file fields have their new names)
+    expect(migratedInSync.fileRef).to.equal('drive-1')
+    expect(migratedInSync).not.to.have.property('driveFileId')
     must(db.db).close()
+  })
+})
+
+describe("ChordlessDB version 7: the fields about a record's file are named for any storage", () => {
+  let dbName: string
+
+  afterEach(async () => {
+    await deleteDatabase(dbName)
+  })
+
+  /** A version 6 database, as it was, with these songs and setlists */
+  function makeVersion6({ songs, setlists }: { songs: object[]; setlists: object[] }) {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(dbName, 6)
+      request.onupgradeneeded = () => {
+        const db = request.result
+        db.createObjectStore('songs', { keyPath: 'uuid' }).createIndex('id', 'id')
+        db.createObjectStore('chordpro', { keyPath: 'id' })
+        db.createObjectStore('setlists', { keyPath: 'id' })
+        db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+      }
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction(['songs', 'setlists'], 'readwrite')
+        for (const song of songs) tx.objectStore('songs').put(song)
+        for (const setlist of setlists) tx.objectStore('setlists').put(setlist)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+  }
+
+  it("moves the old names of a song's and a setlist's file fields to the new, keeping the rest", async () => {
+    dbName = `TEST-${uniqueName()}`
+    const fileProps = { songId: 'song-1', title: 'One' }
+    await makeVersion6({
+      songs: [
+        {
+          uuid: 'uuid-1',
+          id: 'song-1',
+          title: 'One',
+          driveFileId: 'f-song',
+          driveChecksum: 'sum-song',
+          driveModifiedTime: '2026-10-01T00:00:00Z',
+          driveProperties: fileProps,
+          syncedContentHash: 'h',
+        },
+        { uuid: 'uuid-2', id: 'song-2', title: 'Never synced' },
+      ],
+      setlists: [
+        {
+          id: 'set-1',
+          name: 'Sunday',
+          driveFileId: 'f-set',
+          driveChecksum: 'sum-set',
+          driveModifiedTime: '2026-10-02T00:00:00Z',
+          lastSyncedAt: '2026-10-02T01:00:00Z',
+          syncedContentHash: 'hash',
+          songs: [],
+        },
+        // A record that already has the new names (made by a newer version) keeps them
+        { id: 'set-2', name: 'Both', driveFileId: 'old', fileRef: 'new', songs: [] },
+      ],
+    })
+
+    const db = new ChordlessDB(dbName)
+    await db.init()
+
+    const song = must(await db.getSong('uuid-1'))
+    expect(song).to.include({
+      fileRef: 'f-song',
+      fileRev: 'sum-song',
+      fileModified: '2026-10-01T00:00:00Z',
+      syncedContentHash: 'h',
+      title: 'One',
+    })
+    expect(song.fileProps).to.deep.equal(fileProps)
+    for (const old of ['driveFileId', 'driveChecksum', 'driveModifiedTime', 'driveProperties']) {
+      expect(song, old).not.to.have.property(old)
+    }
+    expect(must(await db.getSong('uuid-2'))).not.to.have.property('fileRef')
+
+    const setlist = must(await db.getSetlist('set-1'))
+    expect(setlist).to.include({
+      fileRef: 'f-set',
+      fileRev: 'sum-set',
+      fileModified: '2026-10-02T00:00:00Z',
+      lastSyncedAt: '2026-10-02T01:00:00Z',
+      syncedContentHash: 'hash',
+    })
+    expect(setlist).not.to.have.property('driveFileId')
+    const both = must(await db.getSetlist('set-2'))
+    expect(both.fileRef).to.equal('new')
+    expect(both).not.to.have.property('driveFileId')
+    must(db.db).close()
+  })
+
+  it('leaves a record that has none of them as it is', () => {
+    const record = { id: 'x', name: 'Plain' }
+    expect(withFileFieldsRenamed(record)).to.equal(record)
   })
 })
 

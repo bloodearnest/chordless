@@ -3,7 +3,7 @@
 // Each space then has its own ChordlessDB with songs, setlists, etc.
 
 import type { Space } from './data-types.ts'
-import { transactionError } from './utils/idb.ts'
+import { requestResult, transactionError } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 /**
@@ -19,14 +19,39 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
  * - Timestamps: createdDate, modifiedDate
  */
 
-// The names the browser stores this under were chosen when a space was called an organisation.
-// They stay, so that spaces already on a device are found: renaming means copying every record.
-const DB_NAME = 'organisations'
-const STORE = 'organisations'
+const DB_NAME = 'spaces'
+const STORE = 'spaces'
 const DB_VERSION = 1
+
+// Before 2026-10-20 a space was called an organisation, and the spaces were kept under that name.
+// init() moves them to the new database the first time it finds the old one.
+const LEGACY_DB_NAME = 'organisations'
+const LEGACY_STORE = 'organisations'
+
+/** The old database, or null if this device never had one (and none is made for the asking) */
+function openLegacyDatabase(name: string): Promise<IDBDatabase | null> {
+  return new Promise(resolve => {
+    const request = indexedDB.open(name)
+    // It did not exist: stop it being made
+    request.onupgradeneeded = () => request.transaction?.abort()
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => resolve(null)
+  })
+}
+
+/** A space as the old database kept it: the Drive folder it was linked to had another name */
+type LegacySpace = Space & { driveFolderId?: string | null }
 
 export class SpaceDB {
   db: IDBDatabase | null = null
+  #name: string
+  #legacyName: string
+
+  /** (Tests give names of their own, so they do not touch the spaces of the page they run in) */
+  constructor({ name = DB_NAME, legacyName = LEGACY_DB_NAME } = {}) {
+    this.#name = name
+    this.#legacyName = legacyName
+  }
 
   #transaction(mode: IDBTransactionMode): IDBTransaction {
     if (!this.db) throw new Error('SpaceDB is not initialised')
@@ -39,7 +64,7 @@ export class SpaceDB {
     }
 
     return new Promise<void>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME, DB_VERSION)
+      const request = indexedDB.open(this.#name, DB_VERSION)
 
       request.onerror = () => {
         console.error('[SpaceDB] Error opening database:', request.error)
@@ -50,8 +75,8 @@ export class SpaceDB {
 
       request.onsuccess = () => {
         this.db = request.result
-        ensurePersistentStorage(DB_NAME)
-        resolve()
+        ensurePersistentStorage(this.#name)
+        this.#moveFromLegacy().then(() => resolve(), reject)
       }
 
       request.onupgradeneeded = () => {
@@ -63,6 +88,47 @@ export class SpaceDB {
           spaceStore.createIndex('name', 'name', { unique: true })
         }
       }
+    })
+  }
+
+  /**
+   * Bring the spaces of the database they used to be kept in (and the Drive folder link under its
+   * new name), then remove that database. Spaces already here win, so it is safe to run again, or
+   * in two tabs at once; one that cannot be added (a name already taken) is left behind and said.
+   */
+  async #moveFromLegacy(): Promise<void> {
+    const legacy = await openLegacyDatabase(this.#legacyName)
+    if (!legacy) return
+    try {
+      const old: LegacySpace[] = legacy.objectStoreNames.contains(LEGACY_STORE)
+        ? await requestResult(legacy.transaction([LEGACY_STORE]).objectStore(LEGACY_STORE).getAll())
+        : []
+      for (const { driveFolderId, ...space } of old) {
+        const moved: Space = { ...space }
+        const rootRef = space.rootRef ?? driveFolderId
+        if (rootRef) moved.rootRef = rootRef
+        await this.#addIfNew(moved)
+      }
+    } finally {
+      legacy.close()
+    }
+    await new Promise<void>(resolve => {
+      const request = indexedDB.deleteDatabase(this.#legacyName)
+      // Blocked by another tab still on the old database: it is removed when that closes
+      request.onsuccess = request.onerror = request.onblocked = () => resolve()
+    })
+  }
+
+  #addIfNew(space: Space): Promise<void> {
+    return new Promise(resolve => {
+      const tx = this.#transaction('readwrite')
+      const request = tx.objectStore(STORE).add(space)
+      request.onerror = event => {
+        // (already here under that id, or the name is taken)
+        console.warn(`[SpaceDB] Space "${space.name}" was not moved:`, request.error?.message)
+        event.preventDefault()
+      }
+      tx.oncomplete = tx.onabort = () => resolve()
     })
   }
 

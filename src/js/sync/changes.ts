@@ -19,7 +19,7 @@ export function songUuidOf(song: Pick<SongRecord, 'uuid' | 'id'>): string {
 
 /** What a record keeps of its Drive file: when it was modified, and its checksum */
 export function driveMarkers(file: Pick<StoredFile, 'modified' | 'rev'> | null | undefined) {
-  return { driveModifiedTime: file?.modified ?? null, driveChecksum: file?.rev ?? null }
+  return { fileModified: file?.modified ?? null, fileRev: file?.rev ?? null }
 }
 
 /** What makes two setlist records the same setlist, whatever their ids */
@@ -31,7 +31,7 @@ export const setlistKey = (setlist: Setlist) =>
  * or edited since its last sync. Ignores whether its Drive file still exists.
  */
 export function setlistHasLocalChanges(setlist: Setlist): boolean {
-  if (!setlist.driveFileId) {
+  if (!setlist.fileRef) {
     return true
   }
   if (setlist.syncedContentHash) {
@@ -48,7 +48,7 @@ export function setlistHasLocalChanges(setlist: Setlist): boolean {
  * its chart edited since its last sync. Ignores whether its Drive file exists.
  */
 export function songHasLocalChanges(song: SongRecord, chordproFile: ChordProRecord): boolean {
-  if (!song.driveFileId) {
+  if (!song.fileRef) {
     return true
   }
   if (song.syncedContentHash) {
@@ -64,5 +64,5 @@ export function songHasLocalChanges(song: SongRecord, chordproFile: ChordProReco
   if (localModified <= lastSynced) {
     return false
   }
-  return song.driveProperties?.contentHash !== chordproFile.contentHash
+  return song.fileProps?.contentHash !== chordproFile.contentHash
 }

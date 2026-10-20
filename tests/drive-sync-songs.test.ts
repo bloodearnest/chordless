@@ -24,7 +24,7 @@ describe('Drive sync: songs', () => {
       await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: 'v1' })
       await syncDevice(phone)
       await syncDevice(tablet)
-      const known = must(await tablet.db.getSong('song-1')).driveFileId
+      const known = must(await tablet.db.getSong('song-1')).fileRef
       replaceDriveFile(must(known), 'survivor')
       const filesBefore = rig.storage.list(f => Boolean(f.props.songId || f.props.versionId))
       rig.storage.clearCalls()
@@ -104,7 +104,7 @@ describe('Drive sync: songs', () => {
 
       for (const uuid of ['song-a', 'song-b']) {
         const song = must(await phone.db.getSong(uuid))
-        expect(rig.storage.file(must(song.driveFileId)).content).to.equal(
+        expect(rig.storage.file(must(song.fileRef)).content).to.equal(
           await songContent(phone, uuid)
         )
       }

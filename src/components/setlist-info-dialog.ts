@@ -127,7 +127,7 @@ export class SetlistInfoDialog extends LitElement {
 
   /** Only a setlist that is not in Google Drive can be deleted (see Database.deleteUnsyncedSetlist) */
   _deletable(): boolean {
-    return Boolean(this._setlist && !this._setlist.driveFileId)
+    return Boolean(this._setlist && !this._setlist.fileRef)
   }
 
   _delete(): void {

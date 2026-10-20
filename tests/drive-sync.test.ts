@@ -28,7 +28,7 @@ describe('sync (against the memory backend)', () => {
       expect(driveSetlist(setlist.id).name).to.equal('Harvest')
 
       const local = must(await phone.db.getSetlist(setlist.id))
-      expect(local.driveFileId).to.equal(file.ref)
+      expect(local.fileRef).to.equal(file.ref)
     })
 
     it('downloads setlists created on another device', async () => {
@@ -299,26 +299,21 @@ describe('sync (against the memory backend)', () => {
       await syncDevice(phone)
 
       const onDrive = driveSetlist(setlist.id)
-      for (const field of [
-        'driveFileId',
-        'driveModifiedTime',
-        'lastSyncedAt',
-        'syncedContentHash',
-      ]) {
+      for (const field of ['fileRef', 'fileModified', 'lastSyncedAt', 'syncedContentHash']) {
         expect(onDrive, field).not.to.have.property(field)
       }
     })
 
     it('syncs setlists recorded before content hashes', async () => {
       // Records synced by the previous version have no syncedContentHash or
-      // driveChecksum, and a driveModifiedTime taken from the device clock.
+      // fileRev, and a fileModified taken from the device clock.
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Old record' })
       await syncDevice(phone)
       const stored = must(await phone.db.getSetlist(setlist.id))
       delete stored.syncedContentHash
-      delete stored.driveChecksum
-      stored.driveModifiedTime = new Date().toISOString()
+      delete stored.fileRev
+      stored.fileModified = new Date().toISOString()
       stored._lastSyncHash = 'hash-from-old-version'
       await phone.db.saveSetlist(stored)
       rig.storage.clearCalls()

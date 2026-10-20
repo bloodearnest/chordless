@@ -458,7 +458,7 @@ describe('the setlist page: header, menu and keys', () => {
   })
 
   describe('the differs-from-official button', () => {
-    const changedHere = { driveFileId: 'f', syncedContentHash: 'not-this' }
+    const changedHere = { fileRef: 'f', syncedContentHash: 'not-this' }
 
     it('is on the overview of a changed setlist of a user who can only read, and opens its dialog', async () => {
       const { id } = getCurrentSpace()
@@ -499,7 +499,7 @@ describe('the setlist page: header, menu and keys', () => {
       expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
       const { id } = getCurrentSpace()
       await setSpaceReadOnly(must(id), true)
-      await rig.open(3, { driveFileId: null })
+      await rig.open(3, { fileRef: null })
       expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
     })
   })
@@ -639,8 +639,8 @@ describe('the setlist page: header, menu and keys', () => {
 
     it('says why it cannot, when the setlist is in Drive', async () => {
       const { setlist } = await ready()
-      must(rig.page.currentSetlist).driveFileId = 'in-drive'
-      await rig.db.saveSetlist({ ...setlist, driveFileId: 'in-drive' })
+      must(rig.page.currentSetlist).fileRef = 'in-drive'
+      await rig.db.saveSetlist({ ...setlist, fileRef: 'in-drive' })
       must($<AppModal>('#delete-setlist-modal')).ask = async () => true
       await rig.page.deleteSetlist()
       expect(shownToast()?.message).to.contain("Couldn't delete the setlist")

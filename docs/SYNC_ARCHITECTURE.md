@@ -51,8 +51,8 @@ Backend                   storage/drive-storage.ts → drive-api.ts: REST calls 
 ```
 
 The engine does not know it is Drive: it takes a `StorageBackend` (`DriveSyncManager`'s `storage`
-option, Google Drive unless a test says otherwise). The records still keep `driveFileId` /
-`driveChecksum` for the file's `ref` and `rev` (renaming them is a migration of its own).
+option, Google Drive unless a test says otherwise). A record keeps the file's `ref` and `rev`
+as `fileRef` and `fileRev`.
 
 Sync currently runs on the **main thread**, started by the user from the Storage
 page. The orchestrator and engine have no DOM dependencies, so they could run in the
@@ -105,7 +105,7 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 
 ### Which folder, who may write
 
-Finding a space's Drive folder (by name on the first sync, by `driveFolderId` after), the setlist
+Finding a space's Drive folder (by name on the first sync, by `rootRef` after), the setlist
 leaders list and read-only access are per-space matters: see [SPACES.md](SPACES.md).
 In short: a read-only user pulls but does not push, and edits locally; a pull leaves a record they
 changed (SPACES.md, "Read-only: local edits are never blocked"). Today the flag comes from
@@ -117,15 +117,15 @@ Each synced record stores, from its last sync:
 
 | Field | Meaning |
 |---|---|
-| `driveFileId` | its Drive file |
+| `fileRef` | its file in the storage (a Drive file id) |
 | `syncedContentHash` | hash of its content as last synced |
-| `driveChecksum` | Drive's `md5Checksum` of the file as last synced |
-| `driveModifiedTime`, `lastSyncedAt` | informational |
+| `fileRev` | the storage's rev of the file as last synced (Drive's `md5Checksum`) |
+| `fileModified`, `lastSyncedAt` | informational |
 
 - **Changed locally:** the content hash differs from `syncedContentHash`. For
   setlists the hash ignores sync bookkeeping, key order and `modifiedDate` (so an
   undone edit isn't a change); for songs it's the chart text.
-- **Changed in Drive:** Drive's listed `md5Checksum` differs from `driveChecksum`.
+- **Changed in Drive:** Drive's listed `md5Checksum` differs from `fileRev`.
   Both come from Drive, so device clocks never matter.
 - **Upload check:** after every upload or update, the `md5Checksum` Drive reports must be the
   MD5 of the bytes we sent (`utils/md5.ts`: WebCrypto has no MD5). If it is not, Drive stored
@@ -226,7 +226,7 @@ opened every few weeks on poor wifi is offline when it edits, and Drive has no c
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
-2. **Detect conflicts.** The client sends the checksum it last saw (it records `driveChecksum`
+2. **Detect conflicts.** The client sends the checksum it last saw (it records `fileRev`
    already); if Drive's differs the Worker answers 409 and nothing is overwritten.
 3. **Make that atomic.** Check-then-write is not atomic, so writes go through one Durable Object
    per space, which serialises them. A new Cloudflare piece (wrangler.toml has none).
@@ -266,9 +266,9 @@ app that linked the folder, so the message can say it was an earlier version of 
 
 Start over (`DriveSyncManager.startOver`, via `SyncOrchestrator.startOverInDrive`) asks Drive nothing
 and changes nothing in it: it clears every setlist's and song's Drive markers and a setlist's share
-link (`ChordlessDB.clearDriveLinks`), then the folder link, then the orchestrator syncs. Content stays
+link (`ChordlessDB.clearFileLinks`), then the folder link, then the orchestrator syncs. Content stays
 on the device and is uploaded as new files to a folder found or made by name. The markers must go
-first: a setlist with a `driveFileId` that is not in the folder, and no changes, is read as deleted in
+first: a setlist with a `fileRef` that is not in the folder, and no changes, is read as deleted in
 Drive and removed here. An old folder that can still be seen is left alone, for the user to delete.
 
 ### Safety rules
@@ -301,12 +301,12 @@ Drive and removed here. An old folder that can still be seen is left alone, for 
 ### Deleting setlists
 
 **Built: setlists that are not in Drive.** The setlist info dialog's edit view (the pencil)
-has a **Delete setlist** button when the setlist has no `driveFileId`, i.e. it has never been
+has a **Delete setlist** button when the setlist has no `fileRef`, i.e. it has never been
 synced (or sync is not set up). It asks first (`#delete-setlist-modal`), then
 `ChordlessDB.deleteUnsyncedSetlist()` removes the setlist and this device's `setlist_local`
-state, and the page goes home. The database refuses a setlist with a `driveFileId`, so the rule
+state, and the page goes home. The database refuses a setlist with a `fileRef`, so the rule
 does not depend on the button. For a setlist that is in Drive the edit view says why it cannot
-be deleted. Because the rule is the local `driveFileId`, a setlist another device has already
+be deleted. Because the rule is the local `fileRef`, a setlist another device has already
 uploaded, but this device has not yet synced, can be deleted here and will come back at the
 next sync (nothing in Drive is touched). The rest of this section is the design for setlists
 that are in Drive.
@@ -345,7 +345,7 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
 
 - The setlist record is removed from the local database at once, so lists, song
   history and search don't need to know about deleted setlists.
-- If it had been synced, record a **pending deletion** `{ setlistId, driveFileId,
+- If it had been synced, record a **pending deletion** `{ setlistId, fileRef,
   deletedAt }` in a new object store (e.g. `pending_deletions`, keyPath `setlistId`):
   a `ChordlessDB` version bump from 5 to 6.
 - If it was never synced, it's simply gone. Its `setlist_local` entry can go too.
@@ -360,7 +360,7 @@ pull → push.
    On success, 404 or already trashed, remove the pending entry; otherwise keep it
    and retry next sync. Also processed by the immediate background sync (below).
 2. **Remote deletion on other devices** (a behaviour change). In `pushSetlists`, for a
-   local setlist whose `driveFileId` isn't in the inventory:
+   local setlist whose `fileRef` isn't in the inventory:
    - **Unchanged since last sync** (`setlistHasLocalChanges()` false): the deletion
      wins; remove the local copy instead of re-uploading.
    - **Edited since last sync:** the edit wins; re-upload as today, so unsynced work
@@ -432,8 +432,8 @@ going back home. In the service worker it completes regardless.
   the existing create/update paths and `drive-metadata.js`.
 - **No pull first, so guard against overwriting a remote edit:** before updating,
   fetch that file's current `md5Checksum`. If it differs from the record's
-  `driveChecksum` (someone else changed it), skip and leave it to the full sync, which
-  handles conflicts. New records (no `driveFileId`) are created as usual.
+  `fileRev` (someone else changed it), skip and leave it to the full sync, which
+  handles conflicts. New records (no `fileRef`) are created as usual.
 - Also run pending deletions (see above) through this path.
 - **Never alongside a full sync:** both take the same Web Lock
   (`navigator.locks.request('chordless-sync', …)`), which works across pages and the
@@ -468,7 +468,7 @@ The intervals are named constants, not preferences.
   drive or through the Worker broker. Via the Worker broker (docs/SPACES.md) the same
   call is a Worker route.
 - **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
-  `md5Checksum`, compared with the record's `driveChecksum`; only if it differs, `pullSetlistNow(id)`
+  `md5Checksum`, compared with the record's `fileRev`; only if it differs, `pullSetlistNow(id)`
   (the pull-side twin of `pushSetlistNow`: the same conflict rule as the full pull, nothing else is
   listed or touched). The setlist may now use a song this device has never had, so that pull also
   fetches the charts the setlist needs and the device lacks, found by their `songUuid` property

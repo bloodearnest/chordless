@@ -27,11 +27,11 @@ members of their church. Each space is self-contained, so copyright compliance i
 - The umbrella word is **space**, and there are two kinds: a **personal space** (yours alone, in
   your own Drive) and a **team space** (shared, brokered). "Create a team space", "Join a team
   space", "Save to: Personal space / Grace Church (team space)". The old word "organisation" went from
-  the UI, the code and the docs on 2026-10-20. It survives only where it is stored: the IndexedDB
-  database and store that hold the spaces (both still named `organisations`: renaming means copying
-  every record), and the `appProperties` of files already in Drive (`organisationId`, read by nothing;
-  an update drops it). The `localStorage` keys `current-organisation-*` are moved to
-  `current-space-*` the first time the new code runs (`space.ts`).
+  the UI, the code and the docs on 2026-10-20. It survives only where old data may still carry it, and is moved
+  when the app loads: the IndexedDB database `organisations` (and its store) is copied to `spaces` and
+  removed by `SpaceDB.init`, the `localStorage` keys `current-organisation-*` become `current-space-*`
+  (`space.ts`), and the `appProperties` of files already in Drive (`organisationId`, read by nothing)
+  lose it at their next update.
 - Each space also has its own name (a team space is named by its owner; the personal space defaults
   to the account name, as `first-time-auth.ts` does today). The kind shows as a small label beside
   the name, and only when the user has more than one space.
@@ -51,7 +51,7 @@ folder and how data reaches Drive.
 | | Personal space | Team space |
 |---|---|---|
 | Drive folder | `Chordless/` in your My Drive, as now. No picker. | **Chosen by the owner** with the Picker: any folder in My Drive or a shared drive. No hard-coded path. |
-| Identity | the folder named `Chordless` | server-issued space id; folder found by stored `driveFolderId`, never by name |
+| Identity | the folder named `Chordless` | server-issued space id; folder found by stored `rootRef`, never by name |
 | Drive access | direct, your `drive.file` token | owner: direct. Members: via a Worker route using the owner's token |
 | Roles | you | owner / admin / writer / reader, enforced by the Worker |
 | Pads | `Chordless/pads/` | `<team folder>/pads/` |
@@ -92,7 +92,7 @@ a re-pointing of the folder.
 ### Finding the Drive folder
 
 - The first sync on a device finds the folder **by name** (so a new device joins an existing
-  space) and stores its id on the space record (`driveFolderId`). Later syncs use the id, so a
+  space) and stores its id on the space record (`rootRef`). Later syncs use the id, so a
   rename can't point sync at a different folder.
 - After a rename, sync renames the Drive folder to match, unless another folder has that name; if
   the device has nothing synced yet, it joins that existing folder instead.
@@ -195,7 +195,7 @@ what makes ownership disappear as a problem.
 
 **Restrictions:** the account can only reach what was shared; recommend a dedicated shared drive for
 Chordless (a shared drive's membership is drive-wide, not per folder, so "least privilege" means "a
-drive of its own"). The Worker also checks every call's target is inside the team's `driveFolderId`
+drive of its own"). The Worker also checks every call's target is inside the team's `rootRef`
 tree (the owner-token path needs the same check).
 
 **Operator choice, recommended: one Chordless-operated service account** (key in a Worker secret,
@@ -568,14 +568,14 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 
 1. [ ] Principle in CLAUDE.md; this doc and the consolidation.
 2. [x] Spike (above): passed, see "Spike results".
-3. [ ] Space abstraction: space id + `driveFolderId` identity, folder-location Picker on create,
+3. [ ] Space abstraction: space id + `rootRef` identity, folder-location Picker on create,
    shared-drive flags, no name matching, per-space transport. **The storage API (docs/STORAGE_API.md)
    is built:** the sync engine and share links work through `StorageBackend` / `SpaceStorage`, so
    per-space transport is a matter of which backend a space is given, and the broker (item 7) is
    another backend for it.
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
-   and since checked against a real shared drive: spike 2 passed). The folder is already found by `driveFolderId`
+   and since checked against a real shared drive: spike 2 passed). The folder is already found by `rootRef`
    after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
    The UI, code and docs say "space" (renamed from "organisation" on 2026-10-20).
 4. [ ] Copy/move between spaces (an export and import, above, is built and does the hop between

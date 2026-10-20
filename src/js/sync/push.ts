@@ -2,7 +2,7 @@
  * The push of a Drive sync: what is new or changed on this device goes up to Drive (new files
  * in batches, changed ones one by one, several at a time).
  */
-import type { ChordProRecord, Setlist, SongDriveProperties, SongRecord } from '../data-types.ts'
+import type { ChordProRecord, Setlist, SongFileProps, SongRecord } from '../data-types.ts'
 import {
   fileInput,
   setlistFileMetadata,
@@ -38,7 +38,7 @@ function songMetadata(session: SyncSession, song: SongRecord, chordproFile: Chor
 }
 
 /** What this device records about a song's synced file */
-function songDriveProperties(song: SongRecord, chordproFile: ChordProRecord): SongDriveProperties {
+function songDriveProperties(song: SongRecord, chordproFile: ChordProRecord): SongFileProps {
   const { title, ccliNumber, variantLabel } = songFileDetails(song, chordproFile)
   return {
     songId: song.id,
@@ -53,7 +53,7 @@ function songDriveProperties(song: SongRecord, chordproFile: ChordProRecord): So
 
 /** Record on a setlist that Drive now holds this content in this file (if it stored it intact) */
 function recordSetlistUpload(setlist: Setlist, { file, intact }: WriteResult) {
-  setlist.driveFileId = file.ref
+  setlist.fileRef = file.ref
   Object.assign(setlist, driveMarkers(file))
   if (intact) {
     setlist.lastSyncedAt = new Date().toISOString()
@@ -71,10 +71,10 @@ function recordSongUpload(
   chordproFile: ChordProRecord,
   { file, intact }: WriteResult
 ) {
-  song.driveFileId = file.ref
+  song.fileRef = file.ref
   Object.assign(song, driveMarkers(file))
   if (intact) {
-    song.driveProperties = songDriveProperties(song, chordproFile)
+    song.fileProps = songDriveProperties(song, chordproFile)
     song.lastSyncedAt = new Date().toISOString()
     song.syncedContentHash = hashText(chordproFile.content)
     song.contentHash = chordproFile.contentHash
@@ -83,7 +83,7 @@ function recordSongUpload(
 
 /** Smart skip detection: a setlist needs syncing when it has no Drive file, or has changed */
 export async function setlistNeedsSync(session: SyncSession, setlist: Setlist): Promise<boolean> {
-  if (!setlist.driveFileId || !session.fileExistsInDrive(setlist.driveFileId)) return true
+  if (!setlist.fileRef || !session.fileExistsInDrive(setlist.fileRef)) return true
   return setlistHasLocalChanges(setlist)
 }
 
@@ -93,7 +93,7 @@ export async function songNeedsSync(
   song: SongRecord,
   chordproFile: ChordProRecord
 ): Promise<boolean> {
-  if (!song.driveFileId || !session.fileExistsInDrive(song.driveFileId)) return true
+  if (!song.fileRef || !session.fileExistsInDrive(song.fileRef)) return true
   return songHasLocalChanges(song, chordproFile)
 }
 
@@ -108,7 +108,7 @@ function syncedTwinOf(
     other =>
       other.id !== setlist.id &&
       setlistKey(other) === key &&
-      ((other.driveFileId && session.fileExistsInDrive(other.driveFileId)) ||
+      ((other.fileRef && session.fileExistsInDrive(other.fileRef)) ||
         session.hasLiveFileOfItsOwn(other))
   )
 }
@@ -249,14 +249,14 @@ export async function pushSetlists(
 
   // Those whose file is in Drive are updated; the others are new, or their file is gone
   const updated = toSync.filter(
-    setlist => setlist.driveFileId && session.fileExistsInDrive(setlist.driveFileId)
+    setlist => setlist.fileRef && session.fileExistsInDrive(setlist.fileRef)
   )
   const created = toSync.filter(setlist => !updated.includes(setlist))
   for (const setlist of created) {
-    if (setlist.driveFileId) {
-      setlist.driveFileId = null
-      setlist.driveModifiedTime = null
-      setlist.driveChecksum = null
+    if (setlist.fileRef) {
+      setlist.fileRef = null
+      setlist.fileModified = null
+      setlist.fileRev = null
     }
   }
   const newSetlists = setlistsToCreate(session, created, localSetlists)
@@ -299,9 +299,9 @@ export async function pushSetlist(session: SyncSession, setlist: Setlist): Promi
   try {
     const content = setlistJson(setlist)
     const metadata = setlistMetadata(session, setlist)
-    const result = setlist.driveFileId
+    const result = setlist.fileRef
       ? // (metadata too, so the file name follows e.g. a changed date or leader)
-        await session.space.update(setlist.driveFileId, updateInput(metadata, 'setlist'), content)
+        await session.space.update(setlist.fileRef, updateInput(metadata, 'setlist'), content)
       : await session.space.create('setlists', fileInput(metadata), content)
     recordSetlistUpload(setlist, result)
     await session.db.saveSetlist(setlist)
@@ -334,13 +334,13 @@ export async function pushSongs(
     }
     if (!(await songNeedsSync(session, song, chordproFile))) continue
 
-    if (song.driveFileId && session.fileExistsInDrive(song.driveFileId)) {
+    if (song.fileRef && session.fileExistsInDrive(song.fileRef)) {
       updated.push({ song, chordproFile })
     } else {
-      if (song.driveFileId) {
-        song.driveFileId = null
-        song.driveProperties = null
-        song.driveChecksum = null
+      if (song.fileRef) {
+        song.fileRef = null
+        song.fileProps = null
+        song.fileRev = null
       }
       created.push({ song, chordproFile })
     }
@@ -399,9 +399,9 @@ export async function pushSongVariant(
 ): Promise<void> {
   try {
     const metadata = songMetadata(session, song, chordproFile)
-    const result = song.driveFileId
+    const result = song.fileRef
       ? await session.space.update(
-          song.driveFileId,
+          song.fileRef,
           updateInput(metadata, 'song'),
           chordproFile.content
         )

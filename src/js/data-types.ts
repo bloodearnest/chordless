@@ -69,7 +69,7 @@ export interface SectionState {
 export type TempoInput = number | string | null | undefined
 
 /** What a device records about a song's synced Drive file */
-export interface SongDriveProperties {
+export interface SongFileProps {
   songId: string
   songUuid: string
   contentHash: string
@@ -107,14 +107,14 @@ export interface SongRecord {
   sourceUrl: string | null
   modifiedDate: string
 
-  driveFileId: string | null
-  driveModifiedTime: string | null
-  driveChecksum?: string | null
+  fileRef: string | null
+  fileModified: string | null
+  fileRev?: string | null
   lastSyncedAt: string | null
   /** Hash of the chart as last synced: a change since is a local change */
   syncedContentHash?: string | null
   /** What this device recorded about the synced file */
-  driveProperties?: SongDriveProperties | null
+  fileProps?: SongFileProps | null
   contentHash: string
 }
 
@@ -215,9 +215,9 @@ export interface Setlist {
   createdDate: string
   modifiedDate: string
 
-  driveFileId?: string | null
-  driveModifiedTime?: string | null
-  driveChecksum?: string | null
+  fileRef?: string | null
+  fileModified?: string | null
+  fileRev?: string | null
   lastSyncedAt?: string | null
   syncedContentHash?: string | null
   /** The pre-content-hash field, kept only for old records */
@@ -250,7 +250,7 @@ export interface Space {
   name: string
   createdDate: string
   modifiedDate: string
-  driveFolderId?: string | null
+  rootRef?: string | null
   /** The Google app (OAuth client id) that linked the folder: another app cannot see it (drive.file) */
   driveClientId?: string | null
   members?: SpaceMember[]

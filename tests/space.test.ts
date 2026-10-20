@@ -282,10 +282,10 @@ describe('deleting a space and its data', () => {
 /** Delete a space record directly, to reset to a first visit */
 function deleteSpace(id) {
   return new Promise<void>((resolve, reject) => {
-    const open = indexedDB.open('organisations')
+    const open = indexedDB.open('spaces')
     open.onsuccess = () => {
-      const tx = open.result.transaction(['organisations'], 'readwrite')
-      tx.objectStore('organisations').delete(id)
+      const tx = open.result.transaction(['spaces'], 'readwrite')
+      tx.objectStore('spaces').delete(id)
       tx.oncomplete = () => {
         open.result.close()
         resolve()

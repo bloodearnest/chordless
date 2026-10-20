@@ -2,6 +2,7 @@
 
 import { expect } from '@open-wc/testing'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -152,5 +153,121 @@ describe('SpaceDB', () => {
       }
       expect(error, String(write)).to.be.ok
     }
+  })
+})
+
+describe('SpaceDB: spaces kept as organisations', () => {
+  let names: { name: string; legacyName: string }
+  const toDelete: string[] = []
+
+  beforeEach(() => {
+    const id = crypto.randomUUID().slice(0, 8)
+    names = { name: `test-spaces-${id}`, legacyName: `test-organisations-${id}` }
+    toDelete.push(names.name, names.legacyName)
+  })
+
+  afterEach(async () => {
+    for (const name of toDelete.splice(0)) {
+      await new Promise<void>(resolve => {
+        const request = indexedDB.deleteDatabase(name)
+        request.onsuccess = request.onerror = request.onblocked = () => resolve()
+      })
+    }
+  })
+
+  /** The database as the last version left it: an `organisations` store of spaces */
+  function makeLegacy(spaces: object[]) {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(names.legacyName, 1)
+      request.onupgradeneeded = () => {
+        request.result
+          .createObjectStore('organisations', { keyPath: 'id' })
+          .createIndex('name', 'name', { unique: true })
+      }
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction(['organisations'], 'readwrite')
+        for (const space of spaces) tx.objectStore('organisations').put(space)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+  }
+
+  const databases = async () => (await indexedDB.databases()).map(db => db.name)
+
+  it('brings them to the new database, with the Drive folder link under its new name, and removes the old one', async () => {
+    await makeLegacy([
+      { id: 'a', name: 'Grace', driveFolderId: 'folder-a', driveClientId: 'client', members: [] },
+      { id: 'b', name: 'Personal' },
+    ])
+
+    const store = new SpaceDB(names)
+    await store.init()
+
+    const grace = must(await store.getSpace('a'))
+    expect(grace).to.include({ name: 'Grace', rootRef: 'folder-a', driveClientId: 'client' })
+    expect(grace).not.to.have.property('driveFolderId')
+    expect(must(await store.getSpace('b'))).not.to.have.property('rootRef')
+    expect((await store.getAllSpaces()).map(space => space.id).sort()).to.deep.equal(['a', 'b'])
+    expect(await databases()).to.not.include(names.legacyName)
+    store.db?.close()
+  })
+
+  it('removes an old database that holds no spaces', async () => {
+    await new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(names.legacyName, 1)
+      request.onupgradeneeded = () => request.result.createObjectStore('something-else')
+      request.onsuccess = () => {
+        request.result.close()
+        resolve()
+      }
+      request.onerror = () => reject(request.error)
+    })
+
+    const store = new SpaceDB(names)
+    await store.init()
+
+    expect(await store.getAllSpaces()).to.deep.equal([])
+    expect(await databases()).to.not.include(names.legacyName)
+    store.db?.close()
+  })
+
+  it('makes nothing of the old database when there never was one', async () => {
+    const store = new SpaceDB(names)
+    await store.init()
+    expect(await databases()).to.include(names.name)
+    expect(await databases()).to.not.include(names.legacyName)
+    store.db?.close()
+  })
+
+  it('keeps a space already in the new database, and adds the rest, when it runs again', async () => {
+    await makeLegacy([
+      { id: 'a', name: 'Grace', driveFolderId: 'old-link' },
+      { id: 'c', name: 'Taken' },
+    ])
+    const first = new SpaceDB(names)
+    await first.init()
+    await first.updateSpace('a', { rootRef: 'newer-link' })
+    // The old database comes back (another tab, an old build) with the same space and a new one
+    await makeLegacy([
+      { id: 'a', name: 'Grace', driveFolderId: 'old-link' },
+      { id: 'd', name: 'Later' },
+      { id: 'e', name: 'Taken' },
+    ])
+
+    const second = new SpaceDB(names)
+    await second.init()
+
+    expect(must(await second.getSpace('a')).rootRef).to.equal('newer-link')
+    expect(await second.getSpace('d')).to.be.ok
+    // (the name was taken, by another id: it stays behind, and the others still come)
+    expect(await second.getSpace('e')).to.equal(undefined)
+    expect(await databases()).to.not.include(names.legacyName)
+    first.db?.close()
+    second.db?.close()
   })
 })

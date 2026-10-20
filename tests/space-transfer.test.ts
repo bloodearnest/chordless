@@ -105,7 +105,7 @@ describe('Copying and moving between spaces', () => {
     const original = await setlistWith('set-1', alpha)
     await source.saveSetlist({
       ...original,
-      driveFileId: 'drive-1',
+      fileRef: 'drive-1',
       syncedContentHash: 'hash',
       share: {
         fileId: 'f',
@@ -120,7 +120,7 @@ describe('Copying and moving between spaces', () => {
 
     const [copy] = await destination.getAllSetlists()
     expect(copy.id).to.not.equal('set-1')
-    expect(copy.driveFileId ?? null).to.equal(null)
+    expect(copy.fileRef ?? null).to.equal(null)
     expect(copy.syncedContentHash ?? null).to.equal(null)
     expect(copy.share).to.equal(undefined)
     expect(copy.songs[0].key).to.equal('A')
@@ -163,7 +163,7 @@ describe('Copying and moving between spaces', () => {
   it('leaves a moved setlist that is in Drive in the source, and says so', async () => {
     const alpha = await addChart(source, ALPHA, ADD)
     const set = await setlistWith('set-1', alpha)
-    await source.saveSetlist({ ...set, driveFileId: 'drive-1' })
+    await source.saveSetlist({ ...set, fileRef: 'drive-1' })
     const report = await transferSetlists(source, destination, null, 'move')
     expect(report.setlistsLeftInSource).to.equal(1)
     expect(await destination.getSetlist('set-1')).to.not.equal(undefined)

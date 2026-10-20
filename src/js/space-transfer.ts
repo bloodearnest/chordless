@@ -114,9 +114,9 @@ function forDestination(setlist: Setlist, id: string, songs: SongMap): Setlist {
     songUuid: songs.get(entry.songUuid) ?? entry.songUuid,
   }))
   const {
-    driveFileId: _driveFileId,
-    driveModifiedTime: _driveModifiedTime,
-    driveChecksum: _driveChecksum,
+    fileRef: _driveFileId,
+    fileModified: _driveModifiedTime,
+    fileRev: _driveChecksum,
     lastSyncedAt: _lastSyncedAt,
     syncedContentHash: _syncedContentHash,
     _lastSyncHash,
@@ -181,7 +181,7 @@ export async function transferSetlists(
     existing.push(made)
     report.setlistsAdded++
     if (mode === 'move') {
-      if (setlist.driveFileId || !source.deleteUnsyncedSetlist) report.setlistsLeftInSource++
+      if (setlist.fileRef || !source.deleteUnsyncedSetlist) report.setlistsLeftInSource++
       else await source.deleteUnsyncedSetlist(setlist.id)
     }
   }

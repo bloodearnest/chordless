@@ -80,6 +80,10 @@ are enforced per collection and ref, and not by walking Drive parents.
   `updateShareFile`, `endShareFile`, `listShareFiles`, `listSpaces` and `batchDeleteFiles` have no
   caller in the app any more (the dev page `src/dev/drive-audit.js` uses `downloadSetlist`); only
   their tests do. Remove them with those tests when convenient.
-- **Records**: `driveFileId`, `driveChecksum` and `driveModifiedTime` become `ref`, `rev` and
-  `modified` in one IndexedDB migration of their own. The space record's `driveFolderId` and
-  `driveClientId` likewise.
+- **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).
+
+Records keep what they know of their file as `fileRef`, `fileRev`, `fileModified` and (songs)
+`fileProps`; the space record keeps its root as `rootRef`. Before 2026-10-20 these were
+`driveFileId`, `driveChecksum`, `driveModifiedTime`, `driveProperties` and `driveFolderId`. Each
+space's database is brought over when it next opens (version 7, `migrateRecords` in `db.ts`),
+and the spaces database moves to its new name the same way (`SpaceDB.init`).

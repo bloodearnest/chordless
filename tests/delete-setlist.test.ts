@@ -40,7 +40,7 @@ describe('ChordlessDB.deleteUnsyncedSetlist', () => {
   })
 
   it('refuses a setlist that is in Drive, and changes nothing', async () => {
-    await db.saveSetlist(makeSetlist({ id: 'in-drive', driveFileId: 'drive-file-1' }))
+    await db.saveSetlist(makeSetlist({ id: 'in-drive', fileRef: 'drive-file-1' }))
 
     let error: Error | null = null
     try {

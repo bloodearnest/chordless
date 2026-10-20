@@ -64,7 +64,7 @@ describe('Exporting a space, and importing one', () => {
     })
     await source.saveSetlist({
       ...setlist,
-      driveFileId: 'drive-1',
+      fileRef: 'drive-1',
       syncedContentHash: 'h',
       share: {
         fileId: 'f',
@@ -97,7 +97,7 @@ describe('Exporting a space, and importing one', () => {
     const all = everything.join('\n')
     expect(all).to.not.contain('drive-1')
     expect(all).to.not.contain('bundleHash')
-    expect(all).to.not.contain('driveFileId')
+    expect(all).to.not.contain('fileRef')
   })
 
   it('says in its manifest what it holds and where from', async () => {
@@ -129,7 +129,7 @@ describe('Exporting a space, and importing one', () => {
 
     const setlist = must(await destination.getSetlist('set-1'))
     expect(setlist.name).to.equal('Harvest')
-    expect(setlist.driveFileId ?? null).to.equal(null)
+    expect(setlist.fileRef ?? null).to.equal(null)
     expect(setlist.share).to.equal(undefined)
     expect(setlist.songs.map(entry => entry.key)).to.deep.equal(['A', 'E'])
     for (const entry of setlist.songs) {

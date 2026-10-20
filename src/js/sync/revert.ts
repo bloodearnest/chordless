@@ -14,7 +14,7 @@ import { setlistContent, setlistContentHash } from './setlist-hash.ts'
  * is what their changes on this device are: they never go back, and a pull leaves them.
  */
 export function differsFromOfficial(setlist: Setlist, syncsBack: boolean): boolean {
-  return !syncsBack && Boolean(setlist.driveFileId) && setlistHasLocalChanges(setlist)
+  return !syncsBack && Boolean(setlist.fileRef) && setlistHasLocalChanges(setlist)
 }
 
 /**
@@ -26,14 +26,14 @@ export async function revertSetlistToOfficial(
   setlist: Setlist,
   space: SpaceStorage
 ): Promise<Setlist> {
-  if (!setlist.driveFileId) throw new Error('This setlist is not in Google Drive')
-  const file = await space.status(setlist.driveFileId)
+  if (!setlist.fileRef) throw new Error('This setlist is not in Google Drive')
+  const file = await space.status(setlist.fileRef)
   if (!file || file.trashed) throw new Error('The official copy of this setlist is gone from Drive')
   const remote = withNumericTempos(JSON.parse(await space.readText(file.ref)))
   return db.saveSetlist({
     ...setlistContent(remote),
     id: setlist.id,
-    driveFileId: file.ref,
+    fileRef: file.ref,
     ...driveMarkers(file),
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: setlistContentHash(remote),

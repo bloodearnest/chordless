@@ -88,8 +88,8 @@ describe('LibrarySong', () => {
         importSource: 'test',
         sourceUrl: null,
         modifiedDate: new Date().toISOString(),
-        driveFileId: null,
-        driveModifiedTime: null,
+        fileRef: null,
+        fileModified: null,
         lastSyncedAt: null,
         contentHash: 'hash-123',
       }

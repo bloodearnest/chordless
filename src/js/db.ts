@@ -17,7 +17,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 6
+const DB_VERSION = 7
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -170,8 +170,8 @@ export class ChordlessDB {
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
         }
 
-        if (oldVersion > 0 && oldVersion < 6) {
-          migrateTemposToNumbers(request.transaction as IDBTransaction)
+        if (oldVersion > 0 && oldVersion < DB_VERSION) {
+          migrateRecords(request.transaction as IDBTransaction, oldVersion)
         }
 
         // Clean up old stores
@@ -239,7 +239,7 @@ export class ChordlessDB {
   async deleteUnsyncedSetlist(id: string): Promise<void> {
     const setlist = await this.getSetlist(id)
     if (!setlist) return
-    if (setlist.driveFileId) {
+    if (setlist.fileRef) {
       throw new Error('This setlist is in Google Drive, so it cannot be deleted here')
     }
     await this.deleteSetlist(id)
@@ -406,12 +406,12 @@ export class ChordlessDB {
    * seen, so the next sync uploads it all. Content stays; a setlist's share link goes, since
    * its file was in the folder that is let go. Used to start over in a new Drive folder.
    */
-  async clearDriveLinks(): Promise<void> {
+  async clearFileLinks(): Promise<void> {
     const tx = this.#transaction(['setlists', 'songs'], 'readwrite')
     const unlinked = {
-      driveFileId: null,
-      driveModifiedTime: null,
-      driveChecksum: null,
+      fileRef: null,
+      fileModified: null,
+      fileRev: null,
       lastSyncedAt: null,
       syncedContentHash: null,
     }
@@ -426,7 +426,7 @@ export class ChordlessDB {
     }
     songsRequest.onsuccess = () => {
       for (const song of songsRequest.result as SongRecord[]) {
-        songs.put({ ...song, ...unlinked, driveProperties: null })
+        songs.put({ ...song, ...unlinked, fileProps: null })
       }
     }
     return transactionDone(tx)
@@ -549,27 +549,68 @@ export function withNumericTempos<T extends { songs?: { tempo?: TempoInput }[] }
  * chart's text). A setlist that was in sync stays in sync: its synced hash is
  * refreshed for the converted content.
  */
-function migrateTemposToNumbers(transaction: IDBTransaction) {
+/**
+ * What a record kept of its file in the storage was called before 2026-10-20 (when sync stopped
+ * being about Google Drive alone): the file's ref, its rev, when it changed, and the properties
+ * the song's file had when it was last synced.
+ */
+const FILE_FIELDS_BEFORE_V7: Record<string, string> = {
+  driveFileId: 'fileRef',
+  driveChecksum: 'fileRev',
+  driveModifiedTime: 'fileModified',
+  driveProperties: 'fileProps',
+}
+
+/** The record with those fields under their new names (the new name wins if both are there) */
+export function withFileFieldsRenamed<T extends object>(record: T): T {
+  const renamed = { ...record } as Record<string, unknown>
+  let changed = false
+  for (const [before, now] of Object.entries(FILE_FIELDS_BEFORE_V7)) {
+    if (!(before in renamed)) continue
+    if (!(now in renamed)) renamed[now] = renamed[before]
+    delete renamed[before]
+    changed = true
+  }
+  return changed ? (renamed as T) : record
+}
+
+/**
+ * Bring the songs and setlists of a database from `oldVersion` up to date: tempos as numbers
+ * (version 6), the file fields under their new names (7). One pass over each store applies every
+ * step to a record in turn: a cursor for each step would each read the record as it was, and the
+ * last to write would undo the others.
+ */
+function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
   const songs = transaction.objectStore('songs').openCursor()
   songs.onsuccess = () => {
     const cursor = songs.result
     if (!cursor) return
-    const converted = withNumericSongTempos(cursor.value)
-    if (converted !== cursor.value) cursor.update(converted)
+    let song = cursor.value
+    if (oldVersion < 6) song = withNumericSongTempos(song)
+    if (oldVersion < 7) song = withFileFieldsRenamed(song)
+    if (song !== cursor.value) cursor.update(song)
     cursor.continue()
   }
   const setlists = transaction.objectStore('setlists').openCursor()
   setlists.onsuccess = () => {
     const cursor = setlists.result
     if (!cursor) return
-    const setlist: Setlist = cursor.value
-    const converted = withNumericTempos(setlist)
-    if (JSON.stringify(converted) !== JSON.stringify(setlist)) {
-      if (setlist.syncedContentHash && setlist.syncedContentHash === setlistContentHash(setlist)) {
-        converted.syncedContentHash = setlistContentHash(converted)
+    const before: Setlist = cursor.value
+    let setlist = before
+    if (oldVersion < 6) {
+      const converted = withNumericTempos(setlist)
+      if (JSON.stringify(converted) !== JSON.stringify(setlist)) {
+        if (
+          setlist.syncedContentHash &&
+          setlist.syncedContentHash === setlistContentHash(setlist)
+        ) {
+          converted.syncedContentHash = setlistContentHash(converted)
+        }
+        setlist = converted
       }
-      cursor.update(converted)
     }
+    if (oldVersion < 7) setlist = withFileFieldsRenamed(setlist)
+    if (setlist !== before) cursor.update(setlist)
     cursor.continue()
   }
 }

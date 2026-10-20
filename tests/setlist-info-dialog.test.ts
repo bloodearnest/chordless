@@ -135,7 +135,7 @@ describe('setlist-info-dialog', () => {
 
   it('says why a setlist in Drive cannot be deleted here, and does not delete it', async () => {
     const el = await show()
-    await el.edit(setlist({ driveFileId: 'drive-1' }))
+    await el.edit(setlist({ fileRef: 'drive-1' }))
     await el.updateComplete
     expect(el.shadowRoot?.querySelector('.delete-setlist')?.textContent).to.contain(
       'in Google Drive'

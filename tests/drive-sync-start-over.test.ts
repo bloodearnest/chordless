@@ -62,7 +62,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     })
     await syncDevice(phone)
     const oldFolderId = spaceFolder().ref
-    const oldFileId = must(await phone.db.getSetlist(setlist.id)).driveFileId
+    const oldFileId = must(await phone.db.getSetlist(setlist.id)).fileRef
     folderGoneFromDrive()
 
     await phone.sync.startOver()
@@ -75,9 +75,9 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     expect(must(await phone.db.getSong('song-1')).title).to.equal('Amazing')
     // ...and all of it is in a new folder, under new files
     expect(spaceFolder().ref).to.not.equal(oldFolderId)
-    expect(kept.driveFileId).to.be.a('string').and.not.equal(oldFileId)
+    expect(kept.fileRef).to.be.a('string').and.not.equal(oldFileId)
     const live = rig.storage.list(file => file.props.setlistId === setlist.id)
-    expect(live.filter(file => file.ref === kept.driveFileId)).to.have.length(1)
+    expect(live.filter(file => file.ref === kept.fileRef)).to.have.length(1)
   })
 
   it('asks nothing of Drive and changes nothing in it', async () => {
@@ -108,6 +108,6 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
 
     const live = rig.storage.list(file => file.props.setlistId === setlist.id)
     expect(live).to.have.length(1)
-    expect(must(await phone.db.getSetlist(setlist.id)).driveFileId).to.equal(live[0].ref)
+    expect(must(await phone.db.getSetlist(setlist.id)).fileRef).to.equal(live[0].ref)
   })
 })
