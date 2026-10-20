@@ -71,7 +71,9 @@ class DriveSpace implements SpaceStorage {
       id =
         collection === 'songs'
           ? await DriveAPI.getSongsFolder(this.#rootRef)
-          : await DriveAPI.getSetlistsFolder(this.#rootRef)
+          : collection === 'setlists'
+            ? await DriveAPI.getSetlistsFolder(this.#rootRef)
+            : await DriveAPI.getSharesFolder(this.#rootRef)
       this.#folders.set(collection, id)
     }
     return id
@@ -82,12 +84,19 @@ class DriveSpace implements SpaceStorage {
   }
 
   async list(collection: Collection): Promise<StoredFile[]> {
-    const folder = await this.#folder(collection)
+    // (a space nothing was ever shared from has no shares folder, and listing does not make one)
+    const folder =
+      collection === 'shares'
+        ? await DriveAPI.findSharesFolder(this.#rootRef)
+        : await this.#folder(collection)
+    if (!folder) return []
     const live = `'${folder}' in parents and trashed=false`
     const files =
-      collection === 'setlists'
-        ? await DriveAPI.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
-        : await DriveAPI.listDriveFiles(`${live} and mimeType='text/plain'`)
+      collection === 'shares'
+        ? await DriveAPI.listDriveFiles(live)
+        : collection === 'setlists'
+          ? await DriveAPI.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
+          : await DriveAPI.listDriveFiles(`${live} and mimeType='text/plain'`)
     return files.map(toStored)
   }
 
@@ -117,13 +126,19 @@ class DriveSpace implements SpaceStorage {
     return DriveAPI.downloadFile(ref)
   }
 
-  async create(collection: Collection, input: FileInput, body: FileBody): Promise<WriteResult> {
+  async create(
+    collection: Collection,
+    input: FileInput,
+    body: FileBody,
+    options?: { publicLink?: boolean }
+  ): Promise<WriteResult> {
     const folder = await this.#folder(collection)
     const file = await DriveAPI.createFile(
       { ...writeMetadata(input), mimeType: input.type, parents: [folder] },
       body,
       contentTypeOf(input.type)
     )
+    if (options?.publicLink) await DriveAPI.publishFile(file.id)
     return { file: toStored(file), intact: holds(file, body, input.name) }
   }
 
@@ -156,6 +171,14 @@ class DriveSpace implements SpaceStorage {
       contentTypeOf(input.type)
     )
     return { file: toStored(file), intact: holds(file, body, input.name) }
+  }
+
+  unpublish(ref: string): Promise<void> {
+    return DriveAPI.unpublishFile(ref)
+  }
+
+  trash(ref: string): Promise<void> {
+    return DriveAPI.trashFile(ref)
   }
 }
 

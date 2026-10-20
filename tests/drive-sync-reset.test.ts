@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeLocalState, makeSong } from './builders.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -11,7 +11,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: reset from Drive', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice, driveSetlistFiles } = rig
 
   describe('reset from Drive', () => {

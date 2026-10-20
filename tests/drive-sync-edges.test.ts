@@ -25,7 +25,7 @@ import {
 import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
 import { pushSetlist, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
 import { makeSetlist, makeSong } from './builders.ts'
-import { addSong, useSyncRig } from './drive-harness.ts'
+import { addSong, useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -34,7 +34,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: the less common turns', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice, replaceDriveFile } = rig
 
   const driveFileOf = async (device: { db: ChordlessDB }, setlistId: string) =>

@@ -760,17 +760,35 @@ export async function createShareFile(
     encrypted,
     SHARE_CONTENT_TYPE
   )
+  await publishFile(file.id)
+  return file
+}
+
+/**
+ * Make a file readable by anyone with its link (not discoverable). If Drive refuses (a Workspace
+ * admin may forbid it) the file is trashed again, so no private leftover stays, and the error is
+ * thrown.
+ */
+export async function publishFile(fileId: string): Promise<void> {
   try {
-    await driveRequest(`/files/${file.id}/permissions`, {
+    await driveRequest(`/files/${fileId}/permissions`, {
       method: 'POST',
       body: JSON.stringify({ type: 'anyone', role: 'reader', allowFileDiscovery: false }),
     })
   } catch (error) {
     // Best effort: a private leftover is harmless, and the error that matters is the original
-    await trashFile(file.id).catch(e => console.warn('[DriveAPI] Could not trash share file:', e))
+    await trashFile(fileId).catch(e => console.warn('[DriveAPI] Could not trash share file:', e))
     throw refusedPublicLink(error)
   }
-  return file
+}
+
+/** Take back the public link of a file; a file that is already gone is fine */
+export async function unpublishFile(fileId: string): Promise<void> {
+  try {
+    await driveRequest(`/files/${fileId}/permissions/anyoneWithLink`, { method: 'DELETE' })
+  } catch (error) {
+    if ((error as Partial<DriveError>).status !== 404) throw error
+  }
 }
 
 /**
@@ -802,11 +820,15 @@ export async function updateShareFile(
 }
 
 /** Move a file to the Drive trash (recoverable). Trashing alone leaves a public file readable. */
-async function trashFile(fileId: string): Promise<void> {
-  await driveRequest(`/files/${fileId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ trashed: true }),
-  })
+export async function trashFile(fileId: string): Promise<void> {
+  try {
+    await driveRequest(`/files/${fileId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ trashed: true }),
+    })
+  } catch (error) {
+    if ((error as Partial<DriveError>).status !== 404) throw error
+  }
 }
 
 /**

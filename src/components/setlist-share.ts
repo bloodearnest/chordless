@@ -239,7 +239,7 @@ export class SetlistShare extends LitElement {
       const share = await createShare(setlist, {
         db,
         spaceId: id,
-        spaceFolderId: manager.driveFolderId as string, // (init found or made it)
+        space: manager.space, // (init found or made its folder)
       })
       setlist.share = share
       await db.saveSetlist(setlist)
@@ -256,7 +256,7 @@ export class SetlistShare extends LitElement {
       const manager = await createSyncManager(name, id)
       const share = await refreshShare(
         { ...setlist, share: setlist.share },
-        { db, spaceId: id, spaceFolderId: manager.driveFolderId as string }
+        { db, spaceId: id, space: manager.space }
       )
       if (share !== setlist.share) {
         setlist.share = share
@@ -271,7 +271,9 @@ export class SetlistShare extends LitElement {
     if (!(await this._stopModal.value?.ask())) return
     return this._run(async (setlist, db) => {
       if (!setlist.share) return
-      await stopShare(setlist.share)
+      const { id, name } = getCurrentSpace()
+      const manager = await createSyncManager(name, id)
+      await stopShare(setlist.share, manager.space)
       setlist.share = null
       await db.saveSetlist(setlist)
       this.requestUpdate()

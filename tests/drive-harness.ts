@@ -2,8 +2,10 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
+import type { StorageBackend } from '../src/js/storage/types.ts'
 import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
+import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
 import { deleteDatabase, TEST_SPACE, wait } from './test-helpers.ts'
 
@@ -62,24 +64,11 @@ export async function editSong(device: { db: ChordlessDB }, uuid: string, conten
 }
 
 /**
- * The setup the Drive sync tests share: a FakeDrive installed for each test, and simulated
- * devices (each with its own database) that sync one space through it. Call it inside
- * a describe. Its `drive` and `devices` are new for each test, so read them as `rig.drive`.
+ * What the two sync rigs share: simulated devices (each with its own database) that sync one space
+ * through a storage backend, and the helpers that edit their records the way the app does.
  */
-export function useSyncRig() {
-  const rig = {
-    drive: undefined as unknown as ReturnType<typeof installFakeDrive>,
-    devices: [] as any[],
-    makeDevice,
-    renameSpace,
-    addSetlist,
-    editSetlist,
-    syncDevice,
-    driveSetlistFiles,
-    driveSetlist,
-    replaceDriveFile,
-  }
-  const drive = () => rig.drive
+function makeRig(storage: () => StorageBackend | undefined) {
+  const devices: any[] = []
 
   /** A simulated device: its own local database, syncing the shared space */
   async function makeDevice(
@@ -101,10 +90,15 @@ export function useSyncRig() {
         this.readOnly = readOnly
       },
     }
-    const sync = new DriveSyncManager(spaceName, TEST_SPACE.id, { db, folderLink, memberCache })
+    const sync = new DriveSyncManager(spaceName, TEST_SPACE.id, {
+      db,
+      folderLink,
+      memberCache,
+      storage: storage(),
+    })
     await sync.init()
     const device = { name, db, sync, folderLink, memberCache }
-    rig.devices.push(device)
+    devices.push(device)
     return device
   }
 
@@ -114,6 +108,7 @@ export function useSyncRig() {
       db: device.db,
       folderLink: device.folderLink,
       memberCache: device.memberCache,
+      storage: storage(),
     })
     await device.sync.init()
   }
@@ -138,6 +133,67 @@ export function useSyncRig() {
     await wait(5)
   }
 
+  async function closeDevices() {
+    for (const device of devices.splice(0)) {
+      device.db.db?.close()
+      await deleteDatabase(device.db.dbName)
+    }
+  }
+
+  return { devices, makeDevice, renameSpace, addSetlist, editSetlist, syncDevice, closeDevices }
+}
+
+/**
+ * The setup the sync tests share: a MemoryStorage (tests/memory-storage.ts) for each test, and
+ * simulated devices that sync one space through it. Call it inside a describe. Its `storage` and
+ * `devices` are new for each test, so read them as `rig.storage`. For what the engine does with
+ * any backend; what Drive does on the wire is tested through useFakeDriveRig.
+ */
+export function useSyncRig() {
+  const rig = {
+    storage: new MemoryStorage(),
+    ...makeRig(() => rig.storage),
+    driveSetlistFiles,
+    driveSetlist,
+  }
+
+  function driveSetlistFiles() {
+    return rig.storage.list(f => Boolean(f.props.setlistId))
+  }
+
+  function driveSetlist(setlistId) {
+    const files = rig.storage.list(f => f.props.setlistId === setlistId)
+    expect(files, `Files for setlist ${setlistId}`).to.have.length(1)
+    return JSON.parse(files[0].content)
+  }
+
+  beforeEach(() => {
+    rig.storage = new MemoryStorage()
+  })
+
+  afterEach(async () => {
+    await rig.closeDevices()
+  })
+
+  return rig
+}
+
+/**
+ * The same, against FakeDrive (tests/fake-drive.ts), an in-memory fake of the parts of the Drive v3
+ * API the app uses, so the real drive-api.ts and the Drive adapter run too: for tests of what is
+ * sent to Drive and how its answers are read, and of the parts that still call Drive directly
+ * (share links, pads). Its `drive` and `devices` are new for each test: read them as `rig.drive`.
+ */
+export function useFakeDriveRig() {
+  const rig = {
+    drive: undefined as unknown as ReturnType<typeof installFakeDrive>,
+    ...makeRig(() => undefined),
+    driveSetlistFiles,
+    driveSetlist,
+    replaceDriveFile,
+  }
+  const drive = () => rig.drive
+
   function driveSetlistFiles() {
     return drive().listFiles(f => f.appProperties.setlistId)
   }
@@ -158,15 +214,11 @@ export function useSyncRig() {
 
   beforeEach(() => {
     rig.drive = installFakeDrive()
-    rig.devices = []
   })
 
   afterEach(async () => {
     rig.drive.uninstall()
-    for (const device of rig.devices) {
-      device.db.db?.close()
-      await deleteDatabase(device.db.dbName)
-    }
+    await rig.closeDevices()
     expect(
       rig.drive.errors.map(e => e.message),
       'FakeDrive errors'

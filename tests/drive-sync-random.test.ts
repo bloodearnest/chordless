@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { createSetlist } from '../src/js/db.ts'
 import { makeEntry } from './builders.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { useFakeDriveRig } from './drive-harness.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -49,10 +49,10 @@ function random(seed: number) {
   }
 }
 
-type Device = Awaited<ReturnType<ReturnType<typeof useSyncRig>['makeDevice']>>
+type Device = Awaited<ReturnType<ReturnType<typeof useFakeDriveRig>['makeDevice']>>
 
 describe('Drive sync: random histories', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const { makeDevice } = rig
 
   const liveSetlistFiles = () =>

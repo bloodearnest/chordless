@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { addSong, editSong, useSyncRig } from './drive-harness.ts'
+import { addSong, editSong, useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -8,7 +8,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: spaces', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const {
     makeDevice,
     renameSpace,

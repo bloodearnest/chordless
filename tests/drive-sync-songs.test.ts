@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { songFileMetadata } from '../src/js/drive-metadata.ts'
-import { addSong, editSong, useSyncRig } from './drive-harness.ts'
+import { addSong, editSong, useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -9,7 +9,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: songs', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const { makeDevice, syncDevice, replaceDriveFile } = rig
 
   describe('songs', () => {

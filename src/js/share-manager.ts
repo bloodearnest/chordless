@@ -1,20 +1,12 @@
 /**
  * Making, updating and ending a setlist's share link (docs/SHARING.md), against the
- * space's database and Drive folder. The bundle and encryption are in share-bundle.ts
- * and share-crypto.ts; the Drive calls in drive-api.ts.
+ * space's database and files. The bundle and encryption are in share-bundle.ts
+ * and share-crypto.ts; the files are written through the storage API (storage/types.ts).
  */
 
 import type { Setlist, SetlistShare } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import {
-  createShareFile,
-  endShareFile,
-  findSharesFolder,
-  getSharesFolder,
-  listShareFiles,
-  updateShareFile,
-} from './drive-api.ts'
-import { forUpdate, shareFileMetadata } from './drive-metadata.ts'
+import { fileInput, shareFileMetadata, updateInput } from './drive-metadata.ts'
 import {
   buildShareBundle,
   bundleHash,
@@ -24,6 +16,7 @@ import {
 } from './share-bundle.ts'
 import { encryptBundle, generateShareKey } from './share-crypto.ts'
 import { getSongById } from './song-utils.ts'
+import type { SpaceStorage } from './storage/types.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
 
 /** An orphaned share file (no setlist points at it) is left alone this long, so a share another device is still recording is not ended under it */
@@ -32,8 +25,8 @@ const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
 export interface ShareContext {
   db: ChordlessDB
   spaceId: string | null
-  /** The space's Drive folder */
-  spaceFolderId: string
+  /** The space's files */
+  space: SpaceStorage
   /** For tests: today's YYYY-MM-DD, and the current time */
   today?: string
   now?: Date
@@ -89,10 +82,11 @@ export async function createShare(setlist: Setlist, ctx: ShareContext): Promise<
   const key = generateShareKey()
   const { hash, file } = await prepare(setlist, key, expires, ctx)
 
-  const sharesFolder = await getSharesFolder(ctx.spaceFolderId)
   const metadata = shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires })
-  const driveFile = await createShareFile(sharesFolder, metadata, await file())
-  return { fileId: driveFile.id, key, created, expires, bundleHash: hash }
+  const { file: stored } = await ctx.space.create('shares', fileInput(metadata), await file(), {
+    publicLink: true,
+  })
+  return { fileId: stored.ref, key, created, expires, bundleHash: hash }
 }
 
 /**
@@ -109,14 +103,19 @@ export async function refreshShare(
   const { hash, file } = await prepare(setlist, share.key, expires, ctx)
   if (hash === share.bundleHash && expires === share.expires) return share
 
-  const metadata = forUpdate(shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires }), 'share')
-  await updateShareFile(share.fileId, metadata, await file())
+  const metadata = shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires })
+  await ctx.space.update(share.fileId, updateInput(metadata, 'share'), await file())
   return { ...share, expires, bundleHash: hash }
 }
 
 /** Stop sharing: end access, then trash the file. The caller clears the setlist's share. */
-export async function stopShare(share: SetlistShare): Promise<void> {
-  await endShareFile(share.fileId)
+export async function stopShare(
+  share: Pick<SetlistShare, 'fileId'>,
+  space: SpaceStorage
+): Promise<void> {
+  // The public link goes first: a file in the bin can still be read by anyone who has the link
+  await space.unpublish(share.fileId)
+  await space.trash(share.fileId)
 }
 
 /**
@@ -139,7 +138,7 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
     if (!share || setlist.deletedAt) continue
     try {
       if (isExpired(share.expires, today)) {
-        await stopShare(share)
+        await stopShare(share, ctx.space)
         await ctx.db.saveSetlist({ ...setlist, share: null })
         changed++
       } else {
@@ -155,24 +154,21 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
   }
 
   try {
-    // Nothing to clean up if nothing was ever shared: don't make the folder for that
-    const sharesFolder = await findSharesFolder(ctx.spaceFolderId)
-    if (!sharesFolder) return changed
     const live = new Map(
       (await ctx.db.getAllSetlists()).flatMap(s =>
         s.share && !s.deletedAt ? [[s.share.fileId, s] as const] : []
       )
     )
-    for (const file of await listShareFiles(sharesFolder)) {
-      const expires = file.appProperties?.expires
-      const pointedAt = live.has(file.id)
-      const old = Date.parse(file.modifiedTime as string) < now.getTime() - ORPHAN_GRACE_MS
+    for (const file of await ctx.space.list('shares')) {
+      const expires = file.props.expires
+      const pointedAt = live.has(file.ref)
+      const old = Date.parse(file.modified as string) < now.getTime() - ORPHAN_GRACE_MS
       const expired = expires !== undefined && isExpired(expires, today)
       if (expired || (!pointedAt && old)) {
         try {
-          await endShareFile(file.id)
+          await stopShare({ fileId: file.ref }, ctx.space)
         } catch (error) {
-          console.error(`[Share] Could not end share file ${file.id}:`, error)
+          console.error(`[Share] Could not end share file ${file.ref}:`, error)
         }
       }
     }

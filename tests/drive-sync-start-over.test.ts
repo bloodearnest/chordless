@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { DriveFolderGoneError } from '../src/js/drive-sync.ts'
-import { addSong, useSyncRig } from './drive-harness.ts'
+import { addSong, useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -19,7 +19,7 @@ async function failure(sync: { init(): Promise<unknown> }) {
 }
 
 describe('Drive sync: when the space’s folder is gone, and starting over', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const { makeDevice, addSetlist, syncDevice } = rig
   const spaceFolder = () => rig.drive.findByPath(['Chordless', TEST_SPACE.name])
 

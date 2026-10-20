@@ -9,7 +9,7 @@
 import type { SpaceMember } from '../data-types.ts'
 
 /** The folders of a space that sync keeps files in */
-export type Collection = 'songs' | 'setlists'
+export type Collection = 'songs' | 'setlists' | 'shares'
 
 /** A file as the backend lists it */
 export interface StoredFile {
@@ -74,7 +74,16 @@ export interface SpaceStorage {
   /** A file or folder by ref, wherever it is; null if it does not exist */
   status(ref: string): Promise<FileStatus | null>
   readText(ref: string): Promise<string>
-  create(collection: Collection, input: FileInput, body: FileBody): Promise<WriteResult>
+  /**
+   * Create a file. With `publicLink` it is readable by anyone who has its ref (a share link), and
+   * if the backend will not allow that, nothing is left behind and the error says so.
+   */
+  create(
+    collection: Collection,
+    input: FileInput,
+    body: FileBody,
+    options?: { publicLink?: boolean }
+  ): Promise<WriteResult>
   /**
    * Create several files at once. One entry per item, in order: null for a file that could not
    * be created, so a bad file does not stop the others.
@@ -84,6 +93,10 @@ export interface SpaceStorage {
     items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]>
   update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult>
+  /** Take back a file's public link (the file stays). A file that is gone is fine. */
+  unpublish(ref: string): Promise<void>
+  /** Put a file in the backend's bin, where it can be recovered. A file that is gone is fine. */
+  trash(ref: string): Promise<void>
 }
 
 /** A backend: where spaces are found, made and opened */

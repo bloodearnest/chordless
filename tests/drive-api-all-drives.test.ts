@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { allDrivesUrl } from '../src/js/drive-api.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { useFakeDriveRig } from './drive-harness.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -33,7 +33,7 @@ describe('Shared drives (docs/SPACES.md)', () => {
   })
 
   describe('a sync', () => {
-    const rig = useSyncRig()
+    const rig = useFakeDriveRig()
 
     it('says so on every call on files, whatever it does', async () => {
       const phone = await rig.makeDevice('phone')

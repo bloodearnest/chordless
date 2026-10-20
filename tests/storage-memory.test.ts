@@ -8,6 +8,7 @@ describeStorage('in memory', async () => {
     trash: ref => storage.trash(ref),
     remove: ref => storage.remove(ref),
     edit: (ref, content) => storage.edit(ref, content),
+    publicDownload: ref => storage.publicDownload(ref),
     async fileElsewhere() {
       const other = await storage.ensureRoot('Elsewhere', 'space-elsewhere')
       const { file } = await storage

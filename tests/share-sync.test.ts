@@ -40,21 +40,19 @@ describe('Share links: sync', () => {
   const ctx = (device: Device, extra = {}) => ({
     db: device.db,
     spaceId: TEST_SPACE.id,
-    spaceFolderId: must(device.sync.driveFolderId),
+    space: device.sync.space,
     ...extra,
   })
 
   /** What a recipient would see: the file, decrypted */
   async function openShare(fileId: string, key: string) {
-    const { status, bytes } = rig.drive.anonymousDownload(fileId)
+    const { status, bytes } = rig.storage.publicDownload(fileId)
     expect(status).to.equal(200)
     return decryptBundle(key, must(bytes) as Uint8Array<ArrayBuffer>)
   }
 
-  const shareFiles = () =>
-    [...rig.drive.files.values()].filter((f: any) => f.appProperties?.type === 'share')
-  const uploads = () =>
-    rig.drive.requests.filter(r => r.method === 'PATCH' && r.path.startsWith('/upload'))
+  const shareFiles = () => rig.storage.list(f => f.props.type === 'share')
+  const updates = () => rig.storage.calls.filter(c => c.op === 'update')
 
   /** A device with one shared setlist of two songs, synced */
   async function sharedSetlist() {
@@ -80,10 +78,10 @@ describe('Share links: sync', () => {
     const { share } = await sharedSetlist()
 
     const [file] = shareFiles()
-    expect(file.id).to.equal(share.fileId)
-    expect(file.permissions.map(p => p.type)).to.deep.equal(['anyone'])
-    expect(file.appProperties.expires).to.equal(share.expires)
-    expect(JSON.stringify(file.appProperties)).to.not.include(share.key)
+    expect(file.ref).to.equal(share.fileId)
+    expect(file.public).to.equal(true)
+    expect(file.props.expires).to.equal(share.expires)
+    expect(JSON.stringify(file.props)).to.not.include(share.key)
 
     const bundle = await openShare(share.fileId, share.key)
     expect(bundle.setlist.songs.map(s => s.title)).to.deep.equal(['Alpha', 'Beta'])
@@ -109,18 +107,18 @@ describe('Share links: sync', () => {
   it('leaves an unchanged share alone, and updates a changed one in place', async () => {
     const { phone, share } = await sharedSetlist()
     await phone.sync.sync()
-    const before = uploads().length
+    const before = updates().length
 
     await phone.sync.sync()
-    expect(uploads().filter(r => r.path.includes(share.fileId))).to.have.length(0)
-    expect(uploads().length).to.equal(before)
+    expect(updates().filter(c => c.on === share.fileId)).to.have.length(0)
+    expect(updates().length).to.equal(before)
 
     await editSong(phone, 'a', '{title: Alpha}\n{key: G}\n[G]Alpha line, fixed')
     await phone.sync.sync()
 
     const files = shareFiles()
     expect(files).to.have.length(1)
-    expect(files[0].id).to.equal(share.fileId)
+    expect(files[0].ref).to.equal(share.fileId)
     const bundle = await openShare(share.fileId, share.key)
     expect(bundle.setlist.songs[0].chordpro).to.include('fixed')
     const recorded = must(await phone.db.getSetlist((await phone.db.getAllSetlists())[0].id))
@@ -169,13 +167,12 @@ describe('Share links: sync', () => {
 
     await phone.sync.sync()
 
-    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
-    expect(rig.drive.files.get(share.fileId).trashed).to.equal(true)
-    expect(rig.drive.files.has(share.fileId), 'trashed, never deleted').to.equal(true)
+    expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
+    expect(rig.storage.file(share.fileId).trashed).to.equal(true)
     expect((await phone.db.getSetlist(setlist.id))?.share).to.equal(null)
-    const driveCopy = [...rig.drive.files.values()].find(
-      (f: any) => f.appProperties.setlistId === setlist.id && f.appProperties.type !== 'share'
-    ) as any
+    const [driveCopy] = rig.storage.list(
+      f => f.props.setlistId === setlist.id && f.props.type !== 'share'
+    )
     expect(JSON.parse(driveCopy.content).share).to.equal(null)
   })
 
@@ -191,22 +188,22 @@ describe('Share links: sync', () => {
 
     const recorded = must((await phone.db.getSetlist(setlist.id))?.share)
     expect(recorded.expires).to.equal(addDays(later, SHARE_DAYS_AFTER))
-    expect(rig.drive.files.get(share.fileId).appProperties.expires).to.equal(recorded.expires)
+    expect(rig.storage.file(share.fileId).props.expires).to.equal(recorded.expires)
   })
 
   it('stopping a share ends access, and sharing again makes a new link', async () => {
     const { phone, setlist, share } = await sharedSetlist()
-    await stopShare(share)
+    await stopShare(share, phone.sync.space)
     await phone.db.saveSetlist({
       ...(await phone.db.getSetlist(setlist.id)),
       share: null,
     } as Setlist)
-    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
 
     const again = await createShare(must(await phone.db.getSetlist(setlist.id)), ctx(phone))
     expect(again.fileId).to.not.equal(share.fileId)
     expect(again.key).to.not.equal(share.key)
-    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
   })
 
   it('ends share files nothing points at once they are a day old, not before', async () => {
@@ -217,10 +214,10 @@ describe('Share links: sync', () => {
     } as Setlist)
 
     await syncShares(ctx(phone))
-    expect(rig.drive.anonymousDownload(share.fileId).status, 'fresh orphan is left').to.equal(200)
+    expect(rig.storage.publicDownload(share.fileId).status, 'fresh orphan is left').to.equal(200)
 
     await syncShares(ctx(phone, { now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) }))
-    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
+    expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
   })
 
   it('shares a song the library has lost by the chart edited into the setlist, and leaves out one with none', async () => {
@@ -253,36 +250,19 @@ describe('Share links: sync', () => {
       share: null,
     } as Setlist)
     const later = { now: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) }
-    rig.drive.failRequests({
-      method: 'DELETE',
-      path: new RegExp(`${share.fileId}/permissions`),
-      status: 500,
-      times: 1,
-    })
+    rig.storage.fail('unpublish', { on: share.fileId, status: 500 })
 
     await syncShares(ctx(phone, later))
-    expect(rig.drive.anonymousDownload(share.fileId).status, 'still there').to.equal(200)
+    expect(rig.storage.publicDownload(share.fileId).status, 'still there').to.equal(200)
 
     await syncShares(ctx(phone, later))
-    expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
-  })
-
-  it('does not make a shares folder for a space that never shares', async () => {
-    const phone = await makeDevice('phone')
-    await addSetlist(phone, [])
-    await phone.sync.sync()
-    expect(rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'shares'])).to.equal(null)
+    expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
   })
 
   it('a failing share does not stop setlists syncing', async () => {
     const { phone, share } = await sharedSetlist()
     await editSong(phone, 'a', '{title: Alpha}\n{key: G}\n[G]changed')
-    rig.drive.failRequests({
-      method: 'PATCH',
-      path: new RegExp(`upload.*${share.fileId}`),
-      status: 500,
-      times: 1,
-    })
+    rig.storage.fail('update', { on: share.fileId, status: 500 })
     await phone.sync.sync()
     // The share was not updated, but the sync went on
     expect((await openShare(share.fileId, share.key)).setlist.songs[0].chordpro).to.not.include(

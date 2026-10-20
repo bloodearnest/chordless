@@ -10,7 +10,7 @@ const { describe, it } = window
 
 suppressConsoleLogs()
 
-describe('Drive sync (against FakeDrive)', () => {
+describe('sync (against the memory backend)', () => {
   const rig = useSyncRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice, driveSetlistFiles, driveSetlist } = rig
 
@@ -21,14 +21,14 @@ describe('Drive sync (against FakeDrive)', () => {
 
       await syncDevice(phone)
 
-      const folder = rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'setlists'])
       const [file] = driveSetlistFiles()
-      expect(file.parents).to.deep.equal([folder.id])
-      expect(file.appProperties.setlistId).to.equal(setlist.id)
+      expect(file.collection).to.equal('setlists')
+      expect(file.root).to.equal(must(rig.storage.rootNamed(TEST_SPACE.name)).ref)
+      expect(file.props.setlistId).to.equal(setlist.id)
       expect(driveSetlist(setlist.id).name).to.equal('Harvest')
 
       const local = must(await phone.db.getSetlist(setlist.id))
-      expect(local.driveFileId).to.equal(file.id)
+      expect(local.driveFileId).to.equal(file.ref)
     })
 
     it('downloads setlists created on another device', async () => {
@@ -50,8 +50,8 @@ describe('Drive sync (against FakeDrive)', () => {
       const setlist = await addSetlist(phone, { songs })
       await syncDevice(phone)
       // As an older version uploaded them: the chart's text as the tempo
-      const [file] = rig.drive.listFiles(f => f.appProperties.setlistId === setlist.id)
-      file.content = file.content.replace('"tempo": 72', '"tempo": "72"')
+      const [file] = rig.storage.list(f => f.props.setlistId === setlist.id)
+      rig.storage.edit(file.ref, file.content.replace('"tempo": 72', '"tempo": "72"'))
       expect(driveSetlist(setlist.id).songs[0].tempo).to.equal('72')
 
       await syncDevice(tablet)
@@ -59,23 +59,9 @@ describe('Drive sync (against FakeDrive)', () => {
       expect(onTablet.songs[0].tempo).to.equal(72)
       expect(setlistHasLocalChanges(onTablet)).to.equal(false)
 
-      rig.drive.requests = []
+      rig.storage.clearCalls()
       await syncDevice(tablet)
-      const writes = rig.drive.requests.filter(r => r.method !== 'GET')
-      expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
-    })
-
-    it('downloads every setlist when the listing spans several pages', async () => {
-      rig.drive.maxPageSize = 2
-      const phone = await makeDevice('phone')
-      const tablet = await makeDevice('tablet')
-      const setlists = [await addSetlist(phone), await addSetlist(phone), await addSetlist(phone)]
-      await syncDevice(phone)
-
-      await syncDevice(tablet)
-
-      const onTablet = await tablet.db.getAllSetlists()
-      expect(onTablet.map(s => s.id).sort()).to.deep.equal(setlists.map(s => s.id).sort())
+      expect(rig.storage.writes()).to.deep.equal([])
     })
 
     it('propagates an edit from one device to another', async () => {
@@ -98,15 +84,14 @@ describe('Drive sync (against FakeDrive)', () => {
       await addSetlist(phone)
       await syncDevice(phone)
       await syncDevice(phone) // settle any post-upload bookkeeping
-      rig.drive.requests = []
+      rig.storage.clearCalls()
 
       await syncDevice(phone)
 
-      const writes = rig.drive.requests.filter(r => r.method !== 'GET')
-      expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
     })
 
-    it('never removes Drive files when the local database is empty', async () => {
+    it('never removes files when the local database is empty', async () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Keep me' })
       await syncDevice(phone)
@@ -116,7 +101,7 @@ describe('Drive sync (against FakeDrive)', () => {
 
       expect(driveSetlist(setlist.id).name).to.equal('Keep me')
       expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Keep me')
-      expect(rig.drive.requests.filter(r => r.method === 'DELETE')).to.deep.equal([])
+      expect(driveSetlistFiles()).to.have.length(1)
     })
 
     it('removes a setlist whose Drive file was deleted elsewhere', async () => {
@@ -125,7 +110,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const setlist = await addSetlist(phone, { name: 'Deleted' })
       await syncDevice(phone)
 
-      rig.drive.files.delete(driveSetlistFiles()[0].id)
+      rig.storage.remove(driveSetlistFiles()[0].ref)
       await syncDevice(phone)
 
       expect(await phone.db.getSetlist(setlist.id)).to.not.be.ok
@@ -133,8 +118,8 @@ describe('Drive sync (against FakeDrive)', () => {
     })
   })
 
-  describe('Drive file metadata', () => {
-    const fileFor = id => rig.drive.listFiles(f => f.appProperties.setlistId === id)[0]
+  describe('file metadata', () => {
+    const fileFor = id => rig.storage.list(f => f.props.setlistId === id)[0]
 
     it('creates and updates setlist files with the metadata from drive-metadata.js', async () => {
       const phone = await makeDevice('phone')
@@ -142,11 +127,11 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
       const expected = () => setlistFileMetadata(setlist, { spaceId: TEST_SPACE.id }).appProperties
 
-      expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
+      expect(fileFor(setlist.id).props).to.deep.equal(expected())
 
       await editSetlist(phone, setlist.id, { name: 'Harvest Festival' })
       await syncDevice(phone)
-      expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
+      expect(fileFor(setlist.id).props).to.deep.equal(expected())
     })
 
     it("renames a setlist's file when its date or leader changes", async () => {
@@ -169,7 +154,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Old file' })
       await syncDevice(phone)
-      Object.assign(fileFor(setlist.id).appProperties, {
+      Object.assign(fileFor(setlist.id).props, {
         resourceType: 'setlist',
         organisationId: 'old-id',
         leader: '',
@@ -179,7 +164,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await editSetlist(phone, setlist.id, { name: 'Old file, edited' })
       await syncDevice(phone)
 
-      expect(Object.keys(fileFor(setlist.id).appProperties).sort()).to.deep.equal([
+      expect(Object.keys(fileFor(setlist.id).props).sort()).to.deep.equal([
         'appVersion',
         'setlistId',
         'spaceId',
@@ -227,7 +212,7 @@ describe('Drive sync (against FakeDrive)', () => {
       // Regression: lastSyncedAt (device clock) used to be compared with Drive's
       // modifiedTime (server clock), so with the device ahead, a remote edit
       // looked older than the last sync and was silently overwritten.
-      rig.drive.clockOffsetMs = -5 * 60 * 1000 // server 5 min behind = rig.devices 5 min ahead
+      rig.storage.clockOffsetMs = -5 * 60 * 1000 // server 5 min behind = rig.devices 5 min ahead
       const phone = await makeDevice('phone')
       const tablet = await makeDevice('tablet')
       const setlist = await addSetlist(phone, { name: 'Original', leader: 'Ann' })
@@ -250,7 +235,7 @@ describe('Drive sync (against FakeDrive)', () => {
     it('keeps a local edit when the device clock is behind Drive', async () => {
       // Regression: the device's own upload looked like a newer remote change,
       // so an edit made within the skew window was replaced by the old version.
-      rig.drive.clockOffsetMs = 5 * 60 * 1000 // server 5 min ahead = rig.devices 5 min behind
+      rig.storage.clockOffsetMs = 5 * 60 * 1000 // server 5 min ahead = rig.devices 5 min behind
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Original' })
       await syncDevice(phone)
@@ -283,13 +268,13 @@ describe('Drive sync (against FakeDrive)', () => {
       const setlist = await addSetlist(phone, { name: 'Original' })
       await syncDevice(phone)
       const [file] = driveSetlistFiles()
-      rig.drive.files.get(file.id).modifiedTime = new Date(Date.now() + 60_000).toISOString()
-      rig.drive.files.get(file.id).appProperties.note = 'changed elsewhere'
-      rig.drive.requests = []
+      rig.storage.file(file.ref).modified = new Date(Date.now() + 60_000).toISOString()
+      rig.storage.file(file.ref).props.note = 'changed elsewhere'
+      rig.storage.clearCalls()
 
       await syncDevice(phone)
 
-      expect(rig.drive.requests.filter(r => r.params.get('alt') === 'media')).to.deep.equal([])
+      expect(rig.storage.calls.filter(c => c.op === 'readText')).to.deep.equal([])
       expect(must(await phone.db.getSetlist(setlist.id)).name).to.equal('Original')
     })
 
@@ -299,11 +284,11 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Changed' })
       await editSetlist(phone, setlist.id, { name: 'Original' })
-      rig.drive.requests = []
+      rig.storage.clearCalls()
 
       await syncDevice(phone)
 
-      expect(rig.drive.requests.filter(r => r.method !== 'GET').map(r => r.path)).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
     })
 
     it('keeps device sync state out of the copy in Drive', async () => {
@@ -336,10 +321,10 @@ describe('Drive sync (against FakeDrive)', () => {
       stored.driveModifiedTime = new Date().toISOString()
       stored._lastSyncHash = 'hash-from-old-version'
       await phone.db.saveSetlist(stored)
-      rig.drive.requests = []
+      rig.storage.clearCalls()
 
       await syncDevice(phone)
-      expect(rig.drive.requests.filter(r => r.method !== 'GET').map(r => r.path)).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
       expect(must(await phone.db.getSetlist(setlist.id)).syncedContentHash).to.be.a('string')
 
       await editSetlist(phone, setlist.id, { name: 'Old record, edited' })

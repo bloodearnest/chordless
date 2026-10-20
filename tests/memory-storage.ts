@@ -32,7 +32,11 @@ export interface MemoryFile {
   name: string
   props: Record<string, string>
   type: string
+  /** The text, or for a file that was not text (an encrypted share) one character per byte */
   content: string
+  binary: boolean
+  /** Readable by anyone with the ref (a share link) */
+  public: boolean
   rev: string
   created: string
   modified: string
@@ -71,6 +75,8 @@ export type StorageOp =
   | 'create'
   | 'createMany'
   | 'update'
+  | 'unpublish'
+  | 'trash'
 
 interface Failure {
   op: StorageOp
@@ -82,7 +88,7 @@ interface Failure {
   skip: number
 }
 
-const WRITES: StorageOp[] = ['renameRoot', 'create', 'createMany', 'update']
+const WRITES: StorageOp[] = ['renameRoot', 'create', 'createMany', 'update', 'unpublish', 'trash']
 
 export class MemoryStorage implements StorageBackend {
   roots = new Map<string, MemoryRoot>()
@@ -118,6 +124,16 @@ export class MemoryStorage implements StorageBackend {
     this.#failures.push({ op, on, status, network, times, skip })
   }
 
+  /** The calls that change something (a test of "nothing is uploaded" looks at these) */
+  writes(): { op: StorageOp; on?: string }[] {
+    return this.calls.filter(call => WRITES.includes(call.op))
+  }
+
+  /** Forget the calls made so far, to look at those of the next sync */
+  clearCalls(): void {
+    this.calls = []
+  }
+
   /** The live files, optionally those a predicate picks (folders are not files here) */
   list(predicate: (file: MemoryFile) => boolean = () => true): MemoryFile[] {
     return [...this.files.values()].filter(f => !f.trashed && predicate(f))
@@ -143,6 +159,18 @@ export class MemoryStorage implements StorageBackend {
   /** Share a space with someone */
   addMember(rootRef: string, member: SpaceMember): void {
     this.root(rootRef).members.push(member)
+  }
+
+  /** What the worker's /api/share/<ref> gives a recipient: the file's bytes if it is public */
+  publicDownload(ref: string): { status: number; bytes?: Uint8Array } {
+    const file = this.files.get(ref)
+    if (!file?.public) return { status: 404 }
+    return {
+      status: 200,
+      bytes: file.binary
+        ? Uint8Array.from(file.content, c => c.charCodeAt(0))
+        : new TextEncoder().encode(file.content),
+    }
   }
 
   /** A change made elsewhere (another device, or by hand): new content, so a new rev */
@@ -232,8 +260,9 @@ export class MemoryStorage implements StorageBackend {
     rootRef: string,
     collection: Collection,
     input: FileInput,
-    body: string,
-    ref?: string
+    body: Content,
+    ref?: string,
+    publicLink = false
   ): WriteResult {
     this.refuseWrites()
     let file: MemoryFile
@@ -247,6 +276,8 @@ export class MemoryStorage implements StorageBackend {
         props: {},
         type: input.type,
         content: '',
+        binary: false,
+        public: false,
         rev: '',
         created: now,
         modified: now,
@@ -265,7 +296,9 @@ export class MemoryStorage implements StorageBackend {
       else file.props[key] = value
     }
     const intact = this.corruptWrites <= 0
-    this.#setContent(file, body)
+    file.binary = body.binary
+    this.#setContent(file, body.content)
+    if (publicLink) file.public = true
     if (!intact) {
       this.corruptWrites--
       file.rev = md5Hex(`${body} (corrupted)`)
@@ -329,10 +362,25 @@ export function toStored(file: MemoryFile): StoredFile {
   }
 }
 
-async function text(body: FileBody): Promise<string> {
-  if (typeof body === 'string') return body
-  if (body instanceof Blob) return body.text()
-  return new TextDecoder().decode(body)
+/** What a write holds: text as it is, anything else one character per byte, as FakeDrive does */
+interface Content {
+  content: string
+  binary: boolean
+}
+
+async function contentOf(body: FileBody): Promise<Content> {
+  if (typeof body === 'string') return { content: body, binary: false }
+  const bytes =
+    body instanceof Blob
+      ? new Uint8Array(await body.arrayBuffer())
+      : body instanceof Uint8Array
+        ? body
+        : new Uint8Array(body)
+  let content = ''
+  for (let i = 0; i < bytes.length; i += 8192) {
+    content += String.fromCharCode(...bytes.subarray(i, i + 8192))
+  }
+  return { content, binary: true }
 }
 
 class MemorySpace implements SpaceStorage {
@@ -374,9 +422,21 @@ class MemorySpace implements SpaceStorage {
     return file.content
   }
 
-  async create(collection: Collection, input: FileInput, body: FileBody): Promise<WriteResult> {
+  async create(
+    collection: Collection,
+    input: FileInput,
+    body: FileBody,
+    options?: { publicLink?: boolean }
+  ): Promise<WriteResult> {
     this.#storage.enter('create', collection)
-    return this.#storage.write(this.#root, collection, input, await text(body))
+    return this.#storage.write(
+      this.#root,
+      collection,
+      input,
+      await contentOf(body),
+      undefined,
+      options?.publicLink
+    )
   }
 
   async createMany(
@@ -388,13 +448,25 @@ class MemorySpace implements SpaceStorage {
     for (const { input, body } of items) {
       try {
         this.#storage.enter('create', collection)
-        results.push(this.#storage.write(this.#root, collection, input, await text(body)))
+        results.push(this.#storage.write(this.#root, collection, input, await contentOf(body)))
       } catch (error) {
         console.error('[MemoryStorage] Failed to create a file:', error)
         results.push(null)
       }
     }
     return results
+  }
+
+  async unpublish(ref: string): Promise<void> {
+    this.#storage.enter('unpublish', ref)
+    const file = this.#storage.files.get(ref)
+    if (file) file.public = false
+  }
+
+  async trash(ref: string): Promise<void> {
+    this.#storage.enter('trash', ref)
+    const file = this.#storage.files.get(ref)
+    if (file) file.trashed = true
   }
 
   async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
@@ -404,7 +476,7 @@ class MemorySpace implements SpaceStorage {
       this.#root,
       file?.collection ?? 'setlists',
       input,
-      await text(body),
+      await contentOf(body),
       ref
     )
   }

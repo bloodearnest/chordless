@@ -18,6 +18,8 @@ export interface StorageHarness {
   edit(ref: string, content: string): void
   /** Make the backend list at most this many files at a time (so paging is exercised) */
   pageSize?(size: number): void
+  /** What someone with only a file's ref (a share link's recipient) is given of it */
+  publicDownload(ref: string): { status: number; bytes?: Uint8Array }
   /** Put a file where this space's root is not its parent, and give its ref */
   fileElsewhere(): Promise<string>
 }
@@ -224,6 +226,61 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
         const ref = await harness.fileElsewhere()
         expect(must(await space.status(ref)).trashed).to.equal(false)
         expect((await space.inventory()).has(ref)).to.equal(false)
+      })
+    })
+
+    describe('share files', () => {
+      const shareInput = (id: string) => ({
+        name: `${id}.share`,
+        props: { type: 'share', setlistId: id, expires: '2026-11-01' },
+        type: 'application/octet-stream',
+      })
+      const bytes = new Uint8Array([0, 1, 2, 250, 251, 252, 253, 254, 255, 10, 13])
+
+      it('lists no shares in a space nothing was shared from', async () => {
+        expect(await space.list('shares')).to.deep.equal([])
+      })
+
+      it('keeps shares out of the songs and setlists', async () => {
+        await space.create('shares', shareInput('a'), bytes)
+        expect(await space.list('songs')).to.deep.equal([])
+        expect(await space.list('setlists')).to.deep.equal([])
+        expect((await space.list('shares')).map(f => f.props.setlistId)).to.deep.equal(['a'])
+      })
+
+      it('makes a share readable by its ref alone, byte for byte, and not before', async () => {
+        const open = await space.create('shares', shareInput('a'), bytes, { publicLink: true })
+        const closed = await space.create('shares', shareInput('b'), bytes)
+        const download = harness.publicDownload(open.file.ref)
+        expect(download.status).to.equal(200)
+        expect(Array.from(must(download.bytes))).to.deep.equal(Array.from(bytes))
+        expect(harness.publicDownload(closed.file.ref).status).to.equal(404)
+      })
+
+      it('keeps a share public when its content is replaced, with the same ref', async () => {
+        const { file } = await space.create('shares', shareInput('a'), bytes, { publicLink: true })
+        const more = new Uint8Array([9, 8, 7, 255])
+        const updated = await space.update(file.ref, shareInput('a'), more)
+        expect(updated.file.ref).to.equal(file.ref)
+        expect(Array.from(must(harness.publicDownload(file.ref).bytes))).to.deep.equal([
+          9, 8, 7, 255,
+        ])
+      })
+
+      it('ends a share: unpublished, then in the bin, and no longer listed', async () => {
+        const { file } = await space.create('shares', shareInput('a'), bytes, { publicLink: true })
+        await space.unpublish(file.ref)
+        expect(harness.publicDownload(file.ref).status).to.equal(404)
+        await space.trash(file.ref)
+        expect(await space.list('shares')).to.deep.equal([])
+        expect(must(await space.status(file.ref)).trashed).to.equal(true)
+      })
+
+      it('lets a file that is already gone be unpublished and binned', async () => {
+        const { file } = await space.create('shares', shareInput('a'), bytes, { publicLink: true })
+        harness.remove(file.ref)
+        await space.unpublish(file.ref)
+        await space.trash(file.ref)
       })
     })
 

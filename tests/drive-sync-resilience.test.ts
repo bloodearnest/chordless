@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { makeEntry, makeLocalState } from './builders.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { useFakeDriveRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -11,7 +11,7 @@ const { describe, it, beforeEach } = window
 suppressConsoleLogs()
 
 describe('Drive sync: errors and missing files', () => {
-  const rig = useSyncRig()
+  const rig = useFakeDriveRig()
   const {
     makeDevice,
     addSetlist,

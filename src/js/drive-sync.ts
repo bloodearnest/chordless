@@ -444,7 +444,7 @@ export class DriveSyncManager implements SyncSession {
       return await syncShares({
         db: this.db,
         spaceId: this.spaceId,
-        spaceFolderId: this.folderId,
+        space: this.space,
       })
     } catch (error) {
       // Shares must never stop setlists and songs syncing
