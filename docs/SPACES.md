@@ -59,7 +59,7 @@ inside it (`songs/`, `setlists/`, `shares/`, `pads/`). Because the app creates t
 recommends a **shared drive** (members can see the files in Drive, the files survive the owner
 leaving, Google backs them up) but a My Drive folder is fine. Shared drives need `supportsAllDrives`
 and `includeItemsFromAllDrives` on every Drive call (not in `drive-api.ts` today) and the Picker API
-(API key, app id `376758830135`, CSP for `apis.google.com`, `docs.google.com`, `www.gstatic.com`).
+(API key, app id `818185619377` (the `chordless-app` project number), CSP for `apis.google.com`, `docs.google.com`, `www.gstatic.com`).
 
 **A team space with only its owner needs no Worker** and syncs like a personal space. "Enable
 sharing" is the opt-in that hands the Worker the owner's token. One owner per team space (a person
@@ -203,10 +203,10 @@ still reaches them all; they'd mainly help against a single leaked key, per-team
 clarity and per-identity rate limits (Google's 100-accounts-per-project default is a further limit).
 For the real service account, use a **dedicated project with a tidy id** (the move is planned in docs/CLOUD_MIGRATION.md) (the address a team admin
 sees in their shared drive's members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id
-cannot be renamed: the app's own project is `setalight`, from its first name), separate from the project
+cannot be renamed: the old project is `setalight`, from its first name, now named `chordless-old`), separate from the project
 that holds the OAuth client and the verified brand, so the key that can reach every connected team's drive
-sits apart from the sign-in project. The spike uses `broker@setalight…` in the app's own
-project, which is fine for a test. Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
+sits apart from the sign-in project. The spike used `broker@setalight…`, and the account
+Terraform now makes, `team-storage@chordless-app…`, is in the app's own project for the time being. Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
 service account (the team uploads its own key; isolation, but real setup friction for a church).
 
 Roles, pads and conflicts are identical in both modes (the Worker enforces them either way); only
@@ -431,7 +431,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 **What it changes**
 - No One Tap. The Worker issues its own short-lived signed session token at sign-in (design above).
 - The service account lives in its own Google Cloud project, made when the project moves
-  (docs/CLOUD_MIGRATION.md); `broker@setalight.iam.gserviceaccount.com` is the spike's.
+  (docs/CLOUD_MIGRATION.md); `team-storage@chordless-app.iam.gserviceaccount.com` is in the app project for now, and `broker@setalight…` was the spike's.
 
 **Still open**
 - The Cloudflare limits on a deployed Worker (request length, body size): only a deployment shows them.
@@ -548,7 +548,7 @@ drives on). Picking fills in the parent; the probe then reads it, lists what the
 would be. It needs, in the Google Cloud console, the Picker API enabled and a browser API key allowed
 for it (restrict it to the Picker API and to the page's address); the key is typed on the page and
 kept in that browser only (the Worker's `GOOGLE_API_KEY` is a different key and never reaches a
-browser). The app id is the project number, `376758830135`. The production CSP is not changed yet:
+browser). The app id is the project number, `818185619377` (`chordless-app`; the old project's was `376758830135`). The production CSP is not changed yet:
 it needs `apis.google.com`, `docs.google.com` and `www.gstatic.com` when the Picker goes in the app.
 Needs one account; items 1, 5 and 6 still need two.
 
@@ -568,7 +568,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    shared-drive flags, no name matching, per-space transport.
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
-   **not yet against a real shared drive**: spike 2). The folder is already found by `driveFolderId`
+   and since checked against a real shared drive: spike 2 passed). The folder is already found by `driveFolderId`
    after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
    The UI now says "space" (Storage page, creating and switching, sync errors, the share and differs
    dialogs); code, tests' identifiers and older docs still say "organisation".
@@ -586,7 +586,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    and the preference.
 9. [ ] Space-aware immediate sync in the service worker.
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
-    switch, "Verify" and rollback. Gated on spike item 7.
+    switch, "Verify" and rollback. Spike item 7 passed.
 
 Items carried over from the TODO (organisation section): a media-team email config option; define
 users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
@@ -606,7 +606,7 @@ users, leaders, permissions; join/invite/remove user; restrict editing others' s
 - A Chordless-operated service account concentrates risk: one leaked key reaches every team that
   shared a drive with it. Keep it in a Worker secret, rotatable, and scope every call to the team's
   folder tree.
-- Workspace accounts and shared-drive admin policies are untested (spike 2).
+- The spike ran on a Workspace shared drive; stricter shared-drive admin policies than the test one are untested ("Still open" above).
 - A consent-screen/verification change, or Google restricting `drive.file` further, would undermine
   the whole broker design.
 
