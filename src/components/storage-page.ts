@@ -36,7 +36,6 @@ export class StoragePage extends LitElement {
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
     _otherSpaces: { state: true },
-    _spaceToDelete: { state: true },
     _deleteSpaceError: { state: true },
     _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
@@ -49,7 +48,6 @@ export class StoragePage extends LitElement {
   declare _clearError: string
   /** The spaces on this device other than the current one: the ones that can be deleted */
   declare _otherSpaces: Space[]
-  declare _spaceToDelete: string
   declare _deleteSpaceError: string
   declare _authMessage: AuthMessage | null
 
@@ -92,6 +90,31 @@ export class StoragePage extends LitElement {
 
     .danger-zone {
       border-color: color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
+    }
+
+    .space-rows {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .space-rows li {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--tint, currentColor);
+      border-radius: 8px;
+    }
+
+    .space-row-name {
+      font-size: var(--font-ui);
+      font-weight: 500;
+      overflow-wrap: anywhere;
     }
 
     h4 {
@@ -223,7 +246,6 @@ export class StoragePage extends LitElement {
     this._clearDataModal = createRef()
     this._deleteSpaceModal = createRef()
     this._otherSpaces = []
-    this._spaceToDelete = ''
     this._deleteSpaceError = ''
     this.isAuthenticated = false
     this.signInExpired = false
@@ -243,9 +265,6 @@ export class StoragePage extends LitElement {
     } catch (error) {
       console.error('[Storage] Failed to list the spaces:', error)
       this._otherSpaces = []
-    }
-    if (!this._otherSpaces.some(space => space.id === this._spaceToDelete)) {
-      this._spaceToDelete = ''
     }
   }
 
@@ -530,36 +549,29 @@ export class StoragePage extends LitElement {
         Remove a space you no longer use from this device, with its setlists and songs. To delete
         the space you are working in, switch to another first.
       </p>
-      <select
-        id="space-to-delete"
-        aria-label="Space to delete"
-        .value=${this._spaceToDelete}
-        @change=${(e: Event) => {
-          this._spaceToDelete = (e.target as HTMLSelectElement).value
-        }}
-      >
-        <option value="">Choose a space…</option>
+      <ul class="space-rows">
         ${this._otherSpaces.map(
-          space =>
-            html`<option value=${space.id} ?selected=${space.id === this._spaceToDelete}>${space.name}</option>`
+          space => html`
+            <li>
+              <span class="space-row-name">${space.name}</span>
+              <button
+                class="btn danger delete-space"
+                aria-label="Delete ${space.name}"
+                @click=${() => this._handleDeleteSpace(space)}
+              >
+                Delete
+              </button>
+            </li>
+          `
         )}
-      </select>
-      <button
-        id="delete-space"
-        class="btn block danger"
-        ?disabled=${!this._spaceToDelete}
-        @click=${this._handleDeleteSpace}
-      >
-        Delete Space
-      </button>
+      </ul>
       ${this._deleteSpaceError ? html`<p role="alert">❌ Failed to delete the space: ${this._deleteSpaceError}</p>` : ''}
     `
   }
 
-  async _handleDeleteSpace(): Promise<void> {
-    const space = this._otherSpaces.find(each => each.id === this._spaceToDelete)
+  async _handleDeleteSpace(space: Space): Promise<void> {
     const modal = this._deleteSpaceModal.value
-    if (!space || !modal) return
+    if (!modal) return
     modal.message =
       `Delete "${space.name}"? This deletes its setlists and songs on this device, and anything ` +
       "not yet synced to Google Drive is lost. Its folder in Google Drive is not touched. This can't be undone."

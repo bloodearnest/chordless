@@ -543,13 +543,8 @@ describe('the storage page, signed in to Google', () => {
     let before: { id: string | null; name: string }
     let current: { id: string; name: string }
     const made: string[] = []
-    const picker = () =>
-      must(page.shadowRoot?.querySelector<HTMLSelectElement>('select#space-to-delete'))
-    const choose = async (id: string) => {
-      picker().value = id
-      picker().dispatchEvent(new Event('change'))
-      await page.updateComplete
-    }
+    const deleteButton = (name: string) =>
+      page.shadowRoot?.querySelector<HTMLButtonElement>(`button[aria-label="Delete ${name}"]`)
     const unique = (name: string) => `${name} ${crypto.randomUUID().slice(0, 8)}`
 
     beforeEach(async () => {
@@ -569,21 +564,19 @@ describe('the storage page, signed in to Google', () => {
       return space
     }
 
-    it('offers the other spaces, and not the one being worked in', async () => {
-      const old = await makeOther('Old')
+    it('lists the other spaces, each with its own button, and not the one being worked in', async () => {
+      const first = await makeOther('Old')
+      const second = await makeOther('Test')
       await open()
-      const options = Array.from(picker().options).map(option => option.value)
-      expect(options).to.include(old.id)
-      expect(options).to.not.include(current.id)
-      expect(page.shadowRoot?.querySelector<HTMLButtonElement>('#delete-space')?.disabled).to.equal(
-        true
-      )
+      expect(deleteButton(first.name)).to.be.ok
+      expect(deleteButton(second.name)).to.be.ok
+      expect(deleteButton(current.name)).to.equal(null)
     })
 
-    it('asks first, naming the space and saying Drive is not touched, then deletes it', async () => {
+    it('asks first, naming the space and saying Drive is not touched, then deletes only that one', async () => {
       const old = await makeOther('Old')
+      const keep = await makeOther('Keep')
       await open()
-      await choose(old.id)
       const modal = must(page._deleteSpaceModal.value)
       let said = ''
       modal.ask = async () => {
@@ -591,13 +584,16 @@ describe('the storage page, signed in to Google', () => {
         return true
       }
 
-      button('Delete Space').click()
-      await until(() => !Array.from(picker().options).some(o => o.value === old.id), 'it to go')
+      must(deleteButton(old.name)).click()
+      await until(() => !deleteButton(old.name), 'it to go')
 
       expect(said).to.contain(`"${old.name}"`)
       expect(said).to.contain('Google Drive is not touched')
       const { listSpaces } = await import('../src/js/space.ts')
-      expect((await listSpaces()).map(space => space.id)).to.not.include(old.id)
+      const ids = (await listSpaces()).map(space => space.id)
+      expect(ids).to.not.include(old.id)
+      expect(ids).to.include(keep.id)
+      expect(deleteButton(keep.name)).to.be.ok
       // (and the list of spaces above it follows)
       const selector = must(page.shadowRoot?.querySelector('select-space'))
       await until(() => !selector.shadowRoot?.textContent?.includes(old.name), 'the list to follow')
@@ -606,35 +602,22 @@ describe('the storage page, signed in to Google', () => {
     it('does nothing when it is not confirmed', async () => {
       const old = await makeOther('Old')
       await open()
-      await choose(old.id)
       must(page._deleteSpaceModal.value).ask = async () => false
-      button('Delete Space').click()
+      must(deleteButton(old.name)).click()
       await wait(100)
       const { getSpaceByName } = await import('../src/js/space.ts')
       expect(await getSpaceByName(old.name)).to.be.ok
-    })
-
-    it('does nothing when no space is chosen', async () => {
-      await makeOther('Old')
-      await open()
-      let asked = false
-      must(page._deleteSpaceModal.value).ask = async () => {
-        asked = true
-        return true
-      }
-      await page._handleDeleteSpace()
-      expect(asked).to.equal(false)
+      expect(deleteButton(old.name)).to.be.ok
     })
 
     it('says so when it cannot', async () => {
       const old = await makeOther('Old')
       await open()
-      await choose(old.id)
       must(page._deleteSpaceModal.value).ask = async () => true
       // It went in the meantime, so there is nothing to delete
       await deleteSpace(old.id)
 
-      button('Delete Space').click()
+      must(deleteButton(old.name)).click()
       await until(() => text().includes('Failed to delete the space'), 'the failure to be shown')
       expect(text()).to.contain('not found')
     })
@@ -645,7 +628,7 @@ describe('the storage page, signed in to Google', () => {
       SpaceDB.prototype.getAllSpaces = () => Promise.reject(new Error('unreadable'))
       try {
         await open()
-        expect(page.shadowRoot?.querySelector('select#space-to-delete')).to.equal(null)
+        expect(page.shadowRoot?.querySelector('.space-rows')).to.equal(null)
       } finally {
         SpaceDB.prototype.getAllSpaces = real
       }
