@@ -112,7 +112,7 @@ export async function handleRequest(
     // Not an API route — delegate to static assets (SPA fallback handles unknown paths)
     return env.ASSETS.fetch(request)
   } catch (error) {
-    console.error('Worker error:', error)
+    console.error('Worker error:', message(error), error)
     return jsonResponse({ error: 'Internal server error', message: message(error) }, 500)
   }
 }
