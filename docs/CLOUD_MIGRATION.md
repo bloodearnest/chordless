@@ -107,7 +107,7 @@ Workspace admin console if third-party apps are controlled.
 
 **4. Move the data:** export, sign in, import, sync, remake the share links (above); run
 `just format lint test`, the Drive sync tests against a real Drive, a share link end to end, and
-the probe and spike pages.
+the Picker with the new app id.
 
 **5. Retire the old project:** after a week of use, delete it (Google keeps a deleted project
 recoverable for 30 days). Until then it is the way back.

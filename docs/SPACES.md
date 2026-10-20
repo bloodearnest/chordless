@@ -441,8 +441,11 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 - Clock-time costs: Drive calls took 1 s or more each through the Worker, and `changes.list` runs
   3 to 6 s behind a change. Pulls by a timer are fine; anything wanting instant needs WebRTC.
 
-The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`)
-is kept for reference until the real broker replaces it, and deleted then.
+The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`,
+`src/dev/shared-drive-probe.*`, `src/dev/picker.js`, and their tests) was deleted on 2026-10-20 when the
+spike was done. It is in git history (`git log --diff-filter=D -- worker/src/spike-broker.ts`); the
+service account's JWT signing in `spike-service-account.ts` is the part the real broker will want. The
+"Ready to run" notes below describe the pages and routes as they were.
 
 **Ready to run, item 1 (2026-10-19):** `/dev/broker-spike.html` and a throwaway Worker route
 (`worker/src/spike-broker.ts`, `POST /dev/spike/enable` and `/dev/spike/drive`; 404 unless

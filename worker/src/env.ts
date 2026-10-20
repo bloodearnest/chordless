@@ -14,8 +14,6 @@ export interface Env extends GoogleEnv, ShareEnv {
   EMAIL_OVERALL?: RateLimit
   /** The address links in email replies point to; chordless.app when unset */
   APP_ORIGIN?: string
-  /** Spike item 7, dev only: a service account's JSON key (docs/SPACES.md) */
-  SPIKE_SERVICE_ACCOUNT_KEY?: string
   /** Base64 AES-256 key for the token blobs */
   JWE_ENCRYPTION_KEY: string
 }
