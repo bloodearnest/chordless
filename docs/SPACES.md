@@ -404,6 +404,46 @@ behaviour). Pass/fail, in order:
 
 If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My Drive).
 
+### Spike results (2026-10-19 and 20): the design works
+
+Run on a real Workspace shared drive with a Workspace account (the owner), a Gmail account (the
+member), a throwaway dev Worker and a service account. Detail of each run is below.
+
+| # | Question | Result |
+|---|---|---|
+| 1 | The Worker serves a second person the owner's folder, with roles | **Pass.** Reader, writer, and a stranger who knows every id (403). About 1.1 to 1.4 s a call on the dev server |
+| 2 | A picked shared-drive folder takes every file operation | **Pass.** Create, list, get, update, download, subfolders, permissions, public link, `changes.list`. A Content manager cannot delete for good, so the app trashes (`trashFilesInFolder`) |
+| 3 | The same from My Drive | **Pass.** The shared-drive flags are harmless there; `/about` takes the flag too (the app still does not send it) |
+| 4 | A big file streams through the Worker, nothing kept | **Pass.** 20 MB up (2.1 MB/s) and down (10.3 MB/s), SHA-256 identical. Production limits unchecked |
+| 5 | The stored token refreshes with no user present | **Pass.** Consent screen is In production, brand verified. A sign-in made under Testing dies in 7 days; the app now says "Sign-in expired" and offers Reconnect |
+| 6 | A member's own token sees nothing of the owner's files, and cannot adopt the folder | **Pass.** So the Worker broker is required, and succession of a team space is a copy |
+| 7 | A service account in the shared drive does the whole job | **Pass.** JWT signed with WebCrypto, token with no user, and it sees the files the owner's client made |
+
+**What it settles**
+- Both ways of backing a team space (the owner's token, a Chordless service account) are real. Owner
+  token stays the default; the service account is the upgrade, and it is simpler for the Worker:
+  no refresh token to expire, no dependence on one person's sign-in.
+- Without the Worker, members cannot share a folder at all under `drive.file`.
+- Roles are enforced in the Worker, not by Drive, so a Content manager of the drive is the lowest
+  role the account needs.
+- The Worker streams a pad set through without holding it.
+
+**What it changes**
+- No One Tap. The Worker issues its own short-lived signed session token at sign-in (design above).
+- The service account lives in its own Google Cloud project, made when the project moves
+  (docs/CLOUD_MIGRATION.md); `chordless-broker@setalight.iam.gserviceaccount.com` is the spike's.
+
+**Still open**
+- The Cloudflare limits on a deployed Worker (request length, body size): only a deployment shows them.
+- Whether an *external* service account can be added to a shared drive under a stricter Workspace
+  sharing policy than the test one, and whether shared drives exist on the nonprofit tier.
+- A permanent delete by a Content manager answered 404, not 403: unresolved, and it does not matter.
+- Clock-time costs: Drive calls took 1 s or more each through the Worker, and `changes.list` runs
+  3 to 6 s behind a change. Pulls by a timer are fine; anything wanting instant needs WebRTC.
+
+The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`)
+is kept for reference until the real broker replaces it, and deleted then.
+
 **Ready to run, item 1 (2026-10-19):** `/dev/broker-spike.html` and a throwaway Worker route
 (`worker/src/spike-broker.ts`, `POST /dev/spike/enable` and `/dev/spike/drive`; 404 unless
 `DEV_PAGES`, so dev only; the owner's token is kept in the dev server's memory and nowhere else).
@@ -520,7 +560,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 ## Order of work and status
 
 1. [ ] Principle in CLAUDE.md; this doc and the consolidation.
-2. [ ] Spike (above).
+2. [x] Spike (above): passed, see "Spike results".
 3. [ ] Space abstraction: space id + `driveFolderId` identity, folder-location Picker on create,
    shared-drive flags, no name matching, per-space transport.
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
