@@ -32,19 +32,19 @@ interface PendingChanges {
 export class LibrarySong extends SongModel {
   _song: LoadedSong
   _db: ChordlessDB
-  _orgId: string
+  _spaceId: string
   _pendingChanges: PendingChanges
 
   /**
    * @param song - Full song object with parsed content
    * @param db - Database instance
-   * @param orgId - Organisation ID
+   * @param spaceId - Space ID
    */
-  constructor(song: LoadedSong, db: ChordlessDB, orgId: string) {
+  constructor(song: LoadedSong, db: ChordlessDB, spaceId: string) {
     super()
     this._song = song
     this._db = db
-    this._orgId = orgId
+    this._spaceId = spaceId
 
     // In-memory state for changes before save
     this._pendingChanges = {
@@ -118,7 +118,7 @@ export class LibrarySong extends SongModel {
     }
 
     // Load from song-user-prefs
-    const prefs = getSongUserPrefs(this._song.id, this._orgId)
+    const prefs = getSongUserPrefs(this._song.id, this._spaceId)
     if (prefs && prefs.capo !== undefined) {
       return normalizeCapo(prefs.capo)
     }
@@ -137,7 +137,7 @@ export class LibrarySong extends SongModel {
     }
 
     // Load from song-user-prefs
-    const prefs = getSongUserPrefs(this._song.id, this._orgId)
+    const prefs = getSongUserPrefs(this._song.id, this._spaceId)
     if (prefs?.sectionDefaults?.[sectionIndex.toString()]) {
       return prefs.sectionDefaults[sectionIndex.toString()]
     }
@@ -186,7 +186,7 @@ export class LibrarySong extends SongModel {
 
     if (Object.keys(this._pendingChanges.sectionStates).length > 0) {
       // Merge with existing section defaults
-      const existingPrefs = getSongUserPrefs(this._song.id, this._orgId)
+      const existingPrefs = getSongUserPrefs(this._song.id, this._spaceId)
       const existingSections = existingPrefs?.sectionDefaults || {}
 
       const sectionDefaults: Record<string, SectionState> = { ...existingSections }
@@ -198,7 +198,7 @@ export class LibrarySong extends SongModel {
     }
 
     if (Object.keys(prefsToSave).length > 0) {
-      saveSongUserPrefs(this._song.id, this._orgId, prefsToSave)
+      saveSongUserPrefs(this._song.id, this._spaceId, prefsToSave)
     }
 
     // Clear pending changes
@@ -216,7 +216,7 @@ export class LibrarySong extends SongModel {
     this._pendingChanges.tempo = this.getOriginalTempo() ?? null
 
     // Clear capo and section states from song-user-prefs
-    clearSongUserPrefs(this._song.id, this._orgId)
+    clearSongUserPrefs(this._song.id, this._spaceId)
     this._pendingChanges.capo = 0
     this._pendingChanges.sectionStates = {}
 

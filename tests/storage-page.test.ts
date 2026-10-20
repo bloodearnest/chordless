@@ -8,12 +8,7 @@ import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/storage-page.ts'
 import type { StoragePage } from '../src/components/storage-page.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -480,16 +475,16 @@ describe('the storage page, signed in to Google', () => {
 
   describe('clearing local data', () => {
     let before: { id: string | null; name: string }
-    let organisationId: string
+    let spaceId: string
     const realClear = Storage.prototype.clear
     let cleared: number
     let reloads: number
 
     beforeEach(async () => {
-      before = getCurrentOrganisation()
-      const organisation = await createOrganisation(`Clear ${crypto.randomUUID().slice(0, 8)}`)
-      organisationId = organisation.id
-      await setCurrentOrganisation(organisation.id, organisation.name)
+      before = getCurrentSpace()
+      const space = await createSpace(`Clear ${crypto.randomUUID().slice(0, 8)}`)
+      spaceId = space.id
+      await setCurrentSpace(space.id, space.name)
       cleared = 0
       reloads = 0
       // (clearing the page's storage would take what the other tests have set with it)
@@ -500,8 +495,8 @@ describe('the storage page, signed in to Google', () => {
 
     afterEach(async () => {
       Storage.prototype.clear = realClear
-      await deleteOrganisation(organisationId)
-      if (before.id) await setCurrentOrganisation(before.id, before.name)
+      await deleteSpace(spaceId)
+      if (before.id) await setCurrentSpace(before.id, before.name)
     })
 
     it('asks first, then clears the database and storage and starts afresh', async () => {

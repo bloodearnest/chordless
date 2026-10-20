@@ -11,8 +11,8 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-const clearLocalStorage = (orgId, setlistId) => {
-  localStorage.removeItem(`song-prefs-${orgId}`)
+const clearLocalStorage = (spaceId, setlistId) => {
+  localStorage.removeItem(`song-prefs-${spaceId}`)
   localStorage.removeItem(`state-${setlistId}`)
 }
 
@@ -29,14 +29,14 @@ How [G]precious did that [C]grace ap[G]pear`
 
 describe('SetlistSong', () => {
   let db
-  let orgId
+  let spaceId
   let setlist
   let canonicalSong
   let parser
 
   beforeEach(async () => {
-    orgId = `test-org-${uniqueName()}`
-    db = new ChordlessDB(orgId)
+    spaceId = `test-org-${uniqueName()}`
+    db = new ChordlessDB(spaceId)
     await db.init()
     parser = new ChordProParser()
 
@@ -104,7 +104,7 @@ describe('SetlistSong', () => {
 
     await db.saveSetlist(setlist)
 
-    clearLocalStorage(orgId, setlist.id)
+    clearLocalStorage(spaceId, setlist.id)
   })
 
   afterEach(async () => {
@@ -113,33 +113,33 @@ describe('SetlistSong', () => {
       db = null
     }
     if (setlist?.id) {
-      clearLocalStorage(orgId, setlist.id)
+      clearLocalStorage(spaceId, setlist.id)
     }
   })
 
   describe('Core Properties', () => {
     it('returns correct id from setlist entry', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.id).to.equal('ccli-12345')
     })
 
     it('returns correct uuid from canonical song', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.uuid).to.equal(canonicalSong.uuid)
     })
 
     it('returns correct title from canonical song', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.title).to.equal('Amazing Grace')
     })
 
     it('returns correct artist from canonical song', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.artist).to.equal('John Newton')
     })
 
     it('returns parsed data from canonical song', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.parsed).to.be.an('object')
       expect(song.parsed.sections).to.be.an('array')
     })
@@ -147,18 +147,18 @@ describe('SetlistSong', () => {
 
   describe('Key and Tempo (from setlist entry)', () => {
     it('returns key from setlist entry', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getKey()).to.equal('G')
     })
 
     it('allows setting key', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       song.setKey('A')
       expect(song.getKey()).to.equal('A')
     })
 
     it('persists key changes to setlist in IndexedDB', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       song.setKey('A')
       await song.save()
 
@@ -167,23 +167,23 @@ describe('SetlistSong', () => {
     })
 
     it('returns original key from canonical song', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getOriginalKey()).to.equal('G')
     })
 
     it('returns tempo from setlist entry', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getTempo()).to.equal(90)
     })
 
     it('allows setting tempo', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       song.setTempo(120)
       expect(song.getTempo()).to.equal(120)
     })
 
     it('persists tempo changes to setlist in IndexedDB', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       song.setTempo(120)
       await song.save()
 
@@ -194,13 +194,13 @@ describe('SetlistSong', () => {
 
   describe('Capo (priority cascade)', () => {
     it('returns 0 when no capo is set anywhere', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getCapo()).to.equal(0)
     })
 
     it('loads capo from song-user-prefs when keys match', () => {
       // Set song-user-prefs
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -208,7 +208,7 @@ describe('SetlistSong', () => {
         })
       )
 
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getCapo()).to.equal(2)
     })
 
@@ -217,7 +217,7 @@ describe('SetlistSong', () => {
       setlist.songs[0].key = 'A'
 
       // Set song-user-prefs with capo
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -225,13 +225,13 @@ describe('SetlistSong', () => {
         })
       )
 
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
       expect(song.getCapo()).to.equal(0) // Should ignore user prefs because key doesn't match
     })
 
     it('setlist localStorage overrides song-user-prefs', () => {
       // Set song-user-prefs
-      const prefsKey = `song-prefs-${orgId}`
+      const prefsKey = `song-prefs-${spaceId}`
       localStorage.setItem(
         prefsKey,
         JSON.stringify({
@@ -251,18 +251,18 @@ describe('SetlistSong', () => {
         })
       )
 
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       expect(song.getCapo()).to.equal(3) // Should use setlist state, not user prefs
     })
 
     it('allows setting capo', () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       song.setCapo(4)
       expect(song.getCapo()).to.equal(4)
     })
 
     it('persists capo to setlist localStorage', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       song.setCapo(4)
       await song.save()
 
@@ -274,21 +274,21 @@ describe('SetlistSong', () => {
 
   describe('Reset', () => {
     it('resets key to original from canonical song', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       song.setKey('A')
       await song.reset()
       expect(song.getKey()).to.equal('G')
     })
 
     it('resets tempo to original from canonical song', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       song.setTempo(120)
       await song.reset()
       expect(song.getTempo()).to.equal(90)
     })
 
     it('clears capo from setlist localStorage', async () => {
-      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, orgId, 0)
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId, 0)
       song.setCapo(3)
       await song.save()
       await song.reset()
@@ -310,7 +310,7 @@ describe('SetlistSong, with little recorded about the song or the setlist', () =
         getSetlist: async () => undefined,
         saveSetlist: async () => {},
       } as unknown as ChordlessDB,
-      'org',
+      'space',
       0
     )
 

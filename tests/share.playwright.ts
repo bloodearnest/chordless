@@ -230,7 +230,7 @@ test.describe('A setlist shared by link', () => {
     // seedSetlist waits for the service worker
     test.use({ serviceWorkers: 'allow' })
 
-    test('goes to the setlist, with no download, for someone who has it in their organisation', async ({
+    test('goes to the setlist, with no download, for someone who has it in their space', async ({
       page,
     }) => {
       const setlistId = '3f2a9c10-7b1e-4d55-9a6c-0e8f12345678'

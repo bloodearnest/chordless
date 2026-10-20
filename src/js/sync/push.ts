@@ -36,12 +36,12 @@ function setlistJson(setlist: Setlist): string {
 
 /** Drive file metadata for a setlist (see drive-metadata.ts) */
 function setlistMetadata(session: SyncSession, setlist: Setlist) {
-  return setlistFileMetadata(setlist, { organisationId: session.organisationId })
+  return setlistFileMetadata(setlist, { spaceId: session.spaceId })
 }
 
 /** Drive file metadata for a song variant's chart (see drive-metadata.ts) */
 function songMetadata(session: SyncSession, song: SongRecord, chordproFile: ChordProRecord) {
-  return songFileMetadata(song, chordproFile, { organisationId: session.organisationId })
+  return songFileMetadata(song, chordproFile, { spaceId: session.spaceId })
 }
 
 /** What this device records about a song's synced file */

@@ -1,11 +1,11 @@
-// A user who can only read the organisation's Drive folder (sync found it so) is never blocked
+// A user who can only read the space's Drive folder (sync found it so) is never blocked
 // from changing what they see: a last-minute key change, a late song, a new setlist all work,
 // and stay on this device. Only what needs Drive is not offered: sharing by link.
 import { expect, openApp, seedSetlist, test } from './fixtures.ts'
 
-const READ_ONLY_KEY = 'current-organisation-read-only'
+const READ_ONLY_KEY = 'current-space-read-only'
 
-test.describe('An organisation the user can only read', () => {
+test.describe('A space the user can only read', () => {
   test('still creates, imports and edits, and offers no share link', async ({ page }) => {
     const url = await seedSetlist(page)
     await openApp(page, '/')

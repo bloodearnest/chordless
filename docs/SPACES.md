@@ -7,8 +7,8 @@ SYNC_ARCHITECTURE.md.
 
 > **Status:** the personal space and the single-user sync described under "Today" are built. The
 > team space, the Worker broker, roles, copy/move and the rest are **designed, not built**; the
-> order of work and a status list are at the end. In code, identifiers and some older docs still
-> say "organisation": that is a space (see "Naming").
+> order of work and a status list are at the end. The code and docs
+> call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
 
 ## Principle
 
@@ -26,8 +26,12 @@ members of their church. Each space is self-contained, so copyright compliance i
 
 - The umbrella word is **space**, and there are two kinds: a **personal space** (yours alone, in
   your own Drive) and a **team space** (shared, brokered). "Create a team space", "Join a team
-  space", "Save to: Personal space / Grace Church (team space)". The word "organisation" goes from
-  the UI, and from code and docs as they are touched.
+  space", "Save to: Personal space / Grace Church (team space)". The old word "organisation" went from
+  the UI, the code and the docs on 2026-10-20. It survives only where it is stored: the IndexedDB
+  database and store that hold the spaces (both still named `organisations`: renaming means copying
+  every record), and the `appProperties` of files already in Drive (`organisationId`, read by nothing;
+  an update drops it). The `localStorage` keys `current-organisation-*` are moved to
+  `current-space-*` the first time the new code runs (`space.ts`).
 - Each space also has its own name (a team space is named by its owner; the personal space defaults
   to the account name, as `first-time-auth.ts` does today). The kind shows as a small label beside
   the name, and only when the user has more than one space.
@@ -77,8 +81,8 @@ a re-pointing of the folder.
   described in DATA_MODEL.md. The name never changes, even when the space is renamed (a rename
   updates only the metadata, the cached name in localStorage and, at the next sync, the Drive
   folder).
-- localStorage caches the current space's id (`current-organisation-id`) and name
-  (`current-organisation-name`) for synchronous rendering.
+- localStorage caches the current space's id (`current-space-id`) and name
+  (`current-space-name`) for synchronous rendering.
 - On first load a default space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
 - Spaces are completely isolated: songs and setlists belong to exactly one; switching reloads the
@@ -282,11 +286,11 @@ Google accounts.
 ## Read-only: local edits are never blocked
 
 **Built (2026-10-19).** A user who can only read the Drive folder edits everything a writer does:
-the `isReadOnlyOrganisation()` gates are gone (setlist page, library, home, imports, nav menu, the
-key and BPM controls). The one boolean left is `syncsBack()` (`organisation.ts`), and it removes
+the `isReadOnlySpace()` gates are gone (setlist page, library, home, imports, nav menu, the
+key and BPM controls). The one boolean left is `syncsBack()` (`space.ts`), and it removes
 only what needs Drive: sharing by link (the song list to paste stays).
 - The trigger is still Drive's folder `capabilities` or a refused upload (`refreshAccess()`,
-  `organisation-access.ts`), kept as `readOnly` on the space record and in localStorage. Under
+  `space-access.ts`), kept as `readOnly` on the space record and in localStorage. Under
   `drive.file` it cannot fire for a person with only read access to someone else's folder, so until
   the Worker reports a role this only covers a folder that really is read-only.
 - Their changes are **never pushed**. They last on this device until a pull finds Drive's copy
@@ -570,8 +574,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
    and since checked against a real shared drive: spike 2 passed). The folder is already found by `driveFolderId`
    after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
-   The UI now says "space" (Storage page, creating and switching, sync errors, the share and differs
-   dialogs); code, tests' identifiers and older docs still say "organisation".
+   The UI, code and docs say "space" (renamed from "organisation" on 2026-10-20).
 4. [ ] Copy/move between spaces (an export and import, above, is built and does the hop between
    accounts) (songs, setlists, pads, whole space); migrate personal data.
    Done: the core for songs, setlists and whole spaces (`src/js/space-transfer.ts`, tested on local
@@ -588,7 +591,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
     switch, "Verify" and rollback. Spike item 7 passed.
 
-Items carried over from the TODO (organisation section): a media-team email config option; define
+Items carried over from the TODO (space section): a media-team email config option; define
 users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
 (see SYNC_ARCHITECTURE.md).
 

@@ -1,10 +1,10 @@
 import { html } from 'lit'
 import '../../components/app-header.ts'
-import '../../components/select-organisation.ts'
+import '../../components/select-space.ts'
 import '../../components/storage-page.ts'
 import { PageView } from './page-view.ts'
 
-/** The Storage page: organisations, Google Drive sync and local data */
+/** The Storage page: spaces, Google Drive sync and local data */
 export class StorageView extends PageView {
   override render() {
     return html`

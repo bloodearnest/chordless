@@ -1,6 +1,5 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { createOrganisation, deleteOrganisation } from '../src/js/organisation.ts'
 import {
   addToLibrary,
   getSongFromAnywhere,
@@ -9,6 +8,7 @@ import {
 } from '../src/js/other-songs.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, getLibrarySongs } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
@@ -113,7 +113,7 @@ describe('Songs from the other databases', () => {
   })
 })
 
-describe('Songs from the other organisations', () => {
+describe('Songs from the other spaces', () => {
   const libraryId = `org-${crypto.randomUUID()}`
   let other: { id: string; name: string }
   let otherDb: ChordlessDB
@@ -124,7 +124,7 @@ describe('Songs from the other organisations', () => {
     errors = []
     realError = console.error
     console.error = (...args) => errors.push(args)
-    other = await createOrganisation(`Other church ${crypto.randomUUID().slice(0, 8)}`)
+    other = await createSpace(`Other church ${crypto.randomUUID().slice(0, 8)}`)
     otherDb = new ChordlessDB(other.id)
     await otherDb.init()
   })
@@ -133,10 +133,10 @@ describe('Songs from the other organisations', () => {
     console.error = realError
     otherDb.db?.close()
     await deleteDatabase(other.id)
-    await deleteOrganisation(other.id)
+    await deleteSpace(other.id)
   })
 
-  it('lists the songs of an organisation with a database, marked with its name', async () => {
+  it('lists the songs of a space with a database, marked with its name', async () => {
     await addChart(otherDb, BETA, ADD)
     const found = (await getSongsElsewhere(libraryId)).filter(
       song => song.source?.dbId === other.id
@@ -145,23 +145,23 @@ describe('Songs from the other organisations', () => {
     expect(found[0].source).to.deep.equal({ dbId: other.id, label: other.name })
   })
 
-  it('does not list the songs of the organisation that is asking', async () => {
+  it('does not list the songs of the space that is asking', async () => {
     await addChart(otherDb, BETA, ADD)
     const songs = await getSongsElsewhere(other.id)
     expect(songs.filter(song => song.source?.dbId === other.id)).to.deep.equal([])
   })
 
-  it('skips an organisation that has no database on this device', async () => {
-    const empty = await createOrganisation(`Empty ${crypto.randomUUID().slice(0, 8)}`)
+  it('skips a space that has no database on this device', async () => {
+    const empty = await createSpace(`Empty ${crypto.randomUUID().slice(0, 8)}`)
     try {
       const sources = (await getSongsElsewhere(libraryId)).map(song => song.source?.dbId)
       expect(sources).to.not.include(empty.id)
     } finally {
-      await deleteOrganisation(empty.id)
+      await deleteSpace(empty.id)
     }
   })
 
-  it('marks a song copied from an organisation as copied, not shared', async () => {
+  it('marks a song copied from a space as copied, not shared', async () => {
     await addChart(otherDb, BETA, ADD)
     const library = new ChordlessDB(libraryId)
     await library.init()
@@ -179,7 +179,7 @@ describe('Songs from the other organisations', () => {
     await addChart(otherDb, BETA, ADD)
     const realInit = ChordlessDB.prototype.init
     ChordlessDB.prototype.init = async function () {
-      if (this.organisationId === other.id) throw new Error('database damaged')
+      if (this.spaceId === other.id) throw new Error('database damaged')
       return realInit.call(this)
     }
     try {

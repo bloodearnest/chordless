@@ -1,21 +1,21 @@
 /**
  * Opening a share link (docs/SHARING.md, "Opening a link"): download the encrypted file from
  * the worker, decrypt it with the key from the link, and keep it on this device. Received
- * setlists go in one database of their own, "Shared with me" (a local-only organisation: it
- * is never synced), with their songs the way an organisation's are, so the setlist page can
+ * setlists go in one database of their own, "Shared with me" (a local-only space: it
+ * is never synced), with their songs the way a space's are, so the setlist page can
  * show them.
  *
  * A setlist is kept only while its share lasts: it goes when the share ends or expires, or
- * when the user joins the organisation it came from. Its songs stay: everything a user has
+ * when the user joins the space it came from. Its songs stay: everything a user has
  * seen is theirs to keep.
  */
 
 import type { ReceivedShare, Setlist, SetlistEntry } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
-import { getCurrentOrganisation, listOrganisations } from './organisation.ts'
 import { isExpired, type ShareBundle } from './share-bundle.ts'
 import { decryptBundle, matchesSetlistCode } from './share-crypto.ts'
 import { addChart } from './song-utils.ts'
+import { getCurrentSpace, listSpaces } from './space.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
 
 /** The database of received setlists and their songs (one for all shares) */
@@ -203,12 +203,12 @@ export async function openShare(
 }
 
 /**
- * The id of the current organisation's setlist that a link's setlist code is of, if it has one:
- * a member of the organisation has the real setlist, so the link has no need to be opened.
- * (Not made to look for it: with no organisation yet, there is none.)
+ * The id of the current space's setlist that a link's setlist code is of, if it has one:
+ * a member of the space has the real setlist, so the link has no need to be opened.
+ * (Not made to look for it: with no space yet, there is none.)
  */
 export async function ownSetlistFor(code: string): Promise<string | null> {
-  const { id } = getCurrentOrganisation()
+  const { id } = getCurrentSpace()
   if (!id || !(await databaseExists(id))) return null
   const db = new ChordlessDB(id)
   try {
@@ -216,7 +216,7 @@ export async function ownSetlistFor(code: string): Promise<string | null> {
     const setlists = await db.getAllSetlists()
     return setlists.find(setlist => matchesSetlistCode(code, setlist.id))?.id ?? null
   } catch (error) {
-    console.error('[Share] Could not look for the setlist in the organisation:', error)
+    console.error('[Share] Could not look for the setlist in the space:', error)
     return null
   } finally {
     db.db?.close()
@@ -227,7 +227,7 @@ export async function ownSetlistFor(code: string): Promise<string | null> {
 export interface Tidied {
   /** Setlists removed because their share had expired */
   expired: number
-  /** Setlists removed because the user's organisation has them now */
+  /** Setlists removed because the user's space has them now */
   joined: number
 }
 
@@ -236,19 +236,19 @@ export interface Tidied {
  * - delete the per-share databases from before there was one (their setlists were only ever
  *   copies of shares: opening the link again brings them back)
  * - delete received setlists whose share has expired
- * - delete received setlists the user now has in an organisation (they joined it, and sync
- *   gave them the setlist for good): the share's setlistId matches one of the organisation's setlists
+ * - delete received setlists the user now has in a space (they joined it, and sync
+ *   gave them the setlist for good): the share's setlistId matches one of the space's setlists
  *
  * Songs are never deleted.
  *
- * @param organisationIds the organisations to look for setlists in (default: all this device has)
+ * @param spaceIds the spaces to look for setlists in (default: all this device has)
  */
 export async function tidySharedWithMe({
   today = toLocalDateString(new Date()),
-  organisationIds,
+  spaceIds,
 }: {
   today?: string
-  organisationIds?: string[]
+  spaceIds?: string[]
 } = {}): Promise<Tidied> {
   const tidied: Tidied = { expired: 0, joined: 0 }
   if (typeof indexedDB.databases === 'function') {
@@ -264,20 +264,20 @@ export async function tidySharedWithMe({
     const received = (await db.getAllSetlists()).filter(setlist => setlist.received)
     if (received.length === 0) return tidied
 
-    const ids = organisationIds ?? (await listOrganisations()).map(organisation => organisation.id)
+    const ids = spaceIds ?? (await listSpaces()).map(space => space.id)
     const have = new Set<string>()
     for (const id of ids) {
       if (!(await databaseExists(id))) continue
-      const organisationDb = new ChordlessDB(id)
+      const spaceDb = new ChordlessDB(id)
       try {
-        await organisationDb.init()
-        for (const setlist of await organisationDb.getAllSetlists()) {
+        await spaceDb.init()
+        for (const setlist of await spaceDb.getAllSetlists()) {
           have.add(setlist.id)
         }
       } catch (error) {
-        console.error('[Share] Could not look in an organisation for a received setlist:', error)
+        console.error('[Share] Could not look in a space for a received setlist:', error)
       } finally {
-        organisationDb.db?.close()
+        spaceDb.db?.close()
       }
     }
 

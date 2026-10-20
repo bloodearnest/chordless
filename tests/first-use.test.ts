@@ -1,13 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.ts'
 import { maybeShowFirstUseSetup } from '../src/js/first-use.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { createSong } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -18,21 +13,21 @@ const KEYS = ['setup-done', 'musician_type']
 
 describe('maybeShowFirstUseSetup', () => {
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
 
   beforeEach(async () => {
     for (const key of KEYS) localStorage.removeItem(key)
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`First use ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`First use ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
   })
 
   afterEach(async () => {
     document.querySelector('first-use-setup')?.remove()
     for (const key of KEYS) localStorage.removeItem(key)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   const shown = () => document.querySelector('first-use-setup') !== null

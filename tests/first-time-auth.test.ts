@@ -1,17 +1,17 @@
-/** Naming the organisation after the Google account the first time someone signs in */
+/** Naming the space after the Google account the first time someone signs in */
 import { expect } from '@open-wc/testing'
 import {
   checkFirstTimeAuth,
   handleFirstTimeAuth,
-  nameOrganisationBeforeSync,
+  nameSpaceBeforeSync,
 } from '../src/js/first-time-auth.ts'
 import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  listOrganisations,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  listSpaces,
+  setCurrentSpace,
+} from '../src/js/space.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -55,28 +55,28 @@ describe('the first sign-in', () => {
     switched = []
     worker = new FakeAuthWorker()
     auth = installFakeAuthWorker(worker)
-    before = getCurrentOrganisation()
-    // A "Personal" organisation is the default one: use the one there is, or make it
-    const existing = (await listOrganisations()).find(org => org.name === 'Personal')
-    personal = existing ?? (await createOrganisation('Personal'))
+    before = getCurrentSpace()
+    // A "Personal" space is the default one: use the one there is, or make it
+    const existing = (await listSpaces()).find(space => space.name === 'Personal')
+    personal = existing ?? (await createSpace('Personal'))
     if (!existing) made.push(personal.id)
-    await setCurrentOrganisation(personal.id, personal.name)
+    await setCurrentSpace(personal.id, personal.name)
   })
 
   afterEach(async () => {
     auth.uninstall()
     localStorage.removeItem(KEY)
     // (renamed ones go back to what they were, so the next test finds "Personal")
-    const renamed = (await listOrganisations()).find(org => org.id === personal.id)
+    const renamed = (await listSpaces()).find(space => space.id === personal.id)
     if (renamed && renamed.name !== 'Personal') {
-      const { renameOrganisation } = await import('../src/js/organisation.ts')
-      await renameOrganisation(personal.id, 'Personal')
+      const { renameSpace } = await import('../src/js/space.ts')
+      await renameSpace(personal.id, 'Personal')
     }
-    while (made.length) await deleteOrganisation(made.pop() as string)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    while (made.length) await deleteSpace(made.pop() as string)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
-  const nameNow = async () => (await listOrganisations()).find(org => org.id === personal.id)?.name
+  const nameNow = async () => (await listSpaces()).find(space => space.id === personal.id)?.name
 
   describe('on starting the app', () => {
     it('does nothing once it has been done', async () => {
@@ -114,19 +114,19 @@ describe('the first sign-in', () => {
       expect(localStorage.getItem(KEY)).to.equal(null)
     })
 
-    it('has nothing to rename without a current organisation', async () => {
+    it('has nothing to rename without a current space', async () => {
       signIn('Ann Smith')
-      localStorage.removeItem('current-organisation-id')
-      localStorage.removeItem('current-organisation-name')
+      localStorage.removeItem('current-space-id')
+      localStorage.removeItem('current-space-name')
       expect(await handleFirstTimeAuth(switchTo)).to.equal(false)
       expect(localStorage.getItem(KEY)).to.equal('true')
     })
 
-    it('leaves an organisation that is not called "Personal"', async () => {
+    it('leaves a space that is not called "Personal"', async () => {
       signIn('Ann Smith')
-      const other = await createOrganisation(`Church ${crypto.randomUUID().slice(0, 8)}`)
+      const other = await createSpace(`Church ${crypto.randomUUID().slice(0, 8)}`)
       made.push(other.id)
-      await setCurrentOrganisation(other.id, other.name)
+      await setCurrentSpace(other.id, other.name)
       expect(await handleFirstTimeAuth(switchTo)).to.equal(false)
       expect(localStorage.getItem(KEY)).to.equal('true')
       expect(switched).to.deep.equal([])
@@ -134,8 +134,8 @@ describe('the first sign-in', () => {
 
     it('gives up, and does not try again, when it fails', async () => {
       signIn('Ann Smith')
-      // Another organisation already has the name
-      const taken = await createOrganisation('Ann Smith')
+      // Another space already has the name
+      const taken = await createSpace('Ann Smith')
       made.push(taken.id)
       expect(await handleFirstTimeAuth(switchTo)).to.equal(false)
       expect(localStorage.getItem(KEY)).to.equal('true')
@@ -146,25 +146,25 @@ describe('the first sign-in', () => {
   describe('before syncing', () => {
     it('renames "Personal" to the account, without switching', async () => {
       signIn('Ann Smith')
-      expect(await nameOrganisationBeforeSync()).to.equal(true)
+      expect(await nameSpaceBeforeSync()).to.equal(true)
       expect(await nameNow()).to.equal('Ann Smith')
       expect(localStorage.getItem(KEY)).to.equal('true')
-      expect(getCurrentOrganisation().name).to.equal('Ann Smith')
+      expect(getCurrentSpace().name).to.equal('Ann Smith')
     })
 
-    it('leaves an organisation that is not called "Personal", or none', async () => {
+    it('leaves a space that is not called "Personal", or none', async () => {
       signIn('Ann Smith')
-      const other = await createOrganisation(`Church ${crypto.randomUUID().slice(0, 8)}`)
+      const other = await createSpace(`Church ${crypto.randomUUID().slice(0, 8)}`)
       made.push(other.id)
-      await setCurrentOrganisation(other.id, other.name)
-      expect(await nameOrganisationBeforeSync()).to.equal(false)
-      localStorage.removeItem('current-organisation-id')
-      expect(await nameOrganisationBeforeSync()).to.equal(false)
+      await setCurrentSpace(other.id, other.name)
+      expect(await nameSpaceBeforeSync()).to.equal(false)
+      localStorage.removeItem('current-space-id')
+      expect(await nameSpaceBeforeSync()).to.equal(false)
     })
 
     it('leaves it alone for an account with no name', async () => {
       signIn(null)
-      expect(await nameOrganisationBeforeSync()).to.equal(false)
+      expect(await nameSpaceBeforeSync()).to.equal(false)
       expect(await nameNow()).to.equal('Personal')
     })
   })

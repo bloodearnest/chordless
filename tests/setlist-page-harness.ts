@@ -1,6 +1,6 @@
 /**
  * The setlist page started on the elements the setlist view gives it, against songs and a
- * setlist saved in the organisation's database under names of their own. Call `useSetlistPage()`
+ * setlist saved in the space's database under names of their own. Call `useSetlistPage()`
  * inside a describe; read `rig.page`, `rig.root`, `rig.visited` and the rest as properties of it.
  */
 import { render } from 'lit'
@@ -147,7 +147,7 @@ export function useSetlistPage() {
     console.error = realError
     setCapoPreference(false)
     localStorage.removeItem('section_defaults')
-    localStorage.removeItem(`song-prefs-${rig.db.organisationId}`)
+    localStorage.removeItem(`song-prefs-${rig.db.spaceId}`)
     document.body.classList.remove('edit-mode', 'header-expanded')
     document.body.removeAttribute('data-edit-mode')
     delete document.body.dataset.view

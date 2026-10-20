@@ -22,7 +22,7 @@ export interface SongCardSong {
   currentKey?: string
   originalKey?: string | null
   lastUsageInfo?: { date: string; leader: string; key: string | null }
-  /** Set for a song from another database than the organisation's: where it is from */
+  /** Set for a song from another database than the space's: where it is from */
   source?: { label: string }
   /** The older record of when it was last played */
   lastUsedAt?: string

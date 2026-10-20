@@ -4,10 +4,10 @@ import qrcode from 'qrcode-generator'
 import type { Setlist } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
 import { createSyncManager, isSyncAvailable } from '../js/drive-sync.ts'
-import { getCurrentOrganisation } from '../js/organisation.ts'
 import { type ListedSong, songListHtml, songListText } from '../js/setlist/song-list-text.ts'
 import { shareUrl } from '../js/share-crypto.ts'
 import { createShare, refreshShare, stopShare } from '../js/share-manager.ts'
+import { getCurrentSpace } from '../js/space.ts'
 import { formatSetlistDate, setlistTitle } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
@@ -42,8 +42,8 @@ export function qrDataUrl(text: string): string {
  * It is a modal: the explanation and Create, or once shared the link, QR code, Update and Stop.
  * The page opens it from the header's share button (show()), and listens for the change event.
  *
- * Needs the setlist and the organisation's database. Anyone signed in to Google can share,
- * if their account can write to the organisation's Drive folder.
+ * Needs the setlist and the space's database. Anyone signed in to Google can share,
+ * if their account can write to the space's Drive folder.
  */
 export class SetlistShare extends LitElement {
   /** How long "Copied" is shown (a property for tests to shorten) */
@@ -184,7 +184,7 @@ export class SetlistShare extends LitElement {
   declare db: ChordlessDB | null
   /** The setlist's songs (RuntimeSongs), for the song list */
   declare songs: ListedSong[]
-  /** The setlist can be shared by link (not for a read-only organisation) */
+  /** The setlist can be shared by link (not for a read-only space) */
   declare linkable: boolean
   declare _mode: 'link' | 'list'
   declare _available: boolean
@@ -234,12 +234,12 @@ export class SetlistShare extends LitElement {
 
   _create() {
     return this._run(async (setlist, db) => {
-      const { id, name } = getCurrentOrganisation()
+      const { id, name } = getCurrentSpace()
       const manager = await createSyncManager(name, id)
       const share = await createShare(setlist, {
         db,
-        organisationId: id,
-        organisationFolderId: manager.driveFolderId as string, // (init found or made it)
+        spaceId: id,
+        spaceFolderId: manager.driveFolderId as string, // (init found or made it)
       })
       setlist.share = share
       await db.saveSetlist(setlist)
@@ -252,11 +252,11 @@ export class SetlistShare extends LitElement {
   _update() {
     return this._run(async (setlist, db) => {
       if (!setlist.share) return
-      const { id, name } = getCurrentOrganisation()
+      const { id, name } = getCurrentSpace()
       const manager = await createSyncManager(name, id)
       const share = await refreshShare(
         { ...setlist, share: setlist.share },
-        { db, organisationId: id, organisationFolderId: manager.driveFolderId as string }
+        { db, spaceId: id, spaceFolderId: manager.driveFolderId as string }
       )
       if (share !== setlist.share) {
         setlist.share = share

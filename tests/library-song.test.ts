@@ -11,8 +11,8 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-const clearLocalStorage = orgId => {
-  localStorage.removeItem(`song-prefs-${orgId}`)
+const clearLocalStorage = spaceId => {
+  localStorage.removeItem(`song-prefs-${spaceId}`)
 }
 
 const sampleChordPro = `{title: Amazing Grace}
@@ -31,16 +31,16 @@ The [Em]hour I [D]first be[G]lieved`
 
 describe('LibrarySong', () => {
   let db
-  let orgId
+  let spaceId
   let song
   let parser
 
   beforeEach(async () => {
-    orgId = `test-org-${uniqueName()}`
-    db = new ChordlessDB(orgId)
+    spaceId = `test-org-${uniqueName()}`
+    db = new ChordlessDB(spaceId)
     await db.init()
     parser = new ChordProParser()
-    clearLocalStorage(orgId)
+    clearLocalStorage(spaceId)
   })
 
   afterEach(async () => {
@@ -48,8 +48,8 @@ describe('LibrarySong', () => {
       await deleteDatabase(db.dbName)
       db = null
     }
-    if (orgId) {
-      clearLocalStorage(orgId)
+    if (spaceId) {
+      clearLocalStorage(spaceId)
     }
   })
 
@@ -107,7 +107,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
     })
 
@@ -181,7 +181,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
     })
 
@@ -276,7 +276,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
     })
 
@@ -293,14 +293,14 @@ describe('LibrarySong', () => {
       song.setCapo(2)
       await song.save()
 
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       const prefs = JSON.parse(must(localStorage.getItem(key)))
       expect(prefs['ccli-12345'].capo).to.equal(2)
     })
 
     it('loads capo from song-user-prefs', async () => {
       // Save capo preference
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -319,7 +319,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
 
       expect(song2.getCapo()).to.equal(3)
@@ -360,7 +360,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
     })
 
@@ -382,7 +382,7 @@ describe('LibrarySong', () => {
       song.setSectionState(1, { hideMode: 'none', isCollapsed: true, isHidden: false })
       await song.save()
 
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       const prefs = JSON.parse(must(localStorage.getItem(key)))
       expect(prefs['ccli-12345'].sectionDefaults['0'].hideMode).to.equal('chords')
       expect(prefs['ccli-12345'].sectionDefaults['1'].isCollapsed).to.equal(true)
@@ -390,7 +390,7 @@ describe('LibrarySong', () => {
 
     it('loads section state from song-user-prefs', async () => {
       // Save section preferences
-      const key = `song-prefs-${orgId}`
+      const key = `song-prefs-${spaceId}`
       localStorage.setItem(
         key,
         JSON.stringify({
@@ -414,7 +414,7 @@ describe('LibrarySong', () => {
           parsed: parsedContent,
         },
         db,
-        orgId
+        spaceId
       )
 
       const state0 = song2.getSectionState(0)
@@ -427,11 +427,15 @@ describe('LibrarySong', () => {
 })
 
 describe('LibrarySong, with little recorded about the song', () => {
-  const orgId = `test-org-${crypto.randomUUID()}`
+  const spaceId = `test-org-${crypto.randomUUID()}`
   const bare = (fields: object = {}) =>
-    new LibrarySong({ uuid: 'u', id: 'title-x', ...fields } as LoadedSong, {} as ChordlessDB, orgId)
+    new LibrarySong(
+      { uuid: 'u', id: 'title-x', ...fields } as LoadedSong,
+      {} as ChordlessDB,
+      spaceId
+    )
 
-  afterEach(() => localStorage.removeItem(`song-prefs-${orgId}`))
+  afterEach(() => localStorage.removeItem(`song-prefs-${spaceId}`))
 
   it('is called Untitled with no title, and has no artist with no author', () => {
     expect(bare().title).to.equal('Untitled')
@@ -448,11 +452,11 @@ describe('LibrarySong, with little recorded about the song', () => {
   })
 
   it('adds a section’s state to what was saved for the song, even if that was only a capo', async () => {
-    saveSongUserPrefs('title-x', orgId, { capo: 2 })
+    saveSongUserPrefs('title-x', spaceId, { capo: 2 })
     const song = bare()
     song.setSectionState(1, { hideMode: 'chords' })
     await song.save()
-    const prefs = getSongUserPrefs('title-x', orgId)
+    const prefs = getSongUserPrefs('title-x', spaceId)
     expect(prefs?.capo).to.equal(2)
     expect(prefs?.sectionDefaults?.[1]).to.include({ hideMode: 'chords' })
   })

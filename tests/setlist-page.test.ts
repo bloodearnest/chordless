@@ -4,7 +4,7 @@
  * view-teardown.test.ts; what a user does across the whole app is in the Playwright tests.)
  *
  * The page is started on the elements the setlist view gives it, against a setlist saved in the
- * organisation's database under a name of its own.
+ * space's database under a name of its own.
  */
 
 import { expect } from '@open-wc/testing'
@@ -531,7 +531,7 @@ describe('the setlist page', () => {
 
   describe("a song's media preferences", () => {
     const prefsOf = (index: number) =>
-      getSongUserPrefs(page.songs[index].songId, must(page.db).organisationId)
+      getSongUserPrefs(page.songs[index].songId, must(page.db).spaceId)
 
     /** The song-change events sent while `act` runs */
     async function eventsDuring(act: () => void) {
@@ -547,7 +547,7 @@ describe('the setlist page', () => {
     }
 
     afterEach(() => {
-      localStorage.removeItem(`song-prefs-${db.organisationId}`)
+      localStorage.removeItem(`song-prefs-${db.spaceId}`)
     })
 
     it('remembers the double click for the song being shown, and tells the media player', async () => {

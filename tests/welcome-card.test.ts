@@ -2,12 +2,7 @@ import { expect, fixture, html } from '@open-wc/testing'
 import type { WelcomeCard } from '../src/components/welcome-card.ts'
 import { INSTALL_CHANGE_EVENT } from '../src/js/install.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/welcome-card.ts'
 
@@ -18,7 +13,7 @@ suppressConsoleLogs()
 describe('welcome-card', () => {
   const realFetch = window.fetch
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
   let visited: string[]
 
   beforeEach(async () => {
@@ -29,17 +24,17 @@ describe('welcome-card', () => {
         return true
       },
     })
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Welcome ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Welcome ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
   })
 
   afterEach(async () => {
     window.fetch = realFetch
     setRouter(null)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   const make = () => fixture<WelcomeCard>(html`<welcome-card></welcome-card>`)

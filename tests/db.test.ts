@@ -34,8 +34,8 @@ describe('ChordlessDB', () => {
   })
 
   it('saves and retrieves setlist', async () => {
-    const orgName = `TEST-${uniqueName()}`
-    db = new ChordlessDB(orgName)
+    const spaceName = `TEST-${uniqueName()}`
+    db = new ChordlessDB(spaceName)
     await db.init()
 
     const setlist = createSetlist({
@@ -182,8 +182,8 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
   }
 
   it("converts songs' and setlist entries' tempos, keeping in-sync setlists in sync", async () => {
-    const orgId = `TEST-${uniqueName()}`
-    dbName = orgId
+    const spaceId = `TEST-${uniqueName()}`
+    dbName = spaceId
     const entries = tempo => [{ order: 0, songId: 'song-1', songUuid: 'uuid-1', key: 'G', tempo }]
     const inSync: any = { id: 'in-sync', driveFileId: 'drive-1', songs: entries('72') }
     inSync.syncedContentHash = setlistContentHash(inSync)
@@ -197,7 +197,7 @@ describe('ChordlessDB version 6: tempos become numbers', () => {
       setlists: [inSync, edited],
     })
 
-    const db = new ChordlessDB(orgId)
+    const db = new ChordlessDB(spaceId)
     await db.init()
     const song = must(await db.getSong('uuid-1'))
     expect([song.tempo, song.originalTempo]).to.deep.equal([150, 150])
@@ -252,8 +252,8 @@ describe('ChordlessDB usage aggregation', () => {
   })
 
   it('aggregates song appearances across setlists', async () => {
-    const orgName = `TEST-${uniqueName()}`
-    db = new ChordlessDB(orgName)
+    const spaceName = `TEST-${uniqueName()}`
+    db = new ChordlessDB(spaceName)
     await db.init()
 
     const setlists = [
@@ -358,8 +358,8 @@ describe('ChordlessDB opening', () => {
     expect(message).to.equal('Failed to open IndexedDB')
   })
 
-  it('needs an organisation, and to be opened before it is used', async () => {
-    expect(() => new ChordlessDB('')).to.throw('organisationId is required')
+  it('needs a space, and to be opened before it is used', async () => {
+    expect(() => new ChordlessDB('')).to.throw('spaceId is required')
     let message = ''
     try {
       await new ChordlessDB('never-opened').getSetlist('x')

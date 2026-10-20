@@ -1,35 +1,31 @@
 import { Task } from '@lit/task'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { Organisation } from '../js/data-types.ts'
-import {
-  getCurrentOrganisation,
-  listOrganisations,
-  switchOrganisation,
-} from '../js/organisation.ts'
+import type { Space } from '../js/data-types.ts'
+import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './icon.ts'
 import { buttonStyles } from './shared-styles.ts'
 
-/** What the component loads: the organisations, and the name of the current one */
-interface OrganisationList {
-  organisations: Organisation[]
+/** What the component loads: the spaces, and the name of the current one */
+interface SpaceList {
+  spaces: Space[]
   current: string
 }
 
 /**
- * SelectOrganisation Component
+ * SelectSpace Component
  *
  * Shows the spaces on this device and the current one, and switches between them. It does not
  * make one: a space is made for a team (docs/SPACES.md), which comes with its folder and members.
  */
-export class SelectOrganisation extends LitElement {
-  /** Makes another organisation the current one, and starts the app afresh (a test gives its own) */
-  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+export class SelectSpace extends LitElement {
+  /** Makes another space the current one, and starts the app afresh (a test gives its own) */
+  switchTo: (spaceId: string) => Promise<void> = switchSpace
 
   _switchModal: Ref<AppModal>
-  _orgs: Task<[], OrganisationList>
+  _spaces: Task<[], SpaceList>
 
   static override styles = [
     buttonStyles,
@@ -38,14 +34,14 @@ export class SelectOrganisation extends LitElement {
         display: block;
       }
 
-      .organisations-list {
+      .spaces-list {
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
         margin-bottom: 1rem;
       }
 
-      .organisation-item {
+      .space-item {
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -56,21 +52,21 @@ export class SelectOrganisation extends LitElement {
         cursor: pointer;
       }
 
-      .organisation-item:hover {
+      .space-item:hover {
         background: var(--tint);
       }
 
-      .organisation-item.current {
+      .space-item.current {
         background: color-mix(in srgb, var(--color-primary, #2477ad) 20%, transparent);
         cursor: default;
       }
 
-      .organisation-name {
+      .space-name {
         font-size: var(--font-ui);
         font-weight: 500;
       }
 
-      .organisation-badge {
+      .space-badge {
         padding: 0.3rem 0.8rem;
         background: var(--color-primary, #2477ad);
         color: var(--button-text, white);
@@ -104,67 +100,67 @@ export class SelectOrganisation extends LitElement {
   constructor() {
     super()
     this._switchModal = createRef()
-    // The organisations, and which is current: loaded when first rendered
-    this._orgs = new Task(this, {
+    // The spaces, and which is current: loaded when first rendered
+    this._spaces = new Task(this, {
       task: async () => ({
-        organisations: await listOrganisations(),
-        current: getCurrentOrganisation().name, // synchronous, from localStorage
+        spaces: await listSpaces(),
+        current: getCurrentSpace().name, // synchronous, from localStorage
       }),
       args: () => [],
-      onError: error => console.error('Failed to load organisations:', error),
+      onError: error => console.error('Failed to load spaces:', error),
     })
   }
 
-  async _handleSwitch(org: Organisation): Promise<void> {
-    if (org.name === this._orgs.value?.current) {
+  async _handleSwitch(space: Space): Promise<void> {
+    if (space.name === this._spaces.value?.current) {
       return
     }
 
     const modal = this._switchModal.value
     if (!modal) return
-    modal.message = `Switch to "${org.name}"? This reloads the page.`
+    modal.message = `Switch to "${space.name}"? This reloads the page.`
     if (await modal.ask()) {
-      await this.switchTo(org.id)
+      await this.switchTo(space.id)
     }
   }
 
   override render() {
     const loading = () => html`<div class="loading">Loading spaces...</div>`
-    return this._orgs.render({
+    return this._spaces.render({
       initial: loading,
       pending: loading,
-      complete: ({ organisations, current }) => this._renderOrganisations(organisations, current),
+      complete: ({ spaces, current }) => this._renderSpaces(spaces, current),
       error: error =>
         html`<p class="form-error" role="alert">Couldn't load spaces: ${error instanceof Error ? error.message : error}</p>`,
     })
   }
 
-  _renderOrganisations(organisations: Organisation[], current: string) {
+  _renderSpaces(spaces: Space[], current: string) {
     return html`
-      <div class="organisation-selector">
+      <div class="space-selector">
         ${
-          organisations.length === 0
+          spaces.length === 0
             ? html`<div class="empty-state">
                 <p>No spaces found.</p>
               </div>`
             : ''
         }
-        <div class="organisations-list">
-          ${organisations.map(
-            org => html`
+        <div class="spaces-list">
+          ${spaces.map(
+            space => html`
               <div
-                class="organisation-item ${org.name === current ? 'current' : ''}"
-                @click=${() => this._handleSwitch(org)}
+                class="space-item ${space.name === current ? 'current' : ''}"
+                @click=${() => this._handleSwitch(space)}
               >
-                <span class="organisation-name">${org.name}</span>
+                <span class="space-name">${space.name}</span>
                 ${
-                  org.name === current
-                    ? html`<span class="organisation-badge">CURRENT</span>`
+                  space.name === current
+                    ? html`<span class="space-badge">CURRENT</span>`
                     : html`<button
                       class="btn primary switch-button"
                       @click=${(e: Event) => {
                         e.stopPropagation()
-                        this._handleSwitch(org)
+                        this._handleSwitch(space)
                       }}
                     >
                       Switch
@@ -188,10 +184,10 @@ export class SelectOrganisation extends LitElement {
   }
 }
 
-customElements.define('select-organisation', SelectOrganisation)
+customElements.define('select-space', SelectSpace)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'select-organisation': SelectOrganisation
+    'select-space': SelectSpace
   }
 }

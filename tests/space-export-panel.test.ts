@@ -1,15 +1,10 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { megabytes, type SpaceExportPanel } from '../src/components/space-export-panel.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -34,10 +29,10 @@ describe('the export panel', () => {
 
   beforeEach(async () => {
     drive = installFakeDrive()
-    before = getCurrentOrganisation()
-    const space = await createOrganisation(`Export ${crypto.randomUUID().slice(0, 8)}`)
+    before = getCurrentSpace()
+    const space = await createSpace(`Export ${crypto.randomUUID().slice(0, 8)}`)
     spaceId = space.id
-    await setCurrentOrganisation(space.id, space.name)
+    await setCurrentSpace(space.id, space.name)
     downloads = []
     realClick = HTMLAnchorElement.prototype.click
     HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) {
@@ -55,8 +50,8 @@ describe('the export panel', () => {
     await caches.delete(PAD_CACHE_NAME)
     localStorage.removeItem('padset-cache-state')
     localStorage.removeItem('padset-selection')
-    await deleteOrganisation(spaceId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   const text = (el: SpaceExportPanel) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''

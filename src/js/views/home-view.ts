@@ -17,9 +17,9 @@ import '../../components/status-message.ts'
 import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
-import { getCurrentOrganisation } from '../organisation.ts'
-import { claimSetlistsOnce, getCurrentPerson, getOrganisationPeople } from '../people.ts'
+import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
+import { getCurrentSpace } from '../space.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -100,7 +100,7 @@ export class HomeView extends PageView {
     task: async () => {
       const db = await getCurrentDB()
       // One-off: record leader ids on setlists from before they existed
-      await claimSetlistsOnce(db, db.organisationId)
+      await claimSetlistsOnce(db, db.spaceId)
       return {
         groups: groupSetlistsByYear(await db.getAllSetlists()),
         shared: sharedGroup(await listSharedWithMe().catch(() => [])),
@@ -110,7 +110,7 @@ export class HomeView extends PageView {
   })
 
   async #openCreate(): Promise<void> {
-    const { people, me } = await getOrganisationPeople()
+    const { people, me } = await getSpacePeople()
     const date = toLocalDateString(getNextSunday())
     // Defaults: next Sunday, a Sunday morning service, led by you
     const form = this.#form.value as SetlistDetailsForm
@@ -155,7 +155,7 @@ export class HomeView extends PageView {
   }
 
   /**
-   * The setlists of the organisation, and those shared with the user below them. For someone
+   * The setlists of the space, and those shared with the user below them. For someone
    * with none of their own, the shared ones are all there is: they come first, in place of the
    * welcome card, if there are any.
    */
@@ -177,7 +177,7 @@ export class HomeView extends PageView {
   }
 
   override render() {
-    const { name } = getCurrentOrganisation()
+    const { name } = getCurrentSpace()
     return html`
       <app-header id="home-app-header" heading="Setlists - ${name}">
         <button

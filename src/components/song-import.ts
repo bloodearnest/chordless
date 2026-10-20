@@ -8,7 +8,7 @@ import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
 import { ChordProParser } from '../js/parser.ts'
-import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
+import { getCurrentPerson, getSpacePeople } from '../js/people.ts'
 import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
 import { songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
@@ -635,7 +635,7 @@ export class SongImport extends LitElement {
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
   async _openNewSetlist(): Promise<void> {
-    const { people, me } = await getOrganisationPeople()
+    const { people, me } = await getSpacePeople()
     const date = toLocalDateString(getNextSunday())
     this._people = people
     this._newSetlist = {

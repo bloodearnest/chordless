@@ -20,7 +20,7 @@ export interface DriveFileMetadata {
 }
 
 export interface FileMetadataOptions {
-  organisationId?: string | null
+  spaceId?: string | null
 }
 
 export const APP_VERSION = '1.0.0'
@@ -29,8 +29,16 @@ export const APP_VERSION = '1.0.0'
  * appProperties written by earlier versions that are no longer used. Updates set
  * them to null (which removes them) so old files converge on the current shape.
  */
-const RETIRED_SETLIST_PROPERTIES = ['resourceType', 'date', 'type', 'leader', 'name']
+const RETIRED_SETLIST_PROPERTIES = [
+  'organisationId', // now spaceId
+  'resourceType',
+  'date',
+  'type',
+  'leader',
+  'name',
+]
 const RETIRED_SONG_PROPERTIES = [
+  'organisationId', // now spaceId
   'ccliNumber',
   'title',
   'titleNormalized',
@@ -85,13 +93,13 @@ export function chordproFilename(title: string, ccliNumber?: string | null): str
  */
 export function setlistFileMetadata(
   setlist: Pick<Setlist, 'id' | 'date' | 'owner' | 'type' | 'name'>,
-  { organisationId }: FileMetadataOptions
+  { spaceId }: FileMetadataOptions
 ): DriveFileMetadata {
   return {
     name: setlistFilename(setlist),
     mimeType: 'application/json',
     appProperties: {
-      organisationId: organisationId || '',
+      spaceId: spaceId || '',
       setlistId: setlist.id,
       appVersion: APP_VERSION,
     },
@@ -104,14 +112,14 @@ export function setlistFileMetadata(
  */
 export function shareFileMetadata(
   setlist: Pick<Setlist, 'id'>,
-  { organisationId, expires }: FileMetadataOptions & { expires: string }
+  { spaceId, expires }: FileMetadataOptions & { expires: string }
 ): DriveFileMetadata {
   return {
     name: `${setlist.id}.share`,
     mimeType: 'application/octet-stream',
     appProperties: {
       type: 'share',
-      organisationId: organisationId || '',
+      spaceId: spaceId || '',
       setlistId: setlist.id,
       expires,
       appVersion: APP_VERSION,
@@ -141,7 +149,7 @@ export function songFileDetails(
 export function songFileMetadata(
   song: Partial<SongRecord> & Pick<SongRecord, 'id'>,
   chordproFile: Pick<ChordProRecord, 'content'> | null | undefined,
-  { organisationId }: FileMetadataOptions
+  { spaceId }: FileMetadataOptions
 ): DriveFileMetadata {
   const { title, ccliNumber, variantLabel } = songFileDetails(song, chordproFile)
   return {
@@ -149,7 +157,7 @@ export function songFileMetadata(
     mimeType: 'text/plain',
     appProperties: {
       type: 'chordpro',
-      organisationId: organisationId || '',
+      spaceId: spaceId || '',
       songId: song.id,
       songUuid: song.uuid || song.id,
       variantOf: song.variantOf || '',

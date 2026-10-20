@@ -20,20 +20,20 @@ describe('Share files in Drive', () => {
   let folder: string
   const metadata = shareFileMetadata(
     { id: 'setlist-1' },
-    { organisationId: 'org-1', expires: '2026-10-25' }
+    { spaceId: 'org-1', expires: '2026-10-25' }
   )
 
   beforeEach(async () => {
     drive = installFakeDrive()
-    const org = await createOrg()
-    folder = await getSharesFolder(org)
+    const space = await createSpace()
+    folder = await getSharesFolder(space)
   })
 
   afterEach(() => {
     drive.uninstall()
   })
 
-  async function createOrg() {
+  async function createSpace() {
     const { driveRequest } = await import('../src/js/drive-api.ts')
     const created = await driveRequest<{ id: string }>('/files', {
       method: 'POST',
@@ -46,7 +46,7 @@ describe('Share files in Drive', () => {
     expect(metadata.name).to.equal('setlist-1.share')
     expect(metadata.appProperties).to.deep.equal({
       type: 'share',
-      organisationId: 'org-1',
+      spaceId: 'org-1',
       setlistId: 'setlist-1',
       expires: '2026-10-25',
       appVersion: metadata.appProperties.appVersion,
@@ -87,7 +87,7 @@ describe('Share files in Drive', () => {
     const file = await createShareFile(folder, metadata, bytes(1))
     const other = await createShareFile(
       folder,
-      shareFileMetadata({ id: 'setlist-2' }, { organisationId: 'org-1', expires: '2026-11-01' }),
+      shareFileMetadata({ id: 'setlist-2' }, { spaceId: 'org-1', expires: '2026-11-01' }),
       bytes(2)
     )
     await endShareFile(other.id)
@@ -136,7 +136,7 @@ describe('Share files in Drive', () => {
     expect(leftover.trashed).to.equal(true)
   })
 
-  it('does not blame the organisation for a failure that is not a refusal', async () => {
+  it('does not blame the space for a failure that is not a refusal', async () => {
     for (const status of [401, 429, 500]) {
       drive.failRequests({ method: 'POST', path: /permissions/, status })
       let error: Error | undefined

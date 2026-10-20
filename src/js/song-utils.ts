@@ -2,7 +2,7 @@
  * Song Utilities
  *
  * Helper functions for working with the new song data model.
- * Songs are now stored per-organisation with a flattened variant model.
+ * Songs are now stored per-space with a flattened variant model.
  * Each variant is a separate song document linked by variantOf field.
  */
 
@@ -102,7 +102,7 @@ export async function getSongWithContent(
 /**
  * The library's songs, by title: one entry for each song (its default variant, not
  * every variant), with its chart parsed. A song that can't be loaded is left out.
- * @param db the organisation's database
+ * @param db the space's database
  * @param options.withLastUsage also set lastUsageInfo on each song, from the setlist it was
  *   last played in: {date, leader, key}
  */
@@ -330,7 +330,7 @@ export interface CreateSongOptions {
 }
 
 /**
- * Create a new song from a chart in the current organisation's database. Throws if the song
+ * Create a new song from a chart in the current space's database. Throws if the song
  * is already there, unless forceNew makes this a variant of it.
  */
 export async function createSong(

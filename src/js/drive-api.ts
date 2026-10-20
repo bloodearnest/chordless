@@ -5,7 +5,7 @@
  *
  * Folder Structure:
  * - Chordless/ (root)
- *   - [Organisation Name]/
+ *   - [Space Name]/
  *     - songs/
  *       - [title-ccli].txt (one chord chart per song variant)
  *     - setlists/
@@ -20,8 +20,8 @@ import type {
   DriveFile,
   DriveFileList,
   DriveFileWrite,
-  OrganisationMember,
   Setlist,
+  SpaceMember,
 } from './data-types.ts'
 import { APP_VERSION } from './drive-metadata.ts'
 import * as GoogleAuth from './google-auth.ts'
@@ -172,7 +172,7 @@ export async function getFile(
  * permission (role is owner, organizer, fileOrganizer, writer, commenter or
  * reader). Group, domain and "anyone" permissions are skipped.
  */
-export async function listFolderPermissions(folderId: string): Promise<OrganisationMember[]> {
+export async function listFolderPermissions(folderId: string): Promise<SpaceMember[]> {
   const result = await driveRequest<{ permissions?: DrivePermission[] }>(
     `/files/${folderId}/permissions?fields=permissions(id,type,role,emailAddress,displayName,deleted)`
   )
@@ -456,14 +456,12 @@ export async function downloadFileBinary(fileId: string): Promise<ArrayBuffer> {
  * Find or create the root "Chordless" folder
  */
 /**
- * Find the organisation folder with this name under the root Chordless folder,
+ * Find the space folder with this name under the root Chordless folder,
  * without creating anything. Returns the folder or null.
  */
-export async function findOrganisationFolderByName(
-  organisationName: string
-): Promise<DriveFile | null> {
+export async function findSpaceFolderByName(spaceName: string): Promise<DriveFile | null> {
   const rootFolderId = await findOrCreateRootFolder()
-  const query = `name='${organisationName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  const query = `name='${spaceName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name)`
   )
@@ -495,16 +493,16 @@ export async function findOrCreateRootFolder(): Promise<string> {
 }
 
 /**
- * Find or create an organisation folder under Chordless/
+ * Find or create a space folder under Chordless/
  */
-export async function findOrCreateOrganisationFolder(
-  organisationName: string,
-  organisationId: string
+export async function findOrCreateSpaceFolder(
+  spaceName: string,
+  spaceId: string
 ): Promise<{ folderId: string; isNew: boolean }> {
   const rootFolderId = await findOrCreateRootFolder()
 
-  // Search for existing organisation folder by name and parent
-  const query = `name='${organisationName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+  // Search for existing space folder by name and parent
+  const query = `name='${spaceName}' and '${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties)`
   )
@@ -516,16 +514,16 @@ export async function findOrCreateOrganisationFolder(
     }
   }
 
-  // Create new organisation folder with appProperties
+  // Create new space folder with appProperties
   const folder = await driveRequest<DriveFile>('/files', {
     method: 'POST',
     body: JSON.stringify({
-      name: organisationName,
+      name: spaceName,
       mimeType: 'application/vnd.google-apps.folder',
       parents: [rootFolderId],
       appProperties: {
-        resourceType: 'organisation',
-        organisationId: organisationId,
+        resourceType: 'space',
+        spaceId: spaceId,
         createdAt: new Date().toISOString(),
         appVersion: APP_VERSION,
       },
@@ -676,44 +674,44 @@ async function findSubfolder(parentId: string, name: string): Promise<string | n
 }
 
 /**
- * Get or create songs folder within organisation
+ * Get or create songs folder within space
  */
-export async function getSongsFolder(orgFolderId: string): Promise<string> {
-  let folderId = await findSubfolder(orgFolderId, 'songs')
+export async function getSongsFolder(spaceFolderId: string): Promise<string> {
+  let folderId = await findSubfolder(spaceFolderId, 'songs')
   if (!folderId) {
-    folderId = await createSubfolder(orgFolderId, 'songs')
+    folderId = await createSubfolder(spaceFolderId, 'songs')
   }
   return folderId
 }
 
 /**
- * Get or create setlists folder within organisation
+ * Get or create setlists folder within space
  */
-export async function getSetlistsFolder(orgFolderId: string): Promise<string> {
-  let folderId = await findSubfolder(orgFolderId, 'setlists')
+export async function getSetlistsFolder(spaceFolderId: string): Promise<string> {
+  let folderId = await findSubfolder(spaceFolderId, 'setlists')
   if (!folderId) {
-    folderId = await createSubfolder(orgFolderId, 'setlists')
+    folderId = await createSubfolder(spaceFolderId, 'setlists')
   }
   return folderId
 }
 
 /**
- * Share links (docs/SHARING.md). A share is one encrypted file in the organisation's shares/
+ * Share links (docs/SHARING.md). A share is one encrypted file in the space's shares/
  * folder, readable by anyone with its id, though not discoverable. Only that file is public.
  */
 
 const SHARE_CONTENT_TYPE = 'application/octet-stream'
 
-/** The organisation's shares folder, or null if nothing has ever been shared (nothing is created) */
-export function findSharesFolder(orgFolderId: string): Promise<string | null> {
-  return findSubfolder(orgFolderId, 'shares')
+/** The space's shares folder, or null if nothing has ever been shared (nothing is created) */
+export function findSharesFolder(spaceFolderId: string): Promise<string | null> {
+  return findSubfolder(spaceFolderId, 'shares')
 }
 
-/** Get or create the shares folder within an organisation (it stays private) */
-export async function getSharesFolder(orgFolderId: string): Promise<string> {
-  let folderId = await findSubfolder(orgFolderId, 'shares')
+/** Get or create the shares folder within a space (it stays private) */
+export async function getSharesFolder(spaceFolderId: string): Promise<string> {
+  let folderId = await findSubfolder(spaceFolderId, 'shares')
   if (!folderId) {
-    folderId = await createSubfolder(orgFolderId, 'shares')
+    folderId = await createSubfolder(spaceFolderId, 'shares')
   }
   return folderId
 }
@@ -796,7 +794,7 @@ export async function endShareFile(fileId: string): Promise<void> {
   }
 }
 
-/** The organisation's live share files, with the appProperties that say whose they are and when they end */
+/** The space's live share files, with the appProperties that say whose they are and when they end */
 export async function listShareFiles(sharesFolderId: string): Promise<DriveFile[]> {
   const files: DriveFile[] = []
   let pageToken: string | undefined
@@ -832,10 +830,10 @@ export async function downloadSetlist(fileId: string): Promise<Setlist> {
 }
 
 /**
- * List all setlists in organisation folder
+ * List all setlists in space folder
  */
-export async function listSetlists(organisationFolderId: string): Promise<DriveFile[]> {
-  const setlistsFolderId = await getSetlistsFolder(organisationFolderId)
+export async function listSetlists(spaceFolderId: string): Promise<DriveFile[]> {
+  const setlistsFolderId = await getSetlistsFolder(spaceFolderId)
 
   const query = `'${setlistsFolderId}' in parents and trashed=false and name contains '.json'`
   const files: DriveFile[] = []
@@ -862,21 +860,23 @@ export async function listSetlists(organisationFolderId: string): Promise<DriveF
  */
 
 /**
- * List all Chordless organisation folders
+ * List all Chordless space folders
  */
-export async function listOrganisations(): Promise<DriveFile[]> {
+export async function listSpaces(): Promise<DriveFile[]> {
   const rootFolderId = await findOrCreateRootFolder()
 
-  // Find all folders in Chordless root with type=organisation
+  // Find all folders in Chordless root with type=space
   const query = `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
   const result = await driveRequest(
     `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,createdTime)`
   )
 
-  // Filter to only Chordless organisation folders
-  const organisations = result.files.filter(folder => folder.appProperties?.type === 'organisation')
+  // Filter to only Chordless space folders
+  const spaces = result.files.filter(folder =>
+    ['space', 'organisation'].includes(folder.appProperties?.type ?? '')
+  )
 
-  return organisations
+  return spaces
 }
 
 /**

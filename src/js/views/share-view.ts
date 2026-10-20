@@ -73,7 +73,7 @@ export class ShareView extends PageView {
     // biome-ignore lint/plugin: the share key is the link's fragment
     const { key, code } = parseShareFragment(location.hash)
 
-    // Someone who has this setlist in their organisation has the real one: go to that
+    // Someone who has this setlist in their space has the real one: go to that
     const own = code && (await this.receiver.ownSetlistFor(code))
     if (own && this.isConnected) {
       await goTo(buildUrl({ name: 'setlist', setlistId: own, songIndex: songIndex }), {

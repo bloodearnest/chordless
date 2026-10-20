@@ -58,7 +58,7 @@ export class LibraryView extends PageView {
 
   declare _search: string
   declare _heading: string
-  /** Where the open song is from, if not this organisation's library */
+  /** Where the open song is from, if not this space's library */
   declare _source: string
 
   #libraryList = createRef<HTMLElement>()
@@ -87,7 +87,7 @@ export class LibraryView extends PageView {
 
   /**
    * The library, by title, each song with when it was last used; and the songs of the device's
-   * other databases (shared setlists, other organisations) that it doesn't have
+   * other databases (shared setlists, other spaces) that it doesn't have
    */
   #songs = new Task(this, {
     task: async () => {
@@ -305,7 +305,7 @@ export class LibraryView extends PageView {
     const content = this.#content.value as HTMLElement
     await SongViewManager.renderSongView(parsed, content, { songIndex: 0 })
     const db = await getCurrentDB()
-    const model = createLibrarySongModel(song, db, db.organisationId)
+    const model = createLibrarySongModel(song, db, db.spaceId)
     SongViewManager.initializeSongSections(content, model, { editMode: this.#editMode })
   }
 
@@ -353,7 +353,7 @@ export class LibraryView extends PageView {
     if (!this.#song) return
     try {
       const db = await getCurrentDB()
-      const model = createLibrarySongModel(this.#song, db, db.organisationId)
+      const model = createLibrarySongModel(this.#song, db, db.spaceId)
 
       if (this.#key && this.#key !== model.getKey()) {
         model.setKey(this.#key)
@@ -486,14 +486,14 @@ export class LibraryView extends PageView {
     // Back to the key it was imported in. Drawing the song starts its
     // sections from what is saved, so forget that first: they start as the defaults
     const db = await getCurrentDB()
-    setSongUserPref(this.#song.id, db.organisationId, 'sectionDefaults', undefined)
+    setSongUserPref(this.#song.id, db.spaceId, 'sectionDefaults', undefined)
     const originalKey = this.#song.originalKey || this.#parsed.metadata.key
     await this.#renderInKey(originalKey || undefined)
     if (originalKey) this.#updateKeySelector(originalKey)
     await this.#saveSong()
   }
 
-  /** Copy the open song, from another database, into this organisation's library, and open that */
+  /** Copy the open song, from another database, into this space's library, and open that */
   async #addToLibrary(): Promise<void> {
     // (the button is there only for a song from another database)
     const song = this.#song as SongWithContent

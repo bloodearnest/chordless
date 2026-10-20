@@ -2,12 +2,12 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { DriveSyncPanel } from '../src/components/drive-sync-panel.ts'
 import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-  setOrganisationReadOnly,
-} from '../src/js/organisation.ts'
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  setSpaceReadOnly,
+} from '../src/js/space.ts'
 import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -22,23 +22,23 @@ suppressConsoleLogs()
 describe('drive-sync-panel', () => {
   let drive: ReturnType<typeof installFakeDrive> | undefined
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
 
   beforeEach(async () => {
     localStorage.removeItem('last-sync-time')
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Panel ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Panel ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
   })
 
   afterEach(async () => {
     drive?.uninstall()
     drive = undefined
     localStorage.removeItem('last-sync-time')
-    await setOrganisationReadOnly(organisationId, false)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await setSpaceReadOnly(spaceId, false)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function show(connected = true) {
@@ -151,11 +151,11 @@ describe('drive-sync-panel', () => {
       expect(text(el)).to.contain('Ready to sync')
     })
 
-    it('says an organisation with view-only access uploads nothing', async function () {
+    it('says a space with view-only access uploads nothing', async function () {
       this.timeout(8000)
       const el = await show()
       // The Drive folder is made by the first sync: after that the user can only read it
-      const { name, id } = getCurrentOrganisation()
+      const { name, id } = getCurrentSpace()
       await (await createSyncOrchestrator(name, id)).sync()
       must(drive).readOnly = true
       button(el, /Sync with Drive/)?.click()
@@ -183,7 +183,7 @@ describe('drive-sync-panel', () => {
       expect(el.syncProgress).to.equal(null)
     })
 
-    it('names the organisation after the Google account before it syncs', async () => {
+    it('names the space after the Google account before it syncs', async () => {
       const auth = installFakeAuthWorker(new FakeAuthWorker())
       try {
         const el = await show()
@@ -236,7 +236,7 @@ describe('drive-sync-panel', () => {
     /** The space has synced once; then its folder disappears (another Google app cannot see it) */
     async function afterFolderGone() {
       drive = installFakeDrive()
-      const { name, id } = getCurrentOrganisation()
+      const { name, id } = getCurrentSpace()
       await (await createSyncOrchestrator(name, id)).sync()
       drive.files.delete(drive.findByPath(['Chordless', name]).id)
     }
@@ -280,9 +280,7 @@ describe('drive-sync-panel', () => {
         timeout: 4000,
       })
       expect(text(el)).to.not.contain('Drive folder not found')
-      expect(must(drive).findByPath(['Chordless', getCurrentOrganisation().name])).to.not.equal(
-        undefined
-      )
+      expect(must(drive).findByPath(['Chordless', getCurrentSpace().name])).to.not.equal(undefined)
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
       expect(text(el)).to.contain('Ready to sync')
     })

@@ -40,10 +40,10 @@ describe('Drive file metadata', () => {
   })
 
   it('keeps setlist appProperties to identity only', () => {
-    const meta = setlistFileMetadata(setlist, { organisationId: 'org-1' })
+    const meta = setlistFileMetadata(setlist, { spaceId: 'org-1' })
     expect(meta.mimeType).to.equal('application/json')
     expect(meta.appProperties).to.deep.equal({
-      organisationId: 'org-1',
+      spaceId: 'org-1',
       setlistId: 'setlist-1',
       appVersion: '1.0.0',
     })
@@ -64,13 +64,13 @@ describe('Drive file metadata', () => {
       song,
       { content: '{title: Amazing Grace}' },
       {
-        organisationId: 'org-1',
+        spaceId: 'org-1',
       }
     )
     expect(meta.name).to.equal('amazing-grace-4779.txt')
     expect(meta.appProperties).to.deep.equal({
       type: 'chordpro',
-      organisationId: 'org-1',
+      spaceId: 'org-1',
       songId: 'ccli-4779',
       songUuid: 'uuid-1',
       variantOf: 'uuid-0',
@@ -85,7 +85,7 @@ describe('Drive file metadata', () => {
   })
 
   it('removes retired appProperties on update', () => {
-    const update = forUpdate(setlistFileMetadata(setlist, { organisationId: 'org-1' }), 'setlist')
+    const update = forUpdate(setlistFileMetadata(setlist, { spaceId: 'org-1' }), 'setlist')
     expect(update).not.to.have.property('mimeType')
     expect(update.appProperties.leader).to.equal(null)
     expect(update.appProperties.date).to.equal(null)
@@ -100,17 +100,17 @@ describe('Drive file metadata, with less recorded', () => {
     )
   })
 
-  it('has no organisation in a file’s details when there is none', () => {
+  it('has no space in a file’s details when there is none', () => {
     const metadata = setlistFileMetadata(
       { id: 'x', date: '2026-06-22', owner: '', type: '', name: '' },
-      { organisationId: null }
+      { spaceId: null }
     )
-    expect(metadata.appProperties.organisationId).to.equal('')
+    expect(metadata.appProperties.spaceId).to.equal('')
   })
 
-  it('has no organisation in a share file’s details when there is none', () => {
-    const metadata = shareFileMetadata({ id: 'x' }, { organisationId: null, expires: '2026-10-25' })
-    expect(metadata.appProperties).to.include({ organisationId: '', expires: '2026-10-25' })
+  it('has no space in a share file’s details when there is none', () => {
+    const metadata = shareFileMetadata({ id: 'x' }, { spaceId: null, expires: '2026-10-25' })
+    expect(metadata.appProperties).to.include({ spaceId: '', expires: '2026-10-25' })
   })
 
   it('titles a song’s file by its record, else its chart, else “Untitled”', () => {
@@ -130,9 +130,9 @@ describe('Drive file metadata, with less recorded', () => {
   })
 
   it('records only what a song has, and the id for its uuid if it has none', () => {
-    const metadata = songFileMetadata({ id: 'title-x', title: 'X' }, null, { organisationId: null })
+    const metadata = songFileMetadata({ id: 'title-x', title: 'X' }, null, { spaceId: null })
     expect(metadata.appProperties).to.include({
-      organisationId: '',
+      spaceId: '',
       songUuid: 'title-x',
       variantOf: '',
       isDefault: 'false',

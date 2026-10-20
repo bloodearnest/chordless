@@ -1,12 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { addSampleSetlist, SAMPLE_SOURCE } from '../src/js/samples.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -28,24 +23,24 @@ const FILES: Record<string, string> = {
 describe('addSampleSetlist', () => {
   const realFetch = window.fetch
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
 
   beforeEach(async () => {
     window.fetch = (async (input: RequestInfo | URL) => {
       const body = FILES[String(input)]
       return body === undefined ? new Response('', { status: 404 }) : new Response(body)
     }) as typeof fetch
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Samples ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Samples ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
   })
 
   afterEach(async () => {
     window.fetch = realFetch
     FILES['/samples/index.json'] = INDEX
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   it('adds the songs and a setlist of them, reusing a song the library has', async () => {

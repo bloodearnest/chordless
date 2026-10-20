@@ -1,17 +1,17 @@
 import { expect } from '@open-wc/testing'
 import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
 suppressConsoleLogs()
 
-describe('Drive sync: organisations', () => {
+describe('Drive sync: spaces', () => {
   const rig = useSyncRig()
   const {
     makeDevice,
-    renameOrganisation,
+    renameSpace,
     addSetlist,
     editSetlist,
     syncDevice,
@@ -19,39 +19,39 @@ describe('Drive sync: organisations', () => {
     driveSetlist,
   } = rig
 
-  describe('organisations', () => {
-    const orgFolders = () =>
+  describe('spaces', () => {
+    const spaceFolders = () =>
       [...rig.drive.files.values()].filter(
         f => f.parents.includes(rig.drive.findByPath(['Chordless']).id) && !f.trashed
       )
 
     it('keeps syncing the same Drive folder after a rename, and renames it', async () => {
-      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const phone = await makeDevice('phone', { spaceName: 'Personal' })
       const setlist = await addSetlist(phone, { name: 'Harvest' })
       await syncDevice(phone)
       const folderId = rig.drive.findByPath(['Chordless', 'Personal']).id
 
-      await renameOrganisation(phone, 'Simon Davy')
+      await renameSpace(phone, 'Simon Davy')
       await editSetlist(phone, setlist.id, { name: 'Harvest edited' })
       await syncDevice(phone)
 
-      expect(orgFolders().map(f => f.name)).to.deep.equal(['Simon Davy'])
+      expect(spaceFolders().map(f => f.name)).to.deep.equal(['Simon Davy'])
       expect(rig.drive.findByPath(['Chordless', 'Simon Davy']).id).to.equal(folderId)
       expect(driveSetlist(setlist.id).name).to.equal('Harvest edited')
     })
 
     it('keeps the linked folder, without renaming it, if the new name is taken', async () => {
-      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const phone = await makeDevice('phone', { spaceName: 'Personal' })
       const setlist = await addSetlist(phone, { name: 'Harvest' })
       await syncDevice(phone)
-      await makeDevice('tablet', { orgName: 'Simon Davy' }) // creates that folder
+      await makeDevice('tablet', { spaceName: 'Simon Davy' }) // creates that folder
 
-      await renameOrganisation(phone, 'Simon Davy')
+      await renameSpace(phone, 'Simon Davy')
       await editSetlist(phone, setlist.id, { name: 'Harvest edited' })
       await syncDevice(phone)
 
       expect(
-        orgFolders()
+        spaceFolders()
           .map(f => f.name)
           .sort()
       ).to.deep.equal(['Personal', 'Simon Davy'])
@@ -61,13 +61,13 @@ describe('Drive sync: organisations', () => {
     it('joins an existing folder with the new name if nothing was synced yet', async () => {
       // e.g. a new browser syncs while still "Personal", then is renamed to the
       // Google account's name, which another device already syncs with
-      const tablet = await makeDevice('tablet', { orgName: 'Simon Davy' })
+      const tablet = await makeDevice('tablet', { spaceName: 'Simon Davy' })
       const theirs = await addSetlist(tablet, { name: 'From tablet' })
       await syncDevice(tablet)
-      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const phone = await makeDevice('phone', { spaceName: 'Personal' })
       await syncDevice(phone) // linked to an empty "Personal" folder
 
-      await renameOrganisation(phone, 'Simon Davy')
+      await renameSpace(phone, 'Simon Davy')
       await syncDevice(phone)
 
       expect(must(await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
@@ -76,18 +76,18 @@ describe('Drive sync: organisations', () => {
 
     it('stops before changing anything if records belong to another folder', async () => {
       // A device from before folders were linked: sync found the folder by name,
-      // so renaming its organisation pointed it at a different folder, and
+      // so renaming its space pointed it at a different folder, and
       // everything looked "missing" and was uploaded again (6 October 2026).
       const noLink = { get: async () => null, set: async () => {}, clear: async () => {} }
-      const phone = await makeDevice('phone', { orgName: 'Personal', folderLink: noLink })
+      const phone = await makeDevice('phone', { spaceName: 'Personal', folderLink: noLink })
       await addSetlist(phone, { name: 'Mine' })
       await syncDevice(phone)
-      const tablet = await makeDevice('tablet', { orgName: 'Simon Davy' })
+      const tablet = await makeDevice('tablet', { spaceName: 'Simon Davy' })
       await addSetlist(tablet, { name: 'Theirs' })
       await syncDevice(tablet)
       rig.drive.requests = []
 
-      await renameOrganisation(phone, 'Simon Davy')
+      await renameSpace(phone, 'Simon Davy')
       let error
       try {
         await phone.sync.sync()
@@ -95,33 +95,33 @@ describe('Drive sync: organisations', () => {
         error = e
       }
 
-      expect(error?.name).to.equal('OrganisationFolderMismatchError')
+      expect(error?.name).to.equal('SpaceFolderMismatchError')
       expect(rig.drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
       expect((await phone.db.getAllSetlists()).map(s => s.name)).to.deep.equal(['Mine'])
     })
 
     it('stops instead of creating a new folder if the linked one is in the trash', async () => {
-      const phone = await makeDevice('phone', { orgName: 'Personal' })
+      const phone = await makeDevice('phone', { spaceName: 'Personal' })
       await addSetlist(phone)
       await syncDevice(phone)
       rig.drive.files.get(rig.drive.findByPath(['Chordless', 'Personal']).id).trashed = true
 
       let error
       try {
-        await renameOrganisation(phone, 'Personal')
+        await renameSpace(phone, 'Personal')
       } catch (e) {
         error = e
       }
 
       expect(error?.message).to.match(/in the Drive trash/)
-      expect(orgFolders()).to.deep.equal([])
+      expect(spaceFolders()).to.deep.equal([])
     })
   })
 
-  describe('organisation members', () => {
-    it("caches the people the organisation's folder is shared with", async () => {
+  describe('space members', () => {
+    it("caches the people the space's folder is shared with", async () => {
       const phone = await makeDevice('phone')
-      const folder = rig.drive.findByPath(['Chordless', TEST_ORG.name])
+      const folder = rig.drive.findByPath(['Chordless', TEST_SPACE.name])
       rig.drive.addPermission(folder.id, {
         emailAddress: 'simon@example.com',
         displayName: 'Simon Davy',

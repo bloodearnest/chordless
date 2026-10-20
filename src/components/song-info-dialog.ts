@@ -26,7 +26,7 @@ interface InfoData {
  *   <song-info-dialog id="song-info-dialog"></song-info-dialog>
  *   dialog.show(songId, { title })
  *
- * The song is loaded from the current organisation's database unless `db` is
+ * The song is loaded from the current space's database unless `db` is
  * set. showData() shows already-loaded data (used by the dev page).
  */
 export class SongInfoDialog extends LitElement {

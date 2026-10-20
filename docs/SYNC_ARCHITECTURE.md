@@ -18,14 +18,14 @@ document and SETLIST_DELETION.md.
 
 ### Where data lives
 
-- **On each device:** IndexedDB, one `ChordlessDB` per organisation (setlists, songs,
+- **On each device:** IndexedDB, one `ChordlessDB` per space (setlists, songs,
   chord charts, per-setlist device state in `setlist_local`). The app works offline
   from this.
-- **In Drive:** a `Chordless/` folder with one folder per organisation:
+- **In Drive:** a `Chordless/` folder with one folder per space:
 
   ```
   Chordless/
-    <Organisation name>/
+    <Space name>/
       setlists/  <date>-<leader>-<type>[-<name>].json   one per setlist
       songs/     <title>[-<ccli>].txt                    one chord chart per song variant
     pads/
@@ -59,14 +59,14 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 
 ### A full sync (`DriveSyncManager.sync()`)
 
-1. **Refresh members:** list who the organisation folder is shared with
-   (`permissions.list`) and cache it on the organisation record. Feeds the setlist
+1. **Refresh members:** list who the space folder is shared with
+   (`permissions.list`) and cache it on the space record. Feeds the setlist
    Leader dropdown. Failure is logged, not fatal.
-2. **Inventory:** list every file in the organisation folder (all pages,
+2. **Inventory:** list every file in the space folder (all pages,
    recursively). If listing fails, the "missing from Drive" checks below are skipped
    rather than treating everything as missing.
 3. **Folder guard:** if local records point at Drive files that exist *outside* this
-   organisation's folder, stop with `OrganisationFolderMismatchError` instead of
+   space's folder, stop with `SpaceFolderMismatchError` instead of
    re-uploading them as duplicates.
 4. **Pull** setlists then songs: download what's new or changed in Drive. A local setlist
    whose own Drive file is gone from the folder (e.g. duplicates were cleaned up, leaving
@@ -154,7 +154,7 @@ the sync itself still reports success.
 The one place that decides a synced file's name, MIME type and `appProperties`.
 Every upload and update goes through it.
 
-- **Setlist** `appProperties`: `organisationId`, `setlistId`, `appVersion` only.
+- **Setlist** `appProperties`: `spaceId`, `setlistId`, `appVersion` only.
   Everything else (date, leader, name...) lives in the JSON content.
 - **Song** `appProperties`: identity (`type`, `songId`, `songUuid`), variant
   relationships (`variantOf`, `isDefault`, `variantLabel`) and import provenance:
@@ -198,13 +198,13 @@ layer above), and nothing of theirs is pushed.
 - **Who may write:** both `createdBy` (who made it in Chordless) and `ownerId` (the leader), when
   they differ, have edit rights: the leader who did not create the setlist is not shut out.
   (`createdBy` is only a trace today: "nothing decides by it yet", data-types.ts.) Later an
-  **organisation admin** role can edit any setlist of the organisation (roles come with the
+  **space admin** role can edit any setlist of the space (roles come with the
   Worker broker, SPACES.md). The `editors` list below adds named people.
 - It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
   same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
   as a reader of that setlist (no setlist edits).
 - Later, in this order: an optional `editors` list the owner grants (whether everyone in the
-  organisation may edit by default, or only the people above, is undecided); then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
+  space may edit by default, or only the people above, is undecided); then **suggestions**, where a non-owner's layer is offered to the owner, who accepts or
   rejects each change; accepted changes are applied to the base.
 - Drive's permissions are per folder, so an owner or editors rule inside the setlist file is
   only advice to a client that follows it: anyone who can write the folder can write the file.
@@ -216,14 +216,14 @@ travel as small changes ("song 3 key to D") that merge by field. They do not go 
 opened every few weeks on poor wifi is offline when it edits, and Drive has no compare-and-set
 (to check), so two pushes a moment apart can overwrite each other.
 
-**The Worker, when it brokers organisation writes** (SPACES.md, "Why the Worker brokers"). Every member's Drive call goes through it, so for an organisation
+**The Worker, when it brokers space writes** (SPACES.md, "Why the Worker brokers"). Every member's Drive call goes through it, so for a space
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
 2. **Detect conflicts.** The client sends the checksum it last saw (it records `driveChecksum`
    already); if Drive's differs the Worker answers 409 and nothing is overwritten.
 3. **Make that atomic.** Check-then-write is not atomic, so writes go through one Durable Object
-   per organisation, which serialises them. A new Cloudflare piece (wrangler.toml has none).
+   per space, which serialises them. A new Cloudflare piece (wrangler.toml has none).
 
 The Worker detects and the client resolves: after a 409 the client fetches the current setlist,
 merges it with its layer by a three-way merge (it keeps the last-synced copy as the base) and
@@ -253,9 +253,9 @@ the `drive.file` scope a different Google app (a new OAuth client, as in
 [CLOUD_MIGRATION.md](CLOUD_MIGRATION.md)) cannot see what the first one made. `resolveDriveFolder`
 throws `DriveFolderGoneError` (reason `missing` or `trashed`), changing nothing.
 
-It is told early, not at the first sync: `refreshOrganisationAccess` (app start and sign-in) asks
+It is told early, not at the first sync: `refreshSpaceAccess` (app start and sign-in) asks
 Drive about the linked folder and shows a toast with "Open Drive sync", and the sync panel shows the
-same message with **Start over in Drive**. The organisation record keeps `driveClientId`, the Google
+same message with **Start over in Drive**. The space record keeps `driveClientId`, the Google
 app that linked the folder, so the message can say it was an earlier version of the app.
 
 Start over (`DriveSyncManager.startOver`, via `SyncOrchestrator.startOverInDrive`) asks Drive nothing
@@ -280,7 +280,7 @@ Drive and removed here. An old folder that can still be seen is left alone, for 
   server clock, injected failures). Errors on anything it doesn't model.
 - `tests/drive-sync.test.ts`: the real `DriveSyncManager` for two simulated devices
   sharing one fake Drive: push/pull, conflicts, clock skew, failures part-way,
-  paging, organisations and renames, reset, metadata, members.
+  paging, spaces and renames, reset, metadata, members.
 - `tests/drive-metadata.test.ts`, `tests/fake-drive.test.ts`.
 - Not yet: integration tests against real Drive, using a separate Google test account
   with its refresh token in `.dev.vars`. First things to confirm there: uploads
@@ -405,13 +405,13 @@ going back home. In the service worker it completes regardless.
 - The service worker needs its own access token source: it can't message itself for
   the blob. Use `setAccessTokenProvider` with a provider that reads the blob from
   `AuthDB` and refreshes via the worker's `/session/refresh`.
-- `DriveSyncManager` already runs without the DOM (`ChordlessDB` by organisation id
-  outside a window). The organisation's folder link and members come from the
-  organisations database, available in the service worker.
+- `DriveSyncManager` already runs without the DOM (`ChordlessDB` by space id
+  outside a window). The space's folder link and members come from the
+  spaces database, available in the service worker.
 
 #### Trigger: one explicit call
 
-- App code that saves a *user's* change calls `syncSoon({ type, id, organisationId })`
+- App code that saves a *user's* change calls `syncSoon({ type, id, spaceId })`
   (`type` = `setlist` or `song`), which messages the service worker
   (e.g. `SYNC_RECORD`).
 - Deliberately not a hook in `ChordlessDB.saveSetlist`: sync's own saves (after

@@ -13,14 +13,9 @@ import { encodeImport } from '../src/js/email-link.ts'
 import type { ImportedSetlist } from '../src/js/email-setlist.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, createSong } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { makeEntry, makeImportedSong, makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -49,7 +44,7 @@ const email = (over: Partial<ImportedSetlist> = {}): ImportedSetlist => ({
 
 describe('setlist-email-import', () => {
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
   let db: ChordlessDB
   let importer: SetlistEmailImport
   let visited: string[]
@@ -65,10 +60,10 @@ describe('setlist-email-import', () => {
     })
     sessionStorage.removeItem(KEPT)
     takeLink()
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Email ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Email ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
     db = await getCurrentDB()
   })
 
@@ -80,8 +75,8 @@ describe('setlist-email-import', () => {
     window.history.replaceState(null, '', startUrl)
     db.db?.close()
     await deleteDatabase(SHARED_DB_ID)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function open() {

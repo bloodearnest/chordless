@@ -31,8 +31,8 @@ import {
 } from '../src/components/setlist-overview.ts'
 import { SetlistShareChangeEvent } from '../src/components/setlist-share.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
-import { getCurrentOrganisation, setOrganisationReadOnly } from '../src/js/organisation.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
+import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { shownToast, wait } from './test-helpers.ts'
 
@@ -43,8 +43,8 @@ describe('the setlist page: header, menu and keys', () => {
   const { $, $$ } = rig
 
   afterEach(async () => {
-    const { id } = getCurrentOrganisation()
-    if (id) await setOrganisationReadOnly(id, false)
+    const { id } = getCurrentSpace()
+    if (id) await setSpaceReadOnly(id, false)
     document.getElementById('nav-menu')?.remove()
   })
 
@@ -305,8 +305,8 @@ describe('the setlist page: header, menu and keys', () => {
     })
 
     it('lets a user who can only read change a song’s key too', async () => {
-      const { id } = getCurrentOrganisation()
-      await setOrganisationReadOnly(must(id), true)
+      const { id } = getCurrentSpace()
+      await setSpaceReadOnly(must(id), true)
       await rig.open()
       rig.page.showSong(0, true)
       header().dispatchEvent(new EditModeToggleEvent())
@@ -372,8 +372,8 @@ describe('the setlist page: header, menu and keys', () => {
     })
 
     it('offers the edit toggle on the overview to a user who can only read too', async () => {
-      const { id } = getCurrentOrganisation()
-      await setOrganisationReadOnly(must(id), true)
+      const { id } = getCurrentSpace()
+      await setSpaceReadOnly(must(id), true)
       await rig.open()
       expect(header().showEditToggle).to.equal(true)
       await rig.page.updateHeader(rig.page.songs[0], true)
@@ -461,8 +461,8 @@ describe('the setlist page: header, menu and keys', () => {
     const changedHere = { driveFileId: 'f', syncedContentHash: 'not-this' }
 
     it('is on the overview of a changed setlist of a user who can only read, and opens its dialog', async () => {
-      const { id } = getCurrentOrganisation()
-      await setOrganisationReadOnly(must(id), true)
+      const { id } = getCurrentSpace()
+      await setSpaceReadOnly(must(id), true)
       await rig.open(3, changedHere)
       const button = must($<HTMLElement>('#differs-button'))
       expect(button.hidden).to.equal(false)
@@ -497,8 +497,8 @@ describe('the setlist page: header, menu and keys', () => {
     it('is not there for a writer, or for a setlist that is as Drive has it', async () => {
       await rig.open(3, changedHere)
       expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
-      const { id } = getCurrentOrganisation()
-      await setOrganisationReadOnly(must(id), true)
+      const { id } = getCurrentSpace()
+      await setSpaceReadOnly(must(id), true)
       await rig.open(3, { driveFileId: null })
       expect(must($<HTMLElement>('#differs-button')).hidden).to.equal(true)
     })

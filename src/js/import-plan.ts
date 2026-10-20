@@ -19,7 +19,7 @@ export interface LibrarySong {
   ccli: string | null
   /** The words of its chart, for finding a song by a line of it (see lyricsOf) */
   lyrics?: string
-  /** Set for a song of another database ('Shared with me', another organisation): not the library's yet */
+  /** Set for a song of another database ('Shared with me', another space): not the library's yet */
   source?: SongSource
 }
 

@@ -2,9 +2,9 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import { DriveFolderGoneError } from '../js/drive-sync.ts'
-import { nameOrganisationBeforeSync } from '../js/first-time-auth.ts'
-import { getCurrentOrganisation, syncsBack } from '../js/organisation.ts'
-import { driveFolderProblem } from '../js/organisation-access.ts'
+import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
+import { getCurrentSpace, syncsBack } from '../js/space.ts'
+import { driveFolderProblem } from '../js/space-access.ts'
 import {
   createSyncOrchestrator,
   isSyncAvailable,
@@ -201,8 +201,8 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting reset...' }
 
     try {
-      await nameOrganisationBeforeSync()
-      const { id, name } = getCurrentOrganisation()
+      await nameSpaceBeforeSync()
+      const { id, name } = getCurrentSpace()
       const orchestrator = await createSyncOrchestrator(name, id)
 
       await orchestrator.resetLocalFromDrive(progress => {
@@ -233,8 +233,8 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Initializing...' }
 
     try {
-      await nameOrganisationBeforeSync()
-      const { id, name } = getCurrentOrganisation()
+      await nameSpaceBeforeSync()
+      const { id, name } = getCurrentSpace()
 
       const orchestrator = await createSyncOrchestrator(name, id)
 
@@ -290,8 +290,8 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting over in Drive...' }
 
     try {
-      await nameOrganisationBeforeSync()
-      const { id, name } = getCurrentOrganisation()
+      await nameSpaceBeforeSync()
+      const { id, name } = getCurrentSpace()
       await new SyncOrchestrator(name, id).startOverInDrive(progress => {
         this.syncProgress = progress
         this.requestUpdate()

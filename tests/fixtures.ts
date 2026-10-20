@@ -51,7 +51,7 @@ export async function waitForServiceWorker(page) {
 }
 
 /**
- * Open the app, so it sets up its organisation and database, then add a test
+ * Open the app, so it sets up its space and database, then add a test
  * song (Info Test Song, in G: [G]Amazing [C]grace), and optionally a setlist
  * containing it.
  */

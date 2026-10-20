@@ -111,15 +111,15 @@ test.describe('Reloads on purpose, while offline', () => {
     }
   })
 
-  test('switching organisation, then restarting, with no network', async ({ page, context }) => {
+  test('switching space, then restarting, with no network', async ({ page, context }) => {
     await openStorageOnline(page)
     await context.setOffline(true)
     try {
       await Promise.all([
         page.waitForEvent('load'),
         page.evaluate(async () => {
-          const { getCurrentOrganisation, switchOrganisation } = await import('/js/organisation.ts')
-          await switchOrganisation(getCurrentOrganisation().id as string)
+          const { getCurrentSpace, switchSpace } = await import('/js/space.ts')
+          await switchSpace(getCurrentSpace().id as string)
         }),
       ])
       await expect(page.locator('storage-view')).toBeVisible()

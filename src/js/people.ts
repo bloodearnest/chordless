@@ -1,5 +1,5 @@
 /**
- * People who can lead setlists in the current organisation.
+ * People who can lead setlists in the current space.
  *
  * A person is { id, name }, where id is their Google account email. Setlists
  * store the leader as `owner` (name) and `ownerId` (id). The id is empty for a
@@ -9,7 +9,7 @@
 import type { Person } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
 import { getCurrentUserInfo } from './google-auth.ts'
-import { getCurrentOrganisationFull } from './organisation.ts'
+import { getCurrentSpaceFull } from './space.ts'
 
 /** The signed-in user as a person, or null if not signed in */
 export async function getCurrentPerson(): Promise<Person | null> {
@@ -20,12 +20,12 @@ export async function getCurrentPerson(): Promise<Person | null> {
 }
 
 /**
- * The organisation's members (the people its Drive folder is shared with,
+ * The space's members (the people its Drive folder is shared with,
  * cached at each sync) plus the signed-in user, sorted by name.
  */
-export async function getOrganisationPeople(): Promise<{ people: Person[]; me: Person | null }> {
-  const [me, org] = await Promise.all([getCurrentPerson(), getCurrentOrganisationFull()])
-  const members = (org?.members || []).map(m => ({ id: m.email, name: m.name || m.email }))
+export async function getSpacePeople(): Promise<{ people: Person[]; me: Person | null }> {
+  const [me, space] = await Promise.all([getCurrentPerson(), getCurrentSpaceFull()])
+  const members = (space?.members || []).map(m => ({ id: m.email, name: m.name || m.email }))
   return { people: mergePeople(me ? [me, ...members] : members), me }
 }
 
@@ -67,12 +67,12 @@ export async function claimSetlistsWithoutOwnerId(
 }
 
 /**
- * Run claimSetlistsWithoutOwnerId once per organisation on this device. Once
+ * Run claimSetlistsWithoutOwnerId once per space on this device. Once
  * done it doesn't run again, so a setlist later saved with "No leader" isn't
  * claimed.
  */
-export async function claimSetlistsOnce(db: ChordlessDB, organisationId: string): Promise<number> {
-  const key = `setlist-owner-ids-claimed:${organisationId}`
+export async function claimSetlistsOnce(db: ChordlessDB, spaceId: string): Promise<number> {
+  const key = `setlist-owner-ids-claimed:${spaceId}`
   try {
     if (localStorage.getItem(key)) return 0
     const me = await getCurrentPerson()

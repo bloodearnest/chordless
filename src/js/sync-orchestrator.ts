@@ -88,13 +88,13 @@ interface Messages {
  * Main sync orchestrator
  */
 export class SyncOrchestrator {
-  organisationName: string
-  organisationId: string | null
+  spaceName: string
+  spaceId: string | null
   syncManager: DriveSyncManager | null
 
-  constructor(organisationName: string, organisationId: string | null) {
-    this.organisationName = organisationName
-    this.organisationId = organisationId
+  constructor(spaceName: string, spaceId: string | null) {
+    this.spaceName = spaceName
+    this.spaceId = spaceId
     this.syncManager = null
   }
 
@@ -102,7 +102,7 @@ export class SyncOrchestrator {
    * Initialize sync manager
    */
   async init(): Promise<void> {
-    this.syncManager = await createSyncManager(this.organisationName, this.organisationId)
+    this.syncManager = await createSyncManager(this.spaceName, this.spaceId)
   }
 
   /**
@@ -179,7 +179,7 @@ export class SyncOrchestrator {
   async startOverInDrive(
     progressCallback: BroadcastCallback | null = null
   ): Promise<{ success: true }> {
-    await new DriveSyncManager(this.organisationName, this.organisationId).startOver()
+    await new DriveSyncManager(this.spaceName, this.spaceId).startOver()
     this.syncManager = null
     return this.sync(progressCallback)
   }
@@ -218,10 +218,10 @@ export class SyncOrchestrator {
  * Helper to create an orchestrator instance
  */
 export async function createSyncOrchestrator(
-  organisationName: string,
-  organisationId: string | null
+  spaceName: string,
+  spaceId: string | null
 ): Promise<SyncOrchestrator> {
-  const orchestrator = new SyncOrchestrator(organisationName, organisationId)
+  const orchestrator = new SyncOrchestrator(spaceName, spaceId)
   await orchestrator.init()
   return orchestrator
 }

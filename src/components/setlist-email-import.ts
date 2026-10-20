@@ -17,7 +17,7 @@ import {
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { goTo } from '../js/navigation.ts'
 import { getSongsElsewhere } from '../js/other-songs.ts'
-import { getCurrentPerson, getOrganisationPeople } from '../js/people.ts'
+import { getCurrentPerson, getSpacePeople } from '../js/people.ts'
 import { isCcliNumber, songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -315,7 +315,7 @@ export class SetlistEmailImport extends LitElement {
       })
     this._rows = make(email.songs, true, rows)
     this._unlisted = make(email.unlisted, false, unlisted)
-    const { people, me } = await getOrganisationPeople()
+    const { people, me } = await getSpacePeople()
     this._people = people
     const date = email.date || nearestSunday()
     this._setlist = {

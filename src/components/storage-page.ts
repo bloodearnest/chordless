@@ -9,7 +9,7 @@ import './drive-sync-panel.ts'
 import './storage-summary.ts'
 import './space-export-panel.ts'
 import './pad-set-manager.ts'
-import './select-organisation.ts'
+import './select-space.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
 /** The result of the last sign-in step, shown under the Google section */
@@ -235,7 +235,7 @@ export class StoragePage extends LitElement {
   override render() {
     return html`
       <div class="storage-content">
-        ${this._renderLocalSummarySection()} ${this._renderOrganisationSection()}
+        ${this._renderLocalSummarySection()} ${this._renderSpaceSection()}
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired)}
         ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
@@ -389,7 +389,7 @@ export class StoragePage extends LitElement {
     `
   }
 
-  _renderOrganisationSection() {
+  _renderSpaceSection() {
     return html`
       <div class="panel">
         <h3>🏢 Space</h3>
@@ -397,7 +397,7 @@ export class StoragePage extends LitElement {
           Select which space you're currently working with. Each space has its own
           setlists.
         </p>
-        <select-organisation></select-organisation>
+        <select-space></select-space>
       </div>
     `
   }

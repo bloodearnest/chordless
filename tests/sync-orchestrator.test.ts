@@ -1,12 +1,7 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import type { DriveSyncManager, ProgressCallback } from '../src/js/drive-sync.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import type { ResetSetlist } from '../src/js/sync/session.ts'
 import {
   createSyncOrchestrator,
@@ -280,23 +275,23 @@ describe('SyncOrchestrator', () => {
 describe('SyncOrchestrator against a Drive', () => {
   let drive: ReturnType<typeof installFakeDrive>
   let before: { id: string | null; name: string }
-  let organisation: { id: string; name: string }
+  let space: { id: string; name: string }
 
   beforeEach(async () => {
     drive = installFakeDrive()
-    before = getCurrentOrganisation()
-    organisation = await createOrganisation(`Orchestrated ${crypto.randomUUID().slice(0, 8)}`)
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    space = await createSpace(`Orchestrated ${crypto.randomUUID().slice(0, 8)}`)
+    await setCurrentSpace(space.id, space.name)
   })
 
   afterEach(async () => {
     drive.uninstall()
-    await deleteOrganisation(organisation.id)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(space.id)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   it('is made ready by createSyncOrchestrator, and syncs', async () => {
-    const orchestrator = await createSyncOrchestrator(organisation.name, organisation.id)
+    const orchestrator = await createSyncOrchestrator(space.name, space.id)
     expect(orchestrator.syncManager).to.not.equal(null)
     const stages: string[] = []
     expect(await orchestrator.sync(progress => stages.push(progress.stage))).to.deep.equal({
@@ -307,7 +302,7 @@ describe('SyncOrchestrator against a Drive', () => {
   })
 
   it('makes its manager when it is first asked to do something', async () => {
-    const orchestrator = new SyncOrchestrator(organisation.name, organisation.id)
+    const orchestrator = new SyncOrchestrator(space.name, space.id)
     expect(orchestrator.syncManager).to.equal(null)
     expect(await orchestrator.push()).to.deep.equal({ success: true })
     expect(orchestrator.syncManager).to.not.equal(null)

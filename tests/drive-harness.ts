@@ -5,11 +5,11 @@ import { hashText } from '../src/js/song-utils.ts'
 import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
-import { deleteDatabase, TEST_ORG, wait } from './test-helpers.ts'
+import { deleteDatabase, TEST_SPACE, wait } from './test-helpers.ts'
 
 const { beforeEach, afterEach } = window
 
-/** In-memory stand-in for the organisation's stored Drive folder link */
+/** In-memory stand-in for the space's stored Drive folder link */
 export const memoryFolderLink = (): FolderLink & { value: string | null } => ({
   value: null as string | null,
   async get() {
@@ -63,7 +63,7 @@ export async function editSong(device: { db: ChordlessDB }, uuid: string, conten
 
 /**
  * The setup the Drive sync tests share: a FakeDrive installed for each test, and simulated
- * devices (each with its own database) that sync one organisation through it. Call it inside
+ * devices (each with its own database) that sync one space through it. Call it inside
  * a describe. Its `drive` and `devices` are new for each test, so read them as `rig.drive`.
  */
 export function useSyncRig() {
@@ -71,7 +71,7 @@ export function useSyncRig() {
     drive: undefined as unknown as ReturnType<typeof installFakeDrive>,
     devices: [] as any[],
     makeDevice,
-    renameOrganisation,
+    renameSpace,
     addSetlist,
     editSetlist,
     syncDevice,
@@ -81,13 +81,13 @@ export function useSyncRig() {
   }
   const drive = () => rig.drive
 
-  /** A simulated device: its own local database, syncing the shared org */
+  /** A simulated device: its own local database, syncing the shared space */
   async function makeDevice(
     name,
     {
-      orgName = TEST_ORG.name,
+      spaceName = TEST_SPACE.name,
       folderLink = memoryFolderLink(),
-    }: { orgName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
+    }: { spaceName?: string; folderLink?: FolderLink & { value?: string | null } } = {}
   ) {
     const db = new ChordlessDB(`test-sync-${name}-${crypto.randomUUID()}`)
     await db.init()
@@ -101,16 +101,16 @@ export function useSyncRig() {
         this.readOnly = readOnly
       },
     }
-    const sync = new DriveSyncManager(orgName, TEST_ORG.id, { db, folderLink, memberCache })
+    const sync = new DriveSyncManager(spaceName, TEST_SPACE.id, { db, folderLink, memberCache })
     await sync.init()
     const device = { name, db, sync, folderLink, memberCache }
     rig.devices.push(device)
     return device
   }
 
-  /** Rename the device's organisation: sync from then on uses the new name */
-  async function renameOrganisation(device, newName) {
-    device.sync = new DriveSyncManager(newName, TEST_ORG.id, {
+  /** Rename the device's space: sync from then on uses the new name */
+  async function renameSpace(device, newName) {
+    device.sync = new DriveSyncManager(newName, TEST_SPACE.id, {
       db: device.db,
       folderLink: device.folderLink,
       memberCache: device.memberCache,

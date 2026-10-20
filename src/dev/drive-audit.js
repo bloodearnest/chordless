@@ -37,8 +37,8 @@ const sameSetlistKey = f =>
     ? [f.date, f.time ?? '', f.owner ?? '', f.setlistType ?? '', f.setlistName ?? ''].join('|')
     : null
 
-async function auditOrg(org) {
-  const subfolders = await children(org.id, ` and mimeType='${FOLDER}'`)
+async function auditSpace(space) {
+  const subfolders = await children(space.id, ` and mimeType='${FOLDER}'`)
   const setlistsFolders = subfolders.filter(f => f.name === 'setlists')
   const driveFiles = []
   for (const folder of setlistsFolders) {
@@ -48,7 +48,7 @@ async function auditOrg(org) {
   const files = []
   const CONCURRENCY = 10
   for (let i = 0; i < driveFiles.length; i += CONCURRENCY) {
-    status.textContent = `${org.name}: downloading ${i + 1}–${Math.min(i + CONCURRENCY, driveFiles.length)} of ${driveFiles.length}`
+    status.textContent = `${space.name}: downloading ${i + 1}–${Math.min(i + CONCURRENCY, driveFiles.length)} of ${driveFiles.length}`
     await Promise.all(
       driveFiles.slice(i, i + CONCURRENCY).map(async file => {
         let content = null
@@ -89,8 +89,8 @@ async function auditOrg(org) {
   }
 
   return {
-    org: org.name,
-    orgFolderId: org.id,
+    space: space.name,
+    spaceFolderId: space.id,
     setlistsFolderCount: setlistsFolders.length,
     fileCount: files.length,
     files: files.sort((a, b) => (a.date ?? '').localeCompare(b.date ?? '')),
@@ -129,8 +129,8 @@ async function auditTrash() {
   return { count: setlists.length, byDay, files: setlists }
 }
 
-function renderTrash(trash, orgs) {
-  const liveIds = new Set(orgs.flatMap(o => o.files.map(f => f.setlistId)))
+function renderTrash(trash, spaces) {
+  const liveIds = new Set(spaces.flatMap(o => o.files.map(f => f.setlistId)))
   const matching = trash.files.filter(f => liveIds.has(f.setlistId))
   const byId = new Map()
   for (const f of trash.files) byId.set(f.setlistId, [...(byId.get(f.setlistId) ?? []), f])
@@ -183,8 +183,8 @@ function renderList(title, files) {
     .join('')}</ul>`
 }
 
-function render(orgs) {
-  output.innerHTML = orgs
+function render(spaces) {
+  output.innerHTML = spaces
     .map(
       o => `
     <h2>${esc(o.org)}: ${o.fileCount} setlist files</h2>
@@ -217,9 +217,9 @@ const runButton = document.getElementById('cleanup-run')
 const cleanupStatus = document.getElementById('cleanup-status')
 let plan = null
 
-function planCleanup(orgs, keepName) {
-  const keep = orgs.find(o => o.org === keepName)
-  const others = orgs.filter(o => o !== keep)
+function planCleanup(spaces, keepName) {
+  const keep = spaces.find(o => o.org === keepName)
+  const others = spaces.filter(o => o !== keep)
   const otherIds = new Set(others.flatMap(o => o.files.map(f => f.setlistId)).filter(Boolean))
   // Of files for the same setlist, keep the earliest created and trash the rest
   const newerCopies = new Set()
@@ -230,25 +230,25 @@ function planCleanup(orgs, keepName) {
   const files = keep.files.flatMap(f => {
     const reasons = []
     if (newerCopies.has(f.fileId)) reasons.push('newer copy of the same setlist')
-    if (otherIds.has(f.setlistId)) reasons.push('copy of a setlist from another organisation')
+    if (otherIds.has(f.setlistId)) reasons.push('copy of a setlist from another space')
     if (f.songCount === 0) reasons.push('empty setlist')
     return reasons.length ? [{ ...f, reason: reasons.join(', ') }] : []
   })
   return {
     keep,
     files,
-    folders: others.map(o => ({ id: o.orgFolderId, name: o.org, fileCount: o.fileCount })),
+    folders: others.map(o => ({ id: o.spaceFolderId, name: o.org, fileCount: o.fileCount })),
     remaining: keep.fileCount - files.length,
   }
 }
 
 function renderPlan() {
-  plan = planCleanup(report.orgs, keepSelect.value)
+  plan = planCleanup(report.spaces, keepSelect.value)
   confirmBox.checked = false
   runButton.disabled = true
   document.getElementById('cleanup-plan').innerHTML = `
     <p><strong>${plan.files.length}</strong> setlist files in ${esc(plan.keep.org)} and
-      <strong>${plan.folders.length}</strong> organisation folder(s) will go to the trash.
+      <strong>${plan.folders.length}</strong> space folder(s) will go to the trash.
       ${esc(plan.keep.org)} will have <strong>${plan.remaining}</strong> setlist files left.</p>
     ${plan.folders.map(f => `<p>Folder <code>${esc(f.name)}</code> (${f.fileCount} setlist files, plus its songs)</p>`).join('')}
     <details><summary>Files</summary><table>
@@ -298,9 +298,9 @@ runButton.addEventListener('click', async () => {
 })
 
 function showCleanup() {
-  keepSelect.innerHTML = report.orgs.map(o => `<option>${esc(o.org)}</option>`).join('')
-  // Default to the organisation with the most setlist files
-  keepSelect.value = [...report.orgs].sort((a, b) => b.fileCount - a.fileCount)[0]?.org
+  keepSelect.innerHTML = report.spaces.map(o => `<option>${esc(o.org)}</option>`).join('')
+  // Default to the space with the most setlist files
+  keepSelect.value = [...report.spaces].sort((a, b) => b.fileCount - a.fileCount)[0]?.org
   confirmBox.disabled = false
   cleanupStatus.textContent = ''
   cleanup.hidden = false
@@ -318,18 +318,23 @@ document.getElementById('run').addEventListener('click', async () => {
     )
     if (roots.length !== 1)
       status.textContent = `Warning: found ${roots.length} Chordless folders. `
-    const orgs = []
+    const spaces = []
     for (const root of roots) {
-      for (const org of await children(root.id, ` and mimeType='${FOLDER}'`)) {
-        if (org.name === 'pads') continue
-        orgs.push(await auditOrg(org))
+      for (const space of await children(root.id, ` and mimeType='${FOLDER}'`)) {
+        if (space.name === 'pads') continue
+        spaces.push(await auditSpace(space))
       }
     }
     status.textContent = 'Listing the trash...'
     const trash = await auditTrash()
-    report = { generatedAt: new Date().toISOString(), chordlessFolders: roots.length, orgs, trash }
-    render(orgs)
-    output.insertAdjacentHTML('beforeend', renderTrash(trash, orgs))
+    report = {
+      generatedAt: new Date().toISOString(),
+      chordlessFolders: roots.length,
+      spaces,
+      trash,
+    }
+    render(spaces)
+    output.insertAdjacentHTML('beforeend', renderTrash(trash, spaces))
     showCleanup()
     status.textContent += 'Done.'
     document.getElementById('copy').disabled = false

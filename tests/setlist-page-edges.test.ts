@@ -177,7 +177,7 @@ describe('the setlist page: corners', () => {
   it('mixes a section’s own state with the song’s defaults and the app’s, field by field', async () => {
     await rig.open()
     const { songId } = rig.page.songs[0]
-    const key = `song-prefs-${rig.db.organisationId}`
+    const key = `song-prefs-${rig.db.spaceId}`
     localStorage.setItem(
       key,
       JSON.stringify({

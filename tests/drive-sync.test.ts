@@ -4,7 +4,7 @@ import { setlistFileMetadata } from '../src/js/drive-metadata.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -15,13 +15,13 @@ describe('Drive sync (against FakeDrive)', () => {
   const { makeDevice, addSetlist, editSetlist, syncDevice, driveSetlistFiles, driveSetlist } = rig
 
   describe('setlists', () => {
-    it('uploads a new local setlist into the org setlists folder', async () => {
+    it('uploads a new local setlist into the space setlists folder', async () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Harvest' })
 
       await syncDevice(phone)
 
-      const folder = rig.drive.findByPath(['Chordless', TEST_ORG.name, 'setlists'])
+      const folder = rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'setlists'])
       const [file] = driveSetlistFiles()
       expect(file.parents).to.deep.equal([folder.id])
       expect(file.appProperties.setlistId).to.equal(setlist.id)
@@ -140,8 +140,7 @@ describe('Drive sync (against FakeDrive)', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Harvest', owner: 'Ann' })
       await syncDevice(phone)
-      const expected = () =>
-        setlistFileMetadata(setlist, { organisationId: TEST_ORG.id }).appProperties
+      const expected = () => setlistFileMetadata(setlist, { spaceId: TEST_SPACE.id }).appProperties
 
       expect(fileFor(setlist.id).appProperties).to.deep.equal(expected())
 
@@ -172,6 +171,7 @@ describe('Drive sync (against FakeDrive)', () => {
       await syncDevice(phone)
       Object.assign(fileFor(setlist.id).appProperties, {
         resourceType: 'setlist',
+        organisationId: 'old-id',
         leader: '',
         date: '2020-01-01',
       })
@@ -181,8 +181,8 @@ describe('Drive sync (against FakeDrive)', () => {
 
       expect(Object.keys(fileFor(setlist.id).appProperties).sort()).to.deep.equal([
         'appVersion',
-        'organisationId',
         'setlistId',
+        'spaceId',
       ])
     })
   })

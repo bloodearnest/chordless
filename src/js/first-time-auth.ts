@@ -2,10 +2,10 @@
  * First-time Google Auth Handler
  *
  * When a user authenticates with Google for the first time,
- * rename the "Personal" organisation to their name and switch to it.
+ * rename the "Personal" space to their name and switch to it.
  */
 
-import { getCurrentOrganisation, renameOrganisation, switchOrganisation } from './organisation.ts'
+import { getCurrentSpace, renameSpace, switchSpace } from './space.ts'
 
 const FIRST_AUTH_KEY = 'first-auth-done'
 
@@ -25,14 +25,14 @@ function markFirstAuthComplete(): void {
 
 /**
  * Handle first-time authentication
- * If user has authenticated for the first time and is using "Personal" org,
+ * If user has authenticated for the first time and is using "Personal" space,
  * rename it to their name and switch to it
  *
- * @param switchTo - switches to the organisation, which reloads the page (a test gives its own)
- * @returns True if org was renamed and switched
+ * @param switchTo - switches to the space, which reloads the page (a test gives its own)
+ * @returns True if space was renamed and switched
  */
 export async function handleFirstTimeAuth(
-  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+  switchTo: (spaceId: string) => Promise<void> = switchSpace
 ): Promise<boolean> {
   // Check if this is first auth
   if (!isFirstAuth()) {
@@ -47,14 +47,14 @@ export async function handleFirstTimeAuth(
       return false
     }
 
-    // Get current org from localStorage (synchronous)
-    const { id, name } = getCurrentOrganisation()
+    // Get current space from localStorage (synchronous)
+    const { id, name } = getCurrentSpace()
     if (!id) {
       markFirstAuthComplete()
       return false
     }
 
-    // Check if current org is "Personal"
+    // Check if current space is "Personal"
     if (name !== 'Personal') {
       markFirstAuthComplete()
       return false
@@ -63,14 +63,14 @@ export async function handleFirstTimeAuth(
     // Rename "Personal" to user's name
     const userName = userInfo.name
 
-    await renameOrganisation(id, userName)
+    await renameSpace(id, userName)
 
     // Mark as complete
     markFirstAuthComplete()
 
     // Show notification
 
-    // Switch to the renamed org (will reload the page)
+    // Switch to the renamed space (will reload the page)
     await switchTo(id)
 
     return true
@@ -83,16 +83,16 @@ export async function handleFirstTimeAuth(
 }
 
 /**
- * Rename the organisation from the pre-sign-in default "Personal" to the Google
+ * Rename the space from the pre-sign-in default "Personal" to the Google
  * account's name, if it still has that name. Called before syncing: the Drive
  * folder is found by name on first sync, so syncing as "Personal" and being
  * renamed later would leave this device on a different folder from the others.
  * Unlike handleFirstTimeAuth it doesn't reload the page.
  *
- * @returns True if the organisation was renamed
+ * @returns True if the space was renamed
  */
-export async function nameOrganisationBeforeSync(): Promise<boolean> {
-  const { id, name } = getCurrentOrganisation()
+export async function nameSpaceBeforeSync(): Promise<boolean> {
+  const { id, name } = getCurrentSpace()
   if (!id || name !== 'Personal') {
     return false
   }
@@ -103,7 +103,7 @@ export async function nameOrganisationBeforeSync(): Promise<boolean> {
     return false
   }
 
-  await renameOrganisation(id, userInfo.name)
+  await renameSpace(id, userInfo.name)
   markFirstAuthComplete()
   return true
 }
@@ -113,7 +113,7 @@ export async function nameOrganisationBeforeSync(): Promise<boolean> {
  * Call this from your main app initialization
  */
 export async function checkFirstTimeAuth(
-  switchTo: (organisationId: string) => Promise<void> = switchOrganisation
+  switchTo: (spaceId: string) => Promise<void> = switchSpace
 ): Promise<boolean> {
   if (!isFirstAuth()) {
     return false

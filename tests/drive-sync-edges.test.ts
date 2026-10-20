@@ -9,17 +9,12 @@ import type { ChordlessDB } from '../src/js/db.ts'
 import {
   DriveSyncManager,
   isSyncAvailable,
-  OrganisationFolderMismatchError,
+  SpaceFolderMismatchError,
   type SyncProgress,
   UnsyncedChangesError,
 } from '../src/js/drive-sync.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
-import { OrganisationDB } from '../src/js/organisation-db.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import { SpaceDB } from '../src/js/space-db.ts'
 import {
   driveMarkers,
   setlistHasLocalChanges,
@@ -32,7 +27,7 @@ import { pushSetlist, pushSongVariant, songNeedsSync } from '../src/js/sync/push
 import { makeSetlist, makeSong } from './builders.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -80,8 +75,8 @@ describe('Drive sync: the less common turns', () => {
     })
 
     it('names the folder and the count when records belong to another folder', () => {
-      const error = new OrganisationFolderMismatchError(3, 'Church')
-      expect(error.name).to.equal('OrganisationFolderMismatchError')
+      const error = new SpaceFolderMismatchError(3, 'Church')
+      expect(error.name).to.equal('SpaceFolderMismatchError')
       expect(error.message).to.contain('3 setlist(s)/song(s)')
       expect(error.message).to.contain('"Church"')
     })
@@ -204,32 +199,32 @@ describe('Drive sync: the less common turns', () => {
   })
 
   describe('the Drive folder link', () => {
-    it('is kept in the organisation, and a failure to keep it is only a warning', async () => {
-      const before = getCurrentOrganisation()
-      const organisation = await createOrganisation(`Link ${crypto.randomUUID().slice(0, 8)}`)
-      await setCurrentOrganisation(organisation.id, organisation.name)
-      const realUpdate = OrganisationDB.prototype.updateOrganisation
-      OrganisationDB.prototype.updateOrganisation = () => Promise.reject(new Error('read only'))
+    it('is kept in the space, and a failure to keep it is only a warning', async () => {
+      const before = getCurrentSpace()
+      const space = await createSpace(`Link ${crypto.randomUUID().slice(0, 8)}`)
+      await setCurrentSpace(space.id, space.name)
+      const realUpdate = SpaceDB.prototype.updateSpace
+      SpaceDB.prototype.updateSpace = () => Promise.reject(new Error('read only'))
       try {
-        const sync = new DriveSyncManager(organisation.name, organisation.id)
+        const sync = new DriveSyncManager(space.name, space.id)
         await sync.init()
         expect(sync.driveFolderId).to.be.a('string')
-        sync.organisationDb?.db?.close()
+        sync.spaceDb?.db?.close()
       } finally {
-        OrganisationDB.prototype.updateOrganisation = realUpdate
+        SpaceDB.prototype.updateSpace = realUpdate
       }
       // Kept for real, the next manager finds the folder by the link
-      const again = new DriveSyncManager(organisation.name, organisation.id)
+      const again = new DriveSyncManager(space.name, space.id)
       await again.init()
       const linked = again.driveFolderId
       expect(await again.hasSyncedRecords()).to.equal(false)
-      again.organisationDb?.db?.close()
-      const third = new DriveSyncManager(organisation.name, organisation.id)
+      again.spaceDb?.db?.close()
+      const third = new DriveSyncManager(space.name, space.id)
       await third.init()
       expect(third.driveFolderId).to.equal(linked)
-      third.organisationDb?.db?.close()
-      await deleteOrganisation(organisation.id)
-      if (before.id) await setCurrentOrganisation(before.id, before.name)
+      third.spaceDb?.db?.close()
+      await deleteSpace(space.id)
+      if (before.id) await setCurrentSpace(before.id, before.name)
     })
   })
 
@@ -794,7 +789,7 @@ describe('Drive sync: the less common turns', () => {
     it('is said to be missing when it was deleted, not trashed', async () => {
       const phone = await makeDevice('phone')
       await syncDevice(phone)
-      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_ORG.name]).id)
+      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_SPACE.name]).id)
       let message = ''
       try {
         await phone.sync.resolveDriveFolder()
@@ -830,7 +825,7 @@ describe('Drive sync: the less common turns', () => {
     it('stops quietly when a refused write throws and the user turns out to be a reader', async () => {
       const phone = await makeDevice('phone')
       // The folder it needs for setlists is not there, so making it is what is refused
-      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_ORG.name, 'setlists']).id)
+      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'setlists']).id)
       await addSetlist(phone, { name: 'Mine' })
       phone.sync.readOnly = false
       rig.drive.readOnly = true
@@ -840,7 +835,7 @@ describe('Drive sync: the less common turns', () => {
 
     it('has a manager with no member cache say so, and go on', async () => {
       const phone = await makeDevice('phone')
-      const bare = new DriveSyncManager(TEST_ORG.name, TEST_ORG.id, {
+      const bare = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
         db: phone.db,
         folderLink: phone.folderLink,
       })

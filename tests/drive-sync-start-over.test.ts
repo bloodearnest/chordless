@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import { DriveFolderGoneError } from '../src/js/drive-sync.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -21,10 +21,10 @@ async function failure(sync: { init(): Promise<unknown> }) {
 describe('Drive sync: when the space’s folder is gone, and starting over', () => {
   const rig = useSyncRig()
   const { makeDevice, addSetlist, syncDevice } = rig
-  const orgFolder = () => rig.drive.findByPath(['Chordless', TEST_ORG.name])
+  const spaceFolder = () => rig.drive.findByPath(['Chordless', TEST_SPACE.name])
 
   /** What another Google app sees of the first one's folder: nothing at all */
-  const folderGoneFromDrive = () => rig.drive.files.delete(orgFolder().id)
+  const folderGoneFromDrive = () => rig.drive.files.delete(spaceFolder().id)
 
   it('stops with an error that says what to do, when the folder was deleted or is not visible', async () => {
     const phone = await makeDevice('phone')
@@ -43,7 +43,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
   it('says the folder is in the trash when it is, and offers to restore it', async () => {
     const phone = await makeDevice('phone')
     await syncDevice(phone)
-    rig.drive.files.get(orgFolder().id).trashed = true
+    rig.drive.files.get(spaceFolder().id).trashed = true
 
     const error = await failure(phone.sync)
 
@@ -61,7 +61,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
       content: '{title: Amazing}\n[G]Amazing',
     })
     await syncDevice(phone)
-    const oldFolderId = orgFolder().id
+    const oldFolderId = spaceFolder().id
     const oldFileId = must(await phone.db.getSetlist(setlist.id)).driveFileId
     folderGoneFromDrive()
 
@@ -74,7 +74,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     expect(kept.name).to.equal('Sunday')
     expect(must(await phone.db.getSong('song-1')).title).to.equal('Amazing')
     // ...and all of it is in a new folder, under new files
-    expect(orgFolder().id).to.not.equal(oldFolderId)
+    expect(spaceFolder().id).to.not.equal(oldFolderId)
     expect(kept.driveFileId).to.be.a('string').and.not.equal(oldFileId)
     const live = rig.drive.listFiles(
       file => !file.trashed && file.appProperties.setlistId === setlist.id

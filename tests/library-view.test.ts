@@ -56,7 +56,7 @@ describe('the library view, with a song open', () => {
     )
   const section = (index: number) => must(sections()[index])
   const control = <T extends HTMLElement>(id: string) => must(view.querySelector<T>(`#${id}`))
-  const prefs = () => getSongUserPrefs(song.id, db.organisationId)
+  const prefs = () => getSongUserPrefs(song.id, db.spaceId)
 
   /** Wait for something the view does a step after the last thing awaited */
   async function until(condition: () => unknown, what: string) {
@@ -151,7 +151,7 @@ describe('the library view, with a song open', () => {
     view?.remove()
     outlet.remove()
     setRouter(null)
-    localStorage.removeItem(`song-prefs-${db.organisationId}`)
+    localStorage.removeItem(`song-prefs-${db.spaceId}`)
   })
 
   describe('a section', () => {

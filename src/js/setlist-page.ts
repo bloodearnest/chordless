@@ -41,10 +41,9 @@ import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
-import { syncsBack } from './organisation.ts'
 import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
-import { getOrganisationPeople } from './people.ts'
+import { getSpacePeople } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
@@ -62,6 +61,7 @@ import { OverviewReorder } from './setlist/overview-reorder.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
+import { syncsBack } from './space.ts'
 import { differsFromOfficial } from './sync/revert.ts'
 import { toast } from './toast.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
@@ -108,7 +108,7 @@ export class SetlistPage {
   _restoredState: SetlistPageState | undefined
   /** Where a song of this setlist is: the setlist's own route, or a share's */
   _routeFor: (songIndex: number) => Route
-  /** A setlist received by link: nothing to edit, and nothing of an organisation's */
+  /** A setlist received by link: nothing to edit, and nothing of a space's */
   _readOnly: boolean
   _setlistId: string
   _initialSongIndex: number
@@ -155,7 +155,7 @@ export class SetlistPage {
    * @param options.root the view this page is in: it looks for its elements there
    * @param options.restoredState what captureViewState() gave when the page was left, if it is
    *   being come back to
-   * @param options.db the database holding the setlist, if it isn't the organisation's (a
+   * @param options.db the database holding the setlist, if it isn't the space's (a
    *   setlist received by link has a database of its own)
    * @param options.routeFor the route of a song (or the overview, -1) of this setlist; defaults
    *   to the setlist's own
@@ -250,10 +250,10 @@ export class SetlistPage {
     }
   }
 
-  /** The organisation's database; start() opens it */
-  /** The organisation the setlist is in (a section's song may have preferences of the user's) */
-  organisationId(): string {
-    return this._database().organisationId
+  /** The space's database; start() opens it */
+  /** The space the setlist is in (a section's song may have preferences of the user's) */
+  spaceId(): string {
+    return this._database().spaceId
   }
 
   _database(): ChordlessDB {
@@ -262,7 +262,7 @@ export class SetlistPage {
   }
 
   async start() {
-    // Initialize IndexedDB with current organisation
+    // Initialize IndexedDB with current space
     this.db ??= await getCurrentDB()
 
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
@@ -861,7 +861,7 @@ export class SetlistPage {
 
   dispatchSongChange(song: RuntimeSong | null) {
     // Dispatch custom event for media player to listen to
-    const prefs = song ? getSongUserPrefs(song.songId, this._database().organisationId) : null
+    const prefs = song ? getSongUserPrefs(song.songId, this._database().spaceId) : null
     const event = new SongChangeEvent(song, {
       doubleClick: prefs?.doubleClick,
       padSetId: prefs?.padSetId,
@@ -889,7 +889,7 @@ export class SetlistPage {
       dialog.addEventListener(SetlistInfoDeleteEvent.type, this._setlistDeleteHandler)
     }
     dialog.readonly = this._readOnly
-    dialog.people = dialog.readonly ? [] : (await getOrganisationPeople()).people
+    dialog.people = dialog.readonly ? [] : (await getSpacePeople()).people
     await dialog.show(this.currentSetlist)
   }
 
@@ -1079,7 +1079,7 @@ export class SetlistPage {
       }
 
       // Get song user prefs
-      const songUserPrefs = getSongUserPrefs(song.songId, this._database().organisationId)
+      const songUserPrefs = getSongUserPrefs(song.songId, this._database().spaceId)
       if (!songUserPrefs || songUserPrefs.capo === undefined) {
         return
       }
@@ -1120,7 +1120,7 @@ export class SetlistPage {
       song._canonicalSong,
       this.currentSetlistId as string,
       this._database(),
-      this._database().organisationId
+      this._database().spaceId
     )
   }
 
@@ -1313,7 +1313,7 @@ export class SetlistPage {
     // can only read it can make them too). Shown only where the media player is
     songSettingsPopover.mediaAvailable = wantsMediaPlayer()
     if (songSettingsPopover.mediaAvailable) {
-      const prefs = getSongUserPrefs(song.songId, this._database().organisationId)
+      const prefs = getSongUserPrefs(song.songId, this._database().spaceId)
       songSettingsPopover.padSetId = prefs?.padSetId
       listPadSets()
         .then(sets => {
@@ -1328,9 +1328,9 @@ export class SetlistPage {
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     if (!song) return
     if (name === 'doubleClick') {
-      setSongUserPref(song.songId, this._database().organisationId, name, value as boolean)
+      setSongUserPref(song.songId, this._database().spaceId, name, value as boolean)
     } else {
-      setSongUserPref(song.songId, this._database().organisationId, name, value as string)
+      setSongUserPref(song.songId, this._database().spaceId, name, value as string)
     }
     this.updateSongSettingsPopover()
     this.dispatchSongChange(song)

@@ -28,7 +28,7 @@ export class SetlistSong extends SongModel {
   _canonical: LoadedSong
   _setlistId: string
   _db: ChordlessDB
-  _orgId: string
+  _spaceId: string
   _songIndex: number
   _pendingChanges: PendingChanges
 
@@ -37,7 +37,7 @@ export class SetlistSong extends SongModel {
    * @param canonicalSong - Canonical song data with parsed content
    * @param setlistId - Setlist ID
    * @param db - Database instance
-   * @param orgId - Organisation ID
+   * @param spaceId - Space ID
    * @param songIndex - Index of this song in the setlist
    */
   constructor(
@@ -45,7 +45,7 @@ export class SetlistSong extends SongModel {
     canonicalSong: LoadedSong,
     setlistId: string,
     db: ChordlessDB,
-    orgId: string,
+    spaceId: string,
     songIndex = 0
   ) {
     super()
@@ -53,7 +53,7 @@ export class SetlistSong extends SongModel {
     this._canonical = canonicalSong
     this._setlistId = setlistId
     this._db = db
-    this._orgId = orgId
+    this._spaceId = spaceId
     this._songIndex = songIndex
 
     // In-memory state for changes before save
@@ -135,7 +135,7 @@ export class SetlistSong extends SongModel {
     const canonicalKey = this._canonical.key
 
     if (currentKey === canonicalKey) {
-      const prefs = getSongUserPrefs(this._songEntry.songId, this._orgId)
+      const prefs = getSongUserPrefs(this._songEntry.songId, this._spaceId)
       if (prefs && prefs.capo !== undefined) {
         return normalizeCapo(prefs.capo)
       }

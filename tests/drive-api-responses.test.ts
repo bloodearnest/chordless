@@ -17,21 +17,21 @@ import {
   driveRequest,
   endShareFile,
   ensurePadSetFolder,
-  findOrCreateOrganisationFolder,
   findOrCreateRootFolder,
-  findOrganisationFolderByName,
+  findOrCreateSpaceFolder,
   findSharesFolder,
+  findSpaceFolderByName,
   getFile,
   getPadsRootFolder,
   getSetlistsFolder,
   getSharesFolder,
   getSongsFolder,
   listFolderPermissions,
-  listOrganisations,
   listPadSetFiles,
   listPadSetFolders,
   listSetlists,
   listShareFiles,
+  listSpaces,
   setAccessTokenProvider,
   trashFilesInFolder,
   updateFile,
@@ -298,17 +298,17 @@ describe('drive-api, given what Drive answers', () => {
       expect(await findOrCreateRootFolder()).to.equal('new-root')
     })
 
-    it('finds an organisation folder by name, or none', async () => {
-      script({ files: [{ id: 'root' }] }, { files: [{ id: 'org', name: 'Church' }] })
-      expect((await findOrganisationFolderByName('Church'))?.id).to.equal('org')
+    it('finds a space folder by name, or none', async () => {
+      script({ files: [{ id: 'root' }] }, { files: [{ id: 'space', name: 'Church' }] })
+      expect((await findSpaceFolderByName('Church'))?.id).to.equal('space')
       script({ files: [{ id: 'root' }] }, { files: [] })
-      expect(await findOrganisationFolderByName('Nobody')).to.equal(null)
+      expect(await findSpaceFolderByName('Nobody')).to.equal(null)
     })
 
-    it('finds an organisation folder, or makes it with its subfolders', async () => {
-      script({ files: [{ id: 'root' }] }, { files: [{ id: 'org' }] })
-      expect(await findOrCreateOrganisationFolder('Church', 'org-1')).to.deep.equal({
-        folderId: 'org',
+    it('finds a space folder, or makes it with its subfolders', async () => {
+      script({ files: [{ id: 'root' }] }, { files: [{ id: 'space' }] })
+      expect(await findOrCreateSpaceFolder('Church', 'org-1')).to.deep.equal({
+        folderId: 'space',
         isNew: false,
       })
       script(
@@ -318,27 +318,27 @@ describe('drive-api, given what Drive answers', () => {
         { id: 'songs' },
         { id: 'setlists' }
       )
-      expect(await findOrCreateOrganisationFolder('Church', 'org-1')).to.deep.equal({
+      expect(await findOrCreateSpaceFolder('Church', 'org-1')).to.deep.equal({
         folderId: 'org2',
         isNew: true,
       })
     })
 
-    it('finds the subfolders of an organisation, or makes them', async () => {
+    it('finds the subfolders of a space, or makes them', async () => {
       script({ files: [{ id: 'songs-folder' }] })
-      expect(await getSongsFolder('org')).to.equal('songs-folder')
+      expect(await getSongsFolder('space')).to.equal('songs-folder')
       script({ files: [] }, { id: 'new-songs' })
-      expect(await getSongsFolder('org')).to.equal('new-songs')
+      expect(await getSongsFolder('space')).to.equal('new-songs')
       script({ files: [{ id: 'setlists-folder' }] })
-      expect(await getSetlistsFolder('org')).to.equal('setlists-folder')
+      expect(await getSetlistsFolder('space')).to.equal('setlists-folder')
       script({ files: [] }, { id: 'new-setlists' })
-      expect(await getSetlistsFolder('org')).to.equal('new-setlists')
+      expect(await getSetlistsFolder('space')).to.equal('new-setlists')
       script({ files: [{ id: 'shares-folder' }] })
-      expect(await getSharesFolder('org')).to.equal('shares-folder')
+      expect(await getSharesFolder('space')).to.equal('shares-folder')
       script({ files: [] }, { id: 'new-shares' })
-      expect(await getSharesFolder('org')).to.equal('new-shares')
+      expect(await getSharesFolder('space')).to.equal('new-shares')
       script({ files: [] })
-      expect(await findSharesFolder('org')).to.equal(null)
+      expect(await findSharesFolder('space')).to.equal(null)
     })
 
     it('finds the pads folder, or makes it', async () => {
@@ -386,20 +386,20 @@ describe('drive-api, given what Drive answers', () => {
     })
   })
 
-  describe('setlists, shares and organisations', () => {
+  describe('setlists, shares and spaces', () => {
     it('follows the pages of the setlists', async () => {
       script(
         { files: [{ id: 'sl-folder' }] },
         { files: [{ id: 'a' }], nextPageToken: 'next' },
         { files: [{ id: 'b' }] }
       )
-      expect((await listSetlists('org')).map(file => file.id)).to.deep.equal(['a', 'b'])
+      expect((await listSetlists('space')).map(file => file.id)).to.deep.equal(['a', 'b'])
       expect(calls.at(-1)?.url).to.contain('pageToken=next')
     })
 
     it('has no setlists when Drive lists none', async () => {
       script({ files: [{ id: 'sl-folder' }] }, { files: [] })
-      expect(await listSetlists('org')).to.deep.equal([])
+      expect(await listSetlists('space')).to.deep.equal([])
     })
 
     it('follows the pages of the shares', async () => {
@@ -409,20 +409,20 @@ describe('drive-api, given what Drive answers', () => {
       expect(await listShareFiles('shares')).to.deep.equal([])
     })
 
-    it('lists only the folders that are organisations', async () => {
+    it('lists only the folders that are spaces', async () => {
       script(
         { files: [{ id: 'root' }] },
         {
           files: [
-            { id: 'o1', appProperties: { type: 'organisation' } },
+            { id: 'o1', appProperties: { type: 'space' } },
             { id: 'f2', appProperties: { type: 'other' } },
             { id: 'f3' },
           ],
         }
       )
-      expect((await listOrganisations()).map(file => file.id)).to.deep.equal(['o1'])
+      expect((await listSpaces()).map(file => file.id)).to.deep.equal(['o1'])
       script({ files: [{ id: 'root' }] }, { files: [] })
-      expect(await listOrganisations()).to.deep.equal([])
+      expect(await listSpaces()).to.deep.equal([])
     })
 
     it('trashes a share file that could not be made public, and fails as the permission did', async () => {

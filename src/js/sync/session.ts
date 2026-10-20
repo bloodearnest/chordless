@@ -39,8 +39,8 @@ export interface ResetSetlist {
 export interface SyncSession {
   readonly db: ChordlessDB
   readonly parser: ChordProParser
-  readonly organisationId: string | null
-  /** The organisation's Drive folder */
+  readonly spaceId: string | null
+  /** The space's Drive folder */
   readonly folderId: string
   songsFolder(): Promise<string>
   setlistsFolder(): Promise<string>

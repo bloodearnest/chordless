@@ -8,7 +8,7 @@ import { toLocalDateString } from '../src/js/utils/date-utils.ts'
 import { makeEntry } from './builders.ts'
 import { addSong, editSong, memoryFolderLink, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -39,8 +39,8 @@ describe('Share links: sync', () => {
 
   const ctx = (device: Device, extra = {}) => ({
     db: device.db,
-    organisationId: TEST_ORG.id,
-    organisationFolderId: must(device.sync.driveFolderId),
+    spaceId: TEST_SPACE.id,
+    spaceFolderId: must(device.sync.driveFolderId),
     ...extra,
   })
 
@@ -90,11 +90,11 @@ describe('Share links: sync', () => {
     expect(bundle.setlist.songs[0].chordpro).to.include('[G]Alpha line')
     const text = JSON.stringify(bundle)
     expect(text).to.not.include('ann@example.com')
-    expect(text).to.not.include(TEST_ORG.id)
+    expect(text).to.not.include(TEST_SPACE.id)
     expect(share.expires).to.equal(addDays(nextWeek, SHARE_DAYS_AFTER))
   })
 
-  it('records the share on the setlist, so the organisation has it', async () => {
+  it('records the share on the setlist, so the space has it', async () => {
     const { phone, share } = await sharedSetlist()
     await phone.sync.sync()
 
@@ -267,11 +267,11 @@ describe('Share links: sync', () => {
     expect(rig.drive.anonymousDownload(share.fileId).status).to.equal(404)
   })
 
-  it('does not make a shares folder for an organisation that never shares', async () => {
+  it('does not make a shares folder for a space that never shares', async () => {
     const phone = await makeDevice('phone')
     await addSetlist(phone, [])
     await phone.sync.sync()
-    expect(rig.drive.findByPath(['Chordless', TEST_ORG.name, 'shares'])).to.equal(null)
+    expect(rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'shares'])).to.equal(null)
   })
 
   it('a failing share does not stop setlists syncing', async () => {

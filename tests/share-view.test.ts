@@ -122,7 +122,7 @@ describe('the share view', () => {
     expect(status()?.textContent?.trim()).to.equal("Can't reach the setlist")
   })
 
-  it('goes to the setlist instead, for someone who has it in their organisation', async () => {
+  it('goes to the setlist instead, for someone who has it in their space', async () => {
     await open({ state: 'ended' }, { own: 'own-setlist', hash: `#${KEY}${CODE}`, songIndex: 2 })
     expect(visited).to.deep.equal([{ url: '/setlist/own-setlist/song/2', replace: true }])
   })

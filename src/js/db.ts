@@ -12,10 +12,10 @@ import { requestResult, transactionDone } from './utils/idb.ts'
 import { ensurePersistentStorage } from './utils/persistence.ts'
 
 // IndexedDB wrapper for database operations
-// Manages organisation-specific data: songs, chordpro content, setlists, and local state
+// Manages space-specific data: songs, chordpro content, setlists, and local state
 //
-// NOTE: This now stores ALL organisation data in one database per organisation.
-// Organisation metadata is stored separately in the 'organisations' database.
+// NOTE: This now stores ALL space data in one database per space.
+// Space metadata is stored separately in the 'spaces' database.
 
 const DB_VERSION = 6
 
@@ -95,18 +95,18 @@ export interface SongUsage {
 
 export class ChordlessDB {
   dbName: string
-  organisationId: string
+  spaceId: string
   db: IDBDatabase | null
 
-  constructor(organisationId: string) {
-    if (!organisationId) {
-      throw new Error('organisationId is required for ChordlessDB')
+  constructor(spaceId: string) {
+    if (!spaceId) {
+      throw new Error('spaceId is required for ChordlessDB')
     }
 
-    // Database name is just the organisation ID
-    // This allows renaming organisations without database migration
-    this.dbName = organisationId
-    this.organisationId = organisationId
+    // Database name is just the space ID
+    // This allows renaming spaces without database migration
+    this.dbName = spaceId
+    this.spaceId = spaceId
     this.db = null
   }
 
@@ -127,7 +127,7 @@ export class ChordlessDB {
       request.onsuccess = () => {
         this.db = request.result
         resolve()
-        ensurePersistentStorage(this.organisationId)
+        ensurePersistentStorage(this.spaceId)
       }
 
       request.onupgradeneeded = event => {
@@ -246,7 +246,7 @@ export class ChordlessDB {
     await this.deleteLocalState(id)
   }
 
-  // Song operations (per-organisation)
+  // Song operations (per-space)
   /** Save a song (its tempos as numbers); resolves with what was stored */
   async saveSong(song: SongInput): Promise<SongRecord> {
     const tx = this.#transaction(['songs'], 'readwrite')
@@ -312,7 +312,7 @@ export class ChordlessDB {
     return variants.find(v => v.isDefault) || variants[0] || null
   }
 
-  // ChordPro operations (per-organisation)
+  // ChordPro operations (per-space)
   async saveChordPro(chordpro: ChordProRecord): Promise<void> {
     const tx = this.#transaction(['chordpro'], 'readwrite')
     const store = tx.objectStore('chordpro')
@@ -575,12 +575,12 @@ function migrateTemposToNumbers(transaction: IDBTransaction) {
 }
 
 /**
- * Helper to get current organisation database
- * Returns a database instance for the currently active organisation
+ * Helper to get current space database
+ * Returns a database instance for the currently active space
  */
 export async function getCurrentDB(): Promise<ChordlessDB> {
-  const { ensureCurrentOrganisation } = await import('./organisation.ts')
-  const { id } = await ensureCurrentOrganisation()
+  const { ensureCurrentSpace } = await import('./space.ts')
+  const { id } = await ensureCurrentSpace()
   const db = new ChordlessDB(id)
   await db.init()
   return db

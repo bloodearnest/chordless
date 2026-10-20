@@ -14,17 +14,17 @@ const { describe, it, beforeEach, afterEach } = window
 suppressConsoleLogs()
 
 describe('song user preferences for the media player', () => {
-  const org = 'test-org'
+  const space = 'test-org'
   const song = 'ccli-1'
 
-  beforeEach(() => localStorage.removeItem(`song-prefs-${org}`))
-  afterEach(() => localStorage.removeItem(`song-prefs-${org}`))
+  beforeEach(() => localStorage.removeItem(`song-prefs-${space}`))
+  afterEach(() => localStorage.removeItem(`song-prefs-${space}`))
 
   it('keeps the double click and the pad set beside the capo', () => {
-    saveSongUserPrefs(song, org, { capo: 2 })
-    setSongUserPref(song, org, 'doubleClick', true)
-    setSongUserPref(song, org, 'padSetId', 'drive-warm')
-    expect(getSongUserPrefs(song, org)).to.deep.equal({
+    saveSongUserPrefs(song, space, { capo: 2 })
+    setSongUserPref(song, space, 'doubleClick', true)
+    setSongUserPref(song, space, 'padSetId', 'drive-warm')
+    expect(getSongUserPrefs(song, space)).to.deep.equal({
       capo: 2,
       doubleClick: true,
       padSetId: 'drive-warm',
@@ -32,66 +32,66 @@ describe('song user preferences for the media player', () => {
   })
 
   it('keeps a "no" different from no choice', () => {
-    setSongUserPref(song, org, 'doubleClick', false)
-    expect(getSongUserPrefs(song, org)?.doubleClick).to.equal(false)
+    setSongUserPref(song, space, 'doubleClick', false)
+    expect(getSongUserPrefs(song, space)?.doubleClick).to.equal(false)
   })
 
   it('clears one choice without touching the others', () => {
-    saveSongUserPrefs(song, org, { capo: 2, doubleClick: true })
-    setSongUserPref(song, org, 'doubleClick', undefined)
-    expect(getSongUserPrefs(song, org)).to.deep.equal({ capo: 2 })
+    saveSongUserPrefs(song, space, { capo: 2, doubleClick: true })
+    setSongUserPref(song, space, 'doubleClick', undefined)
+    expect(getSongUserPrefs(song, space)).to.deep.equal({ capo: 2 })
   })
 
   it('drops a song left with no preferences', () => {
-    setSongUserPref(song, org, 'padSetId', 'drive-warm')
-    setSongUserPref(song, org, 'padSetId', undefined)
-    expect(getSongUserPrefs(song, org)).to.equal(null)
+    setSongUserPref(song, space, 'padSetId', 'drive-warm')
+    setSongUserPref(song, space, 'padSetId', undefined)
+    expect(getSongUserPrefs(song, space)).to.equal(null)
   })
 
   it('is per song', () => {
-    setSongUserPref(song, org, 'doubleClick', true)
-    expect(getSongUserPrefs('ccli-2', org)).to.equal(null)
+    setSongUserPref(song, space, 'doubleClick', true)
+    expect(getSongUserPrefs('ccli-2', space)).to.equal(null)
   })
 
   describe('with nothing to say who they are for', () => {
     it('reads, writes and clears nothing', () => {
-      expect(getSongUserPrefs('', org)).to.equal(null)
+      expect(getSongUserPrefs('', space)).to.equal(null)
       expect(getSongUserPrefs(song, '')).to.equal(null)
-      saveSongUserPrefs('', org, { capo: 1 })
+      saveSongUserPrefs('', space, { capo: 1 })
       saveSongUserPrefs(song, '', { capo: 1 })
-      setSongUserPref('', org, 'doubleClick', true)
-      clearSongUserPrefs('', org)
+      setSongUserPref('', space, 'doubleClick', true)
+      clearSongUserPrefs('', space)
       expect(getAllSongUserPrefs('')).to.deep.equal({})
       clearAllSongUserPrefs('')
-      expect(localStorage.getItem(`song-prefs-${org}`)).to.equal(null)
+      expect(localStorage.getItem(`song-prefs-${space}`)).to.equal(null)
     })
   })
 
-  describe('all of an organisation', () => {
+  describe('all of a space', () => {
     it('lists every song, and clears them all', () => {
-      saveSongUserPrefs('a', org, { capo: 1 })
-      saveSongUserPrefs('b', org, { capo: 2 })
-      expect(getAllSongUserPrefs(org)).to.deep.equal({ a: { capo: 1 }, b: { capo: 2 } })
-      clearSongUserPrefs('a', org)
-      expect(Object.keys(getAllSongUserPrefs(org))).to.deep.equal(['b'])
-      clearAllSongUserPrefs(org)
-      expect(getAllSongUserPrefs(org)).to.deep.equal({})
+      saveSongUserPrefs('a', space, { capo: 1 })
+      saveSongUserPrefs('b', space, { capo: 2 })
+      expect(getAllSongUserPrefs(space)).to.deep.equal({ a: { capo: 1 }, b: { capo: 2 } })
+      clearSongUserPrefs('a', space)
+      expect(Object.keys(getAllSongUserPrefs(space))).to.deep.equal(['b'])
+      clearAllSongUserPrefs(space)
+      expect(getAllSongUserPrefs(space)).to.deep.equal({})
     })
   })
 
   describe('when what is stored is damaged', () => {
-    beforeEach(() => localStorage.setItem(`song-prefs-${org}`, '{not json'))
+    beforeEach(() => localStorage.setItem(`song-prefs-${space}`, '{not json'))
 
     it('finds none, and says so', () => {
-      expect(getSongUserPrefs(song, org)).to.equal(null)
-      expect(getAllSongUserPrefs(org)).to.deep.equal({})
+      expect(getSongUserPrefs(song, space)).to.equal(null)
+      expect(getAllSongUserPrefs(space)).to.deep.equal({})
     })
 
     it('leaves it alone rather than lose it, when saving, setting or clearing', () => {
-      saveSongUserPrefs(song, org, { capo: 1 })
-      setSongUserPref(song, org, 'padSetId', 'x')
-      clearSongUserPrefs(song, org)
-      expect(localStorage.getItem(`song-prefs-${org}`)).to.equal('{not json')
+      saveSongUserPrefs(song, space, { capo: 1 })
+      setSongUserPref(song, space, 'padSetId', 'x')
+      clearSongUserPrefs(song, space)
+      expect(localStorage.getItem(`song-prefs-${space}`)).to.equal('{not json')
     })
   })
 
@@ -105,7 +105,7 @@ describe('song user preferences for the media player', () => {
       Storage.prototype.removeItem = () => {
         throw new Error('blocked')
       }
-      expect(() => clearAllSongUserPrefs(org)).to.not.throw()
+      expect(() => clearAllSongUserPrefs(space)).to.not.throw()
     })
   })
 })

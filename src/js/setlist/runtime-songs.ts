@@ -80,7 +80,7 @@ export function parseTempoMetadata(raw: TempoInput): {
  * library's, transposed to the setlist's key and given the setlist's tempo. A song
  * missing from the library is left out.
  *
- * @param options.db the organisation's database
+ * @param options.db the space's database
  * @param options.parser a ChordProParser
  * @param options.fontSize the font size, in rem, each song starts at
  * @returns the songs, as the page works with them

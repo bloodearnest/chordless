@@ -5,13 +5,8 @@ import {
   SetlistShareChangeEvent,
 } from '../src/components/setlist-share.ts'
 import { type ChordlessDB, createSetlist, getCurrentDB } from '../src/js/db.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import '../src/components/setlist-share.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -155,17 +150,17 @@ describe('setlist-share', () => {
 
   describe('making, updating and stopping a share', () => {
     let before: { id: string | null; name: string }
-    let organisationId: string
+    let spaceId: string
     let db: ChordlessDB
     const realOnLine = Object.getOwnPropertyDescriptor(Navigator.prototype, 'onLine')
     const realClipboard = Object.getOwnPropertyDescriptor(Navigator.prototype, 'clipboard')
 
     beforeEach(async () => {
       drive = installFakeDrive()
-      before = getCurrentOrganisation()
-      const organisation = await createOrganisation(`Share ${crypto.randomUUID().slice(0, 8)}`)
-      organisationId = organisation.id
-      await setCurrentOrganisation(organisation.id, organisation.name)
+      before = getCurrentSpace()
+      const space = await createSpace(`Share ${crypto.randomUUID().slice(0, 8)}`)
+      spaceId = space.id
+      await setCurrentSpace(space.id, space.name)
       db = await getCurrentDB()
     })
 
@@ -175,8 +170,8 @@ describe('setlist-share', () => {
       delete (navigator as { onLine?: unknown }).onLine
       delete (navigator as { clipboard?: unknown }).clipboard
       db.db?.close()
-      await deleteOrganisation(organisationId)
-      if (before.id) await setCurrentOrganisation(before.id, before.name)
+      await deleteSpace(spaceId)
+      if (before.id) await setCurrentSpace(before.id, before.name)
     })
 
     async function show(setlist = createSetlist({ date: '2099-10-11' })) {

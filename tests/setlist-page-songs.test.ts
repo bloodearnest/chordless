@@ -14,13 +14,13 @@ import {
   type SongSettingsPopover,
 } from '../src/components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from '../src/js/app-events.ts'
-import { getCurrentOrganisation, setOrganisationReadOnly } from '../src/js/organisation.ts'
 import {
   CapoPreferenceEvent,
   SectionDefaultsEvent,
   setCapoPreference,
 } from '../src/js/preferences.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
+import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
 import { wait } from './test-helpers.ts'
 
@@ -31,14 +31,14 @@ describe('the setlist page: sections, key, tempo and capo', () => {
   const { $ } = rig
 
   afterEach(async () => {
-    const { id } = getCurrentOrganisation()
-    if (id) await setOrganisationReadOnly(id, false)
+    const { id } = getCurrentSpace()
+    if (id) await setSpaceReadOnly(id, false)
     localStorage.removeItem(`state-${rig.page?.currentSetlistId}`)
   })
 
   const section = (song: number, index: number) => must(rig.page.sections.find(song, index))
   const popover = () => must($<SongSettingsPopover>('#song-settings-popover'))
-  const setReadOnly = async () => setOrganisationReadOnly(must(getCurrentOrganisation().id), true)
+  const setReadOnly = async () => setSpaceReadOnly(must(getCurrentSpace().id), true)
 
   describe('the sections’ states', () => {
     it('start from the app’s defaults', async () => {
@@ -77,8 +77,8 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
     it('are the user’s own for a song, then the setlist’s own over those', async () => {
       await rig.open()
-      const orgId = rig.db.organisationId
-      saveSongUserPrefs(rig.page.songs[0].songId, orgId, {
+      const spaceId = rig.db.spaceId
+      saveSongUserPrefs(rig.page.songs[0].songId, spaceId, {
         sectionDefaults: { '0': { hideMode: 'chords', isCollapsed: true, isHidden: false } },
       })
       expect(rig.page.sections.resolve(0, 0)).to.deep.equal({
@@ -102,7 +102,7 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
     it('are not the user’s when what they saved cannot be read', async () => {
       await rig.open()
-      localStorage.setItem(`song-prefs-${rig.db.organisationId}`, '{not json')
+      localStorage.setItem(`song-prefs-${rig.db.spaceId}`, '{not json')
       expect(rig.page.sections.userDefaults(0, 0)).to.equal(null)
     })
 
@@ -233,9 +233,9 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('uses the capo the user prefers for a song, in the key it is in, unless one is set', async () => {
       setCapoPreference(true)
       await rig.open()
-      saveSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId, { capo: 3 })
-      saveSongUserPrefs(rig.page.songs[1].songId, rig.db.organisationId, { capo: 5 })
-      saveSongUserPrefs(rig.page.songs[2].songId, rig.db.organisationId, { capo: 2 })
+      saveSongUserPrefs(rig.page.songs[0].songId, rig.db.spaceId, { capo: 3 })
+      saveSongUserPrefs(rig.page.songs[1].songId, rig.db.spaceId, { capo: 5 })
+      saveSongUserPrefs(rig.page.songs[2].songId, rig.db.spaceId, { capo: 2 })
       rig.page.songs.forEach(song => {
         song.currentCapo = 0
       })
@@ -253,8 +253,8 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       rig.page.songs.forEach(song => {
         song.currentCapo = 0
       })
-      saveSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId, { doubleClick: true })
-      saveSongUserPrefs(rig.page.songs[2].songId, rig.db.organisationId, { capo: 3 })
+      saveSongUserPrefs(rig.page.songs[0].songId, rig.db.spaceId, { doubleClick: true })
+      saveSongUserPrefs(rig.page.songs[2].songId, rig.db.spaceId, { capo: 3 })
       must(rig.page.currentSetlist).songs.splice(2, 1)
       await rig.page._applyCapoDefaults()
       expect(rig.page.songs.map(song => song.currentCapo)).to.deep.equal([0, 0, 0])
@@ -430,20 +430,18 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.open()
       rig.page.showSong(0, true)
       popover().dispatchEvent(new PadSetChoiceEvent('drive-warm'))
-      expect(getSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId)?.padSetId).to.equal(
+      expect(getSongUserPrefs(rig.page.songs[0].songId, rig.db.spaceId)?.padSetId).to.equal(
         'drive-warm'
       )
       popover().dispatchEvent(new PadSetChoiceEvent(undefined))
-      expect(getSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId)).to.equal(null)
+      expect(getSongUserPrefs(rig.page.songs[0].songId, rig.db.spaceId)).to.equal(null)
     })
 
     it('keep the double click from the player’s speed button, for the song being shown', async () => {
       await rig.open()
       rig.page.showSong(0, true)
       document.dispatchEvent(new DoubleClickToggleEvent(true))
-      expect(
-        getSongUserPrefs(rig.page.songs[0].songId, rig.db.organisationId)?.doubleClick
-      ).to.equal(true)
+      expect(getSongUserPrefs(rig.page.songs[0].songId, rig.db.spaceId)?.doubleClick).to.equal(true)
     })
 
     it('are those of the song being viewed only', async () => {

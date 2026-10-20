@@ -1,5 +1,5 @@
 import { ChordlessDB } from '/js/db.ts'
-import { OrganisationDB } from '/js/organisation-db.ts'
+import { SpaceDB } from '/js/space-db.ts'
 
 const output = document.getElementById('output')
 
@@ -20,31 +20,31 @@ function logObject(label, obj) {
 
 async function test() {
   try {
-    log('=== Testing OrganisationDB ===')
+    log('=== Testing SpaceDB ===')
 
-    // Test 1: Create organisation database
-    log('1. Creating OrganisationDB...')
-    const orgDB = new OrganisationDB()
-    await orgDB.init()
-    log('✓ OrganisationDB initialized', 'success')
+    // Test 1: Create space database
+    log('1. Creating SpaceDB...')
+    const spaceDB = new SpaceDB()
+    await spaceDB.init()
+    log('✓ SpaceDB initialized', 'success')
 
-    // Test 2: Create TEST organisation
-    log('2. Creating TEST organisation...')
-    const testOrg = await orgDB.createOrganisation('TEST', 'test@example.com')
-    logObject('Created organisation', testOrg)
-    log('✓ TEST organisation created', 'success')
+    // Test 2: Create TEST space
+    log('2. Creating TEST space...')
+    const testSpace = await spaceDB.createSpace('TEST', 'test@example.com')
+    logObject('Created space', testSpace)
+    log('✓ TEST space created', 'success')
 
-    // Test 3: Retrieve organisation
-    log('3. Retrieving organisation by ID...')
-    const retrieved = await orgDB.getOrganisation(testOrg.id)
-    logObject('Retrieved organisation', retrieved)
-    log('✓ Organisation retrieved successfully', 'success')
+    // Test 3: Retrieve space
+    log('3. Retrieving space by ID...')
+    const retrieved = await spaceDB.getSpace(testSpace.id)
+    logObject('Retrieved space', retrieved)
+    log('✓ Space retrieved successfully', 'success')
 
     log('\\n=== Testing ChordlessDB ===')
 
-    // Test 4: Create organisation-specific database
-    log(`4. Creating ChordlessDB for organisation ${testOrg.id}...`)
-    const db = new ChordlessDB(testOrg.id)
+    // Test 4: Create space-specific database
+    log(`4. Creating ChordlessDB for space ${testSpace.id}...`)
+    const db = new ChordlessDB(testSpace.id)
     await db.init()
     log('✓ ChordlessDB initialized', 'success')
 

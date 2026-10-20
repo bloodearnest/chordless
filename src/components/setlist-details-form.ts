@@ -45,7 +45,7 @@ const NO_LEADER = ''
 const OTHER_LEADER = 'other'
 
 /**
- * The leader choices for a setlist: the organisation's people, plus its current
+ * The leader choices for a setlist: the space's people, plus its current
  * leader if they aren't one of them.
  *
  * A leader recorded by name only (before leaders had ids) is matched to a

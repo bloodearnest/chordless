@@ -45,6 +45,6 @@ uses native browser features wherever it can.
 - [DEVELOPERS.md](DEVELOPERS.md): running it locally, and the checks to run before a commit
 - [docs/TESTING.md](docs/TESTING.md): how the tests are organised and written
 - [docs/BUILD.md](docs/BUILD.md): the Vite build, the service worker and its precache, deploying
-- [docs/DATA_MODEL.md](docs/DATA_MODEL.md): songs, setlists and organisations
+- [docs/DATA_MODEL.md](docs/DATA_MODEL.md): songs, setlists and spaces
 - [docs/SYNC_ARCHITECTURE.md](docs/SYNC_ARCHITECTURE.md): Google Drive sync
 - [docs/SHARING.md](docs/SHARING.md): sharing and licensing

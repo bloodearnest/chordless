@@ -8,16 +8,16 @@ import type { AppHeader } from '../src/components/app-header.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-  setOrganisationReadOnly,
-} from '../src/js/organisation.ts'
 import type { Route } from '../src/js/router.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart } from '../src/js/song-utils.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  setSpaceReadOnly,
+} from '../src/js/space.ts'
 import '../src/js/views/library-view.ts'
 import type { LibraryView } from '../src/js/views/library-view.ts'
 import { must } from './must.ts'
@@ -34,7 +34,7 @@ const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' }
 
 describe('the library view', () => {
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
   let db: ChordlessDB
   let outlet: HTMLElement
   let view: LibraryView
@@ -58,10 +58,10 @@ describe('the library view', () => {
       observe() {}
       disconnect() {}
     } as unknown as typeof IntersectionObserver
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Library ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Library ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
     db = await getCurrentDB()
     outlet = document.createElement('div')
     document.body.append(outlet)
@@ -73,11 +73,11 @@ describe('the library view', () => {
     window.IntersectionObserver = RealObserver
     setRouter(null)
     document.body.classList.remove('edit-mode')
-    await setOrganisationReadOnly(organisationId, false)
+    await setSpaceReadOnly(spaceId, false)
     db.db?.close()
     await deleteDatabase(SHARED_DB_ID)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function open(
@@ -354,9 +354,9 @@ describe('the library view', () => {
       expect((await db.getAllSongs()).map(each => each.title)).to.deep.equal(['Beta Song'])
     })
 
-    it('is still offered copying in a view-only organisation', async () => {
+    it('is still offered copying in a view-only space', async () => {
       const song = await addChart(shared, BETA, ADD)
-      await setOrganisationReadOnly(organisationId, true)
+      await setSpaceReadOnly(spaceId, true)
       await open({ name: 'songs', songUuid: song.uuid })
       expect(view.querySelector('#add-to-library')).to.not.equal(null)
     })

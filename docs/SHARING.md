@@ -41,7 +41,7 @@ download and preview (`worker/src/share.ts`, `share-page.ts`), and opening a lin
 - A leader shares one setlist, with all its charts, as a short link or QR code.
 - Recipients need no account: they open the link and see the set, read-only.
 - The setlist and charts are kept on the recipient's device apart from anything
-  else (no organisation, never mixed into a library), so the set still works offline
+  else (no space, never mixed into a library), so the set still works offline
   at the service.
 - **One link per setlist, updated in place.** Adding a song, changing a key or
   fixing a chart updates what recipients see, without sending a new link.
@@ -56,7 +56,7 @@ Leader's device                     Church's Drive                   Recipient's
 ---------------                     --------------                   ------------------
 setlist + charts
   → bundle (JSON)
-  → compress, encrypt (key K)  →    <org>/shares/<setlistId>.share
+  → compress, encrypt (key K)  →    <space>/shares/<setlistId>.share
                                     (anyone with the link can read,
                                      not discoverable)
 setlist.share = {fileId, K, …}
@@ -72,7 +72,7 @@ link: https://chordless.app/s/<fileId>#<K>  ────────────
 
 ### The bundle
 
-What's encrypted. Everything a recipient needs, and nothing about the organisation:
+What's encrypted. Everything a recipient needs, and nothing about the space:
 
 ```json
 {
@@ -92,7 +92,7 @@ What's encrypted. Everything a recipient needs, and nothing about the organisati
 ```
 
 - The chart text is included, not song ids.
-- Not included: organisation ids, Drive ids, leaders' emails (`ownerId`) and sync
+- Not included: space ids, Drive ids, leaders' emails (`ownerId`) and sync
   fields.
 - A typical setlist (4–6 songs) is 10–15 KB of ChordPro, about 3–4 KB compressed.
 
@@ -111,18 +111,18 @@ share. It's written into the link as base64url, without padding (22 characters).
 
 ### Where things are stored
 
-**The share file:** `<org folder>/shares/<setlistId>.share`
+**The share file:** `<space folder>/shares/<setlistId>.share`
 - Its permission is `anyone` with `role: reader` and `allowFileDiscovery: false`,
   so it can be read by anyone with its id but doesn't appear in searches.
-- Only this file is public. The `shares` folder and the organisation folder stay
+- Only this file is public. The `shares` folder and the space folder stay
   private.
-- Its `appProperties` are `setlistId`, `organisationId`, `expires` and `appVersion`,
+- Its `appProperties` are `setlistId`, `spaceId`, `expires` and `appVersion`,
   generated in `drive-metadata.js` like all other Drive metadata. They're readable
   by anyone with the file id, so they must never include the key.
 
 **The key:** on the setlist, as
 `setlist.share = { fileId, key, expires, bundleHash }`.
-- The setlist file is private to the organisation. Anyone who can read it can
+- The setlist file is private to the space. Anyone who can read it can
   already read the charts, so storing the key there exposes nothing new.
 - **Any leader's device can show the link again, update the share or stop it**,
   not just the device that created it.
@@ -141,13 +141,13 @@ It's enforced in three places:
 3. **Recipients** delete the setlist if the file is gone, so the fetch returns
    404.
 
-Expiry depends on someone in the organisation syncing. A file nobody cleans up stays
+Expiry depends on someone in the space syncing. A file nobody cleans up stays
 in Drive, but it's still encrypted, so it's useless without the full link.
 
 ### Sharing (sharer's UI)
 
 - **Where:** a Share button on the setlist, for signed-in users with write access to
-  the organisation folder.
+  the space folder.
 - **Not shared yet:** "Create share link". This builds the bundle, creates a key,
   uploads the file, sets the permission and saves `setlist.share`. It needs to be
   online.
@@ -189,7 +189,7 @@ Later:
 
 The link is `https://chordless.app/s/<fileId>#<key><code>`, about 70 characters. The `<code>` is 6
 characters, the first 32 bits of the sharer's setlist id (a UUID), in base64url. Someone who has
-that setlist in their current organisation is taken to it at once (`replace`), with no download;
+that setlist in their current space is taken to it at once (`replace`), with no download;
 the code is short, so a clash would only open another of their own setlists. Anyone else opens
 the share with the key. (The file id has to be Drive's own: Drive won't take ids we choose.)
 
@@ -203,8 +203,8 @@ The service worker routes
 3. Check the format. If it's past `expires`, show "This share has ended" and keep
    no setlist.
 4. Store it in the **"Shared with me" database** (`shared-with-me`), apart from any
-   organisation: one `ChordlessDB`, local only (never synced), holding the received setlists
-   (id `share-<fileId>`) and their songs, as an organisation's does, so the setlist page can
+   space: one `ChordlessDB`, local only (never synced), holding the received setlists
+   (id `share-<fileId>`) and their songs, as a space's does, so the setlist page can
    show them. The setlist's `received` field holds the key, `ETag`, `expires` and `setlistId`, so
    `/s/<fileId>` works again on that device without the fragment. Songs are reused when the
    device already has that exact chart (by content hash); a changed chart is added as the new
@@ -223,7 +223,7 @@ The service worker routes
 
 **Tidying:** on every app start, and whenever the home page lists them
 (`tidySharedWithMe`), delete received setlists that are past their `expires`, or that the
-user now has in an organisation (below). The databases from before there was one
+user now has in a space (below). The databases from before there was one
 (`chordless-share-*`) are deleted. Songs are never deleted.
 
 ### Shared with me
@@ -231,7 +231,7 @@ user now has in an organisation (below). The databases from before there was one
 Everything a user has seen should stay available to them. Setlists are temporary, songs are
 not.
 
-- **Where:** the `shared-with-me` database, a local-only organisation. Sync never touches it.
+- **Where:** the `shared-with-me` database, a local-only space. Sync never touches it.
 - **What's kept:** a received setlist lasts as long as its share. Its songs stay for good:
   a share ending, expiring or being replaced never deletes one.
 - **Where it shows:** on the home page, as a "Shared with me" group of the current setlists
@@ -240,16 +240,16 @@ not.
 - **First visit:** like anyone arriving for the first time, a recipient with no songs or
   setlists is asked once, in a modal (`first-use-setup`), how they read (chords or lyrics only,
   capo). The welcome card no longer asks.
-- **Joining the organisation:** a share carries `setlistId`, the sharer's setlist id (a random
-  UUID that gives no access to anything). When the user later joins that organisation and sync
-  brings the setlist, an organisation setlist has the share's `setlistId`, and the received copy
+- **Joining the space:** a share carries `setlistId`, the sharer's setlist id (a random
+  UUID that gives no access to anything). When the user later joins that space and sync
+  brings the setlist, a space setlist has the share's `setlistId`, and the received copy
   is deleted: they have the real one now, permanently. (Shares made before `setlistId` existed
   get one the next time the sharer's sync updates them.)
 
-**Still to build:** search across the organisations' songs and "Shared with me" (the library
+**Still to build:** search across the spaces' songs and "Shared with me" (the library
 and add-song modal show one database today), and "Add to my library", which copies a song
-from another database into the current organisation. A setlist can only point at songs in its
-own organisation's database, so adding is always a copy: deduplicated by content hash, then
+from another database into the current space. A setlist can only point at songs in its
+own space's database, so adding is always a copy: deduplicated by content hash, then
 by the song's deterministic id, as a variant if the song is there in another form. It is up
 to the user to add: a song with a CCLI number is covered by any church's licence anyway.
 Explicit song deletion is separate: a synced song deleted only here would come back at the
@@ -319,13 +319,13 @@ Still to check:
   makes the file readable by anyone is reported as "your organisation may not allow links that
   anyone can open; the song list to paste still works", with Google's message in brackets, and the
   half-made file is trashed.
-- **Creating the file in the organisation's `shares/` folder** (the spike used My Drive).
+- **Creating the file in the space's `shares/` folder** (the spike used My Drive).
 - **The proxy in production:** the Cache API behaves differently in `wrangler dev`.
 
 ### Tests
 
 - **Unit tests:**
-  - building a bundle from a setlist and its songs, with no organisation ids or emails
+  - building a bundle from a setlist and its songs, with no space ids or emails
   - encrypting and decrypting round trip, and tampering failing
   - the expiry calculation
   - the bundle hash changing only when the content does

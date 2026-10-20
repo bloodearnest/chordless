@@ -22,7 +22,7 @@ import { defaultHideMode, sectionLabel } from './section-defaults.ts'
 export interface SectionHost {
   readonly root: HTMLElement
   readonly songs: RuntimeSong[]
-  organisationId(): string
+  spaceId(): string
   /** Keep the section states (and the capos) on this device */
   saveState(): void
 }
@@ -122,7 +122,7 @@ export class SectionController {
     const songId = song.songId
     if (!songId) return null
 
-    const prefs = getSongUserPrefs(songId, this.host.organisationId())
+    const prefs = getSongUserPrefs(songId, this.host.spaceId())
     if (!prefs?.sectionDefaults) return null
 
     return prefs.sectionDefaults[sectionIndex.toString()] || null

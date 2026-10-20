@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { getCurrentDB } from '../js/db.ts'
-import { getCurrentOrganisation } from '../js/organisation.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
+import { getCurrentSpace } from '../js/space.ts'
 import {
   createExport,
   exportFileName,
@@ -138,7 +138,7 @@ export class SpaceExportPanel extends LitElement {
     this._message = null
     try {
       const db = await getCurrentDB()
-      const name = getCurrentOrganisation().name
+      const name = getCurrentSpace().name
       const pads = this._includePads
         ? await readPadSetsForExport(this._padSets.map(set => set.padSet))
         : []
@@ -181,7 +181,7 @@ export class SpaceExportPanel extends LitElement {
     this._message = null
     try {
       const { exported } = pending
-      const where = getCurrentOrganisation().name
+      const where = getCurrentSpace().name
       const report = await importIntoSpace(exported, await getCurrentDB())
       const pads =
         pending.pads && this.signedIn
@@ -212,7 +212,7 @@ export class SpaceExportPanel extends LitElement {
     const when = new Date(manifest.created).toLocaleString()
     return html`
       <fieldset>
-        <legend>Import this export into ${getCurrentOrganisation().name}</legend>
+        <legend>Import this export into ${getCurrentSpace().name}</legend>
         <p class="meta">
           Exported from ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
             padSets > 0 ? html`, ${padSets} pad sets` : nothing

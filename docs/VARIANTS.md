@@ -15,23 +15,23 @@ library has); sync sees the changed hash and uploads it.
 
 ## Decisions
 
-1. **Origin on every variant.** Each variant records the organisation (id and name) and the
+1. **Origin on every variant.** Each variant records the space (id and name) and the
    author that imported or created it. `importUser` becomes the author (a name or email); a new
-   field holds the organisation. Both go to Drive in the file's `appProperties` next to
+   field holds the space. Both go to Drive in the file's `appProperties` next to
    `variantOf` and `isDefault`. A chart that arrives by share or copy keeps the origin of the
-   one who made it: the share bundle carries the sharer's organisation name and the setlist's
-   owner (decided: yes, the organisation's name may be in a share). Older songs have no origin:
+   one who made it: the share bundle carries the sharer's space name and the setlist's
+   owner (decided: yes, the space's name may be in a share). Older songs have no origin:
    "unknown".
-2. **The default is the organisation's.** It starts as the earliest import, and changes only
+2. **The default is the space's.** It starts as the earliest import, and changes only
    when someone with write permission marks another variant as the default. "Write permission"
-   is write access to the organisation's Drive folder, the only access control there is. The app
+   is write access to the space's Drive folder, the only access control there is. The app
    now knows it: a user who can only read has `readOnly` (docs/SPACES.md, "Read-only: local edits
    are never blocked") and "make default" is not offered. A variant that arrives from a share
-   or another organisation never becomes the default by arriving: today's rule (the newest
+   or another space never becomes the default by arriving: today's rule (the newest
    chart wins) goes. Two people setting it at once: the later change wins. In the "Shared with
-   me" database there is no organisation: the default is the earliest there too.
+   me" database there is no space: the default is the earliest there too.
 3. **The song picker chooses a variant.** Choosing a song that has more than one variant opens a
-   second step: the variants, each with its author, organisation, date and label, the default
+   second step: the variants, each with its author, space, date and label, the default
    marked and first. A song with one variant stays one tap. The entry keeps `songUuid`, as now.
 4. **Versions list** on the song info dialog and in the library: the variants, "make default"
    (write access), rename the label, open one. Deleting a variant waits for the Drive-trash
@@ -49,10 +49,10 @@ The user can open a song's ChordPro and edit it on the device, for two different
 - **Fix** (a typo, a wrong chord): saved back to the same variant, in place (`overwriteSong`).
   Everyone's copy follows through sync. A setlist that uses the variant shows the fix.
 - **Arrangement:** saved as a new variant (`variantOf` = the one edited, a label, the editor as
-  author, the organisation as origin). It is not the default unless marked so.
+  author, the space as origin). It is not the default unless marked so.
 
 The editor asks which when saving (default: fix, for the variant's own author; arrangement
-otherwise). A song from another database (Shared with me, another organisation) is first
+otherwise). A song from another database (Shared with me, another space) is first
 copied into the library, so editing it always makes a variant, never a change to the other
 database. Offline-first: the edit is saved at once and syncs later. Two people fixing one chart
 meet the usual Drive conflict rule (docs/SYNC_ARCHITECTURE.md).

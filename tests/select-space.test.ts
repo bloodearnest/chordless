@@ -1,21 +1,16 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
-import type { SelectOrganisation } from '../src/components/select-organisation.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
-import { OrganisationDB } from '../src/js/organisation-db.ts'
+import type { SelectSpace } from '../src/components/select-space.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import { SpaceDB } from '../src/js/space-db.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
-import '../src/components/select-organisation.ts'
+import '../src/components/select-space.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-describe('select-organisation', () => {
+describe('select-space', () => {
   let before: { id: string | null; name: string }
   let current: { id: string; name: string }
   let other: { id: string; name: string }
@@ -23,32 +18,32 @@ describe('select-organisation', () => {
   const unique = (name: string) => `${name} ${crypto.randomUUID().slice(0, 8)}`
 
   beforeEach(async () => {
-    before = getCurrentOrganisation()
-    current = await createOrganisation(unique('Current'))
-    other = await createOrganisation(unique('Other'))
+    before = getCurrentSpace()
+    current = await createSpace(unique('Current'))
+    other = await createSpace(unique('Other'))
     made.push(current.id, other.id)
-    await setCurrentOrganisation(current.id, current.name)
+    await setCurrentSpace(current.id, current.name)
   })
 
   afterEach(async () => {
-    while (made.length) await deleteOrganisation(made.pop() as string)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    while (made.length) await deleteSpace(made.pop() as string)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function show() {
-    const el = await fixture<SelectOrganisation>(html`<select-organisation></select-organisation>`)
-    await waitUntil(() => el.shadowRoot?.querySelector('.organisation-item'), 'it lists them')
+    const el = await fixture<SelectSpace>(html`<select-space></select-space>`)
+    await waitUntil(() => el.shadowRoot?.querySelector('.space-item'), 'it lists them')
     return el
   }
-  const items = (el: SelectOrganisation) =>
-    [...(el.shadowRoot?.querySelectorAll('.organisation-item') ?? [])] as HTMLElement[]
-  const itemFor = (el: SelectOrganisation, name: string) =>
-    items(el).find(item => item.querySelector('.organisation-name')?.textContent === name)
-  const modalOf = (el: SelectOrganisation) => el.shadowRoot?.querySelector('app-modal') as AppModal
-  const text = (el: SelectOrganisation) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
+  const items = (el: SelectSpace) =>
+    [...(el.shadowRoot?.querySelectorAll('.space-item') ?? [])] as HTMLElement[]
+  const itemFor = (el: SelectSpace, name: string) =>
+    items(el).find(item => item.querySelector('.space-name')?.textContent === name)
+  const modalOf = (el: SelectSpace) => el.shadowRoot?.querySelector('app-modal') as AppModal
+  const text = (el: SelectSpace) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
 
   describe('the list', () => {
-    it('shows the organisations, with the current one marked', async () => {
+    it('shows the spaces, with the current one marked', async () => {
       const el = await show()
       expect(itemFor(el, current.name)?.classList.contains('current')).to.equal(true)
       expect(itemFor(el, current.name)?.textContent).to.contain('CURRENT')
@@ -100,7 +95,7 @@ describe('select-organisation', () => {
       expect(switched).to.deep.equal([])
     })
 
-    it('does nothing for the organisation it is already in', async () => {
+    it('does nothing for the space it is already in', async () => {
       const el = await show()
       let asked = 0
       modalOf(el).ask = async () => {
@@ -119,7 +114,7 @@ describe('select-organisation', () => {
         asked++
         return true
       }
-      el._switchModal = { value: undefined } as SelectOrganisation['_switchModal']
+      el._switchModal = { value: undefined } as SelectSpace['_switchModal']
       await el._handleSwitch({ id: 'x', name: 'x' } as never)
       expect(asked).to.equal(0)
     })
@@ -134,43 +129,37 @@ describe('select-organisation', () => {
 
   describe('when the list cannot be read', () => {
     it('says so', async () => {
-      const realAll = OrganisationDB.prototype.getAllOrganisations
-      OrganisationDB.prototype.getAllOrganisations = () => Promise.reject(new Error('no access'))
+      const realAll = SpaceDB.prototype.getAllSpaces
+      SpaceDB.prototype.getAllSpaces = () => Promise.reject(new Error('no access'))
       try {
-        const el = await fixture<SelectOrganisation>(
-          html`<select-organisation></select-organisation>`
-        )
+        const el = await fixture<SelectSpace>(html`<select-space></select-space>`)
         await waitUntil(() => text(el).includes("Couldn't load"), 'it says so')
         expect(text(el)).to.contain('no access')
       } finally {
-        OrganisationDB.prototype.getAllOrganisations = realAll
+        SpaceDB.prototype.getAllSpaces = realAll
       }
     })
 
     it('says a failure that is not an Error as it is', async () => {
-      const realAll = OrganisationDB.prototype.getAllOrganisations
-      OrganisationDB.prototype.getAllOrganisations = () => Promise.reject('plain text')
+      const realAll = SpaceDB.prototype.getAllSpaces
+      SpaceDB.prototype.getAllSpaces = () => Promise.reject('plain text')
       try {
-        const el = await fixture<SelectOrganisation>(
-          html`<select-organisation></select-organisation>`
-        )
+        const el = await fixture<SelectSpace>(html`<select-space></select-space>`)
         await waitUntil(() => text(el).includes("Couldn't load"), 'it says so')
         expect(text(el)).to.contain('plain text')
       } finally {
-        OrganisationDB.prototype.getAllOrganisations = realAll
+        SpaceDB.prototype.getAllSpaces = realAll
       }
     })
 
     it('says there are none, with none', async () => {
-      const realAll = OrganisationDB.prototype.getAllOrganisations
-      OrganisationDB.prototype.getAllOrganisations = () => Promise.resolve([])
+      const realAll = SpaceDB.prototype.getAllSpaces
+      SpaceDB.prototype.getAllSpaces = () => Promise.resolve([])
       try {
-        const el = await fixture<SelectOrganisation>(
-          html`<select-organisation></select-organisation>`
-        )
+        const el = await fixture<SelectSpace>(html`<select-space></select-space>`)
         await waitUntil(() => text(el).includes('No spaces found'), 'it says so')
       } finally {
-        OrganisationDB.prototype.getAllOrganisations = realAll
+        SpaceDB.prototype.getAllSpaces = realAll
       }
     })
   })

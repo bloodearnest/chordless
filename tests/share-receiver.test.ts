@@ -1,11 +1,5 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { buildShareBundle } from '../src/js/share-bundle.ts'
 import { encryptBundle, generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
 import {
@@ -19,6 +13,7 @@ import {
   shareSetlistId,
   tidySharedWithMe,
 } from '../src/js/share-receiver.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { makeEntry } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
@@ -255,25 +250,25 @@ describe('Receiving a share link', () => {
     })
   })
 
-  describe('finding the setlist a link is of in the organisation', () => {
-    let organisationId: string
+  describe('finding the setlist a link is of in the space', () => {
+    let spaceId: string
     let before: { id: string | null; name: string }
 
     afterEach(async () => {
-      if (organisationId) {
-        await deleteOrganisation(organisationId)
-        await deleteDatabase(organisationId)
-        organisationId = ''
+      if (spaceId) {
+        await deleteSpace(spaceId)
+        await deleteDatabase(spaceId)
+        spaceId = ''
       }
-      if (before?.id) await setCurrentOrganisation(before.id, before.name)
+      if (before?.id) await setCurrentSpace(before.id, before.name)
     })
 
-    async function organisationWith(setlistId: string) {
-      before = getCurrentOrganisation()
-      const organisation = await createOrganisation(`Share ${crypto.randomUUID().slice(0, 8)}`)
-      organisationId = organisation.id
-      await setCurrentOrganisation(organisation.id, organisation.name)
-      const db = new ChordlessDB(organisation.id)
+    async function spaceWith(setlistId: string) {
+      before = getCurrentSpace()
+      const space = await createSpace(`Share ${crypto.randomUUID().slice(0, 8)}`)
+      spaceId = space.id
+      await setCurrentSpace(space.id, space.name)
+      const db = new ChordlessDB(space.id)
       await db.init()
       await db.saveSetlist({ ...createSetlist({ date: '2026-10-11' }), id: setlistId })
       db.db?.close()
@@ -281,21 +276,21 @@ describe('Receiving a share link', () => {
 
     it('gives its id, for a link made from it', async () => {
       const id = crypto.randomUUID()
-      await organisationWith(id)
+      await spaceWith(id)
       expect(await ownSetlistFor(setlistCode(id))).to.equal(id)
       expect(await ownSetlistFor(setlistCode(crypto.randomUUID()))).to.equal(null)
     })
 
-    it('gives nothing when the organisation has no database yet', async () => {
-      before = getCurrentOrganisation()
-      const organisation = await createOrganisation(`Share ${crypto.randomUUID().slice(0, 8)}`)
-      organisationId = organisation.id
-      await setCurrentOrganisation(organisation.id, organisation.name)
+    it('gives nothing when the space has no database yet', async () => {
+      before = getCurrentSpace()
+      const space = await createSpace(`Share ${crypto.randomUUID().slice(0, 8)}`)
+      spaceId = space.id
+      await setCurrentSpace(space.id, space.name)
       expect(await ownSetlistFor('abcdef')).to.equal(null)
     })
 
     it('gives nothing, and says why, when the database will not open', async () => {
-      await organisationWith(crypto.randomUUID())
+      await spaceWith(crypto.randomUUID())
       const realInit = ChordlessDB.prototype.init
       const realError = console.error
       const errors: unknown[][] = []
@@ -333,12 +328,12 @@ describe('Receiving a share link', () => {
         OTHER_FILE
       )
 
-      expect(await tidySharedWithMe({ today: '2026-10-19', organisationIds: [] })).to.deep.equal({
+      expect(await tidySharedWithMe({ today: '2026-10-19', spaceIds: [] })).to.deep.equal({
         expired: 0,
         joined: 0,
       })
       expect((await inside()).setlists).to.have.length(2)
-      expect(await tidySharedWithMe({ today: '2026-10-21', organisationIds: [] })).to.deep.equal({
+      expect(await tidySharedWithMe({ today: '2026-10-21', spaceIds: [] })).to.deep.equal({
         expired: 1,
         joined: 0,
       })
@@ -347,12 +342,12 @@ describe('Receiving a share link', () => {
       expect(songs).to.have.length(1)
     })
 
-    it('removes a setlist the user now has in an organisation', async () => {
-      const organisation = new ChordlessDB(`org-${crypto.randomUUID()}`)
-      extraDatabases.push(organisation.dbName)
-      await organisation.init()
-      const mine = await organisation.saveSetlist(createSetlist({ date: '2026-10-11' }))
-      organisation.db?.close()
+    it('removes a setlist the user now has in a space', async () => {
+      const space = new ChordlessDB(`org-${crypto.randomUUID()}`)
+      extraDatabases.push(space.dbName)
+      await space.init()
+      const mine = await space.saveSetlist(createSetlist({ date: '2026-10-11' }))
+      space.db?.close()
 
       // One share is of that setlist (it carries its id), the other of another
       await open(key, (await worker(bundle({ setlistId: mine.id }))).fetchFile)
@@ -364,14 +359,14 @@ describe('Receiving a share link', () => {
       )
 
       expect(
-        await tidySharedWithMe({ today: '2026-10-12', organisationIds: [organisation.dbName] })
+        await tidySharedWithMe({ today: '2026-10-12', spaceIds: [space.dbName] })
       ).to.deep.equal({ expired: 0, joined: 1 })
       const { setlists, songs } = await inside()
       expect(setlists.map(setlist => setlist.id)).to.deep.equal([shareSetlistId(OTHER_FILE)])
       expect(songs).to.have.length(1)
     })
 
-    it('looks past an organisation that has no database here, or one that will not open', async () => {
+    it('looks past a space that has no database here, or one that will not open', async () => {
       const ours = new ChordlessDB(`org-${crypto.randomUUID()}`)
       const broken = new ChordlessDB(`org-${crypto.randomUUID()}`)
       extraDatabases.push(ours.dbName, broken.dbName)
@@ -393,7 +388,7 @@ describe('Receiving a share link', () => {
       try {
         const tidied = await tidySharedWithMe({
           today: '2026-10-12',
-          organisationIds: ['org-with-no-database', broken.dbName, ours.dbName],
+          spaceIds: ['org-with-no-database', broken.dbName, ours.dbName],
         })
         expect(tidied).to.deep.equal({ expired: 0, joined: 1 })
       } finally {
@@ -413,7 +408,7 @@ describe('Receiving a share link', () => {
         throw new Error('database closed')
       }
       try {
-        const tidied = await tidySharedWithMe({ today: '2026-10-12', organisationIds: [] })
+        const tidied = await tidySharedWithMe({ today: '2026-10-12', spaceIds: [] })
         expect(tidied).to.deep.equal({ expired: 0, joined: 0 })
       } finally {
         ChordlessDB.prototype.getAllSetlists = realList
@@ -427,7 +422,7 @@ describe('Receiving a share link', () => {
       const legacy = new ChordlessDB(`${LEGACY_SHARE_DB_PREFIX}${FILE}`)
       await legacy.init()
       legacy.db?.close()
-      await tidySharedWithMe({ organisationIds: [] })
+      await tidySharedWithMe({ spaceIds: [] })
       expect((await indexedDB.databases()).map(database => database.name)).to.not.include(
         legacy.dbName
       )

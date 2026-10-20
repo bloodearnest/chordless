@@ -96,12 +96,12 @@ app's own modules, imported directly: there's no build step to test around.
   It throws on anything it doesn't model rather than guessing, and has its own tests
   (`fake-drive.test.ts`). Every test that syncs uses `useSyncRig()` from `drive-harness.ts`:
   a FakeDrive for each test, simulated devices (`makeDevice`, each with its own database,
-  syncing one organisation), teardown, a check that FakeDrive saw nothing it doesn't model,
+  syncing one space), teardown, a check that FakeDrive saw nothing it doesn't model,
   and `addSong`/`editSong`. Keep new sync tests on it, so they all run against the same fake
   and setup. Two devices syncing through one fake Drive is how cross-device behaviour is
   tested. The tests are split by topic: `drive-sync` (setlists, metadata, conflicts, change
-  detection), `drive-sync-resilience` (errors partway, files gone), `drive-sync-organisation`
-  (organisations, members, read-only folders), `drive-sync-reset`, `drive-sync-songs`, and
+  detection), `drive-sync-resilience` (errors partway, files gone), `drive-sync-space`
+  (spaces, members, read-only folders), `drive-sync-reset`, `drive-sync-songs`, and
   `share-sync` (share links).
   `drive-sync-random.test.ts` runs random histories of several devices (creating and editing
   setlists, syncing, files trashed, restored or re-id'd in Drive, resets, failing requests) and
@@ -116,7 +116,7 @@ app's own modules, imported directly: there's no build step to test around.
 - **Transposition** (`transpose.test.ts`) generates one test per case from a table, so a
   failure names the chord and key.
 - Shared setup is in `test-helpers.ts`: `deleteDatabase`, `uniqueName`, `wait`/`settle`,
-  `TEST_ORG`, `suppressConsoleLogs`, and `installFakeTimers()` (a clock that moves only on
+  `TEST_SPACE`, `suppressConsoleLogs`, and `installFakeTimers()` (a clock that moves only on
   `await clock.tick(ms)`, for code that fades or waits: see `pad-audio-controller.test.ts`).
   Wait for what the test is about (`waitUntil` from
   `@open-wc/testing`) rather than a fixed time where you can.
@@ -145,7 +145,7 @@ parallel, each in its own browser context.
 | `first-use.playwright.ts`, `welcome.playwright.ts` | The first-use setup modal, and the welcome card |
 | `import-setlist.playwright.ts` | Importing a setlist from an email's link |
 | `share.playwright.ts`, `share-button.playwright.ts`, `share-and-open.playwright.ts` | Opening a share link; the share button; songs shared to the app or opened with it |
-| `read-only.playwright.ts`, `setlist-title.playwright.ts` | A read-only organisation (edits still work); a setlist's title in the header |
+| `read-only.playwright.ts`, `setlist-title.playwright.ts` | A read-only space (edits still work); a setlist's title in the header |
 | `wake-lock.playwright.ts` | Keeping the screen awake |
 | `built.playwright.ts` | The production build (the `built` project, port 8792): the precache, offline, security headers, CSP |
 

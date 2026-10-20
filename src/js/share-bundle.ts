@@ -1,6 +1,6 @@
 /**
  * The bundle a share link carries (docs/SHARING.md): one setlist with its charts, and nothing
- * about the organisation. Pure: no storage, no network.
+ * about the space. Pure: no storage, no network.
  */
 
 import type { Setlist, SetlistEntry } from './data-types.ts'
@@ -29,7 +29,7 @@ export interface ShareBundle {
   /** ISO time the bundle was built: not part of its hash */
   updated: string
   /**
-   * The sharer's setlist id, so a recipient who later joins the organisation can tell this is a
+   * The sharer's setlist id, so a recipient who later joins the space can tell this is a
    * setlist they now have. A random id that gives no access. Absent in older shares.
    */
   setlistId?: string
@@ -78,7 +78,7 @@ export function isExpired(expires: string, today: string): boolean {
   return today > expires
 }
 
-/** The bundle for a setlist. Leaves out ids, the organisation, emails and sync fields. */
+/** The bundle for a setlist. Leaves out ids, the space, emails and sync fields. */
 export function buildShareBundle(
   setlist: Pick<Setlist, 'date' | 'time' | 'type' | 'name' | 'owner'>,
   sources: ShareSource[],

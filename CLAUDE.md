@@ -72,8 +72,8 @@ The Worker passes team-space traffic through (streamed, never buffered to storag
 persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song, setlist or pad
 content. They hold only membership, roles, the owner's encrypted token blob and checksums. (Share
 links are the one exception: the Worker caches ciphertext it cannot read.) The space model (personal
-and team spaces, roles, the Worker broker) is in `docs/SPACES.md`. In the UI the word is **space**;
-"organisation" survives only in older code and docs.
+and team spaces, roles, the Worker broker) is in `docs/SPACES.md`. The word is **space** in the UI, the code and the docs
+("organisation" is the old name; it survives only in names already stored on devices and in Drive).
 
 ## Tech Stack
 

@@ -1,28 +1,28 @@
 /**
  * Songs in this device's other databases: what was received in shared setlists ("Shared with
- * me"), and the songs of the other organisations on the device. They can be found and read
- * from the current organisation's library, and added to it (copied; nothing is moved or
+ * me"), and the songs of the other spaces on the device. They can be found and read
+ * from the current space's library, and added to it (copied; nothing is moved or
  * deleted, and what is in another database stays there).
  */
 
 import type { SongSource, SongWithContent } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
-import { listOrganisations } from './organisation.ts'
 import { databaseExists, SHARED_DB_ID } from './share-receiver.ts'
 import { addChart, getLibrarySongs, getSongWithContent } from './song-utils.ts'
+import { listSpaces } from './space.ts'
 
 const SHARED_LABEL = 'Shared with me'
 
-/** The databases other than the current organisation's that may hold songs, shared first */
+/** The databases other than the current space's that may hold songs, shared first */
 async function otherSources(currentDbId: string): Promise<SongSource[]> {
   const sources: SongSource[] = []
   if (currentDbId !== SHARED_DB_ID && (await databaseExists(SHARED_DB_ID))) {
     sources.push({ dbId: SHARED_DB_ID, label: SHARED_LABEL })
   }
-  for (const organisation of await listOrganisations()) {
-    if (organisation.id === currentDbId) continue
-    if (await databaseExists(organisation.id)) {
-      sources.push({ dbId: organisation.id, label: organisation.name })
+  for (const space of await listSpaces()) {
+    if (space.id === currentDbId) continue
+    if (await databaseExists(space.id)) {
+      sources.push({ dbId: space.id, label: space.name })
     }
   }
   return sources
@@ -41,7 +41,7 @@ async function withSource<T>(dbId: string, use: (db: ChordlessDB) => Promise<T>)
 
 /**
  * The songs of the other databases, each marked with where it is from. A song in more than
- * one is listed once (the first, "Shared with me" before organisations).
+ * one is listed once (the first, "Shared with me" before spaces).
  */
 export async function getSongsElsewhere(currentDbId: string): Promise<SongWithContent[]> {
   const found = new Map<string, SongWithContent>()
@@ -66,7 +66,7 @@ export async function getSongsElsewhere(currentDbId: string): Promise<SongWithCo
 }
 
 /**
- * The library to search: the organisation's songs, and the other databases' songs it
+ * The library to search: the space's songs, and the other databases' songs it
  * doesn't have (a song it has is its own, whatever the others hold), by title.
  */
 export function withSongsFromElsewhere(
@@ -79,7 +79,7 @@ export function withSongsFromElsewhere(
   )
 }
 
-/** The song with this uuid from the current organisation's database or, failing that, another */
+/** The song with this uuid from the current space's database or, failing that, another */
 export async function getSongFromAnywhere(
   uuid: string,
   currentDb: ChordlessDB
@@ -95,7 +95,7 @@ export async function getSongFromAnywhere(
 }
 
 /**
- * Add a song from another database to the organisation's library: a copy of its chart, which
+ * Add a song from another database to the space's library: a copy of its chart, which
  * is the same song if the library has that chart already, and a variant if it has the song in
  * another form. Sync takes it to Drive like any song of the library.
  * @returns the library's song

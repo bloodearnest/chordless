@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import { songFileMetadata } from '../src/js/drive-metadata.ts'
 import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_ORG } from './test-helpers.ts'
+import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
 const { describe, it } = window
 
@@ -146,7 +146,7 @@ describe('Drive sync: songs', () => {
       const expected = async () => {
         const song = must(await phone.db.getSong('song-1'))
         const chart = await phone.db.getChordPro(song.chordproFileId)
-        return songFileMetadata(song, chart, { organisationId: TEST_ORG.id }).appProperties
+        return songFileMetadata(song, chart, { spaceId: TEST_SPACE.id }).appProperties
       }
       expect(file().appProperties).to.deep.equal(await expected())
 

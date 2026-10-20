@@ -124,7 +124,7 @@ export type SongInput = Omit<SongRecord, 'tempo' | 'originalTempo'> & {
   originalTempo: TempoInput
 }
 
-/** A database a song can come from other than the organisation's: shared setlists, or another organisation */
+/** A database a song can come from other than the space's: shared setlists, or another space */
 export interface SongSource {
   dbId: string
   label: string
@@ -162,10 +162,10 @@ export interface SetlistEntry {
 
 /**
  * A setlist's share link (docs/SHARING.md). Lives in the setlist's own file, which only the
- * organisation can read: the key is what makes the public share file readable.
+ * space can read: the key is what makes the public share file readable.
  */
 export interface SetlistShare {
-  /** The public, encrypted file in the organisation's shares/ folder */
+  /** The public, encrypted file in the space's shares/ folder */
   fileId: string
   /** The AES key, base64url (43 characters); only ever in the link's # and here */
   key: string
@@ -186,7 +186,7 @@ export interface ReceivedShare {
   etag: string
   /** YYYY-MM-DD */
   expires: string
-  /** The sharer's setlist id: this setlist, if the user later joins its organisation */
+  /** The sharer's setlist id: this setlist, if the user later joins its space */
   setlistId?: string
 }
 
@@ -235,17 +235,17 @@ export interface SetlistLocalState {
   lastUsedDate: string
 }
 
-// ==================== Organisations ====================
+// ==================== Spaces ====================
 
-/** A person the organisation's Drive folder is shared with (cached at each sync) */
-export interface OrganisationMember {
+/** A person the space's Drive folder is shared with (cached at each sync) */
+export interface SpaceMember {
   email: string
   name?: string
   role?: string
 }
 
-/** The 'organisations' store: an organisation's identity and its link to Drive */
-export interface Organisation {
+/** The 'spaces' store: a space's identity and its link to Drive */
+export interface Space {
   id: string
   name: string
   createdDate: string
@@ -253,7 +253,7 @@ export interface Organisation {
   driveFolderId?: string | null
   /** The Google app (OAuth client id) that linked the folder: another app cannot see it (drive.file) */
   driveClientId?: string | null
-  members?: OrganisationMember[]
+  members?: SpaceMember[]
   /** The user can only read the Drive folder: sync doesn't push, and nothing syncable is edited */
   readOnly?: boolean
 }
@@ -303,7 +303,7 @@ export interface SongWithContent {
   chordpro: string
   chordproFileId: string
   parsed: ParsedChart
-  /** Set when the song is from another database than the organisation's (see other-songs.ts) */
+  /** Set when the song is from another database than the space's (see other-songs.ts) */
   source?: SongSource
   /** Set by getLibrarySongs when asked: the last setlist the song was played in */
   lastUsageInfo?: { date: string; leader: string; key: string | null }

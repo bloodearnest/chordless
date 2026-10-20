@@ -141,7 +141,7 @@ describe('song-info-dialog', () => {
     expect(modal().heading).to.equal('Fast Song (our version)')
   })
 
-  it('looks in the organisation’s database when it is not given one', async () => {
+  it('looks in the space’s database when it is not given one', async () => {
     dialog = document.createElement('song-info-dialog')
     document.body.appendChild(dialog)
     await dialog.updateComplete

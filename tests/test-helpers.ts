@@ -46,8 +46,8 @@ export const deleteDatabase = (name: string) =>
     request.onsuccess = request.onerror = request.onblocked = () => resolve()
   })
 
-/** The organisation the sync tests run in */
-export const TEST_ORG = { name: 'Test Church', id: 'org-test-church' }
+/** The space the sync tests run in */
+export const TEST_SPACE = { name: 'Test Church', id: 'org-test-church' }
 
 /**
  * Fake setInterval/setTimeout (and their clears) that only move when the test says so, for code

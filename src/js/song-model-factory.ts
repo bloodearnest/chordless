@@ -31,7 +31,7 @@ function editedSongStandIn(runtimeSong: RuntimeSong, setlistEntry: SetlistEntry)
  *   edits (chordproEdits), which has none: the model then gets one made from the runtime song
  * @param setlistId - Setlist ID
  * @param db - Database instance
- * @param orgId - Organisation ID
+ * @param spaceId - Space ID
  */
 export function createSetlistSongModel(
   runtimeSong: RuntimeSong,
@@ -39,7 +39,7 @@ export function createSetlistSongModel(
   canonicalSong: LoadedSong | null,
   setlistId: string,
   db: ChordlessDB,
-  orgId: string
+  spaceId: string
 ): SetlistSong {
   const songIndex = runtimeSong.songIndex
 
@@ -49,7 +49,7 @@ export function createSetlistSongModel(
     canonicalSong ?? editedSongStandIn(runtimeSong, setlistEntry),
     setlistId,
     db,
-    orgId,
+    spaceId,
     songIndex
   )
 
@@ -74,12 +74,12 @@ export function createSetlistSongModel(
  *
  * @param fullSong - Full song object with parsed content
  * @param db - Database instance
- * @param orgId - Organisation ID
+ * @param spaceId - Space ID
  */
 export function createLibrarySongModel(
   fullSong: LoadedSong,
   db: ChordlessDB,
-  orgId: string
+  spaceId: string
 ): LibrarySong {
-  return new LibrarySong(fullSong, db, orgId)
+  return new LibrarySong(fullSong, db, spaceId)
 }

@@ -132,7 +132,7 @@ storage/sync
   applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
   app is open: docs/SYNC_ARCHITECTURE.md, "Pulling while the app is open"; the Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
-- variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the organisation's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
+- variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
@@ -144,8 +144,8 @@ storage/sync
   non-owners (only the owner's edits to a setlist are uploaded); their edits stay on their device
   in a layer over the shared setlist, which needs building first (same layer as the read-only
   item under "editing"). Later: an editors list, then suggestions to the owner (accept or
-  reject). Decided: createdBy and ownerId (when different) both have edit rights; an organisation admin
-  role later. Open: open to all in the organisation by default, or only those. The layer must
+  reject). Decided: createdBy and ownerId (when different) both have edit rights; a space admin
+  role later. Open: open to all in the space by default, or only those. The layer must
   show, simply: one indicator that something differs from the official version, and a way to view
   what (see the doc). The Worker broker later enforces it and detects conflicts
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
@@ -185,7 +185,7 @@ storage/sync
 - test song import on real devices, on the live site: file import and paste on Android and iPad,
   the bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an
-  app feature that finds duplicate or empty setlists and stray organisation folders, and
+  app feature that finds duplicate or empty setlists and stray space folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
 ci/cd
@@ -232,7 +232,7 @@ ccli import
   some kind of email address to process this as an anonymous share and reply with the link to you
   Built so far: the parser (src/js/email-setlist.ts, tests/email-setlist.node.test.ts), pure text in,
   setlist out. Decisions: the leader's name and email are kept as owner/ownerId whether or not they
-  are in any organisation; songs get their order and keys from the list in the body (numbered, or
+  are in any space; songs get their order and keys from the list in the body (numbered, or
   OnSong's bullets), else the attachments' order (orderFromList false: say it is a guess); the same
   song in two keys is one song, first key, with a note "May also be in E"; a missing date is asked
   for, defaulting to nearestSunday(); a date whose weekday is wrong ("Sunday 8th Nov" on a
@@ -316,7 +316,7 @@ UI
   The JWE key stays in the worker (JWE_ENCRYPTION_KEY): the worker needs it to decrypt the blob
   and use the Google refresh token, and the browser must never hold it. What the browser holds
   is the encrypted blob in IndexedDB (auth-db.js), and that is what an eviction deletes, along
-  with the organisations and their Drive-folder links (organisation-db.js), the songs and
+  with the spaces and their Drive-folder links (space-db.js), the songs and
   setlists (db.js) and the current-org marker (localStorage). So there is nothing on the device
   to restore from: recovery needs either the user or the server.
   - Plan (decided): the server keeps a copy of the blob in a cookie, and the app restores from it.
@@ -329,7 +329,7 @@ UI
     - detect an eviction: a localStorage marker ("this device has data") that is missing when the
       app opens, and /session/restore answers yes. Then show "Safari cleared this device's data:
       restoring your setlists from Google Drive" and run the existing first-sign-in sync
-      (checkFirstTimeAuth renames the Personal org to the Google name, Sync joins the existing
+      (checkFirstTimeAuth renames the Personal space to the Google name, Sync joins the existing
       same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
       to asking the user to sign in again: google-auth.js uses access_type: 'offline' with
       prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
@@ -358,7 +358,7 @@ UI
   the browser is used, not calendar days: a rarely used iPad is not wiped just by sitting idle,
   but Safari use on other days counts; WebKit's "Full Third-Party Cookie Blocking and More"
   post, 2020; not re-checked since) unless the site is added to the Home Screen, which has its
-  own counter. What is lost: the sign-in, the org's Drive folder link, unsynced changes, settings
+  own counter. What is lost: the sign-in, the space's Drive folder link, unsynced changes, settings
   and pads, and at church, with poor wifi, the setlists are gone until signed in and synced.
   On iOS and iPadOS in a Safari tab (not navigator.standalone) it should INSIST: not a corner
   banner that "Not now" dismisses for weeks, but a sheet over the home page that explains the
@@ -406,17 +406,17 @@ library
      edit, or a delete is reflected at once: re-add that one document (MiniSearch discard + add)
    - after a Drive sync pulls charts changed on another device: re-index by comparing each
      chart's contentHash (the same key import-setlist.ts uses for its lyrics cache), not everything
-   - switching organisation/database: one index per database (a received "Shared with me" song
+   - switching space/database: one index per database (a received "Shared with me" song
      is in its own database). Searching across them means querying each in-memory index and
      merging by score, tagged "From …" like the library search does now: cheap (a search is
      milliseconds), only the loading of each index costs, so load them lazily. Scores from
      different indexes are not strictly comparable (they depend on each index's word counts); fine
      for this, or one index with a database field if it ever matters. Per-database keeps dropping
-     an organisation's index trivial.
+     a space's index trivial.
    - a missing store, a different index version (bump when the tokeniser/stemmer changes) or
      storage eviction: rebuild lazily on first search, in batches, off the main thread if slow
-   - Reset from Drive / organisation delete: drop that database's index with it
+   - Reset from Drive / space delete: drop that database's index with it
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.
-- Shared with me (docs/SHARING.md, "Shared with me"): built the database, the home page group, and tidying (expiry, and dropping a setlist once the user has it in an organisation). Search across all databases (library page and add-song modal, tagged "From …") and "Add to my library" (a copy into the current organisation) are built. Still to do: deleting received songs by hand; warnings on organisation delete/Reset from Drive. Links are shorter (128-bit key + 6-character setlist code that sends org members straight to their own setlist).
+- Shared with me (docs/SHARING.md, "Shared with me"): built the database, the home page group, and tidying (expiry, and dropping a setlist once the user has it in a space). Search across all databases (library page and add-song modal, tagged "From …") and "Add to my library" (a copy into the current space) are built. Still to do: deleting received songs by hand; warnings on space delete/Reset from Drive. Links are shorter (128-bit key + 6-character setlist code that sends space members straight to their own setlist).

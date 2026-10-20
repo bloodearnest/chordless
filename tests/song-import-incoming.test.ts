@@ -8,13 +8,8 @@ import { SongImportedEvent } from '../src/components/song-import.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { offerIncoming, takeIncoming } from '../src/js/incoming-songs.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-} from '../src/js/organisation.ts'
 import { createSong } from '../src/js/song-utils.ts'
+import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 import '../src/components/song-import.ts'
@@ -28,7 +23,7 @@ const file = (name: string, content: string, type = '') => new File([content], n
 
 describe('song-import: songs that arrive', () => {
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
   let db: ChordlessDB
   let importer: SongImport
   let visited: string[]
@@ -41,10 +36,10 @@ describe('song-import: songs that arrive', () => {
         return true
       },
     })
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Import ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Import ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
     db = await getCurrentDB()
   })
 
@@ -53,8 +48,8 @@ describe('song-import: songs that arrive', () => {
     await takeIncoming()
     setRouter(null)
     db.db?.close()
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function open() {

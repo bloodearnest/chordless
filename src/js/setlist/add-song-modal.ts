@@ -9,7 +9,7 @@ import { showStatusMessage } from '../utils/status-message.ts'
 
 /**
  * The "Add song" modal of a setlist: the library's songs, searchable, to choose one. Songs
- * from the device's other databases (received in shared setlists, other organisations) are
+ * from the device's other databases (received in shared setlists, other spaces) are
  * listed too; choosing one adds it to the library first.
  * Works with the elements the setlist view has for it, found in `root`:
  * #add-song-modal (an <app-modal>), #add-song-search-input and #add-song-results.
@@ -22,7 +22,7 @@ export class AddSongModal {
 
   /**
    * @param options.root where the modal's elements are
-   * @param options.getDb the organisation's database
+   * @param options.getDb the space's database
    * @param options.onPick a song was chosen; the modal stays open until close() is called
    * @param options.getElsewhere the songs of the device's other databases (for tests to replace)
    */

@@ -86,7 +86,7 @@ export async function decryptBundle(key: string, file: Bytes): Promise<ShareBund
 
 /**
  * A short code for a setlist id (a UUID): its first 32 bits, 6 base64url characters. A link
- * carries it so that someone who has the setlist in their organisation is taken to that
+ * carries it so that someone who has the setlist in their space is taken to that
  * instead (see matchesSetlistCode). Empty for an id that isn't a UUID.
  */
 export function setlistCode(setlistId: string): string {

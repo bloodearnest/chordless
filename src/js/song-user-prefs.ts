@@ -5,8 +5,8 @@
  * These are personal defaults for capo, section visibility, and the media player (double
  * click, pad set).
  *
- * Storage: localStorage per organisation
- * Key format: 'song-prefs-${orgId}'
+ * Storage: localStorage per space
+ * Key format: 'song-prefs-${spaceId}'
  *
  * Structure:
  * {
@@ -38,14 +38,14 @@ export type SongMediaPrefs = Pick<SongUserPrefs, 'doubleClick' | 'padSetId'>
 /**
  * Get user preferences for a specific song
  * @param songId - Deterministic song ID (e.g., "ccli-12345" or "title-...")
- * @param orgId - Organisation ID
+ * @param spaceId - Space ID
  * @returns Song preferences or null if none exist
  */
-export function getSongUserPrefs(songId: string, orgId: string): SongUserPrefs | null {
-  if (!songId || !orgId) return null
+export function getSongUserPrefs(songId: string, spaceId: string): SongUserPrefs | null {
+  if (!songId || !spaceId) return null
 
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     return allPrefs[songId] || null
   } catch (error) {
@@ -57,16 +57,16 @@ export function getSongUserPrefs(songId: string, orgId: string): SongUserPrefs |
 /**
  * Save user preferences for a specific song
  * @param songId - Deterministic song ID
- * @param orgId - Organisation ID
+ * @param spaceId - Space ID
  */
-export function saveSongUserPrefs(songId: string, orgId: string, prefs: SongUserPrefs) {
-  if (!songId || !orgId) {
-    console.warn('[SongUserPrefs] Cannot save: missing songId or orgId')
+export function saveSongUserPrefs(songId: string, spaceId: string, prefs: SongUserPrefs) {
+  if (!songId || !spaceId) {
+    console.warn('[SongUserPrefs] Cannot save: missing songId or spaceId')
     return
   }
 
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
 
     // Merge with existing prefs
@@ -87,21 +87,21 @@ export function saveSongUserPrefs(songId: string, orgId: string, prefs: SongUser
  */
 export function setSongUserPref<K extends keyof SongUserPrefs>(
   songId: string,
-  orgId: string,
+  spaceId: string,
   name: K,
   value: SongUserPrefs[K] | undefined
 ) {
-  if (!songId || !orgId) return
-  const prefs = { ...getSongUserPrefs(songId, orgId) }
+  if (!songId || !spaceId) return
+  const prefs = { ...getSongUserPrefs(songId, spaceId) }
   if (value === undefined) delete prefs[name]
   else prefs[name] = value
   if (Object.keys(prefs).length === 0) {
-    clearSongUserPrefs(songId, orgId)
+    clearSongUserPrefs(songId, spaceId)
     return
   }
   // saveSongUserPrefs merges, so a cleared preference has to go the long way round
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     allPrefs[songId] = prefs
     localStorage.setItem(key, JSON.stringify(allPrefs))
@@ -113,13 +113,13 @@ export function setSongUserPref<K extends keyof SongUserPrefs>(
 /**
  * Clear user preferences for a specific song
  * @param songId - Deterministic song ID
- * @param orgId - Organisation ID
+ * @param spaceId - Space ID
  */
-export function clearSongUserPrefs(songId: string, orgId: string) {
-  if (!songId || !orgId) return
+export function clearSongUserPrefs(songId: string, spaceId: string) {
+  if (!songId || !spaceId) return
 
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     const allPrefs = JSON.parse(localStorage.getItem(key) || '{}')
     delete allPrefs[songId]
     localStorage.setItem(key, JSON.stringify(allPrefs))
@@ -129,15 +129,15 @@ export function clearSongUserPrefs(songId: string, orgId: string) {
 }
 
 /**
- * Get all song preferences for the organisation (for debugging/export)
- * @param orgId - Organisation ID
+ * Get all song preferences for the space (for debugging/export)
+ * @param spaceId - Space ID
  * @returns All preferences, by song ID
  */
-export function getAllSongUserPrefs(orgId: string): Record<string, SongUserPrefs> {
-  if (!orgId) return {}
+export function getAllSongUserPrefs(spaceId: string): Record<string, SongUserPrefs> {
+  if (!spaceId) return {}
 
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     return JSON.parse(localStorage.getItem(key) || '{}')
   } catch (error) {
     console.error('[SongUserPrefs] Error loading all preferences:', error)
@@ -146,14 +146,14 @@ export function getAllSongUserPrefs(orgId: string): Record<string, SongUserPrefs
 }
 
 /**
- * Clear all song preferences for the organisation
- * @param orgId - Organisation ID
+ * Clear all song preferences for the space
+ * @param spaceId - Space ID
  */
-export function clearAllSongUserPrefs(orgId: string) {
-  if (!orgId) return
+export function clearAllSongUserPrefs(spaceId: string) {
+  if (!spaceId) return
 
   try {
-    const key = `song-prefs-${orgId}`
+    const key = `song-prefs-${spaceId}`
     localStorage.removeItem(key)
   } catch (error) {
     console.error('[SongUserPrefs] Error clearing all preferences:', error)

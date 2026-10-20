@@ -1,6 +1,6 @@
 /**
  * Making, updating and ending a setlist's share link (docs/SHARING.md), against the
- * organisation's database and Drive folder. The bundle and encryption are in share-bundle.ts
+ * space's database and Drive folder. The bundle and encryption are in share-bundle.ts
  * and share-crypto.ts; the Drive calls in drive-api.ts.
  */
 
@@ -31,9 +31,9 @@ const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
 
 export interface ShareContext {
   db: ChordlessDB
-  organisationId: string | null
-  /** The organisation's Drive folder */
-  organisationFolderId: string
+  spaceId: string | null
+  /** The space's Drive folder */
+  spaceFolderId: string
   /** For tests: today's YYYY-MM-DD, and the current time */
   today?: string
   now?: Date
@@ -89,8 +89,8 @@ export async function createShare(setlist: Setlist, ctx: ShareContext): Promise<
   const key = generateShareKey()
   const { hash, file } = await prepare(setlist, key, expires, ctx)
 
-  const sharesFolder = await getSharesFolder(ctx.organisationFolderId)
-  const metadata = shareFileMetadata(setlist, { organisationId: ctx.organisationId, expires })
+  const sharesFolder = await getSharesFolder(ctx.spaceFolderId)
+  const metadata = shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires })
   const driveFile = await createShareFile(sharesFolder, metadata, await file())
   return { fileId: driveFile.id, key, created, expires, bundleHash: hash }
 }
@@ -109,10 +109,7 @@ export async function refreshShare(
   const { hash, file } = await prepare(setlist, share.key, expires, ctx)
   if (hash === share.bundleHash && expires === share.expires) return share
 
-  const metadata = forUpdate(
-    shareFileMetadata(setlist, { organisationId: ctx.organisationId, expires }),
-    'share'
-  )
+  const metadata = forUpdate(shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires }), 'share')
   await updateShareFile(share.fileId, metadata, await file())
   return { ...share, expires, bundleHash: hash }
 }
@@ -159,7 +156,7 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
 
   try {
     // Nothing to clean up if nothing was ever shared: don't make the folder for that
-    const sharesFolder = await findSharesFolder(ctx.organisationFolderId)
+    const sharesFolder = await findSharesFolder(ctx.spaceFolderId)
     if (!sharesFolder) return changed
     const live = new Map(
       (await ctx.db.getAllSetlists()).flatMap(s =>

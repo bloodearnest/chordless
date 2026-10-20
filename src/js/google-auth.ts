@@ -269,9 +269,7 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
           if (!stored.success) throw new Error(stored.error || 'Failed to save the sign-in')
 
           // A new sign-in may be a different account, with different access to the folder
-          import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>
-            refreshOrganisationAccess()
-          )
+          import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
 
           resolve({ blob, access_token, expires_in, user: normalizedUser || user })
         } catch (error) {

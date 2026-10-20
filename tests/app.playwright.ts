@@ -282,29 +282,27 @@ test.describe('Storage page', () => {
       dialogs.push(dialog.message())
       dialog.dismiss()
     })
-    await seedSong(page) // opening the app creates the default organisation
+    await seedSong(page) // opening the app creates the default space
     await page.goto('/storage')
-    const organisations = page.locator('select-organisation')
-    const current = await organisations
-      .locator('.organisation-item.current .organisation-name')
-      .innerText()
+    const spaces = page.locator('select-space')
+    const current = await spaces.locator('.space-item.current .space-name').innerText()
 
     // (nothing on the page makes a space: that comes with a team; this one is made in code)
-    await expect(organisations.getByRole('button', { name: /Create/ })).toHaveCount(0)
+    await expect(spaces.getByRole('button', { name: /Create/ })).toHaveCount(0)
     await page.evaluate(async () => {
-      const { createOrganisation } = await import('/js/organisation.ts')
-      await createOrganisation('Second Org')
+      const { createSpace } = await import('/js/space.ts')
+      await createSpace('Second Org')
     })
     await page.goto('/storage')
-    await expect(organisations.locator('.organisation-item')).toHaveCount(2)
+    await expect(spaces.locator('.space-item')).toHaveCount(2)
 
-    await organisations.getByRole('button', { name: 'Switch' }).click()
-    const modal = organisations.locator('#switch-modal')
+    await spaces.getByRole('button', { name: 'Switch' }).click()
+    const modal = spaces.locator('#switch-modal')
     await expect(modal).toHaveAttribute('open', '')
     await expect(modal).toContainText('Switch to "Second Org"?')
     await modal.getByRole('button', { name: 'Cancel' }).click()
     await expect(modal).not.toHaveAttribute('open', '')
-    await expect(organisations.locator('.organisation-item.current')).toContainText(current)
+    await expect(spaces.locator('.space-item.current')).toContainText(current)
     // No native alert() or confirm() along the way
     expect(dialogs).toEqual([])
   })

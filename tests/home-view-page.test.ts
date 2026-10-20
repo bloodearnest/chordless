@@ -6,12 +6,12 @@ import { SetlistDetailsSaveEvent } from '../src/components/setlist-details-form.
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
-  createOrganisation,
-  deleteOrganisation,
-  getCurrentOrganisation,
-  setCurrentOrganisation,
-  setOrganisationReadOnly,
-} from '../src/js/organisation.ts'
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  setSpaceReadOnly,
+} from '../src/js/space.ts'
 import '../src/js/views/home-view.ts'
 import { type HomeView, sharedGroup } from '../src/js/views/home-view.ts'
 import { makeSetlist } from './builders.ts'
@@ -49,7 +49,7 @@ describe('sharedGroup', () => {
 
 describe('the home view', () => {
   let before: { id: string | null; name: string }
-  let organisationId: string
+  let spaceId: string
   let db: ChordlessDB
   let outlet: HTMLElement
   let view: HomeView
@@ -63,10 +63,10 @@ describe('the home view', () => {
         return true
       },
     })
-    before = getCurrentOrganisation()
-    const organisation = await createOrganisation(`Home ${crypto.randomUUID().slice(0, 8)}`)
-    organisationId = organisation.id
-    await setCurrentOrganisation(organisation.id, organisation.name)
+    before = getCurrentSpace()
+    const space = await createSpace(`Home ${crypto.randomUUID().slice(0, 8)}`)
+    spaceId = space.id
+    await setCurrentSpace(space.id, space.name)
     db = await getCurrentDB()
     outlet = document.createElement('div')
     document.body.append(outlet)
@@ -77,9 +77,9 @@ describe('the home view', () => {
     outlet.remove()
     setRouter(null)
     clearToasts()
-    await setOrganisationReadOnly(organisationId, false)
-    await deleteOrganisation(organisationId)
-    if (before.id) await setCurrentOrganisation(before.id, before.name)
+    await setSpaceReadOnly(spaceId, false)
+    await deleteSpace(spaceId)
+    if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
   async function open(restoredState?: HomeView['restoredState']) {
@@ -141,8 +141,8 @@ describe('the home view', () => {
     expect(view.querySelector('status-message[state="error"]')).to.not.equal(null)
   })
 
-  it('still offers a way to create a setlist in a view-only organisation', async () => {
-    await setOrganisationReadOnly(organisationId, true)
+  it('still offers a way to create a setlist in a view-only space', async () => {
+    await setSpaceReadOnly(spaceId, true)
     await open()
     expect(view.querySelector('#create-setlist-button')).to.not.equal(null)
   })

@@ -18,7 +18,7 @@ import { views } from './views/registry.ts'
 // Answer the service worker's requests for a Google ID token
 import('./google-auth.ts').then(({ listenForIdTokenRequests }) => listenForIdTokenRequests())
 
-// The first sign-in renames the organisation: before anything shows its name. The sign-in
+// The first sign-in renames the space: before anything shows its name. The sign-in
 // lives behind the service worker, so a page it does not control yet (the first visit) has none
 // to find: don't make the first view wait for that.
 if (navigator.serviceWorker?.controller) await checkFirstTimeAuth()
@@ -49,10 +49,8 @@ else setTimeout(startMediaPlayer, 1000)
 startFullscreen()
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
-// Whether the user can write to the organisation's Drive folder (a sync asks too)
-import('./organisation-access.ts').then(({ refreshOrganisationAccess }) =>
-  refreshOrganisationAccess()
-)
+// Whether the user can write to the space's Drive folder (a sync asks too)
+import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
 void appUpdate.start()
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()
