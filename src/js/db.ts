@@ -124,8 +124,18 @@ export class ChordlessDB {
         reject(new Error('Failed to open IndexedDB'))
       }
 
+      // Another window on a newer build wants to upgrade: let go, or its open waits for ever
+      /* v8 ignore start -- needs a second window on an older build holding the database open */
+      request.onblocked = () => {
+        void import('./toast.ts').then(({ toast }) =>
+          toast('Close the other Chordless windows to finish updating.', { kind: 'error' })
+        )
+      }
+      /* v8 ignore stop */
+
       request.onsuccess = () => {
         this.db = request.result
+        this.db.onversionchange = () => this.db?.close()
         resolve()
         ensurePersistentStorage(this.spaceId)
       }

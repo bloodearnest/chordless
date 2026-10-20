@@ -64,6 +64,25 @@ describe('ChordlessDB', () => {
   })
 })
 
+describe('ChordlessDB when another window upgrades the database', () => {
+  it('lets go of the database, so the upgrade is not left waiting', async () => {
+    const name = `TEST-${uniqueName()}`
+    const db = new ChordlessDB(name)
+    await db.init()
+
+    const upgraded = await new Promise<IDBDatabase | 'blocked'>((resolve, reject) => {
+      const request = indexedDB.open(name, 99)
+      request.onblocked = () => resolve('blocked')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+
+    expect(upgraded).to.not.equal('blocked')
+    ;(upgraded as IDBDatabase).close()
+    indexedDB.deleteDatabase(name)
+  })
+})
+
 describe('ChordlessDB forgetting Drive', () => {
   let db: ChordlessDB
 

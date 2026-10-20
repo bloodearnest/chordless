@@ -75,6 +75,8 @@ export class SpaceDB {
 
       request.onsuccess = () => {
         this.db = request.result
+        // Another window on a newer build wants to upgrade: let go, or its open waits for ever
+        this.db.onversionchange = () => this.db?.close()
         ensurePersistentStorage(this.#name)
         this.#moveFromLegacy().then(() => resolve(), reject)
       }

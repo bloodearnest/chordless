@@ -197,6 +197,20 @@ describe('SpaceDB: spaces kept as organisations', () => {
     })
   }
 
+  it('lets go of the database when another window upgrades it, so that is not left waiting', async () => {
+    await new SpaceDB(names).init()
+
+    const upgraded = await new Promise<IDBDatabase | 'blocked'>((resolve, reject) => {
+      const request = indexedDB.open(names.name, 99)
+      request.onblocked = () => resolve('blocked')
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+
+    expect(upgraded).to.not.equal('blocked')
+    ;(upgraded as IDBDatabase).close()
+  })
+
   const databases = async () => (await indexedDB.databases()).map(db => db.name)
 
   it('brings them to the new database, with the Drive folder link under its new name, and removes the old one', async () => {
