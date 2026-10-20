@@ -161,6 +161,13 @@ $('cleanup').addEventListener('click', async () => {
 
 const rows = $('results').querySelector('tbody')
 
+/** The member code pasted in the box, or an error saying where to get one */
+function memberCode() {
+  const text = $('code').value.trim()
+  if (!text) throw new Error('Paste the member code first (made by part 1, on the owner’s account)')
+  return JSON.parse(text)
+}
+
 function record(step, ok, detail) {
   report.push({ step, result: ok ? 'pass' : 'fail', detail })
   rows.insertAdjacentHTML(
@@ -176,7 +183,7 @@ $('run').addEventListener('click', async () => {
   $('copy-report').disabled = true
   const status = $('member-status')
   try {
-    const code = JSON.parse($('code').value)
+    const code = memberCode()
     const expect = $('expect').value
     status.textContent = 'Getting your Google ID token…'
     const idToken = await idTokenWithin(30_000)
@@ -262,7 +269,7 @@ $('big').addEventListener('click', async () => {
   const status = $('member-status')
   $('results').hidden = false
   try {
-    const code = JSON.parse($('code').value)
+    const code = memberCode()
     const mb = Math.min(140, Math.max(1, Number($('mb').value) || 20))
     const size = Math.round(mb * 1024 * 1024)
     status.textContent = `Making ${mb} MB of random bytes…`
@@ -340,7 +347,7 @@ $('own').addEventListener('click', async () => {
   const status = $('member-status')
   $('results').hidden = false
   try {
-    const code = JSON.parse($('code').value)
+    const code = memberCode()
     status.textContent = 'Trying my own token on the team folder…'
     // 6a: this account's own Chordless sign-in cannot see what the owner's Chordless made
     const listing = await ownListing(code.folderId)
@@ -368,7 +375,7 @@ $('adopt').addEventListener('click', async () => {
   const status = $('member-status')
   $('results').hidden = false
   try {
-    const code = JSON.parse($('code').value)
+    const code = memberCode()
     const apiKey = $('api-key').value.trim()
     if (!apiKey) throw new Error('Enter the Picker API key in the owner part first')
     status.textContent = 'Pick the team folder in the Google Picker…'
