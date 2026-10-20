@@ -381,7 +381,7 @@ class MemorySpace implements SpaceStorage {
 
   async createMany(
     collection: Collection,
-    items: { input: FileInput; body: FileBody }[]
+    items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]> {
     this.#storage.enter('createMany', collection)
     const results: (WriteResult | null)[] = []

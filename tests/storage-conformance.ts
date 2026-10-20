@@ -24,10 +24,11 @@ export interface StorageHarness {
 
 const { describe, it, beforeEach } = window
 
+/** A file's input; setlists are JSON and everything else is text, as the app writes them */
 const input = (name: string, props: Record<string, string | null> = {}): FileInput => ({
   name,
   props,
-  type: 'text/plain; charset=utf-8',
+  type: name.endsWith('.json') ? 'application/json' : 'text/plain',
 })
 
 export function describeStorage(label: string, makeHarness: () => Promise<StorageHarness>): void {

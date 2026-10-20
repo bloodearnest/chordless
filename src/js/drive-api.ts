@@ -36,7 +36,7 @@ const PADSET_FILE_CATEGORY = 'padsetFile'
 
 // Fields returned by uploads and updates. Sync records md5Checksum (computed by
 // Drive from the stored content) to detect later remote changes.
-const WRITE_FIELDS = 'id,name,mimeType,modifiedTime,md5Checksum'
+const WRITE_FIELDS = 'id,name,mimeType,createdTime,modifiedTime,md5Checksum,appProperties'
 
 // Where Drive access tokens come from. Tests replace this to run without the
 // service worker auth flow (see tests/fake-drive.js).
@@ -150,6 +150,26 @@ export async function driveRequest<T = DriveFileList>(
   }
 
   return response.json()
+}
+
+/**
+ * The files a Drive query matches, all pages of it, with the fields sync reads (the storage
+ * adapter's listings). `orderBy` is Drive's, e.g. `modifiedTime desc`.
+ */
+export async function listDriveFiles(query: string, orderBy?: string): Promise<DriveFile[]> {
+  const files: DriveFile[] = []
+  let pageToken: string | undefined
+  do {
+    const result: DriveFileList = await driveRequest(
+      `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=1000` +
+        '&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,appProperties)' +
+        (orderBy ? `&orderBy=${encodeURIComponent(orderBy)}` : '') +
+        (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '')
+    )
+    files.push(...result.files)
+    pageToken = result.nextPageToken
+  } while (pageToken)
+  return files
 }
 
 /**
@@ -334,7 +354,10 @@ export async function createFile(
       .json()
       .catch(() => ({ error: { message: response.statusText } }))
     noteWriteRefusal(response, error)
-    throw new Error(`Drive upload error: ${error.error?.message || response.statusText}`)
+    throw Object.assign(
+      new Error(`Drive upload error: ${error.error?.message || response.statusText}`),
+      { status: response.status }
+    )
   }
 
   return response.json()
@@ -407,7 +430,10 @@ export async function updateFile(
       .json()
       .catch(() => ({ error: { message: response.statusText } }))
     noteWriteRefusal(response, error)
-    throw new Error(`Drive update error: ${error.error?.message || response.statusText}`)
+    throw Object.assign(
+      new Error(`Drive update error: ${error.error?.message || response.statusText}`),
+      { status: response.status }
+    )
   }
 
   return response.json()
@@ -416,7 +442,7 @@ export async function updateFile(
 /**
  * Download file content
  */
-async function downloadFile(fileId: string): Promise<string> {
+export async function downloadFile(fileId: string): Promise<string> {
   const token = await getAccessToken()
 
   const response = await fetch(`${DRIVE_API_BASE}/files/${fileId}?alt=media&${ALL_DRIVES}`, {
@@ -426,7 +452,9 @@ async function downloadFile(fileId: string): Promise<string> {
   })
 
   if (!response.ok) {
-    throw new Error(`Drive download error: ${response.statusText}`)
+    throw Object.assign(new Error(`Drive download error: ${response.statusText}`), {
+      status: response.status,
+    })
   }
 
   return response.text()
@@ -442,7 +470,9 @@ export async function downloadFileBinary(fileId: string): Promise<ArrayBuffer> {
   })
 
   if (!response.ok) {
-    throw new Error(`Drive download error: ${response.statusText}`)
+    throw Object.assign(new Error(`Drive download error: ${response.statusText}`), {
+      status: response.status,
+    })
   }
 
   return response.arrayBuffer()

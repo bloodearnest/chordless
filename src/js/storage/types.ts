@@ -32,7 +32,7 @@ export interface StoredFile {
 export interface FileInput {
   name: string
   props: Record<string, string | null>
-  /** The content type, as `text/plain; charset=utf-8` */
+  /** What kind of file it is (`text/plain`, `application/json`): listings can tell files apart by it */
   type: string
 }
 
@@ -67,7 +67,7 @@ export interface FileStatus {
 export interface SpaceStorage {
   /** The people the space is shared with, for choosing leaders */
   members(): Promise<SpaceMember[]>
-  /** The live files of a collection (a missing collection is empty, and nothing is made) */
+  /** The live files of a collection */
   list(collection: Collection): Promise<StoredFile[]>
   /** The refs of every live file in the space. Throws if it cannot be listed whole. */
   inventory(): Promise<Set<string>>
@@ -81,7 +81,7 @@ export interface SpaceStorage {
    */
   createMany(
     collection: Collection,
-    items: { input: FileInput; body: FileBody }[]
+    items: { input: FileInput; body: string }[]
   ): Promise<(WriteResult | null)[]>
   update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult>
 }
