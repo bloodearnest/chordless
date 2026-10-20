@@ -1,7 +1,13 @@
 # Moving to a new Google Cloud project, with Terraform
 
-**Status: planned (2026-10-19), to be done before going live.** Nothing here has been done. The team
-spike (docs/SPACES.md) carries on in the meantime, in the current project.
+**Status: planned (2026-10-19), to be done before going live.** The move itself has not been done. The
+team spike (docs/SPACES.md) carries on in the meantime, in the current project.
+
+**Done 2026-10-20: the current setup is recorded as Terraform** in `infra/` (`infra/README.md`): the
+`setalight` project, its Drive and Picker APIs, the two API keys and the `broker` service account, and
+the Cloudflare side (Email Routing, the custom domain, TXT records, TLS settings). The new project's
+Terraform can start from `infra/google/main.tf`. The Sharing Key allows the Drive API only (Picker was
+dropped; nothing used it).
 
 ## Why
 
@@ -82,7 +88,7 @@ Using the Google provider (from memory: check against its documentation when wri
 
 **0. Decide, and prepare (can start now; the long pole is Google's verification).**
 Choose the ids (and the display names); one project or two (above); whether they sit under an
-organisation or folder. Install `gcloud` and Terraform. **Record the current setup** so it can be
+organisation or folder. `gcloud` and Terraform are pinned in `mise.toml`. **Recorded** (`infra/google/main.tf`), so it can be
 copied: `gcloud services list --enabled --project=setalight`, `gcloud services api-keys list`,
 `gcloud iam service-accounts list`, and by eye the consent screen and the client (app name, logo,
 support email, domains, scopes, origins, redirect URIs). Never the client secret or a key.

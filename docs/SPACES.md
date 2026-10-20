@@ -205,7 +205,7 @@ For the real service account, use a **dedicated project with a tidy id** (the mo
 sees in their shared drive's members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id
 cannot be renamed: the app's own project is `setalight`, from its first name), separate from the project
 that holds the OAuth client and the verified brand, so the key that can reach every connected team's drive
-sits apart from the sign-in project. The spike uses `chordless-broker@setalight…` in the app's own
+sits apart from the sign-in project. The spike uses `broker@setalight…` in the app's own
 project, which is fine for a test. Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
 service account (the team uploads its own key; isolation, but real setup friction for a church).
 
@@ -431,7 +431,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 **What it changes**
 - No One Tap. The Worker issues its own short-lived signed session token at sign-in (design above).
 - The service account lives in its own Google Cloud project, made when the project moves
-  (docs/CLOUD_MIGRATION.md); `chordless-broker@setalight.iam.gserviceaccount.com` is the spike's.
+  (docs/CLOUD_MIGRATION.md); `broker@setalight.iam.gserviceaccount.com` is the spike's.
 
 **Still open**
 - The Cloudflare limits on a deployed Worker (request length, body size): only a deployment shows them.
