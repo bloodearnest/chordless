@@ -1,12 +1,14 @@
 import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
+import { ChordlessDB } from '../src/js/db.ts'
 import { setlistFileMetadata } from '../src/js/drive-metadata.ts'
+import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
-import { useSyncRig } from './drive-harness.ts'
+import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, afterEach } = window
 
 suppressConsoleLogs()
 
@@ -325,6 +327,82 @@ describe('sync (against the memory backend)', () => {
       await editSetlist(phone, setlist.id, { name: 'Old record, edited' })
       await syncDevice(phone)
       expect(driveSetlist(setlist.id).name).to.equal('Old record, edited')
+    })
+  })
+
+  describe("after the device's database was migrated from before the file fields were renamed", () => {
+    const OLD_NAMES = {
+      fileRef: 'driveFileId',
+      fileRev: 'driveChecksum',
+      fileModified: 'driveModifiedTime',
+      fileProps: 'driveProperties',
+    }
+    const asBefore = (record: object) =>
+      Object.fromEntries(
+        Object.entries(record).map(([key, value]) => [OLD_NAMES[key] ?? key, value])
+      )
+    let migratedName = ''
+
+    afterEach(() => deleteDatabase(migratedName))
+
+    it('syncs as before: the same files, nothing uploaded again, nothing taken for an edit', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, { uuid: 's1', title: 'One', content: '{title: One}\n[G]One' })
+      const setlist = await addSetlist(phone, { name: 'Sunday' })
+      await syncDevice(phone)
+      const filesBefore = rig.storage.list().map(file => [file.ref, file.rev])
+      const fileRefBefore = must(await phone.db.getSetlist(setlist.id)).fileRef
+
+      // The same records as a version 6 database kept them, opened by the new code
+      migratedName = `test-migrated-${crypto.randomUUID()}`
+      const songs = await phone.db.getAllSongs()
+      const charts = await Promise.all(
+        songs.map(async song => must(await phone.db.getChordPro(song.chordproFileId)))
+      )
+      const setlists = await phone.db.getAllSetlists()
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open(migratedName, 6)
+        request.onupgradeneeded = () => {
+          const db = request.result
+          db.createObjectStore('songs', { keyPath: 'uuid' }).createIndex('id', 'id')
+          db.createObjectStore('chordpro', { keyPath: 'id' })
+          db.createObjectStore('setlists', { keyPath: 'id' })
+          db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+        }
+        request.onsuccess = () => {
+          const db = request.result
+          const tx = db.transaction(['songs', 'chordpro', 'setlists'], 'readwrite')
+          for (const song of songs) tx.objectStore('songs').put(asBefore(song))
+          for (const chart of charts) tx.objectStore('chordpro').put(chart)
+          for (const each of setlists) tx.objectStore('setlists').put(asBefore(each))
+          tx.oncomplete = () => {
+            db.close()
+            resolve()
+          }
+          tx.onerror = () => reject(tx.error)
+        }
+      })
+      const db = new ChordlessDB(migratedName)
+      await db.init()
+      const migrated = must(await db.getSetlist(setlist.id))
+      expect(migrated.fileRef).to.equal(fileRefBefore)
+      expect(setlistHasLocalChanges(migrated)).to.equal(false)
+
+      const sync = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
+        db,
+        folderLink: phone.folderLink,
+        memberCache: phone.memberCache,
+        storage: rig.storage,
+      })
+      await sync.init()
+      rig.storage.clearCalls()
+      await sync.sync()
+
+      expect(rig.storage.writes()).to.deep.equal([])
+      expect(rig.storage.list().map(file => [file.ref, file.rev])).to.deep.equal(filesBefore)
+      expect((await db.getAllSetlists()).length).to.equal(1)
+      expect((await db.getAllSongs()).length).to.equal(1)
+      db.db?.close()
     })
   })
 })
