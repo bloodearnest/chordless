@@ -61,12 +61,16 @@ export class SetlistDiffers extends LitElement {
     this._dialog.value?.show()
   }
 
+  /** The space's files: those a test gave, or the ones in the folder the space is linked to */
+  _storage(db: ChordlessDB): Promise<SpaceStorage> {
+    return this.storage ? Promise.resolve(this.storage) : driveSpaceStorage(db.spaceId)
+  }
+
   async _revert() {
     if (!this.setlist || !this.db) return
     this._busy = true
     try {
-      const storage = this.storage ?? (await driveSpaceStorage(this.db.spaceId))
-      await revertSetlistToOfficial(this.db, this.setlist, storage)
+      await revertSetlistToOfficial(this.db, this.setlist, await this._storage(this.db))
       this._dialog.value?.close()
       this.dispatchEvent(new SetlistRevertedEvent())
     } catch (error) {

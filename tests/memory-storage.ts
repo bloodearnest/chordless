@@ -38,8 +38,8 @@ export interface MemoryFile {
   /** Readable by anyone with the ref (a share link) */
   public: boolean
   rev: string
-  created: string
-  modified: string
+  created: string | null
+  modified: string | null
   trashed: boolean
 }
 
@@ -124,6 +124,11 @@ export class MemoryStorage implements StorageBackend {
     this.#failures.push({ op, on, status, network, times, skip })
   }
 
+  /** Stop injecting failures: the ones not yet used are dropped */
+  clearFailures(): void {
+    this.#failures = []
+  }
+
   /** The calls that change something (a test of "nothing is uploaded" looks at these) */
   writes(): { op: StorageOp; on?: string }[] {
     return this.calls.filter(call => WRITES.includes(call.op))
@@ -173,6 +178,18 @@ export class MemoryStorage implements StorageBackend {
     }
   }
 
+  /**
+   * Another file like `ref`, with these fields changed: what another client or a person in the
+   * Drive UI leaves beside it (a copy, an older file, a file with no properties)
+   */
+  copyFile(ref: string, changes: Partial<MemoryFile> & { ref: string }): MemoryFile {
+    const original = this.file(ref)
+    const copy: MemoryFile = { ...original, props: { ...original.props }, ...changes }
+    if ('content' in changes && !('rev' in changes)) copy.rev = md5Hex(copy.content)
+    this.files.set(copy.ref, copy)
+    return copy
+  }
+
   /** A change made elsewhere (another device, or by hand): new content, so a new rev */
   edit(ref: string, content: string): void {
     this.#setContent(this.file(ref), content)
@@ -190,6 +207,12 @@ export class MemoryStorage implements StorageBackend {
     const file = this.files.get(ref)
     if (file) file.trashed = false
     else this.root(ref).trashed = false
+  }
+
+  /** Delete a root and everything in it, for good: what another app sees of this one's folder */
+  removeRoot(ref: string): void {
+    this.roots.delete(ref)
+    for (const file of this.everything(f => f.root === ref)) this.files.delete(file.ref)
   }
 
   /** Delete a file for good */

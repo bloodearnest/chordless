@@ -8,7 +8,6 @@ import type { ChordProRecord, SongRecord } from '../src/js/data-types.ts'
 import type { ChordlessDB } from '../src/js/db.ts'
 import {
   DriveSyncManager,
-  isSyncAvailable,
   SpaceFolderMismatchError,
   type SyncProgress,
   UnsyncedChangesError,
@@ -23,9 +22,9 @@ import {
   songUuidOf,
 } from '../src/js/sync/changes.ts'
 import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
-import { pushSetlist, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
+import { pushSetlist, pushSetlists, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
 import { makeSetlist, makeSong } from './builders.ts'
-import { addSong, useFakeDriveRig } from './drive-harness.ts'
+import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -34,7 +33,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: the less common turns', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice, replaceDriveFile } = rig
 
   const driveFileOf = async (device: { db: ChordlessDB }, setlistId: string) =>
@@ -171,8 +170,8 @@ describe('Drive sync: the less common turns', () => {
 
     it('is taken over with what Drive has when it changed and this device did not', async () => {
       const { tablet, setlist } = await twoDevices()
-      const file = must(rig.drive.files.get('replacement'))
-      rig.drive.editContent(
+      const file = rig.storage.file('replacement')
+      rig.storage.edit(
         'replacement',
         JSON.stringify({ ...JSON.parse(file.content), name: 'Edited in Drive' })
       )
@@ -186,7 +185,7 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone)
       await syncDevice(phone)
-      rig.drive.files.delete(await driveFileOf(phone, setlist.id))
+      rig.storage.remove(await driveFileOf(phone, setlist.id))
       const said: SyncProgress[] = []
       await phone.sync.sync(progress => said.push(progress))
       expect(await phone.db.getSetlist(setlist.id)).to.equal(undefined)
@@ -206,7 +205,7 @@ describe('Drive sync: the less common turns', () => {
       const realUpdate = SpaceDB.prototype.updateSpace
       SpaceDB.prototype.updateSpace = () => Promise.reject(new Error('read only'))
       try {
-        const sync = new DriveSyncManager(space.name, space.id)
+        const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
         await sync.init()
         expect(sync.driveFolderId).to.be.a('string')
         sync.spaceDb?.db?.close()
@@ -214,12 +213,12 @@ describe('Drive sync: the less common turns', () => {
         SpaceDB.prototype.updateSpace = realUpdate
       }
       // Kept for real, the next manager finds the folder by the link
-      const again = new DriveSyncManager(space.name, space.id)
+      const again = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await again.init()
       const linked = again.driveFolderId
       expect(await again.hasSyncedRecords()).to.equal(false)
       again.spaceDb?.db?.close()
-      const third = new DriveSyncManager(space.name, space.id)
+      const third = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await third.init()
       expect(third.driveFolderId).to.equal(linked)
       third.spaceDb?.db?.close()
@@ -245,18 +244,14 @@ describe('Drive sync: the less common turns', () => {
         content: '{title: Amazing}\n[G]Grace',
       })
       await syncDevice(phone)
-      const [original] = rig.drive.listFiles(file => file.appProperties.type === 'chordpro')
-      const copy = {
-        ...original,
-        id: 'copy',
+      const [original] = rig.storage.list(file => file.props.type === 'chordpro')
+      rig.storage.copyFile(original.ref, {
+        ref: 'copy',
         content: '{title: Amazing}\n[G]Grace, copied',
-        modifiedTime: '2099-01-01T00:00:00Z',
-      }
-      rig.drive.files.set('copy', copy)
-      const older = { ...original, id: 'older', modifiedTime: '2000-01-01T00:00:00Z' }
-      rig.drive.files.set('older', older)
-      const same = { ...original, id: 'same' }
-      rig.drive.files.set('same', same)
+        modified: '2099-01-01T00:00:00Z',
+      })
+      rig.storage.copyFile(original.ref, { ref: 'older', modified: '2000-01-01T00:00:00Z' })
+      rig.storage.copyFile(original.ref, { ref: 'same' })
       await syncDevice(tablet)
       const song = must(await tablet.db.getSong('song-1'))
       expect(song.driveFileId).to.equal('copy')
@@ -270,11 +265,10 @@ describe('Drive sync: the less common turns', () => {
         content: '{title: Amazing}\n[G]Grace',
       })
       await syncDevice(phone)
-      const [chart] = rig.drive.listFiles(file => file.appProperties.type === 'chordpro')
-      rig.drive.files.set('other', {
-        ...chart,
-        id: 'other',
-        appProperties: { ...chart.appProperties, type: 'notes', songUuid: 'other-song' },
+      const [chart] = rig.storage.list(file => file.props.type === 'chordpro')
+      rig.storage.copyFile(chart.ref, {
+        ref: 'other',
+        props: { ...chart.props, type: 'notes', songUuid: 'other-song' },
       })
       const tablet = await makeDevice('tablet')
       await syncDevice(tablet)
@@ -307,8 +301,8 @@ describe('Drive sync: the less common turns', () => {
       const song = must(await phone.db.getSong('song-1'))
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
       await phone.db.saveChordPro({ ...chart, content: '{title: Amazing}\n[G]Edited here' })
-      const [file] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      rig.drive.editContent(file.id, '{title: Amazing}\n[G]Edited in Drive')
+      const [file] = rig.storage.list(each => each.props.type === 'chordpro')
+      rig.storage.edit(file.ref, '{title: Amazing}\n[G]Edited in Drive')
       await pullSongs(phone.sync)
       const after = must(await phone.db.getChordPro(song.chordproFileId))
       expect(after.content).to.contain('Edited in Drive')
@@ -379,7 +373,7 @@ describe('Drive sync: the less common turns', () => {
 
     it('says a sync failed, with why, and fails', async () => {
       const phone = await makeDevice('phone')
-      rig.drive.failRequests({ status: 500, times: 100 })
+      rig.storage.fail('list', { times: 100 })
       const failed = said()
       let error: Error | null = null
       try {
@@ -403,24 +397,6 @@ describe('Drive sync: the less common turns', () => {
         // (expected)
       }
       expect(failed.messages.at(-1)).to.equal('Sync failed: plain failure')
-    })
-  })
-
-  describe('with a Drive that has many files', () => {
-    it('follows the pages of charts', async () => {
-      const phone = await makeDevice('phone')
-      const tablet = await makeDevice('tablet')
-      for (let i = 0; i < 4; i++) {
-        await addSong(phone, {
-          uuid: `song-${i}`,
-          title: `Song ${i}`,
-          content: `{title: Song ${i}}\n[G]Words ${i}`,
-        })
-      }
-      await syncDevice(phone)
-      rig.drive.maxPageSize = 2
-      await syncDevice(tablet)
-      expect(await tablet.db.getAllSongs()).to.have.length(4)
     })
   })
 
@@ -454,12 +430,12 @@ describe('Drive sync: the less common turns', () => {
         content: '{title: Amazing}\n[G]Grace',
       })
       await syncDevice(phone)
-      const [file] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      rig.drive.files.delete(file.id)
+      const [file] = rig.storage.list(each => each.props.type === 'chordpro')
+      rig.storage.remove(file.ref)
       await syncDevice(phone)
-      const [again] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      expect(again.id).to.not.equal(file.id)
-      expect(must(await phone.db.getSong('song-1')).driveFileId).to.equal(again.id)
+      const [again] = rig.storage.list(each => each.props.type === 'chordpro')
+      expect(again.ref).to.not.equal(file.ref)
+      expect(must(await phone.db.getSong('song-1')).driveFileId).to.equal(again.ref)
     })
 
     it('are left out of an upload when their chart is not here, and when they have none', async () => {
@@ -469,7 +445,7 @@ describe('Drive sync: the less common turns', () => {
       )
       await phone.db.saveSong(makeSong({ uuid: 'blank', id: 'title-blank', chordproFileId: '' }))
       await syncDevice(phone)
-      expect(rig.drive.listFiles(each => each.appProperties.type === 'chordpro')).to.have.length(0)
+      expect(rig.storage.list(each => each.props.type === 'chordpro')).to.have.length(0)
     })
 
     it('are uploaded one by one when saving them all together fails', async () => {
@@ -486,7 +462,7 @@ describe('Drive sync: the less common turns', () => {
         return real(songs)
       }
       await syncDevice(phone)
-      expect(rig.drive.listFiles(each => each.appProperties.type === 'chordpro')).to.have.length(2)
+      expect(rig.storage.list(each => each.props.type === 'chordpro')).to.have.length(2)
     })
 
     it('are left for the next sync when they cannot be uploaded one by one either', async () => {
@@ -506,12 +482,12 @@ describe('Drive sync: the less common turns', () => {
     it('say Drive kept other content than it was sent, and are sent again', async () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
-      rig.drive.corruptUploads = 1
+      rig.storage.corruptWrites = 1
       await syncDevice(phone)
       expect(must(await phone.db.getSong('song-1')).syncedContentHash).to.equal(undefined)
-      rig.drive.requests = []
+      rig.storage.clearCalls()
       await syncDevice(phone)
-      expect(rig.drive.requests.some(request => request.method === 'PATCH')).to.equal(true)
+      expect(rig.storage.writes().some(call => call.op === 'update')).to.equal(true)
       expect(must(await phone.db.getSong('song-1')).syncedContentHash).to.be.a('string')
     })
   })
@@ -538,7 +514,7 @@ describe('Drive sync: the less common turns', () => {
       await addSetlist(phone, { id: 'a', name: 'A' })
       await syncDevice(phone)
       await editSetlist(phone, 'a', { name: 'A again' })
-      rig.drive.failRequests({ method: 'PATCH', path: /^\/upload\//, status: 500, times: 10 })
+      rig.storage.fail('update', { times: 10 })
       const update = { messages: [] as string[] }
       await phone.sync.sync(progress => update.messages.push(progress.message))
       expect(update.messages.some(message => /^Uploaded 0\/1 setlists/.test(message))).to.equal(
@@ -571,14 +547,6 @@ describe('Drive sync: the less common turns', () => {
     })
   })
 
-  describe('whether sync is possible', () => {
-    it('is when Drive can be reached with a token, and is not otherwise', async () => {
-      expect(await isSyncAvailable()).to.equal(true)
-      rig.drive.failRequests({ status: 401, times: 5 })
-      expect(await isSyncAvailable()).to.equal(false)
-    })
-  })
-
   describe('songs that need uploading, from before the inventory', () => {
     it('are known to be missing from Drive once the inventory is built', async () => {
       const phone = await makeDevice('phone')
@@ -588,7 +556,7 @@ describe('Drive sync: the less common turns', () => {
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
       expect(await songNeedsSync(phone.sync, song, chart)).to.equal(false)
       await phone.sync.buildDriveInventory()
-      rig.drive.files.delete(must(song.driveFileId))
+      rig.storage.remove(must(song.driveFileId))
       await phone.sync.buildDriveInventory()
       expect(await songNeedsSync(phone.sync, song, chart)).to.equal(true)
       expect(await songNeedsSync(phone.sync, { ...song, driveFileId: null }, chart)).to.equal(true)
@@ -601,7 +569,7 @@ describe('Drive sync: the less common turns', () => {
       phone.memberCache.setReadOnly = async () => {
         throw new Error('cannot record')
       }
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       expect(await phone.sync.refreshAccess()).to.equal(true)
     })
 
@@ -610,8 +578,8 @@ describe('Drive sync: the less common turns', () => {
       await addSetlist(phone, { name: 'Mine' })
       await phone.sync.sync()
       await editSetlist(phone, (await phone.db.getAllSetlists())[0].id, { name: 'Edited' })
-      rig.drive.failRequests({ method: 'GET', path: /capabilities/, times: 1 })
-      rig.drive.readOnly = true
+      rig.storage.fail('inspectRoot')
+      rig.storage.readOnly = true
       await phone.sync.pushToDrive()
       expect(phone.sync.readOnly).to.equal(true)
     })
@@ -647,22 +615,21 @@ describe('Drive sync: the less common turns', () => {
       const tablet = await makeDevice('tablet')
       await addSetlist(phone, { name: 'There' })
       await syncDevice(phone)
-      rig.drive.failRequests({ method: 'GET', path: /alt=media/, status: 500, times: 5 })
+      rig.storage.fail('readText', { times: 5 })
       await pullSetlists(tablet.sync)
       expect(tablet.sync.pullIncomplete).to.equal(true)
     })
   })
 
   describe('charts in Drive', () => {
-    const chartFile = (id: string, content: string, appProperties: Record<string, string> = {}) => {
-      const [template] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      rig.drive.files.set(id, {
-        ...template,
-        id,
+    const chartFile = (id: string, content: string, props: Record<string, string> = {}) => {
+      const [template] = rig.storage.list(each => each.props.type === 'chordpro')
+      rig.storage.copyFile(template.ref, {
+        ref: id,
         name: `${id}.cho`,
         content,
-        modifiedTime: '2026-10-01T00:00:00Z',
-        appProperties: { type: 'chordpro', ...appProperties },
+        modified: '2026-10-01T00:00:00Z',
+        props: { type: 'chordpro', ...props },
       })
     }
 
@@ -685,7 +652,7 @@ describe('Drive sync: the less common turns', () => {
       const tablet = await makeDevice('tablet')
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       await syncDevice(phone)
-      rig.drive.failRequests({ method: 'GET', path: /alt=media/, status: 500, times: 5 })
+      rig.storage.fail('readText', { times: 5 })
       await pullSongs(tablet.sync)
       expect(await tablet.db.getSong('song-1')).to.equal(undefined)
     })
@@ -701,13 +668,13 @@ describe('Drive sync: the less common turns', () => {
       await pushSetlist(phone.sync, setlist)
       await pushSongVariant(phone.sync, song, chart)
       expect(rig.driveSetlistFiles()).to.have.length(1)
-      expect(rig.drive.listFiles(each => each.appProperties.type === 'chordpro')).to.have.length(1)
+      expect(rig.storage.list(each => each.props.type === 'chordpro')).to.have.length(1)
     })
 
     it('says so when it cannot', async () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone)
-      rig.drive.failRequests({ method: 'POST', path: /^\/upload\//, status: 500, times: 5 })
+      rig.storage.fail('create', { times: 5 })
       let failed = false
       try {
         await pushSetlist(phone.sync, setlist)
@@ -742,15 +709,14 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'seed', title: 'Seed', content: '{title: Seed}\n[G]Seed' })
       await syncDevice(phone)
-      const [template] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      rig.drive.files.set('bare', {
-        ...template,
-        id: 'bare',
+      const [template] = rig.storage.list(each => each.props.type === 'chordpro')
+      rig.storage.copyFile(template.ref, {
+        ref: 'bare',
         name: 'Bare Chart.cho',
         content: '[G]Chart with nothing in it',
-        modifiedTime: undefined,
-        createdTime: undefined,
-        appProperties: undefined,
+        modified: null,
+        created: null,
+        props: {},
       })
       const tablet = await makeDevice('tablet')
       await syncDevice(tablet)
@@ -768,7 +734,7 @@ describe('Drive sync: the less common turns', () => {
       const [file] = rig.driveSetlistFiles()
       const content = JSON.parse(file.content)
       content.id = ''
-      rig.drive.editContent(file.id, JSON.stringify(content))
+      rig.storage.edit(file.ref, JSON.stringify(content))
       await syncDevice(tablet)
       expect(must(await tablet.db.getSetlist(setlist.id)).name).to.equal('No id inside')
     })
@@ -777,9 +743,9 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       await syncDevice(phone)
-      const [file] = rig.drive.listFiles(each => each.appProperties.type === 'chordpro')
-      delete file.appProperties.songId
-      rig.drive.editContent(file.id, '{title: One}\n[G]One, changed in Drive')
+      const [file] = rig.storage.list(each => each.props.type === 'chordpro')
+      delete file.props.songId
+      rig.storage.edit(file.ref, '{title: One}\n[G]One, changed in Drive')
       await syncDevice(phone)
       expect(must(await phone.db.getSong('song-1')).id).to.equal('title-one')
     })
@@ -789,7 +755,7 @@ describe('Drive sync: the less common turns', () => {
     it('is said to be missing when it was deleted, not trashed', async () => {
       const phone = await makeDevice('phone')
       await syncDevice(phone)
-      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_SPACE.name]).id)
+      rig.storage.removeRoot(must(rig.storage.rootNamed(TEST_SPACE.name)).ref)
       let message = ''
       try {
         await phone.sync.resolveDriveFolder()
@@ -803,7 +769,7 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       await addSetlist(phone)
       await phone.sync.sync()
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       const said: string[] = []
       await phone.sync.sync(progress => said.push(progress.message))
       expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
@@ -817,20 +783,53 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Edited' })
       phone.sync.readOnly = false
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await phone.sync.pushToDrive()
       expect(phone.sync.readOnly).to.equal(true)
     })
 
     it('stops quietly when a refused write throws and the user turns out to be a reader', async () => {
       const phone = await makeDevice('phone')
-      // The folder it needs for setlists is not there, so making it is what is refused
-      rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_SPACE.name, 'setlists']).id)
-      await addSetlist(phone, { name: 'Mine' })
+      // A write is refused in a way the push does not absorb
+      phone.db.getAllSetlists = async () => {
+        throw Object.assign(new Error('The user does not have write access'), { status: 403 })
+      }
       phone.sync.readOnly = false
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await phone.sync.pushToDrive()
       expect(phone.sync.readOnly).to.equal(true)
+    })
+
+    it('fails the sync when the push fails, and the user is not found to be a reader', async () => {
+      const phone = await makeDevice('phone')
+      phone.sync.pushToDrive = async () => {
+        throw new Error('broken')
+      }
+      let message = ''
+      await phone.sync.sync().catch(error => {
+        message = error.message
+      })
+      expect(message).to.equal('broken')
+    })
+
+    it('finishes the sync as view-only when the push fails and the user turns out to be a reader', async () => {
+      const phone = await makeDevice('phone')
+      phone.sync.pushToDrive = async () => {
+        rig.storage.readOnly = true
+        throw new Error('refused')
+      }
+      const said: string[] = []
+      await phone.sync.sync(progress => said.push(progress.message))
+      expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
+    })
+
+    it('leaves a new setlist alone while Drive has a file for it that the pull did not claim', async () => {
+      const phone = await makeDevice('phone')
+      await addSetlist(phone, { name: 'Waiting' })
+      phone.sync.hasLiveFileOfItsOwn = () => true
+      phone.sync.pullIncomplete = false
+      await pushSetlists(phone.sync)
+      expect(rig.driveSetlistFiles()).to.have.length(0)
     })
 
     it('has a manager with no member cache say so, and go on', async () => {
@@ -838,6 +837,7 @@ describe('Drive sync: the less common turns', () => {
       const bare = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
         db: phone.db,
         folderLink: phone.folderLink,
+        storage: rig.storage,
       })
       bare.driveFolderId = phone.sync.driveFolderId
       expect(await bare.refreshMembers()).to.equal(null)

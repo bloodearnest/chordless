@@ -155,6 +155,12 @@ export function useSyncRig() {
     ...makeRig(() => rig.storage),
     driveSetlistFiles,
     driveSetlist,
+    replaceDriveFile,
+  }
+
+  /** The file `ref` is replaced by a copy with another ref, as when duplicates are cleaned up */
+  function replaceDriveFile(ref: string, newRef: string) {
+    rig.storage.rekey(ref, newRef)
   }
 
   function driveSetlistFiles() {

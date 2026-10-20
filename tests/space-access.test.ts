@@ -9,7 +9,11 @@ import {
   setSpaceReadOnly,
   syncsBack,
 } from '../src/js/space.ts'
-import { driveFolderProblem, refreshSpaceAccess } from '../src/js/space-access.ts'
+import {
+  driveFolderProblem,
+  driveSpaceStorage,
+  refreshSpaceAccess,
+} from '../src/js/space-access.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -40,6 +44,26 @@ describe('Knowing whether the user can write to the space folder', () => {
     drive.uninstall()
     await deleteSpace(spaceId)
     if (before.id) await setCurrentSpace(before.id, before.name)
+  })
+
+  it('gives the files of the space in the folder it is linked to', async () => {
+    const storage = await driveSpaceStorage(spaceId)
+    const { file } = await storage.create(
+      'setlists',
+      { name: 'a.json', props: {}, type: 'application/json' },
+      '{}'
+    )
+    expect((await storage.list('setlists')).map(f => f.ref)).to.deep.equal([file.ref])
+  })
+
+  it('has no files to give for a space that is not linked to a folder', async () => {
+    const unlinked = await createSpace(`Unlinked ${crypto.randomUUID().slice(0, 8)}`)
+    let message = ''
+    await driveSpaceStorage(unlinked.id).catch(error => {
+      message = error.message
+    })
+    await deleteSpace(unlinked.id)
+    expect(message).to.contain('not in Google Drive')
   })
 
   it('asks Drive and keeps the answer', async () => {

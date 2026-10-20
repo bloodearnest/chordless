@@ -2,7 +2,7 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { type SetlistDiffers, SetlistRevertedEvent } from '../src/components/setlist-differs.ts'
 import { differsFromOfficial, revertSetlistToOfficial } from '../src/js/sync/revert.ts'
 import { makeSetlist } from './builders.ts'
-import { useFakeDriveRig } from './drive-harness.ts'
+import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -11,7 +11,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('A setlist that differs from the official one', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice } = rig
 
   it('is one a user who can only read has changed, and only that', () => {

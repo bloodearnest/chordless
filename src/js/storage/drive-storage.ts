@@ -198,9 +198,7 @@ export const driveStorage: StorageBackend = {
 
   async findRootByName(name: string): Promise<RootInfo | null> {
     const folder = await DriveAPI.findSpaceFolderByName(name)
-    return folder
-      ? { ref: folder.id, name: folder.name ?? name, trashed: false, canWrite: null }
-      : null
+    return folder ? { ref: folder.id, name, trashed: false, canWrite: null } : null
   },
 
   async ensureRoot(name: string, spaceId: string) {

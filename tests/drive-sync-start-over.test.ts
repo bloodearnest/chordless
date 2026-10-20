@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { DriveFolderGoneError } from '../src/js/drive-sync.ts'
-import { addSong, useFakeDriveRig } from './drive-harness.ts'
+import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -19,12 +19,12 @@ async function failure(sync: { init(): Promise<unknown> }) {
 }
 
 describe('Drive sync: when the space’s folder is gone, and starting over', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const { makeDevice, addSetlist, syncDevice } = rig
-  const spaceFolder = () => rig.drive.findByPath(['Chordless', TEST_SPACE.name])
+  const spaceFolder = () => must(rig.storage.rootNamed(TEST_SPACE.name))
 
   /** What another Google app sees of the first one's folder: nothing at all */
-  const folderGoneFromDrive = () => rig.drive.files.delete(spaceFolder().id)
+  const folderGoneFromDrive = () => rig.storage.removeRoot(spaceFolder().ref)
 
   it('stops with an error that says what to do, when the folder was deleted or is not visible', async () => {
     const phone = await makeDevice('phone')
@@ -43,7 +43,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
   it('says the folder is in the trash when it is, and offers to restore it', async () => {
     const phone = await makeDevice('phone')
     await syncDevice(phone)
-    rig.drive.files.get(spaceFolder().id).trashed = true
+    rig.storage.trash(spaceFolder().ref)
 
     const error = await failure(phone.sync)
 
@@ -61,7 +61,7 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
       content: '{title: Amazing}\n[G]Amazing',
     })
     await syncDevice(phone)
-    const oldFolderId = spaceFolder().id
+    const oldFolderId = spaceFolder().ref
     const oldFileId = must(await phone.db.getSetlist(setlist.id)).driveFileId
     folderGoneFromDrive()
 
@@ -74,12 +74,10 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     expect(kept.name).to.equal('Sunday')
     expect(must(await phone.db.getSong('song-1')).title).to.equal('Amazing')
     // ...and all of it is in a new folder, under new files
-    expect(spaceFolder().id).to.not.equal(oldFolderId)
+    expect(spaceFolder().ref).to.not.equal(oldFolderId)
     expect(kept.driveFileId).to.be.a('string').and.not.equal(oldFileId)
-    const live = rig.drive.listFiles(
-      file => !file.trashed && file.appProperties.setlistId === setlist.id
-    )
-    expect(live.filter(file => file.id === kept.driveFileId)).to.have.length(1)
+    const live = rig.storage.list(file => file.props.setlistId === setlist.id)
+    expect(live.filter(file => file.ref === kept.driveFileId)).to.have.length(1)
   })
 
   it('asks nothing of Drive and changes nothing in it', async () => {
@@ -87,11 +85,11 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     await addSetlist(phone)
     await syncDevice(phone)
     folderGoneFromDrive()
-    rig.drive.requests = []
+    rig.storage.clearCalls()
 
     await phone.sync.startOver()
 
-    expect(rig.drive.requests).to.deep.equal([])
+    expect(rig.storage.calls).to.deep.equal([])
   })
 
   it('joins a folder of the right name that can be seen, without making duplicates', async () => {
@@ -108,10 +106,8 @@ describe('Drive sync: when the space’s folder is gone, and starting over', () 
     await phone.sync.init()
     await syncDevice(phone)
 
-    const live = rig.drive.listFiles(
-      file => !file.trashed && file.appProperties.setlistId === setlist.id
-    )
+    const live = rig.storage.list(file => file.props.setlistId === setlist.id)
     expect(live).to.have.length(1)
-    expect(must(await phone.db.getSetlist(setlist.id)).driveFileId).to.equal(live[0].id)
+    expect(must(await phone.db.getSetlist(setlist.id)).driveFileId).to.equal(live[0].ref)
   })
 })

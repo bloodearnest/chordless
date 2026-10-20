@@ -2,7 +2,8 @@ import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { createSetlist } from '../src/js/db.ts'
 import { makeEntry } from './builders.ts'
-import { useFakeDriveRig } from './drive-harness.ts'
+import { useSyncRig } from './drive-harness.ts'
+import type { StorageOp } from './memory-storage.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -49,18 +50,26 @@ function random(seed: number) {
   }
 }
 
-type Device = Awaited<ReturnType<ReturnType<typeof useFakeDriveRig>['makeDevice']>>
+/** The calls a history may make fail */
+const FAILING_CALLS: StorageOp[] = [
+  'inspectRoot',
+  'members',
+  'list',
+  'inventory',
+  'status',
+  'readText',
+  'create',
+  'createMany',
+  'update',
+]
+
+type Device = Awaited<ReturnType<ReturnType<typeof useSyncRig>['makeDevice']>>
 
 describe('Drive sync: random histories', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const { makeDevice } = rig
 
-  const liveSetlistFiles = () =>
-    rig.drive.listFiles(f => f.appProperties?.setlistId && !f.trashed) as {
-      id: string
-      appProperties: { setlistId: string }
-      content: string
-    }[]
+  const liveSetlistFiles = () => rig.storage.list(f => Boolean(f.props.setlistId))
 
   const keyOf = (s: Setlist) => [s.date, s.time, s.owner, s.type, s.name].join('|')
 
@@ -72,7 +81,7 @@ describe('Drive sync: random histories', () => {
     const keys = new Set<string>()
     for (const file of liveSetlistFiles()) {
       const content = JSON.parse(file.content) as Setlist
-      const id = file.appProperties.setlistId
+      const id = file.props.setlistId
       expect(ids.has(id), `${label}: two live files for setlist ${id}`).to.equal(false)
       ids.add(id)
       const key = keyOf(content)
@@ -156,37 +165,31 @@ describe('Drive sync: random histories', () => {
         const files = liveSetlistFiles()
         if (files.length === 0) return
         const file = rng.pick(files)
-        rig.drive.files.get(file.id).trashed = true
-        trashedEver.add(file.appProperties.setlistId)
-        log.push(`Drive trashes ${file.appProperties.setlistId.slice(0, 8)}`)
+        rig.storage.trash(file.ref)
+        trashedEver.add(file.props.setlistId)
+        log.push(`Drive trashes ${file.props.setlistId.slice(0, 8)}`)
       },
       async restore() {
-        const trashed = rig.drive.listFiles(f => f.appProperties?.setlistId && f.trashed)
+        const trashed = rig.storage.everything(f => Boolean(f.props.setlistId) && f.trashed)
         if (trashed.length === 0) return
         const file = rng.pick(trashed)
         // Only if nothing took its place meanwhile: restoring beside a copy is the user's doing
         const content = JSON.parse(file.content) as Setlist
         const taken = liveSetlistFiles().some(f => {
           const other = JSON.parse(f.content) as Setlist
-          return (
-            f.appProperties.setlistId === file.appProperties.setlistId ||
-            keyOf(other) === keyOf(content)
-          )
+          return f.props.setlistId === file.props.setlistId || keyOf(other) === keyOf(content)
         })
         if (taken) return
-        file.trashed = false
-        log.push(`Drive restores ${file.appProperties.setlistId.slice(0, 8)}`)
+        rig.storage.restore(file.ref)
+        log.push(`Drive restores ${file.props.setlistId.slice(0, 8)}`)
       },
       async reid() {
         // A duplicate was cleaned up, leaving another file for the setlist: same content, new id
         const files = liveSetlistFiles()
         if (files.length === 0) return
         const file = rng.pick(files)
-        const record = rig.drive.files.get(file.id)
-        rig.drive.files.delete(file.id)
-        record.id = `reid-${crypto.randomUUID()}`
-        rig.drive.files.set(record.id, record)
-        log.push(`Drive re-ids ${file.appProperties.setlistId.slice(0, 8)}`)
+        rig.storage.rekey(file.ref, `reid-${crypto.randomUUID()}`)
+        log.push(`Drive re-ids ${file.props.setlistId.slice(0, 8)}`)
       },
       async reset() {
         const device = rng.pick(devs)
@@ -201,11 +204,11 @@ describe('Drive sync: random histories', () => {
         }
       },
       async fail() {
-        rig.drive.failRequests({
+        rig.storage.fail(rng.pick(FAILING_CALLS), {
           status: 500,
           network: rng.int(2) === 0,
           times: 1 + rng.int(2),
-          skip: rng.int(20),
+          skip: rng.int(4),
         })
         failuresQueued = true
         log.push('requests start failing')
@@ -230,7 +233,7 @@ describe('Drive sync: random histories', () => {
     }
 
     // Quiet: no more failures, everyone syncs until nothing changes
-    rig.drive._failures.length = 0
+    rig.storage.clearFailures()
     failuresQueued = false
     for (let round = 0; round < 3; round++) {
       for (const device of devs) await syncDevice(device)
@@ -241,7 +244,7 @@ describe('Drive sync: random histories', () => {
 
     // Every device has what Drive has
     const inDrive = new Map(
-      liveSetlistFiles().map(f => [f.appProperties.setlistId, songsOf(JSON.parse(f.content))])
+      liveSetlistFiles().map(f => [f.props.setlistId, songsOf(JSON.parse(f.content))])
     )
     for (const device of devs) {
       const local = new Map(

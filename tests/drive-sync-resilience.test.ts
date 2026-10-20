@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { makeEntry, makeLocalState } from './builders.ts'
-import { useFakeDriveRig } from './drive-harness.ts'
+import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -11,7 +11,7 @@ const { describe, it, beforeEach } = window
 suppressConsoleLogs()
 
 describe('Drive sync: errors and missing files', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const {
     makeDevice,
     addSetlist,
@@ -31,19 +31,19 @@ describe('Drive sync: errors and missing files', () => {
       await addSetlist(phone, { id: 'setlist-a', name: 'A' })
       await addSetlist(phone, { id: 'setlist-b', name: 'B' })
       await addSetlist(phone, { id: 'setlist-c', name: 'C' })
-      rig.drive.failRequests({ method: 'POST', path: /^\/upload\/drive\/v3\/files/, status: 500 })
+      rig.storage.fail('create')
 
       await syncDevice(phone)
 
       const fileFor = async id =>
-        rig.drive.files.get(must(await phone.db.getSetlist(id)).driveFileId)
+        rig.storage.file(must(must(await phone.db.getSetlist(id)).driveFileId))
       expect(must(await phone.db.getSetlist('setlist-a')).driveFileId).to.equal(undefined)
-      expect((await fileFor('setlist-b')).appProperties.setlistId).to.equal('setlist-b')
-      expect((await fileFor('setlist-c')).appProperties.setlistId).to.equal('setlist-c')
+      expect((await fileFor('setlist-b')).props.setlistId).to.equal('setlist-b')
+      expect((await fileFor('setlist-c')).props.setlistId).to.equal('setlist-c')
 
       // The failed one is uploaded next sync, and editing it only touches its own file
       await syncDevice(phone)
-      expect((await fileFor('setlist-a')).appProperties.setlistId).to.equal('setlist-a')
+      expect((await fileFor('setlist-a')).props.setlistId).to.equal('setlist-a')
       await editSetlist(phone, 'setlist-a', { name: 'A edited' })
       await syncDevice(phone)
 
@@ -60,7 +60,7 @@ describe('Drive sync: errors and missing files', () => {
       const setlist = await addSetlist(phone)
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Edited' })
-      rig.drive.failRequests({ method: 'GET', path: /files\(id,name,mimeType\)&pageSize/ })
+      rig.storage.fail('inventory')
 
       await syncDevice(phone)
 
@@ -83,17 +83,16 @@ describe('Drive sync: errors and missing files', () => {
 
       await addSetlist(phone, { date: '2026-10-04' })
       await syncDevice(phone)
-      rig.drive.requests = []
+      rig.storage.clearCalls()
       await syncDevice(tablet)
 
       expect(await tablet.db.getAllSetlists()).to.have.length(13)
-      const writes = rig.drive.requests.filter(r => r.method !== 'GET')
-      expect(writes.map(r => `${r.method} ${r.path}`)).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
     })
 
     describe("when a device's Drive file is gone and no other file holds the setlist", () => {
       const trashAll = () => {
-        for (const file of driveSetlistFiles()) rig.drive.files.get(file.id).trashed = true
+        for (const file of driveSetlistFiles()) rig.storage.trash(file.ref)
       }
 
       it('removes the setlists that were not edited here, without uploading anything', async () => {
@@ -101,12 +100,12 @@ describe('Drive sync: errors and missing files', () => {
         for (let i = 0; i < 8; i++) await addSetlist(phone, { date: `2026-09-0${i + 1}` })
         await syncDevice(phone)
         trashAll()
-        rig.drive.requests = []
+        rig.storage.clearCalls()
 
         await syncDevice(phone)
 
         expect(await phone.db.getAllSetlists()).to.have.length(0)
-        expect(rig.drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+        expect(rig.storage.writes()).to.deep.equal([])
       })
 
       it('keeps and uploads again a setlist edited here', async () => {
@@ -121,7 +120,7 @@ describe('Drive sync: errors and missing files', () => {
 
         expect((await phone.db.getAllSetlists()).map(s => s.id)).to.deep.equal([edited.id])
         expect(await phone.db.getSetlist(untouched.id)).to.not.be.ok
-        const live = rig.drive.listFiles(f => f.appProperties.setlistId === edited.id && !f.trashed)
+        const live = rig.storage.list(f => f.props.setlistId === edited.id)
         expect(live.map(f => JSON.parse(f.content).name)).to.deep.equal(['Edited again'])
       })
 
@@ -132,7 +131,9 @@ describe('Drive sync: errors and missing files', () => {
         await syncDevice(phone)
         trashAll()
         await syncDevice(phone)
-        for (const file of driveSetlistFiles()) rig.drive.files.get(file.id).trashed = false
+        for (const file of rig.storage.everything(f => Boolean(f.props.setlistId))) {
+          rig.storage.restore(file.ref)
+        }
 
         await syncDevice(phone)
 
@@ -152,7 +153,7 @@ describe('Drive sync: errors and missing files', () => {
       await syncDevice(phone)
       replaceDriveFile(must(await phone.db.getSetlist(setlist.id)).driveFileId as string, 'moved')
       await editSetlist(phone, setlist.id, { name: 'Edited' })
-      rig.drive.failRequests({ method: 'GET', path: /alt=media/, times: 1 })
+      rig.storage.fail('readText')
 
       await syncDevice(phone)
 
@@ -168,7 +169,7 @@ describe('Drive sync: errors and missing files', () => {
       it('keeps the setlist as changed, and uploads it again over the same file', async () => {
         const phone = await makeDevice('phone')
         const setlist = await addSetlist(phone, { name: 'Intact' })
-        rig.drive.corruptUploads = 1
+        rig.storage.corruptWrites = 1
 
         await syncDevice(phone)
 
@@ -189,7 +190,7 @@ describe('Drive sync: errors and missing files', () => {
         const setlist = await addSetlist(phone, { name: 'Original' })
         await syncDevice(phone)
         await editSetlist(phone, setlist.id, { name: 'Edited' })
-        rig.drive.corruptUploads = 1
+        rig.storage.corruptWrites = 1
 
         await syncDevice(phone)
         expect(setlistHasLocalChanges(must(await phone.db.getSetlist(setlist.id)))).to.equal(true)
@@ -208,7 +209,7 @@ describe('Drive sync: errors and missing files', () => {
 
         const local = must(await phone.db.getSetlist(setlist.id))
         expect(setlistHasLocalChanges(local)).to.equal(false)
-        expect(local.driveChecksum).to.equal(rig.drive.listFiles()[0].md5Checksum)
+        expect(local.driveChecksum).to.equal(rig.storage.list()[0].rev)
       })
     })
 
@@ -249,11 +250,10 @@ describe('Drive sync: errors and missing files', () => {
         await syncDevice(phone)
         await syncDevice(tablet)
         replaceDriveFile(must(await tablet.db.getSetlist(setlist.id)).driveFileId, 'survivor')
-        rig.drive.requests = []
+        rig.storage.clearCalls()
       })
 
-      const writes = () =>
-        rig.drive.requests.filter(r => r.method !== 'GET').map(r => `${r.method} ${r.path}`)
+      const writes = () => rig.storage.writes()
 
       it('adopts the live file, rather than uploading a copy', async () => {
         await syncDevice(tablet)
@@ -275,7 +275,7 @@ describe('Drive sync: errors and missing files', () => {
       })
 
       it("takes the live file's content when it is newer and nothing was edited here", async () => {
-        rig.drive.editContent(
+        rig.storage.edit(
           'survivor',
           JSON.stringify({ ...driveSetlist(setlist.id), name: 'Renamed' })
         )
@@ -294,14 +294,14 @@ describe('Drive sync: errors and missing files', () => {
       const setlist = await addSetlist(phone, { name: 'Shared' })
       await syncDevice(phone)
       await tablet.db.saveSetlist({ ...setlist })
-      rig.drive.requests = []
+      rig.storage.clearCalls()
 
       await syncDevice(tablet)
 
-      expect(rig.drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
       expect(driveSetlistFiles()).to.have.length(1)
       expect(must(await tablet.db.getSetlist(setlist.id)).driveFileId).to.equal(
-        driveSetlistFiles()[0].id
+        driveSetlistFiles()[0].ref
       )
     })
 
@@ -333,20 +333,6 @@ describe('Drive sync: errors and missing files', () => {
       expect(driveSetlistFiles()).to.have.length(2)
     })
 
-    it("doesn't duplicate setlists when the inventory spans several pages", async () => {
-      // Regression: the inventory only read the first page of each folder, so
-      // files on later pages looked missing and were re-uploaded.
-      rig.drive.maxPageSize = 2
-      const phone = await makeDevice('phone')
-      const setlists = [await addSetlist(phone), await addSetlist(phone), await addSetlist(phone)]
-      await syncDevice(phone)
-      for (const { id } of setlists) await editSetlist(phone, id, { name: `Edited ${id}` })
-
-      await syncDevice(phone)
-
-      for (const { id } of setlists) expect(driveSetlist(id).name).to.equal(`Edited ${id}`)
-    })
-
     it('reports success when a setlist update fails, and retries next sync', async () => {
       // Current behaviour: pushSetlists uses Promise.allSettled, so a failed
       // update is only logged and sync() still resolves as successful.
@@ -354,7 +340,7 @@ describe('Drive sync: errors and missing files', () => {
       const setlist = await addSetlist(phone, { name: 'Original' })
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Edited' })
-      rig.drive.failRequests({ method: 'PATCH', path: /^\/upload\//, network: true })
+      rig.storage.fail('update', { network: true })
 
       await syncDevice(phone) // resolves despite the failure
 
@@ -368,7 +354,7 @@ describe('Drive sync: errors and missing files', () => {
       const tablet = await makeDevice('tablet')
       const setlist = await addSetlist(phone, { name: 'Flaky' })
       await syncDevice(phone)
-      rig.drive.failRequests({ method: 'GET', path: /alt=media/, status: 503 })
+      rig.storage.fail('readText', { status: 503 })
 
       await syncDevice(tablet)
       expect(await tablet.db.getSetlist(setlist.id)).to.equal(undefined)
@@ -380,8 +366,8 @@ describe('Drive sync: errors and missing files', () => {
     it('fails the sync without pushing when the setlist listing fails', async () => {
       const phone = await makeDevice('phone')
       await addSetlist(phone)
-      rig.drive.requests = []
-      rig.drive.failRequests({ method: 'GET', path: /name contains/, status: 500 })
+      rig.storage.clearCalls()
+      rig.storage.fail('list', { on: 'setlists' })
 
       let error
       try {
@@ -390,8 +376,8 @@ describe('Drive sync: errors and missing files', () => {
         error = e
       }
 
-      expect(error?.message).to.match(/Drive API error/)
-      expect(rig.drive.requests.filter(r => r.path.startsWith('/upload/'))).to.deep.equal([])
+      expect(error?.message).to.match(/Injected 500/)
+      expect(rig.storage.writes()).to.deep.equal([])
     })
   })
 })

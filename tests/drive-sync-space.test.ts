@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { addSong, editSong, useFakeDriveRig } from './drive-harness.ts'
+import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -8,7 +8,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: spaces', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const {
     makeDevice,
     renameSpace,
@@ -19,24 +19,23 @@ describe('Drive sync: spaces', () => {
     driveSetlist,
   } = rig
 
+  const folderOf = (name: string) => must(rig.storage.rootNamed(name)).ref
+
   describe('spaces', () => {
-    const spaceFolders = () =>
-      [...rig.drive.files.values()].filter(
-        f => f.parents.includes(rig.drive.findByPath(['Chordless']).id) && !f.trashed
-      )
+    const spaceFolders = () => [...rig.storage.roots.values()].filter(root => !root.trashed)
 
     it('keeps syncing the same Drive folder after a rename, and renames it', async () => {
       const phone = await makeDevice('phone', { spaceName: 'Personal' })
       const setlist = await addSetlist(phone, { name: 'Harvest' })
       await syncDevice(phone)
-      const folderId = rig.drive.findByPath(['Chordless', 'Personal']).id
+      const folderId = folderOf('Personal')
 
       await renameSpace(phone, 'Simon Davy')
       await editSetlist(phone, setlist.id, { name: 'Harvest edited' })
       await syncDevice(phone)
 
       expect(spaceFolders().map(f => f.name)).to.deep.equal(['Simon Davy'])
-      expect(rig.drive.findByPath(['Chordless', 'Simon Davy']).id).to.equal(folderId)
+      expect(folderOf('Simon Davy')).to.equal(folderId)
       expect(driveSetlist(setlist.id).name).to.equal('Harvest edited')
     })
 
@@ -71,7 +70,7 @@ describe('Drive sync: spaces', () => {
       await syncDevice(phone)
 
       expect(must(await phone.db.getSetlist(theirs.id)).name).to.equal('From tablet')
-      expect(phone.folderLink.value).to.equal(rig.drive.findByPath(['Chordless', 'Simon Davy']).id)
+      expect(phone.folderLink.value).to.equal(folderOf('Simon Davy'))
     })
 
     it('stops before changing anything if records belong to another folder', async () => {
@@ -85,7 +84,7 @@ describe('Drive sync: spaces', () => {
       const tablet = await makeDevice('tablet', { spaceName: 'Simon Davy' })
       await addSetlist(tablet, { name: 'Theirs' })
       await syncDevice(tablet)
-      rig.drive.requests = []
+      rig.storage.clearCalls()
 
       await renameSpace(phone, 'Simon Davy')
       let error
@@ -96,7 +95,7 @@ describe('Drive sync: spaces', () => {
       }
 
       expect(error?.name).to.equal('SpaceFolderMismatchError')
-      expect(rig.drive.requests.filter(r => r.method !== 'GET')).to.deep.equal([])
+      expect(rig.storage.writes()).to.deep.equal([])
       expect((await phone.db.getAllSetlists()).map(s => s.name)).to.deep.equal(['Mine'])
     })
 
@@ -104,7 +103,7 @@ describe('Drive sync: spaces', () => {
       const phone = await makeDevice('phone', { spaceName: 'Personal' })
       await addSetlist(phone)
       await syncDevice(phone)
-      rig.drive.files.get(rig.drive.findByPath(['Chordless', 'Personal']).id).trashed = true
+      rig.storage.trash(folderOf('Personal'))
 
       let error
       try {
@@ -121,18 +120,13 @@ describe('Drive sync: spaces', () => {
   describe('space members', () => {
     it("caches the people the space's folder is shared with", async () => {
       const phone = await makeDevice('phone')
-      const folder = rig.drive.findByPath(['Chordless', TEST_SPACE.name])
-      rig.drive.addPermission(folder.id, {
-        emailAddress: 'simon@example.com',
-        displayName: 'Simon Davy',
+      const folder = folderOf(TEST_SPACE.name)
+      rig.storage.addMember(folder, {
+        email: 'simon@example.com',
+        name: 'Simon Davy',
         role: 'owner',
       })
-      rig.drive.addPermission(folder.id, {
-        emailAddress: 'ann@example.com',
-        displayName: 'Ann Smith',
-        role: 'writer',
-      })
-      rig.drive.addPermission(folder.id, { type: 'anyone', role: 'reader' })
+      rig.storage.addMember(folder, { email: 'ann@example.com', name: 'Ann Smith', role: 'writer' })
 
       await syncDevice(phone)
 
@@ -145,7 +139,7 @@ describe('Drive sync: spaces', () => {
     it('still syncs if the members cannot be fetched', async () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Synced anyway' })
-      rig.drive.failRequests({ method: 'GET', path: /\/permissions/ })
+      rig.storage.fail('members')
 
       await syncDevice(phone)
 
@@ -155,17 +149,17 @@ describe('Drive sync: spaces', () => {
   })
 
   describe('a user who can only read the folder', () => {
-    const writes = () => rig.drive.requests.filter(r => r.method !== 'GET' && r.method !== 'HEAD')
+    const writes = () => rig.storage.writes()
 
     it('downloads what is in Drive, uploads nothing, and does not fail', async () => {
       const leader = await makeDevice('leader')
       const setlist = await addSetlist(leader, { name: 'Sunday' })
       await syncDevice(leader)
 
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       const member = await makeDevice('member')
       const local = await addSetlist(member, { name: 'Only here' })
-      rig.drive.requests.length = 0
+      rig.storage.clearCalls()
       await syncDevice(member)
 
       expect(await member.db.getSetlist(setlist.id)).to.include({ name: 'Sunday' })
@@ -181,8 +175,8 @@ describe('Drive sync: spaces', () => {
     it('does not push when asked to push directly either', async () => {
       const member = await makeDevice('member')
       await addSetlist(member, { name: 'Only here' })
-      rig.drive.readOnly = true
-      rig.drive.requests.length = 0
+      rig.storage.readOnly = true
+      rig.storage.clearCalls()
       await member.sync.pushToDrive()
       expect(writes()).to.deep.equal([])
     })
@@ -190,14 +184,14 @@ describe('Drive sync: spaces', () => {
     it('is found out by a refused upload when the first check could not be made', async () => {
       const member = await makeDevice('member')
       const local = await addSetlist(member, { name: 'Only here' })
-      rig.drive.readOnly = true
-      rig.drive.requests.length = 0
+      rig.storage.readOnly = true
+      rig.storage.clearCalls()
       // The check fails once, so the sync goes ahead and tries to upload
-      rig.drive.failRequests({ method: 'GET', path: /capabilities/, times: 1 })
+      rig.storage.fail('inspectRoot')
       await syncDevice(member)
 
       expect(writes().length).to.be.greaterThan(0)
-      expect(writes().every(request => request.failed === 403)).to.equal(true)
+      expect(rig.storage.writeRefusals()).to.be.greaterThan(0)
       expect(member.memberCache.readOnly).to.equal(true)
       expect(driveSetlistFiles()).to.have.length(0)
       expect(must(await member.db.getSetlist(local.id)).name).to.equal('Only here')
@@ -206,7 +200,7 @@ describe('Drive sync: spaces', () => {
     it('does not take a failing upload for a reader', async () => {
       const member = await makeDevice('member')
       await addSetlist(member, { name: 'Writer' })
-      rig.drive.failRequests({ method: 'POST', path: /^\/upload\//, status: 500, times: 50 })
+      rig.storage.fail('create', { times: 50 })
       await syncDevice(member)
       expect(member.memberCache.readOnly).to.equal(false)
     })
@@ -218,12 +212,12 @@ describe('Drive sync: spaces', () => {
       const member = await makeDevice('member')
       await syncDevice(member)
 
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await editSetlist(member, setlist.id, { name: 'My key change' })
-      rig.drive.readOnly = false
+      rig.storage.readOnly = false
       await editSetlist(leader, setlist.id, { name: 'Leader change' })
       await syncDevice(leader)
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       const said: string[] = []
       await member.sync.sync(progress => said.push(progress.message))
 
@@ -241,7 +235,7 @@ describe('Drive sync: spaces', () => {
       await syncDevice(member)
       await editSetlist(leader, setlist.id, { name: 'Leader change' })
       await syncDevice(leader)
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await syncDevice(member)
       expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
       expect(member.sync.heldBack).to.equal(0)
@@ -254,12 +248,12 @@ describe('Drive sync: spaces', () => {
       const member = await makeDevice('member')
       await syncDevice(member)
 
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await editSong(member, 'song-1', '{title: Alpha}\n[G]mine')
-      rig.drive.readOnly = false
+      rig.storage.readOnly = false
       await editSong(leader, 'song-1', '{title: Alpha}\n[G]theirs')
       await syncDevice(leader)
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       const said: string[] = []
       await member.sync.sync(progress => said.push(progress.message))
 
@@ -272,11 +266,11 @@ describe('Drive sync: spaces', () => {
     it('uploads again once the user is given write access', async () => {
       const member = await makeDevice('member')
       const local = await addSetlist(member, { name: 'Waiting' })
-      rig.drive.readOnly = true
+      rig.storage.readOnly = true
       await syncDevice(member)
       expect(driveSetlistFiles()).to.have.length(0)
 
-      rig.drive.readOnly = false
+      rig.storage.readOnly = false
       await syncDevice(member)
       expect(driveSetlist(local.id).name).to.equal('Waiting')
       expect(member.memberCache.readOnly).to.equal(false)

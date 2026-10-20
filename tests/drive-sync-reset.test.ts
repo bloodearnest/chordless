@@ -2,7 +2,7 @@ import { expect } from '@open-wc/testing'
 import type { SetlistLocalState } from '../src/js/data-types.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeLocalState, makeSong } from './builders.ts'
-import { useFakeDriveRig } from './drive-harness.ts'
+import { useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -11,7 +11,7 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 describe('Drive sync: reset from Drive', () => {
-  const rig = useFakeDriveRig()
+  const rig = useSyncRig()
   const { makeDevice, addSetlist, editSetlist, syncDevice, driveSetlistFiles } = rig
 
   describe('reset from Drive', () => {
@@ -31,8 +31,8 @@ describe('Drive sync: reset from Drive', () => {
       const keep = await addSetlist(phone, { name: 'Keep' })
       const removed = await addSetlist(phone, { name: 'Duplicate' })
       await syncDevice(phone)
-      const removedFile = rig.drive.listFiles(f => f.appProperties.setlistId === removed.id)[0]
-      rig.drive.files.get(removedFile.id).trashed = true
+      const removedFile = rig.storage.list(f => f.props.setlistId === removed.id)[0]
+      rig.storage.trash(removedFile.ref)
 
       await phone.sync.resetLocalFromDrive()
 
@@ -108,7 +108,7 @@ describe('Drive sync: reset from Drive', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Safe' })
       await syncDevice(phone)
-      rig.drive.failRequests({ method: 'GET', path: /files\(id,name,mimeType,createdTime/ })
+      rig.storage.fail('inventory')
 
       const error = await resetError(phone)
 
