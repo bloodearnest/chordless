@@ -21,7 +21,7 @@ provider "google" {
 
 resource "google_project" "app" {
   project_id = "setalight"
-  name       = "chordless"
+  name       = "chordless-old"
 }
 
 resource "google_project_service" "drive" {
