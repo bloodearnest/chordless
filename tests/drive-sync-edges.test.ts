@@ -791,7 +791,7 @@ describe('Drive sync: the less common turns', () => {
   })
 
   describe('the folder', () => {
-    it('is said to be gone when it was deleted, not trashed', async () => {
+    it('is said to be missing when it was deleted, not trashed', async () => {
       const phone = await makeDevice('phone')
       await syncDevice(phone)
       rig.drive.files.delete(rig.drive.findByPath(['Chordless', TEST_ORG.name]).id)
@@ -801,7 +801,7 @@ describe('Drive sync: the less common turns', () => {
       } catch (error) {
         message = (error as Error).message
       }
-      expect(message).to.contain('no longer exists')
+      expect(message).to.contain("folder can't be found")
     })
 
     it('is said to be view-only when the user can only read it', async () => {

@@ -6,8 +6,8 @@
  */
 
 import type { SetlistEntry } from './data-types.ts'
-import type { DriveSyncManager, SyncProgress } from './drive-sync.ts'
-import { createSyncManager, isSyncAvailable } from './drive-sync.ts'
+import type { SyncProgress } from './drive-sync.ts'
+import { createSyncManager, DriveSyncManager, isSyncAvailable } from './drive-sync.ts'
 import type { ResetSetlist } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { toast } from './toast.ts'
@@ -168,6 +168,20 @@ export class SyncOrchestrator {
     return this.#run('Reset from Drive', {}, progressCallback, (manager, progress) =>
       manager.resetLocalFromDrive(progress)
     )
+  }
+
+  /**
+   * Let go of the space's Drive folder, which is gone (DriveFolderGoneError), and sync into a new
+   * one: everything on this device is uploaded again (see DriveSyncManager.startOver). It works
+   * without the old folder, which init() would not.
+   * @param progressCallback - Optional callback
+   */
+  async startOverInDrive(
+    progressCallback: BroadcastCallback | null = null
+  ): Promise<{ success: true }> {
+    await new DriveSyncManager(this.organisationName, this.organisationId).startOver()
+    this.syncManager = null
+    return this.sync(progressCallback)
   }
 
   /**

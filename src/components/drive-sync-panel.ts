@@ -1,9 +1,15 @@
 import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import { DriveFolderGoneError } from '../js/drive-sync.ts'
 import { nameOrganisationBeforeSync } from '../js/first-time-auth.ts'
 import { getCurrentOrganisation, syncsBack } from '../js/organisation.ts'
-import { createSyncOrchestrator, isSyncAvailable } from '../js/sync-orchestrator.ts'
+import { driveFolderProblem } from '../js/organisation-access.ts'
+import {
+  createSyncOrchestrator,
+  isSyncAvailable,
+  SyncOrchestrator,
+} from '../js/sync-orchestrator.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -29,6 +35,7 @@ export class DriveSyncPanel extends LitElement {
     syncProgress: { type: Object, attribute: false },
     lastSyncTime: { type: String, attribute: false },
     syncError: { type: String, attribute: false },
+    folderProblem: { type: String, attribute: false },
     disabled: { type: Boolean, reflect: true },
   }
 
@@ -42,9 +49,12 @@ export class DriveSyncPanel extends LitElement {
   declare syncProgress: PanelProgress | null
   declare lastSyncTime: string | null
   declare syncError: string | null
+  /** What to tell the user when the space's Drive folder is gone (null: it is there, or not known) */
+  declare folderProblem: string | null
   declare disabled: boolean
 
   _resetModal: Ref<AppModal>
+  _startOverModal: Ref<AppModal>
 
   static override styles = [
     buttonStyles,
@@ -147,6 +157,8 @@ export class DriveSyncPanel extends LitElement {
   constructor() {
     super()
     this._resetModal = createRef()
+    this._startOverModal = createRef()
+    this.folderProblem = null
     this.syncAvailable = false
     this.syncing = false
     this.syncProgress = null
@@ -159,6 +171,7 @@ export class DriveSyncPanel extends LitElement {
     super.connectedCallback()
     await this.checkSyncAvailability()
     this.loadLastSyncTime()
+    if (this.syncAvailable) this.folderProblem = (await driveFolderProblem())?.message ?? null
   }
 
   override updated(changedProperties: PropertyValues<this>): void {
@@ -230,27 +243,62 @@ export class DriveSyncPanel extends LitElement {
         this.requestUpdate()
       })
 
-      // Success!
-      const now = new Date().toISOString()
-      this.lastSyncTime = now
-      localStorage.setItem('last-sync-time', now)
-
-      // Show success briefly
-      this.syncProgress = {
-        stage: 'success',
-        message: syncsBack()
-          ? '✓ Sync complete!'
-          : '✓ Sync complete (view-only access: your changes stay on this device)',
-      }
-      setTimeout(() => {
-        this.syncing = false
-        this.syncProgress = null
-      }, 2000)
+      this._syncSucceeded()
     } catch (error) {
-      console.error('[DriveSyncPanel] Sync failed:', error)
-      this.syncError = errorMessage(error)
-      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+      this._syncFailed(error)
+    }
+  }
+
+  /** Show success briefly */
+  _syncSucceeded(): void {
+    const now = new Date().toISOString()
+    this.lastSyncTime = now
+    localStorage.setItem('last-sync-time', now)
+    this.folderProblem = null
+    this.syncProgress = {
+      stage: 'success',
+      message: syncsBack()
+        ? '✓ Sync complete!'
+        : '✓ Sync complete (view-only access: your changes stay on this device)',
+    }
+    setTimeout(() => {
       this.syncing = false
+      this.syncProgress = null
+    }, 2000)
+  }
+
+  _syncFailed(error: unknown): void {
+    console.error('[DriveSyncPanel] Sync failed:', error)
+    this.syncing = false
+    if (error instanceof DriveFolderGoneError) {
+      // Told with the way on, rather than as an error
+      this.folderProblem = error.message
+      this.syncProgress = null
+      return
+    }
+    this.syncError = errorMessage(error)
+    this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+  }
+
+  /** Let go of the folder that is gone, and upload everything on this device to a new one */
+  async _handleStartOver(): Promise<void> {
+    if (this.syncing || !this.syncAvailable || this.disabled) return
+    if (!(await this._startOverModal.value?.ask())) return
+
+    this.syncing = true
+    this.syncError = null
+    this.syncProgress = { stage: 'starting', message: 'Starting over in Drive...' }
+
+    try {
+      await nameOrganisationBeforeSync()
+      const { id, name } = getCurrentOrganisation()
+      await new SyncOrchestrator(name, id).startOverInDrive(progress => {
+        this.syncProgress = progress
+        this.requestUpdate()
+      })
+      this._syncSucceeded()
+    } catch (error) {
+      this._syncFailed(error)
     }
   }
 
@@ -270,7 +318,11 @@ export class DriveSyncPanel extends LitElement {
 
     return html`
       <div class="sync-panel">
-        ${this._renderSyncStatus()}
+        ${
+          this.folderProblem && !this.syncing && !this.syncError
+            ? this._renderFolderProblem()
+            : this._renderSyncStatus()
+        }
 
         <button class="btn primary" ?disabled=${this.syncing} @click=${this._handleSync}>
           ${
@@ -297,6 +349,29 @@ export class DriveSyncPanel extends LitElement {
             `
             : ''
         }
+      </div>
+    `
+  }
+
+  _renderFolderProblem() {
+    return html`
+      <div class="sync-status error">
+        <div class="status-row">
+          <span class="status-icon">⚠️</span>
+          <span class="status-text">Drive folder not found</span>
+        </div>
+        <div class="error-message">${this.folderProblem}</div>
+        <button class="btn" ?disabled=${this.syncing} @click=${this._handleStartOver}>
+          ↻ Start over in Drive
+        </button>
+        <app-modal
+          ${ref(this._startOverModal)}
+          type="confirm"
+          size="small"
+          heading="Start over in Google Drive?"
+          confirm-label="Start over"
+          message="Everything on this device is kept, and uploaded again to a new Drive folder. Share links to this space's setlists stop working: make them again. If you can still see the old folder in Drive, it is left alone: delete it by hand when you are sure."
+        ></app-modal>
       </div>
     `
   }

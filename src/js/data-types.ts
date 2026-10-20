@@ -251,6 +251,8 @@ export interface Organisation {
   createdDate: string
   modifiedDate: string
   driveFolderId?: string | null
+  /** The Google app (OAuth client id) that linked the folder: another app cannot see it (drive.file) */
+  driveClientId?: string | null
   members?: OrganisationMember[]
   /** The user can only read the Drive folder: sync doesn't push, and nothing syncable is edited */
   readOnly?: boolean

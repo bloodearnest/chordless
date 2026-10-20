@@ -70,7 +70,8 @@ type WorkerMessageType =
   | 'PROCESS_QUEUE'
 
 // Configuration
-const GOOGLE_CLIENT_ID = '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
+export const GOOGLE_CLIENT_ID =
+  '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
 
 // The worker serves the auth routes (/oauth/*, /session/*) on the same origin as

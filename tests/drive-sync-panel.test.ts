@@ -231,4 +231,79 @@ describe('drive-sync-panel', () => {
       expect(el.syncing).to.equal(false)
     })
   })
+
+  describe('when the space’s Drive folder is gone', () => {
+    /** The space has synced once; then its folder disappears (another Google app cannot see it) */
+    async function afterFolderGone() {
+      drive = installFakeDrive()
+      const { name, id } = getCurrentOrganisation()
+      await (await createSyncOrchestrator(name, id)).sync()
+      drive.files.delete(drive.findByPath(['Chordless', name]).id)
+    }
+
+    it('says so as soon as it is shown, with the way on', async () => {
+      await afterFolderGone()
+      const el = await show()
+      expect(text(el)).to.contain('Drive folder not found')
+      expect(text(el)).to.contain('safe on this device')
+      expect(button(el, /Start over in Drive/)).to.not.equal(undefined)
+    })
+
+    it('shows it, not a failure, when a sync finds out', async () => {
+      const el = await show()
+      await afterFolderGone()
+      button(el, /Sync with Drive/)?.click()
+      await waitUntil(() => text(el).includes('Drive folder not found'), 'it says so', {
+        timeout: 4000,
+      })
+      expect(text(el)).to.not.contain('Sync failed')
+      expect(el.syncing).to.equal(false)
+    })
+
+    it('asks first, and does nothing when told not to', async () => {
+      await afterFolderGone()
+      const el = await show()
+      must(el._startOverModal.value as AppModal).ask = async () => false
+      button(el, /Start over in Drive/)?.click()
+      await wait(100)
+      expect(el.syncProgress).to.equal(null)
+      expect(text(el)).to.contain('Drive folder not found')
+    })
+
+    it('starts over in a new folder, and is ready to sync again', async function () {
+      this.timeout(8000)
+      await afterFolderGone()
+      const el = await show()
+      must(el._startOverModal.value as AppModal).ask = async () => true
+      button(el, /Start over in Drive/)?.click()
+      await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done', {
+        timeout: 4000,
+      })
+      expect(text(el)).to.not.contain('Drive folder not found')
+      expect(must(drive).findByPath(['Chordless', getCurrentOrganisation().name])).to.not.equal(
+        undefined
+      )
+      await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
+      expect(text(el)).to.contain('Ready to sync')
+    })
+
+    it('says what went wrong when starting over fails', async function () {
+      this.timeout(8000)
+      await afterFolderGone()
+      const el = await show()
+      must(el._startOverModal.value as AppModal).ask = async () => true
+      must(drive).failRequests({ status: 500, times: 100 })
+      button(el, /Start over in Drive/)?.click()
+      await waitUntil(() => text(el).includes('Sync failed'), 'it says so', { timeout: 4000 })
+      expect(el.syncing).to.equal(false)
+    })
+
+    it('does nothing while it is syncing', async () => {
+      await afterFolderGone()
+      const el = await show()
+      el.syncing = true
+      await el._handleStartOver()
+      expect(el.syncProgress).to.equal(null)
+    })
+  })
 })

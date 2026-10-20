@@ -245,6 +245,26 @@ charts with Drive's copy. Unlike a normal sync, records whose Drive file is gone
 dropped, not re-uploaded. It refuses, changing nothing, if Drive can't be listed or
 if any local record has changes not in Drive. Per-setlist device state is kept.
 
+### Start over in Drive (the linked folder is gone)
+
+A space's linked folder can stop being there to find: deleted, in the Drive trash, or never
+visible to the Google account or app now signed in. Drive answers 404 for all of them, and under
+the `drive.file` scope a different Google app (a new OAuth client, as in
+[CLOUD_MIGRATION.md](CLOUD_MIGRATION.md)) cannot see what the first one made. `resolveDriveFolder`
+throws `DriveFolderGoneError` (reason `missing` or `trashed`), changing nothing.
+
+It is told early, not at the first sync: `refreshOrganisationAccess` (app start and sign-in) asks
+Drive about the linked folder and shows a toast with "Open Drive sync", and the sync panel shows the
+same message with **Start over in Drive**. The organisation record keeps `driveClientId`, the Google
+app that linked the folder, so the message can say it was an earlier version of the app.
+
+Start over (`DriveSyncManager.startOver`, via `SyncOrchestrator.startOverInDrive`) asks Drive nothing
+and changes nothing in it: it clears every setlist's and song's Drive markers and a setlist's share
+link (`ChordlessDB.clearDriveLinks`), then the folder link, then the orchestrator syncs. Content stays
+on the device and is uploaded as new files to a folder found or made by name. The markers must go
+first: a setlist with a `driveFileId` that is not in the folder, and no changes, is read as deleted in
+Drive and removed here. An old folder that can still be seen is left alone, for the user to delete.
+
 ### Safety rules
 
 - Nothing in sync permanently deletes song or setlist files. (Pad set uploads replace

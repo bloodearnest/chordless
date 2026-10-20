@@ -78,7 +78,7 @@ describe('Drive sync: organisations', () => {
       // A device from before folders were linked: sync found the folder by name,
       // so renaming its organisation pointed it at a different folder, and
       // everything looked "missing" and was uploaded again (6 October 2026).
-      const noLink = { get: async () => null, set: async () => {} }
+      const noLink = { get: async () => null, set: async () => {}, clear: async () => {} }
       const phone = await makeDevice('phone', { orgName: 'Personal', folderLink: noLink })
       await addSetlist(phone, { name: 'Mine' })
       await syncDevice(phone)

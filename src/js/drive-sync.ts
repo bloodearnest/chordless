@@ -16,6 +16,7 @@ import type { DriveFile, OrganisationMember, Setlist } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import * as DriveAPI from './drive-api.ts'
 import { driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.ts'
+import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { setOrganisationReadOnly } from './organisation.ts'
 import { OrganisationDB } from './organisation-db.ts'
 import { ChordProParser } from './parser.ts'
@@ -44,6 +45,8 @@ export interface UnsyncedChange {
 export interface FolderLink {
   get(): Promise<string | null>
   set(driveFolderId: string): Promise<void>
+  /** Let go of the folder, so the next sync finds or makes one by name */
+  clear(): Promise<void>
 }
 
 /** Where the organisation's members are cached for offline use */
@@ -74,6 +77,39 @@ export class UnsyncedChangesError extends Error {
     )
     this.name = 'UnsyncedChangesError'
     this.unsynced = unsynced
+  }
+}
+
+/**
+ * What to tell the user when the space's linked Drive folder is not there: `folder` is the folder
+ * in the Drive trash, or null when Drive cannot find it. `otherApp` is known when the folder was
+ * linked by another Google app, which cannot see it (the Drive scope covers only the files an app
+ * made itself).
+ */
+export function folderGoneMessage(folder: { name?: string } | null, otherApp: boolean): string {
+  const safe = 'Your songs and setlists are safe on this device.'
+  if (folder) {
+    return (
+      `This space's Google Drive folder "${folder.name}" is in the Drive trash. ` +
+      `${safe} Restore it from the trash, or start over in Drive to upload them to a new folder.`
+    )
+  }
+  return otherApp
+    ? `This space was synced by an earlier version of Chordless's Google app, which cannot see its Drive folder. ${safe} Start over in Drive to upload them again.`
+    : `This space's Google Drive folder can't be found: it was deleted, or belongs to another Google account than the one you are signed in with. ${safe} Sign in with the right account, or start over in Drive to upload them again.`
+}
+
+/**
+ * Thrown when the Drive folder this space was linked to is gone (deleted, or not visible to this
+ * Google account or app) or in the trash. Nothing was changed; startOver() is the way on.
+ */
+export class DriveFolderGoneError extends Error {
+  reason: 'missing' | 'trashed'
+
+  constructor(folder: DriveFile | null) {
+    super(folderGoneMessage(folder, false))
+    this.name = 'DriveFolderGoneError'
+    this.reason = folder ? 'trashed' : 'missing'
   }
 }
 
@@ -116,10 +152,19 @@ function organisationFolderLink(organisationId: string): FolderLink {
     },
     async set(driveFolderId: string) {
       try {
-        await (await getDb()).updateOrganisation(organisationId, { driveFolderId })
+        await (await getDb()).updateOrganisation(organisationId, {
+          driveFolderId,
+          driveClientId: GOOGLE_CLIENT_ID,
+        })
       } catch (error) {
         console.warn('[DriveSync] Could not record Drive folder link:', error)
       }
+    },
+    async clear() {
+      await (await getDb()).updateOrganisation(organisationId, {
+        driveFolderId: null,
+        driveClientId: null,
+      })
     },
   }
 }
@@ -219,6 +264,13 @@ export class DriveSyncManager implements SyncSession {
   }
 
   async init(): Promise<boolean> {
+    await this.open()
+    const isNew = await this.resolveDriveFolder()
+    return isNew
+  }
+
+  /** Get the database and the stored link and member cache, without asking Drive anything */
+  async open(): Promise<void> {
     // Initialize database
     if (this.organisationDb) {
       this.organisationId ??= this.organisationDb.organisationId
@@ -233,8 +285,20 @@ export class DriveSyncManager implements SyncSession {
     const organisationId = this.organisationId as string
     this.folderLink ??= organisationFolderLink(organisationId)
     this.memberCache ??= organisationMemberCache(organisationId)
-    const isNew = await this.resolveDriveFolder()
-    return isNew
+  }
+
+  /**
+   * Let go of this space's Drive folder and every link to a file in it, keeping all the
+   * content on this device, so the next sync finds or makes a folder by name and uploads it all
+   * again. For when the folder is gone (DriveFolderGoneError): deleted, in the trash, or made
+   * by another Google app, which cannot see what the first one made. Nothing in Drive is
+   * touched: an old folder that can still be seen is left for the user to delete.
+   */
+  async startOver(): Promise<void> {
+    await this.open()
+    await this.db.clearDriveLinks()
+    await this.#folderLink.clear()
+    this.driveFolderId = null
   }
 
   /**
@@ -249,10 +313,7 @@ export class DriveSyncManager implements SyncSession {
     if (linkedId) {
       const folder = await DriveAPI.getFile(linkedId, 'id,name,trashed')
       if (!folder || folder.trashed) {
-        throw new Error(
-          `This space's Google Drive folder ${folder ? `"${folder.name}" is in the Drive trash` : 'no longer exists'}. ` +
-            'Restore it from the Drive trash, or reset this space, before syncing.'
-        )
+        throw new DriveFolderGoneError(folder)
       }
       this.driveFolderId = folder.id
       if (folder.name !== this.organisationName) {

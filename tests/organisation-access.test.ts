@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
+import { setRouter } from '../src/js/navigation.ts'
 import {
   createOrganisation,
   deleteOrganisation,
@@ -8,9 +9,10 @@ import {
   setOrganisationReadOnly,
   syncsBack,
 } from '../src/js/organisation.ts'
-import { refreshOrganisationAccess } from '../src/js/organisation-access.ts'
+import { driveFolderProblem, refreshOrganisationAccess } from '../src/js/organisation-access.ts'
+import { OrganisationDB } from '../src/js/organisation-db.ts'
 import { installFakeDrive } from './fake-drive.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -34,6 +36,7 @@ describe('Knowing whether the user can write to the organisation folder', () => 
   })
 
   afterEach(async () => {
+    clearToasts()
     drive.uninstall()
     await deleteOrganisation(organisationId)
     if (before.id) await setCurrentOrganisation(before.id, before.name)
@@ -85,5 +88,79 @@ describe('Knowing whether the user can write to the organisation folder', () => 
       await setCurrentOrganisation(organisationId)
       await deleteOrganisation(fresh.id)
     }
+  })
+
+  describe('the folder being gone', () => {
+    const folderOf = () => drive.findByPath(['Chordless', getCurrentOrganisation().name])
+
+    it('is not a problem while the folder is there', async () => {
+      expect(await driveFolderProblem()).to.equal(null)
+      await refreshOrganisationAccess()
+      expect(shownToast()).to.equal(null)
+    })
+
+    it('is told at once, with a way on, when the folder is deleted or cannot be seen', async () => {
+      drive.files.delete(folderOf().id)
+
+      const problem = await driveFolderProblem()
+      await refreshOrganisationAccess()
+
+      expect(problem?.reason).to.equal('missing')
+      expect(problem?.message).to.contain('safe on this device')
+      const toast = shownToast()
+      expect(toast?.kind).to.equal('error')
+      expect(toast?.message).to.equal(problem?.message)
+      expect(toast?.action?.label).to.equal('Open Drive sync')
+      const went: string[] = []
+      setRouter({
+        navigate: async url => {
+          went.push(url)
+          return true
+        },
+      })
+      try {
+        toast?.action?.run()
+        await wait(0)
+      } finally {
+        setRouter(null)
+      }
+      expect(went).to.deep.equal(['/storage'])
+    })
+
+    it('says so when the Google app that linked the folder is not this one', async () => {
+      const db = new OrganisationDB()
+      await db.init()
+      await db.updateOrganisation(organisationId, { driveClientId: 'an-earlier-app' })
+      drive.files.delete(folderOf().id)
+
+      expect((await driveFolderProblem())?.message).to.contain(
+        "earlier version of Chordless's Google app"
+      )
+    })
+
+    it('says the folder is in the trash when it is', async () => {
+      drive.files.get(folderOf().id).trashed = true
+
+      const problem = await driveFolderProblem()
+
+      expect(problem?.reason).to.equal('trashed')
+      expect(problem?.message).to.contain('Restore it from the trash')
+    })
+
+    it('is told once, not at every check, and does not turn the user read-only', async () => {
+      drive.files.delete(folderOf().id)
+      await refreshOrganisationAccess()
+      clearToasts()
+
+      await refreshOrganisationAccess()
+
+      expect(shownToast()).to.equal(null)
+      expect(syncsBack()).to.equal(true)
+    })
+
+    it('is not guessed at when Drive cannot be asked', async () => {
+      drive.failRequests({ method: 'GET', status: 500, times: 5 })
+      expect(await driveFolderProblem()).to.equal(null)
+    })
   })
 })

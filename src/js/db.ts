@@ -401,6 +401,37 @@ export class ChordlessDB {
     return transactionDone(tx)
   }
 
+  /**
+   * Forget every link to Drive: each setlist and song is left as a new one that Drive has never
+   * seen, so the next sync uploads it all. Content stays; a setlist's share link goes, since
+   * its file was in the folder that is let go. Used to start over in a new Drive folder.
+   */
+  async clearDriveLinks(): Promise<void> {
+    const tx = this.#transaction(['setlists', 'songs'], 'readwrite')
+    const unlinked = {
+      driveFileId: null,
+      driveModifiedTime: null,
+      driveChecksum: null,
+      lastSyncedAt: null,
+      syncedContentHash: null,
+    }
+    const setlists = tx.objectStore('setlists')
+    const songs = tx.objectStore('songs')
+    const setlistsRequest = setlists.getAll()
+    const songsRequest = songs.getAll()
+    setlistsRequest.onsuccess = () => {
+      for (const setlist of setlistsRequest.result as Setlist[]) {
+        setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null, share: null })
+      }
+    }
+    songsRequest.onsuccess = () => {
+      for (const song of songsRequest.result as SongRecord[]) {
+        songs.put({ ...song, ...unlinked, driveProperties: null })
+      }
+    }
+    return transactionDone(tx)
+  }
+
   // Clear all data (for re-import)
   async clearAll(): Promise<void> {
     const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite')

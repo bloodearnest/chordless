@@ -18,6 +18,9 @@ export const memoryFolderLink = (): FolderLink & { value: string | null } => ({
   async set(value: string) {
     this.value = value
   },
+  async clear() {
+    this.value = null
+  },
 })
 
 /** Give a device a song and its chart, as the app saves them */

@@ -2,13 +2,14 @@ import { expect } from '@open-wc/testing'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
 import { deleteDatabase, suppressConsoleLogs, uniqueName } from './test-helpers.ts'
 
-const { describe, it } = window
+const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
 import { ChordlessDB, createSetlist, parseTempo } from '../src/js/db.ts'
 import { setlistContentHash } from '../src/js/sync/setlist-hash.ts'
 import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
+import { makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 
 describe('ChordlessDB', () => {
@@ -60,6 +61,59 @@ describe('ChordlessDB', () => {
     expect(loaded.name).to.equal('Morning Service')
     expect(loaded.owner).to.equal('Alice')
     expect(loaded.songs).to.have.lengthOf(1)
+  })
+})
+
+describe('ChordlessDB forgetting Drive', () => {
+  let db: ChordlessDB
+
+  beforeEach(async () => {
+    db = new ChordlessDB(`test-forget-${crypto.randomUUID()}`)
+    await db.init()
+  })
+
+  afterEach(async () => {
+    await deleteDatabase(db.dbName)
+  })
+
+  it('leaves every setlist and song as one Drive has never seen, with its content', async () => {
+    const synced = {
+      driveFileId: 'file-1',
+      driveModifiedTime: '2026-10-11T10:00:00.000Z',
+      driveChecksum: 'abc',
+      lastSyncedAt: '2026-10-11T10:00:00.000Z',
+      syncedContentHash: 'hash',
+    }
+    await db.saveSetlist(
+      makeSetlist({
+        id: 'setlist-1',
+        name: 'Sunday',
+        ...synced,
+        share: {
+          fileId: 's',
+          key: 'k',
+          created: '2026-10-01',
+          expires: '2026-12-01',
+          bundleHash: 'h',
+        },
+      })
+    )
+    await db.saveSong(
+      makeSong({ uuid: 'song-1', title: 'Amazing', ...synced, driveProperties: null })
+    )
+
+    await db.clearDriveLinks()
+
+    const setlist = must(await db.getSetlist('setlist-1'))
+    expect(setlist.name).to.equal('Sunday')
+    expect(setlist.driveFileId).to.equal(null)
+    expect(setlist.syncedContentHash).to.equal(null)
+    expect(setlist.share).to.equal(null)
+    const song = must(await db.getSong('song-1'))
+    expect(song.title).to.equal('Amazing')
+    expect(song.driveFileId).to.equal(null)
+    expect(song.driveChecksum).to.equal(null)
+    expect(song.lastSyncedAt).to.equal(null)
   })
 })
 
