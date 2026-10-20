@@ -16,6 +16,9 @@ import type {
   FileBody,
   FileInput,
   FileStatus,
+  PadFileEntry,
+  PadSetEntry,
+  PadStorage,
   RootInfo,
   SpaceStorage,
   StorageBackend,
@@ -77,6 +80,12 @@ export type StorageOp =
   | 'update'
   | 'unpublish'
   | 'trash'
+  | 'listPadSets'
+  | 'ensurePadSet'
+  | 'listPadFiles'
+  | 'addPadFile'
+  | 'trashPadFiles'
+  | 'readPadFile'
 
 interface Failure {
   op: StorageOp
@@ -88,9 +97,41 @@ interface Failure {
   skip: number
 }
 
-const WRITES: StorageOp[] = ['renameRoot', 'create', 'createMany', 'update', 'unpublish', 'trash']
+const WRITES: StorageOp[] = [
+  'renameRoot',
+  'create',
+  'createMany',
+  'update',
+  'unpublish',
+  'trash',
+  'ensurePadSet',
+  'addPadFile',
+  'trashPadFiles',
+]
+
+/** A file of a pad set, as the memory backend keeps it */
+export interface MemoryPadFile {
+  ref: string
+  set: string
+  name: string
+  padKey: string | null
+  type: string
+  bytes: Uint8Array
+  trashed: boolean
+}
+
+/** A pad set, as the memory backend keeps it */
+export interface MemoryPadSet {
+  ref: string
+  name: string
+  modified: string
+}
 
 export class MemoryStorage implements StorageBackend {
+  padSets = new Map<string, MemoryPadSet>()
+  padFiles = new Map<string, MemoryPadFile>()
+  pads: PadStorage = new MemoryPads(this)
+
   roots = new Map<string, MemoryRoot>()
   files = new Map<string, MemoryFile>()
   /** Every call made, for assertions: `op` and the ref or collection it was about */
@@ -371,6 +412,78 @@ export class MemoryStorage implements StorageBackend {
     if (!this.readOnly) return
     this.#refused++
     throw new StorageError('The user does not have write access', 403)
+  }
+}
+
+class MemoryPads implements PadStorage {
+  #storage: MemoryStorage
+
+  constructor(storage: MemoryStorage) {
+    this.#storage = storage
+  }
+
+  async listSets(): Promise<PadSetEntry[]> {
+    this.#storage.enter('listPadSets')
+    return [...this.#storage.padSets.values()].map(set => ({
+      ref: set.ref,
+      name: set.name,
+      modified: set.modified,
+    }))
+  }
+
+  async ensureSet(name: string): Promise<string> {
+    this.#storage.enter('ensurePadSet', name)
+    this.#storage.refuseWrites()
+    let set = [...this.#storage.padSets.values()].find(each => each.name === name)
+    if (!set) {
+      set = { ref: `padset-${crypto.randomUUID()}`, name, modified: '' }
+      this.#storage.padSets.set(set.ref, set)
+    }
+    set.modified = this.#storage.now()
+    return set.ref
+  }
+
+  async listFiles(setRef: string): Promise<PadFileEntry[]> {
+    this.#storage.enter('listPadFiles', setRef)
+    return [...this.#storage.padFiles.values()]
+      .filter(file => file.set === setRef && !file.trashed)
+      .map(file => ({
+        ref: file.ref,
+        name: file.name,
+        padKey: file.padKey,
+        type: file.type,
+        size: file.bytes.length,
+      }))
+  }
+
+  async addFile(setRef: string, padKey: string, audio: Blob): Promise<void> {
+    this.#storage.enter('addPadFile', setRef)
+    this.#storage.refuseWrites()
+    const file: MemoryPadFile = {
+      ref: `padfile-${crypto.randomUUID()}`,
+      set: setRef,
+      name: `${padKey}.mp3`,
+      padKey,
+      type: audio.type || 'audio/mpeg',
+      bytes: new Uint8Array(await audio.arrayBuffer()),
+      trashed: false,
+    }
+    this.#storage.padFiles.set(file.ref, file)
+    const set = this.#storage.padSets.get(setRef)
+    if (set) set.modified = this.#storage.now()
+  }
+
+  async trashFiles(setRef: string): Promise<void> {
+    this.#storage.enter('trashPadFiles', setRef)
+    this.#storage.refuseWrites()
+    for (const file of this.#storage.padFiles.values()) if (file.set === setRef) file.trashed = true
+  }
+
+  async read(fileRef: string): Promise<ArrayBuffer> {
+    this.#storage.enter('readPadFile', fileRef)
+    const file = this.#storage.padFiles.get(fileRef)
+    if (!file || file.trashed) throw new StorageError(`File not found: ${fileRef}`, 404)
+    return file.bytes.slice().buffer
   }
 }
 

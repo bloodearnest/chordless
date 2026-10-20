@@ -1,24 +1,17 @@
-import {
-  downloadFileBinary,
-  ensurePadSetFolder,
-  listPadSetFiles,
-  listPadSetFolders,
-  trashFilesInFolder,
-  updatePadSetFolderMetadata,
-  uploadPadFile,
-} from './drive-api.ts'
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
+import { driveStorage } from './storage/drive-storage.ts'
+import type { PadStorage } from './storage/types.ts'
 import { readZip, type ZipArchive } from './utils/zip.ts'
 
-/** A set of pads: a folder of them in Drive (the app ships none: the pads are the user's own) */
+/** A set of pads: a folder of them in the storage (the app ships none: the pads are the user's own) */
 export interface PadSet {
   id: string
   name: string
   modifiedTime?: string | null
 }
 
-/** Where a pad's audio is in Drive */
+/** Where a pad's audio is in the storage (`fileId` is its ref; the name is what devices have kept) */
 interface PadFile {
   fileId: string
   mimeType: string
@@ -54,6 +47,13 @@ const PAD_SET_SELECTION_KEY = 'padset-selection'
 const PAD_SET_CACHE_STATE_KEY = 'padset-cache-state'
 const PAD_CACHE_NAME = 'padsets-cache-v1'
 
+// Where the pad sets are kept: Google Drive, unless a test says otherwise
+let padStorage: PadStorage = driveStorage.pads
+
+export function setPadStorage(storage?: PadStorage | null) {
+  padStorage = storage ?? driveStorage.pads
+}
+
 const PAD_SET_METADATA_CACHE = new Map<string, PadSetMetadata>()
 const INFLIGHT_PAD_DOWNLOADS = new Map<string, Promise<void>>()
 const PAD_PRELOAD_DELAY_MS = 50
@@ -87,14 +87,8 @@ export async function listPadSets(force = false): Promise<PadSet[]> {
   padSetListPromise = (async () => {
     const sets: PadSet[] = []
     try {
-      const folders = await listPadSetFolders()
-      for (const folder of folders) {
-        const padSet: PadSet = {
-          id: folder.id,
-          name: folder.appProperties?.padSetName || folder.name || folder.id,
-          modifiedTime: folder.modifiedTime,
-        }
-        sets.push(padSet)
+      for (const set of await padStorage.listSets()) {
+        sets.push({ id: set.ref, name: set.name, modifiedTime: set.modified })
       }
     } catch (error) {
       console.warn('[PadSetService] Failed to list pad sets from Drive:', error)
@@ -130,11 +124,10 @@ export async function uploadPadSet(
   }
 
   // Ensure folder exists
-  const folderId = await ensurePadSetFolder(normalizedName)
-  await updatePadSetFolderMetadata(folderId, normalizedName)
+  const folderId = await padStorage.ensureSet(normalizedName)
 
   // Clear old contents and cached media
-  await trashFilesInFolder(folderId)
+  await padStorage.trashFiles(folderId)
   await invalidatePadSetCache(folderId)
 
   // Upload each file
@@ -142,7 +135,7 @@ export async function uploadPadSet(
     // (every key is there: checked above)
     const data = padFiles.get(key) as Uint8Array<ArrayBuffer>
     const blob = new Blob([data], { type: 'audio/mpeg' })
-    await uploadPadFile(folderId, key, blob)
+    await padStorage.addFile(folderId, key, blob)
   }
 
   padSetListCache = null
@@ -156,8 +149,8 @@ export async function uploadPadSet(
 
 /** How many bytes of audio a pad set holds in Drive (for an export to say how big it would be) */
 export async function padSetSize(padSet: PadSet): Promise<number> {
-  const files = await listPadSetFiles(padSet.id)
-  return files.reduce((total, file) => total + Number(file.size ?? 0), 0)
+  const files = await padStorage.listFiles(padSet.id)
+  return files.reduce((total, file) => total + file.size, 0)
 }
 
 /** A pad set's audio, by key, read from Drive (or what was kept of it) */
@@ -165,7 +158,7 @@ export async function readPadSetAudio(padSet: PadSet): Promise<Map<string, Array
   const files = await ensurePadSetMetadata(padSet)
   const audio = new Map<string, ArrayBuffer>()
   for (const key of PAD_FILE_KEYS) {
-    audio.set(key, await downloadFileBinary((files[key] as PadFile).fileId))
+    audio.set(key, await padStorage.read((files[key] as PadFile).fileId))
   }
   return audio
 }
@@ -213,7 +206,7 @@ export async function ensurePadKeyCached(padSet: PadSet, key: string): Promise<v
       throw new Error(`Pad set "${padSet.name}" is missing key: ${normalizedKey}`)
     }
 
-    const buffer = await downloadFileBinary(entry.fileId)
+    const buffer = await padStorage.read(entry.fileId)
     const blob = new Blob([buffer], { type: entry.mimeType })
     await cache.put(
       request,
@@ -340,18 +333,13 @@ async function ensurePadSetMetadata(padSet: PadSet): Promise<Record<string, PadF
     return storedEntry.files
   }
 
-  const files = await listPadSetFiles(padSet.id)
+  const files = await padStorage.listFiles(padSet.id)
   const fileMap: Record<string, PadFile> = {}
 
   for (const file of files) {
-    const keyFromProps = normalizePadKey(file.appProperties?.padKey)
-    const key = keyFromProps || normalizePadKey(extractPadKeyFromFilename(file.name))
-    if (key) {
-      fileMap[key] = {
-        fileId: file.id,
-        mimeType: file.mimeType || 'audio/mpeg',
-      }
-    }
+    const key =
+      normalizePadKey(file.padKey) || normalizePadKey(extractPadKeyFromFilename(file.name))
+    if (key) fileMap[key] = { fileId: file.ref, mimeType: file.type }
   }
 
   const missingKeys = PAD_FILE_KEYS.filter(key => !fileMap[key])

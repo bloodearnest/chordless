@@ -1,5 +1,4 @@
 import { expect } from '@open-wc/testing'
-import { createFile, ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
 import { PadAudioController } from '../src/js/pad-audio-controller.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import {
@@ -16,10 +15,11 @@ import {
   preloadPadKeys,
   preloadPadKeysForSongs,
   selectPadSet,
+  setPadStorage,
   uploadPadSet,
 } from '../src/js/pad-set-service.ts'
 import { makePadSet } from './builders.ts'
-import { binaryStringToBytes, installFakeDrive } from './fake-drive.ts'
+import { MemoryStorage } from './memory-storage.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import { buildZip, type ZipEntry } from './zip.ts'
@@ -34,34 +34,31 @@ const PAD_CACHE_NAME = 'padsets-cache-v1'
 const audioOf = (key: string) =>
   new Uint8Array([...new TextEncoder().encode(`audio:${key}`), 0, 255])
 
-describe('pad sets in Drive', () => {
-  let drive: ReturnType<typeof installFakeDrive>
+describe('pad sets', () => {
+  let storage: MemoryStorage
   let serial = 0
 
   beforeEach(() => {
-    drive = installFakeDrive()
+    storage = new MemoryStorage()
+    setPadStorage(storage.pads)
   })
 
   afterEach(async () => {
-    drive.uninstall()
+    setPadStorage(null)
     await caches.delete(PAD_CACHE_NAME)
     localStorage.removeItem('padset-cache-state')
     localStorage.removeItem('padset-selection')
-    expect(
-      drive.errors.map((e: Error) => e.message),
-      'FakeDrive errors'
-    ).to.deep.equal([])
   })
 
   /**
-   * A pad set folder in Drive, as the app makes it: a file for each key. The set is given its own
+   * A pad set in the storage, as the app makes it: a file for each key. The set is given its own
    * modifiedTime, because what the service remembers of a set is kept for as long as that matches
    */
   async function makeDrivePadSet({ without = [] as string[] } = {}): Promise<PadSet> {
-    const folderId = await ensurePadSetFolder(`Test pads ${++serial}`)
+    const folderId = await storage.pads.ensureSet(`Test pads ${++serial}`)
     for (const key of PAD_FILE_KEYS) {
       if (without.includes(key)) continue
-      await uploadPadFile(folderId, key, new Blob([audioOf(key)], { type: 'audio/mpeg' }))
+      await storage.pads.addFile(folderId, key, new Blob([audioOf(key)], { type: 'audio/mpeg' }))
     }
     return makePadSet({
       id: folderId,
@@ -70,7 +67,9 @@ describe('pad sets in Drive', () => {
     })
   }
 
-  const downloads = () => drive.requests.filter((r: any) => r.params?.get('alt') === 'media')
+  const downloads = () => storage.calls.filter(call => call.op === 'readPadFile')
+  const listings = (op: 'listPadSets' | 'listPadFiles') =>
+    storage.calls.filter(call => call.op === op).length
 
   async function cachedBytes(padSet: PadSet, key: string) {
     const cache = await caches.open(PAD_CACHE_NAME)
@@ -79,15 +78,15 @@ describe('pad sets in Drive', () => {
   }
 
   describe('the list of sets', () => {
-    it('is each pad set folder in Drive, and nothing else: the app has none', async () => {
+    it('is each pad set in the storage, and nothing else: the app has none', async () => {
       const padSet = await makeDrivePadSet()
       const sets = await listPadSets(true)
       expect(sets.map(s => [s.id, s.name])).to.deep.equal([[padSet.id, padSet.name]])
     })
 
-    it('is empty when Drive cannot be listed', async () => {
+    it('is empty when the storage cannot be listed', async () => {
       await makeDrivePadSet()
-      drive.failRequests({ method: 'GET', path: /\/files\?q=/, times: 10 })
+      storage.fail('listPadSets', { times: 10 })
       expect(await listPadSets(true)).to.deep.equal([])
     })
   })
@@ -131,7 +130,7 @@ describe('pad sets in Drive', () => {
   })
 
   describe('keeping a pad for offline', () => {
-    it('downloads a key from Drive once, and keeps it', async () => {
+    it('downloads a key once, and keeps it', async () => {
       const padSet = await makeDrivePadSet()
       expect(await isPadKeyCached(padSet, 'D')).to.equal(false)
 
@@ -143,7 +142,7 @@ describe('pad sets in Drive', () => {
       expect(await isPadKeyCached(padSet, 'E')).to.equal(false)
 
       await ensurePadKeyCached(padSet, 'D')
-      expect(downloads(), 'asked Drive again for a pad it has').to.have.length(1)
+      expect(downloads(), 'asked again for a pad it has').to.have.length(1)
     })
 
     it('finds a key by its flat name, as the pad file of the sharp', async () => {
@@ -154,7 +153,15 @@ describe('pad sets in Drive', () => {
 
     it('ignores a file in the folder that is not for a key', async () => {
       const padSet = await makeDrivePadSet()
-      await createFile({ name: 'notes.txt', parents: [padSet.id] }, 'not a pad')
+      storage.padFiles.set('notes', {
+        ref: 'notes',
+        set: padSet.id,
+        name: 'notes.txt',
+        padKey: null,
+        type: 'text/plain',
+        bytes: new TextEncoder().encode('not a pad'),
+        trashed: false,
+      })
       await ensurePadKeyCached(padSet, 'C')
       expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
     })
@@ -172,20 +179,14 @@ describe('pad sets in Drive', () => {
     it('keeps what it knows of a set, so the files are listed once', async () => {
       const padSet = await makeDrivePadSet()
       await ensurePadKeyCached(padSet, 'A')
-      const listings = () =>
-        drive.requests.filter(
-          (r: any) =>
-            r.path === '/drive/v3/files' &&
-            /in parents and trashed=false/.test(r.params?.get('q') ?? '')
-        ).length
-      const after = listings()
+      const after = listings('listPadFiles')
       await ensurePadKeyCached(padSet, 'B')
-      expect(listings()).to.equal(after)
+      expect(listings('listPadFiles')).to.equal(after)
     })
 
-    it('fails, and keeps nothing, when Drive cannot send the file', async () => {
+    it('fails, and keeps nothing, when the storage cannot send the file', async () => {
       const padSet = await makeDrivePadSet()
-      drive.failRequests({ method: 'GET', path: /alt=media/, times: 1 })
+      storage.fail('readPadFile')
       let failed = false
       await ensurePadKeyCached(padSet, 'C').catch(() => {
         failed = true
@@ -208,9 +209,9 @@ describe('pad sets in Drive', () => {
 
     it('has nothing to keep for no key', async () => {
       const padSet = await makeDrivePadSet()
-      const before = drive.requests.length
+      const before = storage.calls.length
       await ensurePadKeyCached(padSet, '')
-      expect(drive.requests).to.have.length(before)
+      expect(storage.calls).to.have.length(before)
     })
 
     it('refuses a key that is not one', async () => {
@@ -224,7 +225,7 @@ describe('pad sets in Drive', () => {
 
     it('has nothing to keep with no pad set', async () => {
       expect(await isPadKeyCached(null, 'C')).to.equal(false)
-      expect(drive.requests).to.have.length(0)
+      expect(storage.calls).to.have.length(0)
     })
   })
 
@@ -238,7 +239,7 @@ describe('pad sets in Drive', () => {
     // The controller only needs a context to be made: this resolves URLs and does not play
     const controller = () => new PadAudioController({} as AudioContext)
 
-    it('is the cached copy of a Drive pad, fetched first if need be', async () => {
+    it('is the cached copy of a pad, fetched first if need be', async () => {
       const padSet = await makeDrivePadSet()
       const pads = controller()
       expect(await pads._resolvePadUrl('E', padSet)).to.equal(getPadCacheUrl(padSet.id, 'E'))
@@ -264,7 +265,7 @@ describe('pad sets in Drive', () => {
 
     it('is nothing with no pad set: the app ships none', async () => {
       expect(await controller()._resolvePadUrl('Bb', null)).to.equal(null)
-      expect(drive.requests).to.have.length(0)
+      expect(storage.calls).to.have.length(0)
     })
   })
 
@@ -275,12 +276,12 @@ describe('pad sets in Drive', () => {
     const entriesFor = (keys: string[], extra: Partial<ZipEntry> = {}) =>
       keys.map(key => ({ ...mp3(`Pads/Warm Pad - ${key}.mp3`), ...extra }))
 
-    /** The files in a pad set's folder in Drive, by name */
-    const filesIn = (folderId: string) =>
+    /** The files in a pad set, by name */
+    const filesIn = (setRef: string) =>
       Object.fromEntries(
-        drive
-          .listFiles((file: any) => file.parents.includes(folderId) && !file.trashed)
-          .map((file: any) => [file.name, binaryStringToBytes(file.content)])
+        [...storage.padFiles.values()]
+          .filter(file => file.set === setRef && !file.trashed)
+          .map(file => [file.name, file.bytes])
       )
 
     async function failureOf(promise: Promise<unknown>) {
@@ -292,7 +293,7 @@ describe('pad sets in Drive', () => {
       return null
     }
 
-    it('puts a file for each key in a folder in Drive, and returns the set', async () => {
+    it('puts a file for each key in the storage, and returns the set', async () => {
       const zip = await buildZip(entriesFor(allKeys), 'Warm_Pad-Set.zip')
 
       const padSet = await uploadPadSet(zip)
@@ -307,7 +308,7 @@ describe('pad sets in Drive', () => {
       }
     })
 
-    it('keeps the pads of a set that Drive gave no modified time for, as of when they were listed', async () => {
+    it('keeps the pads of a set that the storage gave no modified time for, as of when they were listed', async () => {
       // (uploading forgets anything kept under the set's id, which a fake Drive repeats; and a
       // set already in use means the upload does not choose this one, which would list it)
       localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
@@ -332,19 +333,17 @@ describe('pad sets in Drive', () => {
       // (a set already in use, so the upload does not choose its set, and list the sets again)
       localStorage.setItem('padset-selection', JSON.stringify({ id: 'other', name: 'Other' }))
       await uploadPadSet(await buildZip(entriesFor(allKeys), 'Listed.zip'))
-      const listings = () =>
-        drive.requests.filter((r: any) => r.method === 'GET' && r.params?.has('q')).length
-      const before = listings()
+      const before = listings('listPadSets')
 
       const [first, second] = await Promise.all([listPadSets(), listPadSets()])
-      const asked = listings() - before
+      const asked = listings('listPadSets') - before
 
       expect(second).to.equal(first)
       expect(await listPadSets(), 'and then it is kept').to.equal(first)
-      expect(listings() - before).to.equal(asked)
-      // (Drive is asked as often as for a single list)
+      expect(listings('listPadSets') - before).to.equal(asked)
+      // (the storage is asked as often as for a single list)
       await listPadSets(true)
-      expect(listings() - before - asked).to.equal(asked)
+      expect(listings('listPadSets') - before - asked).to.equal(asked)
     })
 
     it('reads files the zip tool deflated', async () => {
@@ -428,20 +427,17 @@ describe('pad sets in Drive', () => {
 
       expect(again.id).to.equal(first.id)
       const files = filesIn(first.id)
-      expect(
-        drive.listFiles((file: any) => file.parents.includes(first.id) && !file.trashed)
-      ).to.have.length(12)
+      const inSet = [...storage.padFiles.values()].filter(file => file.set === first.id)
+      expect(inSet.filter(file => !file.trashed)).to.have.length(12)
       // the old ones are in the trash, not gone
-      expect(
-        drive.listFiles((file: any) => file.parents.includes(first.id) && file.trashed)
-      ).to.have.length(12)
+      expect(inSet.filter(file => file.trashed)).to.have.length(12)
       expect(files['C.mp3']).to.deep.equal(audioOf('new'))
       expect(await cachedBytes(first as PadSet, 'C')).to.equal(null)
     })
 
     describe('refuses', () => {
-      /** Nothing is made in Drive for a zip that is refused */
-      const nothingMade = () => expect(drive.files.size).to.equal(0)
+      /** Nothing is made for a zip that is refused */
+      const nothingMade = () => expect(storage.padSets.size).to.equal(0)
 
       it('no file', async () => {
         expect(await failureOf(uploadPadSet(null))).to.equal('Please select a pad set ZIP file.')
@@ -501,7 +497,7 @@ describe('pad sets in Drive', () => {
       expect(await isPadKeyCached(padSet, 'C')).to.equal(true)
     })
 
-    it('uses what it kept of a set, without asking Drive again', async () => {
+    it('uses what it kept of a set, without asking the storage again', async () => {
       const made = await makeDrivePadSet()
       const padSet = must((await listPadSets(true)).find(set => set.id === made.id))
       const files = Object.fromEntries(
@@ -513,12 +509,9 @@ describe('pad sets in Drive', () => {
           [padSet.id]: { modifiedTime: padSet.modifiedTime, cachedAt: 'then', files },
         })
       )
-      const before = drive.requests.length
+      const before = listings('listPadFiles')
       await selectPadSet(padSet.id)
-      const filesListed = drive.requests
-        .slice(before)
-        .some((r: any) => r.params?.get('fields')?.includes('md5Checksum'))
-      expect(filesListed).to.equal(false)
+      expect(listings('listPadFiles')).to.equal(before)
     })
 
     it('fails for a key a kept set has no file for', async () => {
@@ -615,64 +608,14 @@ describe('pad sets in Drive', () => {
     })
   })
 
-  describe('what Drive may leave out', () => {
-    /** Answers with these fields of each file taken out of them */
-    function withoutFields(...fields: string[]) {
-      const drivesFetch = window.fetch
-      window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
-        const response = await drivesFetch(input, init)
-        if (!String(input).includes('/files?')) return response
-        const body = await response.json()
-        for (const file of body.files ?? []) {
-          for (const field of fields) delete file[field]
-        }
-        return Response.json(body)
-      }) as typeof fetch
-      return () => {
-        window.fetch = drivesFetch
-      }
-    }
-
-    it('names a set by its folder, or its id, when it has no pad set name', async () => {
-      const made = await makeDrivePadSet()
-      let restore = withoutFields('appProperties')
-      try {
-        expect((await listPadSets(true)).find(set => set.id === made.id)?.name).to.equal(made.name)
-      } finally {
-        restore()
-      }
-      restore = withoutFields('appProperties', 'name')
-      try {
-        expect((await listPadSets(true)).find(set => set.id === made.id)?.name).to.equal(made.id)
-      } finally {
-        restore()
-        await listPadSets(true)
-      }
-    })
-
-    it('takes a file with no type to be audio', async () => {
-      const padSet = await makeDrivePadSet()
-      const restore = withoutFields('mimeType')
-      try {
-        await ensurePadKeyCached(padSet, 'C')
-      } finally {
-        restore()
-      }
-      const cache = await caches.open(PAD_CACHE_NAME)
-      const kept = await cache.match(getPadCacheUrl(padSet.id, 'C'))
-      expect(kept?.headers.get('Content-Type')).to.equal('audio/mpeg')
-    })
-
-    it('uses what it kept of a set that has no modified time, whatever it was', async () => {
+  describe('a set the storage gave no modified time for', () => {
+    it('uses what it kept of it, whatever that was', async () => {
       const made = await makeDrivePadSet()
       const padSet = { ...made, modifiedTime: null }
       await ensurePadKeyCached(padSet, 'C')
-      const before = drive.requests.length
+      const before = listings('listPadFiles')
       await ensurePadKeyCached(padSet, 'D')
-      const listed = drive.requests
-        .slice(before)
-        .filter((r: any) => r.params?.get('fields')?.includes('md5Checksum'))
-      expect(listed).to.have.length(0)
+      expect(listings('listPadFiles')).to.equal(before)
     })
   })
 

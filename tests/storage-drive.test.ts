@@ -113,6 +113,43 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
     expect((error as { status?: number }).status).to.equal(500)
   })
 
+  it('names a pad set by its pad set name, else by its folder, else by its id', async () => {
+    const fake = installFakeDrive()
+    drive = fake
+    const ref = await driveStorage.pads.ensureSet('Warm pads')
+    const nameOf = async () =>
+      (await driveStorage.pads.listSets()).find(set => set.ref === ref)?.name
+    expect(await nameOf()).to.equal('Warm pads')
+    fake.files.get(ref).appProperties = {}
+    fake.files.get(ref).name = 'Folder name'
+    expect(await nameOf()).to.equal('Folder name')
+    fake.files.get(ref).name = undefined
+    expect(await nameOf()).to.equal(ref)
+  })
+
+  it('takes a pad file with no type or size to be audio with no size, and one with no name or properties to have none', async () => {
+    const fake = installFakeDrive()
+    drive = fake
+    const ref = await driveStorage.pads.ensureSet('Warm pads')
+    await driveStorage.pads.addFile(
+      ref,
+      'C',
+      new Blob([new Uint8Array([1, 2])], { type: 'audio/mpeg' })
+    )
+    const stored = [...fake.files.values()].find((file: any) => file.name === 'C.mp3')
+    stored.mimeType = undefined
+    stored.content = undefined
+    const [file] = await driveStorage.pads.listFiles(ref)
+    expect(file.type).to.equal('audio/mpeg')
+    expect(file.padKey).to.equal('C')
+    expect(file.size).to.equal(0)
+    // ...and one with no name or properties
+    stored.name = undefined
+    stored.appProperties = undefined
+    const [bare] = await driveStorage.pads.listFiles(ref)
+    expect([bare.name, bare.padKey]).to.deep.equal(['', null])
+  })
+
   it('does not make a shares folder for a space that never shares', async () => {
     const fake = installFakeDrive()
     drive = fake

@@ -13,6 +13,9 @@ import type {
   FileBody,
   FileInput,
   FileStatus,
+  PadFileEntry,
+  PadSetEntry,
+  PadStorage,
   RootInfo,
   SpaceStorage,
   StorageBackend,
@@ -182,7 +185,43 @@ class DriveSpace implements SpaceStorage {
   }
 }
 
+const drivePads: PadStorage = {
+  async listSets(): Promise<PadSetEntry[]> {
+    return (await DriveAPI.listPadSetFolders()).map(folder => ({
+      ref: folder.id,
+      name: folder.appProperties?.padSetName || folder.name || folder.id,
+      modified: folder.modifiedTime ?? null,
+    }))
+  },
+
+  async ensureSet(name: string): Promise<string> {
+    const ref = await DriveAPI.ensurePadSetFolder(name)
+    await DriveAPI.updatePadSetFolderMetadata(ref, name)
+    return ref
+  },
+
+  async listFiles(setRef: string): Promise<PadFileEntry[]> {
+    return (await DriveAPI.listPadSetFiles(setRef)).map(file => ({
+      ref: file.id,
+      name: file.name ?? '',
+      padKey: file.appProperties?.padKey ?? null,
+      type: file.mimeType || 'audio/mpeg',
+      size: Number(file.size) || 0,
+    }))
+  },
+
+  async addFile(setRef: string, padKey: string, audio: Blob): Promise<void> {
+    await DriveAPI.uploadPadFile(setRef, padKey, audio)
+  },
+
+  trashFiles: setRef => DriveAPI.trashFilesInFolder(setRef),
+
+  read: fileRef => DriveAPI.downloadFileBinary(fileRef),
+}
+
 export const driveStorage: StorageBackend = {
+  pads: drivePads,
+
   available: () => DriveAPI.checkDriveAccess(),
 
   async inspectRoot(ref: string): Promise<RootInfo | null> {

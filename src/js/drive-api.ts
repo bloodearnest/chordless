@@ -658,6 +658,7 @@ export async function trashFilesInFolder(folderId: string): Promise<void> {
 export async function uploadPadFile(folderId: string, key: string, blob: Blob): Promise<DriveFile> {
   const metadata: DriveFileWrite = {
     name: `${key}.mp3`,
+    mimeType: 'audio/mpeg',
     parents: [folderId],
     appProperties: {
       category: PADSET_FILE_CATEGORY,

@@ -9,7 +9,7 @@ interface is shaped so that it would not mean touching the engine.
 **Status (2026-10-20):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
 and the in-memory backend (`tests/memory-storage.ts`) pass one conformance suite
 (`tests/storage-conformance.ts`). The sync engine (`drive-sync.ts`, `sync/*`) and the share links
-(`share-manager.ts`) work through the interface; the engine tests run on the memory backend. Left:
+(`share-manager.ts`) work through the interface, and so do the pad sets (`pad-set-service.ts`); the engine and pad service tests run on the memory backend. Left:
 see "Still on drive-api.ts".
 
 ## The shape
@@ -30,6 +30,16 @@ one space's files in two **collections**, `songs` and `setlists`.
 | `status(ref)` | a file wherever it is: `{trashed}`, or null if it does not exist |
 | `readText(ref)` | a file's text |
 | `create`, `createMany`, `update` | write; each says whether the backend stored exactly what was sent (`intact`) |
+
+## Pad sets
+
+`backend.pads` (a `PadStorage`) lists the sets, makes or finds one by name, lists its files, adds
+a file for a key, puts a set's files in the bin and reads one file's audio. The pad sets are still
+the account's, not a space's, so they hang off the backend, not a `SpaceStorage`; when they move
+into the space (docs/SPACES.md, "Pads in team spaces") `pads` moves to `SpaceStorage` and the
+Worker serves it to members, streaming the audio. `pad-set-service.ts` takes its storage from
+`setPadStorage` (Drive's by default), as the engine takes `storage`. Its device-side cache (the
+service worker cache, and `padset-cache-state` in localStorage) is the app's own and unchanged.
 
 ## Why refs and props, not paths
 
@@ -75,7 +85,6 @@ are enforced per collection and ref, and not by walking Drive parents.
 
 ## Still on drive-api.ts
 
-- **Pads** (pad sets are folders of audio files, per account, not yet per space).
 - **Dead code**: `listSetlists`, `downloadSetlist`, `downloadChordProFile`, `createShareFile`,
   `updateShareFile`, `endShareFile`, `listShareFiles`, `listSpaces` and `batchDeleteFiles` have no
   caller in the app any more (the dev page `src/dev/drive-audit.js` uses `downloadSetlist`); only

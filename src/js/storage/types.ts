@@ -99,6 +99,41 @@ export interface SpaceStorage {
   trash(ref: string): Promise<void>
 }
 
+/** A set of pad audio files, one for each key (`pad-keys.ts`) */
+export interface PadSetEntry {
+  ref: string
+  name: string
+  /** When the set last changed, by the backend's clock; what the device's copy is checked against */
+  modified: string | null
+}
+
+/** One file of a pad set */
+export interface PadFileEntry {
+  ref: string
+  name: string
+  /** The key the file was stored for, if the backend was told (otherwise it is in the name) */
+  padKey: string | null
+  type: string
+  size: number
+}
+
+/**
+ * The pad sets: audio the user uploads, one set per folder. For now they are the account's, not a
+ * space's (docs/SPACES.md, "Pads in team spaces", moves them into the space); they are read-only
+ * to members and large, so a backend streams them and keeps nothing.
+ */
+export interface PadStorage {
+  listSets(): Promise<PadSetEntry[]>
+  /** The set of this name, made if there is none, and marked as changed */
+  ensureSet(name: string): Promise<string>
+  /** The files of a set (none, for a set that is not there) */
+  listFiles(setRef: string): Promise<PadFileEntry[]>
+  addFile(setRef: string, padKey: string, audio: Blob): Promise<void>
+  /** Put every file of a set in the bin, and leave the set */
+  trashFiles(setRef: string): Promise<void>
+  read(fileRef: string): Promise<ArrayBuffer>
+}
+
 /** A backend: where spaces are found, made and opened */
 export interface StorageBackend {
   /** Whether the person can use the backend at all (signed in, and it answers) */
@@ -111,6 +146,7 @@ export interface StorageBackend {
   ensureRoot(name: string, spaceId: string): Promise<{ ref: string; isNew: boolean }>
   renameRoot(ref: string, name: string): Promise<void>
   space(rootRef: string): SpaceStorage
+  readonly pads: PadStorage
   /**
    * How many writes the backend has refused for lack of permission (not for a rate limit), since
    * it was loaded. The sync asks after a push to find out whether the person can only read.

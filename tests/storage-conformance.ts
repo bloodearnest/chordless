@@ -284,6 +284,62 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
       })
     })
 
+    describe('pad sets', () => {
+      const pads = () => backend.pads
+      // Every byte value, so anything that treated the audio as text would corrupt it
+      const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i)
+      const audio = (bytes: Uint8Array) => new Blob([bytes as BlobPart], { type: 'audio/mpeg' })
+
+      it('has no sets until one is made, and makes a set once for a name', async () => {
+        expect(await pads().listSets()).to.deep.equal([])
+        const ref = await pads().ensureSet('Warm pads')
+        expect(await pads().ensureSet('Warm pads')).to.equal(ref)
+        const other = await pads().ensureSet('Bright pads')
+        expect(other).to.not.equal(ref)
+        const sets = await pads().listSets()
+        expect(sets.map(set => set.name).sort()).to.deep.equal(['Bright pads', 'Warm pads'])
+        expect(sets.find(set => set.ref === ref)?.modified).to.be.a('string')
+      })
+
+      it('keeps a file for each key, with its type and size, and gives its audio back byte for byte', async () => {
+        const ref = await pads().ensureSet('Warm pads')
+        await pads().addFile(ref, 'C', audio(allBytes))
+        await pads().addFile(ref, 'F#', audio(new Uint8Array([1, 2, 3])))
+
+        const files = await pads().listFiles(ref)
+        expect(files.map(file => file.padKey).sort()).to.deep.equal(['C', 'F#'])
+        const c = must(files.find(file => file.padKey === 'C'))
+        expect(c.type).to.equal('audio/mpeg')
+        expect(c.size).to.equal(256)
+        expect(c.name).to.contain('C')
+        expect(Array.from(new Uint8Array(await pads().read(c.ref)))).to.deep.equal(
+          Array.from(allBytes)
+        )
+      })
+
+      it('keeps the files of one set apart from another', async () => {
+        const first = await pads().ensureSet('One')
+        const second = await pads().ensureSet('Two')
+        await pads().addFile(first, 'C', audio(new Uint8Array([1])))
+        expect(await pads().listFiles(second)).to.deep.equal([])
+      })
+
+      it('moves the files of a set to the bin, and leaves the set to be filled again', async () => {
+        const ref = await pads().ensureSet('Warm pads')
+        await pads().addFile(ref, 'C', audio(new Uint8Array([1])))
+        await pads().trashFiles(ref)
+
+        expect(await pads().listFiles(ref)).to.deep.equal([])
+        expect((await pads().listSets()).map(set => set.ref)).to.deep.equal([ref])
+        await pads().addFile(ref, 'C', audio(new Uint8Array([2])))
+        expect(await pads().listFiles(ref)).to.have.length(1)
+      })
+
+      it('has no files for a set that is not there', async () => {
+        expect(await pads().listFiles('no-such-set')).to.deep.equal([])
+      })
+    })
+
     describe('members', () => {
       it('lists nobody for a space that is shared with no one', async () => {
         expect(await space.members()).to.deep.equal([])
