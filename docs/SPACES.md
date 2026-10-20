@@ -458,6 +458,15 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
   dev machine's own connection (the dev Worker runs there), not of a deployed Worker, so they are a
   pessimistic guide; the plan's production limits are still unchecked on a real deployment. A pad
   set (12 files of a few MB) would take tens of seconds to upload on a slow link, once.
+- **Item 7 result (2026-10-20): passed.** The Worker signed an RS256 JWT with WebCrypto and Google
+  gave a token with the `drive` scope, no user present. As a Content manager of the shared drive the
+  service account read the team folder (`canAddChildren` and `canTrash` true, `canDelete` false),
+  listed it **including files the owner's Chordless client had made** (which `drive.file` hides from
+  any other client), created a file, read it back, replaced its content and trashed it. The permanent
+  delete of the trashed file answered 404, not the expected 403: it does not say whether a Content
+  manager may delete for good, and does not matter, as the app only trashes. Still unchecked: that an
+  external service account can be added under a stricter sharing policy than this one, and the
+  nonprofit tier.
 - **Item 6, no Worker** (run as the *other* account, a member of the shared drive, with the member
   code from the owner part; the code now includes the team folder's id):
   - **6a** "try my own token on the team's files": this account's own Chordless sign-in lists the team
