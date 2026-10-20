@@ -477,6 +477,13 @@ If 1 or 2 fail, stop and rethink (fallback: team folder only in the owner's My D
     picks the team folder with this account. The pick grants the folder, but listing it must still
     show nothing and the old owner's files must stay refused, which is why there is one live owner
     per team space and succession is a copy.
+  - **Item 6 result (2026-10-20): passed.** Run as the Gmail account, a member of the shared drive.
+    6a: nothing listed, and the folder, a file in it and a file in a subfolder all refused (404), so
+    `drive.file` is per user and per client on a shared drive too, and the broker is needed. 6b: the
+    pick granted the folder it was given and nothing under it (listing showed nothing; the old
+    owner's song stayed refused), so a new owner cannot adopt the folder's contents and succession is
+    a copy. The page marked one row "fail" only because the account picked the parent folder
+    ("Chordless") and not the spike's own subfolder, which the pick made no difference to.
 - It uses the lowest roles that work: a Content manager of the shared drive (or any editor), not a
   Manager, since the app only ever trashes.
 
