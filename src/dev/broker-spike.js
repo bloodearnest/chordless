@@ -60,7 +60,7 @@ $('pick').addEventListener('click', async () => {
     // (kept for this visit only)
   }
   try {
-    const folder = await pickFolder(apiKey, '376758830135')
+    const folder = await pickFolder(apiKey, '818185619377')
     if (!folder) return
     $('parent').value = folder.id
     $('picked').textContent = `Picked "${folder.name}"`
@@ -379,7 +379,7 @@ $('adopt').addEventListener('click', async () => {
     const apiKey = $('api-key').value.trim()
     if (!apiKey) throw new Error('Enter the Picker API key in the owner part first')
     status.textContent = 'Pick the team folder in the Google Picker…'
-    const folder = await pickFolder(apiKey, '376758830135')
+    const folder = await pickFolder(apiKey, '818185619377')
     if (!folder) throw new Error('Nothing picked')
     record(
       '6b: picked a folder',

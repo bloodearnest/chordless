@@ -71,7 +71,7 @@ type WorkerMessageType =
 
 // Configuration
 export const GOOGLE_CLIENT_ID =
-  '376758830135-jnbcm135rqisd69g54tgjvmfhrlkmolb.apps.googleusercontent.com'
+  '818185619377-gi719ehrq0937cmuf0qapms2r68vl3dc.apps.googleusercontent.com'
 const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
 
 // The worker serves the auth routes (/oauth/*, /session/*) on the same origin as
