@@ -236,6 +236,27 @@ describe('SpaceDB: spaces kept as organisations', () => {
     store.db?.close()
   })
 
+  it('keeps the old database when a space cannot be kept, to try again next time', async () => {
+    const store = new SpaceDB(names)
+    await store.init()
+    // Every name "Taken", "Taken (2)" ... up to the last one tried is another space's
+    await store.createSpace('Taken')
+    for (let n = 2; n <= 20; n++) await store.createSpace(`Taken (${n})`)
+    await makeLegacy([
+      { id: 'a', name: 'Fine' },
+      { id: 'z', name: 'Taken' },
+    ])
+
+    const again = new SpaceDB(names)
+    await again.init()
+
+    expect(await again.getSpace('a')).to.be.ok
+    expect(await again.getSpace('z')).to.equal(undefined)
+    expect(await databases()).to.include(names.legacyName)
+    store.db?.close()
+    again.db?.close()
+  })
+
   it('makes nothing of the old database when there never was one', async () => {
     const store = new SpaceDB(names)
     await store.init()
@@ -244,7 +265,7 @@ describe('SpaceDB: spaces kept as organisations', () => {
     store.db?.close()
   })
 
-  it('keeps a space already in the new database, and adds the rest, when it runs again', async () => {
+  it('keeps a space already in the new database, and adds the rest, under another name if need be, when it runs again', async () => {
     await makeLegacy([
       { id: 'a', name: 'Grace', driveFolderId: 'old-link' },
       { id: 'c', name: 'Taken' },
@@ -264,8 +285,8 @@ describe('SpaceDB: spaces kept as organisations', () => {
 
     expect(must(await second.getSpace('a')).rootRef).to.equal('newer-link')
     expect(await second.getSpace('d')).to.be.ok
-    // (the name was taken, by another id: it stays behind, and the others still come)
-    expect(await second.getSpace('e')).to.equal(undefined)
+    // (the name was taken by another space: it comes under another, and is not lost)
+    expect(must(await second.getSpace('e')).name).to.equal('Taken (2)')
     expect(await databases()).to.not.include(names.legacyName)
     first.db?.close()
     second.db?.close()

@@ -93,12 +93,15 @@ export class SpaceDB {
 
   /**
    * Bring the spaces of the database they used to be kept in (and the Drive folder link under its
-   * new name), then remove that database. Spaces already here win, so it is safe to run again, or
-   * in two tabs at once; one that cannot be added (a name already taken) is left behind and said.
+   * new name), then remove that database. A space already here (by id) is left as it is, so this
+   * is safe to run again, or in two tabs at once. One whose name another space has taken since is
+   * kept under "Name (2)" and so on, so none is lost. If any cannot be kept, the old database
+   * stays, to try again next time.
    */
   async #moveFromLegacy(): Promise<void> {
     const legacy = await openLegacyDatabase(this.#legacyName)
     if (!legacy) return
+    let allKept = true
     try {
       const old: LegacySpace[] = legacy.objectStoreNames.contains(LEGACY_STORE)
         ? await requestResult(legacy.transaction([LEGACY_STORE]).objectStore(LEGACY_STORE).getAll())
@@ -107,10 +110,14 @@ export class SpaceDB {
         const moved: Space = { ...space }
         const rootRef = space.rootRef ?? driveFolderId
         if (rootRef) moved.rootRef = rootRef
-        await this.#addIfNew(moved)
+        allKept = (await this.#keep(moved)) && allKept
       }
     } finally {
       legacy.close()
+    }
+    if (!allKept) {
+      console.error('[SpaceDB] Some spaces were not moved: the old database is kept')
+      return
     }
     await new Promise<void>(resolve => {
       const request = indexedDB.deleteDatabase(this.#legacyName)
@@ -119,16 +126,29 @@ export class SpaceDB {
     })
   }
 
-  #addIfNew(space: Space): Promise<void> {
+  /** Whether the space is here now: already, or added (under "Name (2)" and so on if need be) */
+  async #keep(space: Space): Promise<boolean> {
+    if (await this.getSpace(space.id)) return true
+    for (let n = 1; n <= 20; n++) {
+      const named = n === 1 ? space : { ...space, name: `${space.name} (${n})` }
+      if (await this.#tryAdd(named)) {
+        if (n > 1) console.warn(`[SpaceDB] "${space.name}" was taken: moved as "${named.name}"`)
+        return true
+      }
+    }
+    return false
+  }
+
+  /** Add a space; false when it cannot be (its name is another space's, or its id is here) */
+  #tryAdd(space: Space): Promise<boolean> {
     return new Promise(resolve => {
       const tx = this.#transaction('readwrite')
-      const request = tx.objectStore(STORE).add(space)
-      request.onerror = event => {
-        // (already here under that id, or the name is taken)
-        console.warn(`[SpaceDB] Space "${space.name}" was not moved:`, request.error?.message)
+      let added = true
+      tx.objectStore(STORE).add(space).onerror = event => {
+        added = false
         event.preventDefault()
       }
-      tx.oncomplete = tx.onabort = () => resolve()
+      tx.oncomplete = tx.onabort = () => resolve(added)
     })
   }
 
