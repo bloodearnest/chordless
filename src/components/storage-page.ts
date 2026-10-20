@@ -1,7 +1,9 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { StoredBlob } from '../js/auth-db.ts'
+import type { Space } from '../js/data-types.ts'
 import type { UserInfo } from '../js/google-auth.ts'
+import { deleteSpace, getCurrentSpace, listSpaces } from '../js/space.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -33,6 +35,9 @@ export class StoragePage extends LitElement {
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
+    _otherSpaces: { state: true },
+    _spaceToDelete: { state: true },
+    _deleteSpaceError: { state: true },
     _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
 
@@ -42,6 +47,10 @@ export class StoragePage extends LitElement {
   declare authStatus: string
   declare userInfo: UserInfo | null
   declare _clearError: string
+  /** The spaces on this device other than the current one: the ones that can be deleted */
+  declare _otherSpaces: Space[]
+  declare _spaceToDelete: string
+  declare _deleteSpaceError: string
   declare _authMessage: AuthMessage | null
 
   /** Starts the app afresh once everything stored has been cleared (a test gives its own) */
@@ -51,6 +60,7 @@ export class StoragePage extends LitElement {
 
   _logoutModal: Ref<AppModal>
   _clearDataModal: Ref<AppModal>
+  _deleteSpaceModal: Ref<AppModal>
 
   static override styles = [
     panelStyles,
@@ -211,6 +221,10 @@ export class StoragePage extends LitElement {
     super()
     this._logoutModal = createRef()
     this._clearDataModal = createRef()
+    this._deleteSpaceModal = createRef()
+    this._otherSpaces = []
+    this._spaceToDelete = ''
+    this._deleteSpaceError = ''
     this.isAuthenticated = false
     this.signInExpired = false
     this.authStatus = 'checking'
@@ -219,7 +233,20 @@ export class StoragePage extends LitElement {
 
   override async connectedCallback() {
     super.connectedCallback()
-    await this.checkAuthStatus()
+    await Promise.all([this.checkAuthStatus(), this._loadOtherSpaces()])
+  }
+
+  async _loadOtherSpaces(): Promise<void> {
+    try {
+      const { id } = getCurrentSpace()
+      this._otherSpaces = (await listSpaces()).filter(space => space.id !== id)
+    } catch (error) {
+      console.error('[Storage] Failed to list the spaces:', error)
+      this._otherSpaces = []
+    }
+    if (!this._otherSpaces.some(space => space.id === this._spaceToDelete)) {
+      this._spaceToDelete = ''
+    }
   }
 
   async checkAuthStatus(): Promise<void> {
@@ -467,7 +494,15 @@ export class StoragePage extends LitElement {
           Clear Local Data
         </button>
         ${this._clearError ? html`<p role="alert">❌ Failed to clear data: ${this._clearError}</p>` : ''}
+        ${this._renderDeleteSpace()}
       </div>
+      <app-modal
+        id="delete-space-modal"
+        ${ref(this._deleteSpaceModal)}
+        type="confirm"
+        heading="Delete space?"
+        confirm-label="Delete Space"
+      ></app-modal>
       <app-modal
         id="clear-data-modal"
         ${ref(this._clearDataModal)}
@@ -485,6 +520,59 @@ export class StoragePage extends LitElement {
         message="This signs you out and revokes Chordless's access to your Google Drive at Google (which needs the network). Other devices signed in with this Google account will need to connect again too. Your setlists and songs stay on this device and in Drive."
       ></app-modal>
     `
+  }
+
+  _renderDeleteSpace() {
+    if (this._otherSpaces.length === 0) return nothing
+    return html`
+      <h4>Delete a space</h4>
+      <p>
+        Remove a space you no longer use from this device, with its setlists and songs. To delete
+        the space you are working in, switch to another first.
+      </p>
+      <select
+        id="space-to-delete"
+        aria-label="Space to delete"
+        .value=${this._spaceToDelete}
+        @change=${(e: Event) => {
+          this._spaceToDelete = (e.target as HTMLSelectElement).value
+        }}
+      >
+        <option value="">Choose a space…</option>
+        ${this._otherSpaces.map(
+          space =>
+            html`<option value=${space.id} ?selected=${space.id === this._spaceToDelete}>${space.name}</option>`
+        )}
+      </select>
+      <button
+        id="delete-space"
+        class="btn block danger"
+        ?disabled=${!this._spaceToDelete}
+        @click=${this._handleDeleteSpace}
+      >
+        Delete Space
+      </button>
+      ${this._deleteSpaceError ? html`<p role="alert">❌ Failed to delete the space: ${this._deleteSpaceError}</p>` : ''}
+    `
+  }
+
+  async _handleDeleteSpace(): Promise<void> {
+    const space = this._otherSpaces.find(each => each.id === this._spaceToDelete)
+    const modal = this._deleteSpaceModal.value
+    if (!space || !modal) return
+    modal.message =
+      `Delete "${space.name}"? This deletes its setlists and songs on this device, and anything ` +
+      "not yet synced to Google Drive is lost. Its folder in Google Drive is not touched. This can't be undone."
+    if (!(await modal.ask())) return
+    this._deleteSpaceError = ''
+    try {
+      await deleteSpace(space.id)
+      await this._loadOtherSpaces()
+      this.renderRoot.querySelector('select-space')?.refresh()
+    } catch (error) {
+      console.error('[Storage] Failed to delete the space:', error)
+      this._deleteSpaceError = errorMessage(error)
+    }
   }
 
   async _authorize(): Promise<void> {

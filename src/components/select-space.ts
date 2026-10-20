@@ -111,6 +111,11 @@ export class SelectSpace extends LitElement {
     })
   }
 
+  /** Read the spaces again (one was deleted elsewhere on the page) */
+  refresh(): void {
+    this._spaces.run()
+  }
+
   async _handleSwitch(space: Space): Promise<void> {
     if (space.name === this._spaces.value?.current) {
       return

@@ -85,6 +85,10 @@ a re-pointing of the folder.
   (`current-space-name`) for synchronous rendering.
 - On first load a default space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
+- **Deleting a space:** Storage page, Danger Zone, "Delete a space": any space but the one being
+  worked in (switch first), after a confirmation that names it. It removes the space's record and
+  its local database (setlists, songs, charts); nothing in Google Drive is touched, so a folder it
+  synced to stays there for the user to delete.
 - Spaces are completely isolated: songs and setlists belong to exactly one; switching reloads the
   app on the other database; a setlist references only its own space's songs; the same CCLI song in
   two spaces is two separate instances.
