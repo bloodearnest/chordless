@@ -221,6 +221,37 @@ Roles, pads and conflicts are identical in both modes (the Worker enforces them 
 the credential provider behind the transport differs. Build the owner-token path first and slot the
 service account in as a second provider.
 
+## Setting up and joining a team space: decisions so far (2026-10-20)
+
+Agreed with the owner of the project:
+- **Google accounts only**, for members as well as owners. Anyone can make a Google account on
+  their existing email address (accounts.google.com/signup, "use your existing email"), so the only
+  blocker is someone who will not use Google at all; that is accepted. Share links (read-only, no
+  account) cover the rest. A second identity provider (emailed link) is possible later: the broker
+  takes a Worker-issued session token and keys members by verified email, so it does not care how
+  the email was verified.
+- **A member signs in as everyone does** (`initCodeClient` popup). The Worker verifies the ID token
+  and issues its own short-lived session token, renewed in `/session/refresh`. A member needs only
+  `openid email profile`: all their Drive traffic for the team space goes through the Worker, so
+  an unticked Drive box affects only their personal space.
+- **Pad sets** are not in the broker's first cut: they are the account's today
+  (docs/STORAGE_API.md); they move into the space, then the Worker streams them.
+
+Proposed, not yet confirmed:
+- **Invites by email**, each attached to a role; a member opens the invite link and signs in. The
+  invite binds to whichever Google account redeems it first (the admin sees which), as strict email
+  matching would lock out people who sign in with another address than the one invited.
+- **Ask first whether the team has a Google shared drive.** If so, go straight to the service
+  account (the owner's token is never stored; the Worker can make the team folder itself once the
+  service account is a member of the drive, so the Picker is not needed for that path). If not,
+  the owner-token path, with a My Drive parent picked with the Picker. Owner-token stays the
+  default for free Gmail users.
+- **Still to check on a deployed Worker:** request-size limits for pad uploads, whether an external
+  service account can be added to a shared drive under a stricter sharing policy, and whether the
+  nonprofit tier has shared drives.
+
+The Worker serves the storage API (docs/STORAGE_API.md) to members.
+
 ## Roles
 
 owner (implicitly admin) > admin > writer > reader. Worker enforcement:
