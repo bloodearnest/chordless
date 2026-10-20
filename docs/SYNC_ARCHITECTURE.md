@@ -43,10 +43,16 @@ Orchestration             sync-orchestrator.ts: wraps the engine, reports progre
 Sync engine               drive-sync.ts: DriveSyncManager (folder, inventory, access, reset);
                           sync/pull.ts, sync/push.ts, sync/changes.ts: what it pulls and pushes
         │
-File metadata             drive-metadata.js: names, MIME types and appProperties
+File metadata             drive-metadata.ts: names, types and properties of the files
         │
-Drive API                 drive-api.js: REST calls via fetch
+Storage API               storage/types.ts: roots, and a space's files by `ref`, `props` and `rev`
+        │                 (docs/STORAGE_API.md)
+Backend                   storage/drive-storage.ts → drive-api.ts: REST calls via fetch
 ```
+
+The engine does not know it is Drive: it takes a `StorageBackend` (`DriveSyncManager`'s `storage`
+option, Google Drive unless a test says otherwise). The records still keep `driveFileId` /
+`driveChecksum` for the file's `ref` and `rev` (renaming them is a migration of its own).
 
 Sync currently runs on the **main thread**, started by the user from the Storage
 page. The orchestrator and engine have no DOM dependencies, so they could run in the

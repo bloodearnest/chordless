@@ -569,7 +569,10 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 1. [ ] Principle in CLAUDE.md; this doc and the consolidation.
 2. [x] Spike (above): passed, see "Spike results".
 3. [ ] Space abstraction: space id + `driveFolderId` identity, folder-location Picker on create,
-   shared-drive flags, no name matching, per-space transport.
+   shared-drive flags, no name matching, per-space transport. **The storage API (docs/STORAGE_API.md)
+   is built:** the sync engine and share links work through `StorageBackend` / `SpaceStorage`, so
+   per-space transport is a matter of which backend a space is given, and the broker (item 7) is
+   another backend for it.
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
    and since checked against a real shared drive: spike 2 passed). The folder is already found by `driveFolderId`
@@ -583,7 +586,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker broker: Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker broker (serves the storage API to members): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
    and the preference.

@@ -6,10 +6,11 @@ Worker broker serves the same calls to team-space members (docs/SPACES.md), and 
 them in memory for tests. A second real backend (Dropbox, OneDrive, WebDAV) is not planned yet; the
 interface is shaped so that it would not mean touching the engine.
 
-**Status (2026-10-20):** the interface, the Drive adapter (`src/js/storage/drive-storage.ts`) and
-the in-memory backend (`tests/memory-storage.ts`) exist and pass one conformance suite
-(`tests/storage-conformance.ts`). The sync engine still calls `drive-api.ts` directly; moving it
-onto the interface is the next step (see "Moving the engine over").
+**Status (2026-10-20):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
+and the in-memory backend (`tests/memory-storage.ts`) pass one conformance suite
+(`tests/storage-conformance.ts`). The sync engine (`drive-sync.ts`, `sync/*`) and the share links
+(`share-manager.ts`) work through the interface; the engine tests run on the memory backend. Left:
+see "Still on drive-api.ts".
 
 ## The shape
 
@@ -55,13 +56,30 @@ or in the inventory but its status says trashed, a deleted one has no status, a 
 space has one but is not in the inventory). Run it on any new backend first.
 
 Not in the interface, because only Drive has them: shared-drive flags, the `Chordless/` parent
-folder, the share-link calls (public permissions), the pad sets. Those stay in `drive-api.ts` until
-they move over too.
+folder and how a root is found by name, the md5 check that Drive stored what was sent (it answers
+`intact`), the filters of the song and setlist listings.
 
-## Moving the engine over
+**Share links** are in it: the `shares` collection, `create(..., { publicLink: true })` for a file
+anyone with its ref can read (the Worker's `/api/share/<id>` still reads it with a Drive file id, so
+a share link is Drive-specific until that is generalised), and `unpublish` then `trash` to end one.
+
+## Using it
 
 `DriveSyncManager` takes a `storage` option (default `driveStorage`) beside `db`, `folderLink` and
-`memberCache`; the engine tests pass a `MemoryStorage` instead of installing FakeDrive. The Drive
-adapter keeps its own tests on FakeDrive (`drive-api-*`, `storage-drive`). The order: the manager
-(folder, members, access, inventory), then pull, push and revert, then shares and pads, then the
-records' `driveFileId` / `driveChecksum` become `ref` / `rev` in one migration of its own.
+`memberCache`, and opens the space's files with `manager.space`. The engine tests pass a
+`MemoryStorage` (docs/TESTING.md). A second backend means an adapter that passes the conformance
+suite, and a way to keep `props` (see above).
+
+The Worker broker (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
+are enforced per collection and ref, and not by walking Drive parents.
+
+## Still on drive-api.ts
+
+- **Pads** (pad sets are folders of audio files, per account, not yet per space).
+- **Dead code**: `listSetlists`, `downloadSetlist`, `downloadChordProFile`, `createShareFile`,
+  `updateShareFile`, `endShareFile`, `listShareFiles`, `listSpaces` and `batchDeleteFiles` have no
+  caller in the app any more (the dev page `src/dev/drive-audit.js` uses `downloadSetlist`); only
+  their tests do. Remove them with those tests when convenient.
+- **Records**: `driveFileId`, `driveChecksum` and `driveModifiedTime` become `ref`, `rev` and
+  `modified` in one IndexedDB migration of their own. The space record's `driveFolderId` and
+  `driveClientId` likewise.
