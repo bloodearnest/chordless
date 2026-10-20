@@ -7,7 +7,7 @@ own state, so a mistake in one cannot touch the other.
 | Stack | Holds |
 |---|---|
 | `cloudflare/` | the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
-| `google/` | the `setalight` project, the Drive and Picker APIs, the Team Key (Picker, from our origins) and Sharing Key (Drive only; the Worker's `GOOGLE_API_KEY`), the `broker` service account |
+| `google/` | the `setalight` project, the Drive and Picker APIs, the Team Key (Picker, from our origins) and Sharing Key (Drive only; the Worker's `GOOGLE_API_KEY`), the `broker` service account; the 17 default APIs (BigQuery, Cloud Storage, ...) are switched off by a `removed` block |
 
 ## Who owns what
 

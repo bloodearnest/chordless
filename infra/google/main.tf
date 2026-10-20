@@ -4,9 +4,6 @@
 # the service account's key (it would land in the state file: made by hand, kept in a Worker
 # secret), and the API key *values* (read them in the console). Adding the service account to a
 # team's shared drive is a Drive admin action.
-# The project also has the APIs a new project enables by default (BigQuery, Cloud Storage, Logging,
-# ...). They are left alone on purpose: nothing in chordless uses them.
-
 terraform {
   required_version = ">= 1.5"
   required_providers {
@@ -107,4 +104,18 @@ import {
 import {
   to = google_service_account.broker
   id = "projects/setalight/serviceAccounts/broker@setalight.iam.gserviceaccount.com"
+}
+
+# The APIs a new project enables by default (BigQuery, Cloud Storage, Datastore, Dataform, Dataplex,
+# Cloud Trace, ... 17 in all) are switched off: nothing in chordless uses them, and the project has no
+# billing, so there is nothing behind them. They were declared, then removed with this block, which
+# makes Terraform disable them (2026-10-20). It stays as the record. Still on besides the two above:
+# Logging, Monitoring, Service Usage and Service Management, which `gcloud` and Terraform need.
+# If an API is ever wanted again, declare it as a google_project_service like the two above.
+removed {
+  from = google_project_service.unused
+
+  lifecycle {
+    destroy = true
+  }
 }
