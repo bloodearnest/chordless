@@ -1,6 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { driveStorage } from '../src/js/storage/drive-storage.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
+import { must } from './must.ts'
 import { describeStorage } from './storage-conformance.ts'
 
 const { afterEach, describe, it } = window
@@ -148,6 +149,103 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
     stored.appProperties = undefined
     const [bare] = await driveStorage.pads.listFiles(ref)
     expect([bare.name, bare.padKey]).to.deep.equal(['', null])
+  })
+
+  describe('share files', () => {
+    const share = {
+      name: 'setlist-1.share',
+      props: { type: 'share' },
+      type: 'application/octet-stream',
+    }
+    // Every byte value, so anything that treated the file as text would corrupt it
+    const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i)
+
+    async function makeSpace() {
+      const fake = installFakeDrive()
+      drive = fake
+      const root = await driveStorage.ensureRoot('Grace Church', 'space-1')
+      return { fake, space: driveStorage.space(root.ref) }
+    }
+
+    it('is made readable by anyone with the link, though not discoverable, in a shares folder of its own', async () => {
+      const { fake, space } = await makeSpace()
+      const { file } = await space.create('shares', share, allBytes, { publicLink: true })
+      const stored = fake.files.get(file.ref)
+      expect(stored.parents).to.deep.equal([
+        fake.findByPath(['Chordless', 'Grace Church', 'shares']).id,
+      ])
+      expect(stored.permissions).to.deep.equal([
+        { id: 'anyoneWithLink', type: 'anyone', role: 'reader', allowFileDiscovery: false },
+      ])
+      expect(fake.findByPath(['Chordless', 'Grace Church', 'shares']).permissions).to.deep.equal([])
+      expect(fake.anonymousDownload(file.ref)).to.deep.equal({ status: 200, bytes: allBytes })
+    })
+
+    it('is updated in place: the same ref, new content, the link unchanged', async () => {
+      const { fake, space } = await makeSpace()
+      const { file } = await space.create('shares', share, new Uint8Array([1, 2, 3]), {
+        publicLink: true,
+      })
+      const updated = await space.update(file.ref, share, new Uint8Array([9, 8, 7]))
+      expect(updated.file.ref).to.equal(file.ref)
+      expect(updated.file.rev).to.not.equal(file.rev)
+      expect(Array.from(must(fake.anonymousDownload(file.ref).bytes))).to.deep.equal([9, 8, 7])
+      expect(fake.files.get(file.ref).permissions).to.have.length(1)
+    })
+
+    it('ends by taking back the link as well as binning the file, never by deleting it', async () => {
+      const { fake, space } = await makeSpace()
+      const { file } = await space.create('shares', share, new Uint8Array([1]), {
+        publicLink: true,
+      })
+      // Binning alone would leave it public, as real Drive does
+      fake.files.get(file.ref).trashed = true
+      expect(fake.anonymousDownload(file.ref).status).to.equal(200)
+      fake.files.get(file.ref).trashed = false
+
+      await space.unpublish(file.ref)
+      await space.trash(file.ref)
+
+      expect(fake.anonymousDownload(file.ref).status).to.equal(404)
+      expect(fake.files.get(file.ref).trashed).to.equal(true)
+      expect(fake.files.has(file.ref)).to.equal(true)
+    })
+
+    it('is binned again if it cannot be made public, and says why', async () => {
+      const { fake, space } = await makeSpace()
+      fake.failRequests({ method: 'POST', path: /permissions/, status: 403 })
+      let error: (Error & { status?: number }) | undefined
+      await space.create('shares', share, new Uint8Array([1]), { publicLink: true }).catch(e => {
+        error = e
+      })
+      expect(error?.message).to.match(/403/)
+      expect(error?.message).to.contain(
+        'your organisation may not allow links that anyone can open'
+      )
+      expect(error?.message).to.contain('song list to paste still works')
+      expect(error?.status).to.equal(403)
+      const [leftover] = fake.listFiles((f: any) => f.name === 'setlist-1.share')
+      expect(leftover.trashed).to.equal(true)
+    })
+
+    it('does not blame the space for a failure that is not a refusal', async () => {
+      const { fake, space } = await makeSpace()
+      for (const status of [401, 429, 500]) {
+        fake.failRequests({ method: 'POST', path: /permissions/, status })
+        let error: Error | undefined
+        await space.create('shares', share, new Uint8Array([1]), { publicLink: true }).catch(e => {
+          error = e
+        })
+        expect(error?.message, String(status)).to.contain(String(status))
+        expect(error?.message, String(status)).to.not.contain('organisation')
+      }
+      fake.failRequests({ method: 'POST', path: /permissions/, network: true })
+      let offline: Error | undefined
+      await space.create('shares', share, new Uint8Array([1]), { publicLink: true }).catch(e => {
+        offline = e
+      })
+      expect(offline?.message).to.not.contain('organisation')
+    })
   })
 
   it('does not make a shares folder for a space that never shares', async () => {

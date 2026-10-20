@@ -83,13 +83,18 @@ suite, and a way to keep `props` (see above).
 The Worker broker (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
 
-## Still on drive-api.ts
+## What is left
 
-- **Dead code**: `listSetlists`, `downloadSetlist`, `downloadChordProFile`, `createShareFile`,
-  `updateShareFile`, `endShareFile`, `listShareFiles`, `listSpaces` and `batchDeleteFiles` have no
-  caller in the app any more (the dev page `src/dev/drive-audit.js` uses `downloadSetlist`); only
-  their tests do. Remove them with those tests when convenient.
+- **Share links** are Drive-specific on the Worker's side: `/api/share/<id>` reads a Drive file id
+  with the sharing key, so a share link works only for Drive-backed spaces until that is
+  generalised.
+- **Pad sets** are the account's, not a space's: they move into `SpaceStorage` with the team spaces.
+- **Names**: `drive-sync.ts`, `DriveSyncManager`, `driveStorage` and some messages still say Drive.
+  They are accurate while Drive is the only backend.
 - **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).
+
+`drive-api.ts` is now only the Drive adapter's: nothing else in the app calls it (the dev pages
+under `src/dev/` still do, for inspecting Drive).
 
 Records keep what they know of their file as `fileRef`, `fileRev`, `fileModified` and (songs)
 `fileProps`; the space record keeps its root as `rootRef`. Before 2026-10-20 these were

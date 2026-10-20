@@ -270,21 +270,6 @@ export class FakeDrive {
       this.files.delete(file.id)
       return new Response(null, { status: 204 })
     }
-    if (path === '/batch/drive/v3' && method === 'POST') {
-      // Only deletes are batched by the app: answer each as Drive does, in one multipart body
-      const ids = [...body.matchAll(/^DELETE \/drive\/v3\/files\/([^\s?]+)(?:\?\S*)?\r?$/gm)].map(
-        m => m[1]
-      )
-      if (ids.length === 0) this._unsupported('a batch of anything but deletes')
-      const parts = ids.map((id, index) => {
-        const gone = this.files.delete(id)
-        const status = gone ? '204 No Content' : '404 Not Found'
-        return `--batch_fake\r\nContent-Type: application/http\r\nContent-ID: <response-item${index}>\r\n\r\nHTTP/1.1 ${status}\r\n`
-      })
-      return new Response(`${parts.join('\r\n')}\r\n--batch_fake--`, {
-        headers: { 'Content-Type': 'multipart/mixed; boundary=batch_fake' },
-      })
-    }
     if (path === '/upload/drive/v3/files' && method === 'POST') {
       if (params.get('uploadType') !== 'multipart')
         this._unsupported(`uploadType=${params.get('uploadType')}`)

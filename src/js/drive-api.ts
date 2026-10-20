@@ -20,7 +20,6 @@ import type {
   DriveFile,
   DriveFileList,
   DriveFileWrite,
-  Setlist,
   SpaceMember,
 } from './data-types.ts'
 import { APP_VERSION } from './drive-metadata.ts'
@@ -212,45 +211,6 @@ export async function renameFile(fileId: string, name: string): Promise<DriveFil
     method: 'PATCH',
     body: JSON.stringify({ name }),
   })
-}
-
-/**
- * Batch delete multiple files (up to 100 at a time)
- */
-export async function batchDeleteFiles(fileIds: string[]): Promise<number | undefined> {
-  if (fileIds.length === 0) return
-
-  const token = await getAccessToken()
-  const boundary = '===============7330845974216740156=='
-
-  // Build batch request body
-  let batchBody = ''
-  fileIds.forEach((fileId, index) => {
-    batchBody += `--${boundary}\r\n`
-    batchBody += `Content-Type: application/http\r\n`
-    batchBody += `Content-ID: <item${index}>\r\n\r\n`
-    batchBody += `DELETE /drive/v3/files/${fileId}?${ALL_DRIVES}\r\n\r\n`
-  })
-  batchBody += `--${boundary}--`
-
-  const response = await fetch('https://www.googleapis.com/batch/drive/v3', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${token}`,
-      'Content-Type': `multipart/mixed; boundary=${boundary}`,
-    },
-    body: batchBody,
-  })
-
-  if (!response.ok) {
-    throw new Error(`Batch delete failed: ${response.statusText}`)
-  }
-
-  // Parse batch response
-  const responseText = await response.text()
-  const successCount = (responseText.match(/HTTP\/\d\.\d 2\d\d/g) || []).length
-
-  return successCount
 }
 
 /**
@@ -731,8 +691,6 @@ export async function getSetlistsFolder(spaceFolderId: string): Promise<string> 
  * folder, readable by anyone with its id, though not discoverable. Only that file is public.
  */
 
-const SHARE_CONTENT_TYPE = 'application/octet-stream'
-
 /** The space's shares folder, or null if nothing has ever been shared (nothing is created) */
 export function findSharesFolder(spaceFolderId: string): Promise<string | null> {
   return findSubfolder(spaceFolderId, 'shares')
@@ -745,24 +703,6 @@ export async function getSharesFolder(spaceFolderId: string): Promise<string> {
     folderId = await createSubfolder(spaceFolderId, 'shares')
   }
   return folderId
-}
-
-/**
- * Upload a share file and make it readable by anyone with the link. If it can't be made
- * public (a Workspace admin may block that) the file is trashed again and the error thrown.
- */
-export async function createShareFile(
-  sharesFolderId: string,
-  metadata: DriveFileWrite,
-  encrypted: Uint8Array
-): Promise<DriveFile> {
-  const file = await createFile(
-    { ...metadata, parents: [sharesFolderId] },
-    encrypted,
-    SHARE_CONTENT_TYPE
-  )
-  await publishFile(file.id)
-  return file
 }
 
 /**
@@ -780,6 +720,18 @@ export async function publishFile(fileId: string): Promise<void> {
     // Best effort: a private leftover is harmless, and the error that matters is the original
     await trashFile(fileId).catch(e => console.warn('[DriveAPI] Could not trash share file:', e))
     throw refusedPublicLink(error)
+  }
+}
+
+/** Move a file to the Drive trash (recoverable); a file that is already gone is fine. Trashing alone leaves a public file readable. */
+export async function trashFile(fileId: string): Promise<void> {
+  try {
+    await driveRequest(`/files/${fileId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ trashed: true }),
+    })
+  } catch (error) {
+    if ((error as Partial<DriveError>).status !== 404) throw error
   }
 }
 
@@ -809,127 +761,6 @@ function refusedPublicLink(error: unknown): unknown {
     ),
     { status, cause: error }
   )
-}
-
-/** Replace a share file's content in place: the id, and so the link, stay the same */
-export async function updateShareFile(
-  fileId: string,
-  metadata: DriveFileWrite,
-  encrypted: Uint8Array
-): Promise<DriveFile> {
-  return updateFile(fileId, metadata, encrypted, SHARE_CONTENT_TYPE)
-}
-
-/** Move a file to the Drive trash (recoverable). Trashing alone leaves a public file readable. */
-export async function trashFile(fileId: string): Promise<void> {
-  try {
-    await driveRequest(`/files/${fileId}`, {
-      method: 'PATCH',
-      body: JSON.stringify({ trashed: true }),
-    })
-  } catch (error) {
-    if ((error as Partial<DriveError>).status !== 404) throw error
-  }
-}
-
-/**
- * End a share: remove the public permission, which is what stops anonymous downloads (a
- * trashed file can still be read by anyone with the link), then trash the file. A file that
- * is already gone is fine.
- */
-export async function endShareFile(fileId: string): Promise<void> {
-  try {
-    await driveRequest(`/files/${fileId}/permissions/anyoneWithLink`, { method: 'DELETE' })
-    await trashFile(fileId)
-  } catch (error) {
-    if ((error as Partial<DriveError>).status === 404) return
-    throw error
-  }
-}
-
-/** The space's live share files, with the appProperties that say whose they are and when they end */
-export async function listShareFiles(sharesFolderId: string): Promise<DriveFile[]> {
-  const files: DriveFile[] = []
-  let pageToken: string | undefined
-  do {
-    const query = `'${sharesFolderId}' in parents and trashed=false`
-    const page = await driveRequest(
-      `/files?q=${encodeURIComponent(query)}&spaces=drive&pageSize=1000&fields=nextPageToken,files(id,name,appProperties,modifiedTime)${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`
-    )
-    files.push(...page.files)
-    pageToken = page.nextPageToken
-  } while (pageToken)
-  return files
-}
-
-/**
- * Song and setlist files. Their metadata comes from drive-metadata.js; sync
- * creates and updates them with createFile/updateFile.
- */
-
-/**
- * Download a chordpro file from Drive
- */
-export async function downloadChordProFile(fileId: string): Promise<string> {
-  return downloadFile(fileId)
-}
-
-/**
- * Download a setlist from Drive
- */
-export async function downloadSetlist(fileId: string): Promise<Setlist> {
-  const content = await downloadFile(fileId)
-  return JSON.parse(content)
-}
-
-/**
- * List all setlists in space folder
- */
-export async function listSetlists(spaceFolderId: string): Promise<DriveFile[]> {
-  const setlistsFolderId = await getSetlistsFolder(spaceFolderId)
-
-  const query = `'${setlistsFolderId}' in parents and trashed=false and name contains '.json'`
-  const files: DriveFile[] = []
-  let pageToken: string | null = null
-
-  // Drive returns at most one page (default 100) per request, so follow nextPageToken
-  do {
-    let url =
-      `/files?q=${encodeURIComponent(query)}&spaces=drive` +
-      '&fields=nextPageToken,files(id,name,appProperties,modifiedTime,md5Checksum)' +
-      '&orderBy=modifiedTime desc&pageSize=1000'
-    if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
-
-    const result = await driveRequest(url)
-    files.push(...result.files)
-    pageToken = result.nextPageToken || null
-  } while (pageToken)
-
-  return files
-}
-
-/**
- * Discovery Operations
- */
-
-/**
- * List all Chordless space folders
- */
-export async function listSpaces(): Promise<DriveFile[]> {
-  const rootFolderId = await findOrCreateRootFolder()
-
-  // Find all folders in Chordless root with type=space
-  const query = `'${rootFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
-  const result = await driveRequest(
-    `/files?q=${encodeURIComponent(query)}&spaces=drive&fields=files(id,name,appProperties,createdTime)`
-  )
-
-  // Filter to only Chordless space folders
-  const spaces = result.files.filter(folder =>
-    ['space', 'organisation'].includes(folder.appProperties?.type ?? '')
-  )
-
-  return spaces
 }
 
 /**

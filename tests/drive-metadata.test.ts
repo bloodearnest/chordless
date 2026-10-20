@@ -108,6 +108,24 @@ describe('Drive file metadata, with less recorded', () => {
     expect(metadata.appProperties.spaceId).to.equal('')
   })
 
+  it('keeps nothing secret in the share file metadata', () => {
+    const metadata = shareFileMetadata(
+      { id: 'setlist-1' },
+      { spaceId: 'org-1', expires: '2026-10-25' }
+    )
+    expect(metadata.name).to.equal('setlist-1.share')
+    expect(metadata.appProperties).to.deep.equal({
+      type: 'share',
+      spaceId: 'org-1',
+      setlistId: 'setlist-1',
+      expires: '2026-10-25',
+      appVersion: metadata.appProperties.appVersion,
+    })
+    const update = forUpdate(metadata, 'share')
+    expect(update.appProperties.expires).to.equal('2026-10-25')
+    expect(Object.values(update.appProperties)).to.not.include(null)
+  })
+
   it('has no space in a share file’s details when there is none', () => {
     const metadata = shareFileMetadata({ id: 'x' }, { spaceId: null, expires: '2026-10-25' })
     expect(metadata.appProperties).to.include({ spaceId: '', expires: '2026-10-25' })

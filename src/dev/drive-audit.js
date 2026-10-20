@@ -1,4 +1,4 @@
-import { downloadSetlist, driveRequest } from '/js/drive-api.ts'
+import { downloadFile, driveRequest } from '/js/drive-api.ts'
 
 const FOLDER = 'application/vnd.google-apps.folder'
 const status = document.getElementById('status')
@@ -54,7 +54,7 @@ async function auditSpace(space) {
         let content = null
         let error = null
         try {
-          content = await downloadSetlist(file.id)
+          content = JSON.parse(await downloadFile(file.id))
         } catch (e) {
           error = e.message
         }

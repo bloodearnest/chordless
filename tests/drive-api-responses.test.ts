@@ -5,17 +5,13 @@
  */
 import { expect } from '@open-wc/testing'
 import {
-  batchDeleteFiles,
   batchUploadFiles,
   checkDriveAccess,
   countWriteRefusals,
   createFile,
-  createShareFile,
-  downloadChordProFile,
+  downloadFile,
   downloadFileBinary,
-  downloadSetlist,
   driveRequest,
-  endShareFile,
   ensurePadSetFolder,
   findOrCreateRootFolder,
   findOrCreateSpaceFolder,
@@ -26,14 +22,15 @@ import {
   getSetlistsFolder,
   getSharesFolder,
   getSongsFolder,
+  listDriveFiles,
   listFolderPermissions,
   listPadSetFiles,
   listPadSetFolders,
-  listSetlists,
-  listShareFiles,
-  listSpaces,
+  publishFile,
   setAccessTokenProvider,
+  trashFile,
   trashFilesInFolder,
+  unpublishFile,
   updateFile,
 } from '../src/js/drive-api.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -161,25 +158,6 @@ describe('drive-api, given what Drive answers', () => {
     })
   })
 
-  describe('deleting a batch', () => {
-    it('does nothing for no files', async () => {
-      expect(await batchDeleteFiles([])).to.equal(undefined)
-      expect(calls).to.have.length(0)
-    })
-
-    it('counts what Drive says it deleted', async () => {
-      script(new Response('HTTP/1.1 204 No Content\n\nHTTP/1.1 404 Not Found'))
-      expect(await batchDeleteFiles(['a', 'b'])).to.equal(1)
-      script(new Response('nothing recognisable'))
-      expect(await batchDeleteFiles(['a'])).to.equal(0)
-    })
-
-    it('fails when the batch is refused', async () => {
-      script(failure(500))
-      expect(await messageOf(batchDeleteFiles(['a']))).to.equal('Batch delete failed: Because')
-    })
-  })
-
   describe('uploading many files', () => {
     const upload = (name: string, extra = {}) => ({ metadata: { name }, content: 'x', ...extra })
 
@@ -278,15 +256,10 @@ describe('drive-api, given what Drive answers', () => {
         new Response(new Uint8Array([1, 2]).buffer),
         failure(500)
       )
-      expect(await downloadChordProFile('f')).to.equal('chart')
-      expect(await messageOf(downloadChordProFile('f'))).to.equal('Drive download error: Because')
+      expect(await downloadFile('f')).to.equal('chart')
+      expect(await messageOf(downloadFile('f'))).to.equal('Drive download error: Because')
       expect(new Uint8Array(await downloadFileBinary('f'))).to.deep.equal(new Uint8Array([1, 2]))
       expect(await messageOf(downloadFileBinary('f'))).to.equal('Drive download error: Because')
-    })
-
-    it('reads a setlist', async () => {
-      script(new Response('{"id":"s1","songs":[]}'))
-      expect((await downloadSetlist('f')).id).to.equal('s1')
     })
   })
 
@@ -386,62 +359,46 @@ describe('drive-api, given what Drive answers', () => {
     })
   })
 
-  describe('setlists, shares and spaces', () => {
-    it('follows the pages of the setlists', async () => {
-      script(
-        { files: [{ id: 'sl-folder' }] },
-        { files: [{ id: 'a' }], nextPageToken: 'next' },
-        { files: [{ id: 'b' }] }
-      )
-      expect((await listSetlists('space')).map(file => file.id)).to.deep.equal(['a', 'b'])
-      expect(calls.at(-1)?.url).to.contain('pageToken=next')
-    })
-
-    it('has no setlists when Drive lists none', async () => {
-      script({ files: [{ id: 'sl-folder' }] }, { files: [] })
-      expect(await listSetlists('space')).to.deep.equal([])
-    })
-
-    it('follows the pages of the shares', async () => {
+  describe('listing files', () => {
+    it('follows the pages, with the order asked for', async () => {
       script({ files: [{ id: 'a' }], nextPageToken: 'next' }, { files: [{ id: 'b' }] })
-      expect((await listShareFiles('shares')).map(file => file.id)).to.deep.equal(['a', 'b'])
-      script({ files: [] })
-      expect(await listShareFiles('shares')).to.deep.equal([])
-    })
-
-    it('lists only the folders that are spaces', async () => {
-      script(
-        { files: [{ id: 'root' }] },
-        {
-          files: [
-            { id: 'o1', appProperties: { type: 'space' } },
-            { id: 'f2', appProperties: { type: 'other' } },
-            { id: 'f3' },
-          ],
-        }
-      )
-      expect((await listSpaces()).map(file => file.id)).to.deep.equal(['o1'])
-      script({ files: [{ id: 'root' }] }, { files: [] })
-      expect(await listSpaces()).to.deep.equal([])
-    })
-
-    it('trashes a share file that could not be made public, and fails as the permission did', async () => {
-      script({ id: 'share' }, failure(403, { error: { message: 'Blocked' } }), failure(500))
       expect(
-        await messageOf(createShareFile('folder', { name: 's' }, new Uint8Array([1])))
-      ).to.equal(
+        (await listDriveFiles("'f' in parents", 'modifiedTime desc')).map(f => f.id)
+      ).to.deep.equal(['a', 'b'])
+      expect(calls[0].url).to.contain('orderBy=modifiedTime%20desc')
+      expect(calls.at(-1)?.url).to.contain('pageToken=next')
+      script({ files: [] })
+      expect(await listDriveFiles("'f' in parents")).to.deep.equal([])
+      expect(calls.at(-1)?.url).to.not.contain('orderBy')
+    })
+  })
+
+  describe('public links and the trash', () => {
+    it('trashes a file that could not be made public, and fails as the permission did', async () => {
+      script(failure(403, { error: { message: 'Blocked' } }), failure(500))
+      expect(await messageOf(publishFile('share'))).to.equal(
         'Google would not make the link public: your organisation may not allow links that anyone can open. The song list to paste still works. (Drive API error: Blocked)'
       )
       expect(calls.at(-1)?.init?.body).to.contain('trashed')
     })
 
-    it('ends a share, and takes one already gone as ended', async () => {
-      script(new Response(null, { status: 204 }), new Response(null, { status: 204 }))
-      await endShareFile('f')
+    it('takes back a link, and takes a file already gone as done', async () => {
+      script(new Response(null, { status: 204 }))
+      await unpublishFile('f')
       script(failure(404, {}))
-      await endShareFile('f')
+      await unpublishFile('f')
       script(failure(500, {}))
-      expect(await messageOf(endShareFile('f'))).to.contain('Drive API error')
+      expect(await messageOf(unpublishFile('f'))).to.contain('Drive API error')
+    })
+
+    it('trashes a file, and takes one already gone as trashed', async () => {
+      script({ id: 'f' })
+      await trashFile('f')
+      expect(calls.at(-1)?.init?.body).to.contain('trashed')
+      script(failure(404, {}))
+      await trashFile('f')
+      script(failure(500, {}))
+      expect(await messageOf(trashFile('f'))).to.contain('Drive API error')
     })
   })
 
