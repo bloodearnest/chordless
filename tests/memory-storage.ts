@@ -364,7 +364,7 @@ class MemorySpace implements SpaceStorage {
   async status(ref: string): Promise<FileStatus | null> {
     this.#storage.enter('status', ref)
     const file = this.#storage.files.get(ref)
-    return file ? { trashed: file.trashed } : null
+    return file ? { ...toStored(file), trashed: file.trashed } : null
   }
 
   async readText(ref: string): Promise<string> {

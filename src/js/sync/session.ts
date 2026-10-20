@@ -2,9 +2,10 @@
  * What the pull and the push of a Drive sync (pull.ts, push.ts) share. The DriveSyncManager
  * keeps this state for the length of a sync and passes itself to them.
  */
-import type { DriveFile, Setlist } from '../data-types.ts'
+import type { Setlist } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import type { ChordProParser } from '../parser.ts'
+import type { SpaceStorage, StoredFile } from '../storage/types.ts'
 
 /** What a sync reports while it runs */
 export interface SyncProgress {
@@ -40,13 +41,11 @@ export interface SyncSession {
   readonly db: ChordlessDB
   readonly parser: ChordProParser
   readonly spaceId: string | null
-  /** The space's Drive folder */
-  readonly folderId: string
-  songsFolder(): Promise<string>
-  setlistsFolder(): Promise<string>
+  /** The space's files */
+  readonly space: SpaceStorage
 
   /** The setlist files in Drive, as listed by the last pull */
-  liveSetlistFiles: DriveFile[] | null
+  liveSetlistFiles: StoredFile[] | null
   /** Whether the user can only read the folder (null: not asked yet) */
   readOnly: boolean | null
   /** How many charts the pull left alone because they have local changes that can't go back */

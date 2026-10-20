@@ -2,14 +2,14 @@
  * Whether a record has changes that are not in Drive, and what a record keeps of its Drive
  * file. No state: the sync's pull, push and reset all ask.
  */
-import type { ChordProRecord, DriveFile, Setlist, SongRecord } from '../data-types.ts'
+import type { ChordProRecord, Setlist, SongRecord } from '../data-types.ts'
+import type { StoredFile } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
-import { md5Hex } from '../utils/md5.ts'
 import { setlistContentHash } from './setlist-hash.ts'
 
 /** The id of the setlist a Drive file holds: from its properties, or its name (`<id>.json`) */
-export function setlistIdOf(file: DriveFile): string {
-  return file.appProperties?.setlistId || (file.name ?? '').replace('.json', '')
+export function setlistIdOf(file: Pick<StoredFile, 'props' | 'name'>): string {
+  return file.props.setlistId || file.name.replace('.json', '')
 }
 
 /** The id a song's Drive file is known by */
@@ -18,8 +18,8 @@ export function songUuidOf(song: Pick<SongRecord, 'uuid' | 'id'>): string {
 }
 
 /** What a record keeps of its Drive file: when it was modified, and its checksum */
-export function driveMarkers(file: DriveFile | null | undefined) {
-  return { driveModifiedTime: file?.modifiedTime ?? null, driveChecksum: file?.md5Checksum ?? null }
+export function driveMarkers(file: Pick<StoredFile, 'modified' | 'rev'> | null | undefined) {
+  return { driveModifiedTime: file?.modified ?? null, driveChecksum: file?.rev ?? null }
 }
 
 /** What makes two setlist records the same setlist, whatever their ids */
@@ -65,21 +65,4 @@ export function songHasLocalChanges(song: SongRecord, chordproFile: ChordProReco
     return false
   }
   return song.driveProperties?.contentHash !== chordproFile.contentHash
-}
-
-/**
- * Whether Drive stored exactly the bytes we sent: the md5Checksum it reports for the upload
- * is the MD5 of the content. If not, the record is kept as changed here (its synced markers
- * are not set), so the next push uploads it again, over the same file.
- */
-export function driveHolds(
-  driveFile: DriveFile | null | undefined,
-  content: string,
-  what: string
-): boolean {
-  if (!driveFile?.md5Checksum || md5Hex(content) === driveFile.md5Checksum) return true
-  console.error(
-    `[DriveSync] Drive stored other content for ${what} than was sent: uploading it again next sync`
-  )
-  return false
 }

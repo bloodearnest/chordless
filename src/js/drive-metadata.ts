@@ -11,6 +11,7 @@
 
 import type { ChordProRecord, ParsedChart, Setlist, SongRecord } from './data-types.ts'
 import { ChordProParser } from './parser.ts'
+import type { FileInput } from './storage/types.ts'
 
 /** The name, type and appProperties a Drive file is created or updated with */
 export interface DriveFileMetadata {
@@ -175,6 +176,23 @@ export function songFileMetadata(
  * Metadata for updating an existing file: name and appProperties (not mimeType,
  * which doesn't change), with retired appProperties removed.
  */
+/** What the storage API writes a new file with */
+export function fileInput({ name, mimeType, appProperties }: DriveFileMetadata): FileInput {
+  return { name, type: mimeType, props: appProperties }
+}
+
+/** What the storage API updates a file with: see forUpdate */
+export function updateInput(
+  metadata: DriveFileMetadata,
+  kind: 'setlist' | 'song' | 'share'
+): FileInput {
+  return {
+    type: metadata.mimeType,
+    name: metadata.name,
+    props: forUpdate(metadata, kind).appProperties,
+  }
+}
+
 export function forUpdate(
   { name, appProperties }: Pick<DriveFileMetadata, 'name' | 'appProperties'>,
   kind: 'setlist' | 'song' | 'share'

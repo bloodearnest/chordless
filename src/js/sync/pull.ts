@@ -5,11 +5,10 @@
  * app to tell them), while a chart they changed is left as it is (`heldBack` counts it): see
  * docs/SPACES.md, "Read-only: local edits are never blocked".
  */
-import type { DriveFile, Setlist, SongInput, SongRecord } from '../data-types.ts'
+import type { Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
-import * as DriveAPI from '../drive-api.ts'
-import { driveRequest } from '../drive-api.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
+import type { StoredFile } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
   driveMarkers,
@@ -23,14 +22,14 @@ import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 /** A chord chart in Drive that a pull has decided to download */
 interface SongDownload {
   songUuid: string
-  file: DriveFile
+  file: StoredFile
   props: Record<string, string>
   localSong: SongRecord | undefined
 }
 
 /** A setlist in Drive that a pull has decided to download */
 interface SetlistDownload {
-  driveFile: DriveFile
+  driveFile: StoredFile
   setlistId: string
   localSetlist?: Setlist
   /** The local record's own Drive file is gone: this live file is taking its place */
@@ -38,16 +37,14 @@ interface SetlistDownload {
 }
 
 /** The setlist record to keep for a downloaded file, with its local record (if any) in mind */
-async function downloadSetlist({
-  driveFile,
-  setlistId,
-  localSetlist,
-  adopt,
-}: SetlistDownload): Promise<Setlist> {
+async function downloadSetlist(
+  session: SyncSession,
+  { driveFile, setlistId, localSetlist, adopt }: SetlistDownload
+): Promise<Setlist> {
   // Older setlists in Drive may hold a chart's text as a tempo. Saving
   // converts it too, but convert first: the hash recorded as synced must
   // be of what's stored, or the setlist would look edited here
-  const remote = withNumericTempos(await DriveAPI.downloadSetlist(driveFile.id))
+  const remote = withNumericTempos(JSON.parse(await session.space.readText(driveFile.ref)))
   const remoteHash = setlistContentHash(remote)
 
   if (adopt && localSetlist) {
@@ -57,9 +54,9 @@ async function downloadSetlist({
       // The same content: only the file it points at changes
       return {
         ...localSetlist,
-        driveFileId: driveFile.id,
-        driveModifiedTime: driveFile.modifiedTime,
-        driveChecksum: driveFile.md5Checksum,
+        driveFileId: driveFile.ref,
+        driveModifiedTime: driveFile.modified,
+        driveChecksum: driveFile.rev,
         lastSyncedAt: new Date().toISOString(),
         syncedContentHash: remoteHash,
       }
@@ -69,9 +66,9 @@ async function downloadSetlist({
       console.warn(`[DriveSync] Setlist ${setlistId} has local changes: keeping them`)
       return {
         ...localSetlist,
-        driveFileId: driveFile.id,
-        driveModifiedTime: driveFile.modifiedTime,
-        driveChecksum: driveFile.md5Checksum,
+        driveFileId: driveFile.ref,
+        driveModifiedTime: driveFile.modified,
+        driveChecksum: driveFile.rev,
       }
     }
     // Unchanged here since it was synced, and Drive's copy differs: Drive's is newer
@@ -82,8 +79,8 @@ async function downloadSetlist({
     // were recorded. Not a remote change: keep local edits, record checksum.
     return {
       ...localSetlist,
-      driveModifiedTime: driveFile.modifiedTime,
-      driveChecksum: driveFile.md5Checksum,
+      driveModifiedTime: driveFile.modified,
+      driveChecksum: driveFile.rev,
     }
   }
   if (localSetlist && setlistHasLocalChanges(localSetlist)) {
@@ -95,9 +92,9 @@ async function downloadSetlist({
   return {
     ...setlistContent(remote),
     id: remote.id || setlistId,
-    driveFileId: driveFile.id,
-    driveModifiedTime: driveFile.modifiedTime,
-    driveChecksum: driveFile.md5Checksum,
+    driveFileId: driveFile.ref,
+    driveModifiedTime: driveFile.modified,
+    driveChecksum: driveFile.rev,
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
   }
@@ -111,7 +108,7 @@ export async function pullSetlists(
   progressCallback: ProgressCallback | null = null
 ): Promise<void> {
   // Get all setlists from Drive
-  const driveSetlists = await DriveAPI.listSetlists(session.folderId)
+  const driveSetlists = await session.space.list('setlists')
   session.liveSetlistFiles = driveSetlists
   session.pullIncomplete = false
 
@@ -129,10 +126,10 @@ export async function pullSetlists(
       if (!localSetlist) {
         // New setlist, download it
         downloadQueue.push({ driveFile, setlistId })
-      } else if (localSetlist.driveFileId === driveFile.id) {
+      } else if (localSetlist.driveFileId === driveFile.ref) {
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
-        if (driveFile.md5Checksum !== localSetlist.driveChecksum) {
+        if (driveFile.rev !== localSetlist.driveChecksum) {
           if (session.readOnly && setlistHasLocalChanges(localSetlist)) {
             resetting.set(setlistId, localSetlist)
           }
@@ -170,23 +167,27 @@ export async function pullSetlists(
 
   const setlistsToSave: Setlist[] = []
   let completed = 0
-  await inGroups(downloadQueue, downloadSetlist, results => {
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        setlistsToSave.push(result.value)
-        completed++
-        progressCallback?.({
-          stage: 'pulling',
-          message: `Downloaded ${completed}/${downloadQueue.length} setlists`,
-          current: completed,
-          total: downloadQueue.length,
-        })
-      } else {
-        session.pullIncomplete = true
-        console.error('[DriveSync] Failed to download setlist:', result.reason)
+  await inGroups(
+    downloadQueue,
+    item => downloadSetlist(session, item),
+    results => {
+      for (const result of results) {
+        if (result.status === 'fulfilled') {
+          setlistsToSave.push(result.value)
+          completed++
+          progressCallback?.({
+            stage: 'pulling',
+            message: `Downloaded ${completed}/${downloadQueue.length} setlists`,
+            current: completed,
+            total: downloadQueue.length,
+          })
+        } else {
+          session.pullIncomplete = true
+          console.error('[DriveSync] Failed to download setlist:', result.reason)
+        }
       }
     }
-  })
+  )
 
   if (setlistsToSave.length > 0) {
     await session.db.saveSetlistsBatch(setlistsToSave)
@@ -218,18 +219,17 @@ export async function pullSongs(
   session: SyncSession,
   progressCallback: ProgressCallback | null = null
 ): Promise<void> {
-  const songsFolderId = await session.songsFolder()
-  const driveFiles = await listDriveSongFiles(songsFolderId)
+  const driveFiles = await session.space.list('songs')
 
   const latestByUuid = new Map<
     string,
-    { file: DriveFile; props: Record<string, string>; songUuid: string; driveModified: Date }
+    { file: StoredFile; props: Record<string, string>; songUuid: string; driveModified: Date }
   >()
   for (const file of driveFiles) {
-    const props = file.appProperties || {}
+    const props = file.props
     if (props.type && props.type !== 'chordpro') continue
-    const songUuid = driveSongUuid(props, file.id)
-    const driveModified = new Date(file.modifiedTime || file.createdTime || 0)
+    const songUuid = driveSongUuid(props, file.ref)
+    const driveModified = new Date(file.modified || file.created || 0)
     const existing = latestByUuid.get(songUuid)
     if (existing && driveModified <= existing.driveModified) {
       if (driveModified.getTime() !== existing.driveModified.getTime()) {
@@ -264,9 +264,9 @@ export async function pullSongs(
     let needsDownload = false
     if (!localSong) {
       needsDownload = true
-    } else if (!localSong.driveFileId || localSong.driveFileId !== file.id) {
+    } else if (!localSong.driveFileId || localSong.driveFileId !== file.ref) {
       needsDownload = true
-    } else if (file.md5Checksum !== localSong.driveChecksum) {
+    } else if (file.rev !== localSong.driveChecksum) {
       // Drive's content changed since our last sync: its md5Checksum (computed
       // by Drive) differs from the one we recorded
       if (session.readOnly && chordproRecord && songHasLocalChanges(localSong, chordproRecord)) {
@@ -325,29 +325,6 @@ export async function pullSongs(
   )
 }
 
-async function listDriveSongFiles(folderId: string): Promise<DriveFile[]> {
-  const files: DriveFile[] = []
-  let pageToken: string | null = null
-
-  do {
-    const query = `'${folderId}' in parents and trashed=false and mimeType='text/plain'`
-    let url =
-      `/files?q=${encodeURIComponent(
-        query
-      )}&spaces=drive&fields=nextPageToken,files(id,name,mimeType,createdTime,modifiedTime,md5Checksum,appProperties,size)` +
-      '&pageSize=1000'
-    if (pageToken) {
-      url += `&pageToken=${pageToken}`
-    }
-
-    const result = await driveRequest(url)
-    files.push(...result.files)
-    pageToken = result.nextPageToken || null
-  } while (pageToken)
-
-  return files
-}
-
 export function driveSongUuid(props: Record<string, string>, fallbackId: string): string {
   return props.songUuid || props.versionId || props.songId || fallbackId
 }
@@ -361,7 +338,7 @@ async function downloadSong(
   session: SyncSession,
   { songUuid, file, props, localSong }: SongDownload
 ): Promise<void> {
-  const chordproContent = await DriveAPI.downloadChordProFile(file.id)
+  const chordproContent = await session.space.readText(file.ref)
   const remoteHash = hashText(chordproContent)
   const localChart = localSong?.chordproFileId
     ? await session.db.getChordPro(localSong.chordproFileId)
@@ -370,7 +347,7 @@ async function downloadSong(
   // (with the chart gone from this device, it is restored from Drive's, whatever the hash)
   if (
     localChart &&
-    localSong?.driveFileId === file.id &&
+    localSong?.driveFileId === file.ref &&
     localSong.syncedContentHash === remoteHash
   ) {
     // Same chart as we last synced, e.g. a record from before checksums were
@@ -405,8 +382,8 @@ async function downloadSong(
     id: chordproFileId,
     content: chordproContent,
     contentHash,
-    createdDate: localChart?.createdDate ?? file.createdTime ?? now,
-    modifiedDate: file.modifiedTime ?? now,
+    createdDate: localChart?.createdDate ?? file.created ?? now,
+    modifiedDate: file.modified ?? now,
   })
 
   // The chart's fields, as for an imported song, falling back to this device's copy for
@@ -430,12 +407,12 @@ async function downloadSong(
     originalTempo: chart.originalTempo ?? localSong?.originalTempo ?? null,
     time: chart.time ?? localSong?.time ?? null,
     importDate:
-      localSong?.importDate || props.importDate || file.createdTime || new Date().toISOString(),
+      localSong?.importDate || props.importDate || file.created || new Date().toISOString(),
     importUser: localSong?.importUser || props.importUser || null,
     importSource: 'drive',
     sourceUrl: localSong?.sourceUrl || null,
-    modifiedDate: new Date(file.modifiedTime || file.createdTime || Date.now()).toISOString(),
-    driveFileId: file.id,
+    modifiedDate: new Date(file.modified || file.created || Date.now()).toISOString(),
+    driveFileId: file.ref,
     ...driveMarkers(file),
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,

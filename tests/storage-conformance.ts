@@ -198,7 +198,7 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
         const { file } = await space.create('setlists', input('a.json'), '{}')
         harness.trash(file.ref)
         expect(await space.list('setlists')).to.deep.equal([])
-        expect(await space.status(file.ref)).to.deep.equal({ trashed: true })
+        expect(must(await space.status(file.ref)).trashed).to.equal(true)
         expect((await space.inventory()).has(file.ref)).to.equal(false)
       })
 
@@ -211,7 +211,10 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
       it('knows a live file is there, and lists it in the inventory', async () => {
         const song = await space.create('songs', input('a.txt'), 'x')
         const setlist = await space.create('setlists', input('a.json'), '{}')
-        expect(await space.status(song.file.ref)).to.deep.equal({ trashed: false })
+        const status = must(await space.status(song.file.ref))
+        expect(status.trashed).to.equal(false)
+        expect(status.name).to.equal('a.txt')
+        expect(status.rev).to.equal(song.file.rev)
         const inventory = await space.inventory()
         expect(inventory.has(song.file.ref)).to.equal(true)
         expect(inventory.has(setlist.file.ref)).to.equal(true)
@@ -219,7 +222,7 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
 
       it('finds a file that lives outside the space, but keeps it out of the inventory', async () => {
         const ref = await harness.fileElsewhere()
-        expect(await space.status(ref)).to.deep.equal({ trashed: false })
+        expect(must(await space.status(ref)).trashed).to.equal(false)
         expect((await space.inventory()).has(ref)).to.equal(false)
       })
     })

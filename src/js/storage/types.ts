@@ -58,8 +58,8 @@ export interface RootInfo {
   canWrite: boolean | null
 }
 
-/** A file or folder that exists, wherever it is */
-export interface FileStatus {
+/** A file or folder that exists, wherever it is: what it is, and whether it is in the bin */
+export interface FileStatus extends StoredFile {
   trashed: boolean
 }
 

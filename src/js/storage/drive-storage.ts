@@ -106,8 +106,11 @@ class DriveSpace implements SpaceStorage {
   }
 
   async status(ref: string): Promise<FileStatus | null> {
-    const file = await DriveAPI.getFile(ref, 'id,trashed')
-    return file ? { trashed: Boolean(file.trashed) } : null
+    const file = await DriveAPI.getFile(
+      ref,
+      'id,name,trashed,createdTime,modifiedTime,md5Checksum,appProperties'
+    )
+    return file ? { ...toStored(file), trashed: Boolean(file.trashed) } : null
   }
 
   readText(ref: string): Promise<string> {

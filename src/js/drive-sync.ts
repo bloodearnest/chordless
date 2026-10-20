@@ -12,15 +12,15 @@
  * - Whether a record has changes that aren't in Drive: sync/changes.ts
  */
 
-import type { DriveFile, Setlist, SpaceMember } from './data-types.ts'
+import type { Setlist, SpaceMember } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
-import * as DriveAPI from './drive-api.ts'
-import { driveRequest, getSetlistsFolder, getSongsFolder } from './drive-api.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
 import { setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
+import { driveStorage } from './storage/drive-storage.ts'
+import type { RootInfo, SpaceStorage, StorageBackend, StoredFile } from './storage/types.ts'
 import {
   setlistHasLocalChanges,
   setlistIdOf,
@@ -61,6 +61,8 @@ export interface DriveSyncOptions {
   db?: ChordlessDB | null
   folderLink?: FolderLink | null
   memberCache?: MemberCache | null
+  /** Where the space's files are kept. Defaults to Google Drive. Tests pass a fake. */
+  storage?: StorageBackend | null
 }
 
 /**
@@ -106,7 +108,7 @@ export function folderGoneMessage(folder: { name?: string } | null, otherApp: bo
 export class DriveFolderGoneError extends Error {
   reason: 'missing' | 'trashed'
 
-  constructor(folder: DriveFile | null) {
+  constructor(folder: Pick<RootInfo, 'name'> | null) {
     super(folderGoneMessage(folder, false))
     this.name = 'DriveFolderGoneError'
     this.reason = folder ? 'trashed' : 'missing'
@@ -196,11 +198,14 @@ export class DriveSyncManager implements SyncSession {
   memberCache: MemberCache | null
   driveFolderId: string | null
   parser: ChordProParser
-  _folderCache: Map<string, string>
+  /** The storage backend (Google Drive unless a test says otherwise) */
+  storage: StorageBackend
+  /** The space's files, opened once the folder is known and dropped when a sync ends */
+  #space: SpaceStorage | null = null
   /** The ids of the files in the space's Drive folder, once listed */
   _driveFileIds: Set<string> | null
   /** The setlist files in Drive, as listed by the last pull */
-  liveSetlistFiles: DriveFile[] | null
+  liveSetlistFiles: StoredFile[] | null
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete: boolean
   /** Whether the user can only read the folder, as the last check found (null: not asked) */
@@ -221,18 +226,16 @@ export class DriveSyncManager implements SyncSession {
   constructor(
     spaceName: string,
     spaceId: string | null,
-    { db = null, folderLink = null, memberCache = null }: DriveSyncOptions = {}
+    { db = null, folderLink = null, memberCache = null, storage = null }: DriveSyncOptions = {}
   ) {
     this.spaceName = spaceName
     this.spaceId = spaceId
     this.spaceDb = db
     this.folderLink = folderLink
     this.memberCache = memberCache
+    this.storage = storage ?? driveStorage
     this.driveFolderId = null
     this.parser = new ChordProParser()
-
-    // Performance optimizations
-    this._folderCache = new Map<string, string>() // Cache folder IDs during sync
 
     // Drive file inventory (for existence checks)
     this._driveFileIds = null // Set of file IDs that exist in Drive
@@ -255,6 +258,12 @@ export class DriveSyncManager implements SyncSession {
   get #memberCache(): MemberCache {
     if (!this.memberCache) throw new Error('DriveSyncManager is not initialised: call init()')
     return this.memberCache
+  }
+
+  /** The space's files, once its folder is known (opened afresh for each sync) */
+  get space(): SpaceStorage {
+    this.#space ??= this.storage.space(this.folderId)
+    return this.#space
   }
 
   /** The space's Drive folder, once found */
@@ -311,20 +320,20 @@ export class DriveSyncManager implements SyncSession {
     const linkedId = await this.#folderLink.get()
 
     if (linkedId) {
-      const folder = await DriveAPI.getFile(linkedId, 'id,name,trashed')
+      const folder = await this.storage.inspectRoot(linkedId)
       if (!folder || folder.trashed) {
         throw new DriveFolderGoneError(folder)
       }
-      this.driveFolderId = folder.id
+      this.driveFolderId = folder.ref
       if (folder.name !== this.spaceName) {
         await this.followRename(folder)
       }
       return false
     }
 
-    const result = await DriveAPI.findOrCreateSpaceFolder(this.spaceName, this.spaceId as string)
-    this.driveFolderId = result.folderId
-    await this.#folderLink.set(result.folderId)
+    const result = await this.storage.ensureRoot(this.spaceName, this.spaceId as string)
+    this.driveFolderId = result.ref
+    await this.#folderLink.set(result.ref)
     return result.isNew
   }
 
@@ -334,13 +343,13 @@ export class DriveSyncManager implements SyncSession {
    * it) and this device has nothing synced yet, join that folder. Otherwise
    * rename the linked folder to match, unless that name is taken.
    */
-  async followRename(folder: DriveFile): Promise<void> {
-    const existing = await DriveAPI.findSpaceFolderByName(this.spaceName)
+  async followRename(folder: RootInfo): Promise<void> {
+    const existing = await this.storage.findRootByName(this.spaceName)
 
-    if (existing && existing.id !== folder.id) {
+    if (existing && existing.ref !== folder.ref) {
       if (!(await this.hasSyncedRecords())) {
-        this.driveFolderId = existing.id
-        await this.#folderLink.set(existing.id)
+        this.driveFolderId = existing.ref
+        await this.#folderLink.set(existing.ref)
         return
       }
       console.warn(
@@ -350,33 +359,13 @@ export class DriveSyncManager implements SyncSession {
       return
     }
 
-    await DriveAPI.renameFile(folder.id, this.spaceName)
+    await this.storage.renameRoot(folder.ref, this.spaceName)
   }
 
   /** Whether any local setlist or song has been synced to Drive */
   async hasSyncedRecords(): Promise<boolean> {
     const records = [...(await this.db.getAllSetlists()), ...(await this.db.getAllSongs())]
     return records.some(record => record.driveFileId)
-  }
-
-  /** The space's songs folder in Drive (looked up once per sync) */
-  async songsFolder(): Promise<string> {
-    let folderId = this._folderCache.get('songs')
-    if (folderId === undefined) {
-      folderId = await getSongsFolder(this.folderId)
-      this._folderCache.set('songs', folderId)
-    }
-    return folderId
-  }
-
-  /** The space's setlists folder in Drive (looked up once per sync) */
-  async setlistsFolder(): Promise<string> {
-    let folderId = this._folderCache.get('setlists')
-    if (folderId === undefined) {
-      folderId = await getSetlistsFolder(this.folderId)
-      this._folderCache.set('setlists', folderId)
-    }
-    return folderId
   }
 
   /**
@@ -440,7 +429,7 @@ export class DriveSyncManager implements SyncSession {
       throw error
     } finally {
       // Clear caches after sync
-      this._folderCache.clear()
+      this.#space = null
       this._driveFileIds = null
       this.liveSetlistFiles = null
       this.pullIncomplete = false
@@ -470,9 +459,7 @@ export class DriveSyncManager implements SyncSession {
    */
   async buildDriveInventory(): Promise<void> {
     try {
-      const fileIds = new Set<string>()
-      await this._addFolderContentsToInventory(this.folderId, fileIds)
-      this._driveFileIds = fileIds
+      this._driveFileIds = await this.space.inventory()
     } catch (error) {
       // Without a complete inventory we can't tell which files are missing, so
       // skip the check (fileExistsInDrive assumes they exist). An incomplete set
@@ -483,38 +470,12 @@ export class DriveSyncManager implements SyncSession {
   }
 
   /**
-   * Recursively add all files in a folder to the inventory
-   */
-  async _addFolderContentsToInventory(folderId: string, fileIds: Set<string>): Promise<void> {
-    const query = `'${folderId}' in parents and trashed=false`
-    let pageToken: string | null = null
-
-    do {
-      let url =
-        `/files?q=${encodeURIComponent(query)}&spaces=drive` +
-        '&fields=nextPageToken,files(id,name,mimeType)&pageSize=1000'
-      if (pageToken) url += `&pageToken=${encodeURIComponent(pageToken)}`
-
-      const result = await driveRequest(url)
-      for (const file of result.files) {
-        fileIds.add(file.id)
-
-        // Recursively process subfolders
-        if (file.mimeType === 'application/vnd.google-apps.folder') {
-          await this._addFolderContentsToInventory(file.id, fileIds)
-        }
-      }
-      pageToken = result.nextPageToken || null
-    } while (pageToken)
-  }
-
-  /**
    * Fetch and cache the people the space's Drive folder is shared with.
    * Not essential to syncing, so failures are only logged.
    */
   async refreshMembers(): Promise<SpaceMember[] | null> {
     try {
-      const members = await DriveAPI.listFolderPermissions(this.folderId)
+      const members = await this.space.members()
       await this.#memberCache.set(members)
       return members
     } catch (error) {
@@ -530,15 +491,14 @@ export class DriveSyncManager implements SyncSession {
    * @returns whether the user can only read the folder
    */
   async refreshAccess(): Promise<boolean> {
-    let canAdd: boolean | undefined
+    let canAdd: boolean | null | undefined
     try {
-      const folder = await DriveAPI.getFile(this.folderId, 'id,capabilities')
-      canAdd = folder?.capabilities?.canAddChildren
+      canAdd = (await this.storage.inspectRoot(this.folderId))?.canWrite
     } catch (error) {
       console.warn('[DriveSync] Could not check access to the space folder:', error)
     }
     this.readOnly = canAdd === false
-    if (canAdd !== undefined) {
+    if (canAdd !== undefined && canAdd !== null) {
       try {
         await this.#memberCache.setReadOnly?.(this.readOnly)
       } catch (error) {
@@ -573,7 +533,7 @@ export class DriveSyncManager implements SyncSession {
 
     let elsewhere = 0
     for (const record of missing) {
-      const file = await DriveAPI.getFile(record.driveFileId as string, 'id,trashed')
+      const file = await this.space.status(record.driveFileId as string)
       if (file && !file.trashed) elsewhere++
     }
     if (elsewhere > 0) {
@@ -661,7 +621,7 @@ export class DriveSyncManager implements SyncSession {
       await this.pullFromDrive(progressCallback)
       progressCallback?.({ stage: 'complete', message: 'Reset complete' })
     } finally {
-      this._folderCache.clear()
+      this.#space = null
       this._driveFileIds = null
     }
   }
@@ -707,7 +667,7 @@ export class DriveSyncManager implements SyncSession {
     if (this.readOnly ?? (await this.refreshAccess())) {
       return
     }
-    const refusals = DriveAPI.countWriteRefusals()
+    const refusals = this.storage.writeRefusals()
     try {
       await this.#pushAll(progressCallback)
     } catch (error) {
@@ -715,7 +675,7 @@ export class DriveSyncManager implements SyncSession {
       return
     }
     // Writes that failed were tried again and left for the next sync: were they refused?
-    if (DriveAPI.countWriteRefusals() > refusals) await this.foundToBeReadOnly()
+    if (this.storage.writeRefusals() > refusals) await this.foundToBeReadOnly()
   }
 
   async #pushAll(progressCallback: ProgressCallback | null): Promise<void> {
@@ -751,7 +711,7 @@ export class DriveSyncManager implements SyncSession {
  * Check if Drive sync is available (user is authenticated)
  */
 export async function isSyncAvailable(): Promise<boolean> {
-  return DriveAPI.checkDriveAccess()
+  return driveStorage.available()
 }
 
 /**

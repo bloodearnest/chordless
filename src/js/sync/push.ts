@@ -2,24 +2,17 @@
  * The push of a Drive sync: what is new or changed on this device goes up to Drive (new files
  * in batches, changed ones one by one, several at a time).
  */
-import type {
-  ChordProRecord,
-  DriveFile,
-  Setlist,
-  SongDriveProperties,
-  SongRecord,
-} from '../data-types.ts'
-import * as DriveAPI from '../drive-api.ts'
-import { batchUploadFiles, type DriveUpload } from '../drive-api.ts'
+import type { ChordProRecord, Setlist, SongDriveProperties, SongRecord } from '../data-types.ts'
 import {
-  forUpdate,
+  fileInput,
   setlistFileMetadata,
   songFileDetails,
   songFileMetadata,
+  updateInput,
 } from '../drive-metadata.ts'
+import type { WriteResult } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
 import {
-  driveHolds,
   driveMarkers,
   setlistHasLocalChanges,
   setlistKey,
@@ -59,10 +52,10 @@ function songDriveProperties(song: SongRecord, chordproFile: ChordProRecord): So
 }
 
 /** Record on a setlist that Drive now holds this content in this file (if it stored it intact) */
-function recordSetlistUpload(setlist: Setlist, driveFile: DriveFile, content: string) {
-  setlist.driveFileId = driveFile.id
-  Object.assign(setlist, driveMarkers(driveFile))
-  if (driveHolds(driveFile, content, `setlist ${setlist.id}`)) {
+function recordSetlistUpload(setlist: Setlist, { file, intact }: WriteResult) {
+  setlist.driveFileId = file.ref
+  Object.assign(setlist, driveMarkers(file))
+  if (intact) {
     setlist.lastSyncedAt = new Date().toISOString()
     setlist.syncedContentHash = setlistContentHash(setlist)
   }
@@ -73,10 +66,14 @@ function recordSetlistUpload(setlist: Setlist, driveFile: DriveFile, content: st
  * when it is what was sent: with other content in Drive, this song differs from it, and is
  * uploaded again.
  */
-function recordSongUpload(song: SongRecord, chordproFile: ChordProRecord, driveFile: DriveFile) {
-  song.driveFileId = driveFile.id
-  Object.assign(song, driveMarkers(driveFile))
-  if (driveHolds(driveFile, chordproFile.content, `song ${song.id}`)) {
+function recordSongUpload(
+  song: SongRecord,
+  chordproFile: ChordProRecord,
+  { file, intact }: WriteResult
+) {
+  song.driveFileId = file.ref
+  Object.assign(song, driveMarkers(file))
+  if (intact) {
     song.driveProperties = songDriveProperties(song, chordproFile)
     song.lastSyncedAt = new Date().toISOString()
     song.syncedContentHash = hashText(chordproFile.content)
@@ -266,19 +263,20 @@ export async function pushSetlists(
 
   let uploaded = 0
   if (newSetlists.length > 0) {
-    const folderId = await session.setlistsFolder()
     uploaded = await uploadNewInBatches(newSetlists, 50, {
       uploadBatch: async batch => {
-        const files: DriveUpload[] = batch.map(setlist => ({
-          metadata: { ...setlistMetadata(session, setlist), parents: [folderId] },
-          content: setlistJson(setlist),
-          contentType: 'application/json',
-        }))
-        const driveFiles = await batchUploadFiles(files)
+        const results = await session.space.createMany(
+          'setlists',
+          batch.map(setlist => ({
+            input: fileInput(setlistMetadata(session, setlist)),
+            body: setlistJson(setlist),
+          }))
+        )
         const saved: Setlist[] = []
         batch.forEach((setlist, j) => {
-          if (!driveFiles[j]?.id) return
-          recordSetlistUpload(setlist, driveFiles[j], files[j].content)
+          const result = results[j]
+          if (!result) return
+          recordSetlistUpload(setlist, result)
           saved.push(setlist)
         })
         if (saved.length > 0) await session.db.saveSetlistsBatch(saved)
@@ -300,20 +298,12 @@ export async function pushSetlists(
 export async function pushSetlist(session: SyncSession, setlist: Setlist): Promise<void> {
   try {
     const content = setlistJson(setlist)
-    const driveFile = setlist.driveFileId
+    const metadata = setlistMetadata(session, setlist)
+    const result = setlist.driveFileId
       ? // (metadata too, so the file name follows e.g. a changed date or leader)
-        await DriveAPI.updateFile(
-          setlist.driveFileId,
-          forUpdate(setlistMetadata(session, setlist), 'setlist'),
-          content,
-          'application/json'
-        )
-      : await DriveAPI.createFile(
-          { ...setlistMetadata(session, setlist), parents: [await session.setlistsFolder()] },
-          content,
-          'application/json'
-        )
-    recordSetlistUpload(setlist, driveFile, content)
+        await session.space.update(setlist.driveFileId, updateInput(metadata, 'setlist'), content)
+      : await session.space.create('setlists', fileInput(metadata), content)
+    recordSetlistUpload(setlist, result)
     await session.db.saveSetlist(setlist)
   } catch (error) {
     console.error(`[DriveSync] Failed to push setlist ${setlist.id}:`, error)
@@ -371,19 +361,20 @@ export async function pushSongs(
     total: Math.max(1, total),
   })
 
-  const folderId = await session.songsFolder()
   const uploaded = await uploadNewInBatches(created, 25, {
     uploadBatch: async batch => {
-      const files: DriveUpload[] = batch.map(({ song, chordproFile }) => ({
-        metadata: { ...songMetadata(session, song, chordproFile), parents: [folderId] },
-        content: chordproFile.content,
-        contentType: SONG_CONTENT_TYPE,
-      }))
-      const driveFiles = await batchUploadFiles(files)
+      const results = await session.space.createMany(
+        'songs',
+        batch.map(({ song, chordproFile }) => ({
+          input: fileInput(songMetadata(session, song, chordproFile)),
+          body: chordproFile.content,
+        }))
+      )
       const saved: SongRecord[] = []
       batch.forEach(({ song, chordproFile }, j) => {
-        if (!driveFiles[j]?.id) return
-        recordSongUpload(song, chordproFile, driveFiles[j])
+        const result = results[j]
+        if (!result) return
+        recordSongUpload(song, chordproFile, result)
         saved.push(song)
       })
       if (saved.length > 0) await session.db.saveSongsBatch(saved)
@@ -400,8 +391,6 @@ export async function pushSongs(
   )
 }
 
-const SONG_CONTENT_TYPE = 'text/plain; charset=utf-8'
-
 /** Push a specific song variant to Drive: a new file, or an update of its file */
 export async function pushSongVariant(
   session: SyncSession,
@@ -410,19 +399,14 @@ export async function pushSongVariant(
 ): Promise<void> {
   try {
     const metadata = songMetadata(session, song, chordproFile)
-    const driveFile = song.driveFileId
-      ? await DriveAPI.updateFile(
+    const result = song.driveFileId
+      ? await session.space.update(
           song.driveFileId,
-          forUpdate(metadata, 'song'),
-          chordproFile.content,
-          SONG_CONTENT_TYPE
+          updateInput(metadata, 'song'),
+          chordproFile.content
         )
-      : await DriveAPI.createFile(
-          { ...metadata, parents: [await session.songsFolder()] },
-          chordproFile.content,
-          SONG_CONTENT_TYPE
-        )
-    recordSongUpload(song, chordproFile, driveFile)
+      : await session.space.create('songs', fileInput(metadata), chordproFile.content)
+    recordSongUpload(song, chordproFile, result)
     await session.db.saveSong(song)
   } catch (error) {
     console.error(`[DriveSync] Failed to push song ${song.id}/${songUuidOf(song)}:`, error)

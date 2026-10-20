@@ -108,7 +108,7 @@ describe('Drive sync: reset from Drive', () => {
       const phone = await makeDevice('phone')
       const setlist = await addSetlist(phone, { name: 'Safe' })
       await syncDevice(phone)
-      rig.drive.failRequests({ method: 'GET', path: /files\(id,name,mimeType\)&pageSize/ })
+      rig.drive.failRequests({ method: 'GET', path: /files\(id,name,mimeType,createdTime/ })
 
       const error = await resetError(phone)
 

@@ -33,7 +33,7 @@ describe('A setlist that differs from the official one', () => {
     const mine = must(await member.db.getSetlist(setlist.id))
     expect(differsFromOfficial(mine, false)).to.equal(true)
 
-    const reverted = await revertSetlistToOfficial(member.db, mine)
+    const reverted = await revertSetlistToOfficial(member.db, mine, member.sync.space)
     expect(reverted.name).to.equal('Sunday')
     expect(reverted.id).to.equal(setlist.id)
     expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Sunday')
@@ -45,7 +45,7 @@ describe('A setlist that differs from the official one', () => {
     const local = await addSetlist(member, { name: 'Only here' })
     let message = ''
     try {
-      await revertSetlistToOfficial(member.db, local)
+      await revertSetlistToOfficial(member.db, local, member.sync.space)
     } catch (error) {
       message = (error as Error).message
     }
@@ -53,7 +53,11 @@ describe('A setlist that differs from the official one', () => {
 
     message = ''
     try {
-      await revertSetlistToOfficial(member.db, { ...local, driveFileId: 'no-such-file' })
+      await revertSetlistToOfficial(
+        member.db,
+        { ...local, driveFileId: 'no-such-file' },
+        member.sync.space
+      )
     } catch (error) {
       message = (error as Error).message
     }
@@ -76,6 +80,7 @@ describe('A setlist that differs from the official one', () => {
         html`<setlist-differs
           .setlist=${must(await member.db.getSetlist(setlist.id))}
           .db=${member.db}
+          .storage=${member.sync.space}
         ></setlist-differs>`
       )
       el.show()

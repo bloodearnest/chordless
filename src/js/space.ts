@@ -151,7 +151,7 @@ function getOrCreateDefaultSpace(): Promise<Space> {
 export async function ensureCurrentSpace(): Promise<{ id: string; name: string }> {
   const { id, name } = getCurrentSpace()
 
-  // If we have an space ID, we're good
+  // If we have a space ID, we're good
   if (id) {
     return { id, name }
   }

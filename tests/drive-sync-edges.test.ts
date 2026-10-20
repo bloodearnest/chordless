@@ -46,7 +46,7 @@ describe('Drive sync: the less common turns', () => {
       for (const ask of [
         () => sync.hasSyncedRecords(),
         () => sync.resolveDriveFolder(),
-        () => sync.songsFolder(),
+        async () => sync.space,
       ]) {
         let message = ''
         try {
@@ -559,11 +559,11 @@ describe('Drive sync: the less common turns', () => {
 
   describe('the markers a record keeps of its Drive file', () => {
     it('are its modified time and checksum, or nothing when Drive gave none', () => {
-      expect(driveMarkers({ id: 'f', modifiedTime: 't', md5Checksum: 'm' })).to.deep.equal({
+      expect(driveMarkers({ modified: 't', rev: 'm' })).to.deep.equal({
         driveModifiedTime: 't',
         driveChecksum: 'm',
       })
-      expect(driveMarkers({ id: 'f' })).to.deep.equal({
+      expect(driveMarkers({ modified: null, rev: null })).to.deep.equal({
         driveModifiedTime: null,
         driveChecksum: null,
       })
@@ -720,11 +720,11 @@ describe('Drive sync: the less common turns', () => {
 
   describe('what a Drive file may leave out', () => {
     it('is told by its properties or its name, which setlist a file holds', () => {
-      expect(
-        setlistIdOf({ id: 'f', appProperties: { setlistId: 'by-props' }, name: 'other.json' })
-      ).to.equal('by-props')
-      expect(setlistIdOf({ id: 'f', name: 'by-name.json' })).to.equal('by-name')
-      expect(setlistIdOf({ id: 'f' })).to.equal('')
+      expect(setlistIdOf({ props: { setlistId: 'by-props' }, name: 'other.json' })).to.equal(
+        'by-props'
+      )
+      expect(setlistIdOf({ props: {}, name: 'by-name.json' })).to.equal('by-name')
+      expect(setlistIdOf({ props: {}, name: '' })).to.equal('')
     })
 
     it('is told by its properties, in order, which song a chart is, and by its name what it is called', () => {

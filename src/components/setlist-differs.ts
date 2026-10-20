@@ -2,6 +2,8 @@ import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Setlist } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
+import { driveSpaceStorage } from '../js/space-access.ts'
+import type { SpaceStorage } from '../js/storage/types.ts'
 import { revertSetlistToOfficial } from '../js/sync/revert.ts'
 import { toast } from '../js/toast.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -26,6 +28,7 @@ export class SetlistDiffers extends LitElement {
   static override properties = {
     setlist: { attribute: false },
     db: { attribute: false },
+    storage: { attribute: false },
     _busy: { state: true },
   }
 
@@ -41,6 +44,8 @@ export class SetlistDiffers extends LitElement {
 
   declare setlist: Setlist | null
   declare db: ChordlessDB | null
+  /** The space's files in Drive: the space's own by default (tests pass theirs) */
+  declare storage: SpaceStorage | null
   declare _busy: boolean
   _dialog: Ref<AppModal> = createRef()
 
@@ -48,6 +53,7 @@ export class SetlistDiffers extends LitElement {
     super()
     this.setlist = null
     this.db = null
+    this.storage = null
     this._busy = false
   }
 
@@ -59,7 +65,8 @@ export class SetlistDiffers extends LitElement {
     if (!this.setlist || !this.db) return
     this._busy = true
     try {
-      await revertSetlistToOfficial(this.db, this.setlist)
+      const storage = this.storage ?? (await driveSpaceStorage(this.db.spaceId))
+      await revertSetlistToOfficial(this.db, this.setlist, storage)
       this._dialog.value?.close()
       this.dispatchEvent(new SetlistRevertedEvent())
     } catch (error) {
