@@ -37,6 +37,7 @@ export class StoragePage extends LitElement {
     _clearError: { state: true },
     _otherSpaces: { state: true },
     _deleteSpaceError: { state: true },
+    _deleteSpaceMessage: { state: true },
     _authMessage: { state: true }, // {text, type: 'success' | 'error'}, the last sign-in result
   }
 
@@ -49,6 +50,7 @@ export class StoragePage extends LitElement {
   /** The spaces on this device other than the current one: the ones that can be deleted */
   declare _otherSpaces: Space[]
   declare _deleteSpaceError: string
+  declare _deleteSpaceMessage: string
   declare _authMessage: AuthMessage | null
 
   /** Starts the app afresh once everything stored has been cleared (a test gives its own) */
@@ -247,6 +249,7 @@ export class StoragePage extends LitElement {
     this._deleteSpaceModal = createRef()
     this._otherSpaces = []
     this._deleteSpaceError = ''
+    this._deleteSpaceMessage = ''
     this.isAuthenticated = false
     this.signInExpired = false
     this.authStatus = 'checking'
@@ -521,6 +524,7 @@ export class StoragePage extends LitElement {
         type="confirm"
         heading="Delete space?"
         confirm-label="Delete Space"
+        message=${this._deleteSpaceMessage}
       ></app-modal>
       <app-modal
         id="clear-data-modal"
@@ -570,12 +574,11 @@ export class StoragePage extends LitElement {
   }
 
   async _handleDeleteSpace(space: Space): Promise<void> {
-    const modal = this._deleteSpaceModal.value
-    if (!modal) return
-    modal.message =
+    this._deleteSpaceMessage =
       `Delete "${space.name}"? This deletes its setlists and songs on this device, and anything ` +
       "not yet synced to Google Drive is lost. Its folder in Google Drive is not touched. This can't be undone."
-    if (!(await modal.ask())) return
+    await this.updateComplete
+    if (!(await this._deleteSpaceModal.value?.ask())) return
     this._deleteSpaceError = ''
     try {
       await deleteSpace(space.id)
