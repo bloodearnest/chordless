@@ -83,7 +83,7 @@ suite, and a way to keep `props` (see above).
 The Worker's team service (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
 
-## The team backend (client and API built; sign-in, Durable Object and Drive credentials not)
+## The team backend (client, API and Durable Object state built; Drive credentials and the route not)
 
 Team-space members get a second implementation of the same interface, `TeamStorage`
 (`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
@@ -104,7 +104,13 @@ pads answer "not yet". The space-level conformance suite (`describeSpaceStorage`
 backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
 the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
 it must include binned files, and be cheap (the Durable Object keeping the refs, not a walk of
-Drive per call). A team space's root ref is the space id. The client's `token` option is `getIdentityToken()` (`google-auth.ts`), Google's ID token, which the Worker checks (`worker/src/identity.ts`; docs/SPACES.md, "Sign-in model").
+Drive per call): `TeamSpaceState.addRefs` and `owns` (`worker/src/team-state.ts`) keep them, and
+a ref stays noted when its file is binned.
+`notingRefs` (`worker/src/team-refs.ts`) fills it: it wraps the space's storage and notes the refs a
+listing, an inventory or a create shows. The owner syncs straight to Drive, so the Worker never
+sees their files made, but a member lists before reading and a listing is scoped to the space's
+root. A ref no listing has shown is unknown (a 404) until the next one; there is no fallback
+that walks a file's parents. A team space's root ref is the space id. The client's `token` option is `getIdentityToken()` (`google-auth.ts`), Google's ID token, which the Worker checks (`worker/src/identity.ts`; docs/SPACES.md, "Sign-in model").
 
 On the Worker each call is: check the ID token, look up the member's role in the space's
 Durable Object, check it against the collection and ref, make the Drive call with the owner's token

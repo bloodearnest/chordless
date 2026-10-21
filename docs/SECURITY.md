@@ -33,3 +33,16 @@ not safe. Rotate hard, revoke the owners' grants at Google, and make everyone si
 
 To decide when this is done: how a rotation is triggered, how the sweep of Durable Objects runs, and
 a test that a blob made under the old key still opens during the overlap and not after it.
+
+## Probing for team spaces (to do)
+
+A team space's Durable Object is named by the space's id (`idFromName`), so a request for any id
+makes that object, empty, on first use: a read of an unknown id leaves a persisted entry (seen
+locally, 2026-10-21). That is cheap, but it is unbounded, and anyone signed in could ask for random
+ids. To decide when the route is wired (`router.ts`):
+
+- Verify the ID token **before** touching a Durable Object, so only signed-in accounts can.
+- Answer a stranger and an unknown space the same (403), so the answer does not say which ids exist.
+- Make ids unguessable (random, 128 bits). Option: sign the id with a Worker secret
+  (`<random>.<mac>`), so the Worker can reject a forged id without making an object.
+- Rate-limit by account (as the email handler does with `[[ratelimits]]`).

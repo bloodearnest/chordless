@@ -176,8 +176,8 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
    ```
 3. **A personal space syncs** (as always): `page ── access token ──► Google Drive`. The Worker is
    not involved.
-4. **A team member syncs** (client and API built; Durable Object, space credential and router
-   wiring not):
+4. **A team member syncs** (client, API and the Durable Object's state built; space credential and
+   router wiring not):
    ```
    page ── ID token ──► Worker /api/space/<id>/read-many
                                1. verify the ID token: who is this?
@@ -684,7 +684,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below); not yet the Durable Object, the Drive credentials or the route): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob); not yet the Drive credentials, the route, or join/invite/revoke): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
    and the preference.
