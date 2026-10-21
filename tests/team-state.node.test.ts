@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import type { Identity } from '../worker/src/identity.ts'
-import { TeamSpaceState } from '../worker/src/team-state.ts'
+import { INVITE_TTL_MS, TeamSpaceState } from '../worker/src/team-state.ts'
 import { MapStore } from './map-store.ts'
 
 const ann: Identity = { provider: 'google', sub: 'g-1', email: 'Ann@Example.com' }
@@ -161,4 +161,101 @@ test('stores nothing but the space, its members, its refs and the blob', async (
   await state.setOwnerBlob('blob')
   const kinds = new Set([...store.entries.keys()].map(key => key.split(':')[0]))
   assert.deepEqual([...kinds].sort(), ['member', 'ownerBlob', 'ref', 'space'])
+})
+
+describe('members, by email', () => {
+  test('change role, and are removed, by email in any case; a stranger is false', async () => {
+    const { state } = await made()
+    await state.setMember(bob, 'reader')
+    assert.equal(await state.setRoleByEmail('BOB@example.com', 'writer'), true)
+    assert.equal(await state.roleOf(bob), 'writer')
+    assert.equal(await state.setRoleByEmail('nobody@example.com', 'writer'), false)
+    assert.equal(await state.removeByEmail('Bob@Example.com'), true)
+    assert.equal(await state.roleOf(bob), null)
+    assert.equal(await state.removeByEmail('bob@example.com'), false)
+  })
+})
+
+describe('invites', () => {
+  test('are redeemed once, for the role they were made with, and the code is not kept', async () => {
+    const { store, state } = await made()
+    const { code } = await state.createInvite('writer', 'bob@example.com', ann)
+    assert.ok(!JSON.stringify([...store.entries]).includes(code), 'only a hash is stored')
+
+    assert.equal(await state.redeemInvite(code, bob), 'writer')
+    assert.equal(await state.roleOf(bob), 'writer')
+    assert.equal(await state.redeemInvite(code, cat), null, 'used up')
+    assert.equal(await state.roleOf(cat), null)
+  })
+
+  test('are for the invited email only: another account is turned away, and the code stays good', async () => {
+    const { state } = await made()
+    const { code } = await state.createInvite('writer', 'bob@example.com', ann)
+
+    assert.equal(await state.redeemInvite(code, cat), 'other-account')
+    assert.equal(await state.roleOf(cat), null)
+    assert.equal(await state.redeemInvite(code, bob), 'writer', 'the invited person still can')
+  })
+
+  test('are matched on the email whatever its case, and however it was typed', async () => {
+    const { state } = await made()
+    const { code } = await state.createInvite('reader', '  BOB@Example.COM ', ann)
+    assert.equal(await state.redeemInvite(code, { ...bob, email: 'Bob@example.com' }), 'reader')
+  })
+
+  test('are not good when unknown or expired', async () => {
+    const { store, state } = await made()
+    assert.equal(await state.redeemInvite('made-up', bob), null)
+    const { code, expiresAt } = await state.createInvite('reader', 'bob@example.com', ann)
+    assert.equal(
+      new Date(expiresAt).getTime() - NOW.getTime(),
+      INVITE_TTL_MS,
+      'a week from the clock'
+    )
+    const later = new TeamSpaceState(store, () => new Date(NOW.getTime() + INVITE_TTL_MS + 1))
+    assert.equal(await later.redeemInvite(code, bob), null)
+    assert.deepEqual(await later.invites(), [], 'an expired one is not listed')
+  })
+
+  test('are not used up by someone already in the space, who keeps their role', async () => {
+    const { state } = await made()
+    await state.setMember(bob, 'admin')
+    const { code } = await state.createInvite('reader', 'cat@example.com', ann)
+    assert.equal(await state.redeemInvite(code, bob), 'admin')
+    assert.equal(await state.redeemInvite(code, ann), 'owner')
+    assert.equal(await state.redeemInvite(code, cat), 'reader', 'still there for who it is for')
+  })
+
+  test('are listed with who they are for but without their codes, and can be revoked', async () => {
+    const { state } = await made()
+    const first = await state.createInvite('reader', 'cat@example.com', ann)
+    await state.createInvite('writer', 'dan@example.com', bob)
+    const listed = await state.invites()
+    assert.deepEqual(
+      listed.map(({ role, email, createdBy }) => ({ role, email, createdBy })),
+      [
+        { role: 'reader', email: 'cat@example.com', createdBy: 'ann@example.com' },
+        { role: 'writer', email: 'dan@example.com', createdBy: 'bob@example.com' },
+      ]
+    )
+    assert.ok(!JSON.stringify(listed).includes(first.code))
+
+    assert.equal(await state.revokeInvite(listed[0].id), true)
+    assert.equal(await state.revokeInvite(listed[0].id), false)
+    assert.equal(await state.redeemInvite(first.code, cat), null)
+  })
+})
+
+describe('forgetting a space', () => {
+  test('leaves nothing: no space, members, invites, refs or blob', async () => {
+    const { store, state } = await made()
+    await state.setMember(bob, 'writer')
+    await state.createInvite('reader', 'cat@example.com', ann)
+    await state.addRefs(['file-1'])
+    await state.setOwnerBlob('blob')
+    await state.destroy()
+    assert.equal(store.entries.size, 0)
+    assert.equal(await state.info(), null)
+    assert.equal(await state.roleOf(bob), null)
+  })
 })

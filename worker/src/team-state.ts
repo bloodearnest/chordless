@@ -18,6 +18,8 @@ export interface Store {
   /** (Cloudflare takes up to 128 entries in one put) */
   put(entries: Record<string, unknown>): Promise<void>
   delete(key: string): Promise<boolean>
+  /** Everything in the object */
+  deleteAll(): Promise<void>
   list<T>(options: { prefix: string }): Promise<Map<string, T>>
 }
 
@@ -32,11 +34,48 @@ export interface SpaceInfo {
   createdAt: string
 }
 
+interface InviteRecord {
+  email: string
+  role: MemberRole
+  createdBy: string
+  createdAt: string
+  expiresAt: string
+}
+
+/** The hash an invite is kept under: the code is a secret, so it is not stored */
+async function hashOf(code: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code))
+  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/** A new code: 128 random bits, as URL-safe text */
+function newCode(): string {
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+}
+
 interface MemberRecord {
   email: string
   role: MemberRole
   since: string
 }
+
+/** An invitation to join, as an admin sees it (the code itself is never kept or shown again) */
+export interface InviteInfo {
+  /** Names the invite for revoking it: the code's hash, which cannot be turned back into it */
+  id: string
+  /** Who it is for: only an account with this verified email can use it */
+  email: string
+  role: MemberRole
+  createdBy: string
+  createdAt: string
+  expiresAt: string
+}
+
+/** How long an invite can be used */
+export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 /** What the Durable Object answers to the Worker: also the shape of its stub */
 export interface TeamSpaceApi {
@@ -50,6 +89,30 @@ export interface TeamSpaceApi {
   /** Add a member, or change their role */
   setMember(identity: Identity, role: MemberRole): Promise<void>
   removeMember(identity: Identity): Promise<void>
+  /**
+   * Make an invite for the person with this email to join with this role; the code is returned
+   * once, never kept
+   */
+  createInvite(
+    role: MemberRole,
+    email: string,
+    by: Identity
+  ): Promise<{ code: string; expiresAt: string }>
+  invites(): Promise<InviteInfo[]>
+  /** True if there was such an invite */
+  revokeInvite(id: string): Promise<boolean>
+  /**
+   * Join with an invite's code: the role given, null if the code is not good (unknown, used,
+   * expired), or 'other-account' if it is for another email than this account's. It is used up
+   * once; someone already in the space keeps their role and uses nothing.
+   */
+  redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null>
+  /** Change a member's role by email; false if there is no such member */
+  setRoleByEmail(email: string, role: MemberRole): Promise<boolean>
+  /** Remove a member by email; false if there is no such member */
+  removeByEmail(email: string): Promise<boolean>
+  /** Forget the space entirely: its members, invites, files and the owner's blob */
+  destroy(): Promise<void>
   /** Note that these files are in the space's tree (they stay noted when binned); repeats are free */
   addRefs(refs: string[]): Promise<void>
   owns(ref: string): Promise<boolean>
@@ -63,6 +126,7 @@ const SPACE = 'space'
 const BLOB = 'ownerBlob'
 const MEMBER = 'member:'
 const REF = 'ref:'
+const INVITE = 'invite:'
 /** Cloudflare's limit on the entries of one put */
 const PUT_LIMIT = 128
 
@@ -127,6 +191,69 @@ export class TeamSpaceState implements TeamSpaceApi {
 
   async removeMember(identity: Identity): Promise<void> {
     await this.#store.delete(MEMBER + identityKey(identity))
+  }
+
+  /** The member with this email: their key and record */
+  async #byEmail(email: string): Promise<[string, MemberRecord] | null> {
+    const wanted = email.toLowerCase()
+    const all = await this.#store.list<MemberRecord>({ prefix: MEMBER })
+    return [...all].find(([, record]) => record.email === wanted) ?? null
+  }
+
+  async setRoleByEmail(email: string, role: MemberRole): Promise<boolean> {
+    const found = await this.#byEmail(email)
+    if (!found) return false
+    await this.#store.put({ [found[0]]: { ...found[1], role } })
+    return true
+  }
+
+  async removeByEmail(email: string): Promise<boolean> {
+    const found = await this.#byEmail(email)
+    return found ? this.#store.delete(found[0]) : false
+  }
+
+  async createInvite(role: MemberRole, email: string, by: Identity) {
+    const code = newCode()
+    const created = this.#now()
+    const record: InviteRecord = {
+      email: email.trim().toLowerCase(),
+      role,
+      createdBy: by.email.toLowerCase(),
+      createdAt: created.toISOString(),
+      expiresAt: new Date(created.getTime() + INVITE_TTL_MS).toISOString(),
+    }
+    await this.#store.put({ [INVITE + (await hashOf(code))]: record })
+    return { code, expiresAt: record.expiresAt }
+  }
+
+  async invites(): Promise<InviteInfo[]> {
+    const now = this.#now().toISOString()
+    const all = await this.#store.list<InviteRecord>({ prefix: INVITE })
+    return [...all]
+      .filter(([, record]) => record.expiresAt > now)
+      .map(([key, record]) => ({ id: key.slice(INVITE.length), ...record }))
+      .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+  }
+
+  revokeInvite(id: string): Promise<boolean> {
+    return this.#store.delete(INVITE + id)
+  }
+
+  async redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null> {
+    const key = INVITE + (await hashOf(code))
+    const invite = await this.#store.get<InviteRecord>(key)
+    if (!invite || invite.expiresAt <= this.#now().toISOString()) return null
+    const current = await this.roleOf(identity)
+    if (current) return current
+    // (Google verified the account's email at sign-in: the invite is for whoever has that address)
+    if (identity.email.toLowerCase() !== invite.email) return 'other-account'
+    await this.setMember(identity, invite.role)
+    await this.#store.delete(key)
+    return invite.role
+  }
+
+  async destroy(): Promise<void> {
+    await this.#store.deleteAll()
   }
 
   async addRefs(refs: string[]): Promise<void> {

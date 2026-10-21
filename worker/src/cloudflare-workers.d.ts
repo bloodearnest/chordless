@@ -4,6 +4,7 @@ declare module 'cloudflare:workers' {
     get<T>(key: string): Promise<T | undefined>
     put(entries: Record<string, unknown>): Promise<void>
     delete(key: string): Promise<boolean>
+    deleteAll(): Promise<void>
     list<T>(options: { prefix: string }): Promise<Map<string, T>>
   }
   interface DurableObjectState {

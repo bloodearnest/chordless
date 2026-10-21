@@ -13,6 +13,7 @@ import { MapStore } from './map-store.ts'
 import { MemoryStorage } from './memory-storage.ts'
 
 const ann: Identity = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
+const bob: Identity = { provider: 'google', sub: 'g-2', email: 'bob@example.com' }
 const input = (name: string) => ({ name, type: 'song', props: {} })
 
 async function made() {
@@ -59,7 +60,7 @@ describe('noting refs', () => {
     const noted: string[] = []
     const refused = notingRefs(
       { ...storage.space(root), createMany: async (_, items) => items.map(() => null) },
-      { addRefs: async refs => void noted.push(...refs) }
+      { addRefs: async refs => void noted.push(...refs), members: async () => [] }
     )
     assert.deepEqual(await refused.createMany('songs', [{ input: input('Four'), body: 't' }]), [
       null,
@@ -87,7 +88,16 @@ describe('noting refs', () => {
       true
     )
     await space.unpublish(ref)
-    assert.deepEqual(await space.members(), [])
+  })
+
+  test('the members are the Durable Object’s, not the Drive folder’s permissions', async () => {
+    const { storage, root, state } = await made()
+    await state.setMember(bob, 'writer')
+    const space = notingRefs(storage.space(root), state)
+    assert.deepEqual(await space.members(), [
+      { email: 'ann@example.com', role: 'owner' },
+      { email: 'bob@example.com', role: 'writer' },
+    ])
   })
 
   test("an error from the state is the call's error, not swallowed", async () => {
@@ -96,6 +106,7 @@ describe('noting refs', () => {
       addRefs: async () => {
         throw new Error('storage unavailable')
       },
+      members: async () => [],
     })
     await assert.rejects(broken.list('songs'), /storage unavailable/)
   })

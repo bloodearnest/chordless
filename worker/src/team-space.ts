@@ -9,7 +9,13 @@ import type { SpaceMember } from '../../src/js/data-types.ts'
 import type { Env } from './env.ts'
 import type { Identity } from './identity.ts'
 import type { Role } from './team-api.ts'
-import { type MemberRole, type SpaceInfo, type TeamSpaceApi, TeamSpaceState } from './team-state.ts'
+import {
+  type InviteInfo,
+  type MemberRole,
+  type SpaceInfo,
+  type TeamSpaceApi,
+  TeamSpaceState,
+} from './team-state.ts'
 
 export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   #state = new TeamSpaceState(this.ctx.storage)
@@ -31,6 +37,31 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   }
   removeMember(identity: Identity): Promise<void> {
     return this.#state.removeMember(identity)
+  }
+  createInvite(
+    role: MemberRole,
+    email: string,
+    by: Identity
+  ): Promise<{ code: string; expiresAt: string }> {
+    return this.#state.createInvite(role, email, by)
+  }
+  invites(): Promise<InviteInfo[]> {
+    return this.#state.invites()
+  }
+  revokeInvite(id: string): Promise<boolean> {
+    return this.#state.revokeInvite(id)
+  }
+  redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null> {
+    return this.#state.redeemInvite(code, identity)
+  }
+  setRoleByEmail(email: string, role: MemberRole): Promise<boolean> {
+    return this.#state.setRoleByEmail(email, role)
+  }
+  removeByEmail(email: string): Promise<boolean> {
+    return this.#state.removeByEmail(email)
+  }
+  destroy(): Promise<void> {
+    return this.#state.destroy()
   }
   addRefs(refs: string[]): Promise<void> {
     return this.#state.addRefs(refs)

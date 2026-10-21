@@ -3,6 +3,8 @@
  * (`TeamSpaceState.addRefs`, team-state.ts), so the Worker can tell cheaply which files are in the
  * space's tree (`owns`, team-api.ts).
  *
+ * It also makes the space's members the Durable Object's, not the permissions of the Drive folder.
+ *
  * The files are not all made through the Worker: the owner syncs straight to Drive. But a listing
  * of the space is already scoped to its root, and a member lists before they read, so noting what a
  * listing, an inventory or a create returns covers them. A ref that none of these has shown is not
@@ -12,9 +14,13 @@ import type { SpaceStorage } from '../../src/js/storage/types.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
 /** The space's storage, noting each ref it shows before the answer goes on */
-export function notingRefs(space: SpaceStorage, room: Pick<TeamSpaceApi, 'addRefs'>): SpaceStorage {
+export function notingRefs(
+  space: SpaceStorage,
+  room: Pick<TeamSpaceApi, 'addRefs' | 'members'>
+): SpaceStorage {
   return {
-    members: () => space.members(),
+    // (the people of a team space are the Durable Object's, not Drive's folder permissions)
+    members: () => room.members(),
     async list(collection) {
       const files = await space.list(collection)
       await room.addRefs(files.map(file => file.ref))

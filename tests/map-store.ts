@@ -12,6 +12,9 @@ export class MapStore implements Store {
     this.puts.push(Object.keys(entries))
     for (const [key, value] of Object.entries(entries)) this.entries.set(key, value)
   }
+  async deleteAll() {
+    this.entries.clear()
+  }
   async delete(key: string) {
     return this.entries.delete(key)
   }
