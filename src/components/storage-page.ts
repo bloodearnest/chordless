@@ -3,7 +3,8 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { StoredBlob } from '../js/auth-db.ts'
 import type { Space } from '../js/data-types.ts'
 import type { UserInfo } from '../js/google-auth.ts'
-import { deleteSpace, getCurrentSpace, listSpaces } from '../js/space.ts'
+import { deleteSpace, getCurrentSpace, getSpaceById, listSpaces } from '../js/space.ts'
+import { isTeamMember } from '../js/storage/space-storage.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -33,6 +34,7 @@ export class StoragePage extends LitElement {
     isAuthenticated: { type: Boolean, attribute: false },
     signInExpired: { type: Boolean, attribute: false },
     noDrive: { type: Boolean, attribute: false },
+    teamMember: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
@@ -47,6 +49,8 @@ export class StoragePage extends LitElement {
   declare signInExpired: boolean
   /** Signed in, but without Google Drive: nothing can sync until it is connected */
   declare noDrive: boolean
+  /** The current space is a team's and this person is in it, not its owner: its files come through the Worker, not Drive */
+  declare teamMember: boolean
   declare authStatus: string
   declare userInfo: UserInfo | null
   declare _clearError: string
@@ -256,6 +260,7 @@ export class StoragePage extends LitElement {
     this.isAuthenticated = false
     this.signInExpired = false
     this.noDrive = false
+    this.teamMember = false
     this.authStatus = 'checking'
     this.userInfo = null
   }
@@ -282,6 +287,7 @@ export class StoragePage extends LitElement {
     this.isAuthenticated = state !== 'signed-out'
     this.signInExpired = state === 'expired'
     this.noDrive = state === 'no-drive'
+    this.teamMember = isTeamMember(await getSpaceById(getCurrentSpace().id))
     this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
     this.authStatus = 'ready'
   }
@@ -290,7 +296,7 @@ export class StoragePage extends LitElement {
     return html`
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderSpaceSection()}
-        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired || this.noDrive)}
+        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired || (this.noDrive && !this.teamMember))}
         ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
     `
@@ -316,7 +322,9 @@ export class StoragePage extends LitElement {
                     this.signInExpired
                       ? html`<h4>⚠ Sign-in expired</h4>`
                       : this.noDrive
-                        ? html`<h4>Signed in, Google Drive not connected</h4>`
+                        ? this.teamMember
+                          ? html`<h4>✓ Signed in</h4>`
+                          : html`<h4>Signed in, Google Drive not connected</h4>`
                         : html`<h4>✓ Connected</h4>`
                   }
 
@@ -365,9 +373,12 @@ export class StoragePage extends LitElement {
                     </p>`
                     : this.noDrive
                       ? html`<p>
-                        You are signed in, but Chordless has no access to Google Drive, so your
-                        setlists and songs are not being synced. They are safe on this device, and
-                        team spaces you have joined are not affected.
+                        You are signed in, but Chordless has no access to Google Drive.
+                        ${
+                          this.teamMember
+                            ? 'This team space does not need it: its songs and setlists come through Chordless. Connect Google Drive to sync spaces of your own.'
+                            : 'Your setlists and songs are not being synced. They are safe on this device, and team spaces you have joined are not affected.'
+                        }
                       </p>`
                       : html`<p>
                         Cloud features are enabled for this device. Your setlists and songs can be synced
@@ -471,10 +482,13 @@ export class StoragePage extends LitElement {
   _renderSyncSection(disabled = false) {
     return html`
       <div class="panel ${disabled ? 'is-disabled' : ''}">
-        <h3>🔄 Google Drive Sync</h3>
+        <h3>🔄 ${this.teamMember ? 'Team Sync' : 'Google Drive Sync'}</h3>
         <p>
-          Sync your setlists and songs with Google Drive. Your data will be stored in the
-          "Chordless" folder.
+          ${
+            this.teamMember
+              ? "Sync this space's setlists and songs with your team."
+              : 'Sync your setlists and songs with Google Drive. Your data will be stored in the "Chordless" folder.'
+          }
         </p>
         <div class="sync-body">
           <drive-sync-panel ?disabled=${disabled}></drive-sync-panel>

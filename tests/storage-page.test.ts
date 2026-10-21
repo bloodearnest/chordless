@@ -8,7 +8,13 @@ import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/storage-page.ts'
 import type { StoragePage } from '../src/components/storage-page.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  updateSpace,
+} from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -143,6 +149,55 @@ describe('the storage page, signed in to Google', () => {
     await open(false)
     expect(text()).to.contain('Not Connected')
     expect(text()).not.to.contain('Logout')
+  })
+
+  describe('in a team space, signed in without Google Drive', () => {
+    let member: string
+    let before: { id: string | null; name: string }
+
+    beforeEach(async () => {
+      before = getCurrentSpace()
+      const space = await createSpace(`Team ${crypto.randomUUID().slice(0, 8)}`)
+      member = space.id
+      await updateSpace(member, { rootRef: 'team-1', team: { id: 'team-1', role: 'writer' } })
+      await setCurrentSpace(member, space.name)
+    })
+
+    afterEach(async () => {
+      await deleteSpace(member)
+      if (before.id) await setCurrentSpace(before.id, before.name)
+    })
+
+    it('can sync: the space comes through Chordless, and Drive is for spaces of one’s own', async () => {
+      await open()
+      must(worker.stored).metadata.scope = 'openid email profile'
+      page.remove()
+      await open(false)
+
+      expect(page.noDrive).to.equal(true)
+      expect(page.teamMember).to.equal(true)
+      expect(text()).to.contain('✓ Signed in')
+      expect(text()).to.contain('This team space does not need it')
+      expect(text()).to.contain('Team Sync')
+      expect(page.shadowRoot?.querySelector('.panel.is-disabled')).to.equal(null)
+      expect(text()).to.not.contain('Connect Google Drive above to sync')
+    })
+
+    it('has the sync off, and says to connect Drive, in a space of one’s own', async () => {
+      const own = await createSpace(`Own ${crypto.randomUUID().slice(0, 8)}`)
+      await setCurrentSpace(own.id, own.name)
+      try {
+        await open()
+        must(worker.stored).metadata.scope = 'openid email profile'
+        page.remove()
+        await open(false)
+        expect(page.teamMember).to.equal(false)
+        expect(text()).to.contain('Connect Google Drive above to sync')
+        expect(text()).to.not.contain('Team Sync')
+      } finally {
+        await deleteSpace(own.id)
+      }
+    })
   })
 
   describe('logging out', () => {
