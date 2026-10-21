@@ -176,8 +176,7 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
    ```
 3. **A personal space syncs** (as always): `page ── access token ──► Google Drive`. The Worker is
    not involved.
-4. **A team member syncs** (built end to end, for an owner-token space that something has made;
-   nothing makes one yet):
+4. **A team member syncs** (built end to end, for an owner-token space):
    ```
    page ── ID token ──► Worker /api/space/<id>/read-many
                                1. verify the ID token: who is this?
@@ -300,10 +299,29 @@ Agreed with the owner of the project:
 - **Pad sets** are not in the team service's first cut: they are the account's today
   (docs/STORAGE_API.md); they move into the space, then the Worker streams them.
 
+Built 2026-10-21 (`worker/src/team-admin.ts`, routes at its top):
+- **Making a space:** `POST /api/spaces` with the page's blob, the folder and a name. The Worker
+  checks the blob is the caller's (`owner_sub` against the ID token) and that it sees the folder,
+  writable and not in the bin, then issues the space's id and keeps the blob in a new Durable
+  Object. The owner's client keeps the id (nothing records a folder against an id on the Worker, so
+  sharing the same folder twice makes two spaces).
+- **Invites are for an email address.** An admin makes one for a role and an email
+  (`POST /invites`) and gets its code once. Only the code's hash is kept; it lasts a week, is used
+  up once, and can be used only by an account whose email Google verified as the invited one
+  (`POST /api/spaces/join`): anyone else with the code is told it was sent to a different Google
+  account, and the code stays good for the right person. The member is then recorded by
+  `provider:sub`, not by email, so a later change of address does not matter. Unknown, used and
+  expired codes all get the same answer. Someone already in the space keeps their role and uses
+  nothing. The cost of binding it: a person who signs in with another address than the one invited
+  is turned away, and the admin has to invite the address that appears in their Google account (a
+  Gmail address with dots or a `+tag` is a different address from the plain one). The link to hand
+  out is the page's, with the space id and code in its fragment (not built).
+- **Looking after people:** a role acts only on those below it (an admin on writers and readers,
+  the owner on admins too; nobody on the owner), so an admin cannot make or remove an admin. A
+  member can leave; the owner ends sharing instead (`DELETE`), which forgets the space; the owner can
+  replace the stored sign-in (`PUT /credential`) when Google no longer honours it.
+
 Proposed, not yet confirmed:
-- **Invites by email**, each attached to a role; a member opens the invite link and signs in. The
-  invite binds to whichever Google account redeems it first (the admin sees which), as strict email
-  matching would lock out people who sign in with another address than the one invited.
 - **Ask first whether the team has a Google shared drive.** If so, go straight to the service
   account (the owner's token is never stored; the Worker can make the team folder itself once the
   service account is a member of the drive, so the Picker is not needed for that path). If not,
@@ -684,7 +702,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`) and the route (`router.ts`, `team-context.ts`); not yet creating a space ("Enable sharing"), join/invite/revoke, or the service account): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); not yet the service account, the pads, or any page for it): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
    and the preference.
