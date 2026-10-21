@@ -114,8 +114,13 @@ that walks a file's parents. A team space's root ref is the space id. The client
 
 On the Worker each call is: check the ID token, look up the member's role in the space's
 Durable Object, check it against the collection and ref, make the Drive call with the owner's token
-(later the service account's) and stream the answer back. Nothing is stored. The Worker may reuse
-`drive-storage.ts` with another token provider, so there stays one Drive implementation.
+(later the service account's) and stream the answer back. Nothing is stored. The Worker reuses
+`createDriveStorage` with another token source (`worker/src/team-drive.ts`, built 2026-10-21), so there
+stays one Drive implementation: `ownerAccessToken` opens the owner's blob from the space's Durable
+Object, checks it is the owner's (`owner_sub`), refreshes an access token for it (kept in the
+isolate's memory for its hour, made once for a whole batch) and says "sharing is not set up" (no
+blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`) as a 409. A service account
+would be another source. Not yet wired into a route.
 
 How each call maps:
 - `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
@@ -160,7 +165,11 @@ primitives are not enough.
   They are accurate while Drive is the only backend.
 - **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).
 
-`drive-api.ts` is now only the Drive adapter's: nothing else in the app calls it (the dev pages
+The Drive calls are `createDriveApi` (`drive-client.ts`), given a source of access tokens, so the browser
+and the Worker each make their own: `drive-api.ts` is the browser's (the signed-in user's token) and
+`createDriveStorage(api)` (`storage/drive-storage.ts`) is the adapter over any of them
+(`storage/browser-drive.ts` makes the browser's `driveStorage`). Nothing else in the app calls
+`drive-api.ts` (the dev pages
 under `src/dev/` still do, for inspecting Drive).
 
 Records keep what they know of their file as `fileRef`, `fileRev`, `fileModified` and (songs)
