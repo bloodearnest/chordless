@@ -6,13 +6,13 @@ setlist sent to people without an account) are in SHARING.md. How sync itself wo
 SYNC_ARCHITECTURE.md.
 
 > **Status:** the personal space and the single-user sync described under "Today" are built. The
-> team space, the Worker broker, roles, copy/move and the rest are **designed, not built**; the
+> team space, the Worker's team service, roles, copy/move and the rest are **designed, not built**; the
 > order of work and a status list are at the end. The code and docs
 > call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
 
 ## Principle
 
-**Chordless never stores copyrighted content; it only brokers access to it.** Charts, lyrics and pad
+**Chordless never stores copyrighted content; it only passes access on to it.** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song, setlist or pad
@@ -25,7 +25,7 @@ members of their church. Each space is self-contained, so copyright compliance i
 ## Naming
 
 - The umbrella word is **space**, and there are two kinds: a **personal space** (yours alone, in
-  your own Drive) and a **team space** (shared, brokered). "Create a team space", "Join a team
+  your own Drive) and a **team space** (shared, through the Worker). "Create a team space", "Join a team
   space", "Save to: Personal space / Grace Church (team space)". The old word "organisation" went from
   the UI, the code and the docs on 2026-10-20. It survives only where old data may still carry it, and is moved
   when the app loads: the IndexedDB database `organisations` (and its store) is copied to `spaces` and
@@ -109,12 +109,12 @@ a re-pointing of the folder.
 
 A setlist's leader is `owner` (name) + `ownerId` (Google account email; empty for a leader typed in
 by name with "Other…"). The Leader dropdown lists the folder's members (cached at sync, from Drive
-permissions) plus the signed-in user, who is the default for new setlists. With the broker, the
+permissions) plus the signed-in user, who is the default for new setlists. With the team service, the
 member list comes from the Worker instead.
 
 ### Sign-in model
 
-The Worker keeps no per-user state (until the broker adds its Durable Objects).
+The Worker keeps no per-user state (until the team service adds its Durable Objects).
 
 - **Signing in:** Google sign-in (GSI) runs in a popup, and the page posts the code and ID token to
   `/oauth/callback`. The Worker verifies the ID token, exchanges the code for tokens, encrypts the
@@ -133,7 +133,7 @@ The Worker keeps no per-user state (until the broker adds its Durable Objects).
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
 
-## Why the Worker brokers (verified 2026-10-13, real second account)
+## Why the Worker serves members (verified 2026-10-13, real second account)
 
 Under `drive.file`, sharing a space's Drive folder with another person does not give them access:
 they cannot find it by name, and picking the folder in the Picker gives them the folder and
@@ -152,7 +152,7 @@ else made. Access is per user and per file (shared drives not tested; expected t
 - A service account with a folder shared into a *personal* Drive: reads work, but service accounts
   have no storage quota, so writes typically fail (a shared drive is different: see Credentials).
 
-**The design:** the Worker brokers the owner's access.
+**The design:** the Worker acts with the owner's access on members' behalf.
 1. The owner presses "Enable sharing". The Worker keeps the owner's token (the encrypted blob it
    already issues) in the team space's Durable Object, with its member list and a role for each.
 2. A member signs in with the ordinary `drive.file` scope (no warning screen). Their app sends its
@@ -209,12 +209,14 @@ redesign. Not now: per-team accounts need Chordless to hold a key-minting creden
 Account/Key Admin) and many keys in Durable Objects under one master secret, so a Worker compromise
 still reaches them all; they'd mainly help against a single leaked key, per-team revocation, audit
 clarity and per-identity rate limits (Google's 100-accounts-per-project default is a further limit).
-For the real service account, use a **dedicated project with a tidy id** (the move is planned in docs/CLOUD_MIGRATION.md) (the address a team admin
-sees in their shared drive's members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id
-cannot be renamed: the old project is `setalight`, from its first name, now named `chordless-old`), separate from the project
-that holds the OAuth client and the verified brand, so the key that can reach every connected team's drive
-sits apart from the sign-in project. The spike used `broker@setalight…`, and the account
-Terraform now makes, `team-storage@chordless-app…`, is in the app's own project for the time being. Revisit with many teams or if the spike shows rate limits bite. Also not built: bring-your-own
+The service account is `team-storage@chordless-app.iam.gserviceaccount.com` (made by Terraform in
+`infra/google-chordless/`, 2026-10-20): the address a team admin sees in their shared drive's
+members is `<name>@<project-id>.iam.gserviceaccount.com`, and a project id cannot be renamed, so the
+account has a tidy project id. It is in the app's
+own project, the one that holds the OAuth client and the verified brand, for the time being;
+ideally the key that can reach every connected team's drive sits apart from the sign-in project, in
+a project of its own (docs/CLOUD_MIGRATION.md, step 6). Revisit with many teams or if the spike
+shows rate limits bite. Also not built: bring-your-own
 service account (the team uploads its own key; isolation, but real setup friction for a church).
 
 Roles, pads and conflicts are identical in both modes (the Worker enforces them either way); only
@@ -227,14 +229,14 @@ Agreed with the owner of the project:
 - **Google accounts only**, for members as well as owners. Anyone can make a Google account on
   their existing email address (accounts.google.com/signup, "use your existing email"), so the only
   blocker is someone who will not use Google at all; that is accepted. Share links (read-only, no
-  account) cover the rest. A second identity provider (emailed link) is possible later: the broker
+  account) cover the rest. A second identity provider (emailed link) is possible later: the team service
   takes a Worker-issued session token and keys members by verified email, so it does not care how
   the email was verified.
 - **A member signs in as everyone does** (`initCodeClient` popup). The Worker verifies the ID token
   and issues its own short-lived session token, renewed in `/session/refresh`. A member needs only
   `openid email profile`: all their Drive traffic for the team space goes through the Worker, so
   an unticked Drive box affects only their personal space.
-- **Pad sets** are not in the broker's first cut: they are the account's today
+- **Pad sets** are not in the team service's first cut: they are the account's today
   (docs/STORAGE_API.md); they move into the space, then the Worker streams them.
 
 Proposed, not yet confirmed:
@@ -398,7 +400,7 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
 - **Conflicts:** personal spaces are single-writer: keep Drive wins plus a conflict copy of dropped
   local edits. Team spaces add the Worker checksum precondition (409) and a Durable Object per space
   to serialise writes (SYNC_ARCHITECTURE.md).
-- **Owner goes direct**, so it works if the broker is down.
+- **Owner goes direct**, so it works if the team service is down.
 - **Worker state:** one Durable Object per team space: members, roles, encrypted token blob. Never
   content. If the owner revokes the app, members see "owner needs to sign in again".
 - **Immediate/offline sync** (SYNC_ARCHITECTURE.md) is made space-aware: `syncSoon({type, id,
@@ -431,7 +433,7 @@ behaviour). Pass/fail, in order:
 5. Stored token blob: refresh works from the Worker with no user present (consent screen "In
    production"; 7-day refresh expiry in Testing).
 6. Confirm a *different* member of the shared drive, using their own `drive.file` token, cannot see
-   the owner's files (confirms the broker is required) and a new owner token cannot adopt the
+   the owner's files (confirms the team service is required) and a new owner token cannot adopt the
    folder (confirms succession = copy).
 7. **Service account:** in a shared drive, a Chordless service account added as Content manager can
    create, list, read, update and delete files and folders (`supportsAllDrives`); the Worker can
@@ -455,7 +457,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 | 3 | The same from My Drive | **Pass.** The shared-drive flags are harmless there; `/about` takes the flag too (the app still does not send it) |
 | 4 | A big file streams through the Worker, nothing kept | **Pass.** 20 MB up (2.1 MB/s) and down (10.3 MB/s), SHA-256 identical. Production limits unchecked |
 | 5 | The stored token refreshes with no user present | **Pass.** Consent screen is In production, brand verified. A sign-in made under Testing dies in 7 days; the app now says "Sign-in expired" and offers Reconnect |
-| 6 | A member's own token sees nothing of the owner's files, and cannot adopt the folder | **Pass.** So the Worker broker is required, and succession of a team space is a copy |
+| 6 | A member's own token sees nothing of the owner's files, and cannot adopt the folder | **Pass.** So the Worker's team service is required, and succession of a team space is a copy |
 | 7 | A service account in the shared drive does the whole job | **Pass.** JWT signed with WebCrypto, token with no user, and it sees the files the owner's client made |
 
 **What it settles**
@@ -469,8 +471,8 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 
 **What it changes**
 - No One Tap. The Worker issues its own short-lived signed session token at sign-in (design above).
-- The service account lives in its own Google Cloud project, made when the project moves
-  (docs/CLOUD_MIGRATION.md); `team-storage@chordless-app.iam.gserviceaccount.com` is in the app project for now, and `broker@setalight…` was the spike's.
+- The service account is `team-storage@chordless-app.iam.gserviceaccount.com`, in the app project
+  for now (docs/CLOUD_MIGRATION.md, step 6 is a project of its own).
 
 **Still open**
 - The Cloudflare limits on a deployed Worker (request length, body size): only a deployment shows them.
@@ -483,7 +485,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`,
 `src/dev/shared-drive-probe.*`, `src/dev/picker.js`, and their tests) was deleted on 2026-10-20 when the
 spike was done. It is in git history (`git log --diff-filter=D -- worker/src/spike-broker.ts`); the
-service account's JWT signing in `spike-service-account.ts` is the part the real broker will want. The
+service account's JWT signing in `spike-service-account.ts` is the part the real team service will want. The
 "Ready to run" notes below describe the pages and routes as they were.
 
 **Ready to run, item 1 (2026-10-19):** `/dev/broker-spike.html` and a throwaway Worker route
@@ -511,7 +513,7 @@ service account's JWT signing in `spike-service-account.ts` is the part the real
   `X-Spike-Member: <email> (<role or not a member>)` and the page shows it first, so a mix-up of
   accounts is visible. **Item 1 is done** for the owner's token, on a shared-drive folder, with a
   Content manager.
-- **Do not build the real broker on One Tap.** The member's ID token here comes from
+- **Do not build the real team service on One Tap.** The member's ID token here comes from
   `google.accounts.id.prompt()`, which Chrome shows as a native FedCM popup ("Sign in as …"), not an
   OAuth window. Other browsers show Google's own card in the page or nothing, Google is retiring that
   fallback and the moment notifications `getIdToken` relies on, a few dismissals silence it for a
@@ -519,7 +521,7 @@ service account's JWT signing in `spike-service-account.ts` is the part the real
   design: the normal sign-in popup (`initCodeClient`, which works everywhere) already gives the
   Worker a verified ID token, so the Worker issues its own short-lived signed session token (email
   and sub, about an hour, signed with a Worker secret), renews it in `/session/refresh` (which has the
-  encrypted blob as proof of identity), and the broker accepts that. No prompt, any browser, no
+  encrypted blob as proof of identity), and the team service accepts that. No prompt, any browser, no
   per-call popup. (Current dates for Google's retirement not checked.)
 - **Item 4, a big file:** `POST /dev/spike/upload?space=…&name=…` takes the file as the raw body with
   `X-Id-Token` and `Content-Length`, for a writer only. It opens a resumable upload to Drive with the
@@ -553,7 +555,7 @@ service account's JWT signing in `spike-service-account.ts` is the part the real
   code from the owner part; the code now includes the team folder's id):
   - **6a** "try my own token on the team's files": this account's own Chordless sign-in lists the team
     folder and reads the folder, a file in it, and a file in a subfolder. All must be refused or empty.
-    A pass confirms `drive.file` is per app and per user on a shared drive too, so the broker is
+    A pass confirms `drive.file` is per app and per user on a shared drive too, so the team service is
     needed (a "seen" would mean members could sync a shared drive directly, a much simpler design).
   - **6b** "pick the team folder, and see what I get": the Picker (the API key in the owner part)
     picks the team folder with this account. The pick grants the folder, but listing it must still
@@ -561,7 +563,7 @@ service account's JWT signing in `spike-service-account.ts` is the part the real
     per team space and succession is a copy.
   - **Item 6 result (2026-10-20): passed.** Run as the Gmail account, a member of the shared drive.
     6a: nothing listed, and the folder, a file in it and a file in a subfolder all refused (404), so
-    `drive.file` is per user and per client on a shared drive too, and the broker is needed. 6b: the
+    `drive.file` is per user and per client on a shared drive too, and the team service is needed. 6b: the
     pick granted the folder it was given and nothing under it (listing showed nothing; the old
     owner's song stayed refused), so a new owner cannot adopt the folder's contents and succession is
     a copy. The page marked one row "fail" only because the account picked the parent folder
@@ -587,7 +589,7 @@ drives on). Picking fills in the parent; the probe then reads it, lists what the
 would be. It needs, in the Google Cloud console, the Picker API enabled and a browser API key allowed
 for it (restrict it to the Picker API and to the page's address); the key is typed on the page and
 kept in that browser only (the Worker's `GOOGLE_API_KEY` is a different key and never reaches a
-browser). The app id is the project number, `818185619377` (`chordless-app`; the old project's was `376758830135`). The production CSP is not changed yet:
+browser). The app id is the project number, `818185619377` (`chordless-app`). The production CSP is not changed yet:
 it needs `apis.google.com`, `docs.google.com` and `www.gstatic.com` when the Picker goes in the app.
 Needs one account; items 1, 5 and 6 still need two.
 
@@ -606,7 +608,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 3. [ ] Space abstraction: space id + `rootRef` identity, folder-location Picker on create,
    shared-drive flags, no name matching, per-space transport. **The storage API (docs/STORAGE_API.md)
    is built:** the sync engine and share links work through `StorageBackend` / `SpaceStorage`, so
-   per-space transport is a matter of which backend a space is given, and the broker (item 7) is
+   per-space transport is a matter of which backend a space is given, and the team service (item 7) is
    another backend for it.
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
@@ -621,7 +623,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker broker (serves the storage API to members): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; not yet the session token, the Durable Object, the Drive credentials or the route): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
    and the preference.
@@ -640,7 +642,7 @@ users, leaders, permissions; join/invite/remove user; restrict editing others' s
   7-day life and expired; reconnecting made one under production. If an `invalid_grant` comes again,
   the other causes are access revoked, six months unused, the per-account limit on refresh tokens for
   one client, and a Workspace admin's session-length policy (which could affect a team owner's
-  account, and the broker holds that token).
+  account, and the team service holds that token).
 - The Worker carries team-space traffic including pad audio (cost, limits).
 - Owner-token mode: the owner leaves or revokes and sync stops; succession is a copy. (Solved by
   team-managed storage for teams on a shared drive.)
@@ -649,14 +651,14 @@ users, leaders, permissions; join/invite/remove user; restrict editing others' s
   folder tree.
 - The spike ran on a Workspace shared drive; stricter shared-drive admin policies than the test one are untested ("Still open" above).
 - A consent-screen/verification change, or Google restricting `drive.file` further, would undermine
-  the whole broker design.
+  the whole team-space design.
 
 ## Tests
 
-`just format lint test` after each step. Worker broker tests use `fake-auth-worker.ts` /
+`just format lint test` after each step. Worker team-service tests use `fake-auth-worker.ts` /
 `fake-drive.ts` extended with a second user and shared-drive flags. To cover: create a team space
 with a chosen parent; enable sharing; join; reader edits stay local and survive a pull; reader can
 upload but not delete pads; admin can delete; move personal → team keeps setlist ids and moves pads;
 Merged/Separate with 1 vs 2 spaces (switcher hidden with 1); the Worker never persists bodies.
-Manual two-account run for the spike and the broker/UI steps. Log real defects in
+Manual two-account run for the spike and the team-service and UI steps. Log real defects in
 `docs/test-catches.jsonl`.

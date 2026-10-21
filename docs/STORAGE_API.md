@@ -2,7 +2,7 @@
 
 What the sync engine needs of wherever a space's files are kept, as one interface
 (`src/js/storage/types.ts`), so that Google Drive is one backend among those that could be: the
-Worker broker serves the same calls to team-space members (docs/SPACES.md), and a fake implements
+Worker's team service serves the same calls to team-space members (docs/SPACES.md), and a fake implements
 them in memory for tests. A second real backend (Dropbox, OneDrive, WebDAV) is not planned yet; the
 interface is shaped so that it would not mean touching the engine.
 
@@ -80,17 +80,31 @@ a share link is Drive-specific until that is generalised), and `unpublish` then 
 `MemoryStorage` (docs/TESTING.md). A second backend means an adapter that passes the conformance
 suite, and a way to keep `props` (see above).
 
-The Worker broker (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
+The Worker's team service (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
 
-## The team backend (designed, not built)
+## The team backend (client and API built; sign-in, Durable Object and Drive credentials not)
 
-Team-space members get a second implementation of the same interface, `BrokerStorage`
-(`src/js/storage/broker-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
+Team-space members get a second implementation of the same interface, `TeamStorage`
+(`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
 session token (docs/SPACES.md). The engine, share manager and pad service are unchanged; which
 backend a space is given depends on its kind and on whether this person is its owner (the owner
-keeps `DriveStorage`, direct). `BrokerStorage` has to pass `tests/storage-conformance.ts` against
+keeps `DriveStorage`, direct). `TeamStorage` has to pass `tests/storage-conformance.ts` against
 the Worker running over `fake-drive.ts`.
+
+**Built (2026-10-20):** `TeamStorage` and the API it calls, `worker/src/team-api.ts`
+(`handleTeamRequest`; the routes are listed at the top of that file). The API is a function of
+the request and a `TeamContext`: who is asking and their role (`access`), the space's
+`SpaceStorage` (`space`), its root (`root`) and whether a file is in its tree (`owns`). Tests
+give it the in-memory storage; the real context is the Durable Object and the owner's token or
+service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
+(reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
+404 (null in a batch), bodies are text only, and share links (`publicLink`, `unpublish`) and
+pads answer "not yet". The space-level conformance suite (`describeSpaceStorage`, split from the
+backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
+the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
+it must include binned files, and be cheap (the Durable Object keeping the refs, not a walk of
+Drive per call). A team space's root ref is the space id.
 
 On the Worker each call is: check the session token, look up the member's role in the space's
 Durable Object, check it against the collection and ref, make the Drive call with the owner's token
@@ -105,7 +119,7 @@ How each call maps:
   and the Drive-capabilities guess (the "role from the Worker" to-do in SPACES.md).
 - `findRootByName`, `ensureRoot`, `renameRoot`: first-sync-on-a-device calls that do not apply to
   a member, whose space is issued an id and `rootRef`. Open question: a small "join an issued
-  space" call in the interface, so a broker backend is not left with stubs. Rename is admin-only.
+  space" call in the interface, so a team backend is not left with stubs. Rename is admin-only.
 - Pads: `PadStorage` must first move from the backend to `SpaceStorage` ("Pad sets"), then the
   Worker streams audio: any member uploads, admin and up deletes.
 - Share links: `publicLink` and `/api/share/<id>` are Drive-specific. Sharing from a team space
@@ -115,14 +129,14 @@ How each call maps:
 subrequest. A steady-state sync is a few list calls plus one read or write per changed file, so
 roughly 5 to 15 requests; a first sync on a device is one read per file (hundreds for a big
 library). For a team of 30 that sync a few times a month this is thousands of requests a month,
-far inside Workers' limits (checked against the plan's numbers when the broker is built); quota
+far inside Workers' limits (checked against the plan's numbers when the team service is built); quota
 is not the concern. The cost is latency: about 1.1 to 1.4 s per call was measured, and the proxy
 adds a hop to every call the direct path makes, so it cannot be faster than direct.
 
 Batching is therefore in the interface (built 2026-10-20): `readMany`, `createMany` and
 `updateMany`. The engine hands a backend a batch of 50 (`BATCH_SIZE`, `sync/session.ts`) and
 does not say how it is done. `DriveStorage` keeps what it had: 10 reads or updates in flight,
-30 uploads in flight (Google's Batch API cannot carry file content). `BrokerStorage` sends a
+30 uploads in flight (Google's Batch API cannot carry file content). `TeamStorage` sends a
 batch as one request, which the Worker fans out to Drive, with one Durable Object role check for
 the whole batch. A batch call is still partial-failure tolerant (null in a slot), and a batch that
 throws is retried one record at a time on a push and counted as unread on a pull. Not batched:

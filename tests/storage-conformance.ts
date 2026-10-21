@@ -33,53 +33,37 @@ const input = (name: string, props: Record<string, string | null> = {}): FileInp
   type: name.endsWith('.json') ? 'application/json' : 'text/plain',
 })
 
-export function describeStorage(label: string, makeHarness: () => Promise<StorageHarness>): void {
-  describe(`storage backend: ${label}`, () => {
-    let harness: StorageHarness
-    let backend: StorageBackend
+/** A space's storage under test, with the ways of changing it behind its back that a test needs */
+export interface SpaceHarness {
+  space: SpaceStorage
+  /** A second space on the same backend */
+  otherSpace(): Promise<SpaceStorage>
+  /** Put a file in the backend's bin */
+  trash(ref: string): void
+  /** Delete a file for good */
+  remove(ref: string): void
+  /** Change a file's content, as another device would */
+  edit(ref: string, content: string): void
+  /** Make the backend list at most this many files at a time (so paging is exercised) */
+  pageSize?(size: number): void
+  /** Put a file where this space's root is not its parent, and give its ref */
+  fileElsewhere(): Promise<string>
+  /** The space keeps to its own tree: it knows nothing of a file elsewhere (a team space) */
+  scoped?: boolean
+}
+
+/** What every space's storage must do: the files in it, and what has gone from it */
+export function describeSpaceStorage(
+  label: string,
+  makeHarness: () => Promise<SpaceHarness>
+): void {
+  describe(`space storage: ${label}`, () => {
+    let harness: SpaceHarness
     let space: SpaceStorage
-    let rootRef: string
 
     beforeEach(async () => {
       harness = await makeHarness()
-      backend = harness.backend
-      const root = await backend.ensureRoot('Grace Church', 'space-1')
-      rootRef = root.ref
-      space = backend.space(rootRef)
-    })
-
-    describe('roots', () => {
-      it('finds no root before one is made, then makes it once', async () => {
-        const fresh = await makeHarness()
-        expect(await fresh.backend.findRootByName('Other')).to.equal(null)
-        const first = await fresh.backend.ensureRoot('Other', 'space-2')
-        const second = await fresh.backend.ensureRoot('Other', 'space-2')
-        expect(first.isNew).to.equal(true)
-        expect(second).to.deep.equal({ ref: first.ref, isNew: false })
-        expect((await fresh.backend.findRootByName('Other'))?.ref).to.equal(first.ref)
-      })
-
-      it('describes a root, and says whether it can be written', async () => {
-        const info = must(await backend.inspectRoot(rootRef))
-        expect(info.name).to.equal('Grace Church')
-        expect(info.trashed).to.equal(false)
-        expect(info.canWrite).to.equal(true)
-      })
-
-      it('knows no root it did not make', async () => {
-        expect(await backend.inspectRoot('no-such-root')).to.equal(null)
-      })
-
-      it('renames a root', async () => {
-        await backend.renameRoot(rootRef, 'Grace Chapel')
-        expect(must(await backend.inspectRoot(rootRef)).name).to.equal('Grace Chapel')
-        expect(await backend.findRootByName('Grace Church')).to.equal(null)
-        expect((await backend.findRootByName('Grace Chapel'))?.ref).to.equal(rootRef)
-      })
-
-      it('says it is available', async () => {
-        expect(await backend.available()).to.equal(true)
-      })
+      space = harness.space
     })
 
     describe('files', () => {
@@ -115,7 +99,7 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
       })
 
       it('keeps the spaces apart', async () => {
-        const other = backend.space((await backend.ensureRoot('Other', 'space-2')).ref)
+        const other = await harness.otherSpace()
         await space.create('songs', input('mine.txt'), 'x')
         expect(await other.list('songs')).to.deep.equal([])
       })
@@ -252,10 +236,88 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
         expect(inventory.has(setlist.file.ref)).to.equal(true)
       })
 
-      it('finds a file that lives outside the space, but keeps it out of the inventory', async () => {
+      it('keeps a file that lives outside the space out of the inventory', async () => {
         const ref = await harness.fileElsewhere()
-        expect(must(await space.status(ref)).trashed).to.equal(false)
+        if (harness.scoped) {
+          // (a space that keeps to its own tree knows nothing of it)
+          expect(await space.status(ref)).to.equal(null)
+        } else {
+          expect(must(await space.status(ref)).trashed).to.equal(false)
+        }
         expect((await space.inventory()).has(ref)).to.equal(false)
+      })
+    })
+
+    describe('members', () => {
+      it('lists nobody for a space that is shared with no one', async () => {
+        expect(await space.members()).to.deep.equal([])
+      })
+    })
+  })
+}
+
+export function describeStorage(label: string, makeHarness: () => Promise<StorageHarness>): void {
+  describeSpaceStorage(label, async () => {
+    const harness = await makeHarness()
+    const root = await harness.backend.ensureRoot('Grace Church', 'space-1')
+    return {
+      space: harness.backend.space(root.ref),
+      async otherSpace() {
+        return harness.backend.space((await harness.backend.ensureRoot('Other', 'space-2')).ref)
+      },
+      trash: ref => harness.trash(ref),
+      remove: ref => harness.remove(ref),
+      edit: (ref, content) => harness.edit(ref, content),
+      pageSize: harness.pageSize && (size => harness.pageSize?.(size)),
+      fileElsewhere: () => harness.fileElsewhere(),
+    }
+  })
+
+  describe(`storage backend: ${label}`, () => {
+    let harness: StorageHarness
+    let backend: StorageBackend
+    let space: SpaceStorage
+    let rootRef: string
+
+    beforeEach(async () => {
+      harness = await makeHarness()
+      backend = harness.backend
+      const root = await backend.ensureRoot('Grace Church', 'space-1')
+      rootRef = root.ref
+      space = backend.space(rootRef)
+    })
+
+    describe('roots', () => {
+      it('finds no root before one is made, then makes it once', async () => {
+        const fresh = await makeHarness()
+        expect(await fresh.backend.findRootByName('Other')).to.equal(null)
+        const first = await fresh.backend.ensureRoot('Other', 'space-2')
+        const second = await fresh.backend.ensureRoot('Other', 'space-2')
+        expect(first.isNew).to.equal(true)
+        expect(second).to.deep.equal({ ref: first.ref, isNew: false })
+        expect((await fresh.backend.findRootByName('Other'))?.ref).to.equal(first.ref)
+      })
+
+      it('describes a root, and says whether it can be written', async () => {
+        const info = must(await backend.inspectRoot(rootRef))
+        expect(info.name).to.equal('Grace Church')
+        expect(info.trashed).to.equal(false)
+        expect(info.canWrite).to.equal(true)
+      })
+
+      it('knows no root it did not make', async () => {
+        expect(await backend.inspectRoot('no-such-root')).to.equal(null)
+      })
+
+      it('renames a root', async () => {
+        await backend.renameRoot(rootRef, 'Grace Chapel')
+        expect(must(await backend.inspectRoot(rootRef)).name).to.equal('Grace Chapel')
+        expect(await backend.findRootByName('Grace Church')).to.equal(null)
+        expect((await backend.findRootByName('Grace Chapel'))?.ref).to.equal(rootRef)
+      })
+
+      it('says it is available', async () => {
+        expect(await backend.available()).to.equal(true)
       })
     })
 
@@ -367,12 +429,6 @@ export function describeStorage(label: string, makeHarness: () => Promise<Storag
 
       it('has no files for a set that is not there', async () => {
         expect(await pads().listFiles('no-such-set')).to.deep.equal([])
-      })
-    })
-
-    describe('members', () => {
-      it('lists nobody for a space that is shared with no one', async () => {
-        expect(await space.members()).to.deep.equal([])
       })
     })
   })
