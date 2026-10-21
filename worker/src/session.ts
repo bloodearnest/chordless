@@ -39,7 +39,10 @@ export const realGoogle: GoogleApi = {
  * {
  *   blob: string,           // JWE-encrypted token blob
  *   access_token: string,   // Short-lived access token
- *   expires_in: number      // Access token TTL (seconds)
+ *   expires_in: number,     // Access token TTL (seconds)
+ *   id_token: string,       // Google's ID token (who signed in)
+ *   scope: string,          // What was granted: the Drive scope is absent if its box was unticked
+ *   user: {...}             // The profile Google gave
  * }
  */
 export async function handleOAuthCallback(
@@ -71,19 +74,8 @@ export async function handleOAuthCallback(
   const email = payload.email as string | undefined
   const sub = payload.sub
 
-  // Validate that Drive scope was granted
-  const REQUIRED_SCOPE = 'https://www.googleapis.com/auth/drive.file'
-  if (!scope?.includes(REQUIRED_SCOPE)) {
-    return jsonResponse(
-      {
-        error:
-          'Drive access not granted. Please re-authorize and ensure you grant access to Google Drive files.',
-        granted_scopes: scope || '',
-      },
-      400
-    )
-  }
-
+  // (Drive is not required: a member of a team space signs in for who they are, and the page
+  // asks for Drive separately if they want a space of their own. `scope` says what was granted.)
   if (!refresh_token) {
     return jsonResponse(
       { error: 'No refresh token received. User may need to revoke and re-authorize.' },
@@ -95,7 +87,7 @@ export async function handleOAuthCallback(
   const blobData: BlobData = {
     owner_email: email,
     owner_sub: sub,
-    scopes: scope,
+    scopes: scope ?? '',
     refresh_token: refresh_token,
     created_at: new Date().toISOString(),
     blob_id: crypto.randomUUID(),
@@ -118,6 +110,7 @@ export async function handleOAuthCallback(
     access_token,
     expires_in,
     id_token,
+    scope,
     user,
   })
 }

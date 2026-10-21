@@ -185,13 +185,15 @@ describe('POST /oauth/callback', () => {
     assert.match(String((await bodyOf(response)).error), /revoke and re-authorize/)
   })
 
-  test('refuses a sign-in that did not grant Drive access, and says what was granted', async () => {
+  test('lets a sign-in through without Drive access, and says what was granted', async () => {
     const { google } = fakeGoogle({
       exchangeCode: (async () => ({
         refresh_token: 'r',
-        scope: 'openid email',
+        access_token: 'a',
+        expires_in: 3600,
+        scope: 'openid email profile',
         id_token: 'i',
-        claims: { sub: 's' },
+        claims: { sub: 's', email: 'ann@example.com', email_verified: true },
       })) as unknown as GoogleApi['exchangeCode'],
     })
     const response = await handleOAuthCallback(
@@ -200,32 +202,18 @@ describe('POST /oauth/callback', () => {
       google
     )
     const body = await bodyOf(response)
-    assert.equal(response.status, 400)
-    assert.match(String(body.error), /Drive access not granted/)
-    assert.equal(body.granted_scopes, 'openid email')
+    assert.equal(response.status, 200)
+    assert.equal(body.scope, 'openid email profile')
+    assert.ok(body.blob, 'a blob to renew the ID token from')
+    const data = await decryptBlob(String(body.blob), env)
+    assert.equal(data.scopes, 'openid email profile')
   })
 
-  test('says Drive was not granted, not that a refresh token is missing, when it gave neither', async () => {
-    const { google } = fakeGoogle({
-      exchangeCode: (async () => ({
-        scope: 'openid email',
-        id_token: 'i',
-        claims: { sub: 's' },
-      })) as unknown as GoogleApi['exchangeCode'],
-    })
-    const response = await handleOAuthCallback(
-      post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
-      env,
-      google
-    )
-    assert.equal(response.status, 400)
-    assert.equal((await bodyOf(response)).granted_scopes, 'openid email')
-  })
-
-  test('says nothing was granted when Google names no scopes', async () => {
+  test('keeps no scopes when Google names none, rather than failing', async () => {
     const { google } = fakeGoogle({
       exchangeCode: (async () => ({
         refresh_token: 'r',
+        access_token: 'a',
         id_token: 'i',
         claims: { sub: 's' },
       })) as unknown as GoogleApi['exchangeCode'],
@@ -235,8 +223,18 @@ describe('POST /oauth/callback', () => {
       env,
       google
     )
-    assert.equal(response.status, 400)
-    assert.equal((await bodyOf(response)).granted_scopes, '')
+    assert.equal(response.status, 200)
+    assert.equal((await decryptBlob(String((await bodyOf(response)).blob), env)).scopes, '')
+  })
+
+  test('says Drive was granted when it was', async () => {
+    const { google } = fakeGoogle()
+    const response = await handleOAuthCallback(
+      post('/oauth/callback', { code: 'c', redirect_uri: 'https://app.example' }),
+      env,
+      google
+    )
+    assert.ok(String((await bodyOf(response)).scope).includes(DRIVE_SCOPE))
   })
 
   test('gives the app only the details Google gave about who signed in', async () => {
