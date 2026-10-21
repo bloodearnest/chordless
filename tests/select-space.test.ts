@@ -1,7 +1,13 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { SelectSpace } from '../src/components/select-space.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  setCurrentSpace,
+  updateSpace,
+} from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/select-space.ts'
@@ -48,6 +54,40 @@ describe('select-space', () => {
       expect(itemFor(el, current.name)?.classList.contains('current')).to.equal(true)
       expect(itemFor(el, current.name)?.textContent).to.contain('CURRENT')
       expect(itemFor(el, other.name)?.querySelector('.switch-button')).to.not.equal(null)
+    })
+  })
+
+  describe('what kind of space it is', () => {
+    const kindOfItem = (el: SelectSpace, name: string) =>
+      itemFor(el, name)?.querySelector('.space-kind')?.textContent ?? null
+
+    it('says a team space is one, and the role in it', async () => {
+      const spaces = await Promise.all(
+        (['owner', 'admin', 'writer', 'reader'] as const).map(async role => {
+          const space = await createSpace(unique(`Team ${role}`))
+          made.push(space.id)
+          await updateSpace(space.id, { team: { id: `team-${role}`, role } })
+          return { role, name: space.name }
+        })
+      )
+      const el = await show()
+      for (const { role, name } of spaces) {
+        expect(kindOfItem(el, name)).to.equal(`Team · ${role}`)
+      }
+    })
+
+    it('says a space the person can only view is, and nothing of a space of their own', async () => {
+      const viewing = await createSpace(unique('Viewing'))
+      made.push(viewing.id)
+      await updateSpace(viewing.id, { readOnly: true })
+      const el = await show()
+      expect(kindOfItem(el, viewing.name)).to.equal('View only')
+      expect(kindOfItem(el, current.name)).to.equal(null)
+    })
+
+    it('says how a team space is joined', async () => {
+      const el = await show()
+      expect(text(el)).to.contain('To join a team space, open the invite link its admin sent you.')
     })
   })
 

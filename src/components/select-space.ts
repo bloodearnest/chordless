@@ -1,5 +1,5 @@
 import { Task } from '@lit/task'
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
@@ -14,11 +14,19 @@ interface SpaceList {
   current: string
 }
 
+/** What kind of space it is, where that is not just a space of one's own: the team and the role, or view-only */
+function kindOf(space: Space): string | null {
+  if (space.team) return `Team · ${space.team.role}`
+  return space.readOnly ? 'View only' : null
+}
+
 /**
  * SelectSpace Component
  *
- * Shows the spaces on this device and the current one, and switches between them. It does not
- * make one: a space is made for a team (docs/SPACES.md), which comes with its folder and members.
+ * Shows the spaces on this device and the current one, and switches between them. A team space
+ * says it is one, and the person's role in it. It does not make one: a space is made for a team
+ * (docs/SPACES.md), which comes with its folder and members, and one is joined with the invite
+ * link its admin sent.
  */
 export class SelectSpace extends LitElement {
   /** Makes another space the current one, and starts the app afresh (a test gives its own) */
@@ -61,9 +69,25 @@ export class SelectSpace extends LitElement {
         cursor: default;
       }
 
+      .space-title {
+        display: flex;
+        flex-direction: column;
+      }
+
       .space-name {
         font-size: var(--font-ui);
         font-weight: 500;
+      }
+
+      .space-kind {
+        font-size: var(--font-ui-small);
+        opacity: 0.7;
+      }
+
+      .join-hint {
+        margin: 0.5rem 0 0;
+        font-size: var(--font-ui-small);
+        opacity: 0.7;
       }
 
       .space-badge {
@@ -157,7 +181,12 @@ export class SelectSpace extends LitElement {
                 class="space-item ${space.name === current ? 'current' : ''}"
                 @click=${() => this._handleSwitch(space)}
               >
-                <span class="space-name">${space.name}</span>
+                <span class="space-title">
+                  <span class="space-name">${space.name}</span>
+                  ${
+                    kindOf(space) ? html`<span class="space-kind">${kindOf(space)}</span>` : nothing
+                  }
+                </span>
                 ${
                   space.name === current
                     ? html`<span class="space-badge">CURRENT</span>`
@@ -175,6 +204,8 @@ export class SelectSpace extends LitElement {
             `
           )}
         </div>
+
+        <p class="join-hint">To join a team space, open the invite link its admin sent you.</p>
 
         <app-modal
           id="switch-modal"
