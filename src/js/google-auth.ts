@@ -381,33 +381,59 @@ export async function getAccessToken(): Promise<string> {
   const expiresAt = new Date(metadata.expires_at ?? 0)
   const now = new Date()
 
-  // Add 5 minute buffer before expiry
-  const bufferMs = 5 * 60 * 1000
-
-  if (expiresAt.getTime() - now.getTime() > bufferMs) {
+  if (expiresAt.getTime() - now.getTime() > TOKEN_EXPIRY_BUFFER_MS) {
     // Token still valid
     return metadata.access_token ?? ''
   }
 
   // Token expired or about to expire, refresh it
-  const newToken = await refreshAccessToken(blob, metadata)
-  return newToken
+  return (await refreshTokens(blob, metadata)).access_token
 }
 
 /**
- * Refresh access token using the encrypted blob.
- * Internal function - users should call getAccessToken() instead.
+ * Get a valid Google ID token for the team space API, which takes it as proof of who is asking
+ * (worker/src/identity.ts). Unlike `getIdToken`, which asks Google in a prompt, this never shows
+ * anything: the Worker sends a new one with each refreshed access token.
+ * Refreshed if it is about to expire.
+ *
+ * @throws If not authenticated, refresh fails, or Google sends no ID token
+ */
+export async function getIdentityToken(): Promise<string> {
+  const response = await sendToServiceWorker('GET_BLOB')
+  if (!response.success || !response.data) {
+    throw new Error('Not authenticated - please authorize first')
+  }
+  const { blob, metadata } = response.data
+  if (metadata.id_token && idTokenEnd(metadata.id_token) - Date.now() > TOKEN_EXPIRY_BUFFER_MS) {
+    return metadata.id_token
+  }
+  const refreshed = await refreshTokens(blob, metadata)
+  if (!refreshed.id_token) throw new Error('Google sent no ID token')
+  return refreshed.id_token
+}
+
+/** A token this close to its end is replaced before it is used */
+const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
+
+/** When an ID token ends, in ms (its own `exp` claim); 0 for one that cannot be read */
+function idTokenEnd(idToken: string): number {
+  return Number(parseJwt(idToken)?.exp ?? 0) * 1000
+}
+
+/**
+ * Refresh the access token (and the ID token) using the encrypted blob.
+ * Internal function - users should call getAccessToken() or getIdentityToken() instead.
  *
  * The encrypted blob itself proves ownership, so no ID token is required.
  * Auth proxy decrypts the blob and uses the refresh token to get a new access token.
  *
  * @param blob - Encrypted JWE blob containing refresh token
- * @returns New access token
+ * @returns The stored metadata, with the new tokens
  */
-async function refreshAccessToken(
+async function refreshTokens(
   blob: string,
-  existingMetadata: AuthMetadata = {}
-): Promise<string> {
+  existingMetadata: AuthMetadata
+): Promise<AuthMetadata & { access_token: string }> {
   // Call auth proxy to refresh (no ID token needed - blob proves ownership)
   const response = await fetch(`${AUTH_PROXY_URL}/session/refresh`, {
     method: 'POST',
@@ -421,13 +447,14 @@ async function refreshAccessToken(
     throw new Error(error.error || 'Failed to refresh access token')
   }
 
-  const { access_token, expires_in } = await response.json()
+  const { access_token, expires_in, id_token } = await response.json()
 
-  const updatedMetadata = {
+  const updatedMetadata: AuthMetadata & { access_token: string } = {
     ...existingMetadata,
     access_token,
     expires_at: new Date(Date.now() + expires_in * 1000).toISOString(),
   }
+  if (id_token) updatedMetadata.id_token = id_token
 
   // Update stored metadata in Service Worker
   await sendToServiceWorker('STORE_BLOB', {
@@ -435,7 +462,7 @@ async function refreshAccessToken(
     metadata: updatedMetadata,
   })
 
-  return access_token
+  return updatedMetadata
 }
 
 async function buildStoredUserProfile(user: StoredUser): Promise<StoredUser> {

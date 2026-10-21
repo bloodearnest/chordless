@@ -4,6 +4,7 @@ import {
   exportBlobBackup,
   getAccessToken,
   getCurrentUserInfo,
+  getIdentityToken,
   getSignInState,
   isAuthenticated,
   logout,
@@ -90,6 +91,61 @@ describe('google-auth', () => {
       expect(await getSignInState()).to.equal('expired')
       respondTo = () => json({}, 500)
       expect(await getSignInState()).to.equal('signed-in')
+    })
+  })
+
+  describe('getIdentityToken', () => {
+    const endingIn = (ms: number) => idToken({ exp: Math.floor((Date.now() + ms) / 1000) })
+
+    it('says so when nobody is signed in', async () => {
+      let error: Error | null = null
+      await getIdentityToken().catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.include('Not authenticated')
+    })
+
+    it('gives the stored one while it has more than five minutes left, with no request', async () => {
+      const stored = endingIn(30 * MINUTE)
+      signIn({ id_token: stored })
+      expect(await getIdentityToken()).to.equal(stored)
+      expect(fetches).to.have.length(0)
+    })
+
+    it('renews it with the access token, and keeps both', async () => {
+      const fresh = endingIn(60 * MINUTE)
+      signIn(
+        { access_token: 'old', expires_at: inFromNow(-MINUTE), id_token: endingIn(2 * MINUTE) },
+        'the-blob'
+      )
+      respondTo = () => json({ access_token: 'fresh', expires_in: 3600, id_token: fresh })
+
+      expect(await getIdentityToken()).to.equal(fresh)
+
+      expect(must(worker.stored).metadata.id_token).to.equal(fresh)
+      expect(await getAccessToken()).to.equal('fresh')
+      expect(fetches).to.have.length(1)
+    })
+
+    it('renews one it cannot read, or that it never had', async () => {
+      const fresh = endingIn(60 * MINUTE)
+      respondTo = () => json({ access_token: 'fresh', expires_in: 3600, id_token: fresh })
+      signIn({ id_token: 'not-a-token' })
+      expect(await getIdentityToken()).to.equal(fresh)
+
+      signIn({})
+      expect(await getIdentityToken()).to.equal(fresh)
+    })
+
+    it('says so when Google sent none, and keeps the access token it did send', async () => {
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
+      respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
+      let error: Error | null = null
+      await getIdentityToken().catch(e => {
+        error = e
+      })
+      expect((error as Error | null)?.message).to.include('no ID token')
+      expect(must(worker.stored).metadata.access_token).to.equal('fresh')
     })
   })
 
