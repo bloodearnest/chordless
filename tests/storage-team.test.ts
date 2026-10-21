@@ -111,7 +111,7 @@ describe('TeamStorage', () => {
     )
     expect(await failure(() => space.unpublish('anything'))).to.match(/not served/)
     expect(await failure(() => team.ensureRoot())).to.match(/joined/)
-    expect(await failure(() => team.renameRoot())).to.match(/admin/)
+    expect(await failure(() => team.renameRoot())).to.equal('')
     expect(await failure(() => team.pads)).to.match(/Pad sets/)
     expect(await team.findRootByName()).to.equal(null)
   })

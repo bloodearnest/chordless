@@ -244,6 +244,19 @@ export interface SpaceMember {
   role?: string
 }
 
+/** A person's role in a team space (docs/SPACES.md, "Roles") */
+export type TeamRole = 'owner' | 'admin' | 'writer' | 'reader'
+
+/**
+ * A space that is shared as a team space, as this device knows it. The id is the one the Worker
+ * issued. The owner keeps syncing straight to Drive; anyone else goes through the Worker, and
+ * their `rootRef` is this id.
+ */
+export interface TeamLink {
+  id: string
+  role: TeamRole
+}
+
 /** The 'spaces' store: a space's identity and its link to Drive */
 export interface Space {
   id: string
@@ -256,6 +269,8 @@ export interface Space {
   members?: SpaceMember[]
   /** The user can only read the Drive folder: sync doesn't push, and nothing syncable is edited */
   readOnly?: boolean
+  /** Set once the space is shared with a team */
+  team?: TeamLink
 }
 
 /** A person who can lead setlists: id is their Google account email (empty if only a name) */

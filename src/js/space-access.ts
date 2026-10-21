@@ -12,7 +12,7 @@ import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { goTo } from './navigation.ts'
 import { getCurrentSpaceFull, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
-import { driveStorage } from './storage/browser-drive.ts'
+import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage } from './storage/types.ts'
 import { toast } from './toast.ts'
 
@@ -30,7 +30,7 @@ async function inspectFolder(): Promise<{
 } | null> {
   const space = await getCurrentSpaceFull()
   if (!space.rootRef) return null
-  const folder = await driveStorage.inspectRoot(space.rootRef)
+  const folder = await storageFor(space).inspectRoot(space.rootRef)
   return { space, folder }
 }
 
@@ -38,9 +38,9 @@ async function inspectFolder(): Promise<{
 export async function driveSpaceStorage(spaceId: string): Promise<SpaceStorage> {
   const db = new SpaceDB()
   await db.init()
-  const rootRef = (await db.getSpace(spaceId))?.rootRef
-  if (!rootRef) throw new Error('This space is not in Google Drive')
-  return driveStorage.space(rootRef)
+  const space = await db.getSpace(spaceId)
+  if (!space?.rootRef) throw new Error('This space is not in Google Drive')
+  return storageFor(space).space(space.rootRef)
 }
 
 function problemWith(space: Space, folder: RootInfo | null): DriveFolderProblem | null {

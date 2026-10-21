@@ -99,6 +99,19 @@ export function syncsBack(): boolean {
   return !isReadOnlySpace()
 }
 
+/** A space by its id, if this device has it (there is none for no id) */
+export async function getSpaceById(spaceId: string | null): Promise<Space | undefined> {
+  return spaceId ? (await getSpaceDB()).getSpace(spaceId) : undefined
+}
+
+/** Change what is kept of a space (not its id) */
+export async function updateSpace(
+  spaceId: string,
+  updates: Partial<Omit<Space, 'id'>>
+): Promise<Space> {
+  return (await getSpaceDB()).updateSpace(spaceId, updates)
+}
+
 /** Record that the user can (or can only read) a space's Drive folder */
 export async function setSpaceReadOnly(spaceId: string, readOnly: boolean): Promise<void> {
   const db = await getSpaceDB()

@@ -17,9 +17,10 @@ import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
-import { setSpaceReadOnly } from './space.ts'
+import { getCurrentSpace, getSpaceById, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
 import { driveStorage } from './storage/browser-drive.ts'
+import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage, StorageBackend, StoredFile } from './storage/types.ts'
 import {
   setlistHasLocalChanges,
@@ -711,7 +712,12 @@ export class DriveSyncManager implements SyncSession {
  * Check if Drive sync is available (user is authenticated)
  */
 export async function isSyncAvailable(): Promise<boolean> {
-  return driveStorage.available()
+  return (await currentSpaceStorage()).available()
+}
+
+/** The backend for the current space: Drive, or the Worker for a member of a team space */
+async function currentSpaceStorage(): Promise<StorageBackend> {
+  return storageFor(await getSpaceById(getCurrentSpace().id))
 }
 
 /**
@@ -721,7 +727,9 @@ export async function createSyncManager(
   spaceName: string,
   spaceId: string | null
 ): Promise<DriveSyncManager> {
-  const manager = new DriveSyncManager(spaceName, spaceId)
+  // (no id means the current space, as the manager itself takes it)
+  const space = await getSpaceById(spaceId ?? getCurrentSpace().id)
+  const manager = new DriveSyncManager(spaceName, spaceId, { storage: storageFor(space) })
   await manager.init()
   return manager
 }

@@ -259,8 +259,9 @@ export class TeamStorage implements StorageBackend {
     throw new Error('A team space is joined, not made here')
   }
 
+  /** The name belongs to the owner: what a member calls their copy is theirs, and sync goes on */
   async renameRoot(): Promise<void> {
-    throw new Error('A team space is renamed by its admin, not from here yet')
+    // (nothing to do)
   }
 
   space(rootRef: string): SpaceStorage {
