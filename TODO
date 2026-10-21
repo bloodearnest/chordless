@@ -14,6 +14,7 @@ song data
   differently.  
 
 information UI
+ - mobile header: always show the second row, a key chip, fewer controls while live: see docs/MOBILE_UI.md
  - show leader in setlist page
 
 spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
