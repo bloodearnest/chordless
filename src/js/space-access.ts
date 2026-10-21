@@ -12,7 +12,7 @@ import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { goTo } from './navigation.ts'
 import { getCurrentSpaceFull, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
-import { driveStorage } from './storage/drive-storage.ts'
+import { driveStorage } from './storage/browser-drive.ts'
 import type { RootInfo, SpaceStorage } from './storage/types.ts'
 import { toast } from './toast.ts'
 

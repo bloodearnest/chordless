@@ -19,7 +19,7 @@ import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
 import { setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
-import { driveStorage } from './storage/drive-storage.ts'
+import { driveStorage } from './storage/browser-drive.ts'
 import type { RootInfo, SpaceStorage, StorageBackend, StoredFile } from './storage/types.ts'
 import {
   setlistHasLocalChanges,

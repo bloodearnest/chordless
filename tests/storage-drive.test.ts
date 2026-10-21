@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { driveStorage } from '../src/js/storage/drive-storage.ts'
+import { driveStorage } from '../src/js/storage/browser-drive.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { describeStorage } from './storage-conformance.ts'

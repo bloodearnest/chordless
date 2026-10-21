@@ -1,6 +1,6 @@
 import { wantsPads } from './media-player-loader.ts'
 import { extractPadKeyFromFilename, normalizePadKey, PAD_FILE_KEYS } from './pad-keys.ts'
-import { driveStorage } from './storage/drive-storage.ts'
+import { driveStorage } from './storage/browser-drive.ts'
 import type { PadStorage } from './storage/types.ts'
 import { readZip, type ZipArchive } from './utils/zip.ts'
 

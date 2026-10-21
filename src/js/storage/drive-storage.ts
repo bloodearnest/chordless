@@ -2,11 +2,11 @@
  * The storage API (types.ts) on Google Drive: a space is a folder, its collections are the
  * `songs/` and `setlists/` folders in it, a ref is a Drive file id, `props` are the file's
  * appProperties and `rev` is Drive's md5Checksum. Everything Drive-specific stays here and in
- * drive-api.ts: shared-drive flags, finding folders by name, a trashed file kept out of
+ * drive-client.ts: shared-drive flags, finding folders by name, a trashed file kept out of
  * listings, batches of uploads.
  */
 import type { DriveFile } from '../data-types.ts'
-import * as DriveAPI from '../drive-api.ts'
+import type { DriveApi } from '../drive-client.ts'
 import { md5Hex } from '../utils/md5.ts'
 import type {
   Collection,
@@ -79,10 +79,12 @@ function writeMetadata(input: FileInput) {
 }
 
 class DriveSpace implements SpaceStorage {
+  #api: DriveApi
   #rootRef: string
   #folders = new Map<Collection, string>()
 
-  constructor(rootRef: string) {
+  constructor(api: DriveApi, rootRef: string) {
+    this.#api = api
     this.#rootRef = rootRef
   }
 
@@ -92,40 +94,40 @@ class DriveSpace implements SpaceStorage {
     if (id === undefined) {
       id =
         collection === 'songs'
-          ? await DriveAPI.getSongsFolder(this.#rootRef)
+          ? await this.#api.getSongsFolder(this.#rootRef)
           : collection === 'setlists'
-            ? await DriveAPI.getSetlistsFolder(this.#rootRef)
-            : await DriveAPI.getSharesFolder(this.#rootRef)
+            ? await this.#api.getSetlistsFolder(this.#rootRef)
+            : await this.#api.getSharesFolder(this.#rootRef)
       this.#folders.set(collection, id)
     }
     return id
   }
 
   members() {
-    return DriveAPI.listFolderPermissions(this.#rootRef)
+    return this.#api.listFolderPermissions(this.#rootRef)
   }
 
   async list(collection: Collection): Promise<StoredFile[]> {
     // (a space nothing was ever shared from has no shares folder, and listing does not make one)
     const folder =
       collection === 'shares'
-        ? await DriveAPI.findSharesFolder(this.#rootRef)
+        ? await this.#api.findSharesFolder(this.#rootRef)
         : await this.#folder(collection)
     if (!folder) return []
     const live = `'${folder}' in parents and trashed=false`
     const files =
       collection === 'shares'
-        ? await DriveAPI.listDriveFiles(live)
+        ? await this.#api.listDriveFiles(live)
         : collection === 'setlists'
-          ? await DriveAPI.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
-          : await DriveAPI.listDriveFiles(`${live} and mimeType='text/plain'`)
+          ? await this.#api.listDriveFiles(`${live} and name contains '.json'`, 'modifiedTime desc')
+          : await this.#api.listDriveFiles(`${live} and mimeType='text/plain'`)
     return files.map(toStored)
   }
 
   async inventory(): Promise<Set<string>> {
     const refs = new Set<string>()
     const add = async (folderId: string): Promise<void> => {
-      for (const file of await DriveAPI.listDriveFiles(
+      for (const file of await this.#api.listDriveFiles(
         `'${folderId}' in parents and trashed=false`
       )) {
         refs.add(file.id)
@@ -137,7 +139,7 @@ class DriveSpace implements SpaceStorage {
   }
 
   async status(ref: string): Promise<FileStatus | null> {
-    const file = await DriveAPI.getFile(
+    const file = await this.#api.getFile(
       ref,
       'id,name,trashed,createdTime,modifiedTime,md5Checksum,appProperties'
     )
@@ -145,7 +147,7 @@ class DriveSpace implements SpaceStorage {
   }
 
   readText(ref: string): Promise<string> {
-    return DriveAPI.downloadFile(ref)
+    return this.#api.downloadFile(ref)
   }
 
   readMany(refs: string[]): Promise<(string | null)[]> {
@@ -159,12 +161,12 @@ class DriveSpace implements SpaceStorage {
     options?: { publicLink?: boolean }
   ): Promise<WriteResult> {
     const folder = await this.#folder(collection)
-    const file = await DriveAPI.createFile(
+    const file = await this.#api.createFile(
       { ...writeMetadata(input), mimeType: input.type, parents: [folder] },
       body,
       contentTypeOf(input.type)
     )
-    if (options?.publicLink) await DriveAPI.publishFile(file.id)
+    if (options?.publicLink) await this.#api.publishFile(file.id)
     return { file: toStored(file), intact: holds(file, body, input.name) }
   }
 
@@ -174,7 +176,7 @@ class DriveSpace implements SpaceStorage {
   ): Promise<(WriteResult | null)[]> {
     if (items.length === 0) return []
     const folder = await this.#folder(collection)
-    const files = await DriveAPI.batchUploadFiles(
+    const files = await this.#api.batchUploadFiles(
       items.map(({ input, body }) => ({
         metadata: { ...writeMetadata(input), mimeType: input.type, parents: [folder] },
         content: body,
@@ -190,7 +192,7 @@ class DriveSpace implements SpaceStorage {
 
   async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {
     // (the type of a file does not change, so it is not sent in the metadata)
-    const file = await DriveAPI.updateFile(
+    const file = await this.#api.updateFile(
       ref,
       writeMetadata(input),
       body,
@@ -206,79 +208,87 @@ class DriveSpace implements SpaceStorage {
   }
 
   unpublish(ref: string): Promise<void> {
-    return DriveAPI.unpublishFile(ref)
+    return this.#api.unpublishFile(ref)
   }
 
   trash(ref: string): Promise<void> {
-    return DriveAPI.trashFile(ref)
+    return this.#api.trashFile(ref)
   }
 }
 
-const drivePads: PadStorage = {
-  async listSets(): Promise<PadSetEntry[]> {
-    return (await DriveAPI.listPadSetFolders()).map(folder => ({
-      ref: folder.id,
-      name: folder.appProperties?.padSetName || folder.name || folder.id,
-      modified: folder.modifiedTime ?? null,
-    }))
-  },
+function drivePads(api: DriveApi): PadStorage {
+  return {
+    async listSets(): Promise<PadSetEntry[]> {
+      return (await api.listPadSetFolders()).map(folder => ({
+        ref: folder.id,
+        name: folder.appProperties?.padSetName || folder.name || folder.id,
+        modified: folder.modifiedTime ?? null,
+      }))
+    },
 
-  async ensureSet(name: string): Promise<string> {
-    const ref = await DriveAPI.ensurePadSetFolder(name)
-    await DriveAPI.updatePadSetFolderMetadata(ref, name)
-    return ref
-  },
+    async ensureSet(name: string): Promise<string> {
+      const ref = await api.ensurePadSetFolder(name)
+      await api.updatePadSetFolderMetadata(ref, name)
+      return ref
+    },
 
-  async listFiles(setRef: string): Promise<PadFileEntry[]> {
-    return (await DriveAPI.listPadSetFiles(setRef)).map(file => ({
-      ref: file.id,
-      name: file.name ?? '',
-      padKey: file.appProperties?.padKey ?? null,
-      type: file.mimeType || 'audio/mpeg',
-      size: Number(file.size) || 0,
-    }))
-  },
+    async listFiles(setRef: string): Promise<PadFileEntry[]> {
+      return (await api.listPadSetFiles(setRef)).map(file => ({
+        ref: file.id,
+        name: file.name ?? '',
+        padKey: file.appProperties?.padKey ?? null,
+        type: file.mimeType || 'audio/mpeg',
+        size: Number(file.size) || 0,
+      }))
+    },
 
-  async addFile(setRef: string, padKey: string, audio: Blob): Promise<void> {
-    await DriveAPI.uploadPadFile(setRef, padKey, audio)
-  },
+    async addFile(setRef: string, padKey: string, audio: Blob): Promise<void> {
+      await api.uploadPadFile(setRef, padKey, audio)
+    },
 
-  trashFiles: setRef => DriveAPI.trashFilesInFolder(setRef),
+    trashFiles: setRef => api.trashFilesInFolder(setRef),
 
-  read: fileRef => DriveAPI.downloadFileBinary(fileRef),
+    read: fileRef => api.downloadFileBinary(fileRef),
+  }
 }
 
-export const driveStorage: StorageBackend = {
-  pads: drivePads,
+/**
+ * The storage API on Drive, for whoever the client's access tokens are for: the signed-in user in
+ * the browser (browser-drive.ts), or a team space's credential in the Worker (worker/src/team-drive.ts).
+ */
+export function createDriveStorage(api: DriveApi): StorageBackend {
+  return {
+    pads: drivePads(api),
 
-  available: () => DriveAPI.checkDriveAccess(),
+    available: () => api.checkDriveAccess(),
 
-  async inspectRoot(ref: string): Promise<RootInfo | null> {
-    const folder = await DriveAPI.getFile(ref, 'id,name,trashed,capabilities')
-    if (!folder) return null
-    return {
-      ref: folder.id,
-      name: folder.name ?? '',
-      trashed: Boolean(folder.trashed),
-      canWrite: folder.capabilities?.canAddChildren ?? null,
-    }
-  },
+    async inspectRoot(ref: string): Promise<RootInfo | null> {
+      const folder = await api.getFile(ref, 'id,name,trashed,capabilities')
+      if (!folder) return null
+      return {
+        ref: folder.id,
+        name: folder.name ?? '',
+        trashed: Boolean(folder.trashed),
+        canWrite: folder.capabilities?.canAddChildren ?? null,
+      }
+    },
 
-  async findRootByName(name: string): Promise<RootInfo | null> {
-    const folder = await DriveAPI.findSpaceFolderByName(name)
-    return folder ? { ref: folder.id, name, trashed: false, canWrite: null } : null
-  },
+    async findRootByName(name: string): Promise<RootInfo | null> {
+      const folder = await api.findSpaceFolderByName(name)
+      return folder ? { ref: folder.id, name, trashed: false, canWrite: null } : null
+    },
 
-  async ensureRoot(name: string, spaceId: string) {
-    const { folderId, isNew } = await DriveAPI.findOrCreateSpaceFolder(name, spaceId)
-    return { ref: folderId, isNew }
-  },
+    async ensureRoot(name: string, spaceId: string) {
+      const { folderId, isNew } = await api.findOrCreateSpaceFolder(name, spaceId)
+      return { ref: folderId, isNew }
+    },
 
-  async renameRoot(ref: string, name: string): Promise<void> {
-    await DriveAPI.renameFile(ref, name)
-  },
+    async renameRoot(ref: string, name: string): Promise<void> {
+      await api.renameFile(ref, name)
+    },
 
-  space: rootRef => new DriveSpace(rootRef),
+    space: rootRef => new DriveSpace(api, rootRef),
 
-  writeRefusals: () => DriveAPI.countWriteRefusals(),
+    writeRefusals: () => api.countWriteRefusals(),
+  }
 }
