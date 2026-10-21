@@ -39,6 +39,16 @@ binding = "ASSETS"
 # /dev is listed so the worker can hide the dev-only pages in production.
 run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/s/*", "/dev", "/dev/*"]
 
+# One Durable Object per team space (worker/src/team-space.ts): its members and roles, the files in
+# its tree, and the owner's encrypted token blob. Never song, setlist or pad content.
+[[durable_objects.bindings]]
+name = "TEAM_SPACE"
+class_name = "TeamSpace"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["TeamSpace"]
+
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
 # - GOOGLE_CLIENT_ID: Google OAuth client ID
@@ -58,6 +68,15 @@ simple = { limit = 5, period = 60 }
 name = "EMAIL_OVERALL"
 namespace_id = "7302"
 simple = { limit = 30, period = 60 }
+
+# (so do Durable Objects and their migrations)
+[[env.dev.durable_objects.bindings]]
+name = "TEAM_SPACE"
+class_name = "TeamSpace"
+
+[[env.dev.migrations]]
+tag = "v1"
+new_sqlite_classes = ["TeamSpace"]
 
 [env.dev.vars]
 # Serve the component playgrounds in src/dev/ (404 in production)

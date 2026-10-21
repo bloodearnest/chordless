@@ -15,6 +15,8 @@ import type { Env } from './env.ts'
 import { handleRequest } from './router.ts'
 import type { ShareCache } from './share.ts'
 
+export { TeamSpace } from './team-space.ts'
+
 /**
  * The Worker's entry: what only the Worker has (the cache, `cloudflare:email`) goes in here, and
  * the rest is in the modules it calls, which tests run in Node.

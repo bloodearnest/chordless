@@ -8,8 +8,10 @@
  */
 
 import assert from 'node:assert/strict'
-import { after, before, test } from 'node:test'
+import { after, before, describe, test } from 'node:test'
 import { createTestHarness } from 'wrangler'
+import type { Env } from '../worker/src/env.ts'
+import type { TeamSpaceApi } from '../worker/src/team-state.ts'
 import { email } from './make-email.ts'
 
 const secrets = {
@@ -205,4 +207,49 @@ test('an email with no songs in it is answered with why, and no link', async () 
   assert.equal(result.replies.length, 1)
   assert.match(result.replies[0].raw, /^Subject: Re: Hello\r?$/m)
   assert.ok(!plainTextOf(result.replies[0].raw).includes('import-setlist#'))
+})
+
+// A team space's Durable Object (worker/src/team-space.ts), through its binding in the real runtime
+describe('a team space Durable Object', () => {
+  const ann = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
+  const bob = { provider: 'google', sub: 'g-2', email: 'bob@example.com' }
+
+  /** A space's object, through the binding */
+  const inSpace = async <T>(name: string, use: (team: TeamSpaceApi) => Promise<T>) => {
+    const env = await worker.getWorker<Env>().getEnv()
+    assert.ok(env.TEAM_SPACE, 'wrangler.toml binds TEAM_SPACE')
+    return use(env.TEAM_SPACE.get(env.TEAM_SPACE.idFromName(name)))
+  }
+
+  test('keeps a space, its members and its files, and serves them over the binding', async () => {
+    await inSpace('team-a', async team => {
+      assert.equal(await team.create({ rootRef: 'root-a', name: 'Pat Church', owner: ann }), true)
+      await team.setMember(bob, 'writer')
+      await team.addRefs(['file-1'])
+
+      assert.equal(await team.roleOf(ann), 'owner')
+      assert.equal(await team.roleOf(bob), 'writer')
+      assert.equal(await team.owns('file-1'), true)
+      assert.deepEqual(await team.members(), [
+        { email: 'ann@example.com', role: 'owner' },
+        { email: 'bob@example.com', role: 'writer' },
+      ])
+    })
+  })
+
+  test('is one object per space: another id has nothing of the first', async () => {
+    await inSpace('team-b', async team => {
+      assert.equal(await team.info(), null)
+      assert.equal(await team.roleOf(ann), null)
+      assert.equal(await team.owns('file-1'), false)
+    })
+  })
+
+  test('persists a space that was made', async () => {
+    const handle = worker.getWorker<Env>()
+    const env = await handle.getEnv()
+    assert.ok(env.TEAM_SPACE)
+    const persisted = await handle.listDurableObjectIds('TEAM_SPACE')
+    assert.ok(persisted.includes(String(env.TEAM_SPACE.idFromName('team-a'))))
+  })
 })
