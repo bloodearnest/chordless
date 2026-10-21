@@ -8,6 +8,7 @@ import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import '../src/components/storage-page.ts'
 import type { StoragePage } from '../src/components/storage-page.ts'
+import { TeamShareChangedEvent, TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
 import {
   createSpace,
   deleteSpace,
@@ -181,6 +182,29 @@ describe('the storage page, signed in to Google', () => {
       expect(text()).to.contain('Team Sync')
       expect(page.shadowRoot?.querySelector('.panel.is-disabled')).to.equal(null)
       expect(text()).to.not.contain('Connect Google Drive above to sync')
+    })
+
+    it('gives the team share panel the current space, and starts the app afresh when the person leaves it', async () => {
+      await open()
+      const panel = must(page.shadowRoot?.querySelector('team-share-panel'))
+      expect(panel.space?.id).to.equal(member)
+      expect(panel.space?.team?.role).to.equal('writer')
+
+      let reloads = 0
+      page.reload = () => {
+        reloads++
+      }
+      panel.dispatchEvent(new TeamShareLeftEvent())
+      expect(reloads).to.equal(1)
+    })
+
+    it('reads the space again when it is shared or stops being', async () => {
+      await open()
+      const panel = must(page.shadowRoot?.querySelector('team-share-panel'))
+      await updateSpace(member, { team: undefined })
+      panel.dispatchEvent(new TeamShareChangedEvent())
+      await until(() => page.teamMember === false, 'the space to be read again')
+      expect(panel.space?.team).to.equal(undefined)
     })
 
     it('has the sync off, and says to connect Drive, in a space of one’s own', async () => {

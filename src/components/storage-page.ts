@@ -10,6 +10,7 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import './drive-sync-panel.ts'
 import './storage-summary.ts'
+import './team-share-panel.ts'
 import './space-export-panel.ts'
 import './pad-set-manager.ts'
 import './select-space.ts'
@@ -35,6 +36,7 @@ export class StoragePage extends LitElement {
     signInExpired: { type: Boolean, attribute: false },
     noDrive: { type: Boolean, attribute: false },
     teamMember: { type: Boolean, attribute: false },
+    _space: { state: true },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
@@ -51,6 +53,8 @@ export class StoragePage extends LitElement {
   declare noDrive: boolean
   /** The current space is a team's and this person is in it, not its owner: its files come through the Worker, not Drive */
   declare teamMember: boolean
+  /** The current space's record: whether it is shared with a team, and as what */
+  declare _space: Space | null
   declare authStatus: string
   declare userInfo: UserInfo | null
   declare _clearError: string
@@ -261,6 +265,7 @@ export class StoragePage extends LitElement {
     this.signInExpired = false
     this.noDrive = false
     this.teamMember = false
+    this._space = null
     this.authStatus = 'checking'
     this.userInfo = null
   }
@@ -287,7 +292,8 @@ export class StoragePage extends LitElement {
     this.isAuthenticated = state !== 'signed-out'
     this.signInExpired = state === 'expired'
     this.noDrive = state === 'no-drive'
-    this.teamMember = isTeamMember(await getSpaceById(getCurrentSpace().id))
+    this._space = (await getSpaceById(getCurrentSpace().id)) ?? null
+    this.teamMember = isTeamMember(this._space)
     this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
     this.authStatus = 'ready'
   }
@@ -297,6 +303,7 @@ export class StoragePage extends LitElement {
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderSpaceSection()}
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired || (this.noDrive && !this.teamMember))}
+        ${this._renderTeamSection()}
         ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
     `
@@ -507,6 +514,17 @@ export class StoragePage extends LitElement {
           }
         </div>
       </div>
+    `
+  }
+
+  _renderTeamSection() {
+    return html`
+      <team-share-panel
+        .space=${this._space}
+        ?can-share=${this.isAuthenticated && !this.signInExpired && !this.noDrive}
+        @team-share-panel:changed=${this.checkAuthStatus}
+        @team-share-panel:left=${() => this.reload()}
+      ></team-share-panel>
     `
   }
 

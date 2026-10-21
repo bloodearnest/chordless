@@ -20,7 +20,14 @@ import { driveStorage } from '../src/js/storage/browser-drive.ts'
 import { isTeamMember, storageFor } from '../src/js/storage/space-storage.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import { TeamError, teamApi } from '../src/js/team-client.ts'
-import { joinSpace, shareSpace } from '../src/js/team-spaces.ts'
+import {
+  inviteLink,
+  joinSpace,
+  leaveSpace,
+  outranks,
+  shareSpace,
+  stopSharing,
+} from '../src/js/team-spaces.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -86,7 +93,8 @@ describe('team spaces on this device', () => {
   afterEach(async () => {
     window.fetch = realFetch
     uninstallWorker()
-    for (const id of made.splice(0)) await deleteSpace(id)
+    // (a space the test left or stopped sharing is gone already)
+    for (const id of made.splice(0)) await deleteSpace(id).catch(() => {})
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
@@ -301,6 +309,67 @@ describe('team spaces on this device', () => {
       expect(refused).to.be.instanceOf(TeamError)
       expect((await listSpaces()).length).to.equal(count)
       must(refused)
+    })
+  })
+
+  describe('who acts on whom', () => {
+    it('is only on those below: an admin on writers and readers, the owner on everyone else', () => {
+      expect(outranks('owner', 'admin')).to.equal(true)
+      expect(outranks('admin', 'writer')).to.equal(true)
+      expect(outranks('admin', 'admin')).to.equal(false)
+      expect(outranks('admin', 'owner')).to.equal(false)
+      expect(outranks('reader', 'reader')).to.equal(false)
+    })
+
+    it('has the invite link hold the space and the code in the fragment', () => {
+      expect(inviteLink('https://chordless.app', 'space-1', 'code')).to.equal(
+        'https://chordless.app/join#space-1.code'
+      )
+    })
+  })
+
+  describe('stopping sharing, and leaving', () => {
+    const message = (work: Promise<unknown>) =>
+      work.then(
+        () => '',
+        error => (error as Error).message
+      )
+
+    it('stop sharing tells the Worker, and the space is the owner’s alone again', async () => {
+      routes['DELETE /api/space/team-1'] = () => new Response(null, { status: 204 })
+      const mine = await space('Shared', { rootRef: 'f', team: { id: 'team-1', role: 'owner' } })
+      const stopped = await stopSharing(mine.id)
+      expect(stopped.team).to.equal(undefined)
+      expect(stopped.rootRef).to.equal('f')
+      expect((await getSpaceById(mine.id))?.team).to.equal(undefined)
+    })
+
+    it('leaving tells the Worker, and the copy on this device goes', async () => {
+      routes['POST /api/space/team-1/leave'] = () => new Response(null, { status: 204 })
+      const joined = await space('Joined', {
+        rootRef: 'team-1',
+        team: { id: 'team-1', role: 'reader' },
+      })
+      await leaveSpace(joined.id)
+      expect(await getSpaceById(joined.id)).to.equal(undefined)
+    })
+
+    it('leaving keeps the copy when the Worker refuses', async () => {
+      routes['POST /api/space/team-1/leave'] = () => json({ error: 'The owner cannot leave' }, 400)
+      const joined = await space('Kept', {
+        rootRef: 'team-1',
+        team: { id: 'team-1', role: 'writer' },
+      })
+      expect(await message(leaveSpace(joined.id))).to.equal('The owner cannot leave')
+      expect(await getSpaceById(joined.id)).to.not.equal(undefined)
+    })
+
+    it('say so for a space that is not shared', async () => {
+      const mine = await space('Plain')
+      expect(await message(stopSharing(mine.id))).to.match(/not shared/)
+      expect(await message(leaveSpace(mine.id))).to.match(/not shared/)
+      expect(await message(stopSharing('nothing'))).to.match(/not shared/)
+      expect(requests).to.have.length(0)
     })
   })
 })

@@ -4,9 +4,9 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
-import type { Space } from './data-types.ts'
+import type { Space, TeamRole } from './data-types.ts'
 import { getStoredBlob } from './google-auth.ts'
-import { createSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
+import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
 import { teamApi } from './team-client.ts'
 
@@ -55,4 +55,38 @@ export async function joinSpace(
     team: { id: spaceId, role },
     readOnly: role === 'reader',
   })
+}
+
+const RANK: Record<TeamRole, number> = { reader: 0, writer: 1, admin: 2, owner: 3 }
+
+/** The roles that can be given to someone, which are the ones below the owner */
+export const GRANTABLE_ROLES = ['reader', 'writer', 'admin'] as const
+
+/** Whether a role may act on another (change it, remove it, invite to it): only on those below it */
+export function outranks(mine: TeamRole, target: TeamRole): boolean {
+  return RANK[mine] > RANK[target]
+}
+
+/** The link to send someone an invite: the space and the code are in the fragment, which is never sent to a server */
+export function inviteLink(origin: string, teamId: string, code: string): string {
+  return `${origin}/join#${teamId}.${code}`
+}
+
+/** Stop sharing a space of this person's: the Worker forgets it, and it is theirs alone again */
+export async function stopSharing(spaceId: string): Promise<Space> {
+  const space = await getSpaceById(spaceId)
+  if (!space?.team) throw new Error('This space is not shared')
+  await teamApi.endSharing(space.team.id)
+  return updateSpace(spaceId, { team: undefined })
+}
+
+/**
+ * Leave a team space this person joined. The Worker removes them, and the copy on this device
+ * goes (it would never sync again): the caller starts the app afresh.
+ */
+export async function leaveSpace(spaceId: string): Promise<void> {
+  const space = await getSpaceById(spaceId)
+  if (!space?.team) throw new Error('This space is not shared')
+  await teamApi.leave(space.team.id)
+  await deleteSpace(spaceId)
 }
