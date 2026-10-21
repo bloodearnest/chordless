@@ -1,6 +1,7 @@
 /** The view of a setlist someone shared by link, with a receiver that says what each link holds */
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
+import { offerLink, takeLink } from '../src/js/incoming-link.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import type { ShareOpening } from '../src/js/share-receiver.ts'
 import { shareSetlistId } from '../src/js/share-receiver.ts'
@@ -125,6 +126,29 @@ describe('the share view', () => {
   it('goes to the setlist instead, for someone who has it in their space', async () => {
     await open({ state: 'ended' }, { own: 'own-setlist', hash: `#${KEY}${CODE}`, songIndex: 2 })
     expect(visited).to.deep.equal([{ url: '/setlist/own-setlist/song/2', replace: true }])
+  })
+
+  it('takes the key and code the installed app was launched with, when the address has none', async () => {
+    offerLink('/s/file1', `#${KEY}${CODE}`)
+    const owned: string[] = []
+    const opened: string[] = []
+    view = document.createElement('share-view')
+    view.receiver = {
+      ownSetlistFor: async (code: string) => {
+        owned.push(code)
+        return null
+      },
+      openShare: async (_fileId: string, key: string) => {
+        opened.push(key)
+        return { state: 'ended' } as ShareOpening
+      },
+    }
+    view.route = { name: 'share', fileId: 'file1', songIndex: -1 }
+    outlet.append(view)
+    await wait(100)
+    expect(opened).to.deep.equal([KEY])
+    expect(owned).to.deep.equal([CODE])
+    expect(takeLink('/s/file1')).to.equal(null)
   })
 
   it('does not look for an own setlist when the link has no code', async () => {

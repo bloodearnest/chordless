@@ -196,6 +196,12 @@ the share with the key. (The file id has to be Drive's own: Drive won't take ids
 The service worker routes
 `/s/*` to the share page.
 
+**In the installed app** a link is opened through Chrome's launch queue, not a page load, and routes
+are paths, so the key in the fragment would be lost. `launch.ts` hands the fragment of any link it is
+launched with to the page (`incoming-link.ts`, tagged with the path it came for), and the share view
+takes it before it reads the address. A tab, and the iOS home-screen app, which does not capture
+links, keep the fragment in the address as before. Not checked in a real installed app.
+
 1. Download the file from the worker: `GET /api/share/<fileId>`. No sign-in needed. It returns
    the ciphertext and an `ETag`; send it back as `If-None-Match` to learn cheaply whether
    anything changed (304). See "The download proxy".

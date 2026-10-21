@@ -1,6 +1,7 @@
 import { html, nothing } from 'lit'
 import '../../components/app-header.ts'
 import type { ChordlessDB } from '../db.ts'
+import { takeLink } from '../incoming-link.ts'
 import { goTo } from '../navigation.ts'
 import type { Route } from '../router.ts'
 import { buildUrl } from '../router.ts'
@@ -71,7 +72,9 @@ export class ShareView extends PageView {
     // The key is in the link's fragment, which browsers never send to a server. (Not a route:
     // routes stay paths.)
     // biome-ignore lint/plugin: the share key is the link's fragment
-    const { key, code } = parseShareFragment(location.hash)
+    const inAddress = location.hash
+    // (the installed app is given the fragment instead, launch.ts)
+    const { key, code } = parseShareFragment(takeLink(buildUrl(this.#shareRoute())) ?? inAddress)
 
     // Someone who has this setlist in their space has the real one: go to that
     const own = code && (await this.receiver.ownSetlistFor(code))

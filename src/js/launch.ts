@@ -1,6 +1,7 @@
 import { offerLink } from './incoming-link.ts'
 import { offerIncoming } from './incoming-songs.ts'
 import { goTo } from './navigation.ts'
+import { normalizePath } from './router.ts'
 
 /**
  * The installed app being launched with something: files the system opened with it (the
@@ -36,9 +37,10 @@ export async function handleLaunch(
   // A link or shortcut for the window that is open: go there (unless already there)
   if (params.targetURL) {
     const target = new URL(params.targetURL, location.href)
-    // A setlist link from the email Worker holds the setlist in its fragment, which routes drop
-    if (target.origin === location.origin && target.pathname === '/import-setlist' && target.hash) {
-      offerLink(target.hash)
+    // Some links hold what they are for in the fragment (a setlist from the email Worker, an
+    // invite to a team space, a share link's key), and routes drop it: the page is handed it
+    if (target.origin === location.origin && target.hash) {
+      offerLink(normalizePath(target.pathname), target.hash)
     }
     if (
       target.origin === location.origin &&

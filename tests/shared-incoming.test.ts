@@ -108,8 +108,43 @@ describe('launching the installed app', () => {
       wentTo.push(url)
     })
     expect(wentTo).to.deep.equal(['/import-setlist'])
-    expect(takeLink()).to.equal('#abc-123')
-    expect(takeLink()).to.equal(null)
+    expect(takeLink('/import-setlist')).to.equal('#abc-123')
+    expect(takeLink('/import-setlist')).to.equal(null)
+  })
+
+  it('keeps the space and the code in an invite to a team space, which a route would drop', async () => {
+    const wentTo: string[] = []
+    await handleLaunch({ targetURL: `${location.origin}/join#space-aaaa1111.code` }, async url => {
+      wentTo.push(url)
+    })
+    expect(wentTo).to.deep.equal(['/join'])
+    expect(takeLink('/join')).to.equal('#space-aaaa1111.code')
+  })
+
+  it('keeps the key in a share link, which a route would drop, for the song it opens at too', async () => {
+    const wentTo: string[] = []
+    const link = (path: string) =>
+      handleLaunch({ targetURL: `${location.origin}${path}#key` }, async url => {
+        wentTo.push(url)
+      })
+    await link('/s/file-1')
+    expect(takeLink('/s/file-1')).to.equal('#key')
+    await link('/s/file-1/song/3')
+    expect(takeLink('/s/file-1/song/3')).to.equal('#key')
+    expect(wentTo).to.deep.equal(['/s/file-1', '/s/file-1/song/3'])
+  })
+
+  it('keeps a fragment for the page it came for only: another page does not take it', async () => {
+    await handleLaunch({ targetURL: `${location.origin}/s/file-1#key` }, async () => {})
+    expect(takeLink('/join')).to.equal(null)
+    expect(takeLink('/import-setlist')).to.equal(null)
+    expect(takeLink('/s/file-2')).to.equal(null)
+    expect(takeLink('/s/file-1')).to.equal('#key')
+  })
+
+  it('keeps no fragment for a link that has none', async () => {
+    await handleLaunch({ targetURL: `${location.origin}/storage` }, async () => {})
+    expect(takeLink('/storage')).to.equal(null)
   })
 })
 

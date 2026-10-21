@@ -207,7 +207,7 @@ export class SetlistEmailImport extends LitElement {
 
   /** A link the installed app was launched with while this page is open */
   _onLink = (): void => {
-    const fragment = takeLink()
+    const fragment = takeLink('/import-setlist')
     if (fragment) void this._openLink(fragment)
   }
 
@@ -222,7 +222,7 @@ export class SetlistEmailImport extends LitElement {
   async _restore(): Promise<void> {
     // The installed app is given the link's fragment (launch.ts); a tab keeps it in the address
     // biome-ignore lint/plugin: the setlist is the link's fragment (not a route)
-    const fragment = takeLink() ?? location.hash
+    const fragment = takeLink('/import-setlist') ?? location.hash
     if (fragment.length > 1 && (await this._openLink(fragment))) return
     try {
       const text = sessionStorage.getItem(KEPT)

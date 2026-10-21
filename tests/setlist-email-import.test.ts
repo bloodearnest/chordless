@@ -59,7 +59,7 @@ describe('setlist-email-import', () => {
       },
     })
     sessionStorage.removeItem(KEPT)
-    takeLink()
+    takeLink('/import-setlist')
     before = getCurrentSpace()
     const space = await createSpace(`Email ${crypto.randomUUID().slice(0, 8)}`)
     spaceId = space.id
@@ -71,7 +71,7 @@ describe('setlist-email-import', () => {
     importer?.remove()
     setRouter(null)
     sessionStorage.removeItem(KEPT)
-    takeLink()
+    takeLink('/import-setlist')
     window.history.replaceState(null, '', startUrl)
     db.db?.close()
     await deleteDatabase(SHARED_DB_ID)
@@ -141,11 +141,11 @@ describe('setlist-email-import', () => {
 
     it('reads a link the installed app was given, when it opens or when it is open', async () => {
       const fragment = await encodeImport(email({ songs: [makeImportedSong('Alpha Song')] }))
-      offerLink(`#${fragment}`)
+      offerLink('/import-setlist', `#${fragment}`)
       await open()
       await waitUntil(() => importer._state === 'review', 'the review')
       await importer._startAgain()
-      offerLink(`#${fragment}`)
+      offerLink('/import-setlist', `#${fragment}`)
       await waitUntil(() => importer._state === 'review', 'the review again')
     })
 
@@ -162,9 +162,9 @@ describe('setlist-email-import', () => {
     it('ignores a link offered after it has gone', async () => {
       await open()
       importer.remove()
-      offerLink('#whatever')
+      offerLink('/import-setlist', '#whatever')
       await wait(30)
-      expect(takeLink()).to.equal('#whatever')
+      expect(takeLink('/import-setlist')).to.equal('#whatever')
     })
 
     it('goes back to what was being reviewed, with the decisions made', async () => {

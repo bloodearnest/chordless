@@ -311,7 +311,7 @@ test('a link from the email Worker opens the review, and a reload keeps it', asy
   await expect(instructions(page)).toBeVisible()
   await page.evaluate(async fragment => {
     const { offerLink } = await import('/js/incoming-link.ts')
-    offerLink(`#${fragment}`)
+    offerLink('/import-setlist', `#${fragment}`)
   }, fragment)
   await expect(songsList(page)).toHaveCount(2)
 
