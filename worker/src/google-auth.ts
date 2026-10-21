@@ -12,7 +12,7 @@ import * as oauth from 'oauth4webapi'
 
 const ISSUER = 'https://accounts.google.com'
 // Google also issues ID tokens with the issuer written without the scheme
-const ISSUERS = [ISSUER, 'accounts.google.com']
+export const ISSUERS = [ISSUER, 'accounts.google.com']
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token'
 const REVOCATION_ENDPOINT = 'https://oauth2.googleapis.com/revoke'
 const JWKS_URI = 'https://www.googleapis.com/oauth2/v3/certs'

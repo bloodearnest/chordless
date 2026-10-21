@@ -358,6 +358,24 @@ describe('POST /session/refresh', () => {
     assert.equal(calls[0].args[0], REFRESH_TOKEN)
   })
 
+  test('passes on the new ID token when Google sends one with the refresh', async () => {
+    const { google } = fakeGoogle({
+      refreshAccessToken: (async () => ({
+        access_token: 'access-2',
+        expires_in: 1800,
+        id_token: 'id-token-2',
+      })) as unknown as GoogleApi['refreshAccessToken'],
+    })
+    const blob = await encryptBlob(blobData(), env)
+    const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
+
+    assert.deepEqual(await bodyOf(response), {
+      access_token: 'access-2',
+      expires_in: 1800,
+      id_token: 'id-token-2',
+    })
+  })
+
   test('fails for a blob that is not ours, and asks Google nothing', async () => {
     const { google, calls } = fakeGoogle()
     const other = await encryptBlob(blobData(), { JWE_ENCRYPTION_KEY: randomKey() })

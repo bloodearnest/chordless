@@ -140,7 +140,8 @@ export async function handleOAuthCallback(
  * Response:
  * {
  *   access_token: string,   // New short-lived access token
- *   expires_in: number      // Access token TTL (seconds)
+ *   expires_in: number,     // Access token TTL (seconds)
+ *   id_token?: string       // A new ID token, if Google sent one: what the team space API takes
  * }
  */
 export async function handleTokenRefresh(
@@ -176,11 +177,16 @@ export async function handleTokenRefresh(
   const blobData = await decryptBlob(blob, env)
 
   try {
-    const { access_token, expires_in } = await google.refreshAccessToken(
+    const { access_token, expires_in, id_token } = await google.refreshAccessToken(
       blobData.refresh_token,
       env
     )
-    return jsonResponse({ access_token, expires_in })
+    return jsonResponse({
+      access_token,
+      expires_in,
+      // (Google sends a new ID token with a refresh when it was asked for `openid`)
+      ...(id_token ? { id_token } : {}),
+    })
   } catch (error) {
     // Google no longer honours the refresh token (it expired, e.g. the consent screen is still
     // in "Testing", or the access was revoked): the user has to sign in again, which is
