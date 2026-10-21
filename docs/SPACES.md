@@ -143,16 +143,21 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   `{provider, sub, email}`: members are keyed by `provider:sub` (`identityKey`), since a `sub` is
   unique only within a provider. It says who someone is, not what they may do: roles are the
   space's. There is no Worker signing key.
-- **Signing in without Drive (checked 2026-10-21, a real account with no earlier grant; not built):**
-  asking for `openid email profile` alone gives a refresh token, an ID token with a verified email,
-  and an access token, and asking later for `drive.file` alone (with `include_granted_scopes`,
-  `prompt: consent`) gives the Drive scope added to the earlier ones, with a refresh token. Google's
-  window showed no box to untick for either request, the second one included, so "Connect Google
-  Drive" as its own request cannot be passed with Drive unticked, unlike the combined request made
-  today. Not checked: whether the refresh token is sent again without `prompt: consent`. **Not yet built:** `/oauth/callback` still refuses a
-  sign-in without `drive.file`, so a team member who unticks the box is turned away. The plan:
-  allow it, show "Google Drive isn't connected" with a Connect button (Storage page, personal
-  space), and leave local use alone.
+- **Signing in without Drive (checked and built 2026-10-21):** asking for `openid email profile`
+  alone gives a refresh token, an ID token with a verified email, and an access token, and asking
+  later for `drive.file` alone (with `include_granted_scopes` and `prompt: consent`) adds the Drive
+  scope to the earlier ones, with a refresh token. Google's window showed no box to untick for
+  either request, so "Connect Google Drive" as its own request cannot be passed with Drive unticked,
+  unlike the combined request made by "Connect with Google" (`drive.file openid email profile`),
+  which has a box. `/oauth/callback` no longer refuses a sign-in without `drive.file`; it returns
+  `scope` (what was granted), which the page keeps. `authorizeWithGoogle({drive: false})` signs in
+  for who someone is alone (what a team member joining needs), `connectDrive()` adds Drive, and
+  `getSignInState()` says `'no-drive'` while the stored sign-in has no Drive scope (one made
+  before the scope was kept is taken to have it). The Storage page then says "Signed in, Google Drive
+  not connected" with a **Connect Google Drive** button, and the sync section points at it; syncing
+  is off (`driveStorage.available()` is false) and local use and team spaces are unaffected. Not
+  checked: whether the refresh token is sent again without `prompt: consent` (connecting forces it).
+  Not built: the same notice in the personal space itself, and a toast after sign-in.
 
 ### The three credentials, and how they are used
 
