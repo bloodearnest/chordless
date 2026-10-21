@@ -37,3 +37,27 @@ export function jsonResponse(data: unknown, status = 200) {
     },
   })
 }
+
+/** An answer to send as it is */
+export class Refusal extends Error {
+  status: number
+  constructor(status: number, text: string) {
+    super(text)
+    this.status = status
+  }
+}
+
+export function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+export async function readJson(request: Request): Promise<Record<string, unknown>> {
+  let body: unknown
+  try {
+    body = await request.json()
+  } catch {
+    throw new Refusal(400, 'The body is not JSON')
+  }
+  if (!isRecord(body)) throw new Refusal(400, 'The body is not an object')
+  return body
+}

@@ -24,7 +24,7 @@
  */
 import type { SpaceMember } from '../../src/js/data-types.ts'
 import type { Collection, FileInput, SpaceStorage } from '../../src/js/storage/types.ts'
-import { jsonResponse, message } from './http.ts'
+import { isRecord, jsonResponse, message, Refusal, readJson } from './http.ts'
 
 export type Role = 'owner' | 'admin' | 'writer' | 'reader'
 
@@ -62,19 +62,6 @@ export function teamSpacePath(path: string): { spaceId: string; rest: string } |
   return { spaceId: decodeURIComponent(match[1]), rest: match[2] ?? '/' }
 }
 
-/** An answer to send as it is */
-class Refusal extends Error {
-  status: number
-  constructor(status: number, text: string) {
-    super(text)
-    this.status = status
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
-}
-
 function asFileInput(value: unknown): FileInput {
   if (
     isRecord(value) &&
@@ -103,17 +90,6 @@ function asWrite(value: unknown): Write {
 function asList(value: unknown, what: string): unknown[] {
   if (!Array.isArray(value)) throw new Refusal(400, `${what} must be a list`)
   return value
-}
-
-async function readJson(request: Request): Promise<Record<string, unknown>> {
-  let body: unknown
-  try {
-    body = await request.json()
-  } catch {
-    throw new Refusal(400, 'The body is not JSON')
-  }
-  if (!isRecord(body)) throw new Refusal(400, 'The body is not an object')
-  return body
 }
 
 function collectionOf(url: URL): Collection {

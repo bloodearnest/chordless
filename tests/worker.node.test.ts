@@ -84,6 +84,14 @@ test('worker API: /api/space/<id> is the Worker’s, and asks who is asking firs
   assert.equal(resp.headers.get('cache-control'), 'no-store')
 })
 
+test('worker API: /api/spaces and /api/spaces/join are the Worker’s, and want a sign-in', async () => {
+  for (const path of ['/api/spaces', '/api/spaces/join']) {
+    const resp = await worker.fetch(path, { method: 'POST', body: '{}' })
+    assert.equal(resp.status, 401, path)
+    assert.ok(resp.headers.get('content-type')?.includes('application/json'), path)
+  }
+})
+
 test('worker API: /session/refresh route exists', async () => {
   const resp = await worker.fetch('/session/refresh', {
     method: 'POST',
@@ -250,6 +258,21 @@ describe('a team space Durable Object', () => {
       assert.equal(await team.info(), null)
       assert.equal(await team.roleOf(ann), null)
       assert.equal(await team.owns('file-1'), false)
+    })
+  })
+
+  test('makes an invite that is used once, with the code never stored', async () => {
+    await inSpace('team-a', async team => {
+      const { code } = await team.createInvite('reader', 'new@example.com', ann)
+      assert.match(code, /^[A-Za-z0-9_-]{22}$/)
+      assert.equal((await team.invites()).length, 1)
+
+      assert.equal(
+        await team.redeemInvite(code, { ...bob, sub: 'g-9', email: 'new@example.com' }),
+        'reader'
+      )
+      assert.equal(await team.redeemInvite(code, { ...bob, sub: 'g-10' }), null)
+      assert.equal((await team.invites()).length, 0)
     })
   })
 

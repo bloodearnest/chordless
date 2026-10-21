@@ -7,10 +7,12 @@
  * ask for one; a stranger and a space that is not there get the same answer (docs/SECURITY.md,
  * "Probing for team spaces").
  */
+import { decryptBlob } from './blob.ts'
 import type { Env } from './env.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
 import type { GoogleApi } from './session.ts'
 import { realGoogle } from './session.ts'
+import type { AdminContext } from './team-admin.ts'
 import type { Access, TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingRefs } from './team-refs.ts'
@@ -24,14 +26,21 @@ export interface TeamDeps {
   now?: () => number
 }
 
+/** What a request uses to know who is asking and to reach Google: the real ones unless a test gives its own */
+function resolve(env: Env, deps: TeamDeps) {
+  return {
+    providers: deps.providers ?? [googleProvider(env)],
+    google: deps.google ?? realGoogle,
+    now: deps.now ?? Date.now,
+  }
+}
+
 export function createTeamContext(
   env: Env,
   teamSpaces: NonNullable<Env['TEAM_SPACE']>,
   deps: TeamDeps = {}
 ): TeamContext {
-  const providers = deps.providers ?? [googleProvider(env)]
-  const google = deps.google ?? realGoogle
-  const now = deps.now ?? Date.now
+  const { providers, google, now } = resolve(env, deps)
   const room = (spaceId: string) => teamSpaces.get(teamSpaces.idFromName(spaceId))
 
   // (a request's space is looked up once; its token source is shared by the calls it makes)
@@ -64,5 +73,33 @@ export function createTeamContext(
       return root && { ref: root.ref, name: root.name, trashed: root.trashed }
     },
     owns: (spaceId, ref) => room(spaceId).owns(ref),
+  }
+}
+
+/** What making a space, joining one and looking after its people need */
+export function createAdminContext(
+  env: Env,
+  teamSpaces: NonNullable<Env['TEAM_SPACE']>,
+  deps: TeamDeps = {}
+): AdminContext {
+  const { providers, google, now } = resolve(env, deps)
+  return {
+    identify: request => authenticate(request, providers),
+    room: spaceId => teamSpaces.get(teamSpaces.idFromName(spaceId)),
+    async inspectRoot(blob, owner, rootRef) {
+      // (the blob is not stored yet: it is what the space would be made from)
+      const info = { rootRef, name: '', owner, createdAt: '' }
+      const token = ownerAccessToken({
+        room: { ownerBlob: async () => blob },
+        info,
+        env,
+        google,
+        now,
+      })
+      const root = await teamDrive(token, deps.fetch).inspectRoot(rootRef)
+      return root && { trashed: root.trashed, canWrite: root.canWrite }
+    },
+    openBlob: blob => decryptBlob(blob, env),
+    newSpaceId: () => crypto.randomUUID(),
   }
 }
