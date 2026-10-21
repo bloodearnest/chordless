@@ -6,8 +6,10 @@ setlist sent to people without an account) are in SHARING.md. How sync itself wo
 SYNC_ARCHITECTURE.md.
 
 > **Status:** the personal space and the single-user sync described under "Today" are built. The
-> team space, the Worker's team service, roles, copy/move and the rest are **designed, not built**; the
-> order of work and a status list are at the end. The code and docs
+> team space is built end to end for the owner's-token credential (the Worker's team service, roles,
+> invites, joining, the Storage page), tested against fakes only; the service account, pads, copy/move
+> UI and the rest are **designed, not built**. The order of work, a status list and where work
+> stopped are at the end. The code and docs
 > call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
 
 ## Principle
@@ -718,6 +720,33 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 Items carried over from the TODO (space section): a media-team email config option; define
 users, leaders, permissions; join/invite/remove user; restrict editing others' setlists by `ownerId`
 (see SYNC_ARCHITECTURE.md).
+
+## Where work stopped (2026-10-21)
+
+Built and committed, all verified against fakes (fake Drive, in-memory storage, workerd for the
+Durable Object) and never against a real deployed Worker, a real Google sign-in or an installed app:
+
+- Identity: the Google ID token as the per-request proof, behind `IdentityProvider`; members are keyed
+  by `provider:sub`. Sign-in without Drive; `connectDrive()` adds `drive.file` later.
+- The Durable Object per team space; the owner-token credential; the storage API for members;
+  `TeamStorage` on the client; making a space, invites (bound to one email, single use, 7 days),
+  joining, roles, leaving, ending sharing.
+- Pages: `/join`, the Team Space panel on the Storage page, and the space list showing kind and role.
+  The installed app hands the fragment of any link to the page (`incoming-link.ts`).
+
+**Not built**, in the order I would take them:
+
+1. **A real-account run first.** Expect surprises in Google's consent screen, the Durable Object
+   migration `v1` on the first deploy, and Drive permissions on the owner's folder. Two accounts, one
+   installed app.
+2. Service-account credential (item 10), so a shared drive needs no owner token.
+3. Pads in team spaces (item 6).
+4. Share links from a team space (they fail today with "Share links from a team space are not
+   supported yet").
+5. A switcher in the header, then Merged and Separate (item 8).
+6. Probing protections: unguessable or signed space ids, per-account rate limits, key rotation
+   (SECURITY.md).
+7. The personal-space notice and a toast after sign-in for "Drive not connected".
 
 ## Risks
 
