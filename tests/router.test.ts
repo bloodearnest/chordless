@@ -31,7 +31,7 @@ describe('normalizePath', () => {
 })
 
 describe('matchRoute', () => {
-  const pages = ['songs', 'preferences', 'storage', 'import-song', 'bookmarklet'] as const
+  const pages = ['songs', 'preferences', 'storage', 'import-song', 'bookmarklet', 'join'] as const
   const setlist = (setlistId: string, songIndex: number) =>
     ({ name: 'setlist', setlistId, songIndex }) as const satisfies Route
   const notFound = (path: string) => ({ name: 'not-found', path }) as const satisfies Route
@@ -43,6 +43,8 @@ describe('matchRoute', () => {
     ),
     ['/', { name: 'home' }],
     ['/index.html', { name: 'home' }],
+    // An invite link: the space and the code are in the fragment, which the route leaves out
+    ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
 
     // The library list, searched
     ['/songs?q=grace', { name: 'songs', search: 'grace' }],
@@ -111,6 +113,7 @@ describe('buildUrl', () => {
     [{ name: 'storage' }, '/storage'],
     [{ name: 'import-song' }, '/import-song'],
     [{ name: 'bookmarklet' }, '/bookmarklet'],
+    [{ name: 'join' }, '/join'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
     [{ name: 'setlist', setlistId: 'a b', songIndex: -1 }, '/setlist/a%20b'], // ids are encoded

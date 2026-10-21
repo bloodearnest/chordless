@@ -14,6 +14,7 @@ const VIEWS = [
   ['/import-setlist', 'import-setlist-view'],
   ['/bookmarklet', 'bookmarklet-view'],
   ['/about', 'about-view'],
+  ['/join', 'join-view'],
   ['/no/such/page', 'not-found-view'],
 ]
 
