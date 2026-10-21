@@ -205,7 +205,7 @@ layer above), and nothing of theirs is pushed.
   they differ, have edit rights: the leader who did not create the setlist is not shut out.
   (`createdBy` is only a trace today: "nothing decides by it yet", data-types.ts.) Later an
   **space admin** role can edit any setlist of the space (roles come with the
-  Worker broker, SPACES.md). The `editors` list below adds named people.
+  Worker team service, SPACES.md). The `editors` list below adds named people.
 - It needs the layer first. Without it, a non-owner's edit would be dropped by the next pull, the
   same reason a reader's edits are blocked now. So until the layer exists a non-owner is treated
   as a reader of that setlist (no setlist edits).
@@ -222,7 +222,7 @@ travel as small changes ("song 3 key to D") that merge by field. They do not go 
 opened every few weeks on poor wifi is offline when it edits, and Drive has no compare-and-set
 (to check), so two pushes a moment apart can overwrite each other.
 
-**The Worker, when it brokers space writes** (SPACES.md, "Why the Worker brokers"). Every member's Drive call goes through it, so for a space
+**The Worker, when it serves space writes** (SPACES.md, "Why the Worker serves members"). Every member's Drive call goes through it, so for a space
 it is the one place that can:
 1. **Enforce roles and ownership.** It already enforces reader or writer; it can reject a write
    to a setlist by someone who is not its owner or an editor, so the rule stops being advice.
@@ -241,7 +241,7 @@ edits.
 
 Order of work: (1) never drop a losing local edit silently (a conflict copy is the cheap first
 step, see the TODO); (2) the device layer and merge module; (3) block the sync of non-owners'
-writes, on the client; (4) the Worker's roles and conflict check, with the broker; (5) editors,
+writes, on the client; (4) the Worker's roles and conflict check, with the team service; (5) editors,
 then suggestions.
 
 ### Reset from Google Drive
@@ -465,7 +465,7 @@ The intervals are named constants, not preferences.
   folders. Checked on a real My Drive under `drive.file` (2026-10-19, with the shared-drive probe page, since deleted):
   it works, and a change shows in the feed after about 5 s, so a tick can be that far behind (fine
   at 60 s; the live 15 s tick checks the one file directly instead). Not yet checked on a shared
-  drive or through the Worker broker. Via the Worker broker (docs/SPACES.md) the same
+  drive or through the Worker's team service. Via the Worker's team service (docs/SPACES.md) the same
   call is a Worker route.
 - **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
   `md5Checksum`, compared with the record's `fileRev`; only if it differs, `pullSetlistNow(id)`
@@ -513,6 +513,6 @@ backstop.
 - **Restricting edits to a setlist's owner** (`createdBy` and `ownerId` both write; admins later): designed above,
   first by blocking the sync of non-owners' writes.
 - **Inviting people to a team space:** shared users can't see the folder under
-  `drive.file`; the design (the Worker brokers the owner's access) is in SPACES.md.
+  `drive.file`; the design (the Worker acts with the owner's access) is in SPACES.md.
 - **Songs:** deletion and the "deletion wins over an unchanged copy" rule for songs.
 - **Real Drive integration tests** (see Tests above).

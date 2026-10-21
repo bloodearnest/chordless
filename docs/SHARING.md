@@ -4,7 +4,7 @@ Share links: one setlist, with its charts, sent as a link to people who may have
 Built (see "Status"). Replaces the earlier link sharing (`share.html`,
 `share-setlist.js` and the worker's `/api/share`), which only sent song ids and never worked.
 
-Permanent sharing of a whole space with a team (invites, roles, the Worker broker) and the
+Permanent sharing of a whole space with a team (invites, roles, the Worker's team service) and the
 sign-in model are in SPACES.md. Sync itself is described in SYNC_ARCHITECTURE.md.
 
 ## Licensing and why links expire

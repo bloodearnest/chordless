@@ -66,13 +66,13 @@ they must be able to. Overly restrictive is an antipattern here.
 
 ## Spaces and copyright
 
-**Chordless never stores copyrighted content; it only brokers access to it.** Charts, lyrics and pad
+**Chordless never stores copyrighted content; it only passes access on to it.** Charts, lyrics and pad
 audio live in the user's own browser and in a Drive the user (or their team space's owner) controls.
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song, setlist or pad
 content. They hold only membership, roles, the owner's encrypted token blob and checksums. (Share
 links are the one exception: the Worker caches ciphertext it cannot read.) The space model (personal
-and team spaces, roles, the Worker broker) is in `docs/SPACES.md`. The word is **space** in the UI, the code and the docs
+and team spaces, roles, the Worker's team service) is in `docs/SPACES.md`. The word is **space** in the UI, the code and the docs
 ("organisation" is the old name; it survives only in names already stored on devices and in Drive).
 
 ## Tech Stack
@@ -87,7 +87,7 @@ and team spaces, roles, the Worker broker) is in `docs/SPACES.md`. The word is *
 ## Development Standards
 
 - Use `just format lint test` to verify all changes. This runs formatting, linting (Biome, `tsc -b` over the tsconfig.*.json projects, knip for unused files, exports and dependencies, and a dry-run deploy of `wrangler.toml` that fails on warnings: `scripts/lint-wrangler.sh`), and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
-- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker broker next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/CLOUD_MIGRATION.md` for the planned move to a new Google Cloud project, to be done before going live).
+- How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker's team service next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/CLOUD_MIGRATION.md` for the planned move to a new Google Cloud project, to be done before going live).
 - TypeScript (erasable syntax only: no enums or parameter properties, so Node and esbuild can strip the types) and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
 - Infrastructure that rarely changes is Terraform in `infra/` (`infra/README.md`): the Cloudflare zone side (Email Routing, the Worker's custom domain, DNS, TLS settings) and the Google Cloud project (APIs, API keys, service account). Deploys, and everything in `wrangler.toml`, stay wrangler's: do not move the Worker, its assets, bindings or secrets into Terraform. `gcloud` and `terraform` come from `mise.toml`
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`

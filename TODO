@@ -147,7 +147,7 @@ storage/sync
   reject). Decided: createdBy and ownerId (when different) both have edit rights; a space admin
   role later. Open: open to all in the space by default, or only those. The layer must
   show, simply: one indicator that something differs from the official version, and a way to view
-  what (see the doc). The Worker broker later enforces it and detects conflicts
+  what (see the doc). The Worker's team service later enforces it and detects conflicts
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
   designed in docs/SYNC_ARCHITECTURE.md, not built
 - immediate background sync of just the changed record (setlist/song), in the

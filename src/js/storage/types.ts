@@ -1,7 +1,7 @@
 /**
  * The storage API: what the sync engine needs of wherever a space's files are kept.
  *
- * Google Drive is the first backend (`drive-storage.ts`); the Worker broker will serve the same
+ * Google Drive is the first backend (`drive-storage.ts`); the Worker's team service will serve the same
  * calls to team-space members, and a test fake implements them in memory. Nothing here is
  * Drive-shaped: a file is known by an opaque `ref` the backend chose, and is told apart by its
  * `props`, so another backend can keep them as it can. See docs/STORAGE_API.md.

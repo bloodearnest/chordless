@@ -9,7 +9,7 @@ Not designed or checked against the code yet. What is known from the design (202
 | Key | Where it lives | Effect of rotating |
 |---|---|---|
 | Blob key (`JWE_ENCRYPTION_KEY`) | Worker secret | The one with consequences, see below |
-| Session signing key (proposed, for the broker's session token) | Worker secret | Cheap: tokens last about an hour, so a hard swap costs each client one 401 and `/session/refresh` re-issues it from the blob. A `kid` and a short overlap make it seamless |
+| Session signing key (proposed, for the team service's session token) | Worker secret | Cheap: tokens last about an hour, so a hard swap costs each client one 401 and `/session/refresh` re-issues it from the blob. A `kid` and a short overlap make it seamless |
 | Service account key | Worker secret | Invisible to members: mint a new key, deploy it, delete the old one. Nothing stored to migrate (access tokens are minted in memory) |
 
 **The blob key.** Blobs carry a `kid`, so the Worker can hold old and new keys together, decrypt by
@@ -24,7 +24,7 @@ So the order is:
 3. Retire the old key once nothing uses it.
 
 The Durable Object's stored blob must therefore be re-wrappable: design for that when building the
-broker.
+team service.
 
 **A compromised key is different.** The key plus a stolen blob gives a refresh token, so overlap is
 not safe. Rotate hard, revoke the owners' grants at Google, and make everyone sign in again.
