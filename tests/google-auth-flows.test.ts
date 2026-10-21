@@ -5,10 +5,12 @@
 import { expect } from '@open-wc/testing'
 import {
   authorizeWithGoogle,
+  connectDrive,
   downloadBlobBackup,
   getCurrentUserInfo,
   getIdToken,
   getPendingOperations,
+  hasDriveAccess,
   importBlobBackup,
   initGoogleAuth,
   listenForIdTokenRequests,
@@ -23,7 +25,12 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-type CodeConfig = { callback: (response: { code?: string; error?: string }) => void }
+type CodeConfig = {
+  scope: string
+  prompt?: string
+  include_granted_scopes?: boolean
+  callback: (response: { code?: string; error?: string }) => void
+}
 type PromptNotification = {
   isNotDisplayed(): boolean
   isSkippedMoment(): boolean
@@ -46,6 +53,8 @@ describe('google-auth: signing in', () => {
   let fetches: Array<{ url: string; body?: Record<string, unknown> }>
   let respondTo: (url: string) => Response | Promise<Response>
   let codeResponse: { code?: string; error?: string }
+  /** What the page last asked Google for */
+  let requested: CodeConfig | undefined
   let idCredential: string | null
   let promptNotification: PromptNotification | null
   /** The credential comes first, then the notification (the prompt closing after it) */
@@ -72,9 +81,10 @@ describe('google-auth: signing in', () => {
     ;(window as { google?: unknown }).google = {
       accounts: {
         oauth2: {
-          initCodeClient: (config: CodeConfig) => ({
-            requestCode: () => config.callback(codeResponse),
-          }),
+          initCodeClient: (config: CodeConfig) => {
+            requested = config
+            return { requestCode: () => config.callback(codeResponse) }
+          },
         },
         id: {
           initialize: (config: { callback: (response: { credential?: string }) => void }) => {
@@ -232,24 +242,65 @@ describe('google-auth: signing in', () => {
       expect(message).to.equal('Failed to exchange code for tokens')
     })
 
-    it('tells the user to tick the Drive box when Google was not allowed to give Drive access', async () => {
-      respondTo = () =>
-        json(
-          {
-            error: 'Drive access not granted. Please re-authorize.',
-            granted_scopes: 'openid email',
-          },
-          400
-        )
+    const DRIVE = 'https://www.googleapis.com/auth/drive.file'
+    const without = {
+      blob: 'b',
+      access_token: 'tok',
+      expires_in: 3600,
+      scope: 'openid email profile',
+    }
+    const withDrive = { ...without, scope: `${DRIVE} openid email profile` }
+
+    it('asks for Drive with the sign-in, and for who they are alone when told not to', async () => {
+      await authorizeWithGoogle()
+      expect(requested?.scope).to.contain(DRIVE)
+      expect(requested?.prompt).to.equal('consent')
+
+      await authorizeWithGoogle({ drive: false })
+      expect(requested?.scope).to.equal('openid email profile')
+    })
+
+    it('keeps what Google granted, and signs in without Drive if its box was left unticked', async () => {
+      respondTo = () => json(without)
+      await authorizeWithGoogle()
+      expect(worker.stored?.metadata.scope).to.equal('openid email profile')
+      expect(await hasDriveAccess()).to.equal(false)
+
+      respondTo = () => json(withDrive)
+      await authorizeWithGoogle()
+      expect(await hasDriveAccess()).to.equal(true)
+    })
+
+    it('adds Drive to a sign-in without it: Drive alone, keeping what was granted, replacing the sign-in', async () => {
+      respondTo = () => json(without)
+      await authorizeWithGoogle({ drive: false })
+      expect(await hasDriveAccess()).to.equal(false)
+
+      respondTo = () => json({ ...withDrive, blob: 'second-blob' })
+      await connectDrive()
+      expect(requested?.scope).to.equal(DRIVE)
+      expect(requested?.include_granted_scopes).to.equal(true)
+      expect(requested?.prompt).to.equal('consent')
+      expect(worker.stored?.blob).to.equal('second-blob')
+      expect(await hasDriveAccess()).to.equal(true)
+    })
+
+    it('says so when Google or the worker refuses to add Drive, and keeps the sign-in it has', async () => {
+      respondTo = () => json(without)
+      await authorizeWithGoogle({ drive: false })
+      codeResponse = { error: 'access_denied' }
       let message = ''
-      try {
-        await authorizeWithGoogle()
-      } catch (error) {
-        message = (error as Error).message
-      }
-      expect(message).to.contain('tick the Google Drive box')
-      expect(message).to.contain('then connect again')
-      expect(worker.stored).to.equal(undefined)
+      await connectDrive().catch(error => {
+        message = error.message
+      })
+      expect(message).to.equal('access_denied')
+      expect(worker.stored?.blob).to.equal('b')
+    })
+
+    it('counts a sign-in made before the scope was kept as having Drive, and none as not', async () => {
+      expect(await hasDriveAccess()).to.equal(false)
+      worker.stored = { blob: 'old', metadata: {}, updated_at: new Date().toISOString() }
+      expect(await hasDriveAccess()).to.equal(true)
     })
 
     it('fails when the worker cannot keep the blob', async () => {

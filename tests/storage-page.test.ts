@@ -262,28 +262,59 @@ describe('the storage page, signed in to Google', () => {
       expect(page.authStatus).to.equal('ready')
     })
 
-    it('says what to tick when the Drive box was left unticked, and can be tried again', async () => {
-      await open(false)
-      exchange = () =>
-        Response.json(
-          { error: 'Drive access not granted', granted_scopes: 'openid' },
-          { status: 400 }
-        )
-      button('Connect with Google').click()
-      await until(() => text().includes('Authorization failed'), 'the failure to be shown')
-      expect(text()).to.contain('tick the Google Drive box')
-      expect(page.isAuthenticated).to.equal(false)
+    const signedIn = (scope: string) => () =>
+      Response.json({
+        blob: 'new-blob',
+        access_token: 'tok',
+        expires_in: 3600,
+        scope,
+        user: { name: 'Bea Singer', email: 'bea@example.com', picture: null },
+      })
 
-      exchange = () =>
-        Response.json({
-          blob: 'new-blob',
-          access_token: 'tok',
-          expires_in: 3600,
-          user: { name: 'Bea Singer', email: 'bea@example.com', picture: null },
-        })
+    it('signs in when the Drive box was left unticked, says Drive is not connected, and can connect it', async () => {
+      await open(false)
+      exchange = signedIn('openid email profile')
       button('Connect with Google').click()
-      await until(() => text().includes('Authorization successful'), 'the sign-in to finish')
-      expect(text()).to.not.contain('tick the Google Drive box')
+      await until(() => text().includes('Drive was not connected'), 'the sign-in to finish')
+      expect(page.isAuthenticated).to.equal(true)
+      expect(page.noDrive).to.equal(true)
+      expect(text()).to.contain('Signed in, Google Drive not connected')
+      expect(text()).to.contain('Connect Google Drive above to sync')
+      expect(text()).to.contain('are safe on this device')
+
+      exchange = signedIn('https://www.googleapis.com/auth/drive.file openid email profile')
+      button('Connect Google Drive').click()
+      await until(() => text().includes('Google Drive connected'), 'Drive to be connected')
+      expect(page.noDrive).to.equal(false)
+      expect(text()).to.contain('✓ Connected')
+      expect(text()).to.not.contain('Connect Google Drive above')
+    })
+
+    it('says so when Drive is still not connected after asking for it, and when asking fails', async () => {
+      await open(false)
+      exchange = signedIn('openid email profile')
+      button('Connect with Google').click()
+      await until(() => page.noDrive, 'the sign-in to finish')
+
+      button('Connect Google Drive').click()
+      await until(() => text().includes('Google Drive was not connected.'), 'the answer')
+      expect(page.noDrive).to.equal(true)
+
+      codeResponse = { error: 'access_denied' }
+      button('Connect Google Drive').click()
+      await until(() => text().includes('Connecting Google Drive failed'), 'the failure')
+      expect(text()).to.contain('access_denied')
+    })
+
+    it('is back to signed out after logging out of a sign-in without Drive', async () => {
+      await open(false)
+      exchange = signedIn('openid email profile')
+      button('Connect with Google').click()
+      await until(() => page.noDrive, 'the sign-in to finish')
+      button('Logout').click()
+      await answerLogout(true)
+      await until(() => !page.isAuthenticated, 'the logout')
+      expect(page.noDrive).to.equal(false)
     })
 
     it('says the sign-in has expired, with a way to reconnect, when Google no longer honours it', async () => {

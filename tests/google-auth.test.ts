@@ -6,6 +6,7 @@ import {
   getCurrentUserInfo,
   getIdentityToken,
   getSignInState,
+  hasDriveAccess,
   isAuthenticated,
   logout,
   SignInExpiredError,
@@ -83,6 +84,35 @@ describe('google-auth', () => {
       signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
       respondTo = () => json({ access_token: 'fresh', expires_in: 3600 })
       expect(await getSignInState()).to.equal('signed-in')
+    })
+
+    it('is no-drive while the sign-in has no Drive scope, and signed in once it has', async () => {
+      signIn({
+        access_token: 'good',
+        expires_at: inFromNow(30 * MINUTE),
+        scope: 'openid email profile',
+      })
+      expect(await getSignInState()).to.equal('no-drive')
+      signIn({
+        access_token: 'good',
+        expires_at: inFromNow(30 * MINUTE),
+        scope: 'https://www.googleapis.com/auth/drive.file openid email',
+      })
+      expect(await getSignInState()).to.equal('signed-in')
+    })
+
+    it('has no Drive access when the stored sign-in cannot be read', async () => {
+      signIn({ scope: 'https://www.googleapis.com/auth/drive.file' })
+      setController(null)
+      expect(await hasDriveAccess()).to.equal(false)
+    })
+
+    it('is still expired when Google refuses a sign-in that has no Drive', async () => {
+      signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE), scope: 'openid email' })
+      respondTo = () => json({ error: 'invalid_grant' }, 401)
+      expect(await getSignInState()).to.equal('expired')
+      respondTo = () => json({}, 500)
+      expect(await getSignInState()).to.equal('no-drive')
     })
 
     it('is expired only when Google refuses the sign-in', async () => {

@@ -32,6 +32,7 @@ export class StoragePage extends LitElement {
   static override properties = {
     isAuthenticated: { type: Boolean, attribute: false },
     signInExpired: { type: Boolean, attribute: false },
+    noDrive: { type: Boolean, attribute: false },
     authStatus: { type: String, attribute: 'auth-status' },
     userInfo: { type: Object, attribute: false },
     _clearError: { state: true },
@@ -44,6 +45,8 @@ export class StoragePage extends LitElement {
   declare isAuthenticated: boolean
   /** Signed in here, but Google no longer honours it: sync cannot work until the user reconnects */
   declare signInExpired: boolean
+  /** Signed in, but without Google Drive: nothing can sync until it is connected */
+  declare noDrive: boolean
   declare authStatus: string
   declare userInfo: UserInfo | null
   declare _clearError: string
@@ -252,6 +255,7 @@ export class StoragePage extends LitElement {
     this._deleteSpaceMessage = ''
     this.isAuthenticated = false
     this.signInExpired = false
+    this.noDrive = false
     this.authStatus = 'checking'
     this.userInfo = null
   }
@@ -277,6 +281,7 @@ export class StoragePage extends LitElement {
     const state = await getSignInState()
     this.isAuthenticated = state !== 'signed-out'
     this.signInExpired = state === 'expired'
+    this.noDrive = state === 'no-drive'
     this.userInfo = this.isAuthenticated ? await getCurrentUserInfo() : null
     this.authStatus = 'ready'
   }
@@ -285,7 +290,7 @@ export class StoragePage extends LitElement {
     return html`
       <div class="storage-content">
         ${this._renderLocalSummarySection()} ${this._renderSpaceSection()}
-        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired)}
+        ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired || this.noDrive)}
         ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
     `
@@ -310,7 +315,9 @@ export class StoragePage extends LitElement {
                   ${
                     this.signInExpired
                       ? html`<h4>⚠ Sign-in expired</h4>`
-                      : html`<h4>✓ Connected</h4>`
+                      : this.noDrive
+                        ? html`<h4>Signed in, Google Drive not connected</h4>`
+                        : html`<h4>✓ Connected</h4>`
                   }
 
                   ${
@@ -356,10 +363,16 @@ export class StoragePage extends LitElement {
                       access was removed), so nothing can sync until you connect again. Your setlists
                       and songs on this device are not affected.
                     </p>`
-                    : html`<p>
-                      Cloud features are enabled for this device. Your setlists and songs can be synced
-                      to Google Drive.
-                    </p>`
+                    : this.noDrive
+                      ? html`<p>
+                        You are signed in, but Chordless has no access to Google Drive, so your
+                        setlists and songs are not being synced. They are safe on this device, and
+                        team spaces you have joined are not affected.
+                      </p>`
+                      : html`<p>
+                        Cloud features are enabled for this device. Your setlists and songs can be synced
+                        to Google Drive.
+                      </p>`
                 }
 
                 <div class="button-group">
@@ -368,7 +381,11 @@ export class StoragePage extends LitElement {
                       ? html`<button class="btn block primary" @click=${this._authorize}>
                         🔑 Reconnect with Google
                       </button>`
-                      : nothing
+                      : this.noDrive
+                        ? html`<button class="btn block primary" @click=${this._connectDrive}>
+                          📁 Connect Google Drive
+                        </button>`
+                        : nothing
                   }
                   <button class="btn block" @click=${this._testTokenRefresh}>
                     🔄 Test Token Refresh
@@ -467,7 +484,9 @@ export class StoragePage extends LitElement {
                 ${
                   this.signInExpired
                     ? 'Reconnect with Google above to sync again.'
-                    : 'Connect with Google above to enable syncing features.'
+                    : this.noDrive
+                      ? 'Connect Google Drive above to sync.'
+                      : 'Connect with Google above to enable syncing features.'
                 }
               </p>`
               : ''
@@ -499,7 +518,7 @@ export class StoragePage extends LitElement {
           space, on this device or another: it needs no Google account, and an import only adds
           what is missing. Pad sets are large, so they are included only if you choose.
         </p>
-        <space-export-panel ?signed-in=${this.isAuthenticated && !this.signInExpired}></space-export-panel>
+        <space-export-panel ?signed-in=${this.isAuthenticated && !this.signInExpired && !this.noDrive}></space-export-panel>
       </div>
     `
   }
@@ -596,20 +615,50 @@ export class StoragePage extends LitElement {
     this.requestUpdate()
 
     try {
-      const { authorizeWithGoogle, getCurrentUserInfo } = await import('../js/google-auth.ts')
+      const { authorizeWithGoogle, getCurrentUserInfo, hasDriveAccess } = await import(
+        '../js/google-auth.ts'
+      )
       await authorizeWithGoogle()
       this.userInfo = await getCurrentUserInfo()
 
       this.isAuthenticated = true
       this.signInExpired = false
+      this.noDrive = !(await hasDriveAccess())
       this.authStatus = 'ready'
 
-      this._authMessage = { text: '✓ Authorization successful!', type: 'success' }
+      this._authMessage = this.noDrive
+        ? {
+            text: '✓ Signed in. Google Drive was not connected, so nothing will sync yet.',
+            type: 'success',
+          }
+        : { text: '✓ Authorization successful!', type: 'success' }
     } catch (error) {
       console.error('[StoragePage] Authorization failed:', error)
       this.authStatus = 'ready'
 
       this._authMessage = { text: `✗ Authorization failed: ${errorMessage(error)}`, type: 'error' }
+    }
+  }
+
+  /** Add Google Drive to a sign-in that has none: Google is asked for that alone */
+  async _connectDrive(): Promise<void> {
+    this._authMessage = null
+    try {
+      const { connectDrive, getCurrentUserInfo, hasDriveAccess } = await import(
+        '../js/google-auth.ts'
+      )
+      await connectDrive()
+      this.userInfo = await getCurrentUserInfo()
+      this.noDrive = !(await hasDriveAccess())
+      this._authMessage = this.noDrive
+        ? { text: '✗ Google Drive was not connected.', type: 'error' }
+        : { text: '✓ Google Drive connected!', type: 'success' }
+    } catch (error) {
+      console.error('[StoragePage] Connecting Google Drive failed:', error)
+      this._authMessage = {
+        text: `✗ Connecting Google Drive failed: ${errorMessage(error)}`,
+        type: 'error',
+      }
     }
   }
 
@@ -622,6 +671,7 @@ export class StoragePage extends LitElement {
 
       this.isAuthenticated = false
       this.signInExpired = false
+      this.noDrive = false
       this.userInfo = null
       this.requestUpdate()
 

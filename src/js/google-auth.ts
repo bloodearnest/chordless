@@ -72,7 +72,9 @@ type WorkerMessageType =
 // Configuration
 export const GOOGLE_CLIENT_ID =
   '818185619377-gi719ehrq0937cmuf0qapms2r68vl3dc.apps.googleusercontent.com'
-const GOOGLE_SCOPES = 'https://www.googleapis.com/auth/drive.file openid email profile'
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
+const IDENTITY_SCOPES = 'openid email profile'
+const GOOGLE_SCOPES = `${DRIVE_SCOPE} ${IDENTITY_SCOPES}`
 
 // The worker serves the auth routes (/oauth/*, /session/*) on the same origin as
 // the app: wrangler dev locally, Tailscale serve/funnel, and production.
@@ -199,31 +201,31 @@ export interface AuthorizeResult {
   user: StoredUser | null
 }
 
-/** Said when Google's screen was passed with the Drive box unticked (it is optional there) */
-const DRIVE_NOT_TICKED =
-  "Chordless wasn't given access to Google Drive. On Google's screen, tick the Google Drive box " +
-  '(“See, edit, create and delete only the specific Google Drive files you use with this app”) ' +
-  'before you press Continue, then connect again.'
+/** What Google is asked for: the scopes, and whether it should add the ones already granted */
+interface CodeRequest {
+  scope: string
+  include_granted_scopes?: boolean
+}
 
 /**
- * Start OAuth flow to get auth code and exchange for token blob
+ * Ask Google for an authorization code with these scopes, have the Worker exchange it for the
+ * encrypted blob, and keep the sign-in. The consent screen is forced every time, so what is
+ * granted is always what the person just chose (Google otherwise reuses an earlier consent).
  */
-export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
-  await initGoogleAuth()
-
+function signInWith({ scope, include_granted_scopes }: CodeRequest): Promise<AuthorizeResult> {
   return new Promise<AuthorizeResult>((resolve, reject) => {
-    // access_type and prompt are not in Google's typed config, but are sent as they always were
+    // access_type, prompt and include_granted_scopes are not in Google's typed config, but are sent
     const config: google.accounts.oauth2.CodeClientConfig & {
       access_type: 'offline'
       prompt: 'consent'
+      include_granted_scopes?: boolean
     } = {
       client_id: GOOGLE_CLIENT_ID,
-      scope: `${GOOGLE_SCOPES} openid email profile`,
+      scope,
       ux_mode: 'popup',
       access_type: 'offline',
-      // Force the consent screen every time so Drive scope is always explicitly granted.
-      // Without this, Google reuses cached consent and may issue a token without Drive scope.
       prompt: 'consent',
+      ...(include_granted_scopes && { include_granted_scopes }),
       callback: async response => {
         try {
           if (response.error) {
@@ -240,13 +242,11 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
 
           if (!blobResponse.ok) {
             const error = await blobResponse.json()
-            // The Worker names the scopes Google did grant when the Drive one is not among them:
-            // the box for Drive was not ticked on Google's screen
-            if (typeof error.granted_scopes === 'string') throw new Error(DRIVE_NOT_TICKED)
             throw new Error(error.error || 'Failed to exchange code for tokens')
           }
 
-          const { blob, access_token, expires_in, id_token, user } = await blobResponse.json()
+          const { blob, access_token, expires_in, id_token, scope, user } =
+            await blobResponse.json()
 
           const normalizedUser = user ? await buildStoredUserProfile(user).catch(() => user) : null
 
@@ -258,6 +258,9 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
 
           if (id_token) {
             metadata.id_token = id_token
+          }
+          if (typeof scope === 'string') {
+            metadata.scope = scope
           }
 
           // Store blob in Service Worker: with no blob kept the user is not signed in, whatever
@@ -277,10 +280,47 @@ export async function authorizeWithGoogle(): Promise<AuthorizeResult> {
         }
       },
     }
-    const client = google.accounts.oauth2.initCodeClient(config)
-
-    client.requestCode()
+    google.accounts.oauth2.initCodeClient(config).requestCode()
   })
+}
+
+/**
+ * Sign in with Google, asking for Drive as well unless `drive` is false (someone who only wants to
+ * join a team space has no use for it). Google's screen lets the Drive box be left unticked; the
+ * sign-in then works without it, and `getSignInState()` says 'no-drive' until it is connected.
+ */
+export async function authorizeWithGoogle({
+  drive = true,
+}: {
+  drive?: boolean
+} = {}): Promise<AuthorizeResult> {
+  await initGoogleAuth()
+  return signInWith({ scope: drive ? GOOGLE_SCOPES : IDENTITY_SCOPES })
+}
+
+/**
+ * Add Google Drive to a sign-in that has none. Drive is asked for alone, so there is no box to
+ * leave unticked, and what was granted before is kept. It replaces the stored sign-in.
+ */
+export async function connectDrive(): Promise<AuthorizeResult> {
+  await initGoogleAuth()
+  return signInWith({ scope: DRIVE_SCOPE, include_granted_scopes: true })
+}
+
+/**
+ * Whether the stored sign-in includes Drive (not if there is none). One made before the scope was
+ * kept did, as signing in without Drive was not possible then.
+ */
+export async function hasDriveAccess(): Promise<boolean> {
+  try {
+    const stored = (await sendToServiceWorker('GET_BLOB')).data
+    if (!stored) return false
+    const { scope } = stored.metadata
+    return scope === undefined || scope.includes(DRIVE_SCOPE)
+  } catch (error) {
+    logAuthFailure('Error checking for Drive access', error)
+    return false
+  }
 }
 
 /**
@@ -334,19 +374,21 @@ export class SignInExpiredError extends Error {
 }
 
 /**
- * Where the sign-in stands: there is none ('signed-out'), it works ('signed-in'), or it is stored
- * but Google refuses it ('expired'). Only Google saying so makes it expired: with no network, or
- * any other failure, it is taken to work, as the access token may well still be good.
+ * Where the sign-in stands: there is none ('signed-out'), it works ('signed-in'), it works but has
+ * no Google Drive ('no-drive'), or it is stored but Google refuses it ('expired'). Only Google
+ * saying so makes it expired: with no network, or any other failure, it is taken to work, as the
+ * access token may well still be good.
  */
-export type SignInState = 'signed-out' | 'signed-in' | 'expired'
+export type SignInState = 'signed-out' | 'signed-in' | 'no-drive' | 'expired'
 
 export async function getSignInState(): Promise<SignInState> {
   if (!(await isAuthenticated())) return 'signed-out'
+  const state = (await hasDriveAccess()) ? 'signed-in' : 'no-drive'
   try {
     await getAccessToken()
-    return 'signed-in'
+    return state
   } catch (error) {
-    return error instanceof SignInExpiredError ? 'expired' : 'signed-in'
+    return error instanceof SignInExpiredError ? 'expired' : state
   }
 }
 

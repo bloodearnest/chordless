@@ -31,6 +31,8 @@ export interface AuthMetadata {
   expires_at?: string
   user?: StoredUser | null
   id_token?: string
+  /** What Google granted at the last sign-in; absent for a sign-in made before this was kept */
+  scope?: string
 }
 
 /** The encrypted token blob, as stored (the single record 'current') */
