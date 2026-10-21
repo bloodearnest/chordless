@@ -132,6 +132,67 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   "Reconnect with Google", and disables the sync panel with the reason.
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
+- **Who is asking the team service (built 2026-10-21):** Google's own ID token, as
+  `Authorization: Bearer`. Google sends a new one (an hour, checked on a real refresh) with every
+  refreshed access token, so `/session/refresh` passes it on and the page keeps it beside the access
+  token. `getIdentityToken()` (`google-auth.ts`) renews it silently (`getIdToken` is the old
+  One Tap prompt, which is not used for this). The Worker side is `worker/src/identity.ts`: an
+  `IdentityProvider` says which issuers it answers for and verifies a token (signature, issuer,
+  audience, expiry, and a *verified* email), and `authenticate(request, providers)` matches the token
+  to its provider by issuer. Google is the only provider. It gives an `Identity`
+  `{provider, sub, email}`: members are keyed by `provider:sub` (`identityKey`), since a `sub` is
+  unique only within a provider. It says who someone is, not what they may do: roles are the
+  space's. There is no Worker signing key.
+- **Signing in without Drive (checked 2026-10-21, a real account with no earlier grant; not built):**
+  asking for `openid email profile` alone gives a refresh token, an ID token with a verified email,
+  and an access token, and asking later for `drive.file` alone (with `include_granted_scopes`,
+  `prompt: consent`) gives the Drive scope added to the earlier ones, with a refresh token. Google's
+  window showed no box to untick for either request, the second one included, so "Connect Google
+  Drive" as its own request cannot be passed with Drive unticked, unlike the combined request made
+  today. Not checked: whether the refresh token is sent again without `prompt: consent`. **Not yet built:** `/oauth/callback` still refuses a
+  sign-in without `drive.file`, so a team member who unticks the box is turned away. The plan:
+  allow it, show "Google Drive isn't connected" with a Connect button (Storage page, personal
+  space), and leave local use alone.
+
+### The three credentials, and how they are used
+
+| Credential | Held by | Proves | Used with |
+|---|---|---|---|
+| Refresh token | Inside the encrypted blob. The page keeps the blob but cannot read it; only the Worker can | "This person authorised Chordless to use their Drive" | Only the Worker, to get access tokens |
+| Google access token | The page (an hour) | Drive permission for that person | Google Drive directly (personal spaces) |
+| Google ID token | The page (an hour) | "This is `a@example.com`" | The Worker's `/api/space/...` calls |
+
+1. **Sign-in, once** (built):
+   ```
+   page ──popup──► Google ──code──► /oauth/callback (Worker)
+                                      │ exchanges the code, checks the ID token
+   page ◄── access token, blob, ID token ──┘
+   ```
+2. **About every hour** (built):
+   ```
+   page ── blob ──► /session/refresh (Worker)
+                      │ opens the blob, asks Google for a new access token
+   page ◄── new access token + new ID token
+   ```
+3. **A personal space syncs** (as always): `page ── access token ──► Google Drive`. The Worker is
+   not involved.
+4. **A team member syncs** (client and API built; Durable Object, space credential and router
+   wiring not):
+   ```
+   page ── ID token ──► Worker /api/space/<id>/read-many
+                               1. verify the ID token: who is this?
+                               2. ask the space's Durable Object: what role?
+                               3. refuse, or carry on
+                               4. use the space's Drive credential ──► Drive
+   page ◄── the files ─────────┘
+   ```
+   The member's own Drive access plays no part, and the member needs none. The Worker uses the
+   space's credential (the owner's token from the owner's blob in the Durable Object, later the
+   service account), so Drive sees one account acting for the whole team.
+5. **The space's owner syncs** directly, as in 3: they own the folder.
+
+The ID token is for the Worker's access control only: it says who is asking, the Durable
+Object says what they may do, and the Drive credential does the reading and writing.
 
 ## Why the Worker serves members (verified 2026-10-13, real second account)
 
@@ -230,10 +291,10 @@ Agreed with the owner of the project:
   their existing email address (accounts.google.com/signup, "use your existing email"), so the only
   blocker is someone who will not use Google at all; that is accepted. Share links (read-only, no
   account) cover the rest. A second identity provider (emailed link) is possible later: the team service
-  takes a Worker-issued session token and keys members by verified email, so it does not care how
-  the email was verified.
+  takes an identity provider's ID token through `IdentityProvider` and keys members by provider and
+  `sub`, so another provider is another `IdentityProvider`.
 - **A member signs in as everyone does** (`initCodeClient` popup). The Worker verifies the ID token
-  and issues its own short-lived session token, renewed in `/session/refresh`. A member needs only
+  and the page then sends Google's ID token to the team service, renewed in `/session/refresh`. A member needs only
   `openid email profile`: all their Drive traffic for the team space goes through the Worker, so
   an unticked Drive box affects only their personal space.
 - **Pad sets** are not in the team service's first cut: they are the account's today
@@ -470,7 +531,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
 - The Worker streams a pad set through without holding it.
 
 **What it changes**
-- No One Tap. The Worker issues its own short-lived signed session token at sign-in (design above).
+- No One Tap. The page sends Google's ID token, renewed with the access token (design above).
 - The service account is `team-storage@chordless-app.iam.gserviceaccount.com`, in the app project
   for now (docs/CLOUD_MIGRATION.md, step 6 is a project of its own).
 
@@ -519,10 +580,10 @@ service account's JWT signing in `spike-service-account.ts` is the part the real
   fallback and the moment notifications `getIdToken` relies on, a few dismissals silence it for a
   while, and an old iPad is the target. It was only the quickest way to make the spike run. The
   design: the normal sign-in popup (`initCodeClient`, which works everywhere) already gives the
-  Worker a verified ID token, so the Worker issues its own short-lived signed session token (email
-  and sub, about an hour, signed with a Worker secret), renews it in `/session/refresh` (which has the
-  encrypted blob as proof of identity), and the team service accepts that. No prompt, any browser, no
-  per-call popup. (Current dates for Google's retirement not checked.)
+  Worker a verified ID token, and a refresh (`/session/refresh`, which has the encrypted blob as proof
+  of identity) returns a new ID token with every new access token (checked on a real refresh,
+  2026-10-21), so the page sends that to the team service. No prompt, any browser, no per-call
+  popup, and no Worker signing key. (Current dates for Google's retirement not checked.)
 - **Item 4, a big file:** `POST /dev/spike/upload?space=…&name=…` takes the file as the raw body with
   `X-Id-Token` and `Content-Length`, for a writer only. It opens a resumable upload to Drive with the
   owner's token and passes the body on as it arrives, through a `FixedLengthStream` of exactly that
@@ -623,7 +684,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; not yet the session token, the Durable Object, the Drive credentials or the route): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below); not yet the Durable Object, the Drive credentials or the route): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
    and the preference.

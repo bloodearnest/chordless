@@ -87,7 +87,7 @@ are enforced per collection and ref, and not by walking Drive parents.
 
 Team-space members get a second implementation of the same interface, `TeamStorage`
 (`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
-session token (docs/SPACES.md). The engine, share manager and pad service are unchanged; which
+ID token (docs/SPACES.md). The engine, share manager and pad service are unchanged; which
 backend a space is given depends on its kind and on whether this person is its owner (the owner
 keeps `DriveStorage`, direct). `TeamStorage` has to pass `tests/storage-conformance.ts` against
 the Worker running over `fake-drive.ts`.
@@ -104,9 +104,9 @@ pads answer "not yet". The space-level conformance suite (`describeSpaceStorage`
 backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
 the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
 it must include binned files, and be cheap (the Durable Object keeping the refs, not a walk of
-Drive per call). A team space's root ref is the space id.
+Drive per call). A team space's root ref is the space id. The client's `token` option is `getIdentityToken()` (`google-auth.ts`), Google's ID token, which the Worker checks (`worker/src/identity.ts`; docs/SPACES.md, "Sign-in model").
 
-On the Worker each call is: check the session token, look up the member's role in the space's
+On the Worker each call is: check the ID token, look up the member's role in the space's
 Durable Object, check it against the collection and ref, make the Drive call with the owner's token
 (later the service account's) and stream the answer back. Nothing is stored. The Worker may reuse
 `drive-storage.ts` with another token provider, so there stays one Drive implementation.

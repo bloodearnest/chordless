@@ -2,6 +2,9 @@
 
 Things to handle, not yet handled. The space model is in SPACES.md.
 
+There is no session signing key to rotate: the team service takes Google's own ID token as proof of
+who is asking (SPACES.md, "Sign-in model"), checked against Google's published keys.
+
 ## Key rotation (to do)
 
 Not designed or checked against the code yet. What is known from the design (2026-10-20):
@@ -9,7 +12,6 @@ Not designed or checked against the code yet. What is known from the design (202
 | Key | Where it lives | Effect of rotating |
 |---|---|---|
 | Blob key (`JWE_ENCRYPTION_KEY`) | Worker secret | The one with consequences, see below |
-| Session signing key (proposed, for the team service's session token) | Worker secret | Cheap: tokens last about an hour, so a hard swap costs each client one 401 and `/session/refresh` re-issues it from the blob. A `kid` and a short overlap make it seamless |
 | Service account key | Worker secret | Invisible to members: mint a new key, deploy it, delete the old one. Nothing stored to migrate (access tokens are minted in memory) |
 
 **The blob key.** Blobs carry a `kid`, so the Worker can hold old and new keys together, decrypt by
