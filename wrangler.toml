@@ -37,7 +37,7 @@ binding = "ASSETS"
 # Paths the worker handles before static assets. API routes must be listed:
 # otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.
 # /dev is listed so the worker can hide the dev-only pages in production.
-run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/s/*", "/dev", "/dev/*"]
+run_worker_first = ["/oauth/*", "/session/*", "/api/share/*", "/api/space/*", "/s/*", "/dev", "/dev/*"]
 
 # One Durable Object per team space (worker/src/team-space.ts): its members and roles, the files in
 # its tree, and the owner's encrypted token blob. Never song, setlist or pad content.

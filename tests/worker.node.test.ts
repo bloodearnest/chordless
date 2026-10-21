@@ -76,6 +76,14 @@ test('worker API: /oauth/callback route exists', async () => {
   assert.equal(resp.status, 400, `expected 400 for missing fields, got ${resp.status}`)
 })
 
+test('worker API: /api/space/<id> is the Worker’s, and asks who is asking first', async () => {
+  // 401 for a request with no token: not the SPA fallback's HTML, and no Durable Object touched
+  const resp = await worker.fetch('/api/space/space-aaaaaaaa/root')
+  assert.equal(resp.status, 401)
+  assert.ok(resp.headers.get('content-type')?.includes('application/json'))
+  assert.equal(resp.headers.get('cache-control'), 'no-store')
+})
+
 test('worker API: /session/refresh route exists', async () => {
   const resp = await worker.fetch('/session/refresh', {
     method: 'POST',

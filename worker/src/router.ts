@@ -16,13 +16,16 @@ import {
 } from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { withSharePreview } from './share-page.ts'
+import { handleTeamRequest, teamSpacePath } from './team-api.ts'
+import { createTeamContext, type TeamDeps } from './team-context.ts'
 
 export async function handleRequest(
   request: Request,
   env: Env,
   ctx: { waitUntil(promise: Promise<unknown>): void },
   cache: ShareCache,
-  google?: GoogleApi
+  google?: GoogleApi,
+  team?: TeamDeps
 ) {
   const url = new URL(request.url)
   const path = url.pathname
@@ -30,7 +33,8 @@ export async function handleRequest(
   if (
     (path.startsWith('/oauth/') ||
       path.startsWith('/session/') ||
-      path.startsWith('/api/share/')) &&
+      path.startsWith('/api/share/') ||
+      path.startsWith('/api/space/')) &&
     isCrossOrigin(request, url)
   ) {
     return jsonResponse({ error: 'Cross-origin requests are not allowed' }, 403)
@@ -59,6 +63,25 @@ export async function handleRequest(
 
     if (path === '/session/revoke' && request.method === 'POST') {
       return await handleSessionRevoke(request, env, google)
+    }
+
+    // A team space's storage API (docs/SPACES.md): the ID token, then the space's role, then Drive
+    const teamPath = teamSpacePath(path)
+    if (teamPath) {
+      if (!env.TEAM_SPACE) return jsonResponse({ error: 'Team spaces are not available' }, 503)
+      // (an id is made by the Worker, so anything else is not one: no object is made for it)
+      if (!/^[A-Za-z0-9_-]{8,64}$/.test(teamPath.spaceId)) {
+        return jsonResponse({ error: 'No such space' }, 404)
+      }
+      const answer = await handleTeamRequest(
+        request,
+        teamPath,
+        createTeamContext(env, env.TEAM_SPACE, team)
+      )
+      // (a member's files are not kept by anything on the way)
+      const headers = new Headers(answer.headers)
+      headers.set('Cache-Control', 'no-store')
+      return new Response(answer.body, { status: answer.status, headers })
     }
 
     // A share link's download (public, encrypted; see docs/SHARING.md)

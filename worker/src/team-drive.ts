@@ -10,7 +10,7 @@
 import { createDriveApi } from '../../src/js/drive-client.ts'
 import { createDriveStorage } from '../../src/js/storage/drive-storage.ts'
 import type { StorageBackend } from '../../src/js/storage/types.ts'
-import { type BlobKey, decryptBlob } from './blob.ts'
+import { type BlobData, type BlobKey, decryptBlob } from './blob.ts'
 import type { GoogleEnv, refreshAccessToken } from './google-auth.ts'
 import type { SpaceInfo, TeamSpaceApi } from './team-state.ts'
 
@@ -56,14 +56,27 @@ export function ownerAccessToken({
   google,
   now,
 }: OwnerTokenOptions): () => Promise<string> {
+  // (opened once for the calls of this source, a batch's many; tried again if it failed)
+  let opened: Promise<BlobData> | undefined
+  const open = (): Promise<BlobData> => {
+    opened ??= (async () => {
+      const blob = await room.ownerBlob()
+      if (!blob) throw new CredentialError('Sharing is not set up for this space', 409)
+      const data = await decryptBlob(blob, env)
+      // (a blob that is not the owner's must not stand in for their access)
+      if (data.owner_sub !== info.owner.sub) {
+        throw new CredentialError('The stored Google sign-in is not the space owner’s', 409)
+      }
+      return data
+    })()
+    opened.catch(() => {
+      opened = undefined
+    })
+    return opened
+  }
+
   return async () => {
-    const blob = await room.ownerBlob()
-    if (!blob) throw new CredentialError('Sharing is not set up for this space', 409)
-    const data = await decryptBlob(blob, env)
-    // (a blob that is not the owner's must not stand in for their access)
-    if (data.owner_sub !== info.owner.sub) {
-      throw new CredentialError('The stored Google sign-in is not the space owner’s', 409)
-    }
+    const data = await open()
 
     const known = made.get(data.blob_id)
     if (known && known.expiresAt - now() > EXPIRY_BUFFER_MS) return known.token
