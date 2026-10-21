@@ -39,7 +39,10 @@ a test that a blob made under the old key still opens during the overlap and not
 A team space's Durable Object is named by the space's id (`idFromName`), so a request for any id
 makes that object, empty, on first use: a read of an unknown id leaves a persisted entry (seen
 locally, 2026-10-21). That is cheap, but it is unbounded, and anyone signed in could ask for random
-ids. To decide when the route is wired (`router.ts`):
+ids. Done when the route was wired (2026-10-21): the ID token is verified before any object is
+touched, a stranger and an unknown space get the same 403, and an id that is not 8 to 64 letters,
+digits, `-` or `_` is a 404 with no object made. Still to do: unguessable ids and per-account rate
+limits. The original list:
 
 - Verify the ID token **before** touching a Durable Object, so only signed-in accounts can.
 - Answer a stranger and an unknown space the same (403), so the answer does not say which ids exist.

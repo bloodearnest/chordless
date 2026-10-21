@@ -83,7 +83,7 @@ suite, and a way to keep `props` (see above).
 The Worker's team service (docs/SPACES.md) serves this API over HTTP to team members, so roles and scope
 are enforced per collection and ref, and not by walking Drive parents.
 
-## The team backend (client, API and Durable Object state built; Drive credentials and the route not)
+## The team backend (built end to end for an owner-token space; creating a space, join/invite/revoke and the service account not)
 
 Team-space members get a second implementation of the same interface, `TeamStorage`
 (`src/js/storage/team-storage.ts`): HTTP calls to `/api/space/<id>/...` carrying the Worker's
@@ -120,7 +120,7 @@ stays one Drive implementation: `ownerAccessToken` opens the owner's blob from t
 Object, checks it is the owner's (`owner_sub`), refreshes an access token for it (kept in the
 isolate's memory for its hour, made once for a whole batch) and says "sharing is not set up" (no
 blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`) as a 409. A service account
-would be another source. Not yet wired into a route.
+would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from the Durable Object, then Drive with the owner's token, with the refs each listing shows noted. Nothing makes a space yet (below), so in production every id is still an unknown space.
 
 How each call maps:
 - `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
