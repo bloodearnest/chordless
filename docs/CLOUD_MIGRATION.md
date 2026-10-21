@@ -1,8 +1,8 @@
 # Moving to a new Google Cloud project, with Terraform
 
-**Status (2026-10-20): the app has moved; the old project is still there as the way back.** The new app
-project `chordless-app` exists, its sign-in is verified, and production uses it. What is left is to
-use the new project for about a week, then retire `chordless-old` (steps 5 and 6 below).
+**Status (2026-10-21): the app has moved to `chordless-app`.** Its sign-in is verified and production
+uses it. The old project is deleted. This document is the record of
+the move, and what is left of it is step 6 (a project of its own for the service account).
 
 | Step | State |
 |---|---|
@@ -11,8 +11,8 @@ use the new project for about a week, then retire `chordless-old` (steps 5 and 6
 | 2. Consent screen and web client | Done by hand; brand verified the same day. |
 | 3. Wire it in | Done and deployed: client id in `google-auth.ts`, Worker secrets (pushed with `just secrets`), Picker app id. |
 | 4. Move the data | Done: **Start over in Drive** (below) replaces export and import, and the checks passed. |
-| 5. Retire the old project | Not yet: after a week of use. |
-| 6. Broker project | Not yet. |
+| 5. Retire the old project | Done 2026-10-21: deleted at Google. |
+| 6. Team storage project | Not yet. |
 
 What was made:
 
@@ -22,20 +22,17 @@ What was made:
   Team Key and Sharing Key, and the service account `team-storage@chordless-app.iam.gserviceaccount.com`
   (in this project for now; step 6 is about moving it to its own).
 - **By hand:** the consent screen, the web client, the Worker secrets.
-- **The old project** `setalight` is renamed `chordless-old` (its id cannot change), also in Terraform
-  (`infra/google/`).
 
-**Done 2026-10-20: the current setup is recorded as Terraform** in `infra/` (`infra/README.md`): the
-`setalight` project, its Drive and Picker APIs, the two API keys and the `broker` service account, and
-the Cloudflare side (Email Routing, the custom domain, TXT records, TLS settings). The new project's
-Terraform started from `infra/google/main.tf` and is `infra/google-chordless/`. The Sharing Key allows the Drive API only (Picker was
-dropped; nothing used it).
+**Done 2026-10-20: the setup is recorded as Terraform** in `infra/` (`infra/README.md`): the new
+project (`infra/google-chordless/`) and the Cloudflare side (Email Routing, the custom domain, TXT
+records, TLS settings). The Sharing Key allows the Drive API only (Picker was dropped; nothing used
+it).
 
 ## Why
 
-- The current project's id is `setalight`, from its first name. A project id cannot be renamed, so it
-  shows wherever the id shows: the service account's address (`…@setalight.iam.gserviceaccount.com`)
-  is what a team admin sees in their shared drive's members.
+- The old project's id was an untidy leftover from its first name. A project id cannot be renamed,
+  and it shows in the service account's address, which is what a team admin sees in their shared
+  drive's members. The new project gives `team-storage@chordless-app.iam.gserviceaccount.com`.
 - There are no users yet. The move is as cheap as it will ever be: the only data is the developer's.
 - The setup is a pile of console clicks nobody could repeat. What Terraform can cover should be in code.
 - The key that can reach every connected team's drive (the service account, docs/SPACES.md,
@@ -46,13 +43,13 @@ dropped; nothing used it).
 Two projects, with ids to be chosen (they are global and permanent: check they are free, and think
 before creating):
 
-| | App project (e.g. `chordless-app`) | Broker project (e.g. `chordless-broker`) |
+| | App project (e.g. `chordless-app`) | Team storage project (e.g. `chordless-team`) |
 |---|---|---|
 | Holds | OAuth consent screen and web client, the Drive and Picker APIs, two API keys | the service account for team-managed storage (and nothing else) |
 | By hand | the consent screen, its brand verification, the web client | the service account key (into a Worker secret) |
 | Terraform | project, enabled APIs, the API keys and their restrictions | project, enabled APIs, the service account |
 
-The broker project can be made at any time, and the spike's item 7 runs in the current project first.
+The team storage project can be made at any time, and the spike's item 7 ran in the old project first (passed).
 
 ## What depends on the current project
 
@@ -64,7 +61,7 @@ Found in the repo; each changes with a new project.
 | The client id and secret | Worker secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`scripts/push-secrets.sh`, `.dev.vars`, DEVELOPERS.md) | the new client's |
 | The sharing key | Worker secret `GOOGLE_API_KEY`: Drive API only, **no** referrer restriction, since the Worker sends none | a new key in the app project |
 | The Picker key | typed on the dev pages today; a public build-time setting in the product, restricted to the Picker API and to `https://chordless.app/*` and the dev address | a new key in the app project |
-| The Picker app id | the project **number**, `376758830135`, in `src/dev/*.js`, the probe page, docs/SPACES.md | the new project number |
+| The Picker app id | the project **number**, in `src/dev/*.js`, the probe page, docs/SPACES.md | the new project number, `818185619377` (done) |
 | Authorised origins and redirect URIs | the web client: `http://localhost:8787`, `https://chordless.app`, the Tailscale funnel address (the sign-in popup uses the page's origin as `redirect_uri`) | the same list on the new client |
 | The consent screen | app name, logo, support email, developer contact, authorised domains (`chordless.app`), scopes `openid email profile drive.file`, **In production**, brand verified | the same, and verified again |
 | Enabled APIs | Drive, Picker; the Gmail download script (`scripts/gmail-download.ts`, a local developer tool) may use this client too: **check** | the same |
@@ -102,7 +99,7 @@ Using the Google provider (from memory: check against its documentation when wri
 
 - **Yes:** the project (with the chosen id), enabled APIs (`google_project_service`), service
   accounts and their roles, API keys with their restrictions (`google_apikeys_key`), organisation
-  policy overrides (for example allowing service account keys on the broker project).
+  policy overrides (for example allowing service account keys on the team storage project).
 - **No:** the consent screen and its verification, and the web OAuth client (the provider has only
   the IAP kind); adding the service account to a shared drive (a Drive admin action); the Worker and
   its secrets (`wrangler`'s job).
@@ -115,10 +112,9 @@ Using the Google provider (from memory: check against its documentation when wri
 
 **0. Decide, and prepare (can start now; the long pole is Google's verification).**
 Choose the ids (and the display names); one project or two (above); whether they sit under an
-organisation or folder. `gcloud` and Terraform are pinned in `mise.toml`. **Recorded** (`infra/google/main.tf`), so it can be
-copied: `gcloud services list --enabled --project=setalight`, `gcloud services api-keys list`,
-`gcloud iam service-accounts list`, and by eye the consent screen and the client (app name, logo,
-support email, domains, scopes, origins, redirect URIs). Never the client secret or a key.
+organisation or folder. `gcloud` and Terraform are pinned in `mise.toml`. What the old project had was recorded by hand to copy from: the enabled APIs, the API keys, the
+service accounts, and by eye the consent screen and the client (app name, logo, support email,
+domains, scopes, origins, redirect URIs). Never the client secret or a key.
 
 **1. The new app project, in Terraform:** the project, the APIs, the Drive-only sharing key (no
 referrer) and the Picker key (Picker API only; referrers for chordless.app and the dev address).
@@ -137,19 +133,17 @@ remake the share links (above); run
 `just format lint test`, the Drive sync tests against a real Drive, a share link end to end, and
 the Picker with the new app id.
 
-**5. Retire the old project:** after a week of use, delete it (Google keeps a deleted project
-recoverable for 30 days). Until then it is the way back.
+**5. Retire the old project:** deleted on 2026-10-21 (Google keeps a deleted project for 30 days,
+then removes it for good).
 
-**6. The broker project:** Terraform for the project, APIs and the service account; the key by hand
+**6. The team storage project:** Terraform for the project, APIs and the service account; the key by hand
 into a Worker secret; add the service account to the shared drive as Content manager. (Spike item 7
 proves it first, in the current project.)
 
 ## Rollback
 
-The old project and client stay untouched until step 5, so going back is a matter of putting the old
-client id (in git history, `src/js/google-auth.ts` before the switch commit) and the old client's id, secret and
-Sharing Key (from the old project's console) back, in the code and as Worker secrets. The only thing that cannot be undone is the data written under the new
-client, which is why the old Drive folders are kept until the move is checked.
+None: the old project is dead and is not a way back. The data written under the new client is the
+only data; keep an export (docs/SPACES.md, "Export and import") as the backup.
 
 ## Decisions
 
@@ -158,10 +152,10 @@ Made (2026-10-20):
 - **Ids and names:** the app project is `chordless-app` (`chordless` was taken); the service account is
   `team-storage` (6 to 30 characters, and an admin sees `team-storage@…` in their shared drive's
   members, so it says what it is).
-- **No organisation.** The Google account has none, as with `setalight`.
+- **No organisation.** The Google account has none.
 - **Terraform**, not OpenTofu, with local state in `infra/` (gitignored, cheap to lose: `infra/README.md`).
 
 Still open:
 
-- Whether the service account moves to its own broker project (step 6), and what that project is called.
+- Whether the service account moves to its own team storage project (step 6), and what that project is called.
 - Whether the Gmail download script has its own client or uses this one.

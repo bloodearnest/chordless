@@ -2,13 +2,12 @@
 
 The slow-changing setup around the app, captured as code on 2026-10-20 from what was already
 there: nothing was created, each resource is imported (`import` blocks). Two stacks, each with its
-own state, so a mistake in one cannot touch the other. A third, `google-chordless/`, was
-added the same day and is the only one that created what it holds (the others only imported).
+own state, so a mistake in one cannot touch the other. `google-chordless/` created what it holds;
+`cloudflare/` only imported.
 
 | Stack | Holds |
 |---|---|
 | `cloudflare/` | the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
-| `google/` | the old `setalight` project (named `chordless-old` since 2026-10-20; its id cannot change), the Drive and Picker APIs, the Team Key (Picker, from our origins) and Sharing Key (Drive only; the Worker's `GOOGLE_API_KEY`), the `broker` service account; the 17 default APIs (BigQuery, Cloud Storage, ...) are switched off by a `removed` block |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
 
 ## Who owns what
@@ -33,7 +32,7 @@ added the same day and is the only one that created what it holds (the others on
     #               DNS, Zone Settings, Zone, Email Routing Rules; limited to chordless.app)
     CLOUDFLARE_API_TOKEN=... mise exec -- terraform plan
 
-    # google/ and google-chordless/ (the same)
+    # google-chordless/ (the same)
     gcloud auth login
     GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform plan
 

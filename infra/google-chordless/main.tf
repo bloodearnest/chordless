@@ -1,6 +1,5 @@
-# Google Cloud config for the `chordless-app` project, the app project that replaces `setalight`
-# (docs/CLOUD_MIGRATION.md). Created by Terraform, not imported, so it runs in parallel to
-# infra/google/ with its own state.
+# Google Cloud config for the `chordless-app` project, the app project (docs/CLOUD_MIGRATION.md).
+# Created by Terraform, not imported.
 #
 # NOT here: the OAuth consent screen and the web OAuth client (the provider cannot manage them),
 # the service account's key (it would land in the state file: made by hand, kept in a Worker
