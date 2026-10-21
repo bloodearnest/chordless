@@ -6,6 +6,13 @@ editing
   set (a key change there is lost when the set updates): see docs/SPACES.md, "Read-only"
 - song notes/stickies
 
+song data
+- feature idea: song structure.  Have an translucent overlay on the top right
+  that shows intended structure vertically e.g. "v1 c1 v2 c2 x2 b1 x4 c1". We
+  could fill in a default by guessing based on source chordpro, but users
+  should be able to edit it per setlists, as they might structure things
+  differently.  
+
 information UI
  - show leader in setlist page
 
