@@ -122,6 +122,17 @@ isolate's memory for its hour, made once for a whole batch) and says "sharing is
 blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`) as a 409. A service account
 would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from the Durable Object, then Drive with the owner's token, with the refs each listing shows noted. Spaces are made and joined through `team-admin.ts` (docs/SPACES.md), not through this API.
 
+**On the device (built 2026-10-21):** a space shared with a team has `team: {id, role}` on its
+record (`Space.team`). `storageFor(space)` (`storage/space-storage.ts`) gives the backend: Drive for
+a space of one's own and for the owner of a team space, `TeamStorage` for anyone else, whose
+`rootRef` is the team space id. `createSyncManager`, `isSyncAvailable` and the folder check
+(`space-access.ts`) use it, so a member's sync, availability and read-only state (the role's
+`canWrite`) come from the Worker. `team-client.ts` is the page's end of the Worker's routes
+(`teamApi`), and `team-spaces.ts` has `shareSpace` (the owner: the space keeps its folder and files
+and gets an id) and `joinSpace` (a member: a space named as the team calls it, rooted at the team
+id). A member's local rename is theirs: `TeamStorage.renameRoot` does nothing. No page uses these
+yet.
+
 How each call maps:
 - `list`, `inventory`, `status`, `readText`, `create`, `createMany`, `update`: straight through;
   writes need writer or above.
