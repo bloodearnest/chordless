@@ -3,7 +3,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { formatSyncTime, lastSyncOf } from '../js/last-sync.ts'
-import { spaceRole, spaceTitle } from '../js/space-label.ts'
+import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { syncSpaceNow } from '../js/space-sync.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
@@ -31,10 +31,21 @@ export class SpaceSwitchEvent extends Event {
   }
 }
 
+/** A person asked to manage this space: the page shows everything to do with it in a modal */
+export class SpaceManageEvent extends Event {
+  static readonly type = 'space-card:manage'
+  readonly spaceId: string
+  constructor(spaceId: string) {
+    super(SpaceManageEvent.type, { bubbles: true, composed: true })
+    this.spaceId = spaceId
+  }
+}
+
 /**
- * One space on the Account and Teams page (docs/ACCOUNT.md): what it is called, how big it is, when
- * it last synced, and the two things done most: sync it, and switch to it. Everything else is on its
- * own page ("Manage").
+ * One space on the Account and Teams page (docs/ACCOUNT.md): its name, with what kind it is (and
+ * the person's role in a Team) as labels on the right, how big it is, when it last synced, and the
+ * things done most: switch to it, sync it. Everything else is under "Manage", which asks the page
+ * to show it in a modal.
  */
 export class SpaceCard extends LitElement {
   static override properties = {
@@ -83,14 +94,20 @@ export class SpaceCard extends LitElement {
       }
       .head {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         gap: 0.75rem;
         flex-wrap: wrap;
       }
       .title { font-weight: 600; font-size: var(--font-ui); overflow-wrap: anywhere; }
-      .role { font-size: var(--font-ui-small); opacity: 0.75; }
+      .labels { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+      .chip {
+        font-size: var(--font-ui-small);
+        padding: 0.1rem 0.6rem;
+        border: 1px solid var(--panel-border, var(--tint, #ccc));
+        border-radius: 999px;
+        opacity: 0.85;
+      }
       .badge {
-        margin-left: auto;
         font-size: var(--font-ui-small);
         font-weight: 600;
         color: var(--color-primary, #2477ad);
@@ -98,7 +115,6 @@ export class SpaceCard extends LitElement {
       .line { font-size: var(--font-ui-small); opacity: 0.8; margin: 0; }
       .line.error { color: var(--color-danger, #e74c3c); opacity: 1; }
       .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
-      a.btn { text-decoration: none; }
     `,
   ]
 
@@ -154,7 +170,7 @@ export class SpaceCard extends LitElement {
 
   async _switch(): Promise<void> {
     const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${spaceTitle(this.space)}"? This reloads the page.`
+    modal.message = `Switch to "${this.space.name}"? This reloads the page.`
     if (await modal.ask()) this.dispatchEvent(new SpaceSwitchEvent(this.space.id))
   }
 
@@ -176,14 +192,18 @@ export class SpaceCard extends LitElement {
 
   override render() {
     const space = this.space
+    const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
     return html`
       <div class="card ${this.current ? 'current' : ''}">
         <div class="head">
-          <span class="title">${spaceTitle(space)}</span>
-          ${role ? html`<span class="role">${role}</span>` : nothing}
-          ${this.current ? html`<span class="badge">Current</span>` : nothing}
+          <span class="title">${space.name}</span>
+          <span class="labels">
+            ${kind ? html`<span class="chip">${kind}</span>` : nothing}
+            ${role ? html`<span class="chip">${role}</span>` : nothing}
+            ${this.current ? html`<span class="badge">Current</span>` : nothing}
+          </span>
         </div>
         <p class="line">
           ${
@@ -201,18 +221,20 @@ export class SpaceCard extends LitElement {
         </p>
         <div class="actions">
           ${
+            this.current
+              ? nothing
+              : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
+          }
+          ${
             this._canSync
               ? html`<button class="btn primary" id="sync" ?disabled=${this._syncing} @click=${this._sync}>
                 Sync
               </button>`
               : nothing
           }
-          ${
-            this.current
-              ? nothing
-              : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
-          }
-          <a class="btn" id="manage" href="/account/${encodeURIComponent(space.id)}">Manage</a>
+          <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
+            Manage
+          </button>
         </div>
       </div>
       <app-modal

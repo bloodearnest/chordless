@@ -1,17 +1,17 @@
 /**
- * One space's page (space-page.ts): what it shows for a Personal space and for a Team, switching,
- * and deleting from this device. The sign-in is the fake service worker's, Drive a fake Drive, and
- * the router a stand-in that notes where the page went.
+ * Managing one space (space-manager.ts): what it shows for a Personal space and for a Team,
+ * switching, and deleting from this device. The sign-in is the fake service worker's and Drive a
+ * fake Drive.
  */
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { SpaceImportedEvent } from '../src/components/space-export-panel.ts'
-import type { SpacePage } from '../src/components/space-page.ts'
-import '../src/components/space-page.ts'
+import { SpaceGoneEvent, type SpaceManager } from '../src/components/space-manager.ts'
+import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
+import '../src/components/space-manager.ts'
 import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { forgetSync } from '../src/js/last-sync.ts'
-import { setRouter } from '../src/js/navigation.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
   createSpace,
@@ -32,28 +32,21 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-describe('space-page', () => {
+describe('space-manager', () => {
   let drive: ReturnType<typeof installFakeDrive>
   let uninstallWorker: () => void
   let before: { id: string | null; name: string }
-  let went: string[]
+  let gone: number
   const made: string[] = []
 
   beforeEach(() => {
     drive = installFakeDrive()
     ;({ uninstall: uninstallWorker } = installFakeAuthWorker())
     before = getCurrentSpace()
-    went = []
-    setRouter({
-      navigate: async url => {
-        went.push(url)
-        return true
-      },
-    })
+    gone = 0
   })
 
   afterEach(async () => {
-    setRouter(null)
     drive.uninstall()
     uninstallWorker()
     for (const id of made.splice(0)) {
@@ -78,15 +71,21 @@ describe('space-page', () => {
   }
 
   async function page(spaceId: string) {
-    const el = await fixture<SpacePage>(html`<space-page .spaceId=${spaceId}></space-page>`)
+    const el = await fixture<SpaceManager>(
+      html`<space-manager .spaceId=${spaceId}></space-manager>`
+    )
+    el.addEventListener(SpaceGoneEvent.type, () => gone++)
     for (let i = 0; i < 100 && !el._summary && !el._missing; i++) await wait(20)
     await el.updateComplete
     return el
   }
-  const text = (el: SpacePage) => (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
-  const has = (el: SpacePage, selector: string) => el.shadowRoot?.querySelector(selector) !== null
+  const labels = (el: SpaceManager) =>
+    Array.from(el.shadowRoot?.querySelectorAll('.chip') ?? []).map(chip => chip.textContent?.trim())
+  const text = (el: SpaceManager) => (el.shadowRoot?.textContent ?? '').replace(/\s+/g, ' ')
+  const has = (el: SpaceManager, selector: string) =>
+    el.shadowRoot?.querySelector(selector) !== null
 
-  async function answer(el: SpacePage, heading: string, confirm: boolean) {
+  async function answer(el: SpaceManager, heading: string, confirm: boolean) {
     const modal = must(el.shadowRoot?.querySelector<AppModal>(`app-modal[heading="${heading}"]`))
     for (let i = 0; i < 50 && !modal.open; i++) await wait(20)
     await modal.updateComplete
@@ -98,10 +97,9 @@ describe('space-page', () => {
     return modal
   }
 
-  it('says there is no such space, and the way back, for an id this device does not have', async () => {
+  it('says there is no such space for an id this device does not have', async () => {
     const el = await page('no-such-space')
     expect(text(el)).to.contain('no such Personal space or Team')
-    expect(el.shadowRoot?.querySelector('a.back')?.getAttribute('href')).to.equal('/account')
   })
 
   it('shows a Personal space: what it holds, sync, export and import, and delete; no people', async () => {
@@ -109,7 +107,7 @@ describe('space-page', () => {
     const other = await space('Other')
     await setCurrentSpace(other.id, other.name)
     const el = await page(mine.id)
-    expect(text(el)).to.contain(`${mine.name} ~ Personal`)
+    expect(labels(el)).to.deep.equal(['Personal'])
     expect(text(el)).to.match(/1 song · 0 setlists · about \d+ B/)
     expect(has(el, 'drive-sync-panel')).to.equal(true)
     expect(has(el, 'space-export-panel')).to.equal(true)
@@ -118,12 +116,25 @@ describe('space-page', () => {
     expect(has(el, '#switch')).to.equal(true)
   })
 
+  it('labels nothing for a personal space that is still called Personal', async () => {
+    const created = await createSpace('Personal')
+    made.push(created.id)
+    const el = await page(created.id)
+    expect(labels(el)).to.deep.equal([])
+  })
+
   it('shows a Team’s people as well, and says what the person is in it', async () => {
     const team = await space('Team', { team: { id: 'space-gggg7777', role: 'owner' } })
     const el = await page(team.id)
-    expect(text(el)).to.contain(`${team.name} ~ Team`)
-    expect(text(el)).to.contain('owner')
+    expect(labels(el)).to.deep.equal(['Team', 'owner'])
     expect(has(el, 'team-share-panel')).to.equal(true)
+  })
+
+  it('says it is gone when the person leaves the Team', async () => {
+    const team = await space('Team', { team: { id: 'space-kkkk1111', role: 'writer' } })
+    const el = await page(team.id)
+    must(el.shadowRoot?.querySelector('team-share-panel')).dispatchEvent(new TeamShareLeftEvent())
+    expect(gone).to.equal(1)
   })
 
   it('gives a Team member the Team sync, which needs no Drive', async () => {
@@ -214,7 +225,7 @@ describe('space-page', () => {
       }
       must(el.shadowRoot?.querySelector<HTMLButtonElement>('#switch')).click()
       const modal = await answer(el, 'Switch?', true)
-      expect(modal.message).to.contain(`Switch to "${mine.name} ~ Personal"?`)
+      expect(modal.message).to.contain(`Switch to "${mine.name}"?`)
       for (let i = 0; i < 50 && reloads === 0; i++) await wait(20)
       expect(reloads).to.equal(1)
       expect(getCurrentSpace().id).to.equal(mine.id)
@@ -233,18 +244,18 @@ describe('space-page', () => {
   })
 
   describe('deleting from this device', () => {
-    it('asks first, saying Drive is not touched, then deletes only that one and goes back to the list', async () => {
+    it('asks first, saying Drive is not touched, then deletes only that one and says it is gone', async () => {
       const mine = await space('Mine')
       const other = await space('Other')
       await setCurrentSpace(other.id, other.name)
       const el = await page(mine.id)
       must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
       const modal = await answer(el, 'Delete from this device?', true)
-      expect(modal.message).to.contain(`Delete "${mine.name} ~ Personal" from this device?`)
+      expect(modal.message).to.contain(`Delete "${mine.name}" from this device?`)
       expect(modal.message).to.contain('folder in Google Drive is not touched')
       expect(modal.message).to.not.contain('You stay in the Team')
-      for (let i = 0; i < 50 && went.length === 0; i++) await wait(20)
-      expect(went).to.deep.equal(['/account'])
+      for (let i = 0; i < 50 && gone === 0; i++) await wait(20)
+      expect(gone).to.equal(1)
       expect(await getSpaceById(mine.id)).to.equal(undefined)
       expect(await getSpaceById(other.id)).to.not.equal(undefined)
     })
@@ -263,7 +274,7 @@ describe('space-page', () => {
       must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).click()
       await answer(el, 'Delete from this device?', false)
       await wait(50)
-      expect(went).to.deep.equal([])
+      expect(gone).to.equal(0)
       expect(await getSpaceById(mine.id)).to.not.equal(undefined)
     })
 
@@ -278,7 +289,7 @@ describe('space-page', () => {
         await answer(el, 'Delete from this device?', true)
         for (let i = 0; i < 50 && !text(el).includes('disk full'); i++) await wait(20)
         expect(text(el)).to.contain('Failed to delete it: disk full')
-        expect(went).to.deep.equal([])
+        expect(gone).to.equal(0)
       } finally {
         proto.deleteSpace = real
       }
@@ -305,9 +316,9 @@ describe('space-page', () => {
     const one = await space('One')
     const two = await space('Two')
     const el = await page(one.id)
-    expect(text(el)).to.contain(`${one.name} ~ Personal`)
+    expect(el._space?.name).to.equal(one.name)
     el.spaceId = two.id
-    for (let i = 0; i < 50 && !text(el).includes(two.name); i++) await wait(20)
-    expect(text(el)).to.contain(`${two.name} ~ Personal`)
+    for (let i = 0; i < 50 && el._space?.name !== two.name; i++) await wait(20)
+    expect(el._space?.name).to.equal(two.name)
   })
 })

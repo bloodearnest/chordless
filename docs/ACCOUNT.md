@@ -6,12 +6,12 @@ people see are in docs/SPACES.md, "Naming": the UI says Personal and Team, the c
 say space.
 
 Where the code is: `account-page.ts` (the list), `account-card.ts` (the account), `space-card.ts`
-(one space on the list), `space-page.ts` (one space's page), `storage-summary.ts` (the device), and
+(one space on the list), `space-manager.ts` (everything to do with one space, shown in a modal), `storage-summary.ts` (the device), and
 `media-page.ts` (the media player and the pad sets). `/storage` still opens the page (an alias in
 `router.ts`). The panels for sync, export and import and people take the space they are given
 (`drive-sync-panel.ts`, `space-export-panel.ts`, `team-share-panel.ts`), and a sync manager made for
 a space works on that space, not the one in use (`drive-sync.ts`). Differences from the sketch
-below: "Manage" on the account is an inline disclosure, not a sheet; a card's Sync button is shown
+above: "Manage" on the account is an inline disclosure, not a sheet; a card's Sync button is shown
 for any space once syncing can work, and the card runs the sync itself (`space-sync.ts`).
 
 ## Why it changes
@@ -42,11 +42,11 @@ Account and Teams
 +--------------------------------------------------------+
   signed out: "Not signed in. Your songs stay on this device."  [Sign in with Google]
 
-+- Bea Singer ~ Personal ------------------------ Current +
++- Bea Singer ------------------ [Personal] Current -----+
 | 31 songs - 6 setlists - about 190 KB                    |
 | Synced 5 min ago                      [Sync] [Manage]   |
 +--------------------------------------------------------+
-+- Gateway Church ~ Team - owner -------------------------+
++- Gateway Church ------------- [Team] [owner] ---------+
 | 212 songs - 48 setlists - about 1.4 MB                  |
 | Sign in to sync                    [Switch] [Manage]    |
 +--------------------------------------------------------+
@@ -72,24 +72,33 @@ This device
 - **"Create a new Team"** goes to `/account/new` (the wizard, docs/SPACES.md "Creating a team
   space"). There is no conversion of a personal space.
 
-## One space's page: `/account/<id>`
+## One space's Manage modal
+
+"Manage" on a card opens a modal over the list, like the app's other settings (Preferences, Help, the
+info dialogs): not a page of its own with a back button. Whether the app should move to forward/back
+settings pages everywhere is a decision for the whole app, not for this feature, so this follows what
+it has. The cost is that a space's management has no address of its own.
 
 ```
-< Account and Teams
-Gateway Church ~ Team - owner                                [Switch]
-31 songs - 6 setlists - about 190 KB
-
-Sync     Last synced 5 min ago   [Sync now]   Reset from Google Drive...   Start over...
-Backup   [Export...]  [Import...]
-People   (a Team only) who is in it and their roles, invite someone, invites waiting
-Danger   Delete from this device... - Leave this Team... - Stop sharing...   (those that apply)
++- Gateway Church ---------------------------------------- x -+
+| [Switch]                                  [Team] [owner]     |
+| 31 songs - 6 setlists - about 190 KB                         |
+|                                                              |
+| Sync     Last synced 5 min ago   [Sync now]   Reset...  Start over...
+| Export and import   [Export...]  [Import...]                 |
+| People   (a Team only) who is in it and their roles, invite someone, invites waiting
+| Delete from this device   [Delete...]                        |
++--------------------------------------------------------------+
 ```
 
-It works for any space, not only the one in use, so nothing is switched to be managed. That is
-possible because the first sync takes the space's own database (`syncTeamSpace`), export and delete
-need only that database, and the people and invite calls need only the team id. Every destructive
-action asks first (CLAUDE.md: friction, not prohibition). A Personal space has no People section and
-its Danger section is only Delete.
+The space's name is the modal's heading. On the list, the kind (Personal, Team) and the person's role
+in a Team are labels at the right of the card, and Switch is the first (leftmost) button. It works
+for any space, not only the one in use, so nothing is switched to be managed. That is possible
+because the first sync takes the space's own database (`syncTeamSpace`), export and delete need only
+that database, and the people and invite calls need only the team id. Every destructive action asks
+first (CLAUDE.md: friction, not prohibition). A Personal space has no People section. Deleting a
+space, or leaving a Team, closes the modal (`SpaceGoneEvent`) and the list is read again; closing it
+any other way reads the list again too.
 
 ## Pad sets and the media player: their own page, `/media`
 
@@ -100,7 +109,7 @@ stereo split) and the Pad sets (upload, list, delete). The page shows nothing of
 player is off. The player's own settings popover keeps using the same settings component. Pad sets
 leave the Account and Teams page: they are the account's today (docs/STORAGE_API.md), the one large
 thing in the device's cache, and useful only with the player. When pads become per-space
-(docs/SPACES.md, item 6) they move into each space's page.
+(docs/SPACES.md, item 6) they move into each space's Manage modal.
 
 ## What changes in the code
 
@@ -108,7 +117,7 @@ thing in the device's cache, and useful only with the player. When pads become p
    current-space marker compares ids.
 2. `drive-sync-panel`, `space-export-panel` and `team-share-panel` take a `space` property instead
    of reading the current space; the sync panel runs `syncTeamSpace`-style (the space's own database).
-3. The list page, the space page and the account card/sheet; `/storage` redirects to `/account`; the
+3. The list page, the Manage modal and the account card; `/storage` opens `/account`; the
    seven links to `/storage` (menu, welcome card, sync panel, share dialog, space access, media
    player settings) and the e2e and unit tests move with it.
 4. The routes in docs/ROUTING.md, the naming in docs/SPACES.md and CLAUDE.md (done), and the
@@ -117,4 +126,4 @@ thing in the device's cache, and useful only with the player. When pads become p
 ## Decided
 
 Decided 2026-10-22: there is no "clear everything on this device"; a space is deleted one at a time,
-from its own page, after a confirmation. The media page's menu entry is always shown.
+from its Manage modal, after a confirmation. The media page's menu entry is always shown.

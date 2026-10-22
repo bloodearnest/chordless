@@ -51,17 +51,6 @@ describe('the views of the app shell', () => {
   })
 })
 
-describe('the pages of Account and Teams', () => {
-  it('keeps the space page for the same space, and not for another or for the list', () => {
-    const page = (spaceId: string) => ({ name: 'account-space', spaceId }) as Route
-    const same = views['account-space'].sameView
-    expect(same?.(page('a'), page('a'))).to.equal(true)
-    expect(same?.(page('a'), page('b'))).to.equal(false)
-    expect(same?.({ name: 'account' }, page('a'))).to.equal(false)
-    expect(same?.(page('a'), { name: 'account' })).to.equal(false)
-  })
-})
-
 describe('the about page', () => {
   it('shows the app’s name and what it is, and the policies', async () => {
     const element = await views.about.load({ name: 'about' } as Route)

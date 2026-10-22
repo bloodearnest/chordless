@@ -5,9 +5,15 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { AccountStateEvent } from '../src/components/account-card.ts'
 import type { AccountPage } from '../src/components/account-page.ts'
+import { type AppModal, ModalCloseEvent } from '../src/components/app-modal.ts'
 import '../src/components/account-page.ts'
 import type { SpaceCard } from '../src/components/space-card.ts'
-import { SpaceSwitchEvent, SpaceSyncedEvent } from '../src/components/space-card.ts'
+import {
+  SpaceManageEvent,
+  SpaceSwitchEvent,
+  SpaceSyncedEvent,
+} from '../src/components/space-card.ts'
+import { SpaceGoneEvent } from '../src/components/space-manager.ts'
 import {
   createSpace,
   deleteSpace,
@@ -112,5 +118,76 @@ describe('account-page', () => {
       await wait(20)
     }
     expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
+  })
+
+  describe('managing a space', () => {
+    const modal = (el: AccountPage) => must(el.shadowRoot?.querySelector<AppModal>('app-modal'))
+    const manager = (el: AccountPage) => el.shadowRoot?.querySelector('space-manager') ?? null
+
+    async function manage(el: AccountPage, id: string) {
+      const card = must(cards(el).find(each => each.space.id === id))
+      card.dispatchEvent(new SpaceManageEvent(id))
+      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await el.updateComplete
+    }
+
+    it('opens a modal named for the space, with everything to do with it, over the list', async () => {
+      const first = await space('First')
+      const el = await page()
+      expect(modal(el).open).to.equal(false)
+      expect(manager(el)).to.equal(null)
+
+      await manage(el, first.id)
+      expect(modal(el).open).to.equal(true)
+      expect(modal(el).heading).to.equal(first.name)
+      expect(manager(el)?.spaceId).to.equal(first.id)
+      expect(el.shadowRoot?.querySelector('space-card')).to.not.equal(null)
+    })
+
+    it('goes when closed, and reads the list again, as what was done in it may have changed it', async () => {
+      const first = await space('First')
+      const el = await page()
+      await manage(el, first.id)
+      const renamed = `Renamed ${crypto.randomUUID().slice(0, 8)}`
+      await renameSpace(first.id, renamed)
+      modal(el).close()
+      for (let i = 0; i < 50 && !cards(el).some(card => card.space.name === renamed); i++) {
+        await wait(20)
+      }
+      expect(manager(el)).to.equal(null)
+      expect(cards(el).some(card => card.space.name === renamed)).to.equal(true)
+    })
+
+    it('stays open when a question asked inside it closes', async () => {
+      const first = await space('First')
+      const el = await page()
+      await manage(el, first.id)
+      must(manager(el)).dispatchEvent(new ModalCloseEvent())
+      await wait(50)
+      expect(modal(el).open).to.equal(true)
+      expect(manager(el)).to.not.equal(null)
+    })
+
+    it('closes, and shows the list without it, when the space is gone', async () => {
+      const first = await space('First')
+      await space('Second')
+      const el = await page()
+      await manage(el, first.id)
+      await deleteSpace(first.id)
+      must(manager(el)).dispatchEvent(new SpaceGoneEvent())
+      for (let i = 0; i < 50 && modal(el).open; i++) await wait(20)
+      expect(modal(el).open).to.equal(false)
+      for (let i = 0; i < 50 && cards(el).some(card => card.space.id === first.id); i++) {
+        await wait(20)
+      }
+      expect(cards(el).some(card => card.space.id === first.id)).to.equal(false)
+    })
+
+    it('does nothing for a space that is not on the list', async () => {
+      const el = await page()
+      el.dispatchEvent(new SpaceManageEvent('no-such-space'))
+      await wait(50)
+      expect(modal(el).open).to.equal(false)
+    })
   })
 })

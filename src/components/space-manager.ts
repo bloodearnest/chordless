@@ -4,9 +4,8 @@ import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { forgetSync } from '../js/last-sync.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
-import { goTo } from '../js/navigation.ts'
 import { deleteSpace, getCurrentSpace, getSpaceById, switchSpace } from '../js/space.ts'
-import { spaceRole, spaceTitle } from '../js/space-label.ts'
+import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
 import { formatBytes } from '../js/utils/bytes.ts'
@@ -18,12 +17,23 @@ import { buttonStyles, panelStyles } from './shared-styles.ts'
 import './space-export-panel.ts'
 import './team-share-panel.ts'
 
+/** The space is gone from this device (deleted, or the person left the Team): whoever shows this can close it */
+export class SpaceGoneEvent extends Event {
+  static readonly type = 'space-manager:gone'
+  constructor() {
+    super(SpaceGoneEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 /**
- * One Personal space or Team, and everything to do with it (docs/ACCOUNT.md): sync, export and
- * import, its people (a Team), and deleting it from this device. It works on any space on this
- * device, not only the one in use; switching to it is a button, not a step.
+ * Everything to do with one Personal space or Team (docs/ACCOUNT.md): sync, export and import, its
+ * people (a Team), and deleting it from this device. It is shown in a modal over the list, like the
+ * app's other settings, and works on any space on this device, not only the one in use; switching
+ * to it is a button, not a step. The name is the modal's heading, so it is not repeated here.
+ *
+ * @fires SpaceGoneEvent - when the space is deleted, or the person leaves the Team
  */
-export class SpacePage extends LitElement {
+export class SpaceManager extends LitElement {
   static override properties = {
     spaceId: { type: String },
     _space: { state: true },
@@ -33,7 +43,7 @@ export class SpacePage extends LitElement {
     _error: { state: true },
   }
 
-  /** The space to show (from the address) */
+  /** The space to manage */
   declare spaceId: string
   declare _space: Space | null
   declare _summary: SpaceSummary | null
@@ -64,10 +74,16 @@ export class SpacePage extends LitElement {
         max-width: 800px;
         margin: 0 auto;
       }
-      .back { align-self: flex-start; font-size: var(--font-ui-small); }
-      .head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
-      h2 { font-size: var(--font-ui); margin: 0; overflow-wrap: anywhere; }
-      .role, .meta { font-size: var(--font-ui-small); opacity: 0.75; }
+      .head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+      .spacer { flex: 1; }
+      .chip {
+        font-size: var(--font-ui-small);
+        padding: 0.15rem 0.6rem;
+        border: 1px solid var(--panel-border, var(--tint, #ccc));
+        border-radius: 999px;
+        opacity: 0.85;
+      }
+      .meta { font-size: var(--font-ui-small); opacity: 0.75; margin: 0; }
       .badge { font-weight: 600; color: var(--color-primary, #2477ad); font-size: var(--font-ui-small); }
       .danger-zone {
         border-color: color-mix(in srgb, var(--color-danger, #e74c3c) 40%, transparent);
@@ -122,7 +138,7 @@ export class SpacePage extends LitElement {
   async _switch(): Promise<void> {
     const space = this._space as Space
     const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${spaceTitle(space)}"? This reloads the page.`
+    modal.message = `Switch to "${space.name}"? This reloads the page.`
     if (await modal.ask()) await switchSpace(space.id, this.reload)
   }
 
@@ -130,7 +146,7 @@ export class SpacePage extends LitElement {
     const space = this._space as Space
     const modal = this._deleteModal.value as AppModal
     modal.message =
-      `Delete "${spaceTitle(space)}" from this device? Its songs and setlists here are deleted, and ` +
+      `Delete "${space.name}" from this device? Its songs and setlists here are deleted, and ` +
       'anything not yet synced to Google Drive is lost. Its folder in Google Drive is not touched.' +
       (isTeamMember(space)
         ? ' You stay in the Team: to get it back on this device, ask for a new invite link.'
@@ -141,9 +157,9 @@ export class SpacePage extends LitElement {
     try {
       await deleteSpace(space.id)
       forgetSync(space.id)
-      goTo('/account')
+      this.dispatchEvent(new SpaceGoneEvent())
     } catch (error) {
-      console.error('[SpacePage] Failed to delete the space:', error)
+      console.error('[SpaceManager] Failed to delete the space:', error)
       this._error = errorMessage(error)
     }
   }
@@ -156,25 +172,25 @@ export class SpacePage extends LitElement {
   override render() {
     if (this._missing) {
       return html`<div class="content">
-        <a class="back" href="/account">← Account and Teams</a>
         <div class="panel"><p>This device has no such Personal space or Team. It may have been deleted.</p></div>
       </div>`
     }
     const space = this._space
     if (!space) return html`<div class="content"><p class="hint">Loading…</p></div>`
+    const kind = spaceKind(space)
     const role = spaceRole(space)
     const summary = this._summary
     return html`
       <div class="content">
-        <a class="back" href="/account">← Account and Teams</a>
         <div class="head">
-          <h2>${spaceTitle(space)}</h2>
-          ${role ? html`<span class="role">${role}</span>` : nothing}
           ${
             this._current
               ? html`<span class="badge">Current</span>`
               : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
           }
+          <span class="spacer"></span>
+          ${kind ? html`<span class="chip">${kind}</span>` : nothing}
+          ${role ? html`<span class="chip">${role}</span>` : nothing}
         </div>
         ${
           summary
@@ -221,7 +237,7 @@ export class SpacePage extends LitElement {
             ? html`<team-share-panel
               .space=${space}
               @team-share-panel:changed=${this._refresh}
-              @team-share-panel:left=${() => goTo('/account')}
+              @team-share-panel:left=${() => this.dispatchEvent(new SpaceGoneEvent())}
             ></team-share-panel>`
             : nothing
         }
@@ -254,10 +270,10 @@ export class SpacePage extends LitElement {
     `
   }
 }
-customElements.define('space-page', SpacePage)
+customElements.define('space-manager', SpaceManager)
 
 declare global {
   interface HTMLElementTagNameMap {
-    'space-page': SpacePage
+    'space-manager': SpaceManager
   }
 }

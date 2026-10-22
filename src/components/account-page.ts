@@ -1,30 +1,40 @@
-import { css, html, LitElement } from 'lit'
+import { css, html, LitElement, nothing } from 'lit'
+import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { getCurrentSpace, listSpaces, switchSpace } from '../js/space.ts'
 import { AccountStateEvent } from './account-card.ts'
 import './account-card.ts'
+import type { AppModal } from './app-modal.ts'
+import './app-modal.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
-import { SpaceSwitchEvent, SpaceSyncedEvent } from './space-card.ts'
+import { SpaceManageEvent, SpaceSwitchEvent, SpaceSyncedEvent } from './space-card.ts'
 import './space-card.ts'
+import { SpaceGoneEvent } from './space-manager.ts'
+import './space-manager.ts'
 import './storage-summary.ts'
 
 /**
  * Account and Teams (docs/ACCOUNT.md): who is signed in, then the Personal space and the Teams on
- * this device, each with its size, when it last synced, and sync and switch; everything else for a
- * space is on its own page. Making a Team is rare, so it is under them. The device's own usage is
- * last.
+ * this device, each with its size, when it last synced, and switch and sync; everything else for a
+ * space is under "Manage", in a modal over the list like the app's other settings. Making a Team is
+ * rare, so it is under them. The device's own usage is last.
  */
 export class AccountPage extends LitElement {
   static override properties = {
     _spaces: { state: true },
     _currentId: { state: true },
     _signIn: { state: true },
+    _managing: { state: true },
   }
 
   declare _spaces: Space[]
   declare _currentId: string | null
   declare _signIn: SignInState | null
+  /** The space being managed, while its modal is open */
+  declare _managing: Space | null
+
+  _modal: Ref<AppModal> = createRef()
 
   /** Starts the app afresh in the space switched to (a test gives its own) */
   /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
@@ -72,6 +82,7 @@ export class AccountPage extends LitElement {
     this._spaces = []
     this._currentId = null
     this._signIn = null
+    this._managing = null
   }
 
   override connectedCallback(): void {
@@ -79,6 +90,8 @@ export class AccountPage extends LitElement {
     this.addEventListener(AccountStateEvent.type, this._onAccount)
     this.addEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.addEventListener(SpaceSwitchEvent.type, this._onSwitch)
+    this.addEventListener(SpaceManageEvent.type, this._onManage)
+    this.addEventListener(SpaceGoneEvent.type, this._onGone)
     void this.load()
   }
 
@@ -86,6 +99,8 @@ export class AccountPage extends LitElement {
     this.removeEventListener(AccountStateEvent.type, this._onAccount)
     this.removeEventListener(SpaceSyncedEvent.type, this._onSynced)
     this.removeEventListener(SpaceSwitchEvent.type, this._onSwitch)
+    this.removeEventListener(SpaceManageEvent.type, this._onManage)
+    this.removeEventListener(SpaceGoneEvent.type, this._onGone)
     super.disconnectedCallback()
   }
 
@@ -100,6 +115,29 @@ export class AccountPage extends LitElement {
 
   _onSwitch = (event: Event): void => {
     void switchSpace((event as SpaceSwitchEvent).spaceId, this.reload)
+  }
+
+  /** Show everything to do with a space in a modal */
+  _onManage = async (event: Event): Promise<void> => {
+    const id = (event as SpaceManageEvent).spaceId
+    const space = this._spaces.find(each => each.id === id)
+    if (!space) return
+    this._managing = space
+    await this.updateComplete
+    this._modal.value?.show()
+  }
+
+  /** The space was deleted, or the person left the Team: close its modal, and read the list again */
+  _onGone = (): void => {
+    this._modal.value?.close()
+  }
+
+  /** The modal closed, however: what was done in it may have changed the cards */
+  _onClosed = (event: Event): void => {
+    // (a question asked inside it closes too, and tells the same way: only its own close counts)
+    if (event.target !== this._modal.value) return
+    this._managing = null
+    void this.load()
   }
 
   /** The spaces on this device, the one in use first */
@@ -132,6 +170,18 @@ export class AccountPage extends LitElement {
           <storage-summary></storage-summary>
         </div>
       </div>
+      <app-modal
+        ${ref(this._modal)}
+        size="large"
+        heading=${this._managing?.name ?? ''}
+        @app-modal:close=${this._onClosed}
+      >
+        ${
+          this._managing
+            ? html`<space-manager .spaceId=${this._managing.id} .reload=${this.reload}></space-manager>`
+            : nothing
+        }
+      </app-modal>
     `
   }
 }

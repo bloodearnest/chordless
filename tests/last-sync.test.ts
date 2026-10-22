@@ -1,7 +1,7 @@
 import { expect } from '@open-wc/testing'
 import { forgetSync, formatSyncTime, lastSyncOf, recordSync } from '../src/js/last-sync.ts'
 import { getCurrentSpace } from '../src/js/space.ts'
-import { spaceRole, spaceTitle } from '../src/js/space-label.ts'
+import { spaceKind, spaceRole } from '../src/js/space-label.ts'
 
 const { describe, it, afterEach } = window
 
@@ -44,19 +44,15 @@ describe('when a space last synced', () => {
   })
 })
 
-describe('how a space is named to people', () => {
-  it('is "<name> ~ Personal" for a space of one’s own, and just "Personal" while it has that name', () => {
-    expect(spaceTitle({ name: 'Bea Singer' })).to.equal('Bea Singer ~ Personal')
-    expect(spaceTitle({ name: 'Personal' })).to.equal('Personal')
+describe('how a space is labelled to people', () => {
+  it('is Personal for a space of one’s own, with no label while it is still called Personal', () => {
+    expect(spaceKind({ name: 'Bea Singer' })).to.equal('Personal')
+    expect(spaceKind({ name: 'Personal' })).to.equal(null)
   })
 
-  it('is "<name> ~ Team" for a Team, whatever it is called', () => {
-    expect(spaceTitle({ name: 'Gateway Church', team: { id: 't', role: 'owner' } })).to.equal(
-      'Gateway Church ~ Team'
-    )
-    expect(spaceTitle({ name: 'Personal', team: { id: 't', role: 'writer' } })).to.equal(
-      'Personal ~ Team'
-    )
+  it('is Team for a Team, whatever it is called', () => {
+    expect(spaceKind({ name: 'Gateway Church', team: { id: 't', role: 'owner' } })).to.equal('Team')
+    expect(spaceKind({ name: 'Personal', team: { id: 't', role: 'writer' } })).to.equal('Team')
   })
 
   it('says what the person is in a Team, or that a space is view-only, and nothing for their own', () => {

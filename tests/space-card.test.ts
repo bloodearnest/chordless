@@ -4,7 +4,12 @@
  */
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
-import { type SpaceCard, SpaceSwitchEvent, SpaceSyncedEvent } from '../src/components/space-card.ts'
+import {
+  type SpaceCard,
+  SpaceManageEvent,
+  SpaceSwitchEvent,
+  SpaceSyncedEvent,
+} from '../src/components/space-card.ts'
 import '../src/components/space-card.ts'
 import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
@@ -74,13 +79,39 @@ describe('space-card', () => {
   const button = (el: SpaceCard, id: string) =>
     el.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`)
 
-  it('names the space, says how much is in it, and links to its page', async () => {
+  const labels = (el: SpaceCard) =>
+    Array.from(el.shadowRoot?.querySelectorAll('.chip') ?? []).map(chip => chip.textContent?.trim())
+
+  it('names the space, labels it Personal, and says how much is in it', async () => {
     const el = await card('signed-out')
-    expect(text(el)).to.contain(`${space.name} ~ Personal`)
+    expect(el.shadowRoot?.querySelector('.title')?.textContent).to.equal(space.name)
+    expect(labels(el)).to.deep.equal(['Personal'])
+    expect(text(el)).to.not.contain('~')
     expect(text(el)).to.match(/1 song · 1 setlist · about \d+ B/)
-    expect(el.shadowRoot?.querySelector('a#manage')?.getAttribute('href')).to.equal(
-      `/account/${space.id}`
+  })
+
+  it('labels nothing for a personal space that is still called Personal', async () => {
+    const plain = await make('Personal')
+    const el = await card('signed-out', { space: plain })
+    expect(labels(el)).to.deep.equal([])
+  })
+
+  it('asks the page to show it when told to manage it', async () => {
+    const el = await card('signed-out')
+    const asked: string[] = []
+    el.addEventListener(SpaceManageEvent.type, event =>
+      asked.push((event as SpaceManageEvent).spaceId)
     )
+    must(button(el, 'manage')).click()
+    expect(asked).to.deep.equal([space.id])
+  })
+
+  it('puts Switch first of the buttons, then Sync, then Manage', async () => {
+    const el = await card('signed-in')
+    const order = Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(
+      each => each.id
+    )
+    expect(order).to.deep.equal(['switch', 'sync', 'manage'])
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {
@@ -88,8 +119,8 @@ describe('space-card', () => {
       team: { id: 't-1', role: 'writer' },
     })
     const el = await card('signed-in', { space: team })
-    expect(text(el)).to.contain(`${team.name} ~ Team`)
-    expect(text(el)).to.contain('worship leader')
+    expect(el.shadowRoot?.querySelector('.title')?.textContent).to.equal(team.name)
+    expect(labels(el)).to.deep.equal(['Team', 'worship leader'])
   })
 
   it('marks the space in use, which has no Switch, and gives the others one', async () => {
@@ -203,7 +234,7 @@ describe('space-card', () => {
       )
       must(button(el, 'switch')).click()
       const modal = await answer(el, true)
-      expect(modal.message).to.contain(`Switch to "${space.name} ~ Personal"?`)
+      expect(modal.message).to.contain(`Switch to "${space.name}"?`)
       await wait(50)
       expect(switched).to.deep.equal([space.id])
     })

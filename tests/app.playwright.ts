@@ -68,15 +68,9 @@ test.describe('Themes', () => {
   test('in dark mode a modal is lighter than the page beneath it, and edged', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await seedSong(page)
-    const otherId = await page.evaluate(async () => {
-      const { createSpace } = await import('/js/space.ts')
-      return (await createSpace('Second Org')).id
-    })
-    await page.goto(`/account/${otherId}`)
-    await page.getByRole('button', { name: 'Delete…' }).click()
-    const card = page
-      .locator('space-page app-modal[heading="Delete from this device?"]')
-      .locator('.modal-content')
+    await page.goto('/account')
+    await page.locator('space-card').getByRole('button', { name: 'Manage' }).click()
+    const card = page.locator('account-page > app-modal').locator('.modal-content').first()
     await expect(card).toBeVisible()
     const { cardBg, pageBg, border } = await card.evaluate(element => ({
       cardBg: getComputedStyle(element).backgroundColor,
@@ -304,11 +298,12 @@ test.describe('Account and Teams page', () => {
       '/account/new'
     )
 
-    const other = cards.filter({ hasText: 'Second Org ~ Personal' })
+    const other = cards.filter({ hasText: 'Second Org' })
+    await expect(other).toContainText('Personal') // what kind it is is a label beside its name
     await other.getByRole('button', { name: 'Switch' }).click()
     const modal = other.locator('app-modal')
     await expect(modal).toHaveAttribute('open', '')
-    await expect(modal).toContainText('Switch to "Second Org ~ Personal"?')
+    await expect(modal).toContainText('Switch to "Second Org"?')
     await modal.getByRole('button', { name: 'Cancel' }).click()
     await expect(modal).not.toHaveAttribute('open', '')
     await expect(cards.filter({ hasText: 'Current' })).not.toContainText('Second Org')
@@ -325,27 +320,37 @@ test.describe('Account and Teams page', () => {
     await expect(page.locator('account-card').getByRole('alert')).toContainText('Signing in failed')
   })
 
-  test('works signed out: a space can be managed, and deleting one asks first', async ({
+  test('works signed out: a space is managed in a modal, and deleting one asks first', async ({
     page,
   }) => {
     await seedSong(page, { setlistId: 'delete-test-setlist' })
-    const otherId = await page.evaluate(async () => {
+    await page.evaluate(async () => {
       const { createSpace } = await import('/js/space.ts')
-      return (await createSpace('Second Org')).id
+      await createSpace('Second Org')
     })
-    await page.goto(`/account/${otherId}`)
-    const modal = page.locator('space-page app-modal[heading="Delete from this device?"]')
+    await page.goto('/account')
+    await page
+      .locator('space-card')
+      .filter({ hasText: 'Second Org' })
+      .getByRole('button', { name: 'Manage' })
+      .click()
+    const manage = page.locator('account-page > app-modal')
+    await expect(manage).toHaveAttribute('open', '')
+    await expect(manage).toContainText('Second Org')
+    await expect(page).toHaveURL(/\/account$/) // a modal, not a page: nothing to go back from
+    const confirm = manage.locator('app-modal[heading="Delete from this device?"]')
 
     // Cancelling keeps it
-    await page.getByRole('button', { name: 'Delete…' }).click()
-    await expect(modal).toHaveAttribute('open', '')
-    await modal.getByRole('button', { name: 'Cancel' }).click()
-    await expect(modal).not.toHaveAttribute('open', '')
+    await manage.getByRole('button', { name: 'Delete…' }).click()
+    await expect(confirm).toHaveAttribute('open', '')
+    await confirm.getByRole('button', { name: 'Cancel' }).click()
+    await expect(confirm).not.toHaveAttribute('open', '')
+    await expect(manage).toHaveAttribute('open', '')
 
-    // Confirming deletes it and goes back to the list
-    await page.getByRole('button', { name: 'Delete…' }).click()
-    await modal.getByRole('button', { name: 'Delete', exact: true }).click()
-    await expect(page).toHaveURL(/\/account$/)
+    // Confirming deletes it, closes the modal, and the list no longer has it
+    await manage.getByRole('button', { name: 'Delete…' }).click()
+    await confirm.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(manage).not.toHaveAttribute('open', '')
     await expect(page.locator('space-card')).toHaveCount(1)
     await expect(page.locator('space-card')).toContainText('Current')
   })

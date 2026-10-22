@@ -16,7 +16,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 | `/` | `home` | `home-view.js` |
 | `/songs`, `/songs?q=<search>`, `/songs/<uuid>` | `songs` | `library-view.js` |
 | `/setlist/<id>`, `/setlist/<id>/song/<n>` | `setlist` (`songIndex` -1 is the overview) | `setlist-view.js` |
-| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/account/<space id>`, `/media`, `/preferences`, `/import-song`, `/import-setlist`, `/bookmarklet`, `/join` | by name | `*-view.js` |
+| `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/preferences`, `/import-song`, `/import-setlist`, `/bookmarklet`, `/join` | by name | `*-view.js` |
 | anything else | `not-found` | `not-found-view.js` |
 
 - `js/router.js` is pure: `matchRoute(url)`, `buildUrl(route)`, and `historyAction(from, to,

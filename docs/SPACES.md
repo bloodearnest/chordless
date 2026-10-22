@@ -35,8 +35,8 @@ members of their church. Each space is self-contained, so copyright compliance i
   (`space.ts`), and the `appProperties` of files already in Drive (`organisationId`, read by nothing)
   lose it at their next update.
 - **In the UI, "space" is not used** (decided 2026-10-22: too generic for a menu title). People see
-  **Personal** and **Team**: a personal space's card reads `<name> ~ Personal` and a team's reads
-  `<team name> ~ Team`; the button is "Create a new Team" and the page that lists them is "Account
+  **Personal** and **Team**: a card shows the space's name with a label beside it, Personal or Team
+  (none on a personal space still called "Personal"), and the person's role in a Team; the button is "Create a new Team" and the page that lists them is "Account
   and Teams" (`docs/ACCOUNT.md`). Roles read owner, admin, worship leader (the `writer` role) and
   team member (the `reader` role). The code, the routes of the API and these docs keep "space".
 - Each space also has its own name (a team space is named by its owner; the personal space defaults
@@ -99,7 +99,7 @@ a re-pointing of the folder.
   (`current-space-name`) for synchronous rendering.
 - On first load a default space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
-- **Deleting a space:** a space's own page on Account and Teams (`/account/<id>`), "Delete from this device":
+- **Deleting a space:** a space's Manage modal on Account and Teams, "Delete from this device":
   not available for the space being worked in (switch first), and after a confirmation that names it. It removes the space's record and
   its local database (setlists, songs, charts); nothing in Google Drive is touched, so a folder it
   synced to stays there for the user to delete.

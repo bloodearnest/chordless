@@ -88,8 +88,6 @@ describe('matchRoute', () => {
     // The page was called Storage: its old address still opens it
     ['/storage', { name: 'account' }],
     ['/account/new', { name: 'new-team-space' }],
-    ['/account/abc-123', { name: 'account-space', spaceId: 'abc-123' }],
-    ['/account/a%20b', { name: 'account-space', spaceId: 'a b' }],
 
     // Not a route
     ['/nope', notFound('/nope')],
@@ -117,7 +115,6 @@ describe('buildUrl', () => {
     [{ name: 'songs', songUuid: 'abc-123' }, '/songs/abc-123'],
     [{ name: 'preferences' }, '/preferences'],
     [{ name: 'account' }, '/account'],
-    [{ name: 'account-space', spaceId: 'a b' }, '/account/a%20b'],
     [{ name: 'import-song' }, '/import-song'],
     [{ name: 'bookmarklet' }, '/bookmarklet'],
     [{ name: 'join' }, '/join'],
