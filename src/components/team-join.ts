@@ -10,11 +10,19 @@ import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
 import { switchSpace } from '../js/space.ts'
 import { storageFor } from '../js/storage/space-storage.ts'
 import { TeamError } from '../js/team-client.ts'
-import { joinSpace } from '../js/team-spaces.ts'
+import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
-type State = 'bad-link' | 'checking' | 'sign-in' | 'ready' | 'joining' | 'joined' | 'failed'
+type State =
+  | 'bad-link'
+  | 'checking'
+  | 'sign-in'
+  | 'ready'
+  | 'joining'
+  | 'syncing'
+  | 'joined'
+  | 'failed'
 
 /** The space and the invite's code, from the link's fragment: `#<space id>.<code>` */
 export function parseInvite(fragment: string): { teamId: string; code: string } | null {
@@ -36,6 +44,7 @@ export class TeamJoin extends LitElement {
     _message: { state: true },
     _joined: { state: true },
     _role: { state: true },
+    _syncError: { state: true },
   }
 
   declare _state: State
@@ -45,11 +54,15 @@ export class TeamJoin extends LitElement {
   declare _joined: Space | null
   /** Their role in it, for 'joined' */
   declare _role: string
+  /** Why the first sync did not work, if it did not */
+  declare _syncError: string
 
   /** Starts the app afresh at the home page, once this device has the space (a test gives its own) */
   /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
   // biome-ignore lint/plugin: the database is another space's now, so start afresh
   reload: () => void = () => window.location.assign('/')
+  /** Gets the team's files for the space just joined (a test gives its own) */
+  syncSpace: (space: Space) => Promise<void> = syncTeamSpace
   /** The invite, once the link is read */
   _invite: { teamId: string; code: string } | null = null
   /** The link's fragment (a test gives its own) */
@@ -76,6 +89,7 @@ export class TeamJoin extends LitElement {
     this._message = ''
     this._joined = null
     this._role = ''
+    this._syncError = ''
   }
 
   override connectedCallback(): void {
@@ -147,12 +161,25 @@ export class TeamJoin extends LitElement {
         storageFor({ team: { id: invite.teamId, role: 'reader' } })
       )
       this._joined = joined
-      this._role = (joined.team as TeamLink).role
-      this._state = 'joined'
+      this._role = roleWithArticle((joined.team as TeamLink).role)
     } catch (error) {
       this._message = this._explain(error)
       this._state = error instanceof SignInExpiredError ? 'sign-in' : 'failed'
+      return
     }
+    await this._sync()
+  }
+
+  /** The first sync: the team's songs and setlists come to this device (they are joined either way) */
+  async _sync(): Promise<void> {
+    this._state = 'syncing'
+    this._syncError = ''
+    try {
+      await this.syncSpace(this._joined as Space)
+    } catch (error) {
+      this._syncError = this._explain(error)
+    }
+    this._state = 'joined'
   }
 
   /** What to tell them of a refusal */
@@ -216,14 +243,22 @@ export class TeamJoin extends LitElement {
         `
       case 'joining':
         return html`<p class="status" role="status">Joining…</p>`
+      case 'syncing':
+        return html`<p class="status" role="status">Getting the team's songs and setlists…</p>`
       case 'joined':
         return html`
           <h2>You have joined ${this._joined?.name}</h2>
           <p>
-            The space is on this device, and you are in it as a
-            ${this._role}. Open it to sync the team's songs and setlists.
+            The space is on this device, and you are in it as ${this._role}.
+            ${
+              this._syncError
+                ? "The team's songs and setlists have not come across yet. Open the space and sync to try again."
+                : "The team's songs and setlists are here."
+            }
           </p>
+          ${this._syncError ? html`<p class="status error" role="alert">${this._syncError}</p>` : nothing}
           <div class="actions">
+            ${this._syncError ? html`<button class="btn" @click=${this._sync}>Try again</button>` : nothing}
             <button class="btn primary" @click=${this._open}>Open ${this._joined?.name}</button>
           </div>
         `

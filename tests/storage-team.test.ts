@@ -1,5 +1,9 @@
 import { expect } from '@open-wc/testing'
+import { ChordlessDB } from '../src/js/db.ts'
+import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { TeamStorage, TeamStorageError } from '../src/js/storage/team-storage.ts'
+import { makeSetlist } from './builders.ts'
+import { memoryFolderLink } from './drive-harness.ts'
 import { must } from './must.ts'
 import { describeSpaceStorage } from './storage-conformance.ts'
 import { makeTeamRig, ORIGIN } from './team-context.ts'
@@ -52,6 +56,53 @@ describe('TeamStorage', () => {
         error = e
       })
     expect((error as TeamStorageError).status).to.equal(403)
+  })
+
+  it('says which account and space a refusal was about, to tell a wrong sign-in from a stale space', async () => {
+    const rig = await makeTeamRig()
+    rig.roles.set('stranger', 'none')
+    const encode = (value: object) => btoa(JSON.stringify(value)).replace(/=+$/, '')
+    const token = `${encode({ alg: 'none' })}.${encode({ email: 'bea@example.com' })}.sig`
+    rig.roles.set(token, 'none')
+    const refused = (token: string) =>
+      teamFor(rig, token)
+        .inspectRoot('space-1')
+        .then(
+          () => '',
+          error => (error as Error).message
+        )
+    expect(await refused(token)).to.equal(
+      'Not a member of this space (signed in as bea@example.com, space space-1)'
+    )
+    // (a token with no address in it, or that cannot be read, says only the space)
+    const noEmail = `${encode({ alg: 'none' })}.${encode({ sub: '1' })}.sig`
+    rig.roles.set(noEmail, 'none')
+    expect(await refused(noEmail)).to.equal('Not a member of this space (space space-1)')
+    expect(await refused('stranger')).to.equal('Not a member of this space (space space-1)')
+  })
+
+  it('has a member’s sync keep to the space id, which is the root of a team space, not the folder behind it', async () => {
+    const rig = await makeTeamRig()
+    const db = new ChordlessDB(`test-member-${crypto.randomUUID()}`)
+    await db.init()
+    const folderLink = memoryFolderLink()
+    folderLink.value = 'space-1'
+    const sync = new DriveSyncManager('Team space-1', 'member-space', {
+      db,
+      folderLink,
+      memberCache: { set: async () => {}, setReadOnly: async () => {} } as never,
+      storage: teamFor(rig),
+    })
+    try {
+      await sync.init()
+      expect(sync.rootRef).to.equal('space-1')
+      await db.saveSetlist(makeSetlist({ id: 'from-member', date: '2026-12-20' }))
+      await sync.sync()
+      const there = rig.storage.list(file => file.props.setlistId === 'from-member')
+      expect(there).to.have.length(1)
+    } finally {
+      db.db?.close()
+    }
   })
 
   it('lets a reader read but not write, and counts the refusal', async () => {

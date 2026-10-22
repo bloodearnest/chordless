@@ -5,8 +5,10 @@
  * `storageFor` gives it.
  */
 import type { Setlist, Space, TeamRole } from './data-types.ts'
+import { ChordlessDB } from './db.ts'
 import { getStoredBlob } from './google-auth.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
+import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
 import { teamApi } from './team-client.ts'
 
@@ -77,6 +79,20 @@ const RANK: Record<TeamRole, number> = { reader: 0, writer: 1, admin: 2, owner: 
 /** The roles that can be given to someone, which are the ones below the owner */
 export const GRANTABLE_ROLES = ['reader', 'writer', 'admin'] as const
 
+/**
+ * What a role is called to people: the roles are the Worker's (a reader may only read, a writer may
+ * change files), but a church knows them as team members and worship leaders.
+ */
+export function roleLabel(role: TeamRole): string {
+  return { owner: 'owner', admin: 'admin', writer: 'worship leader', reader: 'team member' }[role]
+}
+
+/** A role as part of a sentence: "a worship leader", "an admin" */
+export function roleWithArticle(role: TeamRole): string {
+  const label = roleLabel(role)
+  return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
+}
+
 /** Whether a role may act on another (change it, remove it, invite to it): only on those below it */
 export function outranks(mine: TeamRole, target: TeamRole): boolean {
   return RANK[mine] > RANK[target]
@@ -132,4 +148,23 @@ export function leadersOf(setlists: Setlist[], own?: string | null): Leader[] {
     leaders.push({ name: name || (email as string), email })
   }
   return leaders.sort((a, b) => Number(Boolean(b.email)) - Number(Boolean(a.email)))
+}
+
+/**
+ * Bring a team space's files into step with the team's: the first sync of a space just made or
+ * joined, so the songs and setlists are on this device (for a member) or in the team's folder (for
+ * the owner) before anyone is told it is ready. The space is not the one in use yet, so its own
+ * database is given to the sync: left to itself the sync works on the space in use.
+ */
+export async function syncTeamSpace(space: Space): Promise<void> {
+  const { DriveSyncManager } = await import('./drive-sync.ts')
+  const db = new ChordlessDB(space.id)
+  await db.init()
+  try {
+    const manager = new DriveSyncManager(space.name, space.id, { db, storage: storageFor(space) })
+    await manager.init()
+    await manager.sync()
+  } finally {
+    db.db?.close()
+  }
 }

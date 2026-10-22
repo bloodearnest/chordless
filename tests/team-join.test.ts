@@ -67,6 +67,8 @@ describe('the join page', () => {
   let signInAnswer: () => Response
   let page: TeamJoin
   let reloads: number
+  let synced: string[]
+  let syncFails: boolean
   let before: { id: string | null; name: string }
   const made: string[] = []
 
@@ -102,6 +104,10 @@ describe('the join page', () => {
     page.reload = () => {
       reloads++
     }
+    page.syncSpace = async space => {
+      synced.push(space.name)
+      if (syncFails) throw new Error('Drive is not answering')
+    }
     document.body.append(page)
     await page.updateComplete
   }
@@ -110,6 +116,8 @@ describe('the join page', () => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     before = getCurrentSpace()
     reloads = 0
+    synced = []
+    syncFails = false
     requested = []
     codeResponse = { code: 'the-code' }
     signInAnswer = () =>
@@ -194,9 +202,26 @@ describe('the join page', () => {
 
     button('Join the team space').click()
     await until(() => text().includes('You have joined'), 'to be joined')
-    expect(text()).to.contain('as a writer')
+    expect(text()).to.contain('as a worship leader')
+    expect(text()).to.contain("The team's songs and setlists are here")
+    expect(synced).to.have.length(1)
     expect(requested).to.include('POST /api/spaces/join')
     expect((await listSpaces()).some(space => space.team?.id === TEAM)).to.equal(true)
+  })
+
+  it('joins all the same when the first sync does not work, and offers to try again', async () => {
+    syncFails = true
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes('You have joined'), 'to be joined')
+    expect(text()).to.contain('have not come across yet')
+    expect(text()).to.contain('Drive is not answering')
+
+    syncFails = false
+    button('Try again').click()
+    await until(() => text().includes("The team's songs and setlists are here"), 'synced')
+    expect(synced).to.have.length(2)
   })
 
   it('works when the sign-in has no profile to show: it does not say who they are', async () => {

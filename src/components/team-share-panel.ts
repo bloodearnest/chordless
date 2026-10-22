@@ -7,6 +7,8 @@ import {
   inviteLink,
   leaveSpace,
   outranks,
+  roleLabel,
+  roleWithArticle,
   stopSharing,
 } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -264,7 +266,7 @@ export class TeamSharePanel extends LitElement {
   _renderTeam(mine: TeamRole) {
     const canInvite = outranks(mine, 'writer')
     return html`
-      <p>You are ${mine === 'owner' ? 'the owner of' : `a${mine === 'admin' ? 'n' : ''} ${mine} in`} this team space.</p>
+      <p>You are ${mine === 'owner' ? 'the owner of' : `${roleWithArticle(mine)} in`} this team space.</p>
       <h4>People</h4>
       <ul class="people">${this._members.map(member => this._renderMember(member, mine))}</ul>
       ${canInvite ? this._renderInvites(mine) : nothing}
@@ -301,14 +303,15 @@ export class TeamSharePanel extends LitElement {
                 )}
             >
               ${this._grantable(mine).map(
-                each => html`<option value=${each} ?selected=${each === role}>${each}</option>`
+                each =>
+                  html`<option value=${each} ?selected=${each === role}>${roleLabel(each)}</option>`
               )}
             </select>
             <button class="btn" ?disabled=${this._busy} @click=${() => this._remove(member.email)}>
               Remove
             </button>
           `
-          : html`<span class="role">${role}</span>`
+          : html`<span class="role">${roleLabel(role)}</span>`
       }
     </li>`
   }
@@ -335,7 +338,8 @@ export class TeamSharePanel extends LitElement {
         />
         <select ${ref(this._inviteRole)} aria-label="Their role">
           ${this._grantable(mine).map(
-            each => html`<option value=${each} ?selected=${each === 'writer'}>${each}</option>`
+            each =>
+              html`<option value=${each} ?selected=${each === 'writer'}>${roleLabel(each)}</option>`
           )}
         </select>
         <button class="btn primary" type="submit" ?disabled=${this._busy}>Make the invite</button>
@@ -358,7 +362,7 @@ export class TeamSharePanel extends LitElement {
               ${this._invites.map(
                 invite => html`<li>
                   <span class="who">${invite.email}</span>
-                  <span class="role">${invite.role}, until ${new Date(invite.expiresAt).toLocaleDateString()}</span>
+                  <span class="role">${roleLabel(invite.role)}, until ${new Date(invite.expiresAt).toLocaleDateString()}</span>
                   <button class="btn" ?disabled=${this._busy} @click=${() => this._revoke(invite.id)}>
                     Withdraw
                   </button>

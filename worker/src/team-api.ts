@@ -129,7 +129,9 @@ export async function handleTeamRequest(
     if (method === 'GET' && rest === '/root') {
       const root = await context.root(spaceId)
       if (!root) return jsonResponse({ error: 'No such space' }, 404)
-      return jsonResponse({ ...root, canWrite: atLeast(role, 'writer') })
+      // (the ref a member knows the space by is the space's id: the folder behind it is the
+      // owner's business, and every later call is made to the id a root names)
+      return jsonResponse({ ...root, ref: spaceId, canWrite: atLeast(role, 'writer') })
     }
     if (method === 'GET' && rest === '/members') {
       const members: SpaceMember[] = await space.members()

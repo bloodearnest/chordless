@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { TeamLink } from '../js/data-types.ts'
 import { type Invite, teamApi } from '../js/team-client.ts'
-import { GRANTABLE_ROLES, inviteLink, type Leader } from '../js/team-spaces.ts'
+import { GRANTABLE_ROLES, inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -154,6 +154,10 @@ export class TeamInviteStep extends LitElement {
         }
         You get a link for each, to send yourself: it works once, for a week, and only for that account.
       </p>
+      <p class="hint">
+        A worship leader can edit songs and setlists, a team member can see them, and an admin can
+        also look after the people.
+      </p>
       <ul>
         ${this._entries.map(
           entry => html`<li>
@@ -178,7 +182,7 @@ export class TeamInviteStep extends LitElement {
             >
               ${GRANTABLE_ROLES.map(
                 role =>
-                  html`<option value=${role} ?selected=${role === entry.role}>${role}</option>`
+                  html`<option value=${role} ?selected=${role === entry.role}>${roleLabel(role)}</option>`
               )}
             </select>
           </li>`

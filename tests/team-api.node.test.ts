@@ -100,6 +100,14 @@ test('answers the reads of every member', async () => {
   assert.equal((await call(rig, 'GET', '/root', as)).json().canWrite, false)
 })
 
+test("says a space's root is the space itself, not the folder in the storage behind it", async () => {
+  const rig = await makeTeamRig()
+  const root = (await call(rig, 'GET', '/root')).json()
+  assert.equal(root.ref, 'space-1')
+  assert.notEqual(root.ref, rig.spaces[0].root)
+  assert.equal(root.name, 'Team space-1')
+})
+
 test('writes: create, update and trash a file; unpublish is not served', async () => {
   const rig = await makeTeamRig()
   const made = (

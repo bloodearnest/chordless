@@ -21,7 +21,13 @@ import {
   type TransferReport,
 } from '../js/space-transfer.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
-import { createTeamSpace, type Leader, leadersOf, type TeamFolders } from '../js/team-spaces.ts'
+import {
+  createTeamSpace,
+  type Leader,
+  leadersOf,
+  syncTeamSpace,
+  type TeamFolders,
+} from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -51,6 +57,8 @@ export class TeamSpaceWizard extends LitElement {
     _mode: { state: true },
     _report: { state: true },
     _bringError: { state: true },
+    _syncError: { state: true },
+    _stage: { state: true },
     _leaders: { state: true },
   }
 
@@ -73,15 +81,24 @@ export class TeamSpaceWizard extends LitElement {
   declare _report: TransferReport | null
   /** Why bringing them across did not work, if it did not */
   declare _bringError: string
+  /** Why saving the new space to Google Drive did not work, if it did not */
+  declare _syncError: string
+  /** What is being done, while the space is being made */
+  declare _stage: string
   /** The people the brought setlists name as leaders, to suggest inviting */
   declare _leaders: Leader[]
   /** What each of the sources holds */
   _counts: Map<string, Contents> = new Map()
+  /** Where the work after the space is made has got to */
+  _brought = false
+  _saved = false
   _modal: Ref<AppModal> = createRef()
 
   /** The folder chooser, Drive, and starting the app afresh in the new space (tests give their own) */
   pick: () => Promise<PickedFolder | null> = () => pickFolder()
   folders: TeamFolders = driveApi
+  /** Saves the new space's songs and setlists to Drive for the team to get (a test gives its own) */
+  syncSpace: (space: Space) => Promise<void> = syncTeamSpace
   /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
   // biome-ignore lint/plugin: the database is another space's now, so start afresh
   reload: () => void = () => window.location.assign('/')
@@ -123,6 +140,8 @@ export class TeamSpaceWizard extends LitElement {
     this._mode = 'move'
     this._report = null
     this._bringError = ''
+    this._syncError = ''
+    this._stage = ''
     this._leaders = []
   }
 
@@ -195,6 +214,7 @@ export class TeamSpaceWizard extends LitElement {
     if (!this._name.trim() || !this._parent) return
     if (this._moves && !(await this._sureOfMove())) return
     this._message = ''
+    this._stage = 'Making the space…'
     this._state = 'creating'
     try {
       this._created = await createTeamSpace(this._name, this._parent.id, this.folders)
@@ -203,9 +223,36 @@ export class TeamSpaceWizard extends LitElement {
       this._state = 'form'
       return
     }
-    // (the space is made: whatever goes wrong now is about bringing things across, and can be tried again)
-    await this._bring()
+    // (the space is made: whatever goes wrong now can be tried again)
+    await this._finish()
+  }
+
+  /**
+   * What is left to do once the space is made: bring the songs and setlists across, then save them
+   * to Drive so the team gets them when they join. Each is done once; this picks up where it stopped.
+   */
+  async _finish(): Promise<void> {
+    this._state = 'creating'
+    if (!this._brought) {
+      this._stage = 'Bringing your songs and setlists across…'
+      await this._bring()
+    }
+    if (this._brought && !this._saved) {
+      this._stage = 'Saving to Google Drive…'
+      await this._save()
+    }
     this._state = 'created'
+  }
+
+  /** Put the new space's files in Drive (the first sync) */
+  async _save(): Promise<void> {
+    this._syncError = ''
+    try {
+      await this.syncSpace(this._created as Space)
+      this._saved = true
+    } catch (error) {
+      this._syncError = errorMessage(error)
+    }
   }
 
   /** What to bring across, as chosen (nothing if there is no source) */
@@ -242,7 +289,10 @@ export class TeamSpaceWizard extends LitElement {
   /** Bring the chosen songs and setlists into the new space (again, if it did not work) */
   async _bring(): Promise<void> {
     const created = this._created
-    if (!created || !this._hasSomething || !(this._songs || this._setlists)) return
+    if (!created || !this._hasSomething || !(this._songs || this._setlists)) {
+      this._brought = true
+      return
+    }
     this._bringError = ''
     try {
       const destination = new ChordlessDB(created.id)
@@ -253,18 +303,13 @@ export class TeamSpaceWizard extends LitElement {
         )
         const own = (await getCurrentUserInfo())?.email
         this._leaders = leadersOf(await destination.getAllSetlists(), own)
+        this._brought = true
       } finally {
         destination.db?.close()
       }
     } catch (error) {
       this._bringError = errorMessage(error)
     }
-  }
-
-  async _retryBring(): Promise<void> {
-    this._state = 'creating'
-    await this._bring()
-    this._state = 'created'
   }
 
   /** The space is on this device: start the app afresh in it */
@@ -307,9 +352,20 @@ export class TeamSpaceWizard extends LitElement {
             this._bringError
               ? html`<p class="status error" role="alert">
                 Couldn't bring your songs across: ${this._bringError}
-              </p>
-              <div class="actions">
-                <button class="btn" @click=${this._retryBring}>Try again</button>
+              </p>`
+              : nothing
+          }
+          ${
+            this._syncError
+              ? html`<p class="status error" role="alert">
+                Couldn’t save it to Google Drive yet, so the team can’t get it: ${this._syncError}
+              </p>`
+              : nothing
+          }
+          ${
+            this._bringError || this._syncError
+              ? html`<div class="actions">
+                <button class="btn" @click=${this._finish}>Try again</button>
               </div>`
               : nothing
           }
@@ -463,7 +519,7 @@ export class TeamSpaceWizard extends LitElement {
             class="btn primary"
             ?disabled=${busy || !this._name.trim() || !this._parent}
           >
-            ${busy ? 'Creating…' : 'Create team space'}
+            ${busy ? this._stage || 'Creating…' : 'Create team space'}
           </button>
         </div>
       </form>

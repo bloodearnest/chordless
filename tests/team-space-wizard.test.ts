@@ -52,6 +52,8 @@ describe('team-space-wizard', () => {
   let page: TeamSpaceWizard
   let reloads: number
   let madeFolders: [string, string][]
+  let synced: string[]
+  let syncFails: boolean
   let before: { id: string | null; name: string }
   const prefix = 'Wizard Church'
 
@@ -101,6 +103,10 @@ describe('team-space-wizard', () => {
         return 'new-folder'
       },
     }
+    page.syncSpace = async space => {
+      synced.push(space.name)
+      if (syncFails) throw new Error('Drive is not answering')
+    }
     document.body.append(page)
     await page.updateComplete
   }
@@ -113,6 +119,8 @@ describe('team-space-wizard', () => {
     asked = []
     codeResponse = { code: 'the-code' }
     madeFolders = []
+    synced = []
+    syncFails = false
     workerAnswer = () => Response.json({ spaceId: 'space-dddd4444', role: 'owner' })
     window.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       const path = new URL(String(input), window.location.origin).pathname
@@ -260,6 +268,38 @@ describe('team-space-wizard', () => {
     await wait(50)
     expect(text()).to.contain('Church Drive')
     expect(page.shadowRoot?.querySelector('.error')).to.equal(null)
+  })
+
+  it('saves the new space to Drive before saying it is ready, so the team has something to get', async () => {
+    await open()
+    await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+    const name = `${prefix} saved ${crypto.randomUUID().slice(0, 8)}`
+    await type(name)
+    button('Choose a folder').click()
+    await until(() => text().includes('Church Drive'), 'the folder is shown')
+    button('Create team space').click()
+    await until(() => text().includes('is ready'), 'created')
+    expect(synced).to.deep.equal([name])
+    expect(text()).to.not.contain('Couldn’t save')
+  })
+
+  it('keeps the space and offers another try when saving to Drive does not work', async () => {
+    syncFails = true
+    await open()
+    await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+    await type(`${prefix} unsaved ${crypto.randomUUID().slice(0, 8)}`)
+    button('Choose a folder').click()
+    await until(() => text().includes('Church Drive'), 'the folder is shown')
+    button('Create team space').click()
+    await until(() => text().includes('is ready'), 'created')
+    expect(text()).to.contain('Drive is not answering')
+    expect(text()).to.contain('so the team can’t get it')
+
+    syncFails = false
+    button('Try again').click()
+    await until(() => !text().includes('Drive is not answering'), 'tried again')
+    expect(text()).to.not.contain('Try again')
+    expect(synced).to.have.length(2)
   })
 
   describe('bringing songs and setlists across', () => {

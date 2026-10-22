@@ -62,9 +62,8 @@ class TeamClient {
   async #send(spaceId: string, { method = 'GET', path, query, body }: Call): Promise<Response> {
     const url = new URL(`/api/space/${encodeURIComponent(spaceId)}${path}`, this.#options.origin)
     for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value)
-    const headers: Record<string, string> = {
-      Authorization: `Bearer ${await this.#options.token()}`,
-    }
+    const token = await this.#options.token()
+    const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
     if (body !== undefined) headers['Content-Type'] = 'application/json'
     const response = await this.#options.fetch(url, {
       method,
@@ -78,6 +77,11 @@ class TeamClient {
       reason = ((await response.json()) as { error?: string }).error ?? reason
     } catch {
       // (an answer that was not ours: the status text will do)
+    }
+    if (response.status === 403 && /not a member/i.test(reason)) {
+      // (which account and space were refused: the way to tell a wrong sign-in from a stale space)
+      const who = emailIn(token)
+      reason = `${reason} (${who ? `signed in as ${who}, ` : ''}space ${spaceId})`
     }
     throw new TeamStorageError(reason || `Error ${response.status}`, response.status)
   }
@@ -95,6 +99,17 @@ class TeamClient {
   /** Make the call, and say nothing of the answer */
   async run(spaceId: string, call: Call): Promise<void> {
     await this.#send(spaceId, call)
+  }
+}
+
+/** The address an ID token is for. Only read, to say who was refused: the Worker is what checks it. */
+function emailIn(idToken: string): string | null {
+  try {
+    const payload = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const { email } = JSON.parse(atob(payload)) as { email?: unknown }
+    return typeof email === 'string' ? email : null
+  } catch {
+    return null
   }
 }
 
