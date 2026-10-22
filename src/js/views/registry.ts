@@ -49,11 +49,22 @@ export const views: Record<string, ViewEntry> = {
     () => 'Not found - Chordless'
   ),
   home: view('home-view', () => import('./home-view.ts')),
-  storage: view(
-    'storage-view',
-    () => import('./storage-view.ts'),
-    () => 'Storage - Chordless'
+  account: view(
+    'account-view',
+    () => import('./account-view.ts'),
+    () => 'Account and Teams - Chordless'
   ),
+  'account-space': {
+    ...view(
+      'account-space-view',
+      () => import('./account-space-view.ts'),
+      () => 'Account and Teams - Chordless'
+    ),
+    sameView: (previous, next) =>
+      previous.name === 'account-space' &&
+      next.name === 'account-space' &&
+      previous.spaceId === next.spaceId,
+  },
   preferences: view(
     'preferences-view',
     () => import('./preferences-view.ts'),

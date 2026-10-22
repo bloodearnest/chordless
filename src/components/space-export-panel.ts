@@ -26,6 +26,14 @@ interface PendingImport {
   pads: boolean
 }
 
+/** An import was added to the space: whoever shows what it holds can look again */
+export class SpaceImportedEvent extends Event {
+  static readonly type = 'space-export-panel:imported'
+  constructor() {
+    super(SpaceImportedEvent.type, { bubbles: true, composed: true })
+  }
+}
+
 export function megabytes(bytes: number): string {
   const mb = bytes / (1024 * 1024)
   return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
@@ -198,9 +206,7 @@ export class SpaceExportPanel extends LitElement {
           : []
       this._pending = null
       // (the space has more in it now: whoever shows what it holds can look again)
-      this.dispatchEvent(
-        new Event('space-export-panel:imported', { bubbles: true, composed: true })
-      )
+      this.dispatchEvent(new SpaceImportedEvent())
       this._message = {
         text:
           `Imported into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +

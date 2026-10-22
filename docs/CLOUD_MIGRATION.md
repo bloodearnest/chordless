@@ -76,7 +76,7 @@ owner's (docs/SPACES.md, spike items 2 and 6). Every stored sign-in also stops w
 means a new consent), and the old refresh tokens are dead.
 
 So the data does not move through Drive. A space whose folder the new client cannot see says so (a toast
-after sign-in and a notice on the Storage page) and offers **Start over in Drive**: it keeps everything
+after sign-in and a notice on the Account and Teams page) and offers **Start over in Drive**: it keeps everything
 on the device, forgets the links to the old files and folder, and uploads it all again to a new
 `Chordless/` folder (docs/SYNC_ARCHITECTURE.md, "Start over in Drive"). That is the way to move. The
 **export and import** that is already built (docs/SPACES.md, "Export and import") also works, and is the

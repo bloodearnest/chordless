@@ -16,7 +16,7 @@ import '../src/js/views/library-view.ts'
 import '../src/js/views/not-found-view.ts'
 import '../src/js/views/preferences-view.ts'
 import '../src/js/views/setlist-view.ts'
-import '../src/js/views/storage-view.ts'
+import '../src/js/views/account-view.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -183,7 +183,7 @@ describe('views leave nothing behind', () => {
 
   const simple = [
     ['home-view', { name: 'home' }],
-    ['storage-view', { name: 'storage' }],
+    ['account-view', { name: 'account' }],
     ['preferences-view', { name: 'preferences' }],
     ['import-song-view', { name: 'import-song' }],
     ['bookmarklet-view', { name: 'bookmarklet' }],

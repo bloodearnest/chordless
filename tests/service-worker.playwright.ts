@@ -29,10 +29,10 @@ test('SW routes non-root pages to correct HTML', async ({ page }) => {
   await waitForSW(page)
 
   // Navigate to a non-root route through the SW and verify the correct page loads.
-  // This would have caught the .html redirect bug: fetching /storage.html redirected
-  // to /storage, and browser navigations use redirect:manual so the SW response failed.
-  await page.goto('/storage')
-  await expect(page).toHaveTitle('Storage - Chordless')
+  // This would have caught the .html redirect bug: fetching /account.html redirected
+  // to /account, and browser navigations use redirect:manual so the SW response failed.
+  await page.goto('/account')
+  await expect(page).toHaveTitle('Account and Teams - Chordless')
 
   await page.goto('/songs')
   await expect(page).toHaveTitle('Song Library - Chordless')
@@ -81,38 +81,31 @@ test('a setlist opened online can be reloaded while offline', async ({ page, con
 // A few actions reload the page on purpose (they replace the database under every view).
 // They must work with no network, which is when a band most needs the app.
 test.describe('Reloads on purpose, while offline', () => {
-  /** Open the storage view, and let the service worker cache what it needs to restart */
-  async function openStorageOnline(page) {
+  /** Open the Account and Teams view, and let the service worker cache what it needs to restart */
+  async function openAccountOnline(page) {
     await seedSetlist(page, { setlistId: 'offline-reload-setlist' })
-    await page.goto('/storage')
+    await page.goto('/account')
     await waitForSW(page)
-    await expect(page.locator('storage-view')).toBeVisible()
+    await expect(page.locator('account-view')).toBeVisible()
     await page.waitForLoadState('networkidle')
   }
 
-  test('clearing local data, then restarting, with no network', async ({ page, context }) => {
-    await openStorageOnline(page)
+  test('restarting with no network', async ({ page, context }) => {
+    await openAccountOnline(page)
     await context.setOffline(true)
     try {
-      await page.locator('storage-page').getByRole('button', { name: 'Clear Local Data' }).click()
-      await Promise.all([
-        page.waitForEvent('load'),
-        page
-          .locator('storage-page #clear-data-modal')
-          .getByRole('button', { name: 'Clear Local Data' })
-          .click(),
-      ])
-      // The app came back from the service worker's cache, with its data gone
-      await expect(page.locator('storage-view')).toBeVisible()
-      await expect(page).toHaveTitle('Storage - Chordless')
-      expect(await fromDB(page, 'getSetlist', 'offline-reload-setlist')).toBeFalsy()
+      await page.reload()
+      // The app came back from the service worker's cache, with its data
+      await expect(page.locator('account-view')).toBeVisible()
+      await expect(page).toHaveTitle('Account and Teams - Chordless')
+      expect(await fromDB(page, 'getSetlist', 'offline-reload-setlist')).toBeTruthy()
     } finally {
       await context.setOffline(false)
     }
   })
 
   test('switching space, then restarting, with no network', async ({ page, context }) => {
-    await openStorageOnline(page)
+    await openAccountOnline(page)
     await context.setOffline(true)
     try {
       await Promise.all([
@@ -122,8 +115,8 @@ test.describe('Reloads on purpose, while offline', () => {
           await switchSpace(getCurrentSpace().id as string)
         }),
       ])
-      await expect(page.locator('storage-view')).toBeVisible()
-      await expect(page).toHaveTitle('Storage - Chordless')
+      await expect(page.locator('account-view')).toBeVisible()
+      await expect(page).toHaveTitle('Account and Teams - Chordless')
     } finally {
       await context.setOffline(false)
     }

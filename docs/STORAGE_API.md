@@ -19,7 +19,7 @@ one space's files in two **collections**, `songs` and `setlists`.
 
 | Call | What it is for |
 |---|---|
-| `backend.available()` | signed in, and the backend answers (the Storage page's sync panel) |
+| `backend.available()` | signed in, and the backend answers (the sync panel on a space's page) |
 | `inspectRoot(ref)` | the root a space was linked to: its name, whether it is in the bin, whether this person may write; null if it is gone |
 | `findRootByName(name)`, `ensureRoot(name, spaceId)` | first sync on a device: find or make the root by name (goes away for team spaces, which are issued an id) |
 | `renameRoot(ref, name)` | a renamed space renames its root |

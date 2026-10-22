@@ -34,8 +34,6 @@ describe('storage-summary', () => {
 
   const bare = () => document.createElement('storage-summary') as StorageSummary
   const stats = (over: Partial<Stats> = {}): Stats => ({
-    setlists: 2,
-    songs: 5,
     dbBytes: 2048,
     appCacheBytes: 3 * 1024 * 1024,
     mediaCacheBytes: 1536,
@@ -47,10 +45,8 @@ describe('storage-summary', () => {
       const el = bare()
       el._loadStats = async () => stats()
       document.body.append(el)
-      const text = await shown(el, 'Setlists')
-      expect(text).to.contain('Setlists 2')
-      expect(text).to.contain('Songs 5')
-      expect(text).to.contain('DB 2.0 KB')
+      const text = await shown(el, 'Browser data')
+      expect(text).to.contain('Browser data 2.0 KB')
       expect(text).to.contain('App Cache 3.0 MB')
       expect(text).to.contain('Media Cache 1.5 KB')
       el.remove()
@@ -83,9 +79,9 @@ describe('storage-summary', () => {
       el.remove()
     })
 
-    it('reads the real database when it is not told otherwise', async () => {
+    it('reads the browser when it is not told otherwise', async () => {
       const el = await fixture<StorageSummary>(html`<storage-summary></storage-summary>`)
-      expect(await shown(el, 'Setlists')).to.contain('Setlists')
+      expect(await shown(el, 'Browser data')).to.contain('Browser data')
     })
   })
 
@@ -124,10 +120,9 @@ describe('storage-summary', () => {
       expect(await bare()._estimateIndexedDbUsage()).to.equal(null)
     })
 
-    it('is measured from the records when the browser cannot say', async () => {
+    it('shows as unknown in the stats when the browser cannot say', async () => {
       replace(navigator, 'storage', undefined)
-      const el = bare()
-      expect((await el._loadStats()).dbBytes).to.be.a('number')
+      expect((await bare()._loadStats()).dbBytes).to.equal(null)
     })
   })
 

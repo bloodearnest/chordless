@@ -134,7 +134,7 @@ describe('Knowing whether the user can write to the space folder', () => {
       const toast = shownToast()
       expect(toast?.kind).to.equal('error')
       expect(toast?.message).to.equal(problem?.message)
-      expect(toast?.action?.label).to.equal('Open Drive sync')
+      expect(toast?.action?.label).to.equal('Open Account and Teams')
       const went: string[] = []
       setRouter({
         navigate: async url => {
@@ -148,7 +148,7 @@ describe('Knowing whether the user can write to the space folder', () => {
       } finally {
         setRouter(null)
       }
-      expect(went).to.deep.equal(['/storage'])
+      expect(went).to.deep.equal(['/account'])
     })
 
     it('says so when the Google app that linked the folder is not this one', async () => {

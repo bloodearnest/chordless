@@ -131,7 +131,7 @@ describe('nav-menu', () => {
     await settle()
     expect(menu.isOpen()).to.equal(true)
 
-    provideRoute({ name: 'storage' })
+    provideRoute({ name: 'account' })
     await settle()
     expect(menu.isOpen()).to.equal(false)
     provideRoute(null)

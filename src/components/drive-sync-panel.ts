@@ -4,6 +4,7 @@ import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
 import { DriveFolderGoneError } from '../js/drive-sync.ts'
 import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
+import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
 import { getCurrentSpace, getSpaceById, syncsBack } from '../js/space.ts'
 import { driveFolderProblem } from '../js/space-access.ts'
 import {
@@ -190,24 +191,12 @@ export class DriveSyncPanel extends LitElement {
     this.syncAvailable = await isSyncAvailable(this.space)
   }
 
-  /** Where this space's last sync time is kept (the one before there were several is the space in use's) */
-  get _lastSyncKey(): string {
-    return `last-sync-time:${this.space.id}`
-  }
-
   loadLastSyncTime(): void {
-    const legacy =
-      this.space.id === getCurrentSpace().id ? localStorage.getItem('last-sync-time') : null
-    const stored = localStorage.getItem(this._lastSyncKey) ?? legacy
-    if (stored) {
-      this.lastSyncTime = stored
-    }
+    this.lastSyncTime = lastSyncOf(this.space.id)
   }
 
   _recordSyncTime(): void {
-    const now = new Date().toISOString()
-    this.lastSyncTime = now
-    localStorage.setItem(this._lastSyncKey, now)
+    this.lastSyncTime = recordSync(this.space.id)
   }
 
   async _handleReset(): Promise<void> {
@@ -335,7 +324,7 @@ export class DriveSyncPanel extends LitElement {
           <div class="unavailable-notice">
             <strong>⚠️ Drive Sync Unavailable</strong>
             <p style="margin: 0.5rem 0 0 0;">
-              You need to <a href="/storage">connect with Google Drive</a> to enable sync.
+              You need to <a href="/account">connect with Google Drive</a> to enable sync.
             </p>
           </div>
         </div>
@@ -456,19 +445,7 @@ export class DriveSyncPanel extends LitElement {
   }
 
   _formatSyncTime(isoString: string): string {
-    const date = new Date(isoString)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins} minute${diffMins === 1 ? '' : 's'} ago`
-    if (diffHours < 24) return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`
-    if (diffDays < 7) return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`
-
-    return date.toLocaleDateString()
+    return formatSyncTime(isoString)
   }
 }
 

@@ -1,5 +1,9 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
-import { megabytes, type SpaceExportPanel } from '../src/components/space-export-panel.ts'
+import {
+  megabytes,
+  type SpaceExportPanel,
+  SpaceImportedEvent,
+} from '../src/components/space-export-panel.ts'
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { uploadPadSet } from '../src/js/pad-set-service.ts'
@@ -184,7 +188,7 @@ describe('the export panel', () => {
       expect(downloads[0]?.name).to.contain(other.name.replace(/ /g, '-'))
 
       let imported = 0
-      el.addEventListener('space-export-panel:imported', () => imported++)
+      el.addEventListener(SpaceImportedEvent.type, () => imported++)
       await choose(el, await exportOf('Elsewhere'))
       await waitUntil(() => text(el).includes('Import this export'), 'the question')
       expect(text(el)).to.contain(`into ${other.name}`)

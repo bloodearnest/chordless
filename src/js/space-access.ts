@@ -71,7 +71,7 @@ function tellOfProblem(spaceId: string, problem: DriveFolderProblem): void {
   toldOf.add(spaceId)
   toast(problem.message, {
     kind: 'error',
-    action: { label: 'Open Drive sync', run: () => goTo('/storage') },
+    action: { label: 'Open Account and Teams', run: () => goTo('/account') },
   })
 }
 

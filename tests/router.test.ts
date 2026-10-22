@@ -31,7 +31,7 @@ describe('normalizePath', () => {
 })
 
 describe('matchRoute', () => {
-  const pages = ['songs', 'preferences', 'storage', 'import-song', 'bookmarklet', 'join'] as const
+  const pages = ['songs', 'preferences', 'account', 'import-song', 'bookmarklet', 'join'] as const
   const setlist = (setlistId: string, songIndex: number) =>
     ({ name: 'setlist', setlistId, songIndex }) as const satisfies Route
   const notFound = (path: string) => ({ name: 'not-found', path }) as const satisfies Route
@@ -45,7 +45,6 @@ describe('matchRoute', () => {
     ['/index.html', { name: 'home' }],
     // An invite link: the space and the code are in the fragment, which the route leaves out
     ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
-    ['/spaces/new', { name: 'new-team-space' }],
     ['/media', { name: 'media' }],
 
     // The library list, searched
@@ -81,11 +80,16 @@ describe('matchRoute', () => {
 
     // Also accepted: a Location-like object
     [{ pathname: '/setlist/abc/song/3' }, setlist('abc', 3)],
-    [{ pathname: '/storage' }, { name: 'storage' }],
+    [{ pathname: '/account' }, { name: 'account' }],
 
     // The query string and the hash say nothing
     ['/songs/abc?x=1#top', { name: 'songs', songUuid: 'abc' }],
-    ['/storage#section', { name: 'storage' }],
+    ['/account#section', { name: 'account' }],
+    // The page was called Storage: its old address still opens it
+    ['/storage', { name: 'account' }],
+    ['/account/new', { name: 'new-team-space' }],
+    ['/account/abc-123', { name: 'account-space', spaceId: 'abc-123' }],
+    ['/account/a%20b', { name: 'account-space', spaceId: 'a b' }],
 
     // Not a route
     ['/nope', notFound('/nope')],
@@ -112,11 +116,12 @@ describe('buildUrl', () => {
     [{ name: 'songs', search: 'amazing grace' }, '/songs?q=amazing%20grace'],
     [{ name: 'songs', songUuid: 'abc-123' }, '/songs/abc-123'],
     [{ name: 'preferences' }, '/preferences'],
-    [{ name: 'storage' }, '/storage'],
+    [{ name: 'account' }, '/account'],
+    [{ name: 'account-space', spaceId: 'a b' }, '/account/a%20b'],
     [{ name: 'import-song' }, '/import-song'],
     [{ name: 'bookmarklet' }, '/bookmarklet'],
     [{ name: 'join' }, '/join'],
-    [{ name: 'new-team-space' }, '/spaces/new'],
+    [{ name: 'new-team-space' }, '/account/new'],
     [{ name: 'media' }, '/media'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
@@ -145,7 +150,7 @@ describe('sameRoute', () => {
     const overview = { name: 'setlist', setlistId: 'a', songIndex: -1 } as const satisfies Route
     expect(sameRoute(overview, { ...overview })).to.equal(true)
     expect(sameRoute(overview, { ...overview, songIndex: 0 })).to.equal(false)
-    expect(sameRoute({ name: 'home' }, { name: 'storage' })).to.equal(false)
+    expect(sameRoute({ name: 'home' }, { name: 'account' })).to.equal(false)
   })
 })
 
@@ -193,7 +198,7 @@ describe('historyAction', () => {
 
   it('pushes when moving between pages', () => {
     expect(historyAction({ name: 'home' }, { name: 'songs' })).to.equal('push')
-    expect(historyAction(song(1), { name: 'storage' })).to.equal('push')
+    expect(historyAction(song(1), { name: 'account' })).to.equal('push')
   })
 
   describe('in the library', () => {
@@ -213,7 +218,7 @@ describe('historyAction', () => {
 
     it('pushes between the library and other pages', () => {
       expect(historyAction({ name: 'home' }, list)).to.equal('push')
-      expect(historyAction(librarySong('a'), { name: 'storage' })).to.equal('push')
+      expect(historyAction(librarySong('a'), { name: 'account' })).to.equal('push')
     })
   })
 

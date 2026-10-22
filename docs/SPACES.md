@@ -7,7 +7,7 @@ SYNC_ARCHITECTURE.md.
 
 > **Status:** the personal space and the single-user sync described under "Today" are built. The
 > team space is built end to end for the owner's-token credential (the Worker's team service, roles,
-> invites, joining, the Storage page), tested against fakes only; the service account, pads, copy/move
+> invites, joining, the Account and Teams page), tested against fakes only; the service account, pads, copy/move
 > UI and the rest are **designed, not built**. The order of work, a status list and where work
 > stopped are at the end. The code and docs
 > call it a space throughout (it was "organisation" until 2026-10-20: see "Naming").
@@ -49,7 +49,7 @@ members of their church. Each space is self-contained, so copyright compliance i
 
 A space is made for a team: there is no button that makes an empty one. The personal space is made
 automatically, and a team space comes with its folder, its sharing and its members, made together
-by the wizard (see "Creating a team space", below). The Storage page's Space section therefore only
+by the wizard (see "Creating a team space", below). The Account and Teams page's Space section therefore only
 lists the spaces on this device and switches between them; it no longer has "Create New Space".
 
 **A personal space is never turned into a team space** (decided 2026-10-22). The first cut had a
@@ -99,8 +99,8 @@ a re-pointing of the folder.
   (`current-space-name`) for synchronous rendering.
 - On first load a default space named "Personal" is created and made current. On a first Google
   sign-in, a space still called "Personal" is renamed to the user's name (metadata only).
-- **Deleting a space:** Storage page, Danger Zone, "Delete a space": a row with its own Delete
-  button for each space but the one being worked in (switch first), after a confirmation that names it. It removes the space's record and
+- **Deleting a space:** a space's own page on Account and Teams (`/account/<id>`), "Delete from this device":
+  not available for the space being worked in (switch first), and after a confirmation that names it. It removes the space's record and
   its local database (setlists, songs, charts); nothing in Google Drive is touched, so a folder it
   synced to stays there for the user to delete.
 - Spaces are completely isolated: songs and setlists belong to exactly one; switching reloads the
@@ -142,7 +142,7 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   or was revoked; it dies after 7 days if it was made while the consent screen was "Testing"), the Worker answers
   `401 invalid_grant` and the client throws `SignInExpiredError`. `getSignInState()` is
   `signed-out`, `signed-in` or `expired`; only Google's refusal makes it `expired` (no network, or
-  any other failure, counts as signed in). The Storage page then says "Sign-in expired", offers
+  any other failure, counts as signed in). The Account and Teams page then says "Sign-in expired", offers
   "Reconnect with Google", and disables the sync panel with the reason.
 - **Scope:** `drive.file openid email profile`. Drive access is limited to files the app created
   (or the user picked with the Picker).
@@ -167,7 +167,7 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   `scope` (what was granted), which the page keeps. `authorizeWithGoogle({drive: false})` signs in
   for who someone is alone (what a team member joining needs), `connectDrive()` adds Drive, and
   `getSignInState()` says `'no-drive'` while the stored sign-in has no Drive scope (one made
-  before the scope was kept is taken to have it). The Storage page then says "Signed in, Google Drive
+  before the scope was kept is taken to have it). The Account and Teams page then says "Signed in, Google Drive
   not connected" with a **Connect Google Drive** button, and the sync section points at it; syncing
   is off (`driveStorage.available()` is false) and local use and team spaces are unaffected. Not
   checked: whether the refresh token is sent again without `prompt: consent` (connecting forces it).
@@ -250,9 +250,9 @@ everyone (the consent screen must be "In production": refresh tokens last 7 days
 
 **Decided 2026-10-22, not built.** The adoption path is: someone at a church tries Chordless on
 their own, in the personal space, then decides the team should use it. Making that step easy is
-the job of one dedicated page (a route, `/spaces/new`, not a modal on the Storage page: it has
+the job of one dedicated page (a route, `/account/new`, not a modal on the Account and Teams page: it has
 several steps, and a route gives it the back button, reload and a URL, see ROUTING.md). It is
-reached from a "Create a team space" button in the Storage page's Space section, and offered to
+reached from the "Create a new Team" link under the Teams on the Account and Teams page, and offered to
 someone who has used their personal space for a while.
 
 Steps, each on the one page:
@@ -453,7 +453,7 @@ Setting "Spaces: Merged / Separate" in Preferences.
   badged/grouped by space; the library already merges (`other-songs.ts`). New setlist uses a default
   space (last used, changeable).
 - **Separate:** one active space, header switcher, everything scoped to it (today's model, with the
-  switcher moved from the Storage page to the header).
+  switcher moved from the Account and Teams page to the header).
 - A setlist belongs to exactly one space and references only that space's songs.
 
 Ship Separate first (mostly today's code: `getCurrentDB()`, switch = reload). Merged needs setlist
@@ -513,13 +513,13 @@ only what needs Drive: sharing by link (the song list to paste stays).
   uploaded and will be replaced if the leader changes the setlist, and offers "Put it
   back to the official setlist" (`sync/revert.ts`: Drive's copy replaces the local one, keeping the
   id and the device state). A held-back chart has no marker yet; "Reset from Google Drive" on the
-  Storage page is its revert.
+  Account and Teams page is its revert.
 - The toast says what the leader's version has that theirs did not (`sync/setlist-diff.ts`: songs
   added and removed, a different order, a key or tempo, the details) and offers **Undo**, which puts
   their version back (still never uploaded). Undo lasts as long as the toast (15 seconds).
 - **No guard for a setlist that is open or live, on purpose.** A leader's last-minute song must reach
   a live follower: blocking it would go against "permissive in the moment". Today it cannot happen
-  mid-service anyway, because a sync only runs when the user presses it on the Storage page. When
+  mid-service anyway, because a sync only runs when the user presses it on the Account and Teams page. When
   updates can arrive while a setlist is open (immediate sync, or the leader pushing over WebRTC,
   opt-in), apply them in place: keep the current song by its song id, say what changed with the same
   summary, and keep Undo. The diff is pure so both sources can share it.
@@ -534,7 +534,7 @@ same way: it is kept on the device on its own, so a key change there is harmless
 
 ## Export and import
 
-**Built (2026-10-19).** Storage page, "Export and import" (`space-export-panel.ts`,
+**Built (2026-10-19).** Account and Teams page, "Export and import" (`space-export-panel.ts`,
 `space-export.ts`). An export is a zip of the current space that needs no Google account, and can be
 imported into the current space on any device or account, which also makes it the way to move data
 between two Google accounts. (It is called export and import, not backup and restore: it is a file to
@@ -792,10 +792,10 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 5. [x] Read-only rework: gates removed, `syncsBack`, pull skips records with local changes, "differs
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
-7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Storage page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Storage page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
+7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Account and Teams page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Account and Teams page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
-   bring, invite, progress). **Built so far (2026-10-22): `/spaces/new` (`team-space-wizard.ts`) asks
+   bring, invite, progress). **Built so far (2026-10-22): `/account/new` (`team-space-wizard.ts`) asks
    for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;
    "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) and the invite step are built too. Not built:
    the shared-drive choice and the service account; header switcher (Separate), then Merged
@@ -818,7 +818,7 @@ Durable Object) and never against a real deployed Worker, a real Google sign-in 
 - The Durable Object per team space; the owner-token credential; the storage API for members;
   `TeamStorage` on the client; making a space, invites (bound to one email, single use, 7 days),
   joining, roles, leaving, ending sharing.
-- Pages: `/join`, the Team Space panel on the Storage page, and the space list showing kind and role.
+- Pages: `/join`, the Team Space panel on the Account and Teams page, and the space list showing kind and role.
   The installed app hands the fragment of any link to the page (`incoming-link.ts`).
 
 **Not built**, in the order I would take them:

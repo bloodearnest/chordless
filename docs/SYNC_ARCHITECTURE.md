@@ -246,7 +246,7 @@ then suggestions.
 
 ### Reset from Google Drive
 
-Storage page, only when sync is set up. Replaces the device's setlists, songs and
+Account and Teams page, only when sync is set up. Replaces the device's setlists, songs and
 charts with Drive's copy. Unlike a normal sync, records whose Drive file is gone are
 dropped, not re-uploaded. It refuses, changing nothing, if Drive can't be listed or
 if any local record has changes not in Drive. Per-setlist device state is kept.

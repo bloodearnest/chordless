@@ -9,8 +9,9 @@
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'storage' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' | 'join' | 'new-team-space' }
- *                                             /join is a team space's invite link; the space and the
+ *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' | 'join' | 'new-team-space' | 'media' }
+ *                                             /account is Account and Teams (/storage still opens it); /account/new makes a team
+ *   { name: 'account-space', spaceId }       /account/<space id>: one space's page *                                             /join is a team space's invite link; the space and the
  *                                             code are in its #fragment, which routes ignore
  *                                             /spaces/new makes a team space (team-space-wizard.ts)
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
@@ -25,7 +26,7 @@
 export type PageName =
   | 'home'
   | 'preferences'
-  | 'storage'
+  | 'account'
   | 'import-song'
   | 'import-setlist'
   | 'bookmarklet'
@@ -37,6 +38,7 @@ export type PageName =
 export type Route =
   | { name: PageName }
   | { name: 'songs'; songUuid?: string; search?: string }
+  | { name: 'account-space'; spaceId: string }
   | { name: 'setlist'; setlistId: string; songIndex: number }
   | { name: 'share'; fileId: string; songIndex: number }
   | { name: 'not-found'; path: string }
@@ -46,15 +48,18 @@ const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/': 'home',
   '/songs': 'songs',
   '/preferences': 'preferences',
-  '/storage': 'storage',
+  '/account': 'account',
   '/import-song': 'import-song',
   '/import-setlist': 'import-setlist',
   '/bookmarklet': 'bookmarklet',
   '/about': 'about',
   '/join': 'join',
-  '/spaces/new': 'new-team-space',
+  '/account/new': 'new-team-space',
   '/media': 'media',
 }
+
+/** Paths that open another page (the Account and Teams page was Storage) */
+const ALIASES: Readonly<Record<string, string>> = { '/storage': '/account' }
 
 const PAGE_PATHS: Record<string, string> = Object.fromEntries(
   Object.entries(PAGES).map(([path, name]) => [name, path])
@@ -66,11 +71,13 @@ const PAGE_PATHS: Record<string, string> = Object.fromEntries(
  */
 export const ROUTE_NAMES: Route['name'][] = [
   ...Object.values(PAGES),
+  'account-space',
   'setlist',
   'share',
   'not-found',
 ]
 
+const ACCOUNT_SPACE_PATH = /^\/account\/([^/]+)$/
 const SONGS_SONG_PATH = /^\/songs\/([^/]+)$/
 const SETLIST_PATH = /^\/setlist\/([^/]+)$/
 const SETLIST_SONG_PATH = /^\/setlist\/([^/]+)\/song\/(\d+)$/
@@ -113,7 +120,8 @@ export function matchRoute(location: string | { pathname: string; search?: strin
     pathname = location.pathname
     search = location.search ?? ''
   }
-  const path = normalizePath(pathname)
+  const normalized = normalizePath(pathname)
+  const path = ALIASES[normalized] ?? normalized
 
   const page = PAGES[path]
   // The library list can be searched: /songs?q=...
@@ -122,6 +130,9 @@ export function matchRoute(location: string | { pathname: string; search?: strin
     return query ? { name: 'songs', search: query } : { name: 'songs' }
   }
   if (page) return { name: page }
+
+  const accountSpace = path.match(ACCOUNT_SPACE_PATH)
+  if (accountSpace) return { name: 'account-space', spaceId: decode(accountSpace[1]) }
 
   const librarySong = path.match(SONGS_SONG_PATH)
   if (librarySong) return { name: 'songs', songUuid: decode(librarySong[1]) }
@@ -153,6 +164,8 @@ export function buildUrl(route: Route): string {
     case 'songs':
       if (route.songUuid) return `/songs/${encodeURIComponent(route.songUuid)}`
       return route.search ? `/songs?q=${encodeURIComponent(route.search)}` : '/songs'
+    case 'account-space':
+      return `/account/${encodeURIComponent(route.spaceId)}`
     case 'setlist': {
       const base = `/setlist/${encodeURIComponent(route.setlistId)}`
       return route.songIndex >= 0 ? `${base}/song/${route.songIndex}` : base
@@ -182,6 +195,8 @@ export function sameRoute(a: Route, b: Route): boolean {
  * overview, then a song). Null for routes that are not in such a section.
  */
 function placeOf(route: Route): { section: string; depth: number } | null {
+  if (route.name === 'account') return { section: 'account', depth: 0 }
+  if (route.name === 'account-space') return { section: 'account', depth: 1 }
   if (route.name === 'songs') return { section: 'songs', depth: route.songUuid ? 1 : 0 }
   if (route.name === 'setlist') {
     return { section: `setlist:${route.setlistId}`, depth: route.songIndex >= 0 ? 1 : 0 }

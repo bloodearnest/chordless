@@ -143,8 +143,8 @@ describe('launching the installed app', () => {
   })
 
   it('keeps no fragment for a link that has none', async () => {
-    await handleLaunch({ targetURL: `${location.origin}/storage` }, async () => {})
-    expect(takeLink('/storage')).to.equal(null)
+    await handleLaunch({ targetURL: `${location.origin}/account` }, async () => {})
+    expect(takeLink('/account')).to.equal(null)
   })
 })
 

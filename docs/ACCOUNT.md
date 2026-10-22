@@ -1,9 +1,18 @@
 # Account and Teams
 
 The page that was "Storage" (`/storage`): who you are signed in as, and the spaces on this device
-(a **Personal** space and any **Teams**) with what to do with each. **Designed 2026-10-22, not
-built.** The words people see are in docs/SPACES.md, "Naming": the UI says Personal and Team, the
-code and these docs say space.
+(a **Personal** space and any **Teams**) with what to do with each. **Built 2026-10-22.** The words
+people see are in docs/SPACES.md, "Naming": the UI says Personal and Team, the code and these docs
+say space.
+
+Where the code is: `account-page.ts` (the list), `account-card.ts` (the account), `space-card.ts`
+(one space on the list), `space-page.ts` (one space's page), `storage-summary.ts` (the device), and
+`media-page.ts` (the media player and the pad sets). `/storage` still opens the page (an alias in
+`router.ts`). The panels for sync, export and import and people take the space they are given
+(`drive-sync-panel.ts`, `space-export-panel.ts`, `team-share-panel.ts`), and a sync manager made for
+a space works on that space, not the one in use (`drive-sync.ts`). Differences from the sketch
+below: "Manage" on the account is an inline disclosure, not a sheet; a card's Sync button is shown
+for any space once syncing can work, and the card runs the sync itself (`space-sync.ts`).
 
 ## Why it changes
 

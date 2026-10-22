@@ -106,7 +106,7 @@ app's own modules, imported directly: there's no build step to test around.
   (`storage/drive-storage.ts`) and `drive-api.ts` run against **FakeDrive** (`fake-drive.ts`), an
   in-memory fake of the parts of the Drive v3 API the app uses. It throws on anything it doesn't
   model rather than guessing, and has its own tests (`fake-drive.test.ts`). The Drive-specific
-  tests (`storage-drive`, `drive-api-*`, the sync panel, the pad sets, the Storage page) use it,
+  tests (`storage-drive`, `drive-api-*`, the sync panel, the pad sets, the Account and Teams page) use it,
   and `useFakeDriveRig()` is the same rig as `useSyncRig()` on top of it, with a check that
   FakeDrive saw nothing it doesn't model. The tests are split by topic: `drive-sync` (setlists, metadata, conflicts, change
   detection), `drive-sync-resilience` (errors partway, files gone), `drive-sync-space`

@@ -96,8 +96,8 @@ test.describe('Song library navigation', () => {
     await expect(page.locator('body')).toHaveClass(/edit-mode/)
 
     await page.getByRole('button', { name: 'Navigation menu' }).click()
-    await page.locator('nav-menu').getByRole('link', { name: 'Storage' }).click()
-    await expect(page.locator('storage-view')).toBeVisible()
+    await page.locator('nav-menu').getByRole('link', { name: 'Account and Teams' }).click()
+    await expect(page.locator('account-view')).toBeVisible()
     await expect(page.locator('body')).not.toHaveClass(/edit-mode/)
   })
 

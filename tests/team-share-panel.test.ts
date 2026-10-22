@@ -132,11 +132,9 @@ describe('the team share panel', () => {
   })
 
   describe('a space that is not shared', () => {
-    it('offers to create a team space on its page, and does not turn this one into one', async () => {
+    it('shows nothing for a space that is not a Team’s, and asks the Worker nothing', async () => {
       await open(await space(null, { rootRef: 'folder-1' }))
-      expect(text()).to.contain('Create a team space')
-      expect(panel.shadowRoot?.querySelector('a')?.getAttribute('href')).to.equal('/spaces/new')
-      expect(panel.shadowRoot?.querySelector('button') === null).to.equal(true)
+      expect(panel.shadowRoot?.textContent?.trim()).to.equal('')
       expect(calls).to.deep.equal([])
     })
   })
@@ -145,7 +143,7 @@ describe('the team share panel', () => {
     it('sees everyone, may change and remove all but the owner, and see who is invited', async () => {
       await open(await space('owner'))
       await until(() => text().includes('cat@example.com'), 'the people')
-      expect(text()).to.contain('the owner of this team space')
+      expect(text()).to.contain('the owner of this Team')
       const selects = panel.shadowRoot?.querySelectorAll('ul.people select') ?? []
       expect(selects).to.have.length(3) // dan, bob, cat: not ann
       expect(text()).to.contain('eve@example.com')
@@ -297,7 +295,7 @@ describe('the team share panel', () => {
     it('manages writers and readers, and can invite up to writer, but not touch the other admin or the owner', async () => {
       await open(await space('admin'))
       await until(() => text().includes('cat@example.com'), 'the people')
-      expect(text()).to.contain('an admin in this team space')
+      expect(text()).to.contain('an admin in this Team')
       const selects = panel.shadowRoot?.querySelectorAll('ul.people select') ?? []
       expect(selects).to.have.length(2) // bob, cat: not ann, not dan
       const roles = Array.from(
@@ -305,7 +303,7 @@ describe('the team share panel', () => {
           .options
       ).map(option => option.value)
       expect(roles).to.deep.equal(['reader', 'writer'])
-      expect(button('Leave this space').disabled).to.equal(false)
+      expect(button('Leave this Team').disabled).to.equal(false)
       expect(text()).to.not.contain('Stop sharing')
     })
   })
@@ -318,7 +316,7 @@ describe('the team share panel', () => {
         expect(panel.shadowRoot?.querySelector('ul.people select') === null).to.equal(true)
         expect(text()).to.not.contain('Invite someone')
         expect(calls.some(call => call.key.endsWith('/invites'))).to.equal(false)
-        expect(button('Leave this space').disabled).to.equal(false)
+        expect(button('Leave this Team').disabled).to.equal(false)
       })
     }
 
@@ -327,7 +325,7 @@ describe('the team share panel', () => {
       const mine = await space('writer')
       await open(mine)
       await until(() => text().includes('cat@example.com'), 'the people')
-      button('Leave this space').click()
+      button('Leave this Team').click()
       await answer(true)
       await until(() => left === 1, 'to leave')
       expect(await getSpaceById(mine.id)).to.equal(undefined)
@@ -337,7 +335,7 @@ describe('the team share panel', () => {
       const mine = await space('reader')
       await open(mine)
       await until(() => text().includes('cat@example.com'), 'the people')
-      button('Leave this space').click()
+      button('Leave this Team').click()
       await answer(false)
       await wait(50)
       expect(left).to.equal(0)

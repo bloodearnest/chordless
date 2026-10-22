@@ -1,6 +1,6 @@
 // App-wide: themes, loading, display preferences, the menu, modals and the
-// storage page
-import { expect, fromDB, openApp, seedSetlist, seedSong, test } from './fixtures.ts'
+// Account and Teams page
+import { expect, openApp, seedSetlist, seedSong, test } from './fixtures.ts'
 import { must } from './must.ts'
 
 test.describe('Themes', () => {
@@ -39,11 +39,11 @@ test.describe('Themes', () => {
         .match(/\d+/g)
         .slice(0, 3)
         .reduce((sum, n) => sum + Number(n), 0)
-    await openApp(page, '/storage')
+    await openApp(page, '/account')
     for (const scheme of ['light', 'dark'] as const) {
       await page.emulateMedia({ colorScheme: scheme })
       for (const [url, host] of [
-        ['/storage', 'storage-page'],
+        ['/account', 'account-page'],
         ['/preferences', 'app-preferences'],
       ]) {
         await page.goto(url)
@@ -67,9 +67,16 @@ test.describe('Themes', () => {
 
   test('in dark mode a modal is lighter than the page beneath it, and edged', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' })
-    await page.goto('/storage')
-    await page.locator('storage-page').getByRole('button', { name: 'Clear Local Data' }).click()
-    const card = page.locator('storage-page #clear-data-modal').locator('.modal-content')
+    await seedSong(page)
+    const otherId = await page.evaluate(async () => {
+      const { createSpace } = await import('/js/space.ts')
+      return (await createSpace('Second Org')).id
+    })
+    await page.goto(`/account/${otherId}`)
+    await page.getByRole('button', { name: 'Delete…' }).click()
+    const card = page
+      .locator('space-page app-modal[heading="Delete from this device?"]')
+      .locator('.modal-content')
     await expect(card).toBeVisible()
     const { cardBg, pageBg, border } = await card.evaluate(element => ({
       cardBg: getComputedStyle(element).backgroundColor,
@@ -267,82 +274,79 @@ test.describe('Modals', () => {
   })
 })
 
-test.describe('Storage page', () => {
-  test('the local data summary shows how many setlists and songs are stored', async ({ page }) => {
+test.describe('Account and Teams page', () => {
+  test('each space shows how many songs and setlists it holds', async ({ page }) => {
     await seedSong(page, { setlistId: 'summary-setlist' })
-    await page.goto('/storage')
-    const summary = page.locator('storage-summary')
-    await expect(summary.locator('.stat-row', { hasText: 'Setlists' })).toContainText('1')
-    await expect(summary.locator('.stat-row', { hasText: 'Songs' })).toContainText('1')
+    await page.goto('/account')
+    const card = page.locator('space-card').filter({ hasText: 'Current' })
+    await expect(card).toContainText('1 song')
+    await expect(card).toContainText('1 setlist')
+    await expect(card).toContainText('about')
   })
 
-  test('spaces: switching asks first, and no space is made from the page', async ({ page }) => {
+  test('switching asks first, and no Team is made from the cards', async ({ page }) => {
     const dialogs: string[] = []
     page.on('dialog', dialog => {
       dialogs.push(dialog.message())
       dialog.dismiss()
     })
     await seedSong(page) // opening the app creates the default space
-    await page.goto('/storage')
-    const spaces = page.locator('select-space')
-    const current = await spaces.locator('.space-item.current .space-name').innerText()
-
-    // (nothing on the page makes a space: that comes with a team; this one is made in code)
-    await expect(spaces.getByRole('button', { name: /Create/ })).toHaveCount(0)
     await page.evaluate(async () => {
       const { createSpace } = await import('/js/space.ts')
       await createSpace('Second Org')
     })
-    await page.goto('/storage')
-    await expect(spaces.locator('.space-item')).toHaveCount(2)
+    await page.goto('/account')
+    const cards = page.locator('space-card')
+    await expect(cards).toHaveCount(2)
+    // The Team is made on its own page, from a link under the cards
+    await expect(page.getByRole('link', { name: 'Create a new Team' })).toHaveAttribute(
+      'href',
+      '/account/new'
+    )
 
-    await spaces.getByRole('button', { name: 'Switch' }).click()
-    const modal = spaces.locator('#switch-modal')
+    const other = cards.filter({ hasText: 'Second Org ~ Personal' })
+    await other.getByRole('button', { name: 'Switch' }).click()
+    const modal = other.locator('app-modal')
     await expect(modal).toHaveAttribute('open', '')
-    await expect(modal).toContainText('Switch to "Second Org"?')
+    await expect(modal).toContainText('Switch to "Second Org ~ Personal"?')
     await modal.getByRole('button', { name: 'Cancel' }).click()
     await expect(modal).not.toHaveAttribute('open', '')
-    await expect(spaces.locator('.space-item.current')).toContainText(current)
+    await expect(cards.filter({ hasText: 'Current' })).not.toContainText('Second Org')
     // No native alert() or confirm() along the way
     expect(dialogs).toEqual([])
   })
 
-  test('says when connecting to Google fails', async ({ page }) => {
-    // Without Google's sign-in script, connecting fails straight away
+  test('says when signing in to Google fails', async ({ page }) => {
+    // Without Google's sign-in script, signing in fails straight away
     await page.route('https://accounts.google.com/**', route => route.abort())
-    await page.goto('/storage')
+    await page.goto('/account')
 
-    await page
-      .locator('storage-page')
-      .getByRole('button', { name: /Connect with Google/ })
-      .click()
-    await expect(page.locator('storage-page').getByRole('alert')).toContainText(
-      'Authorization failed'
-    )
+    await page.locator('account-card').getByRole('button', { name: 'Sign in with Google' }).click()
+    await expect(page.locator('account-card').getByRole('alert')).toContainText('Signing in failed')
   })
 
-  test('clearing local data asks first, then clears it', async ({ page }) => {
-    await seedSong(page, { setlistId: 'clear-test-setlist' })
-    await page.goto('/storage')
+  test('works signed out: a space can be managed, and deleting one asks first', async ({
+    page,
+  }) => {
+    await seedSong(page, { setlistId: 'delete-test-setlist' })
+    const otherId = await page.evaluate(async () => {
+      const { createSpace } = await import('/js/space.ts')
+      return (await createSpace('Second Org')).id
+    })
+    await page.goto(`/account/${otherId}`)
+    const modal = page.locator('space-page app-modal[heading="Delete from this device?"]')
 
-    const clearButton = page
-      .locator('storage-page')
-      .getByRole('button', { name: 'Clear Local Data' })
-    const modal = page.locator('storage-page #clear-data-modal')
-
-    // Cancelling keeps everything
-    await clearButton.click()
+    // Cancelling keeps it
+    await page.getByRole('button', { name: 'Delete…' }).click()
     await expect(modal).toHaveAttribute('open', '')
     await modal.getByRole('button', { name: 'Cancel' }).click()
     await expect(modal).not.toHaveAttribute('open', '')
-    expect(await fromDB(page, 'getSetlist', 'clear-test-setlist')).toBeTruthy()
 
-    // Confirming clears it and reloads
-    await clearButton.click()
-    await Promise.all([
-      page.waitForEvent('load'),
-      modal.getByRole('button', { name: 'Clear Local Data' }).click(),
-    ])
-    expect(await fromDB(page, 'getSetlist', 'clear-test-setlist')).toBeFalsy()
+    // Confirming deletes it and goes back to the list
+    await page.getByRole('button', { name: 'Delete…' }).click()
+    await modal.getByRole('button', { name: 'Delete', exact: true }).click()
+    await expect(page).toHaveURL(/\/account$/)
+    await expect(page.locator('space-card')).toHaveCount(1)
+    await expect(page.locator('space-card')).toContainText('Current')
   })
 })

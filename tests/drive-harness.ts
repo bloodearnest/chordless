@@ -150,9 +150,12 @@ function makeRig(storage: () => StorageBackend | undefined) {
  * any backend; what Drive does on the wire is tested through useFakeDriveRig.
  */
 export function useSyncRig() {
+  // (the devices read the storage through this, not through `rig`: an object that refers to itself
+  // in its own initializer has a type that depends on the order the files are checked in)
+  const current = { storage: new MemoryStorage() }
   const rig = {
-    storage: new MemoryStorage(),
-    ...makeRig(() => rig.storage),
+    storage: current.storage,
+    ...makeRig(() => current.storage),
     driveSetlistFiles,
     driveSetlist,
     replaceDriveFile,
@@ -174,7 +177,8 @@ export function useSyncRig() {
   }
 
   beforeEach(() => {
-    rig.storage = new MemoryStorage()
+    current.storage = new MemoryStorage()
+    rig.storage = current.storage
   })
 
   afterEach(async () => {

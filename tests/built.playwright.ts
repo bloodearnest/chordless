@@ -8,14 +8,14 @@ import { must } from './must.ts'
 // Every view the router has, by the URL that shows it
 const VIEWS = [
   ['/songs', 'library-view'],
-  ['/storage', 'storage-view'],
+  ['/account', 'account-view'],
   ['/preferences', 'preferences-view'],
   ['/import-song', 'import-song-view'],
   ['/import-setlist', 'import-setlist-view'],
   ['/bookmarklet', 'bookmarklet-view'],
   ['/about', 'about-view'],
   ['/join', 'join-view'],
-  ['/spaces/new', 'new-team-space-view'],
+  ['/account/new', 'new-team-space-view'],
   ['/media', 'media-view'],
   ['/no/such/page', 'not-found-view'],
 ]

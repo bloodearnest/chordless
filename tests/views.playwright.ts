@@ -22,11 +22,11 @@ test.describe('Moving between views', () => {
     await expect(page.locator('home-view')).toBeVisible()
     await markDocument(page)
 
-    await chooseFromMenu(page, 'Storage')
+    await chooseFromMenu(page, 'Account and Teams')
 
-    await expect(page).toHaveURL(/\/storage$/)
-    await expect(page).toHaveTitle('Storage - Chordless')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await expect(page).toHaveURL(/\/account$/)
+    await expect(page).toHaveTitle('Account and Teams - Chordless')
+    await expect(page.locator('account-view')).toBeVisible()
     await expect(page.locator('home-view')).toHaveCount(0)
     expect(await isSameDocument(page)).toBe(true)
     // The menu closes when the route changes
@@ -36,32 +36,32 @@ test.describe('Moving between views', () => {
   test('the back and forward buttons move between views', async ({ page }) => {
     await openApp(page, '/')
     await markDocument(page)
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
 
     await page.goBack()
     await expect(page.locator('home-view')).toBeVisible()
-    await expect(page.locator('storage-view')).toHaveCount(0)
+    await expect(page.locator('account-view')).toHaveCount(0)
     await expect(page).toHaveTitle('Chordless')
     await expect(page).toHaveURL(/\/$/)
 
     await page.goForward()
-    await expect(page.locator('storage-view')).toBeVisible()
-    await expect(page).toHaveTitle('Storage - Chordless')
+    await expect(page.locator('account-view')).toBeVisible()
+    await expect(page).toHaveTitle('Account and Teams - Chordless')
     expect(await isSameDocument(page)).toBe(true)
   })
 
   test('opening a view by its URL, and reloading it, shows it', async ({ page }) => {
-    await openApp(page, '/storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await openApp(page, '/account')
+    await expect(page.locator('account-view')).toBeVisible()
     await page.reload()
-    await expect(page.locator('storage-view')).toBeVisible()
-    await expect(page).toHaveTitle('Storage - Chordless')
+    await expect(page.locator('account-view')).toBeVisible()
+    await expect(page).toHaveTitle('Account and Teams - Chordless')
   })
 
   for (const [path, tag, title] of [
     ['/', 'home-view', 'Chordless'],
-    ['/storage', 'storage-view', 'Storage - Chordless'],
+    ['/account', 'account-view', 'Account and Teams - Chordless'],
     ['/preferences', 'preferences-view', 'Preferences - Chordless'],
     ['/import-song', 'import-song-view', 'Import Songs - Chordless'],
     ['/bookmarklet', 'bookmarklet-view', 'Bookmarklet - Chordless'],
@@ -81,7 +81,7 @@ test.describe('Moving between views', () => {
     ['/', 'Import Songs', 'import-song-view', 'Import Songs - Chordless'],
     ['/', 'SongSelect Import', 'bookmarklet-view', 'Bookmarklet - Chordless'],
     ['/', 'Song Library', 'library-view', 'Song Library - Chordless'],
-    ['/storage', 'Setlists', 'home-view', 'Chordless'],
+    ['/account', 'Setlists', 'home-view', 'Chordless'],
   ]) {
     test(`the menu's ${link} link, from ${from}, shows ${tag} without loading a page`, async ({
       page,
@@ -119,8 +119,8 @@ test.describe('Moving between views', () => {
     await expect(player).toBeHidden()
     await markDocument(page)
 
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
     await expect(player).toBeHidden()
 
     // Playing shows it wherever you are, and it's the same player throughout
@@ -142,8 +142,8 @@ test.describe('Moving between views', () => {
 
   test('the page title reaches screen readers when the view changes', async ({ page }) => {
     await openApp(page, '/')
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('#route-announcer')).toHaveText('Storage - Chordless')
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('#route-announcer')).toHaveText('Account and Teams - Chordless')
   })
 })
 
@@ -186,10 +186,12 @@ test.describe('The setlist view', () => {
     await page.getByRole('button', { name: 'Navigation menu' }).click()
     await expect(page.locator('nav-menu').getByRole('button', { name: 'Alpha' })).toBeVisible()
 
-    await page.locator('nav-menu').getByRole('link', { name: 'Storage' }).click()
-    await expect(page.locator('storage-view')).toBeVisible()
+    await page.locator('nav-menu').getByRole('link', { name: 'Account and Teams' }).click()
+    await expect(page.locator('account-view')).toBeVisible()
     await page.getByRole('button', { name: 'Navigation menu' }).click()
-    await expect(page.locator('nav-menu').getByRole('link', { name: 'Storage' })).toBeVisible()
+    await expect(
+      page.locator('nav-menu').getByRole('link', { name: 'Account and Teams' })
+    ).toBeVisible()
     await expect(page.locator('nav-menu').getByRole('button', { name: 'Alpha' })).toHaveCount(0)
     expect(await isSameDocument(page)).toBe(true)
   })
@@ -198,12 +200,12 @@ test.describe('The setlist view', () => {
     const url = await seedSetlist(page)
     await page.goto(`${url}/song/0`)
     await expect(page.locator('#app-header')).toContainText('Alpha')
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
 
     await page.keyboard.press('ArrowRight')
     await page.keyboard.press('ArrowLeft')
-    await expect(page).toHaveURL(/\/storage$/)
+    await expect(page).toHaveURL(/\/account$/)
   })
 
   test('leaving a setlist in edit mode leaves edit mode', async ({ page }) => {
@@ -214,8 +216,8 @@ test.describe('The setlist view', () => {
     await enterEditMode(page)
     await expect(page.locator('body')).toHaveClass(/edit-mode/)
 
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
     await expect(page.locator('body')).not.toHaveClass(/edit-mode/)
   })
 
@@ -278,8 +280,8 @@ test.describe('Coming back to a view', () => {
     await expect(page).toHaveURL(/\/songs\?q=zzz-nothing$/)
 
     // Leaving and coming back
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
     await page.goBack()
     await expect(page.locator('library-view')).toBeVisible()
     await expect(page.locator('#song-search')).toHaveValue('zzz-nothing')
@@ -326,8 +328,8 @@ test.describe('Coming back to a view', () => {
     await seedSong(page)
     await openApp(page, '/songs')
     await page.locator('#song-search').fill('info')
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
 
     await chooseFromMenu(page, 'Song Library')
     await expect(page.locator('library-view')).toBeVisible()
@@ -359,8 +361,8 @@ test.describe('Coming back to a view', () => {
     await old.getByRole('button', { name: /2021/ }).click()
     await expect(old).toHaveAttribute('expanded', '')
 
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
     await page.goBack()
 
     await expect(page.locator('home-view')).toBeVisible()
@@ -378,8 +380,8 @@ test.describe('Coming back to a view', () => {
     await expect.poll(() => song.evaluate(element => element.scrollTop)).toBeGreaterThan(200)
     const left = await song.evaluate(element => element.scrollTop)
 
-    await chooseFromMenu(page, 'Storage')
-    await expect(page.locator('storage-view')).toBeVisible()
+    await chooseFromMenu(page, 'Account and Teams')
+    await expect(page.locator('account-view')).toBeVisible()
     await page.goBack()
 
     await expect(page.locator('#app-header')).toContainText('Alpha')

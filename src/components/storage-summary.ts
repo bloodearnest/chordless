@@ -4,14 +4,14 @@ import { css, html, LitElement } from 'lit'
 /**
  * storage-summary
  *
- * Displays counts of local setlists/songs plus storage usage estimates
- * for IndexedDB and Service Worker caches.
+ * What this device keeps for the app: the browser's usage for IndexedDB, and the service worker's
+ * caches (the app itself, and pad audio). What each space holds is on its own card
+ * (docs/ACCOUNT.md); this is the device, which a space does not own.
  */
 /** Counts and sizes of what is stored in this browser */
 interface StorageStats {
-  setlists: number
-  songs: number
-  dbBytes: number
+  /** IndexedDB's usage, as far as the browser says (null where it does not) */
+  dbBytes: number | null
   appCacheBytes: number | null
   mediaCacheBytes: number | null
 }
@@ -111,17 +111,13 @@ export class StorageSummary extends LitElement {
   _renderStats(stats: StorageStats) {
     return html`
       <div class="summary-grid">
-        ${this._renderListStat('Setlists & Songs', [
-          { label: 'Setlists', value: stats.setlists },
-          { label: 'Songs', value: stats.songs },
-        ])}
         ${this._renderListStat('Storage Usage', [
-          { label: 'DB', value: this._formatBytes(stats.dbBytes) },
+          { label: 'Browser data', value: this._formatBytes(stats.dbBytes) },
           { label: 'App Cache', value: this._formatMegabytes(stats.appCacheBytes) },
           { label: 'Media Cache', value: this._formatBytes(stats.mediaCacheBytes) },
         ])}
       </div>
-      <p class="footnote">Includes data stored in this browser only.</p>
+      <p class="footnote">Data on this device only. Each team's size is on its own card.</p>
     `
   }
 
@@ -143,25 +139,15 @@ export class StorageSummary extends LitElement {
     `
   }
 
-  /** Counts and sizes of the setlists, songs and caches stored in this browser */
+  /** Sizes of what this browser keeps for the app */
   async _loadStats(): Promise<StorageStats> {
-    const { getCurrentDB } = await import('../js/db.ts')
-    const db = await getCurrentDB()
-
-    const [setlists, songs] = await Promise.all([db.getAllSetlists(), db.getAllSongs()])
-
-    const [dbBytesFromEstimate, cacheUsage] = await Promise.all([
+    const [dbBytes, cacheUsage] = await Promise.all([
       this._estimateIndexedDbUsage(),
       this._estimateCacheUsage(),
     ])
 
-    const approxDataBytes =
-      dbBytesFromEstimate ?? estimateRecordsSize(setlists) + estimateRecordsSize(songs)
-
     return {
-      setlists: setlists.length,
-      songs: songs.length,
-      dbBytes: approxDataBytes,
+      dbBytes,
       appCacheBytes: cacheUsage?.appBytes ?? null,
       mediaCacheBytes: cacheUsage?.mediaBytes ?? null,
     }
@@ -240,10 +226,6 @@ export class StorageSummary extends LitElement {
     const mb = bytes / (1024 * 1024)
     return `${mb.toFixed(mb >= 10 ? 0 : 1)} MB`
   }
-}
-
-function estimateRecordsSize(records: unknown): number {
-  return new Blob([JSON.stringify(records)]).size
 }
 
 const MEDIA_EXTENSIONS = new Set(['mp3', 'wav', 'aac', 'm4a', 'ogg', 'flac'])

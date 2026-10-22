@@ -468,7 +468,7 @@ export class SetlistShare extends LitElement {
       return html`
         <section>
           <p class="note">
-            Sign in with Google on the <a href="/storage">Storage page</a> to share this setlist by
+            Sign in with Google on the <a href="/account">Account and Teams page</a> to share this setlist by
             link.
           </p>
         </section>

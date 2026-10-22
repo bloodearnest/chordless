@@ -33,10 +33,10 @@ export class TeamShareLeftEvent extends Event {
 }
 
 /**
- * Sharing the current space with a team, and looking after it (docs/SPACES.md, "Setting up and
- * joining a team space"). A space of this person's can be shared once it has synced to Google Drive;
- * the owner and admins then see the members and their roles and invite people by email (the invite
- * is a link to send them, shown once), and every member can see who is in the space and leave it.
+ * The people of a Team, and looking after them (docs/SPACES.md, "Setting up and joining a team
+ * space"; it shows nothing for a space that is not a Team's, which is made on /account/new): the
+ * owner and admins see the members and their roles and invite people by email (the invite is a
+ * link to send them, shown once), and every member can see who is in it and leave.
  * What a role may do is the Worker's rule, and the controls shown follow it: a role acts only on
  * those below it.
  *
@@ -161,8 +161,8 @@ export class TeamSharePanel extends LitElement {
   async _stopSharing(): Promise<void> {
     const space = this._current
     const sure = await this._confirm(
-      'Stop sharing this space?',
-      'Everyone else loses access, and Chordless forgets the sign-in it kept for this space. The folder and its files stay in your Drive, and on every device that has them.',
+      'Stop sharing this Team?',
+      'Everyone else loses access, and Chordless forgets the sign-in it kept for this Team. The folder and its files stay in your Drive, and on every device that has them.',
       'Stop sharing'
     )
     if (!sure) return
@@ -176,7 +176,7 @@ export class TeamSharePanel extends LitElement {
     const space = this._current
     const sure = await this._confirm(
       `Leave ${space.name}?`,
-      'You lose access to the team space, and it is removed from this device. The team keeps its songs and setlists, and an admin can invite you again.',
+      'You lose access to the Team, and it is removed from this device. The team keeps its songs and setlists, and an admin can invite you again.',
       'Leave'
     )
     if (!sure) return
@@ -195,7 +195,7 @@ export class TeamSharePanel extends LitElement {
     const team = this._team
     const sure = await this._confirm(
       `Remove ${email}?`,
-      'They lose access to this space. What is already on their device stays there, but it no longer syncs.',
+      'They lose access to this Team. What is already on their device stays there, but it no longer syncs.',
       'Remove'
     )
     if (sure) await this._run(() => teamApi.removeMember(team.id, email))
@@ -238,36 +238,22 @@ export class TeamSharePanel extends LitElement {
   }
 
   override render() {
-    const space = this.space
-    if (!space) return nothing
+    const team = this.space?.team
+    if (!team) return nothing
     return html`
       <div class="panel">
-        <h3>🤝 Team Space</h3>
-        ${space.team ? this._renderTeam(space.team.role) : this._renderOffer()}
+        <h3>People</h3>
+        ${this._renderTeam(team.role)}
         ${this._error ? html`<p class="error" role="alert">✗ ${this._error}</p>` : nothing}
       </div>
       <app-modal ${ref(this._modal)} type="confirm" size="small"></app-modal>
     `
   }
 
-  _renderOffer() {
-    return html`
-      <p>
-        A team space is shared with your team: they sync its songs and setlists with you and each
-        other, each with a role you choose. It is a new space with a folder of its own in Google
-        Drive, separate from this one, and you can bring songs across when you make it.
-      </p>
-      <div class="actions">
-        <a class="btn primary" href="/spaces/new">🤝 Create a team space</a>
-      </div>
-    `
-  }
-
   _renderTeam(mine: TeamRole) {
     const canInvite = outranks(mine, 'writer')
     return html`
-      <p>You are ${mine === 'owner' ? 'the owner of' : `${roleWithArticle(mine)} in`} this team space.</p>
-      <h4>People</h4>
+      <p>You are ${mine === 'owner' ? 'the owner of' : `${roleWithArticle(mine)} in`} this Team.</p>
       <ul class="people">${this._members.map(member => this._renderMember(member, mine))}</ul>
       ${canInvite ? this._renderInvites(mine) : nothing}
       <div class="actions">
@@ -277,7 +263,7 @@ export class TeamSharePanel extends LitElement {
               Stop sharing
             </button>`
             : html`<button class="btn danger" ?disabled=${this._busy} @click=${this._leave}>
-              Leave this space
+              Leave this Team
             </button>`
         }
       </div>

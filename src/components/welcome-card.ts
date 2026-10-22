@@ -208,7 +208,7 @@ export class WelcomeCard extends LitElement {
               Sign in with Google to keep your songs and setlists in your own Google Drive, and to
               share them between your devices.
             </p>
-            <div class="actions"><a class="btn" href="/storage">Sign in and sync</a></div>
+            <div class="actions"><a class="btn" href="/account">Sign in and sync</a></div>
           </li>
           ${this._renderInstall()}
         </ol>

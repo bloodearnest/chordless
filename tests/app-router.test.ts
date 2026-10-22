@@ -70,10 +70,10 @@ describe('AppRouter', () => {
     document.body.append(outlet)
     loads = []
     views = {
-      storage: {
+      account: {
         load: () => {
-          loads.push('storage')
-          return fakeView('storage')
+          loads.push('account')
+          return fakeView('account')
         },
         title: () => 'Storage - Chordless',
       },
@@ -98,10 +98,10 @@ describe('AppRouter', () => {
 
   describe('start', () => {
     it('shows the view for the current URL', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       expect(await makeRouter().start()).to.equal(true)
-      expect(outlet.querySelector('[data-view=storage]')).to.exist
-      expect(router.route).to.deep.equal({ name: 'storage' })
+      expect(outlet.querySelector('[data-view=account]')).to.exist
+      expect(router.route).to.deep.equal({ name: 'account' })
       expect(document.title).to.equal('Storage - Chordless')
     })
 
@@ -122,7 +122,7 @@ describe('AppRouter', () => {
   describe('navigate', () => {
     beforeEach(async () => {
       atEndOfHistory()
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
     })
 
@@ -139,9 +139,9 @@ describe('AppRouter', () => {
     it('returns false, and changes nothing, for a route with no view', async () => {
       const before = window.history.length
       expect(await router.navigate('/bookmarklet')).to.equal(false)
-      expect(window.location.pathname).to.equal('/storage')
+      expect(window.location.pathname).to.equal('/account')
       expect(window.history.length).to.equal(before)
-      expect(router.route).to.deep.equal({ name: 'storage' })
+      expect(router.route).to.deep.equal({ name: 'account' })
     })
 
     it('replaces rather than pushes when asked', async () => {
@@ -157,7 +157,7 @@ describe('AppRouter', () => {
       expect(window.history.state.key).to.equal(key)
 
       window.history.replaceState(null, '', '/songs')
-      await router.navigate('/storage', { replace: true })
+      await router.navigate('/account', { replace: true })
       expect(window.history.state.key).to.be.a('string')
     })
 
@@ -188,7 +188,7 @@ describe('AppRouter', () => {
       router.navigate('/songs')
       const event = (await changed) as RouteChangeEvent
       expect(event.route).to.deep.equal({ name: 'songs' })
-      expect(event.previous).to.deep.equal({ name: 'storage' })
+      expect(event.previous).to.deep.equal({ name: 'account' })
     })
 
     it('keeps the default title for a view with none', async () => {
@@ -216,7 +216,7 @@ describe('AppRouter', () => {
         },
       })
       try {
-        window.history.replaceState(null, '', '/storage')
+        window.history.replaceState(null, '', '/account')
         router = new AppRouter({ outlet, views, transitions: false })
         expect(await router.start()).to.equal(true)
       } finally {
@@ -236,7 +236,7 @@ describe('AppRouter', () => {
       router.setTitle('Sun 11 Oct - Easter')
       expect(document.title).to.equal('Sun 11 Oct - Easter - Chordless')
 
-      await router.navigate('/storage')
+      await router.navigate('/account')
       expect(document.title).to.equal('Storage - Chordless')
     })
 
@@ -277,11 +277,11 @@ describe('AppRouter', () => {
 
     it('does not cancel a change of view that is still loading', async () => {
       let release
-      views.storage.load = () =>
+      views.account.load = () =>
         new Promise(resolve => {
-          release = () => resolve(fakeView('storage'))
+          release = () => resolve(fakeView('account'))
         })
-      const going = router.navigate('/storage')
+      const going = router.navigate('/account')
       // While storage loads, the setlist moves on within itself
       await router.navigate('/setlist/abc/song/1', { replace: true })
       expect(router.view.dataset.view).to.equal('setlist')
@@ -289,8 +289,8 @@ describe('AppRouter', () => {
 
       release()
       await going
-      expect(router.view.dataset.view).to.equal('storage')
-      expect(window.location.pathname).to.equal('/storage')
+      expect(router.view.dataset.view).to.equal('account')
+      expect(window.location.pathname).to.equal('/account')
     })
 
     it('replaces the view for another setlist', async () => {
@@ -345,8 +345,8 @@ describe('AppRouter', () => {
     })
 
     it('follows the back button', async () => {
-      await router.navigate('/storage')
-      expect(router.route.name).to.equal('storage')
+      await router.navigate('/account')
+      expect(router.route.name).to.equal('account')
       const changed = routeChanged()
       window.history.back()
       await changed
@@ -381,7 +381,7 @@ describe('AppRouter', () => {
       host = document.createElement('div')
       host.attachShadow({ mode: 'open' })
       document.body.append(host)
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
     })
 
@@ -396,7 +396,7 @@ describe('AppRouter', () => {
 
     it('leaves a link to a route with no view to the browser', () => {
       expect(click('href="/bookmarklet"')).to.equal(false)
-      expect(router.route.name).to.equal('storage')
+      expect(router.route.name).to.equal('account')
     })
 
     it('leaves other kinds of clicks and links to the browser', () => {
@@ -410,7 +410,7 @@ describe('AppRouter', () => {
       expect(click('href="https://example.com/songs"')).to.equal(false)
       expect(click('href="#top"')).to.equal(false)
       expect(click('')).to.equal(false)
-      expect(window.location.pathname).to.equal('/storage')
+      expect(window.location.pathname).to.equal('/account')
     })
   })
 
@@ -418,7 +418,7 @@ describe('AppRouter', () => {
     let release
 
     beforeEach(async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
     })
 
@@ -437,8 +437,8 @@ describe('AppRouter', () => {
       slowSongs()
       const done = router.navigate('/songs')
       await Promise.resolve()
-      expect(window.location.pathname).to.equal('/storage')
-      expect(outlet.firstElementChild.dataset.view).to.equal('storage')
+      expect(window.location.pathname).to.equal('/account')
+      expect(outlet.firstElementChild.dataset.view).to.equal('account')
       release()
       await done
       expect(window.location.pathname).to.equal('/songs')
@@ -470,7 +470,7 @@ describe('AppRouter', () => {
             return view
           },
         })
-        window.history.replaceState(null, '', '/storage')
+        window.history.replaceState(null, '', '/account')
         await router.start()
         views.songs.load = () => Promise.reject(new Error('offline'))
         await router.navigate('/songs')
@@ -507,7 +507,7 @@ describe('AppRouter', () => {
       announcer = document.createElement('div')
       announcer.setAttribute('aria-live', 'polite')
       document.body.append(announcer)
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter({ announcer }).start()
     })
 
@@ -545,9 +545,9 @@ describe('AppRouter', () => {
       const host = document.createElement('route-consumer')
       document.body.append(host)
       const consumer = host.consumer
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
-      expect(consumer.value).to.deep.equal({ name: 'storage' })
+      expect(consumer.value).to.deep.equal({ name: 'account' })
       await router.navigate('/songs')
       expect(consumer.value).to.deep.equal({ name: 'songs' })
       router.stop()
@@ -558,7 +558,7 @@ describe('AppRouter', () => {
 
   describe('coming back to a view', () => {
     beforeEach(async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
     })
 
@@ -572,7 +572,7 @@ describe('AppRouter', () => {
     })
 
     it('gives an entry the browser made, such as one for a link to #here, a key', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
       const first = window.history.state.key
       const popped = new Promise(resolve =>
@@ -582,7 +582,7 @@ describe('AppRouter', () => {
       await popped
       await new Promise(resolve => setTimeout(resolve, 30))
       expect(window.history.state.key).to.be.a('string').and.to.not.equal(first)
-      expect(router.route).to.deep.equal({ name: 'storage' })
+      expect(router.route).to.deep.equal({ name: 'account' })
     })
 
     it('hands back what a view showed when you return with the back button', async () => {
@@ -592,7 +592,7 @@ describe('AppRouter', () => {
       const back = routeChanged()
       window.history.back()
       await back
-      expect(router.view.dataset.view).to.equal('storage')
+      expect(router.view.dataset.view).to.equal('account')
       expect(router.view.restoredState).to.deep.equal(left)
     })
 
@@ -611,8 +611,8 @@ describe('AppRouter', () => {
 
     it('starts a view clean when it is reached by a new navigation', async () => {
       await router.navigate('/songs')
-      await router.navigate('/storage')
-      expect(router.view.dataset.view).to.equal('storage')
+      await router.navigate('/account')
+      expect(router.view.dataset.view).to.equal('account')
       expect(router.view.restoredState).to.equal(undefined)
     })
 
@@ -642,23 +642,23 @@ describe('AppRouter', () => {
      * was handed
      */
     async function backToTheFirstOfSix() {
-      for (const path of ['/songs', '/storage', '/songs', '/storage', '/songs']) {
+      for (const path of ['/songs', '/account', '/songs', '/account', '/songs']) {
         await router.navigate(path)
       }
       const back = routeChanged()
       window.history.go(-5)
       await back
-      expect(router.view.dataset.view).to.equal('storage')
+      expect(router.view.dataset.view).to.equal('account')
       return router.view.restoredState
     }
 
     it('remembers a view for a long trip through the history', async () => {
-      expect(await backToTheFirstOfSix()).to.include({ name: 'storage' })
+      expect(await backToTheFirstOfSix()).to.include({ name: 'account' })
     })
 
     it('forgets the oldest entries when it has too many', async () => {
       makeRouter({ rememberLimit: 2 })
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await router.start()
       expect(await backToTheFirstOfSix()).to.equal(undefined)
     })
@@ -679,38 +679,38 @@ describe('AppRouter', () => {
     }
 
     it('hands back the state of a view that was left, to a router that starts afterwards', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter({ storage }).start()
       await router.navigate('/songs')
       const back = routeChanged()
       window.history.back()
       await back
       const left = JSON.parse(must(storage.getItem(STORAGE_KEY))).find(
-        ([, state]) => state.name === 'storage'
+        ([, state]) => state.name === 'account'
       )
       expect(left).to.not.equal(undefined)
 
       const view = await reload()
-      expect(view.dataset.view).to.equal('storage')
+      expect(view.dataset.view).to.equal('account')
       expect(view.restoredState).to.deep.equal(left[1])
     })
 
     it('keeps the view that is showing when the page is hidden', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter({ storage }).start()
       expect(storage.getItem(STORAGE_KEY)).to.equal(null)
 
       window.dispatchEvent(new Event('pagehide'))
       const saved = JSON.parse(must(storage.getItem(STORAGE_KEY)))
       expect(saved).to.have.length(1)
-      expect(saved[0][1]).to.include({ name: 'storage' })
+      expect(saved[0][1]).to.include({ name: 'account' })
 
       const view = await reload()
       expect(view.restoredState).to.deep.equal(saved[0][1])
     })
 
     it('keeps it when the tab goes out of sight, but not when it comes back', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter({ storage }).start()
       const visible = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState')
       const setVisibility = value =>
@@ -731,7 +731,7 @@ describe('AppRouter', () => {
     it('starts without state if what is stored cannot be read', async () => {
       for (const junk of ['not json', '{"a":1}', '42', 'null']) {
         storage.setItem(STORAGE_KEY, junk)
-        window.history.replaceState(null, '', '/storage')
+        window.history.replaceState(null, '', '/account')
         await makeRouter({ storage }).start()
         expect(router.view.restoredState, junk).to.equal(undefined)
         router.stop()
@@ -745,20 +745,20 @@ describe('AppRouter', () => {
           throw new Error('quota')
         },
       }
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter({ storage: full }).start()
       await router.navigate('/songs')
       const back = routeChanged()
       window.history.back()
       await back
       // Kept in memory all the same
-      expect(router.view.restoredState).to.include({ name: 'storage' })
+      expect(router.view.restoredState).to.include({ name: 'account' })
     })
   })
 
   describe('stop', () => {
     it('removes the view and stops following links', async () => {
-      window.history.replaceState(null, '', '/storage')
+      window.history.replaceState(null, '', '/account')
       await makeRouter().start()
       const view = router.view
       router.stop()
