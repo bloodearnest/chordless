@@ -7,6 +7,14 @@ editing
 - song notes/stickies
 
 song data
+- importing a chart the library already has: say what differs (a verdict and a side-by-side view),
+  offer Keep both, and make Replace take the new CCLI number, source and date: designed in
+  docs/VARIANTS.md, "Importing a chart the library already has"
+- variants of one song are all labelled "Original" after a copy between spaces: label them by what
+  differs (the key, say) or ask
+- a free-form source (who wrote a chart) can be supplied nowhere: add an optional field to the import
+  and to the song's info
+- the Worker does not check who may delete songs in a Team (admin and up): see docs/SPACES.md, "Roles"
 - feature idea: song structure.  Have an translucent overlay on the top right
   that shows intended structure vertically e.g. "v1 c1 v2 c2 x2 b1 x4 c1". We
   could fill in a default by guessing based on source chordpro, but users

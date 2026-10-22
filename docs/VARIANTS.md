@@ -79,6 +79,45 @@ meet the usual Drive conflict rule (docs/SYNC_ARCHITECTURE.md).
 docs/DATA_MODEL.md says "Songs are immutable - any edit creates a new variant". That changes:
 a fix is in place.
 
+## Importing a chart the library already has (designed 2026-10-22, not built)
+
+**Today.** Importing a chart looks for an existing song by CCLI number, then by normalised title
+(`findExistingSong`, used by `song-import.ts`). A hand-made chart has no CCLI number, so an official
+SongSelect chart of the same song is found by its **title**, and the import lists it as "already in
+library" with two choices per song: **Update** (replace the existing chart's text in place with the
+new one; setlists keep pointing at it) and **Use existing** (keep the old, store nothing). Neither
+is right for a hand-made alternate-chords chart, and Update only swaps the text: the song keeps its
+title-based id, has no CCLI number, keeps its old source ("Simon Davy") and its old import date, so
+an official chart ends up looking hand-made. A hand-made and an official chart of one song are also
+two identities (`title ...` and `ccli ...`), so the library repair does not see them as the same song.
+
+**Wanted.**
+
+1. **Say what differs before asking.** `compareCharts(a, b)` (pure, next to `chartFingerprint`)
+   gives a verdict, built on the same fingerprint as the repair so a change of key does not mark every
+   line:
+   - *identical*: the same text; nothing to ask, the existing one is used;
+   - *same chart, other key*: only the key differs (G to A); the same song;
+   - *same words, different chords*: the alternate-chords case;
+   - *different words*: another version or arrangement.
+
+   It also gives the two keys and the lines of the two charts aligned section by section, each marked
+   only where its normalised form differs.
+2. **A side-by-side view** of the two charts (`chart-diff`, stacked on a narrow screen), under a
+   **Compare** disclosure that is open by default when the words or the chords differ. The differing
+   chords or words are highlighted inside a marked line; the two keys are shown above the columns.
+3. **A third choice, Keep both.** The chart being imported becomes the song's default (with its CCLI
+   number and id, source SongSelect, its own import date) and the existing chart becomes a variant of
+   it (source and import date unchanged, label "Alternate chords" unless the person gives one).
+   Setlists that used the old chart keep using it.
+4. **Replace is fixed** to take the incoming chart's CCLI number, id, source and import date as well
+   as its text (every variant of the song gets the new id, and a setlist entry keeps its `songUuid`).
+5. The repair's preview shows the same comparison for the groups it merges.
+
+**Open question: what is pre-selected.** Proposed: *Keep both* when the words match and the chords
+differ (nothing is lost, and the official chart is the obvious default), *Keep mine* when it is only
+a change of key (the same song), nothing pre-selected when the words differ.
+
 ## Order of work
 
 1. Data: origin fields and their Drive properties, the default rule (earliest import; share and
