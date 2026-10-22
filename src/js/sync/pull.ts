@@ -232,6 +232,8 @@ export async function pullSongs(
   for (const file of driveFiles) {
     const props = file.props
     if (props.type && props.type !== 'chordpro') continue
+    // A song deleted here, whose file could not be put in the trash yet, is not to come back
+    if (session.pendingDeletedRefs.has(file.ref)) continue
     const songUuid = driveSongUuid(props, file.ref)
     const driveModified = new Date(file.modified || file.created || 0)
     const existing = latestByUuid.get(songUuid)
@@ -246,6 +248,8 @@ export async function pullSongs(
     }
     latestByUuid.set(songUuid, { file, props, songUuid, driveModified })
   }
+
+  session.liveSongUuids = new Set(latestByUuid.keys())
 
   if (latestByUuid.size === 0) {
     progressCallback?.({

@@ -24,7 +24,7 @@ import {
 import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
 import { pushSetlist, pushSetlists, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
 import { makeSetlist, makeSong } from './builders.ts'
-import { addSong, useSyncRig } from './drive-harness.ts'
+import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -422,7 +422,7 @@ describe('Drive sync: the less common turns', () => {
       expect(must(await phone.db.getChordPro(song.chordproFileId)).content).to.contain('Grace')
     })
 
-    it('are uploaded again when their Drive file is gone', async () => {
+    it('are deleted here too when their Drive file is gone and they were not changed here', async () => {
       const phone = await makeDevice('phone')
       await addSong(phone, {
         uuid: 'song-1',
@@ -432,6 +432,22 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const [file] = rig.storage.list(each => each.props.type === 'chordpro')
       rig.storage.remove(file.ref)
+      await syncDevice(phone)
+      expect(await phone.db.getSong('song-1')).to.equal(undefined)
+      expect(rig.storage.list(each => each.props.type === 'chordpro')).to.have.length(0)
+    })
+
+    it('are uploaded again when their Drive file is gone and they were changed here', async () => {
+      const phone = await makeDevice('phone')
+      await addSong(phone, {
+        uuid: 'song-1',
+        title: 'Amazing',
+        content: '{title: Amazing}\n[G]Grace',
+      })
+      await syncDevice(phone)
+      const [file] = rig.storage.list(each => each.props.type === 'chordpro')
+      rig.storage.remove(file.ref)
+      await editSong(phone, 'song-1', '{title: Amazing}\n[G]Grace, edited')
       await syncDevice(phone)
       const [again] = rig.storage.list(each => each.props.type === 'chordpro')
       expect(again.ref).to.not.equal(file.ref)

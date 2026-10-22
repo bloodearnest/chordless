@@ -1,5 +1,6 @@
 import type {
   ChordProRecord,
+  PendingDeletion,
   Setlist,
   SetlistLocalState,
   SongInput,
@@ -18,7 +19,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 8
+const DB_VERSION = 9
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -179,6 +180,11 @@ export class ChordlessDB {
         // Create setlist_local store (new in v5)
         if (!db.objectStoreNames.contains('setlist_local')) {
           db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+        }
+
+        // Files whose records were deleted here and are to go in the Drive trash (new in v9)
+        if (!db.objectStoreNames.contains('pending_deletions')) {
+          db.createObjectStore('pending_deletions', { keyPath: 'ref' })
         }
 
         if (oldVersion > 0 && oldVersion < DB_VERSION) {
@@ -443,14 +449,61 @@ export class ChordlessDB {
     return transactionDone(tx)
   }
 
+  /**
+   * Delete a song and its chart. If it has a file in Drive, that is noted, for the next sync to
+   * put in the Drive trash: without that, the file would bring the song back. A song deleted
+   * because Drive no longer has its file passes `remember: false`.
+   */
+  async deleteSong(uuid: string, { remember = true }: { remember?: boolean } = {}): Promise<void> {
+    const song = await this.getSong(uuid)
+    if (!song) return
+    const tx = this.#transaction(['songs', 'chordpro', 'pending_deletions'], 'readwrite')
+    tx.objectStore('songs').delete(uuid)
+    if (remember && song.fileRef) {
+      const pending: PendingDeletion = {
+        ref: song.fileRef,
+        kind: 'song',
+        deletedAt: new Date().toISOString(),
+      }
+      tx.objectStore('pending_deletions').put(pending)
+    }
+    await transactionDone(tx)
+    // The chart goes too, unless another song uses it
+    const shared = (await this.getAllSongs()).some(
+      other => other.chordproFileId === song.chordproFileId
+    )
+    if (song.chordproFileId && !shared) {
+      const tx2 = this.#transaction(['chordpro'], 'readwrite')
+      tx2.objectStore('chordpro').delete(song.chordproFileId)
+      await transactionDone(tx2)
+    }
+  }
+
+  /** The files to be put in the Drive trash at the next sync */
+  async getPendingDeletions(): Promise<PendingDeletion[]> {
+    const tx = this.#transaction(['pending_deletions'], 'readonly')
+    return requestResult(tx.objectStore('pending_deletions').getAll())
+  }
+
+  /** Note that a file has been put in the trash (or is gone): it is no longer to be */
+  async clearPendingDeletion(ref: string): Promise<void> {
+    const tx = this.#transaction(['pending_deletions'], 'readwrite')
+    tx.objectStore('pending_deletions').delete(ref)
+    return transactionDone(tx)
+  }
+
   // Clear all data (for re-import)
   async clearAll(): Promise<void> {
-    const tx = this.#transaction(['setlists', 'songs', 'chordpro', 'setlist_local'], 'readwrite')
+    const tx = this.#transaction(
+      ['setlists', 'songs', 'chordpro', 'setlist_local', 'pending_deletions'],
+      'readwrite'
+    )
 
     const setlistStore = tx.objectStore('setlists')
     const songStore = tx.objectStore('songs')
     const chordproStore = tx.objectStore('chordpro')
     const localStore = tx.objectStore('setlist_local')
+    tx.objectStore('pending_deletions').clear()
 
     await setlistStore.clear()
     await songStore.clear()

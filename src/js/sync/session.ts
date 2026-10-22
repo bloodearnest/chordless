@@ -77,6 +77,10 @@ export interface SyncSession {
   resetSetlists: ResetSetlist[]
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete: boolean
+  /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
+  pendingDeletedRefs: Set<string>
+  /** The ids of the songs that have a live file in Drive, as listed by the last pull (null: not listed) */
+  liveSongUuids: Set<string> | null
 
   /** Whether a Drive file is in the folder (with no inventory, any file is assumed to be) */
   fileExistsInDrive(fileRef: string): boolean

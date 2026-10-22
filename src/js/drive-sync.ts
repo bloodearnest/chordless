@@ -209,6 +209,10 @@ export class DriveSyncManager implements SyncSession {
   liveSetlistFiles: StoredFile[] | null
   /** Whether the last pull of setlists failed to read some file, so it may not know them all */
   pullIncomplete: boolean
+  /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
+  pendingDeletedRefs: Set<string>
+  /** The ids of the songs that have a live file in Drive, as listed by the last pull (null: not listed) */
+  liveSongUuids: Set<string> | null
   /** Whether the user can only read the folder, as the last check found (null: not asked) */
   readOnly: boolean | null
   /** How many records the last pull left alone, for a user who can only read (sync/pull.ts) */
@@ -243,6 +247,8 @@ export class DriveSyncManager implements SyncSession {
     this._driveFileIds = null // Set of file IDs that exist in Drive
     this.liveSetlistFiles = null
     this.pullIncomplete = false
+    this.pendingDeletedRefs = new Set()
+    this.liveSongUuids = null
     this.readOnly = null
   }
 
@@ -395,6 +401,15 @@ export class DriveSyncManager implements SyncSession {
       await this.buildDriveInventory()
       await this.assertRecordsInThisFolder()
 
+      // Songs deleted here go in the Drive trash before anything is pulled, or they would come back
+      const trashed = await this.trashPendingDeletions()
+      if (trashed > 0 && progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: `Moved ${trashed} deleted file${trashed === 1 ? '' : 's'} to the Drive trash`,
+        })
+      }
+
       // First, pull changes from Drive
       progressCallback?.({ stage: 'pulling', message: 'Downloading from Drive...' })
       await this.pullFromDrive(progressCallback)
@@ -406,6 +421,15 @@ export class DriveSyncManager implements SyncSession {
         progressCallback({
           stage: 'pulling',
           message: `Removed ${removed} setlists that were deleted in Drive`,
+        })
+      }
+
+      // A song whose file was deleted elsewhere, and not edited here, is deleted here too
+      const goneSongs = await this.removeSongsDeletedInDrive()
+      if (goneSongs > 0 && progressCallback) {
+        progressCallback({
+          stage: 'pulling',
+          message: `Removed ${goneSongs} song${goneSongs === 1 ? '' : 's'} that ${goneSongs === 1 ? 'was' : 'were'} deleted elsewhere`,
         })
       }
 
@@ -442,9 +466,54 @@ export class DriveSyncManager implements SyncSession {
       this._driveFileIds = null
       this.liveSetlistFiles = null
       this.pullIncomplete = false
+      this.pendingDeletedRefs = new Set()
+      this.liveSongUuids = null
       this.readOnly = null
     }
     return { success: true }
+  }
+
+  /**
+   * Put the files of songs deleted here in the Drive trash (where they can be restored from), and
+   * stop noting them. One that cannot be (a user who can only read, no network) is kept noted and
+   * is not pulled again meanwhile.
+   * @returns how many were put in the trash
+   */
+  async trashPendingDeletions(): Promise<number> {
+    const pending = await this.db.getPendingDeletions()
+    this.pendingDeletedRefs = new Set(pending.map(entry => entry.ref))
+    let trashed = 0
+    for (const entry of pending) {
+      try {
+        await this.space.trash(entry.ref)
+        await this.db.clearPendingDeletion(entry.ref)
+        this.pendingDeletedRefs.delete(entry.ref)
+        trashed++
+      } catch (error) {
+        console.warn(`[DriveSync] Could not put ${entry.ref} in the Drive trash yet:`, error)
+      }
+    }
+    return trashed
+  }
+
+  /**
+   * A song whose Drive file is gone, with no other file for it, and no change here that Drive
+   * lacks, was deleted elsewhere: delete it here too. One that has been changed here is kept, and
+   * goes back to Drive with the push.
+   * @returns how many were removed
+   */
+  async removeSongsDeletedInDrive(): Promise<number> {
+    if (!this._driveFileIds || !this.liveSongUuids) return 0
+    let removed = 0
+    for (const song of await this.db.getAllSongs()) {
+      if (!song.fileRef || this.fileExistsInDrive(song.fileRef)) continue
+      if (this.liveSongUuids.has(songUuidOf(song))) continue
+      const chordproFile = await this.db.getChordPro(song.chordproFileId)
+      if (!chordproFile || songHasLocalChanges(song, chordproFile)) continue
+      await this.db.deleteSong(song.uuid, { remember: false })
+      removed++
+    }
+    return removed
   }
 
   /** Update and clean up this space's share links (see share-manager.ts) */
@@ -652,6 +721,9 @@ export class DriveSyncManager implements SyncSession {
       if (chordproFile && songHasLocalChanges(song, chordproFile)) {
         unsynced.push({ type: 'song', id: songUuidOf(song), label: song.title || '' })
       }
+    }
+    for (const entry of await this.db.getPendingDeletions()) {
+      unsynced.push({ type: 'song', id: entry.ref, label: '(deleted, not yet in the Drive trash)' })
     }
     return unsynced
   }

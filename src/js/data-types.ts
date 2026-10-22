@@ -115,7 +115,20 @@ export interface SongRecord {
   syncedContentHash?: string | null
   /** What this device recorded about the synced file */
   fileProps?: SongFileProps | null
+  /**
+   * When something about the song other than its chart changed (its source, say), for sync to send:
+   * a change since the last sync is a local change. Not kept from Drive.
+   */
+  metadataChangedAt?: string | null
   contentHash: string
+}
+
+/** A file in Drive that this device has deleted the record of, to be put in the Drive trash at the next sync */
+export interface PendingDeletion {
+  /** The file's ref (a Drive file id) */
+  ref: string
+  kind: 'song' | 'setlist'
+  deletedAt: string
 }
 
 /** A song as it is passed to be saved: tempos may still be a chart's text */

@@ -51,6 +51,13 @@ export function songHasLocalChanges(song: SongRecord, chordproFile: ChordProReco
   if (!song.fileRef) {
     return true
   }
+  // Something besides the chart changed (its source, say), and has not been sent since
+  if (
+    song.metadataChangedAt &&
+    (!song.lastSyncedAt || song.metadataChangedAt > song.lastSyncedAt)
+  ) {
+    return true
+  }
   if (song.syncedContentHash) {
     // Hash the chart itself rather than trusting a stored contentHash
     return hashText(chordproFile.content) !== song.syncedContentHash

@@ -298,6 +298,22 @@ Drive and removed here. An old folder that can still be seen is left alone, for 
 
 ## Part 2: Planned work
 
+### Deleting songs
+
+**Built 2026-10-22** (for the library cleanup in docs/ACCOUNT.md; setlists below are still to do).
+`ChordlessDB.deleteSong(uuid)` removes the song and its chart (unless another song uses it). A song that
+has a file in Drive is noted in a `pending_deletions` store (database version 9, `PendingDeletion`).
+At the next sync, before anything is pulled, `trashPendingDeletions()` puts each such file in the
+Drive trash (restorable) and stops noting it; one that cannot be trashed (a user who can only read,
+no network) stays noted, and the pull does not bring its file back meanwhile
+(`SyncSession.pendingDeletedRefs`). On another device, after the pull, `removeSongsDeletedInDrive()`
+deletes a song whose file is gone from Drive when it has no other live file there
+(`liveSongUuids`) and has no change that Drive lacks; a song changed there goes back to Drive. This
+also makes deleting a song's file in the Drive web page stick, where a sync used to upload it again.
+A deletion not yet in the trash counts as an unsynced change, so "Reset from Drive" says so first.
+A change to a song other than its chart (its source, say) is sent by setting `metadataChangedAt`
+on the record. Who may delete songs in a Team (admin and up) is not yet checked by the Worker.
+
 ### Deleting setlists
 
 **Built: setlists that are not in Drive.** The setlist info dialog's edit view (the pencil)
