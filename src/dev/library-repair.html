@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Library repair - Chordless</title>
+    <link rel="stylesheet" href="/css/style.css" />
+    <style>
+      body { overflow: auto; padding: 2rem; }
+      main { max-width: 52rem; margin: 0 auto; }
+      label { display: block; margin-block: 0.75rem 0.25rem; font-weight: 600; }
+      select, input[type='text'] { font: inherit; padding: 0.4rem; min-width: 18rem; }
+      button { font: inherit; padding: 0.5rem 1rem; margin-right: 0.5rem; }
+      table { border-collapse: collapse; margin-block: 0.5rem; width: 100%; }
+      th, td { text-align: left; padding: 0.25rem 0.5rem; border-bottom: 1px solid #8884; }
+      .note { opacity: 0.75; }
+      .done { color: green; }
+      .problem { color: crimson; }
+      details { margin-block: 0.75rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Library repair</h1>
+      <p>
+        Merges songs that are the same song twice (a change of key is not a variant), and gives
+        every song without a known source one: SongSelect where its chart has the CCLI material,
+        otherwise the person who wrote it. Preview first; nothing changes until you apply. Merged
+        songs go in the Drive trash at the next sync, so <strong>sync that space afterwards</strong>.
+        Also available in the console as <code>libraryRepair</code>. Served by
+        <code>just serve</code> only, never in production.
+      </p>
+
+      <label for="space">Space</label>
+      <select id="space"></select>
+
+      <label for="written-by">Written by (the source of a song with no CCLI material)</label>
+      <input id="written-by" type="text" />
+
+      <p>
+        <label style="display: inline">
+          <input id="backup" type="checkbox" checked /> Download an export of the space first
+        </label>
+      </p>
+
+      <p>
+        <button id="preview">Preview</button>
+        <button id="apply" disabled>Apply</button>
+      </p>
+      <div id="output"></div>
+    </main>
+    <script type="module" src="/dev/library-repair.js"></script>
+  </body>
+</html>

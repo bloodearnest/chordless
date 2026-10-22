@@ -42,6 +42,25 @@ library has); sync sees the changed hash and uploads it.
    arrangements" in the variant step, separate songs and never merged. No change to the data. If
    unrelated songs with one title make this noisy, add an explicit link between song ids later.
 
+## A key change is not a variant
+
+Decided 2026-10-22. A variant is a different arrangement: other words, other sections, other chords.
+The same chart in another key is the same song, and so are two charts that differ only in what is
+about the song (title, copyright, tempo, the CCLI material). `chartFingerprint` in
+`src/js/library-repair.ts` reduces a chart to its words and its chords as numbers from the key, and
+two charts with the same fingerprint are one chart.
+
+Copying songs between spaces dedupes by exact text (`contentHash`) only, so a library that holds the
+same song twice (an import done twice, a copy of a chart in another key) keeps both. To clean one up
+there is a repair, run from the dev page `/dev/library-repair.html` (or the console, `libraryRepair`),
+not from the app: it merges each set of records with one fingerprint into the one the setlists use
+most, moves the setlist entries to it (an entry with no key or tempo of its own is given the
+removed song's, so it shows as it did), deletes the others (their Drive files go in the trash at the
+next sync, docs/SYNC_ARCHITECTURE.md "Deleting songs"), and reports the songs that have genuinely
+different arrangements, which it leaves. It also gives a song with no known source one: SongSelect
+if its chart has the CCLI material, otherwise the person who wrote it. Run on the 278-record
+library that prompted it, it leaves the 148 songs; and the 177-record copy of it in a Team, 148.
+
 ## Editing a chart
 
 The user can open a song's ChordPro and edit it on the device, for two different reasons:
