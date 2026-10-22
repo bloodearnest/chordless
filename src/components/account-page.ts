@@ -140,12 +140,14 @@ export class AccountPage extends LitElement {
     void this.load()
   }
 
-  /** The spaces on this device, the one in use first */
+  /**
+   * The spaces on this device, in the order they were added, so the list stays put whichever is in
+   * use: the Personal space, made first, is always first
+   */
   async load(): Promise<void> {
-    const current = getCurrentSpace().id
     const spaces = await listSpaces()
-    spaces.sort((a, b) => Number(b.id === current) - Number(a.id === current))
-    this._currentId = current
+    spaces.sort((a, b) => a.createdDate.localeCompare(b.createdDate) || a.id.localeCompare(b.id))
+    this._currentId = getCurrentSpace().id
     this._spaces = spaces
   }
 

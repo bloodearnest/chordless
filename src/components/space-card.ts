@@ -99,7 +99,6 @@ export class SpaceCard extends LitElement {
         flex-wrap: wrap;
       }
       .title { font-weight: 600; font-size: var(--font-ui); overflow-wrap: anywhere; }
-      .labels { margin-left: auto; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
       .chip {
         font-size: var(--font-ui-small);
         padding: 0.1rem 0.6rem;
@@ -108,6 +107,7 @@ export class SpaceCard extends LitElement {
         opacity: 0.85;
       }
       .badge {
+        margin-left: auto;
         font-size: var(--font-ui-small);
         font-weight: 600;
         color: var(--color-primary, #2477ad);
@@ -200,11 +200,9 @@ export class SpaceCard extends LitElement {
       <div class="card ${this.current ? 'current' : ''}">
         <div class="head">
           <span class="title">${space.name}</span>
-          <span class="labels">
-            ${kind ? html`<span class="chip">${kind}</span>` : nothing}
-            ${role ? html`<span class="chip">${role}</span>` : nothing}
-            ${this.current ? html`<span class="badge">Current</span>` : nothing}
-          </span>
+          ${kind ? html`<span class="chip">${kind}</span>` : nothing}
+          ${role ? html`<span class="chip">${role}</span>` : nothing}
+          ${this.current ? html`<span class="badge">Current</span>` : nothing}
         </div>
         <p class="line">
           ${

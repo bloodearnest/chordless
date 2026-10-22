@@ -42,11 +42,11 @@ Account and Teams
 +--------------------------------------------------------+
   signed out: "Not signed in. Your songs stay on this device."  [Sign in with Google]
 
-+- Bea Singer ------------------ [Personal] Current -----+
++- Bea Singer [Personal]                        Current -+
 | 31 songs - 6 setlists - about 190 KB                    |
 | Synced 5 min ago                      [Sync] [Manage]   |
 +--------------------------------------------------------+
-+- Gateway Church ------------- [Team] [owner] ---------+
++- Gateway Church [Team] [owner]                         +
 | 212 songs - 48 setlists - about 1.4 MB                  |
 | Sign in to sync          [Manage]                [Switch] |
 +--------------------------------------------------------+
@@ -62,7 +62,7 @@ This device
   (download, import) are under an *Advanced* disclosure.
 - **Signed out disables nothing.** The Personal space, export, import and delete all work; a card's
   sync line says "Sign in to sync".
-- **Cards:** the space in use says Current and has Sync; the others have Switch. A personal
+- **Cards:** in the order the spaces were added (the Personal space is always first), whichever is in use; the one in use says Current and the others have Switch. A personal
   space's name is the account name once signed in (`first-time-auth.ts`); one still called
   "Personal" shows just "Personal". A team shows the person's role.
 - **Switch** (not "Open") is the word, and the only thing that reloads the app.
@@ -92,7 +92,7 @@ it has. The cost is that a space's management has no address of its own.
 ```
 
 The space's name is the modal's heading. On the list, the kind (Personal, Team) and the person's role
-in a Team are labels at the right of the card, and Switch is flush right, on the card and in the modal's header. It works
+in a Team are labels after the name on the left, Current is flush right where it never moves, and Switch is flush right, on the card and in the modal's header. It works
 for any space, not only the one in use, so nothing is switched to be managed. That is possible
 because the first sync takes the space's own database (`syncTeamSpace`), export and delete need only
 that database, and the people and invite calls need only the team id. Every destructive action asks

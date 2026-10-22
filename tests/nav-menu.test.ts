@@ -28,6 +28,20 @@ describe('nav-menu', () => {
 
   afterEach(() => container?.remove())
 
+  it('lists Account and Teams before the Media Player, after Preferences', async () => {
+    const menu = await setUp(`
+      <button id="menu-button">Menu</button>
+      <nav-menu for="menu-button"></nav-menu>
+    `)
+    const labels = [...menu.shadowRoot.querySelectorAll('.nav-menu-item')].map(item =>
+      item.textContent.trim()
+    )
+    const at = (label: string) => labels.findIndex(each => each.startsWith(label))
+    expect(at('Preferences')).to.be.greaterThan(-1)
+    expect(at('Account and Teams')).to.equal(at('Preferences') + 1)
+    expect(at('Media Player')).to.equal(at('Account and Teams') + 1)
+  })
+
   it('has a Help item only on a page that has help, and it opens that help', async () => {
     const menu = await setUp(`
       <button id="menu-button">Menu</button>

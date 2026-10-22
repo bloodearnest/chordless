@@ -384,6 +384,11 @@ export class NavMenu extends LitElement {
             <span>Preferences</span>
           </button>
 
+          <a href="/account" class="nav-menu-item" part="nav-item">
+            <app-icon name="layers" size="20" class="nav-icon"></app-icon>
+            <span>Account and Teams</span>
+          </a>
+
           <a href="/media" class="nav-menu-item" part="nav-item">
             <app-icon name="play" size="20" class="nav-icon"></app-icon>
             <span>Media Player</span>
@@ -398,11 +403,6 @@ export class NavMenu extends LitElement {
                 <app-icon name="bookmark" size="20" class="nav-icon"></app-icon>
                 <span>SongSelect Import</span>
               </a>
-
-          <a href="/account" class="nav-menu-item" part="nav-item">
-            <app-icon name="layers" size="20" class="nav-icon"></app-icon>
-            <span>Account and Teams</span>
-          </a>
 
           <a href="/about" class="nav-menu-item" part="nav-item">
             <app-icon name="info" size="20" class="nav-icon"></app-icon>

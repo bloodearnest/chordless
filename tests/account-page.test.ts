@@ -74,15 +74,33 @@ describe('account-page', () => {
     expect(el.shadowRoot?.textContent).to.contain('invite link')
   })
 
-  it('puts the space in use first, and marks only it', async () => {
+  it('keeps the spaces in the order they were added, whichever is in use, and marks only that one', async () => {
     const first = await space('First')
+    await wait(5)
     const second = await space('Second')
-    await setCurrentSpace(second.id, second.name)
+    const order = () => cards(el).map(card => card.space.id)
+    await setCurrentSpace(first.id, first.name)
     const el = await page()
-    const shown = cards(el)
-    expect(shown[0].space.id).to.equal(second.id)
-    expect(shown.filter(card => card.current).map(card => card.space.id)).to.deep.equal([second.id])
-    expect(shown.some(card => card.space.id === first.id)).to.equal(true)
+    const mine = order().filter(id => id === first.id || id === second.id)
+    expect(mine).to.deep.equal([first.id, second.id])
+    expect(
+      cards(el)
+        .filter(card => card.current)
+        .map(card => card.space.id)
+    ).to.deep.equal([first.id])
+
+    await setCurrentSpace(second.id, second.name)
+    await el.load()
+    await el.updateComplete
+    expect(order().filter(id => id === first.id || id === second.id)).to.deep.equal([
+      first.id,
+      second.id,
+    ])
+    expect(
+      cards(el)
+        .filter(card => card.current)
+        .map(card => card.space.id)
+    ).to.deep.equal([second.id])
   })
 
   it('hands the sign-in on to the cards', async () => {
