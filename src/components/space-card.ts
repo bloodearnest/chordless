@@ -115,6 +115,7 @@ export class SpaceCard extends LitElement {
       .line { font-size: var(--font-ui-small); opacity: 0.8; margin: 0; }
       .line.error { color: var(--color-danger, #e74c3c); opacity: 1; }
       .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+      .switch { margin-left: auto; }
     `,
   ]
 
@@ -221,11 +222,6 @@ export class SpaceCard extends LitElement {
         </p>
         <div class="actions">
           ${
-            this.current
-              ? nothing
-              : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
-          }
-          ${
             this._canSync
               ? html`<button class="btn primary" id="sync" ?disabled=${this._syncing} @click=${this._sync}>
                 Sync
@@ -235,6 +231,11 @@ export class SpaceCard extends LitElement {
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
             Manage
           </button>
+          ${
+            this.current
+              ? nothing
+              : html`<button class="btn switch" id="switch" @click=${this._switch}>Switch</button>`
+          }
         </div>
       </div>
       <app-modal

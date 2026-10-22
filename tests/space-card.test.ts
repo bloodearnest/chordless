@@ -106,12 +106,15 @@ describe('space-card', () => {
     expect(asked).to.deep.equal([space.id])
   })
 
-  it('puts Switch first of the buttons, then Sync, then Manage', async () => {
+  it('puts Sync and Manage on the left, and Switch flush right', async () => {
     const el = await card('signed-in')
     const order = Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(
       each => each.id
     )
-    expect(order).to.deep.equal(['switch', 'sync', 'manage'])
+    expect(order).to.deep.equal(['sync', 'manage', 'switch'])
+    const switchButton = must(button(el, 'switch'))
+    const row = must(el.shadowRoot?.querySelector('.actions')).getBoundingClientRect()
+    expect(Math.round(switchButton.getBoundingClientRect().right)).to.equal(Math.round(row.right))
   })
 
   it('says a Team is a Team, and what the person is in it', async () => {

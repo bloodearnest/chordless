@@ -183,14 +183,14 @@ export class SpaceManager extends LitElement {
     return html`
       <div class="content">
         <div class="head">
+          ${kind ? html`<span class="chip">${kind}</span>` : nothing}
+          ${role ? html`<span class="chip">${role}</span>` : nothing}
+          <span class="spacer"></span>
           ${
             this._current
               ? html`<span class="badge">Current</span>`
               : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
           }
-          <span class="spacer"></span>
-          ${kind ? html`<span class="chip">${kind}</span>` : nothing}
-          ${role ? html`<span class="chip">${role}</span>` : nothing}
         </div>
         ${
           summary

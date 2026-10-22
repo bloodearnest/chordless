@@ -48,7 +48,7 @@ Account and Teams
 +--------------------------------------------------------+
 +- Gateway Church ------------- [Team] [owner] ---------+
 | 212 songs - 48 setlists - about 1.4 MB                  |
-| Sign in to sync                    [Switch] [Manage]    |
+| Sign in to sync          [Manage]                [Switch] |
 +--------------------------------------------------------+
 
 [Create a new Team]           (rare: under the Teams, not above them)
@@ -81,7 +81,7 @@ it has. The cost is that a space's management has no address of its own.
 
 ```
 +- Gateway Church ---------------------------------------- x -+
-| [Switch]                                  [Team] [owner]     |
+| [Team] [owner]                                      [Switch] |
 | 31 songs - 6 setlists - about 190 KB                         |
 |                                                              |
 | Sync     Last synced 5 min ago   [Sync now]   Reset...  Start over...
@@ -92,7 +92,7 @@ it has. The cost is that a space's management has no address of its own.
 ```
 
 The space's name is the modal's heading. On the list, the kind (Personal, Team) and the person's role
-in a Team are labels at the right of the card, and Switch is the first (leftmost) button. It works
+in a Team are labels at the right of the card, and Switch is flush right, on the card and in the modal's header. It works
 for any space, not only the one in use, so nothing is switched to be managed. That is possible
 because the first sync takes the space's own database (`syncTeamSpace`), export and delete need only
 that database, and the people and invite calls need only the team id. Every destructive action asks
