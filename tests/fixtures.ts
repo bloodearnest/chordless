@@ -3,6 +3,8 @@ import { test as base, expect } from '@playwright/test'
 import type { ChordProRecord, SongInput } from '../src/js/data-types.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 
+const CANCELLED_IMPORT = /^TypeError: Importing a module script failed/
+
 export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
   // The first-use setup modal blocks the page, so every test starts with it answered. Tests of
   // the first visit itself opt out with test.use({ firstUse: true })
@@ -20,6 +22,15 @@ export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
     async ({ page }, use) => {
       const errors: string[] = []
       page.on('pageerror', error => errors.push(error.message))
+      // Leaving a page cancels the module imports still in flight, which WebKit reports as an
+      // uncaught error on the page being left (the app reloads itself once, on the first visit,
+      // when its service worker takes over): not a fault of the app, so not counted
+      page.on('framenavigated', frame => {
+        if (frame !== page.mainFrame()) return
+        for (let i = errors.length - 1; i >= 0; i--) {
+          if (CANCELLED_IMPORT.test(errors[i])) errors.splice(i, 1)
+        }
+      })
       await use(errors)
       expect(errors, 'uncaught errors in the page').toEqual([])
     },
