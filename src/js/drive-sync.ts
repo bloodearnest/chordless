@@ -13,7 +13,7 @@
  */
 
 import type { Setlist, SpaceMember } from './data-types.ts'
-import { type ChordlessDB, getCurrentDB } from './db.ts'
+import { ChordlessDB, getCurrentDB } from './db.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
 import { syncShares } from './share-manager.ts'
@@ -217,7 +217,8 @@ export class DriveSyncManager implements SyncSession {
   resetSetlists: ResetSetlist[] = []
 
   /**
-   * @param options.db - Database to sync. Defaults to the current space's database.
+   * @param options.db - Database to sync. Defaults to the database of the space with this id,
+   *   or of the one in use if there is no id.
    *   Tests pass one per simulated device.
    * @param options.folderLink - Where the link to the space's Drive folder is stored.
    *   Defaults to its record in the spaces database.
@@ -285,8 +286,15 @@ export class DriveSyncManager implements SyncSession {
     if (this.spaceDb) {
       this.spaceId ??= this.spaceDb.spaceId
     } else {
-      // Reuse the same DB instance the UI uses
-      this.spaceDb = await getCurrentDB()
+      // The space asked for, or (with no id) the one in use. A given id must be honoured: a
+      // sync of a space that is not in use (the first sync of one just made or joined, or one
+      // managed from the Account and Teams page) would otherwise work on the space in use.
+      if (this.spaceId) {
+        this.spaceDb = new ChordlessDB(this.spaceId)
+        await this.spaceDb.init()
+      } else {
+        this.spaceDb = await getCurrentDB()
+      }
       // Ensure we keep the actual space ID from the DB (in case caller passed null)
       this.spaceId = this.spaceDb.spaceId
     }

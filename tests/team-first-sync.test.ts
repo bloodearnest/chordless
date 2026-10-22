@@ -6,6 +6,7 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createTeamFolder } from '../src/js/drive-api.ts'
+import { createSyncManager } from '../src/js/drive-sync.ts'
 import {
   createSpace,
   deleteSpace,
@@ -60,6 +61,32 @@ describe('syncTeamSpace', () => {
     expect(rig.driveSetlist('team-list').id).to.equal('team-list')
     expect(must(await inUse.getSetlist('current-list')).fileRef ?? null).to.equal(null)
     inUse.db?.close()
+    if (before.id) await setCurrentSpace(before.id, before.name)
+  })
+
+  it('has a sync manager made for a space work on that space, whichever is in use', async () => {
+    const parent = await createTeamFolder('root', 'Parent')
+    const folder = await createTeamFolder(parent, 'Other')
+    const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+    made.push(other.id)
+    await updateSpace(other.id, { rootRef: folder })
+    const db = new ChordlessDB(other.id)
+    await db.init()
+    await db.saveSetlist(makeSetlist({ id: 'other-list', date: '2026-12-20' }))
+    db.db?.close()
+
+    const current = await createSpace(`In use ${crypto.randomUUID().slice(0, 8)}`)
+    made.push(current.id)
+    const before = getCurrentSpace()
+    await setCurrentSpace(current.id, current.name)
+
+    const manager = await createSyncManager(other.name, other.id)
+    await manager.sync()
+    expect(manager.db.spaceId).to.equal(other.id)
+    expect(rig.driveSetlistFiles().map(file => file.appProperties.setlistId)).to.deep.equal([
+      'other-list',
+    ])
+    manager.db.db?.close()
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 })

@@ -46,7 +46,6 @@ Account and Teams
 
 This device
   Browser data 2.1 MB - App cache 6 MB - Media cache 180 MB
-  [Clear everything on this device...]
 ```
 
 - **The account card** is a prerequisite shown first, and it can be empty (anonymous). Its "Manage"
@@ -83,14 +82,16 @@ need only that database, and the people and invite calls need only the team id. 
 action asks first (CLAUDE.md: friction, not prohibition). A Personal space has no People section and
 its Danger section is only Delete.
 
-## Pad sets and the media player
+## Pad sets and the media player: their own page, `/media`
 
-Pad sets leave this page. They are the account's today (docs/STORAGE_API.md), the one large thing in
-the device's cache, and useful only when the media player is on: the Pad sets UI is shown only
-when the player is enabled. They belong on the media player's own page (`/media`), where its
-settings (pads, metronome, stereo split) can live too, with the enabled switch at its top so it
-is findable; the menu entry is always there. When pads become per-space (docs/SPACES.md, item 6)
-they move into each space's page. The media player page is its own change, after this one.
+Decided 2026-10-22. The media player gets a page of its own and a **permanent** menu entry, so it
+can be found and switched on. **Everything about the media player is on that page and nowhere in
+Preferences**: the enabled switch at its top, then (when it is on) the settings (pads, metronome,
+stereo split) and the Pad sets (upload, list, delete). The page shows nothing of pads while the
+player is off. The player's own settings popover keeps using the same settings component. Pad sets
+leave the Account and Teams page: they are the account's today (docs/STORAGE_API.md), the one large
+thing in the device's cache, and useful only with the player. When pads become per-space
+(docs/SPACES.md, item 6) they move into each space's page.
 
 ## What changes in the code
 
@@ -104,9 +105,7 @@ they move into each space's page. The media player page is its own change, after
 4. The routes in docs/ROUTING.md, the naming in docs/SPACES.md and CLAUDE.md (done), and the
    status lines here.
 
-## Not decided
+## Decided
 
-- Whether "Clear everything on this device" stays (deleting each space covers most of it), and if so
-  how strong its confirmation is.
-- Whether the media page's menu entry shows only while the player is enabled (then the switch must
-  stay in Preferences).
+Decided 2026-10-22: there is no "clear everything on this device"; a space is deleted one at a time,
+from its own page, after a confirmation. The media page's menu entry is always shown.
