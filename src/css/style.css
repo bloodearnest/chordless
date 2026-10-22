@@ -83,10 +83,12 @@ app-modal:not(:defined) {
   --active-bg: rgba(255, 255, 255, 0.3);
   --focus-ring: #3498db;
 
-  /* On a wide screen the app is a tablet-sized frame, centred, with a border either side (like
-     a vertical video shown on a wide screen). The width is a portrait tablet's. The border is
-     the header's colour, darkened. The text size follows the frame, not the window. */
-  --app-width: 56rem;
+  /* On a desktop (a mouse, and a window wider than this) the app is a tablet-sized frame, centred,
+     with a border either side (like a vertical video shown on a wide screen). The width is a
+     portrait tablet's. The border is the header's colour, darkened. The text size follows the
+     frame, not the window. A tablet or a phone has no frame, whatever its size or pixel density:
+     it fills the screen, so the width is the screen's (see the media query below). */
+  --app-width: 100vw;
   --frame-bg: color-mix(in srgb, var(--header-bg), black 45%);
 
   /* Typography */
@@ -101,6 +103,15 @@ app-modal:not(:defined) {
   --font-ui: calc(var(--font-base) * 0.8);
   --font-ui-small: calc(var(--font-base) * 0.7);
   --font-icon: var(--font-ui); /* Icon/symbol text (buttons, etc.) */
+}
+
+/* The frame is for a desktop: a primary input that can hover and point finely (a mouse or
+   trackpad). A touch device is not one, at any width or pixel density: CSS pixels are what
+   widths are in, so a 1000px-wide portrait tablet is as wide as a small window. */
+@media (hover: hover) and (pointer: fine) {
+  :root {
+    --app-width: 56rem;
+  }
 }
 
 body {
