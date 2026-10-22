@@ -108,7 +108,7 @@ test("says a space's root is the space itself, not the folder in the storage beh
   assert.equal(root.name, 'Team space-1')
 })
 
-test('writes: create, update and trash a file; unpublish is not served', async () => {
+test('writes: create, update and trash a file; unpublish ends a share link', async () => {
   const rig = await makeTeamRig()
   const made = (
     await call(rig, 'POST', '/files?collection=songs', { body: { input: file, body: 'one' } })
@@ -120,7 +120,24 @@ test('writes: create, update and trash a file; unpublish is not served', async (
   assert.equal(rig.storage.file(ref).content, 'two')
   assert.equal((await call(rig, 'POST', `/files/${ref}/trash`)).status, 204)
   assert.equal(rig.storage.file(ref).trashed, true)
-  assert.equal((await call(rig, 'POST', `/files/${ref}/unpublish`)).status, 501)
+})
+
+test('a share can be public and unpublished; nothing else can be public', async () => {
+  const rig = await makeTeamRig()
+  const share = (
+    await call(rig, 'POST', '/files?collection=shares', {
+      body: { input: file, body: 'cipher', publicLink: true },
+    })
+  ).json()
+  const ref = share.file.ref
+  assert.equal(rig.storage.publicDownload(ref).status, 200)
+  assert.equal((await call(rig, 'POST', `/files/${ref}/unpublish`)).status, 204)
+  assert.equal(rig.storage.publicDownload(ref).status, 404)
+  const song = await call(rig, 'POST', '/files?collection=songs', {
+    body: { input: file, body: 'x', publicLink: true },
+  })
+  assert.equal(song.status, 400)
+  assert.equal((await call(rig, 'POST', '/files/nope/unpublish')).status, 404)
 })
 
 test('reads and updates many files, with null in the place of one that is not in the space', async () => {

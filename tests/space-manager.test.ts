@@ -160,6 +160,8 @@ describe('space-manager', () => {
     expect(
       must(own.shadowRoot?.querySelector('drive-sync-panel')).hasAttribute('disabled')
     ).to.equal(true)
+    expect(text(own)).to.contain('Google Drive is not connected')
+    expect(text(own)).to.not.contain('Sign in on the Account and Teams page to sync')
     own._signIn = 'signed-in'
     await own.updateComplete
     expect(

@@ -13,11 +13,11 @@
  *   GET  /files/<ref>                       status (404 for a file that does not exist)
  *   GET  /files/<ref>/text                  the file's text
  *   POST /read-many         {refs}          {texts}
- *   POST /files?collection= {input, body}   create
+ *   POST /files?collection= {input, body, publicLink?}  create (publicLink: shares only)
  *   POST /create-many?collection= {items}   {results}
  *   PUT  /files/<ref>       {input, body}   update
  *   POST /update-many       {items}         {results}
- *   POST /files/<ref>/unpublish             writers; not supported yet for team spaces
+ *   POST /files/<ref>/unpublish             writers; ends a share link
  *   POST /files/<ref>/trash                 writers
  *
  * Bodies are text. Share links and pad audio are not served yet.
@@ -155,8 +155,14 @@ export async function handleTeamRequest(
     if (method === 'POST' && rest === '/files') {
       write()
       const collection = collectionOf(url)
-      const { input, body } = asWrite(await readJson(request))
-      return jsonResponse(await space.create(collection, input, body))
+      const json = await readJson(request)
+      const { input, body } = asWrite(json)
+      // (only a share is made readable by anyone: its body is ciphertext; a chart never is)
+      const publicLink = json.publicLink === true
+      if (publicLink && collection !== 'shares') {
+        throw new Refusal(400, 'Only a share can have a public link')
+      }
+      return jsonResponse(await space.create(collection, input, body, { publicLink }))
     }
     if (method === 'POST' && rest === '/create-many') {
       write()
@@ -204,7 +210,9 @@ export async function handleTeamRequest(
       }
       if (method === 'POST' && action === '/unpublish') {
         write()
-        return jsonResponse({ error: 'Share links are not served for team spaces yet' }, 501)
+        if (!(await owned(ref))) return jsonResponse({ error: 'No such file' }, 404)
+        await space.unpublish(ref)
+        return new Response(null, { status: 204 })
       }
     }
     return jsonResponse({ error: 'Not found' }, 404)

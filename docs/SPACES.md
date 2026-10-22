@@ -171,7 +171,7 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
   not connected" with a **Connect Google Drive** button, and the sync section points at it; syncing
   is off (`driveStorage.available()` is false) and local use and team spaces are unaffected. Not
   checked: whether the refresh token is sent again without `prompt: consent` (connecting forces it).
-  Not built: the same notice in the personal space itself, and a toast after sign-in.
+  The space's own page says the same for a personal space (built 2026-10-22). Not built: a toast after sign-in; the Account page already says it inline, and the sign-ins that end without Drive elsewhere (joining a team) are meant to.
 
 ### The three credentials, and how they are used
 
@@ -828,12 +828,12 @@ Durable Object) and never against a real deployed Worker, a real Google sign-in 
    installed app.
 2. Service-account credential (item 10), so a shared drive needs no owner token.
 3. Pads in team spaces (item 6).
-4. Share links from a team space (they fail today with "Share links from a team space are not
-   supported yet").
+4. ~~Share links from a team space~~ (built 2026-10-22, tested on fakes: the team service passes
+   `publicLink` for shares and `unpublish` through to the owner's Drive; check on the real run).
 5. A switcher in the header, then Merged and Separate (item 8).
 6. Probing protections: unguessable or signed space ids, per-account rate limits, key rotation
    (SECURITY.md).
-7. The personal-space notice and a toast after sign-in for "Drive not connected".
+7. ~~The personal-space notice~~ (built); a toast after sign-in for "Drive not connected" is left, and may not be needed.
 
 ## Risks
 

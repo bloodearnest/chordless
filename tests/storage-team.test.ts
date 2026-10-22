@@ -143,6 +143,15 @@ describe('TeamStorage', () => {
     expect((error as TeamStorageError).status).to.equal(404)
   })
 
+  it('makes a share readable by anyone, and ends it', async () => {
+    const rig = await makeTeamRig()
+    const space = teamFor(rig).space('space-1')
+    const { file } = await space.create('shares', text, 'cipher', { publicLink: true })
+    expect(rig.storage.publicDownload(file.ref).status).to.equal(200)
+    await space.unpublish(file.ref)
+    expect(rig.storage.publicDownload(file.ref).status).to.equal(404)
+  })
+
   it('says what a team space does not do yet', async () => {
     const team = teamFor(await makeTeamRig())
     const space = team.space('space-1')
@@ -154,13 +163,9 @@ describe('TeamStorage', () => {
       }
       return ''
     }
-    expect(await failure(() => space.create('shares', text, 'x', { publicLink: true }))).to.match(
-      /not supported yet/
-    )
     expect(await failure(() => space.create('songs', text, new Uint8Array([1])))).to.match(
       /text only/
     )
-    expect(await failure(() => space.unpublish('anything'))).to.match(/not served/)
     expect(await failure(() => team.ensureRoot())).to.match(/joined/)
     expect(await failure(() => team.renameRoot())).to.equal('')
     expect(await failure(() => team.pads)).to.match(/Pad sets/)

@@ -171,14 +171,11 @@ class TeamSpace implements SpaceStorage {
     body: FileBody,
     options?: { publicLink?: boolean }
   ): Promise<WriteResult> {
-    if (options?.publicLink) {
-      throw new Error('Share links from a team space are not supported yet')
-    }
     return this.#client.json(this.#id, {
       method: 'POST',
       path: '/files',
       query: { collection },
-      body: { input, body: textOf(body) },
+      body: { input, body: textOf(body), publicLink: options?.publicLink === true },
     })
   }
 

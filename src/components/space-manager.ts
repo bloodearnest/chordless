@@ -214,7 +214,16 @@ export class SpaceManager extends LitElement {
             }
           </p>
           <drive-sync-panel .space=${space} ?disabled=${!this._canSync}></drive-sync-panel>
-          ${this._canSync ? nothing : html`<p class="hint">Sign in on the Account and Teams page to sync.</p>`}
+          ${
+            this._canSync
+              ? nothing
+              : this._signIn === 'no-drive'
+                ? html`<p class="hint">
+                  You are signed in, but Google Drive is not connected, so this space is not syncing.
+                  <a href="/account">Connect Google Drive</a> on the Account and Teams page.
+                </p>`
+                : html`<p class="hint">Sign in on the Account and Teams page to sync.</p>`
+          }
         </div>
 
         <div class="panel">

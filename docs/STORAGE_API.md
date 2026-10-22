@@ -99,8 +99,10 @@ the request and a `TeamContext`: who is asking and their role (`access`), the sp
 give it the in-memory storage; the real context is the Durable Object and the owner's token or
 service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
 (reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
-404 (null in a batch), bodies are text only, and share links (`publicLink`, `unpublish`) and
-pads answer "not yet". The space-level conformance suite (`describeSpaceStorage`, split from the
+404 (null in a batch), bodies are text only, and pads answer "not yet". Share links work (2026-10-22): `publicLink` is
+accepted for the `shares` collection only and `unpublish` is passed through, and because a team
+space's refs are Drive file ids, the Worker's `/api/share/<id>` serves a share from a team space
+unchanged (ciphertext only, as ever). The space-level conformance suite (`describeSpaceStorage`, split from the
 backend suite) runs over `TeamStorage` through the handler, and `team-api.node.test.ts` covers
 the roles, the refusals and the scoping. `owns` is the part that needs care in the real context:
 it must include binned files, and be cheap (the Durable Object keeping the refs, not a walk of
@@ -144,8 +146,9 @@ How each call maps:
   space" call in the interface, so a team backend is not left with stubs. Rename is admin-only.
 - Pads: `PadStorage` must first move from the backend to `SpaceStorage` ("Pad sets"), then the
   Worker streams audio: any member uploads, admin and up deletes.
-- Share links: `publicLink` and `/api/share/<id>` are Drive-specific. Sharing from a team space
-  needs that generalised, or to go through the owner's direct path. Not settled.
+- Share links: `/api/share/<id>` is Drive-specific. Team spaces work today because their refs are
+  Drive file ids; a backend with other refs (a service account on another store) would need it
+  generalised.
 
 **Request volume and batching.** Each storage call is one Worker request plus one Drive
 subrequest. A steady-state sync is a few list calls plus one read or write per changed file, so
@@ -169,8 +172,8 @@ primitives are not enough.
 ## What is left
 
 - **Share links** are Drive-specific on the Worker's side: `/api/share/<id>` reads a Drive file id
-  with the sharing key, so a share link works only for Drive-backed spaces until that is
-  generalised.
+  with the sharing key, so a share link works only for Drive-backed spaces (team spaces included,
+  as their refs are Drive ids) until that is generalised.
 - **Pad sets** are the account's, not a space's: they move into `SpaceStorage` with the team spaces.
 - **Names**: `drive-sync.ts`, `DriveSyncManager`, `driveStorage` and some messages still say Drive.
   They are accurate while Drive is the only backend.
