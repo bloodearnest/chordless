@@ -66,6 +66,7 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/session/logout',
     '/session/invite',
     '/api/share/abc',
+    '/api/config',
   ]) {
     for (const headers of crossOrigin) {
       const response = await send(path, { ...postJson('{}'), headers })
@@ -127,6 +128,16 @@ test('a route that throws is a JSON 500 with the reason, not a crash', async () 
   } finally {
     console.error = error
   }
+})
+
+test('the page is given the Picker key the server has, or null where there is none', async () => {
+  const withKey = setup({ PICKER_API_KEY: 'picker-key' })
+  const response = await withKey.send('/api/config')
+  assert.equal(response.status, 200)
+  assert.deepEqual(await response.json(), { pickerApiKey: 'picker-key' })
+  assert.deepEqual(withKey.assetRequests, [])
+
+  assert.deepEqual(await (await setup().send('/api/config')).json(), { pickerApiKey: null })
 })
 
 test("a share download is the Worker's, not the assets", async () => {

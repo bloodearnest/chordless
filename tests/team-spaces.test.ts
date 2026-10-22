@@ -21,11 +21,11 @@ import { isTeamMember, storageFor } from '../src/js/storage/space-storage.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import { TeamError, teamApi } from '../src/js/team-client.ts'
 import {
+  createTeamSpace,
   inviteLink,
   joinSpace,
   leaveSpace,
   outranks,
-  shareSpace,
   stopSharing,
 } from '../src/js/team-spaces.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
@@ -215,40 +215,56 @@ describe('team spaces on this device', () => {
     })
   })
 
-  describe('sharing a space', () => {
-    it('sends the sign-in and the folder, and keeps the id and role the Worker gives', async () => {
-      const mine = await space('Church', { rootRef: 'drive-folder' })
-      routes['POST /api/spaces'] = () => json({ spaceId: 'space-aaaa1111', role: 'owner' })
+  describe('creating a team space', () => {
+    const folders = () => {
+      const made: [string, string][] = []
+      return {
+        made,
+        createTeamFolder: async (parentId: string, name: string) => {
+          made.push([parentId, name])
+          return 'new-folder'
+        },
+      }
+    }
 
-      const shared = await shareSpace(mine.id)
-      expect(shared.team).to.deep.equal({ id: 'space-aaaa1111', role: 'owner' })
-      expect(requests[0].body).to.deep.equal({
-        blob: 'the-blob',
-        rootRef: 'drive-folder',
-        name: mine.name,
-      })
-      expect((await getSpaceById(mine.id))?.team?.id).to.equal('space-aaaa1111')
-      expect(shared.rootRef).to.equal('drive-folder')
+    it('makes a folder in the picked parent, registers it, and keeps a space of its own for it', async () => {
+      routes['POST /api/spaces'] = () => json({ spaceId: 'space-bbbb2222', role: 'owner' })
+      const drive = folders()
+      const name = unique('St Mary’s')
+
+      const created = await createTeamSpace(`  ${name} `, 'picked-parent', drive)
+      made.push(created.id)
+      expect(drive.made).to.deep.equal([['picked-parent', name]])
+      expect(requests[0].body).to.deep.equal({ blob: 'the-blob', rootRef: 'new-folder', name })
+      expect(created.name).to.equal(name)
+      expect(created.rootRef).to.equal('new-folder')
+      expect(created.team).to.deep.equal({ id: 'space-bbbb2222', role: 'owner' })
     })
 
-    it('says why not: no such space, shared already, not in Drive yet, not signed in', async () => {
+    it('does not touch the personal space, and renames only if the name is taken here', async () => {
+      routes['POST /api/spaces'] = () => json({ spaceId: 'space-cccc3333', role: 'owner' })
+      const mine = await space('Church')
+      const created = await createTeamSpace(mine.name, 'p', folders())
+      made.push(created.id)
+      expect(created.id).to.not.equal(mine.id)
+      expect(created.name).to.equal(`${mine.name} (team)`)
+      expect((await getSpaceById(mine.id))?.team).to.equal(undefined)
+    })
+
+    it('leaves no space here when the Worker refuses, and asks for a name and a sign-in', async () => {
       const message = (work: Promise<unknown>) =>
         work.then(
           () => '',
           error => (error as Error).message
         )
-      expect(await message(shareSpace('nothing'))).to.equal('No such space')
+      routes['POST /api/spaces'] = () => json({ error: 'No' }, 403)
+      const before = (await listSpaces()).length
+      expect(await message(createTeamSpace(unique('Refused'), 'p', folders()))).to.equal('No')
+      expect((await listSpaces()).length).to.equal(before)
 
-      const shared = await space('Shared', { rootRef: 'f', team: { id: 't', role: 'owner' } })
-      expect(await message(shareSpace(shared.id))).to.match(/shared already/)
-
-      const local = await space('Local')
-      expect(await message(shareSpace(local.id))).to.match(/Sync this space to Google Drive/)
-
-      const linked = await space('Linked', { rootRef: 'f' })
+      expect(await message(createTeamSpace('  ', 'p', folders()))).to.match(/needs a name/)
       worker.stored = undefined
-      expect(await message(shareSpace(linked.id))).to.match(/Sign in with Google first/)
-      expect(requests).to.have.length(0)
+      expect(await message(createTeamSpace('Church', 'p', folders()))).to.match(/Sign in/)
     })
   })
 

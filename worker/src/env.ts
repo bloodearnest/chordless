@@ -20,6 +20,12 @@ export interface Env extends GoogleEnv, ShareEnv {
   EMAIL_OVERALL?: RateLimit
   /** The address links in email replies point to; chordless.app when unset */
   APP_ORIGIN?: string
+  /**
+   * The browser key for the Google Picker (folder choice for a team space). Public by nature (it
+   * works for the Picker API only, from our own addresses), kept here beside the other keys so
+   * it is set in one place; the page asks for it at `/api/config`
+   */
+  PICKER_API_KEY?: string
   /** Base64 AES-256 key for the token blobs */
   JWE_ENCRYPTION_KEY: string
 }

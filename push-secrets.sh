@@ -22,4 +22,9 @@ echo "$GOOGLE_CLIENT_ID"     | npx wrangler secret put GOOGLE_CLIENT_ID --env=""
 echo "$GOOGLE_CLIENT_SECRET" | npx wrangler secret put GOOGLE_CLIENT_SECRET --env=""
 echo "$GOOGLE_API_KEY"       | npx wrangler secret put GOOGLE_API_KEY --env=""
 
+# (optional: without it the team space folder picker says it is not set up)
+if [ -n "$PICKER_API_KEY" ]; then
+  echo "$PICKER_API_KEY"      | npx wrangler secret put PICKER_API_KEY --env=""
+fi
+
 echo "Done."

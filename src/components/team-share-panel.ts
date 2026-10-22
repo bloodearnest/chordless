@@ -7,7 +7,6 @@ import {
   inviteLink,
   leaveSpace,
   outranks,
-  shareSpace,
   stopSharing,
 } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -39,13 +38,12 @@ export class TeamShareLeftEvent extends Event {
  * What a role may do is the Worker's rule, and the controls shown follow it: a role acts only on
  * those below it.
  *
- * @fires TeamShareChangedEvent - the space was shared, or sharing stopped
+ * @fires TeamShareChangedEvent - sharing was stopped
  * @fires TeamShareLeftEvent - the person left the space, which is gone from this device
  */
 export class TeamSharePanel extends LitElement {
   static override properties = {
     space: { attribute: false },
-    canShare: { type: Boolean, attribute: 'can-share' },
     _members: { state: true },
     _invites: { state: true },
     _error: { state: true },
@@ -56,8 +54,6 @@ export class TeamSharePanel extends LitElement {
 
   /** The current space */
   declare space: Space | null
-  /** Signed in with Google Drive, which a space needs to be shared from */
-  declare canShare: boolean
   declare _members: SpaceMember[]
   declare _invites: Invite[]
   declare _error: string
@@ -93,7 +89,6 @@ export class TeamSharePanel extends LitElement {
   constructor() {
     super()
     this.space = null
-    this.canShare = false
     this._members = []
     this._invites = []
     this._error = ''
@@ -159,20 +154,6 @@ export class TeamSharePanel extends LitElement {
     await this.updateComplete
     await modal.updateComplete
     return modal.ask()
-  }
-
-  async _share(): Promise<void> {
-    const space = this._current
-    const sure = await this._confirm(
-      'Share this space with a team?',
-      "Chordless will keep your Google sign-in, encrypted, so it can reach this space's Drive folder when your team syncs. People you invite see and change the songs and setlists in it, as far as the role you give them allows. The folder and its files stay yours, and you can stop sharing at any time.",
-      'Share'
-    )
-    if (!sure) return
-    await this._run(async () => {
-      await shareSpace(space.id)
-      this.dispatchEvent(new TeamShareChangedEvent())
-    }, false)
   }
 
   async _stopSharing(): Promise<void> {
@@ -260,30 +241,23 @@ export class TeamSharePanel extends LitElement {
     return html`
       <div class="panel">
         <h3>🤝 Team Space</h3>
-        ${space.team ? this._renderTeam(space.team.role) : this._renderOffer(space)}
+        ${space.team ? this._renderTeam(space.team.role) : this._renderOffer()}
         ${this._error ? html`<p class="error" role="alert">✗ ${this._error}</p>` : nothing}
       </div>
       <app-modal ${ref(this._modal)} type="confirm" size="small"></app-modal>
     `
   }
 
-  _renderOffer(space: Space) {
+  _renderOffer() {
     return html`
       <p>
-        Share this space with your team, so they sync its songs and setlists with you and each other,
-        each with a role you choose.
+        A team space is shared with your team: they sync its songs and setlists with you and each
+        other, each with a role you choose. It is a new space with a folder of its own in Google
+        Drive, separate from this one, and you can bring songs across when you make it.
       </p>
-      ${
-        !space.rootRef
-          ? html`<p>Sync this space to Google Drive first: sharing starts from its folder there.</p>`
-          : !this.canShare
-            ? html`<p>Connect Google Drive above to share this space.</p>`
-            : html`<div class="actions">
-              <button class="btn primary" ?disabled=${this._busy} @click=${this._share}>
-                🤝 Share this space
-              </button>
-            </div>`
-      }
+      <div class="actions">
+        <a class="btn primary" href="/spaces/new">🤝 Create a team space</a>
+      </div>
     `
   }
 

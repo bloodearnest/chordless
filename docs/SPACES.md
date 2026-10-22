@@ -400,11 +400,20 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
 - **Read** songs/setlists/pads: all members.
 - **Write** songs/setlists: writer and up.
 - **Upload pads: any member**, readers included (create-only, `pads/` folder only).
-- **Delete pads: admin and up.** **Delete setlists: admin and up** (decided 2026-10-22; a writer
-  can make and edit them but not delete, and the button says why). Delete songs: writer and up
-  (friction/confirm in the UI, per CLAUDE.md "friction not prohibition"). In a personal space the
-  person using it may delete. How a setlist deletion works is in SYNC_ARCHITECTURE.md, "Deleting
-  setlists"; the Worker checks the role on the server.
+- **Delete pads: admin and up.**
+- **Delete setlists** (decided 2026-10-22): a **writer may delete a setlist they lead** (its
+  `ownerId` is their verified email); **only an admin (or the owner) may delete one someone else
+  leads.** A reader never.
+- **Delete songs: admin and up.** A song is shared by every setlist that uses it.
+- **In a personal space the person is implicitly an admin** and may delete anything: they are a
+  grown-up, and the backup (export) feature is there. **Every delete asks for confirmation, in every
+  case**, danger-styled, naming the effect (CLAUDE.md: friction, not prohibition).
+- How a deletion works is in SYNC_ARCHITECTURE.md, "Deleting setlists". The Worker checks the role
+  on the server. To know who leads a setlist without reading its body, the setlist's file carries
+  `ownerId` as a file property (kept current on every push), and the storage API's `status` returns
+  a file's collection and its properties. Until restrictions on editing others' setlists exist
+  (SYNC_ARCHITECTURE.md), a writer can make themselves the leader first, so the rule guards against
+  mistakes, not a determined writer.
 - Invite, remove, change roles, enable/disable sharing: admin and up (owner for disable/transfer).
 
 Undecided: whether writers may edit others' setlists (see "Several people editing a setlist" in
@@ -758,7 +767,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    Done: `supportsAllDrives` (and `includeItemsFromAllDrives` on listings) on every call on files in
    `drive-api.ts` and on the share download in the Worker (`allDrivesUrl`; tested against FakeDrive,
    and since checked against a real shared drive: spike 2 passed). The folder is already found by `rootRef`
-   after the first sync. Not done: the space id and kind on the record, the Picker, no name matching.
+   after the first sync. The Picker is built (2026-10-22: `folder-picker.ts`; its key is `PICKER_API_KEY` on the Worker, served at `/api/config`; the CSP is a first guess, not yet seen running). Not done: the space id and kind on the record, no name matching.
    The UI, code and docs say "space" (renamed from "organisation" on 2026-10-20).
 4. [ ] Copy/move between spaces (an export and import, above, is built and does the hop between
    accounts) (songs, setlists, pads, whole space); migrate personal data.
@@ -771,7 +780,10 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Storage page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Storage page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
-   bring, invite, progress), replacing "Share this space"; header switcher (Separate), then Merged
+   bring, invite, progress). **Built so far (2026-10-22): `/spaces/new` (`team-space-wizard.ts`) asks
+   for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;
+   "Share this space" is gone (the Team Space panel links to the wizard). Not built: what to bring,
+   invites, the shared-drive choice and the service account; header switcher (Separate), then Merged
    and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
 9. [ ] Space-aware immediate sync in the service worker.
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on

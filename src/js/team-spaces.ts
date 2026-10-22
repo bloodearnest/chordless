@@ -10,21 +10,36 @@ import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from 
 import type { TeamStorage } from './storage/team-storage.ts'
 import { teamApi } from './team-client.ts'
 
-/** Share a space of this person's with a team: it keeps its folder and files, and gets an id */
-export async function shareSpace(spaceId: string): Promise<Space> {
-  const space = await getSpaceById(spaceId)
-  if (!space) throw new Error('No such space')
-  if (space.team) throw new Error('This space is shared already')
-  if (!space.rootRef) throw new Error('Sync this space to Google Drive before sharing it')
+/** What making a team space needs from Drive: a folder inside the one the person picked */
+export interface TeamFolders {
+  createTeamFolder(parentId: string, name: string): Promise<string>
+}
+
+/**
+ * Make a team space (docs/SPACES.md, "Creating a team space"): a new folder named for the team
+ * inside the parent the person picked, registered with the Worker, and a space of its own on this
+ * device for it. A personal space is never turned into one. The Worker is told last but one and
+ * the device last, so a failure leaves nothing here that has to be cleaned up; a folder made
+ * and not registered is left in Drive for the person to delete.
+ */
+export async function createTeamSpace(
+  name: string,
+  parentId: string,
+  folders: TeamFolders
+): Promise<Space> {
+  const teamName = name.trim()
+  if (!teamName) throw new Error('A team space needs a name')
   const stored = await getStoredBlob()
   if (!stored) throw new Error('Sign in with Google first')
 
-  const { spaceId: teamId, role } = await teamApi.createSpace({
+  const rootRef = await folders.createTeamFolder(parentId, teamName)
+  const { spaceId, role } = await teamApi.createSpace({
     blob: stored.blob,
-    rootRef: space.rootRef,
-    name: space.name,
+    rootRef,
+    name: teamName,
   })
-  return updateSpace(spaceId, { team: { id: teamId, role } })
+  const space = await createSpace(await freeName(teamName))
+  return updateSpace(space.id, { rootRef, team: { id: spaceId, role } })
 }
 
 /** A name for the new space that no space on this device has */

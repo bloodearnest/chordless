@@ -9,9 +9,10 @@
  *   { name: 'home' }
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
- *   { name: 'preferences' | 'storage' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' | 'join' }
+ *   { name: 'preferences' | 'storage' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' | 'join' | 'new-team-space' }
  *                                             /join is a team space's invite link; the space and the
  *                                             code are in its #fragment, which routes ignore
+ *                                             /spaces/new makes a team space (team-space-wizard.ts)
  *   { name: 'setlist', setlistId, songIndex } /setlist/<id> (the overview, songIndex -1)
  *                                             /setlist/<id>/song/<n>
  *   { name: 'share', fileId, songIndex }     /s/<id> (a setlist shared by link, songIndex -1 for
@@ -30,6 +31,7 @@ export type PageName =
   | 'bookmarklet'
   | 'about'
   | 'join'
+  | 'new-team-space'
 
 export type Route =
   | { name: PageName }
@@ -49,6 +51,7 @@ const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/bookmarklet': 'bookmarklet',
   '/about': 'about',
   '/join': 'join',
+  '/spaces/new': 'new-team-space',
 }
 
 const PAGE_PATHS: Record<string, string> = Object.fromEntries(

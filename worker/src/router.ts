@@ -33,6 +33,7 @@ export async function handleRequest(
   if (
     (path.startsWith('/oauth/') ||
       path.startsWith('/session/') ||
+      path === '/api/config' ||
       path.startsWith('/api/share/') ||
       path.startsWith('/api/space/') ||
       path.startsWith('/api/spaces')) &&
@@ -64,6 +65,11 @@ export async function handleRequest(
 
     if (path === '/session/revoke' && request.method === 'POST') {
       return await handleSessionRevoke(request, env, google)
+    }
+
+    // What the page needs that is set on the server (not secret: see Env)
+    if (path === '/api/config' && request.method === 'GET') {
+      return jsonResponse({ pickerApiKey: env.PICKER_API_KEY ?? null })
     }
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files

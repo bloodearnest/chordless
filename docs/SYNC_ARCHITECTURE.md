@@ -333,10 +333,13 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
 Decided 2026-10-22 (replacing the owner-only rule this section had, which guarded against
 mistakes and not abuse, since anyone could make themselves the leader first):
 
-- **Team space: admins and the owner only.** A writer can edit a setlist but not delete it; the
-  button is shown but says why it cannot be used. The Worker checks the role on the delete, so the
-  rule does not depend on the page (docs/SPACES.md, "Roles").
-- **Personal space:** the person using it.
+- **Team space: a writer may delete a setlist they lead** (`ownerId` is their email), **an admin or
+  the owner any setlist.** A writer cannot delete one someone else leads; the button is shown but
+  says why. Deleting songs is admin and up. The Worker checks it on the server from the file's
+  `ownerId` property and collection (docs/SPACES.md, "Roles"), so the rule does not depend on the
+  page.
+- **Personal space:** the person using it, anything (implicitly an admin; the export is the backup).
+- **A confirmation always**, in every case.
 - Not signed in, or a space with no Drive: nothing in Drive to trash, so the existing local rule
   applies (a setlist that was never synced is simply removed).
 - `Setlist.createdBy` (kept, recorded at creation) no longer decides anything here.
@@ -353,7 +356,7 @@ mistakes and not abuse, since anyone could make themselves the leader first):
   history and search don't need to know about deleted setlists.
 - If it had been synced, record a **pending deletion** `{ setlistId, fileRef,
   deletedAt }` in a new object store (e.g. `pending_deletions`, keyPath `setlistId`):
-  a `ChordlessDB` version bump from 5 to 6.
+  a `ChordlessDB` version bump (the database is at version 7; this is 8).
 - If it was never synced, it's simply gone. Its `setlist_local` entry can go too.
 
 #### Sync

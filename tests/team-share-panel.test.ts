@@ -91,9 +91,8 @@ describe('the team share panel', () => {
     })
   }
 
-  async function open(shared: Space, canShare = true) {
+  async function open(shared: Space) {
     panel = document.createElement('team-share-panel')
-    panel.canShare = canShare
     panel.space = shared
     panel.addEventListener(TeamShareChangedEvent.type, () => changed++)
     panel.addEventListener(TeamShareLeftEvent.type, () => left++)
@@ -133,45 +132,12 @@ describe('the team share panel', () => {
   })
 
   describe('a space that is not shared', () => {
-    it('says to sync to Google Drive first when it has no folder yet, and offers nothing', async () => {
-      await open(await space(null))
-      expect(text()).to.contain('Sync this space to Google Drive first')
-      expect(panel.shadowRoot?.querySelector('button') === null).to.equal(true)
-    })
-
-    it('says to connect Google Drive when the sign-in has none', async () => {
-      await open(await space(null, { rootRef: 'folder-1' }), false)
-      expect(text()).to.contain('Connect Google Drive above to share')
-      expect(panel.shadowRoot?.querySelector('button') === null).to.equal(true)
-    })
-
-    it('shares it when told to and sure: the Worker is asked, and the page is told', async () => {
-      routes['POST /api/spaces'] = () => json({ spaceId: TEAM, role: 'owner' })
-      const mine = await space(null, { rootRef: 'folder-1' })
-      await open(mine)
-      button('Share this space').click()
-      await answer(true)
-      await until(() => changed === 1, 'the space to be shared')
-      expect(calls.at(-1)?.body).to.deep.include({ rootRef: 'folder-1', name: mine.name })
-      expect((await getSpaceById(mine.id))?.team?.id).to.equal(TEAM)
-    })
-
-    it('shares nothing when not sure', async () => {
+    it('offers to create a team space on its page, and does not turn this one into one', async () => {
       await open(await space(null, { rootRef: 'folder-1' }))
-      button('Share this space').click()
-      await answer(false)
-      await wait(50)
+      expect(text()).to.contain('Create a team space')
+      expect(panel.shadowRoot?.querySelector('a')?.getAttribute('href')).to.equal('/spaces/new')
+      expect(panel.shadowRoot?.querySelector('button') === null).to.equal(true)
       expect(calls).to.deep.equal([])
-      expect(changed).to.equal(0)
-    })
-
-    it('says what the Worker said when it refuses', async () => {
-      routes['POST /api/spaces'] = () => json({ error: 'That folder is not there' }, 400)
-      await open(await space(null, { rootRef: 'folder-1' }))
-      button('Share this space').click()
-      await answer(true)
-      await until(() => text().includes('That folder is not there'), 'the refusal')
-      expect(changed).to.equal(0)
     })
   })
 
@@ -185,6 +151,21 @@ describe('the team share panel', () => {
       expect(text()).to.contain('eve@example.com')
       expect(text()).to.contain('Withdraw')
       expect(panel.shadowRoot?.querySelector('.role')?.textContent).to.equal('owner')
+    })
+
+    it('says what the Worker said when a change is refused', async () => {
+      routes[`PUT /api/space/${TEAM}/members/cat%40example.com`] = () =>
+        json({ error: 'You cannot do that' }, 403)
+      await open(await space('owner'))
+      await until(() => text().includes('cat@example.com'), 'the people')
+      const select = must(
+        panel.shadowRoot?.querySelector<HTMLSelectElement>(
+          'select[aria-label="Role of cat@example.com"]'
+        )
+      )
+      select.value = 'writer'
+      select.dispatchEvent(new Event('change'))
+      await until(() => text().includes('You cannot do that'), 'the refusal')
     })
 
     it('changes a role, and reads the people again', async () => {

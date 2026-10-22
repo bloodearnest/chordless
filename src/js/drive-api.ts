@@ -42,6 +42,7 @@ export const {
   listPadSetFiles,
   trashFilesInFolder,
   uploadPadFile,
+  createTeamFolder,
   getSongsFolder,
   getSetlistsFolder,
   findSharesFolder,

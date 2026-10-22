@@ -15,6 +15,7 @@ const VIEWS = [
   ['/bookmarklet', 'bookmarklet-view'],
   ['/about', 'about-view'],
   ['/join', 'join-view'],
+  ['/spaces/new', 'new-team-space-view'],
   ['/no/such/page', 'not-found-view'],
 ]
 

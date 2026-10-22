@@ -84,6 +84,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./join-view.ts'),
     () => 'Join a team space - Chordless'
   ),
+  'new-team-space': view(
+    'new-team-space-view',
+    () => import('./new-team-space-view.ts'),
+    () => 'New team space - Chordless'
+  ),
   bookmarklet: view(
     'bookmarklet-view',
     () => import('./bookmarklet-view.ts'),

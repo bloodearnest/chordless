@@ -521,7 +521,6 @@ export class StoragePage extends LitElement {
     return html`
       <team-share-panel
         .space=${this._space}
-        ?can-share=${this.isAuthenticated && !this.signInExpired && !this.noDrive}
         @team-share-panel:changed=${this.checkAuthStatus}
         @team-share-panel:left=${() => this.reload()}
       ></team-share-panel>

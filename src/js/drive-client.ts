@@ -673,6 +673,25 @@ export function createDriveApi({
   }
 
   /**
+   * Make a team space's folder inside a parent the person picked (My Drive or a shared drive).
+   * The app makes it, so `drive.file` grants it everything inside; a picked folder alone exposes no
+   * children (docs/SPACES.md, "Folder choice"). Not looked for by name first: two teams may share a
+   * name, and each is told apart by its id.
+   */
+  async function createTeamFolder(parentId: string, name: string): Promise<string> {
+    const folder = await driveRequest<DriveFile>('/files', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        mimeType: 'application/vnd.google-apps.folder',
+        parents: [parentId],
+        appProperties: { resourceType: 'space', appVersion: APP_VERSION },
+      }),
+    })
+    return folder.id
+  }
+
+  /**
    * Get or create songs folder within space
    */
   async function getSongsFolder(spaceFolderId: string): Promise<string> {
@@ -808,6 +827,7 @@ export function createDriveApi({
     listPadSetFiles,
     trashFilesInFolder,
     uploadPadFile,
+    createTeamFolder,
     getSongsFolder,
     getSetlistsFolder,
     findSharesFolder,

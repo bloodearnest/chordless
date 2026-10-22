@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { allDrivesUrl } from '../src/js/drive-api.ts'
+import { allDrivesUrl, createTeamFolder } from '../src/js/drive-api.ts'
 import { useFakeDriveRig } from './drive-harness.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -55,6 +55,20 @@ describe('Shared drives (docs/SPACES.md)', () => {
       expect(
         listings.every(request => request.params?.get('includeItemsFromAllDrives') === 'true')
       ).to.equal(true)
+    })
+
+    it('makes a team folder inside a picked parent, as a folder the app made', async () => {
+      const phone = await rig.makeDevice('phone')
+      const parent = await createTeamFolder('root', 'Parent')
+      const id = await createTeamFolder(parent, 'St Mary’s')
+      const file = rig.drive.files.get(id)
+      expect(file?.name).to.equal('St Mary’s')
+      expect(file?.parents).to.deep.equal([parent])
+      const posts = rig.drive.requests.filter(request => request.method === 'POST')
+      expect(posts.every(request => request.params?.get('supportsAllDrives') === 'true')).to.equal(
+        true
+      )
+      expect(phone).to.not.equal(undefined)
     })
   })
 })
