@@ -78,7 +78,7 @@ export class SongSettingsPopover extends LitElement {
       z-index: 1000;
       min-width: 250px;
       max-width: 90vw;
-      max-height: 80vh;
+      max-height: 80dvh;
       overflow-y: auto;
       position: fixed;
       inset: unset;

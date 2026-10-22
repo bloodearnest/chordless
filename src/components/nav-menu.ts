@@ -118,7 +118,7 @@ export class NavMenu extends LitElement {
       background: var(--bg-secondary, white);
       min-width: 250px;
       max-width: 90vw;
-      max-height: 80vh;
+      max-height: 80dvh;
       margin: 0;
       position: fixed;
       inset: unset;

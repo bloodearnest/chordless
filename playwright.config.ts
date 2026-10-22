@@ -15,6 +15,12 @@ const needsBuilt =
   named.some(a => /built|--project[= ]?built/.test(a)) ||
   args.includes('--ui')
 
+// WebKit (Safari's engine) roughly doubles the run, so it is opt-in: `just test-webkit`, or
+// --project=webkit. Plain runs, and `just test`, stay on Chromium
+// (Workers get no command line, so the choice goes to them in the environment.)
+if (args.some(a => /webkit/.test(a))) process.env.CHORDLESS_WEBKIT = '1'
+const webkit = process.env.CHORDLESS_WEBKIT === '1'
+
 export default defineConfig({
   testDir: './tests',
   testMatch: '*.playwright.{js,ts}',
@@ -39,6 +45,16 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
       testIgnore: 'built.playwright.{js,ts}',
     },
+    ...(webkit
+      ? [
+          {
+            // iPad and iPhone browsers are all WebKit: where "not big enough" modals show up
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+            testIgnore: 'built.playwright.{js,ts}',
+          },
+        ]
+      : []),
     {
       // The production build, as `vite preview` serves it: the service worker with its
       // precache, which the dev server does not have

@@ -85,6 +85,11 @@ test-browser-headless *args:
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
     {{ if args == "" { "PLAYWRIGHT_JSON_OUTPUT_NAME=.stats/e2e.json npx playwright test --reporter=list,json" } else { "npx playwright test " + args } }}
 
+# Run the browser tests in WebKit (Safari's engine) instead of Chromium; opt-in, as it is slow: just test-webkit tests/app.playwright.ts
+test-webkit *args:
+    @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
+    npx playwright test --project=webkit {{args}}
+
 # Run browser tests with Playwright UI
 test-browser-ui:
     @echo "Running browser tests with Playwright UI..."
@@ -99,6 +104,10 @@ test-browser-headed:
 
 # First-time setup: npm dependencies, and Chromium for the browser tests
 setup: install-playwright
+
+# Install WebKit for `just test-webkit` (on Linux, add --with-deps for the system libraries; needs sudo)
+install-webkit:
+    npx playwright install webkit
 
 # Install Playwright and browsers
 install-playwright:

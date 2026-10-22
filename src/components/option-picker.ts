@@ -85,7 +85,7 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
     .picker-popover {
       margin: 0;
       inset: unset;
-      max-height: 70vh;
+      max-height: 70dvh;
       overflow-y: auto;
       padding: 0.5rem;
       border: 2px solid color-mix(in srgb, currentColor 30%, transparent);

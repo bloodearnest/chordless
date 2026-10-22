@@ -196,6 +196,11 @@ good check for a new test.
 
 `just test-browser-ui` opens Playwright's UI, to step through a test.
 
+`just test-webkit [files]` runs the same tests in WebKit (the `webkit` project, Desktop Safari), which is
+what every iPhone and iPad browser uses. It is opt-in, not part of `just test`: it roughly doubles
+the run. Use it for layout and modal problems reported on Apple devices. `just install-webkit` fetches
+it once (on Linux it also needs system libraries: `sudo npx playwright install-deps webkit`).
+
 ## Real emails
 
 The email importer (`src/js/email-setlist.ts`) is tuned on real emails from other leaders. They

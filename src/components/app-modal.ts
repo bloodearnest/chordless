@@ -109,7 +109,7 @@ export class AppModal extends LitElement {
       border-radius: 8px;
       padding: 0;
       max-width: min(90%, calc(var(--app-width) - 2rem));
-      max-height: 90vh;
+      max-height: 90dvh;
       box-shadow: var(--modal-shadow, 0 4px 20px rgba(0, 0, 0, 0.3));
       overflow: hidden;
     }
@@ -138,9 +138,9 @@ export class AppModal extends LitElement {
 
     :host([size='fullscreen']) .modal-content {
       max-width: min(95vw, calc(var(--app-width) - 2rem));
-      max-height: 95vh;
+      max-height: 95dvh;
       width: min(95vw, calc(var(--app-width) - 2rem));
-      height: 95vh;
+      height: 95dvh;
     }
 
     /* Themed like the page header: title and buttons in one centred row */
@@ -221,9 +221,12 @@ export class AppModal extends LitElement {
       padding-top: 4.5rem;
     }
 
+    /* flex-basis auto, not the 0 of "flex: 1": the dialog's height is auto, and Safari then
+       sizes it as if the body had no content (a header and a sliver of padding) */
     .modal-body {
       padding: 2rem;
-      flex: 1;
+      flex: 1 1 auto;
+      min-height: 0;
       overflow: auto;
     }
 
