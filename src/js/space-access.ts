@@ -24,11 +24,11 @@ export interface DriveFolderProblem {
 }
 
 /** Ask Drive about the current space's folder, if it has one yet (the first sync finds or makes it) */
-async function inspectFolder(): Promise<{
+async function inspectFolder(given?: Space): Promise<{
   space: Space
   folder: RootInfo | null
 } | null> {
-  const space = await getCurrentSpaceFull()
+  const space = given ?? (await getCurrentSpaceFull())
   if (!space.rootRef) return null
   const folder = await storageFor(space).inspectRoot(space.rootRef)
   return { space, folder }
@@ -54,9 +54,9 @@ function problemWith(space: Space, folder: RootInfo | null): DriveFolderProblem 
  * to this Google account or app: Drive says the same for all of them). Null when it is there, or
  * when that can't be told (not signed in, offline, no folder yet): sync reports those.
  */
-export async function driveFolderProblem(): Promise<DriveFolderProblem | null> {
+export async function driveFolderProblem(space?: Space): Promise<DriveFolderProblem | null> {
   try {
-    const found = await inspectFolder()
+    const found = await inspectFolder(space)
     return found ? problemWith(found.space, found.folder) : null
   } catch {
     return null

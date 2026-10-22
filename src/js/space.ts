@@ -95,8 +95,8 @@ function isReadOnlySpace(): boolean {
  * it still edits what they see (a late song, a key change); those changes stay on this device,
  * and a pull leaves them (docs/SPACES.md, "Read-only: local edits are never blocked").
  */
-export function syncsBack(): boolean {
-  return !isReadOnlySpace()
+export function syncsBack(space?: Pick<Space, 'readOnly'>): boolean {
+  return space ? !space.readOnly : !isReadOnlySpace()
 }
 
 /** A space by its id, if this device has it (there is none for no id) */

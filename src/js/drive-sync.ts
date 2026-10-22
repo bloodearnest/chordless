@@ -12,7 +12,7 @@
  * - Whether a record has changes that aren't in Drive: sync/changes.ts
  */
 
-import type { Setlist, SpaceMember } from './data-types.ts'
+import type { Setlist, Space, SpaceMember } from './data-types.ts'
 import { ChordlessDB, getCurrentDB } from './db.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
@@ -717,10 +717,11 @@ export class DriveSyncManager implements SyncSession {
  */
 
 /**
- * Check if Drive sync is available (user is authenticated)
+ * Check if sync is available for a space (the one in use if none is given): signed in, and for
+ * a team's member that is all it takes, as their files come through the Worker
  */
-export async function isSyncAvailable(): Promise<boolean> {
-  return (await currentSpaceStorage()).available()
+export async function isSyncAvailable(space?: Pick<Space, 'team'> | null): Promise<boolean> {
+  return (space === undefined ? await currentSpaceStorage() : storageFor(space)).available()
 }
 
 /** The backend for the current space: Drive, or the Worker for a member of a team space */

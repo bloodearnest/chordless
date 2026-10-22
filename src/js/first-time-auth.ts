@@ -91,8 +91,10 @@ export async function handleFirstTimeAuth(
  *
  * @returns True if the space was renamed
  */
-export async function nameSpaceBeforeSync(): Promise<boolean> {
-  const { id, name } = getCurrentSpace()
+export async function nameSpaceBeforeSync(
+  space: { id: string | null; name: string } = getCurrentSpace()
+): Promise<boolean> {
+  const { id, name } = space
   if (!id || name !== 'Personal') {
     return false
   }

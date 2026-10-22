@@ -1,9 +1,10 @@
 import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
+import type { Space } from '../js/data-types.ts'
 import { DriveFolderGoneError } from '../js/drive-sync.ts'
 import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
-import { getCurrentSpace, syncsBack } from '../js/space.ts'
+import { getCurrentSpace, getSpaceById, syncsBack } from '../js/space.ts'
 import { driveFolderProblem } from '../js/space-access.ts'
 import {
   createSyncOrchestrator,
@@ -30,6 +31,7 @@ interface PanelProgress {
  */
 export class DriveSyncPanel extends LitElement {
   static override properties = {
+    space: { attribute: false },
     syncAvailable: { type: Boolean, attribute: false },
     syncing: { type: Boolean, attribute: false },
     syncProgress: { type: Object, attribute: false },
@@ -39,6 +41,8 @@ export class DriveSyncPanel extends LitElement {
     disabled: { type: Boolean, reflect: true },
   }
 
+  /** The space to sync: any on this device, not only the one in use */
+  declare space: Space
   declare syncAvailable: boolean
   declare syncing: boolean
 
@@ -171,7 +175,9 @@ export class DriveSyncPanel extends LitElement {
     super.connectedCallback()
     await this.checkSyncAvailability()
     this.loadLastSyncTime()
-    if (this.syncAvailable) this.folderProblem = (await driveFolderProblem())?.message ?? null
+    if (this.syncAvailable) {
+      this.folderProblem = (await driveFolderProblem(this.space))?.message ?? null
+    }
   }
 
   override updated(changedProperties: PropertyValues<this>): void {
@@ -181,14 +187,27 @@ export class DriveSyncPanel extends LitElement {
   }
 
   async checkSyncAvailability(): Promise<void> {
-    this.syncAvailable = await isSyncAvailable()
+    this.syncAvailable = await isSyncAvailable(this.space)
+  }
+
+  /** Where this space's last sync time is kept (the one before there were several is the space in use's) */
+  get _lastSyncKey(): string {
+    return `last-sync-time:${this.space.id}`
   }
 
   loadLastSyncTime(): void {
-    const stored = localStorage.getItem('last-sync-time')
+    const legacy =
+      this.space.id === getCurrentSpace().id ? localStorage.getItem('last-sync-time') : null
+    const stored = localStorage.getItem(this._lastSyncKey) ?? legacy
     if (stored) {
       this.lastSyncTime = stored
     }
+  }
+
+  _recordSyncTime(): void {
+    const now = new Date().toISOString()
+    this.lastSyncTime = now
+    localStorage.setItem(this._lastSyncKey, now)
   }
 
   async _handleReset(): Promise<void> {
@@ -201,8 +220,8 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting reset...' }
 
     try {
-      await nameSpaceBeforeSync()
-      const { id, name } = getCurrentSpace()
+      await nameSpaceBeforeSync(this.space)
+      const { id, name } = this.space
       const orchestrator = await createSyncOrchestrator(name, id)
 
       await orchestrator.resetLocalFromDrive(progress => {
@@ -210,10 +229,17 @@ export class DriveSyncPanel extends LitElement {
         this.requestUpdate()
       })
 
-      const now = new Date().toISOString()
-      this.lastSyncTime = now
-      localStorage.setItem('last-sync-time', now)
+      this._recordSyncTime()
 
+      if (this.space.id !== getCurrentSpace().id) {
+        // (not the space in use: no page is showing it, so nothing needs to start afresh)
+        this.syncProgress = { stage: 'success', message: '✓ Reset complete' }
+        setTimeout(() => {
+          this.syncing = false
+          this.syncProgress = null
+        }, 2000)
+        return
+      }
       // Local data changed underneath every page, so reload to show it
       this.syncProgress = { stage: 'success', message: '✓ Reset complete, reloading...' }
       setTimeout(() => this.reload(), 1000)
@@ -233,8 +259,8 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Initializing...' }
 
     try {
-      await nameSpaceBeforeSync()
-      const { id, name } = getCurrentSpace()
+      await nameSpaceBeforeSync(this.space)
+      const { id, name } = this.space
 
       const orchestrator = await createSyncOrchestrator(name, id)
 
@@ -243,21 +269,21 @@ export class DriveSyncPanel extends LitElement {
         this.requestUpdate()
       })
 
-      this._syncSucceeded()
+      await this._syncSucceeded()
     } catch (error) {
       this._syncFailed(error)
     }
   }
 
   /** Show success briefly */
-  _syncSucceeded(): void {
-    const now = new Date().toISOString()
-    this.lastSyncTime = now
-    localStorage.setItem('last-sync-time', now)
+  async _syncSucceeded(): Promise<void> {
+    this._recordSyncTime()
     this.folderProblem = null
+    // (the sync may have found the space is read-only: ask the record, not the one this page was given)
+    const fresh = (await getSpaceById(this.space.id)) ?? this.space
     this.syncProgress = {
       stage: 'success',
-      message: syncsBack()
+      message: syncsBack(fresh)
         ? '✓ Sync complete!'
         : '✓ Sync complete (view-only access: your changes stay on this device)',
     }
@@ -290,13 +316,13 @@ export class DriveSyncPanel extends LitElement {
     this.syncProgress = { stage: 'starting', message: 'Starting over in Drive...' }
 
     try {
-      await nameSpaceBeforeSync()
-      const { id, name } = getCurrentSpace()
+      await nameSpaceBeforeSync(this.space)
+      const { id, name } = this.space
       await new SyncOrchestrator(name, id).startOverInDrive(progress => {
         this.syncProgress = progress
         this.requestUpdate()
       })
-      this._syncSucceeded()
+      await this._syncSucceeded()
     } catch (error) {
       this._syncFailed(error)
     }

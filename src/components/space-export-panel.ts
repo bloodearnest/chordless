@@ -1,7 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
-import { getCurrentDB } from '../js/db.ts'
+import type { Space } from '../js/data-types.ts'
+import { withSource } from '../js/other-songs.ts'
 import { listPadSets, type PadSet, padSetSize } from '../js/pad-set-service.ts'
-import { getCurrentSpace } from '../js/space.ts'
 import {
   createExport,
   exportFileName,
@@ -32,13 +32,15 @@ export function megabytes(bytes: number): string {
 }
 
 /**
- * Exporting the current space to a zip file, and importing one (docs/SPACES.md, "Export and
+ * Exporting a space to a zip file, and importing one into it (docs/SPACES.md, "Export and
  * import"). The pad sets are large, so they go in only if the user ticks them, with their size
  * shown; they live in the signed-in account's Drive, so they need the user signed in.
  */
 export class SpaceExportPanel extends LitElement {
   static override properties = {
+    space: { attribute: false },
     signedIn: { type: Boolean, attribute: 'signed-in' },
+    showPads: { type: Boolean, attribute: 'show-pads' },
     _padSets: { state: true },
     _includePads: { state: true },
     _busy: { state: true },
@@ -84,7 +86,11 @@ export class SpaceExportPanel extends LitElement {
     `,
   ]
 
+  /** The space to export, or to import into: any on this device, not only the one in use */
+  declare space: Space
   declare signedIn: boolean
+  /** Whether pad sets are on offer: only while the media player is, as nothing else uses them */
+  declare showPads: boolean
   declare _padSets: PadSetChoice[]
   declare _includePads: boolean
   declare _busy: boolean
@@ -94,6 +100,7 @@ export class SpaceExportPanel extends LitElement {
   constructor() {
     super()
     this.signedIn = false
+    this.showPads = false
     this._padSets = []
     this._includePads = false
     this._busy = false
@@ -107,12 +114,12 @@ export class SpaceExportPanel extends LitElement {
   }
 
   override updated(changed: Map<string, unknown>) {
-    if (changed.has('signedIn')) void this._loadPadSets()
+    if (changed.has('signedIn') || changed.has('showPads')) void this._loadPadSets()
   }
 
   /** The pad sets in Drive and their sizes; none if the user is not signed in or is offline */
   async _loadPadSets() {
-    if (!this.signedIn) {
+    if (!this.signedIn || !this.showPads) {
       this._padSets = []
       this._includePads = false
       return
@@ -137,12 +144,11 @@ export class SpaceExportPanel extends LitElement {
     this._busy = true
     this._message = null
     try {
-      const db = await getCurrentDB()
-      const name = getCurrentSpace().name
+      const name = this.space.name
       const pads = this._includePads
         ? await readPadSetsForExport(this._padSets.map(set => set.padSet))
         : []
-      const blob = await createExport(db, name, pads)
+      const blob = await withSource(this.space.id, db => createExport(db, name, pads))
       const link = document.createElement('a')
       link.href = URL.createObjectURL(blob)
       link.download = exportFileName(name)
@@ -181,8 +187,8 @@ export class SpaceExportPanel extends LitElement {
     this._message = null
     try {
       const { exported } = pending
-      const where = getCurrentSpace().name
-      const report = await importIntoSpace(exported, await getCurrentDB())
+      const where = this.space.name
+      const report = await withSource(this.space.id, db => importIntoSpace(exported, db))
       const pads =
         pending.pads && this.signedIn
           ? await importPadSets(
@@ -191,9 +197,13 @@ export class SpaceExportPanel extends LitElement {
             )
           : []
       this._pending = null
+      // (the space has more in it now: whoever shows what it holds can look again)
+      this.dispatchEvent(
+        new Event('space-export-panel:imported', { bubbles: true, composed: true })
+      )
       this._message = {
         text:
-          `Imported into this space (${where}): ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
+          `Imported into ${where}: ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
           `, ${report.songsSkipped} charts and ${report.setlistsSkipped} setlists were already there` +
           (pads.length > 0 ? `; ${pads.length} pad sets uploaded to Drive` : '') +
           '.',
@@ -212,7 +222,7 @@ export class SpaceExportPanel extends LitElement {
     const when = new Date(manifest.created).toLocaleString()
     return html`
       <fieldset>
-        <legend>Import this export into ${getCurrentSpace().name}</legend>
+        <legend>Import this export into ${this.space.name}</legend>
         <p class="meta">
           Exported from ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
             padSets > 0 ? html`, ${padSets} pad sets` : nothing

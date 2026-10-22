@@ -4,7 +4,13 @@ import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { uploadPadSet } from '../src/js/pad-set-service.ts'
 import { addChart } from '../src/js/song-utils.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  getSpaceById,
+  setCurrentSpace,
+} from '../src/js/space.ts'
 import { createExport } from '../src/js/space-export.ts'
 import { makeEntry, makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
@@ -54,6 +60,14 @@ describe('the export panel', () => {
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
+  /** The panel for the space made for the test (signed in means pad sets are on offer too) */
+  async function mount({ signedIn = false }: { signedIn?: boolean } = {}) {
+    const space = must(await getSpaceById(spaceId))
+    return fixture<SpaceExportPanel>(
+      html`<space-export-panel .space=${space} ?signed-in=${signedIn} ?show-pads=${signedIn}></space-export-panel>`
+    )
+  }
+
   const text = (el: SpaceExportPanel) => el.shadowRoot?.textContent?.replace(/\s+/g, ' ') ?? ''
   const button = (el: SpaceExportPanel, id: string) =>
     must(el.shadowRoot?.querySelector<HTMLButtonElement>(`#${id}`))
@@ -94,13 +108,13 @@ describe('the export panel', () => {
   })
 
   it('does nothing when asked to import with no export chosen', async () => {
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     await el._import()
     expect(text(el)).to.not.contain('Imported')
   })
 
   it('offers no pad sets when not signed in', async () => {
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     expect(el.shadowRoot?.querySelector('#include-pads')).to.equal(null)
     expect(text(el)).to.contain('Export this space')
   })
@@ -108,7 +122,7 @@ describe('the export panel', () => {
   it('downloads an export of the current space, named by space and day', async () => {
     const db = await getCurrentDB()
     await addChart(db, ALPHA, ADD)
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     button(el, 'export-space').click()
     await waitUntil(() => downloads.length === 1, 'the download')
     expect(downloads[0]?.name).to.match(
@@ -123,7 +137,7 @@ describe('the export panel', () => {
     const real = Object.getPrototypeOf(db).getAllSongs
     Object.getPrototypeOf(db).getAllSongs = () => Promise.reject(new Error('disk full'))
     try {
-      const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+      const el = await mount()
       button(el, 'export-space').click()
       await waitUntil(() => text(el).includes('Exporting failed'), 'the failure')
       expect(text(el)).to.contain('disk full')
@@ -134,14 +148,14 @@ describe('the export panel', () => {
 
   it('imports into this space, and says what was added and what was already there', async () => {
     const file = await exportOf('Elsewhere')
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     await choose(el, file)
     await waitUntil(() => text(el).includes('Import this export'), 'the question')
     expect(text(el)).to.contain('Exported from Elsewhere')
     expect(text(el)).to.contain('1 charts, 1 setlists')
 
     button(el, 'import').click()
-    await waitUntil(() => text(el).includes('Imported into this space'), 'the import')
+    await waitUntil(() => text(el).includes('Imported into Export'), 'the import')
     expect(text(el)).to.contain('1 charts and 1 setlists added')
     const db = await getCurrentDB()
     expect(await db.getAllSongs()).to.have.length(1)
@@ -155,8 +169,41 @@ describe('the export panel', () => {
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
   })
 
+  it('exports and imports for the space it is given, not the one in use', async () => {
+    const other = await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)
+    try {
+      const db = new ChordlessDB(other.id)
+      await db.init()
+      await addChart(db, ALPHA, ADD)
+      db.db?.close()
+      const el = await fixture<SpaceExportPanel>(
+        html`<space-export-panel .space=${other}></space-export-panel>`
+      )
+      button(el, 'export-space').click()
+      await waitUntil(() => downloads.length === 1, 'the download')
+      expect(downloads[0]?.name).to.contain(other.name.replace(/ /g, '-'))
+
+      let imported = 0
+      el.addEventListener('space-export-panel:imported', () => imported++)
+      await choose(el, await exportOf('Elsewhere'))
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      expect(text(el)).to.contain(`into ${other.name}`)
+      button(el, 'import').click()
+      await waitUntil(() => text(el).includes(`Imported into ${other.name}`), 'the import')
+      expect(imported).to.equal(1)
+      const there = new ChordlessDB(other.id)
+      await there.init()
+      expect(await there.getAllSetlists()).to.have.length(1)
+      there.db?.close()
+      // (the space in use is untouched)
+      expect(await (await getCurrentDB()).getAllSetlists()).to.have.length(0)
+    } finally {
+      await deleteSpace(other.id)
+    }
+  })
+
   it('goes back to the choice of file when the question is cancelled', async () => {
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     await choose(el, await exportOf('Elsewhere', false))
     await waitUntil(() => text(el).includes('Import this export'), 'the question')
     button(el, 'import-cancel').click()
@@ -165,7 +212,7 @@ describe('the export panel', () => {
   })
 
   it('says a file that is not an export is not one, and asks nothing', async () => {
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     await choose(el, new File(['hello'], 'notes.zip'))
     await waitUntil(() => text(el).includes('not a ZIP file'), 'the reason')
     expect(text(el)).to.not.contain('Import this export')
@@ -175,7 +222,7 @@ describe('the export panel', () => {
   })
 
   it('says why an import failed, and changes nothing', async () => {
-    const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+    const el = await mount()
     await choose(el, await exportOf('Elsewhere'))
     await waitUntil(() => text(el).includes('Import this export'), 'the question')
     const db = await getCurrentDB()
@@ -206,9 +253,7 @@ describe('the export panel', () => {
 
     it('shows their size, and puts them in the export only when ticked', async () => {
       await uploadSet('Warm')
-      const el = await fixture<SpaceExportPanel>(
-        html`<space-export-panel signed-in></space-export-panel>`
-      )
+      const el = await mount({ signedIn: true })
       await waitUntil(() => el.shadowRoot?.querySelector('#include-pads'), 'the choice')
       expect(text(el)).to.contain('Include my pad sets (1, about')
 
@@ -239,9 +284,7 @@ describe('the export panel', () => {
       }
       drive.files.delete(set.id)
 
-      const el = await fixture<SpaceExportPanel>(
-        html`<space-export-panel signed-in></space-export-panel>`
-      )
+      const el = await mount({ signedIn: true })
       await choose(el, file)
       await waitUntil(() => text(el).includes('Import this export'), 'the question')
       expect(text(el)).to.contain('1 pad sets')
@@ -268,7 +311,7 @@ describe('the export panel', () => {
       )
       db.db?.close()
       await deleteDatabase(db.dbName)
-      const el = await fixture<SpaceExportPanel>(html`<space-export-panel></space-export-panel>`)
+      const el = await mount()
       await choose(el, file)
       await waitUntil(() => text(el).includes('Import this export'), 'the question')
       expect(
@@ -279,9 +322,7 @@ describe('the export panel', () => {
 
     it('leaves out the pad sets when Drive cannot be asked', async () => {
       drive.failRequests({ method: 'GET', status: 500, times: 50 })
-      const el = await fixture<SpaceExportPanel>(
-        html`<space-export-panel signed-in></space-export-panel>`
-      )
+      const el = await mount({ signedIn: true })
       await wait(100)
       expect(el.shadowRoot?.querySelector('#include-pads')).to.equal(null)
       // and when the user signs out

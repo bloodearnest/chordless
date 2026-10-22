@@ -498,7 +498,7 @@ export class StoragePage extends LitElement {
           }
         </p>
         <div class="sync-body">
-          <drive-sync-panel ?disabled=${disabled}></drive-sync-panel>
+          ${this._space ? html`<drive-sync-panel .space=${this._space} ?disabled=${disabled}></drive-sync-panel>` : nothing}
           ${
             disabled
               ? html`<p class="sync-hint">
@@ -549,7 +549,15 @@ export class StoragePage extends LitElement {
           space, on this device or another: it needs no Google account, and an import only adds
           what is missing. Pad sets are large, so they are included only if you choose.
         </p>
-        <space-export-panel ?signed-in=${this.isAuthenticated && !this.signInExpired && !this.noDrive}></space-export-panel>
+        ${
+          this._space
+            ? html`<space-export-panel
+                .space=${this._space}
+                show-pads
+                ?signed-in=${this.isAuthenticated && !this.signInExpired && !this.noDrive}
+              ></space-export-panel>`
+            : nothing
+        }
       </div>
     `
   }

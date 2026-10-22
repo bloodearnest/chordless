@@ -1,14 +1,17 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { DriveSyncPanel } from '../src/components/drive-sync-panel.ts'
+import { ChordlessDB } from '../src/js/db.ts'
 import {
   createSpace,
   deleteSpace,
   getCurrentSpace,
+  getSpaceById,
   setCurrentSpace,
   setSpaceReadOnly,
 } from '../src/js/space.ts'
 import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
+import { makeSetlist } from './builders.ts'
 import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
@@ -36,14 +39,18 @@ describe('drive-sync-panel', () => {
     drive?.uninstall()
     drive = undefined
     localStorage.removeItem('last-sync-time')
+    localStorage.removeItem(`last-sync-time:${spaceId}`)
     await setSpaceReadOnly(spaceId, false)
     await deleteSpace(spaceId)
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
-  async function show(connected = true) {
+  async function show(connected = true, id = spaceId) {
     if (connected) drive = installFakeDrive()
-    const el = await fixture<DriveSyncPanel>(html`<drive-sync-panel></drive-sync-panel>`)
+    const space = must(await getSpaceById(id))
+    const el = await fixture<DriveSyncPanel>(
+      html`<drive-sync-panel .space=${space}></drive-sync-panel>`
+    )
     await wait(80)
     await el.updateComplete
     return el
@@ -145,7 +152,7 @@ describe('drive-sync-panel', () => {
       const el = await show()
       button(el, /Sync with Drive/)?.click()
       await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done')
-      expect(localStorage.getItem('last-sync-time')).to.be.a('string')
+      expect(localStorage.getItem(`last-sync-time:${spaceId}`)).to.be.a('string')
       expect(text(el)).to.contain('Last synced')
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
       expect(text(el)).to.contain('Ready to sync')
@@ -197,6 +204,57 @@ describe('drive-sync-panel', () => {
     })
   })
 
+  describe('a space that is not the one in use', () => {
+    let otherId: string
+
+    beforeEach(async () => {
+      otherId = (await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)).id
+      const db = new ChordlessDB(otherId)
+      await db.init()
+      await db.saveSetlist(makeSetlist({ id: 'other-list', date: '2026-12-20' }))
+      db.db?.close()
+    })
+
+    afterEach(async () => {
+      localStorage.removeItem(`last-sync-time:${otherId}`)
+      await deleteSpace(otherId)
+    })
+
+    it('syncs that space, and says when it did', async function () {
+      this.timeout(8000)
+      const el = await show(true, otherId)
+      button(el, /Sync with Drive/)?.click()
+      await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done', {
+        timeout: 4000,
+      })
+      const files = must(drive).listFiles(file => Boolean(file.appProperties.setlistId))
+      expect(files.map(file => file.appProperties.setlistId)).to.deep.equal(['other-list'])
+      expect(localStorage.getItem(`last-sync-time:${otherId}`)).to.be.a('string')
+      expect(localStorage.getItem(`last-sync-time:${spaceId}`)).to.equal(null)
+    })
+
+    it('resets that space without starting the app afresh, as nothing is showing it', async function () {
+      this.timeout(8000)
+      const el = await show(true, otherId)
+      // (a reset refuses while the space has changes Drive does not: sync them first)
+      button(el, /Sync with Drive/)?.click()
+      await waitUntil(() => text(el).includes('Sync complete!'), 'it is synced', { timeout: 4000 })
+      await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
+      let reloads = 0
+      el.reload = () => {
+        reloads++
+      }
+      must(el._resetModal.value as AppModal).ask = async () => true
+      button(el, /Reset from Google Drive/)?.click()
+      await waitUntil(() => text(el).includes('Reset complete'), 'it says it is done', {
+        timeout: 4000,
+      })
+      await wait(1300)
+      expect(reloads).to.equal(0)
+      await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
+    })
+  })
+
   describe('resetting from Drive', () => {
     it('asks first, and does nothing when told not to', async () => {
       const el = await show()
@@ -218,7 +276,7 @@ describe('drive-sync-panel', () => {
       await waitUntil(() => text(el).includes('Reset complete'), 'it says it is done', {
         timeout: 4000,
       })
-      expect(localStorage.getItem('last-sync-time')).to.be.a('string')
+      expect(localStorage.getItem(`last-sync-time:${spaceId}`)).to.be.a('string')
       await waitUntil(() => reloads === 1, 'it reloads', { timeout: 3000 })
     })
 
