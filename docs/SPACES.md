@@ -34,6 +34,11 @@ members of their church. Each space is self-contained, so copyright compliance i
   removed by `SpaceDB.init`, the `localStorage` keys `current-organisation-*` become `current-space-*`
   (`space.ts`), and the `appProperties` of files already in Drive (`organisationId`, read by nothing)
   lose it at their next update.
+- **In the UI, "space" is not used** (decided 2026-10-22: too generic for a menu title). People see
+  **Personal** and **Team**: a personal space's card reads `<name> ~ Personal` and a team's reads
+  `<team name> ~ Team`; the button is "Create a new Team" and the page that lists them is "Account
+  and Teams" (`docs/ACCOUNT.md`). Roles read owner, admin, worship leader (the `writer` role) and
+  team member (the `reader` role). The code, the routes of the API and these docs keep "space".
 - Each space also has its own name (a team space is named by its owner; the personal space defaults
   to the account name, as `first-time-auth.ts` does today). The kind shows as a small label beside
   the name, and only when the user has more than one space.

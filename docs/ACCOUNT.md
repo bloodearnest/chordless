@@ -1,0 +1,112 @@
+# Account and Teams
+
+The page that was "Storage" (`/storage`): who you are signed in as, and the spaces on this device
+(a **Personal** space and any **Teams**) with what to do with each. **Designed 2026-10-22, not
+built.** The words people see are in docs/SPACES.md, "Naming": the UI says Personal and Team, the
+code and these docs say space.
+
+## Why it changes
+
+`/storage` is eight panels stacked in one column, and they mix three scopes with no signposting:
+
+| Scope | Where it is today |
+|---|---|
+| The device | Local Data (the browser's usage), Clear Local Data, the delete-a-space list |
+| The account | Google Drive Authorization, including "Test Token Refresh" and the auth backup |
+| One space | Space switcher, Sync, Team Space, Export and import, Pad Sets (account-level for now) |
+
+The space panels all act on the space in use, and say nothing of which that is. To do anything to
+another space you must switch to it, which reloads the app. A space's operations are in five
+panels, and its size is nowhere. A signed-out person (a normal state) sees the sync, team and
+export panels turn into "connect above" hints. Developer tools sit in the main UI. And the switcher
+marks the current space by comparing names, not ids, so two spaces called the same both read
+CURRENT.
+
+## The page: `/account`, "Account and Teams"
+
+```
+Account and Teams
+
++- Account ----------------------------------------------+
+| Bea Singer - bea@example.com                           |
+| Google Drive connected                      [Manage]   |
++--------------------------------------------------------+
+  signed out: "Not signed in. Your songs stay on this device."  [Sign in with Google]
+
++- Bea Singer ~ Personal ------------------------ Current +
+| 31 songs - 6 setlists - about 190 KB                    |
+| Synced 5 min ago                      [Sync] [Manage]   |
++--------------------------------------------------------+
++- Gateway Church ~ Team - owner -------------------------+
+| 212 songs - 48 setlists - about 1.4 MB                  |
+| Sign in to sync                    [Switch] [Manage]    |
++--------------------------------------------------------+
+
+[Create a new Team]           (rare: under the Teams, not above them)
+
+This device
+  Browser data 2.1 MB - App cache 6 MB - Media cache 180 MB
+  [Clear everything on this device...]
+```
+
+- **The account card** is a prerequisite shown first, and it can be empty (anonymous). Its "Manage"
+  sheet has reconnect, connect Drive and log out. "Test token refresh" and the auth backup
+  (download, import) are under an *Advanced* disclosure.
+- **Signed out disables nothing.** The Personal space, export, import and delete all work; a card's
+  sync line says "Sign in to sync".
+- **Cards:** the space in use says Current and has Sync; the others have Switch. A personal
+  space's name is the account name once signed in (`first-time-auth.ts`); one still called
+  "Personal" shows just "Personal". A team shows the person's role.
+- **Switch** (not "Open") is the word, and the only thing that reloads the app.
+- **Sizes** are estimates: IndexedDB reports usage for the whole origin only, so a space's size is
+  its records (setlist JSON and chart text), as the team wizard's "Bring across" step counts them.
+  "This device" is the browser's own total; the caches (app, media) belong to it, not to a space.
+- **"Create a new Team"** goes to `/account/new` (the wizard, docs/SPACES.md "Creating a team
+  space"). There is no conversion of a personal space.
+
+## One space's page: `/account/<id>`
+
+```
+< Account and Teams
+Gateway Church ~ Team - owner                                [Switch]
+31 songs - 6 setlists - about 190 KB
+
+Sync     Last synced 5 min ago   [Sync now]   Reset from Google Drive...   Start over...
+Backup   [Export...]  [Import...]
+People   (a Team only) who is in it and their roles, invite someone, invites waiting
+Danger   Delete from this device... - Leave this Team... - Stop sharing...   (those that apply)
+```
+
+It works for any space, not only the one in use, so nothing is switched to be managed. That is
+possible because the first sync takes the space's own database (`syncTeamSpace`), export and delete
+need only that database, and the people and invite calls need only the team id. Every destructive
+action asks first (CLAUDE.md: friction, not prohibition). A Personal space has no People section and
+its Danger section is only Delete.
+
+## Pad sets and the media player
+
+Pad sets leave this page. They are the account's today (docs/STORAGE_API.md), the one large thing in
+the device's cache, and useful only when the media player is on: the Pad sets UI is shown only
+when the player is enabled. They belong on the media player's own page (`/media`), where its
+settings (pads, metronome, stereo split) can live too, with the enabled switch at its top so it
+is findable; the menu entry is always there. When pads become per-space (docs/SPACES.md, item 6)
+they move into each space's page. The media player page is its own change, after this one.
+
+## What changes in the code
+
+1. A per-space summary (`spaceSummary(id)`: counts and estimated size) and a card component. The
+   current-space marker compares ids.
+2. `drive-sync-panel`, `space-export-panel` and `team-share-panel` take a `space` property instead
+   of reading the current space; the sync panel runs `syncTeamSpace`-style (the space's own database).
+3. The list page, the space page and the account card/sheet; `/storage` redirects to `/account`; the
+   seven links to `/storage` (menu, welcome card, sync panel, share dialog, space access, media
+   player settings) and the e2e and unit tests move with it.
+4. The routes in docs/ROUTING.md, the naming in docs/SPACES.md and CLAUDE.md (done), and the
+   status lines here.
+
+## Not decided
+
+- Whether "Clear everything on this device" stays (deleting each space covers most of it), and if so
+  how strong its confirmation is.
+- Whether the media page's menu entry shows only while the player is enabled (then the switch must
+  stay in Preferences).
