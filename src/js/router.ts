@@ -32,6 +32,7 @@ export type PageName =
   | 'about'
   | 'join'
   | 'new-team-space'
+  | 'media'
 
 export type Route =
   | { name: PageName }
@@ -52,6 +53,7 @@ const PAGES: Readonly<Record<string, PageName | 'songs'>> = {
   '/about': 'about',
   '/join': 'join',
   '/spaces/new': 'new-team-space',
+  '/media': 'media',
 }
 
 const PAGE_PATHS: Record<string, string> = Object.fromEntries(

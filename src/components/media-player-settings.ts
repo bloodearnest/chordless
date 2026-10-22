@@ -267,7 +267,7 @@ export class MediaPlayerSettings extends LitElement {
                 ${
                   this._padSets.list.length || this._padSets.loading
                     ? 'Select which pad audio library to use'
-                    : html`Chordless has no pads of its own: upload a set you own in <a href="/storage">Storage</a>`
+                    : html`Chordless has no pads of its own: upload a set you own on the <a href="/media">Media Player page</a>`
                 }
               </div>
               <select

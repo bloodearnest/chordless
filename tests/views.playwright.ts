@@ -478,7 +478,7 @@ test.describe('The media player is optional', () => {
     await page.evaluate(() => {
       localStorage.setItem('media-settings', JSON.stringify({ mediaPlayerEnabled: false }))
     })
-    await page.goto('/preferences')
+    await page.goto('/media')
     const player = page
       .locator('media-player-settings')
       .getByRole('switch', { name: 'Enable Media Player' })

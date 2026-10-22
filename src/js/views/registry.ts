@@ -84,6 +84,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./join-view.ts'),
     () => 'Join a team space - Chordless'
   ),
+  media: view(
+    'media-view',
+    () => import('./media-view.ts'),
+    () => 'Media player - Chordless'
+  ),
   'new-team-space': view(
     'new-team-space-view',
     () => import('./new-team-space-view.ts'),

@@ -12,7 +12,6 @@ import './drive-sync-panel.ts'
 import './storage-summary.ts'
 import './team-share-panel.ts'
 import './space-export-panel.ts'
-import './pad-set-manager.ts'
 import './select-space.ts'
 import { buttonStyles, panelStyles, spinnerStyles } from './shared-styles.ts'
 
@@ -304,7 +303,7 @@ export class StoragePage extends LitElement {
         ${this._renderLocalSummarySection()} ${this._renderSpaceSection()}
         ${this._renderAuthSection()} ${this._renderSyncSection(!this.isAuthenticated || this.signInExpired || (this.noDrive && !this.teamMember))}
         ${this._renderTeamSection()}
-        ${this._renderPadSetSection()} ${this._renderExportSection()} ${this._renderDangerSection()}
+        ${this._renderExportSection()} ${this._renderDangerSection()}
       </div>
     `
   }
@@ -524,19 +523,6 @@ export class StoragePage extends LitElement {
         @team-share-panel:changed=${this.checkAuthStatus}
         @team-share-panel:left=${() => this.reload()}
       ></team-share-panel>
-    `
-  }
-
-  _renderPadSetSection() {
-    return html`
-      <div class="panel">
-        <h3>🎚️ Pad Sets</h3>
-        <p>
-          Upload zipped pad libraries (with all 12 keys). They are stored locally for instant use
-          and uploaded to Google Drive when available.
-        </p>
-        <pad-set-manager></pad-set-manager>
-      </div>
     `
   }
 

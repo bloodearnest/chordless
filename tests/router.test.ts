@@ -46,6 +46,7 @@ describe('matchRoute', () => {
     // An invite link: the space and the code are in the fragment, which the route leaves out
     ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
     ['/spaces/new', { name: 'new-team-space' }],
+    ['/media', { name: 'media' }],
 
     // The library list, searched
     ['/songs?q=grace', { name: 'songs', search: 'grace' }],
@@ -116,6 +117,7 @@ describe('buildUrl', () => {
     [{ name: 'bookmarklet' }, '/bookmarklet'],
     [{ name: 'join' }, '/join'],
     [{ name: 'new-team-space' }, '/spaces/new'],
+    [{ name: 'media' }, '/media'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: -1 }, '/setlist/abc'],
     [{ name: 'setlist', setlistId: 'abc', songIndex: 4 }, '/setlist/abc/song/4'],
     [{ name: 'setlist', setlistId: 'a b', songIndex: -1 }, '/setlist/a%20b'], // ids are encoded

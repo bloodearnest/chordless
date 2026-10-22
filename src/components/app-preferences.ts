@@ -24,7 +24,6 @@ import {
 } from '../js/preferences.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../js/wake-lock.ts'
 import './theme-settings.ts'
-import './media-player-settings.ts'
 import { buttonStyles, panelStyles, statusStyles } from './shared-styles.ts'
 import { renderStatus } from './status-view.ts'
 
@@ -442,12 +441,6 @@ export class AppPreferences extends LitElement {
             />
             <span>Use unicode accidentals (♯/♭)</span>
           </label>
-        </div>
-
-        <div class="panel">
-          <h3>Media Player</h3>
-          <p>Configure global media player settings. These settings apply to all setlists.</p>
-          <media-player-settings></media-player-settings>
         </div>
       </div>
     `

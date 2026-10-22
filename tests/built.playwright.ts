@@ -16,6 +16,7 @@ const VIEWS = [
   ['/about', 'about-view'],
   ['/join', 'join-view'],
   ['/spaces/new', 'new-team-space-view'],
+  ['/media', 'media-view'],
   ['/no/such/page', 'not-found-view'],
 ]
 

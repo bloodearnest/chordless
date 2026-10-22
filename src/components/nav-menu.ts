@@ -384,6 +384,11 @@ export class NavMenu extends LitElement {
             <span>Preferences</span>
           </button>
 
+          <a href="/media" class="nav-menu-item" part="nav-item">
+            <app-icon name="play" size="20" class="nav-icon"></app-icon>
+            <span>Media Player</span>
+          </a>
+
           <a href="/import-song" class="nav-menu-item" part="nav-item">
                 <app-icon name="upload" size="20" class="nav-icon"></app-icon>
                 <span>Import Songs</span>

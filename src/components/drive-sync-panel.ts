@@ -280,7 +280,7 @@ export class DriveSyncPanel extends LitElement {
     this._recordSyncTime()
     this.folderProblem = null
     // (the sync may have found the space is read-only: ask the record, not the one this page was given)
-    const fresh = (await getSpaceById(this.space.id)) ?? this.space
+    const fresh = (await getSpaceById(this.space.id)) as Space
     this.syncProgress = {
       stage: 'success',
       message: syncsBack(fresh)

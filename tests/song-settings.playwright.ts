@@ -238,7 +238,7 @@ test.describe('Media player settings', () => {
   test('its switches work from the keyboard, and are off limits while the player is off', async ({
     page,
   }) => {
-    await page.goto('/preferences')
+    await page.goto('/media')
     const settings = page.locator('media-player-settings')
     const player = settings.getByRole('switch', { name: 'Enable Media Player' })
     const pads = settings.getByRole('switch', { name: 'Enable Pads' })
@@ -262,7 +262,7 @@ test.describe('Media player settings', () => {
     await page.goto('/setlist/player-test-setlist')
     await expect(page.locator('media-player')).toBeVisible()
 
-    await page.goto('/preferences')
+    await page.goto('/media')
     const masterToggle = page.getByRole('switch', { name: 'Enable Media Player' })
     await masterToggle.click()
     await expect(masterToggle).toHaveAttribute('aria-checked', 'false')
