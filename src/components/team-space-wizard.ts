@@ -28,6 +28,7 @@ import {
   syncTeamSpace,
   type TeamFolders,
 } from '../js/team-spaces.ts'
+import { formatBytes } from '../js/utils/bytes.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
@@ -530,14 +531,7 @@ export class TeamSpaceWizard extends LitElement {
 
 /** "212, 640 KB" */
 function amount(count: number, bytes: number): string {
-  return `${count}, ${size(bytes)}`
-}
-
-/** A size for people to read */
-function size(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  return `${count}, ${formatBytes(bytes)}`
 }
 customElements.define('team-space-wizard', TeamSpaceWizard)
 
