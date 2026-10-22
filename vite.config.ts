@@ -31,6 +31,10 @@ export default defineConfig(({ command, isPreview }) => {
       outDir: '../dist',
       emptyOutDir: true,
       target: TARGET,
+      // The one chunk over the default 500 kB is pdf.js (1.6 MB), already its own lazily loaded
+      // chunk and not precached (see NOT_PRECACHED): it is as split as it can be. The limit is
+      // just above it, so a second large chunk still warns.
+      chunkSizeWarningLimit: 1700,
     },
     // Port 8787 is the origin the browser's data (IndexedDB, sign-in) belongs to, and the
     // one the Tailscale funnel points at: keep it for development (the tests set CHORDLESS_PORT
