@@ -6,8 +6,18 @@
  */
 import { expect } from '@open-wc/testing'
 import '../src/components/team-space-wizard.ts'
+import type { AppModal } from '../src/components/app-modal.ts'
 import type { TeamSpaceWizard } from '../src/components/team-space-wizard.ts'
-import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace } from '../src/js/space.ts'
+import { ChordlessDB } from '../src/js/db.ts'
+import { addChart } from '../src/js/song-utils.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  listSpaces,
+  setCurrentSpace,
+} from '../src/js/space.ts'
+import { makeEntry, makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -54,7 +64,10 @@ describe('team-space-wizard', () => {
     )
   async function until(condition: () => unknown, what: string) {
     for (let i = 0; i < 100 && !condition(); i++) await wait(20)
-    expect(condition(), what).to.be.ok
+    expect(
+      condition(),
+      `${what}: ${page?.shadowRoot?.textContent?.replace(/\s+/g, ' ').slice(0, 400)}`
+    ).to.be.ok
   }
   const type = async (name: string) => {
     const input = must(page.shadowRoot?.querySelector<HTMLInputElement>('#name'))
@@ -247,5 +260,289 @@ describe('team-space-wizard', () => {
     await wait(50)
     expect(text()).to.contain('Church Drive')
     expect(page.shadowRoot?.querySelector('.error')).to.equal(null)
+  })
+
+  describe('bringing songs and setlists across', () => {
+    const ALPHA = '{title: Alpha}\n{key: G}\n[G]Alpha line'
+    const BETA = '{title: Beta}\n{key: D}\n[D]Beta line'
+    const ADD = { variantLabel: 'Test', importSource: 'test', makeDefault: 'first' } as const
+    let source: { id: string; name: string }
+
+    /** A space on this device with two songs and a setlist (one of them synced, if asked) */
+    async function sourceSpace(synced = false) {
+      const made = await createSpace(`${prefix} source ${crypto.randomUUID().slice(0, 8)}`)
+      source = made
+      const db = new ChordlessDB(made.id)
+      await db.init()
+      const alpha = await addChart(db, ALPHA, ADD)
+      await addChart(db, BETA, ADD)
+      await db.saveSetlist(
+        makeSetlist({
+          id: `list-${crypto.randomUUID()}`,
+          date: '2026-10-25',
+          fileRef: synced ? 'drive-file' : null,
+          songs: [makeEntry({ order: 0, songId: alpha.id, songUuid: alpha.uuid, key: 'A' })],
+        })
+      )
+      db.db?.close()
+    }
+
+    const check = (id: string) => must(page.shadowRoot?.querySelector<HTMLInputElement>(`#${id}`))
+    async function pickSource() {
+      await until(() => text().includes('Songs ('), 'something to bring')
+      // (with other spaces holding songs as well, there is a choice of where from)
+      const select = page.shadowRoot?.querySelector<HTMLSelectElement>('#source')
+      if (select) {
+        select.value = source.id
+        select.dispatchEvent(new Event('change'))
+      }
+      await until(() => text().includes('Songs (2,'), 'the source counted')
+    }
+    async function fillForm() {
+      await until(() => page.shadowRoot?.querySelector('#name'), 'the form')
+      await type(`${prefix} team ${crypto.randomUUID().slice(0, 8)}`)
+      button('Choose a folder').click()
+      await until(() => text().includes('Church Drive'), 'the folder is shown')
+    }
+    async function answer(confirm: boolean) {
+      const modal = must(page.shadowRoot?.querySelector<AppModal>('app-modal'))
+      await until(() => modal.open, 'the question to be asked')
+      await modal.updateComplete
+      must(
+        modal.shadowRoot?.querySelector<HTMLElement>(
+          confirm ? '.modal-btn-confirm' : '.modal-btn-cancel'
+        )
+      ).click()
+    }
+    const inTeamSpace = async () => {
+      const made = must((await listSpaces()).find(space => space.team))
+      const db = new ChordlessDB(made.id)
+      await db.init()
+      const found = { songs: await db.getAllSongs(), setlists: await db.getAllSetlists() }
+      db.db?.close()
+      return found
+    }
+    const inSource = async () => {
+      const db = new ChordlessDB(source.id)
+      await db.init()
+      const found = await db.getAllSetlists()
+      db.db?.close()
+      return found
+    }
+
+    /** A space with only these charts (and no setlists), another place to bring songs from */
+    async function songsOnlySpace(...charts: string[]) {
+      const made = await createSpace(`${prefix} songs ${crypto.randomUUID().slice(0, 8)}`)
+      const db = new ChordlessDB(made.id)
+      await db.init()
+      for (const chart of charts) await addChart(db, chart, ADD)
+      db.db?.close()
+      return made
+    }
+
+    it('lets them choose between spaces that hold songs, and counts the one chosen', async () => {
+      const other = await songsOnlySpace('{title: Gamma}\n[C]Gamma line')
+      await sourceSpace()
+      await open()
+      await until(() => page.shadowRoot?.querySelector('#source'), 'a choice of source')
+      const select = must(page.shadowRoot?.querySelector<HTMLSelectElement>('#source'))
+      select.value = other.id
+      select.dispatchEvent(new Event('change'))
+      await until(() => text().includes('Songs (1,'), 'the other counted')
+      expect(page.shadowRoot?.querySelector('#setlists')).to.equal(null)
+
+      await pickSource()
+      expect(text()).to.contain('Setlists (1,')
+      check('copy').click()
+      check('move').click()
+      await page.updateComplete
+      expect(check('move').checked).to.equal(true)
+    })
+
+    /** Open the page and choose a source, if there is a choice */
+    async function openWith(from: { id: string }) {
+      await open()
+      await until(() => text().includes('Bring across'), 'something to bring')
+      const select = page.shadowRoot?.querySelector<HTMLSelectElement>('#source')
+      if (select) {
+        select.value = from.id
+        select.dispatchEvent(new Event('change'))
+      }
+    }
+
+    it('offers only the setlists of a space that has setlists and no songs', async () => {
+      const made = await createSpace(`${prefix} lists ${crypto.randomUUID().slice(0, 8)}`)
+      source = made
+      const db = new ChordlessDB(made.id)
+      await db.init()
+      await db.saveSetlist(makeSetlist({ id: `list-${crypto.randomUUID()}`, date: '2026-11-08' }))
+      db.db?.close()
+      await openWith(source)
+      await until(() => text().includes('Setlists (1,'), 'the setlist counted')
+      expect(page.shadowRoot?.querySelector('#songs')).to.equal(null)
+    })
+
+    it('says nothing new came across when only what a space has none of was asked for', async () => {
+      source = await songsOnlySpace('{title: Eta}\n[C]Eta line')
+      await openWith(source)
+      await until(() => /Songs \(1,/.test(text()), 'the source counted')
+      await fillForm()
+      check('songs').click()
+      await page.updateComplete
+      button('Create team space').click()
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.contain('Nothing new came across')
+    })
+
+    it('shows sizes in KB and in MB', async () => {
+      const kb = `{title: Delta}\n[C]${'Delta line '.repeat(300)}`
+      source = await songsOnlySpace(kb)
+      await openWith(source)
+      await until(() => /Songs \(1, \d+ KB\)/.test(text()), 'a size in KB')
+
+      page.remove()
+      const mb = `{title: Epsilon}\n[C]${'Epsilon '.repeat(150_000)}`
+      source = await songsOnlySpace(mb)
+      await openWith(source)
+      await until(() => /Songs \(1, \d\.\d MB\)/.test(text()), 'a size in MB')
+    })
+
+    it('brings the songs of a space with no setlists, and says "1 song"', async () => {
+      source = await songsOnlySpace('{title: Zeta}\n[C]Zeta line')
+      await openWith(source)
+      await until(() => /Songs \(1,/.test(text()), 'the source counted')
+      expect(page.shadowRoot?.querySelector('#move')).to.equal(null)
+      await fillForm()
+      button('Create team space').click()
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.contain('1 song came across')
+    })
+
+    it('asks about moving 2 setlists in the plural, and says how many stay behind', async () => {
+      await sourceSpace(true)
+      const db = new ChordlessDB(source.id)
+      await db.init()
+      await db.saveSetlist(
+        makeSetlist({ id: `list-${crypto.randomUUID()}`, date: '2026-11-01', fileRef: 'drive-2' })
+      )
+      db.db?.close()
+      await openWith(source)
+      await until(() => text().includes('Setlists (2,'), 'two setlists')
+      await fillForm()
+      button('Create team space').click()
+      const modal = must(page.shadowRoot?.querySelector<AppModal>('app-modal'))
+      await until(() => modal.open, 'the question to be asked')
+      expect(modal.message).to.contain('2 setlists will move')
+      await answer(true)
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.contain('2 setlists are also still in')
+    })
+
+    it('offers what a space holds, with counts and sizes, and nothing where it holds nothing', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      expect(text()).to.match(/Songs \(2, \d+ B\)/)
+      expect(text()).to.match(/Setlists \(1, \d+ B\)/)
+      expect(check('songs').checked).to.equal(true)
+      expect(check('move').checked).to.equal(true)
+      expect(text()).to.not.contain('Pads')
+    })
+
+    it('copies the songs and moves the setlists when asked, after confirming the move', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      await fillForm()
+      button('Create team space').click()
+      await answer(true)
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.contain('2 songs and 1 setlist came across')
+      const brought = await inTeamSpace()
+      expect(brought.songs).to.have.length(2)
+      expect(brought.setlists).to.have.length(1)
+      expect(await inSource()).to.have.length(0)
+    })
+
+    it('makes nothing when the move is not confirmed', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      await fillForm()
+      button('Create team space').click()
+      await answer(false)
+      await wait(50)
+      expect(requests.some(request => request.key === 'POST /api/spaces')).to.equal(false)
+      expect(madeFolders).to.deep.equal([])
+      expect(await inSource()).to.have.length(1)
+    })
+
+    it('keeps a copy in the source when asked, with no question', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      await fillForm()
+      check('copy').click()
+      await page.updateComplete
+      button('Create team space').click()
+      await until(() => text().includes('is ready'), 'created')
+      expect((await inTeamSpace()).setlists).to.have.length(1)
+      expect(await inSource()).to.have.length(1)
+    })
+
+    it('brings only what is ticked: no songs, and no setlists, means nothing comes', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      await fillForm()
+      check('songs').click()
+      check('setlists').click()
+      await page.updateComplete
+      expect(page.shadowRoot?.querySelector('#move')).to.equal(null)
+      button('Create team space').click()
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.not.contain('came across')
+      const brought = await inTeamSpace()
+      expect(brought.songs.length + brought.setlists.length).to.equal(0)
+    })
+
+    it('says which setlists could not leave the source because they are in Drive', async () => {
+      await sourceSpace(true)
+      await open()
+      await pickSource()
+      await fillForm()
+      button('Create team space').click()
+      await answer(true)
+      await until(() => text().includes('is ready'), 'created')
+      expect(text()).to.contain('1 setlist is also still in')
+      expect(await inSource()).to.have.length(1)
+    })
+
+    it('keeps the new space and offers another try when bringing them across fails', async () => {
+      await sourceSpace()
+      await open()
+      await pickSource()
+      await fillForm()
+      check('setlists').click()
+      await page.updateComplete
+      const real = ChordlessDB.prototype.init
+      ChordlessDB.prototype.init = async function (this: ChordlessDB) {
+        if (this.dbName !== source.id && this.dbName !== getCurrentSpace().id) {
+          throw new Error('the disk is full')
+        }
+        return real.call(this)
+      }
+      try {
+        button('Create team space').click()
+        await until(() => text().includes('the disk is full'), 'says why')
+      } finally {
+        ChordlessDB.prototype.init = real
+      }
+      expect((await listSpaces()).some(space => space.team)).to.equal(true)
+      button('Try again').click()
+      await until(() => !text().includes('the disk is full'), 'tried again')
+      await until(() => text().includes('came across'), 'brought across')
+      expect((await inTeamSpace()).songs).to.have.length(2)
+    })
   })
 })

@@ -265,16 +265,24 @@ Steps, each on the one page:
      the default for free Gmail users. Shared drives need Workspace, so this cannot be dropped.
    Either way the app creates `<name>/` inside the picked parent (with `songs/`, `setlists/`,
    `shares/`, `pads/`): a picked folder alone exposes no children under `drive.file`.
-3. **What to bring** from a space on this device (the personal space by default; a dropdown if there
-   are several), as separate checkboxes, each with its count and size ("Songs (212, 640 KB)",
-   "Setlists (48, 90 KB)", "Pads (4 sets, 180 MB)"). Pads are not shown if there are none.
-   - **Move** (default) or **Copy**. An upgrade means the team's songs should leave the personal
-     space, so move is the default and the wording says what it does: "they leave your personal
-     space". Copy keeps them in both. Moving asks for a confirmation that names how many setlists
-     will be removed from the source.
-   - Songs and setlists go through `space-transfer.ts` (the local databases; no Drive access to the
-     source needed). A copy gives setlists new ids, a move keeps them (as "Copy and move" says), so
-     this is that code and not the export file's import. Pads are Drive calls.
+3. **What to bring** from a space on this device (the one in use if it holds anything, else the
+   first that does; a dropdown if more than one does), as separate checkboxes, each with its count
+   and size ("Songs (212, 640 KB), copied"). Built 2026-10-22, except pads.
+   - **Songs are always copied, never moved**: a song deleted from a synced library would come back
+     (SYNC_ARCHITECTURE.md), so the source keeps its songs. Ticking only the setlists still brings the
+     songs they use.
+   - **Setlists: move** (default) or **keep a copy**. An upgrade means the team's setlists should
+     leave the personal space, so move is the default and the wording says so ("they leave your
+     personal space"). Moving asks for a confirmation that names how many setlists will go. A
+     setlist already saved to Drive cannot be removed from the source until "Deleting setlists" is
+     built: it stays, and the result says how many.
+   - They go through `space-transfer.ts` (`contentsOf` counts, `bringAcross` does it; the local
+     databases, no Drive access to the source needed). A copy gives setlists new ids, a move keeps
+     them (as "Copy and move" says), so this is that code and not the export file's import.
+   - The space is made first. If bringing things across then fails, the result page says why and
+     offers "Try again" (it is re-runnable: what is there is skipped).
+   - **Pads are not in this step yet.** They are the account's, not a space's (item 6), and need
+     Drive calls. When they are, the checkbox is hidden if there are none.
 4. **Invite people.** The setlists being brought have leaders (`owner` and `ownerId`, an email).
    Leaders with an email are listed as suggestions, with a role chosen for each (writer by default),
    and an email can be added by hand. Nothing is sent without being ticked. A leader typed by name
@@ -782,7 +790,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
    bring, invite, progress). **Built so far (2026-10-22): `/spaces/new` (`team-space-wizard.ts`) asks
    for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;
-   "Share this space" is gone (the Team Space panel links to the wizard). Not built: what to bring,
+   "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) is built too. Not built:
    invites, the shared-drive choice and the service account; header switcher (Separate), then Merged
    and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
 9. [ ] Space-aware immediate sync in the service worker.

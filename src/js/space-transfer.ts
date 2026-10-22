@@ -209,3 +209,66 @@ export async function transferSpace(
   report.songsSkipped = songsBefore.skipped
   return report
 }
+
+/** How much of something a space holds: its count, and about how many bytes it is */
+export interface Amount {
+  count: number
+  bytes: number
+}
+
+/** What a space holds that can be brought into another */
+export interface Contents {
+  songs: Amount
+  setlists: Amount
+}
+
+/** The setlists that are the space's own to bring: not deleted, not received by a share link */
+const bringable = (setlist: Setlist): boolean => !setlist.deletedAt && !setlist.received
+
+/** What there is to bring from a space, and how big it is (the charts' text, the setlists' JSON) */
+export async function contentsOf(source: TransferSource): Promise<Contents> {
+  const songs: Amount = { count: 0, bytes: 0 }
+  for (const song of await source.getAllSongs()) {
+    const chordpro = await source.getChordPro(song.chordproFileId)
+    if (!chordpro) continue
+    songs.count++
+    songs.bytes += new Blob([chordpro.content]).size
+  }
+  const setlists: Amount = { count: 0, bytes: 0 }
+  for (const setlist of (await source.getAllSetlists()).filter(bringable)) {
+    setlists.count++
+    setlists.bytes += new Blob([JSON.stringify(setlist)]).size
+  }
+  return { songs, setlists }
+}
+
+/** What to bring into a new space (the wizard's step, docs/SPACES.md "Creating a team space") */
+export interface Bring {
+  songs: boolean
+  setlists: boolean
+  /**
+   * What happens to the setlists. Songs are always copied: a song deleted from a synced library
+   * would come back (docs/SYNC_ARCHITECTURE.md), so there is no moving them yet.
+   */
+  mode: 'copy' | 'move'
+}
+
+/**
+ * Bring a space's songs and/or setlists into another. The setlists come with the songs they use,
+ * whether or not all the songs were asked for. Re-runnable: what is there is skipped.
+ */
+export function bringAcross(
+  source: TransferSource,
+  destination: ChordlessDB,
+  { songs, setlists, mode }: Bring,
+  importSource = 'copy'
+): Promise<TransferReport> {
+  if (songs && setlists) return transferSpace(source, destination, mode, importSource)
+  if (setlists)
+    return transferSetlists(source, destination, null, mode, emptyReport(), importSource)
+  if (songs) {
+    const report = emptyReport()
+    return copySongs(source, destination, null, report, importSource).then(() => report)
+  }
+  return Promise.resolve(emptyReport())
+}

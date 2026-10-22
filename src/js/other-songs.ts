@@ -29,7 +29,10 @@ async function otherSources(currentDbId: string): Promise<SongSource[]> {
 }
 
 /** Run something with a source's database open, and let go of it after */
-async function withSource<T>(dbId: string, use: (db: ChordlessDB) => Promise<T>): Promise<T> {
+export async function withSource<T>(
+  dbId: string,
+  use: (db: ChordlessDB) => Promise<T>
+): Promise<T> {
   const db = new ChordlessDB(dbId)
   await db.init()
   try {

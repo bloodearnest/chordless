@@ -1,7 +1,13 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { addChart } from '../src/js/song-utils.ts'
-import { copySongs, transferSetlists, transferSpace } from '../src/js/space-transfer.ts'
+import {
+  bringAcross,
+  contentsOf,
+  copySongs,
+  transferSetlists,
+  transferSpace,
+} from '../src/js/space-transfer.ts'
 import { makeEntry, makeLocalState, makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
@@ -207,5 +213,86 @@ describe('Copying and moving between spaces', () => {
     // songs are copied, not moved
     expect(await source.getAllSongs()).to.have.length(2)
     expect(await source.getAllSetlists()).to.have.length(0)
+  })
+
+  describe('what a space holds, and bringing it across', () => {
+    it('counts the charts and setlists, and their size, leaving out deleted and received setlists', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await addChart(source, BETA, ADD)
+      await setlistWith('mine', alpha)
+      await source.saveSetlist(makeSetlist({ id: 'gone', deletedAt: '2026-10-01T00:00:00Z' }))
+      await source.saveSetlist(makeSetlist({ id: 'sent', received: { from: 'x' } } as never))
+
+      const contents = await contentsOf(source)
+      expect(contents.songs.count).to.equal(2)
+      expect(contents.songs.bytes).to.equal(new Blob([ALPHA]).size + new Blob([BETA]).size)
+      expect(contents.setlists.count).to.equal(1)
+      expect(contents.setlists.bytes).to.be.greaterThan(50)
+      expect(await contentsOf(destination)).to.deep.equal({
+        songs: { count: 0, bytes: 0 },
+        setlists: { count: 0, bytes: 0 },
+      })
+    })
+
+    it('does not count a chart whose text is missing', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      const sparse = {
+        getAllSongs: () => source.getAllSongs(),
+        getChordPro: async () => undefined,
+        getAllSetlists: async () => [],
+      }
+      expect(alpha.title).to.equal('Alpha')
+      expect((await contentsOf(sparse)).songs.count).to.equal(0)
+    })
+
+    it('brings both: every song, and the setlists', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await addChart(source, BETA, ADD)
+      await setlistWith('mine', alpha)
+      const report = await bringAcross(source, destination, {
+        songs: true,
+        setlists: true,
+        mode: 'copy',
+      })
+      expect(report.songsAdded).to.equal(2)
+      expect(report.setlistsAdded).to.equal(1)
+    })
+
+    it('brings only the setlists, with the songs they use and no others', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await addChart(source, BETA, ADD)
+      await setlistWith('mine', alpha)
+      const report = await bringAcross(source, destination, {
+        songs: false,
+        setlists: true,
+        mode: 'copy',
+      })
+      expect(report.setlistsAdded).to.equal(1)
+      expect((await destination.getAllSongs()).map(song => song.title)).to.deep.equal(['Alpha'])
+    })
+
+    it('brings only the songs, and no setlist', async () => {
+      const alpha = await addChart(source, ALPHA, ADD)
+      await setlistWith('mine', alpha)
+      const report = await bringAcross(source, destination, {
+        songs: true,
+        setlists: false,
+        mode: 'move',
+      })
+      expect(report.songsAdded).to.equal(1)
+      expect(await destination.getAllSetlists()).to.have.length(0)
+      expect(await source.getAllSetlists()).to.have.length(1)
+    })
+
+    it('brings nothing when asked for nothing', async () => {
+      await addChart(source, ALPHA, ADD)
+      const report = await bringAcross(source, destination, {
+        songs: false,
+        setlists: false,
+        mode: 'copy',
+      })
+      expect(report.songsAdded + report.setlistsAdded).to.equal(0)
+      expect(await destination.getAllSongs()).to.have.length(0)
+    })
   })
 })
