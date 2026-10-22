@@ -394,6 +394,35 @@ describe('team-space-wizard', () => {
       expect(text()).to.contain('Nothing new came across')
     })
 
+    it('suggests inviting the people who lead the setlists it brought, but not the person making it', async () => {
+      await sourceSpace()
+      const db = new ChordlessDB(source.id)
+      await db.init()
+      // (on different days: a copy skips a setlist that is the same event as one it has)
+      for (const [date, owner, ownerId] of [
+        ['2026-11-15', 'Cat', 'cat@example.com'],
+        ['2026-11-22', 'Bea', 'bea@example.com'],
+      ]) {
+        await db.saveSetlist(
+          makeSetlist({ id: `list-${crypto.randomUUID()}`, date, owner, ownerId })
+        )
+      }
+      db.db?.close()
+      await openWith(source)
+      await until(() => text().includes('Setlists (3,'), 'three setlists')
+      await fillForm()
+      check('copy').click()
+      await page.updateComplete
+      button('Create team space').click()
+      await until(() => page.shadowRoot?.querySelector('team-invite-step'), 'created')
+      const step = must(page.shadowRoot?.querySelector('team-invite-step'))
+      await until(
+        () => step.shadowRoot?.textContent?.includes('cat@example.com'),
+        'the leader suggested'
+      )
+      expect(step.shadowRoot?.textContent).to.not.contain('bea@example.com')
+    })
+
     it('shows sizes in KB and in MB', async () => {
       const kb = `{title: Delta}\n[C]${'Delta line '.repeat(300)}`
       source = await songsOnlySpace(kb)

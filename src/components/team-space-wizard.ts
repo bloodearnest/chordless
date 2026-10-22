@@ -7,6 +7,7 @@ import { type PickedFolder, pickFolder } from '../js/folder-picker.ts'
 import {
   authorizeWithGoogle,
   connectDrive,
+  getCurrentUserInfo,
   getSignInState,
   type SignInState,
 } from '../js/google-auth.ts'
@@ -20,11 +21,12 @@ import {
   type TransferReport,
 } from '../js/space-transfer.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
-import { createTeamSpace, type TeamFolders } from '../js/team-spaces.ts'
+import { createTeamSpace, type Leader, leadersOf, type TeamFolders } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import { buttonStyles } from './shared-styles.ts'
+import './team-invite-step.ts'
 
 type State = 'checking' | 'sign-in' | 'form' | 'creating' | 'created'
 
@@ -49,6 +51,7 @@ export class TeamSpaceWizard extends LitElement {
     _mode: { state: true },
     _report: { state: true },
     _bringError: { state: true },
+    _leaders: { state: true },
   }
 
   declare _state: State
@@ -70,6 +73,8 @@ export class TeamSpaceWizard extends LitElement {
   declare _report: TransferReport | null
   /** Why bringing them across did not work, if it did not */
   declare _bringError: string
+  /** The people the brought setlists name as leaders, to suggest inviting */
+  declare _leaders: Leader[]
   /** What each of the sources holds */
   _counts: Map<string, Contents> = new Map()
   _modal: Ref<AppModal> = createRef()
@@ -118,6 +123,7 @@ export class TeamSpaceWizard extends LitElement {
     this._mode = 'move'
     this._report = null
     this._bringError = ''
+    this._leaders = []
   }
 
   override connectedCallback(): void {
@@ -245,6 +251,8 @@ export class TeamSpaceWizard extends LitElement {
         this._report = await withSource(this._sourceId, source =>
           bringAcross(source, destination, this._wanted)
         )
+        const own = (await getCurrentUserInfo())?.email
+        this._leaders = leadersOf(await destination.getAllSetlists(), own)
       } finally {
         destination.db?.close()
       }
@@ -293,8 +301,7 @@ export class TeamSpaceWizard extends LitElement {
         return html`
           <h2>${this._created?.name} is ready</h2>
           <p>
-            It is a new space with its own folder in Google Drive. ${this._reportText()}Invite your team
-            from the Storage page.
+            It is a new space with its own folder in Google Drive. ${this._reportText()}
           </p>
           ${
             this._bringError
@@ -306,6 +313,10 @@ export class TeamSpaceWizard extends LitElement {
               </div>`
               : nothing
           }
+          <team-invite-step
+            .team=${this._created?.team}
+            .leaders=${this._leaders}
+          ></team-invite-step>
           <div class="actions">
             <button class="btn primary" @click=${this._open}>Open ${this._created?.name}</button>
           </div>

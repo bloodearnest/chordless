@@ -4,7 +4,7 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
-import type { Space, TeamRole } from './data-types.ts'
+import type { Setlist, Space, TeamRole } from './data-types.ts'
 import { getStoredBlob } from './google-auth.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
@@ -104,4 +104,32 @@ export async function leaveSpace(spaceId: string): Promise<void> {
   if (!space?.team) throw new Error('This space is not shared')
   await teamApi.leave(space.team.id)
   await deleteSpace(spaceId)
+}
+
+/** Someone a setlist names as its leader: who to suggest inviting */
+export interface Leader {
+  name: string
+  /** Their Google account, if the setlist has it (a leader typed in by name alone has none) */
+  email: string | null
+}
+
+/**
+ * The people who lead these setlists, once each, for suggesting who to invite to a team space
+ * (docs/SPACES.md, "Creating a team space"). Those with an email come first; `own` (the person
+ * making the space) is left out, as are setlists with no leader.
+ */
+export function leadersOf(setlists: Setlist[], own?: string | null): Leader[] {
+  const mine = own?.trim().toLowerCase()
+  const seen = new Set<string>()
+  const leaders: Leader[] = []
+  for (const setlist of setlists) {
+    const email = setlist.ownerId?.trim().toLowerCase() || null
+    const name = setlist.owner.trim()
+    if (email === mine && email) continue
+    const key = email ?? `name:${name.toLowerCase()}`
+    if ((!email && !name) || seen.has(key)) continue
+    seen.add(key)
+    leaders.push({ name: name || (email as string), email })
+  }
+  return leaders.sort((a, b) => Number(Boolean(b.email)) - Number(Boolean(a.email)))
 }

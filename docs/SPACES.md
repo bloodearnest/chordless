@@ -283,12 +283,14 @@ Steps, each on the one page:
      offers "Try again" (it is re-runnable: what is there is skipped).
    - **Pads are not in this step yet.** They are the account's, not a space's (item 6), and need
      Drive calls. When they are, the checkbox is hidden if there are none.
-4. **Invite people.** The setlists being brought have leaders (`owner` and `ownerId`, an email).
-   Leaders with an email are listed as suggestions, with a role chosen for each (writer by default),
-   and an email can be added by hand. Nothing is sent without being ticked. A leader typed by name
-   alone has no email and is listed as "no email, can't be invited". Invites are the existing ones
-   (single use, bound to the email; the link is shown once to send), so the last screen lists the
-   links to copy.
+4. **Invite people** (built 2026-10-22; `team-invite-step.ts`, on the result page once the space
+   exists, since an invite needs its id). The setlists brought across have leaders (`owner` and
+   `ownerId`, an email). Leaders with an email are listed once each (`leadersOf`), ticked, with a
+   role to choose (writer by default), and an email can be added by hand; the person making the
+   space is left out. Nothing is sent without being ticked, and Chordless sends nothing itself:
+   each invite is a link, shown once, to copy and pass on. A leader typed by name alone has no
+   email and is listed as someone who cannot be invited. A refused invite stays in the list to try
+   again. Invites are the existing ones (single use, bound to the email, a week).
 5. **Progress and result.** The space is made and registered with the Worker *first*, so a failure
    later never loses it. The transfer then runs, and is re-runnable (what is there is skipped), so
    the failure screen offers "Try again". The result says what was added, skipped and removed from
@@ -790,8 +792,8 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
    bring, invite, progress). **Built so far (2026-10-22): `/spaces/new` (`team-space-wizard.ts`) asks
    for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;
-   "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) is built too. Not built:
-   invites, the shared-drive choice and the service account; header switcher (Separate), then Merged
+   "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) and the invite step are built too. Not built:
+   the shared-drive choice and the service account; header switcher (Separate), then Merged
    and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
 9. [ ] Space-aware immediate sync in the service worker.
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
