@@ -330,16 +330,22 @@ Drive is already removed from devices that haven't edited it; see step 5 of a fu
 
 #### Who can delete
 
-- Only when the setlist's `ownerId` matches the signed-in user's email
-  (`getCurrentPerson()` in `people.js`, case-insensitive). Not signed in: no button.
-- Caveat until edit restrictions exist: anyone can change a setlist's leader to
-  themselves first, so this guards against mistakes, not abuse.
-- Owner means leader. A setlist created in error with someone else as leader (an imported
-  one, whose leader is named in the email) can't be deleted by its creator without changing
-  the leader first. So `Setlist.createdBy` (the maker's Google email) is recorded at
-  creation, from the new-setlist form, the song import and the email import. Nothing decides
-  by it yet: the delete rule above is the intended one, and would allow the owner or the
-  creator. Setlists made before it was added have none.
+Decided 2026-10-22 (replacing the owner-only rule this section had, which guarded against
+mistakes and not abuse, since anyone could make themselves the leader first):
+
+- **Team space: admins and the owner only.** A writer can edit a setlist but not delete it; the
+  button is shown but says why it cannot be used. The Worker checks the role on the delete, so the
+  rule does not depend on the page (docs/SPACES.md, "Roles").
+- **Personal space:** the person using it.
+- Not signed in, or a space with no Drive: nothing in Drive to trash, so the existing local rule
+  applies (a setlist that was never synced is simply removed).
+- `Setlist.createdBy` (kept, recorded at creation) no longer decides anything here.
+- **Friction, not prohibition.** It stays behind the edit step (the pencil). The confirmation
+  names the effect and is danger-styled: "Deletes this setlist for everyone in *<space>*. It goes
+  to the Google Drive trash and can be restored from there." After it, a toast offers **Undo**
+  for fifteen seconds (CLAUDE.md, toasts), which restores the file from the trash.
+- A move into a team space (the wizard in SPACES.md) uses this to remove the source's setlists
+  that are in Drive, after a confirmation that says how many.
 
 #### Local effect
 

@@ -43,9 +43,16 @@ members of their church. Each space is self-contained, so copyright compliance i
 ## The model
 
 A space is made for a team: there is no button that makes an empty one. The personal space is made
-automatically, and a team space comes with its folder, its sharing and its members (not built). The
-Storage page's Space section therefore only lists the spaces on this device and switches between
-them; it no longer has "Create New Space".
+automatically, and a team space comes with its folder, its sharing and its members, made together
+by the wizard (see "Creating a team space", below). The Storage page's Space section therefore only
+lists the spaces on this device and switches between them; it no longer has "Create New Space".
+
+**A personal space is never turned into a team space** (decided 2026-10-22). The first cut had a
+"Share this space" button that registered the current space's folder with the Worker. It was
+confusing: the team space kept the personal space's name (the owner's) and folder (`Chordless/`), and
+nothing said that what had been private was now shared. A team space is always a new space, in a
+folder of its own; the wizard brings the personal data across if the owner asks. Spaces already
+shared that way keep working and can be renamed.
 
 A space is a local IndexedDB plus a Drive folder; what changes between the kinds is who owns the
 folder and how data reaches Drive.
@@ -234,6 +241,53 @@ Costs and risks: the Worker carries the traffic; the Durable Object holds a toke
 everything the owner's app made; if the owner revokes the app or the token expires, sync stops for
 everyone (the consent screen must be "In production": refresh tokens last 7 days in "Testing").
 
+## Creating a team space (the wizard)
+
+**Decided 2026-10-22, not built.** The adoption path is: someone at a church tries Chordless on
+their own, in the personal space, then decides the team should use it. Making that step easy is
+the job of one dedicated page (a route, `/spaces/new`, not a modal on the Storage page: it has
+several steps, and a route gives it the back button, reload and a URL, see ROUTING.md). It is
+reached from a "Create a team space" button in the Storage page's Space section, and offered to
+someone who has used their personal space for a while.
+
+Steps, each on the one page:
+
+1. **Name.** The team's name, supplied by the creator ("St Mary's Music"). It is the new space's
+   name and its folder's name. Never taken from the personal space.
+2. **Where the files live.** Two choices, as "Credentials" describes:
+   - *The team has a Google shared drive*: recommended (the files outlive any one person, members can
+     see them in Drive, Google backs them up). This is also the way in to the **service account**
+     ("Team-managed storage"): the wizard shows the address to add as Content manager, "Verify"s it,
+     and the owner's token is never stored. Not built; the step is there so the wizard does not
+     have to change shape when it is. Until then it picks a folder on the shared drive and uses the
+     owner's token like any other.
+   - *No shared drive*: pick a parent folder in My Drive with the Picker. The owner-token path, and
+     the default for free Gmail users. Shared drives need Workspace, so this cannot be dropped.
+   Either way the app creates `<name>/` inside the picked parent (with `songs/`, `setlists/`,
+   `shares/`, `pads/`): a picked folder alone exposes no children under `drive.file`.
+3. **What to bring** from a space on this device (the personal space by default; a dropdown if there
+   are several), as separate checkboxes, each with its count and size ("Songs (212, 640 KB)",
+   "Setlists (48, 90 KB)", "Pads (4 sets, 180 MB)"). Pads are not shown if there are none.
+   - **Move** (default) or **Copy**. An upgrade means the team's songs should leave the personal
+     space, so move is the default and the wording says what it does: "they leave your personal
+     space". Copy keeps them in both. Moving asks for a confirmation that names how many setlists
+     will be removed from the source.
+   - Songs and setlists go through `space-transfer.ts` (the local databases; no Drive access to the
+     source needed). A copy gives setlists new ids, a move keeps them (as "Copy and move" says), so
+     this is that code and not the export file's import. Pads are Drive calls.
+4. **Invite people.** The setlists being brought have leaders (`owner` and `ownerId`, an email).
+   Leaders with an email are listed as suggestions, with a role chosen for each (writer by default),
+   and an email can be added by hand. Nothing is sent without being ticked. A leader typed by name
+   alone has no email and is listed as "no email, can't be invited". Invites are the existing ones
+   (single use, bound to the email; the link is shown once to send), so the last screen lists the
+   links to copy.
+5. **Progress and result.** The space is made and registered with the Worker *first*, so a failure
+   later never loses it. The transfer then runs, and is re-runnable (what is there is skipped), so
+   the failure screen offers "Try again". The result says what was added, skipped and removed from
+   the source, and ends with the switch to the new space.
+
+A team space's creator is its owner. The personal space is left as the place for private sets.
+
 ## Credentials: two ways to back a team space
 
 A human's OAuth token can't be given a wider-but-safe scope: anything beyond `drive.file` is
@@ -346,8 +400,11 @@ owner (implicitly admin) > admin > writer > reader. Worker enforcement:
 - **Read** songs/setlists/pads: all members.
 - **Write** songs/setlists: writer and up.
 - **Upload pads: any member**, readers included (create-only, `pads/` folder only).
-- **Delete pads: admin and up.** Delete songs/setlists: writer and up (friction/confirm in the UI,
-  per CLAUDE.md "friction not prohibition").
+- **Delete pads: admin and up.** **Delete setlists: admin and up** (decided 2026-10-22; a writer
+  can make and edit them but not delete, and the button says why). Delete songs: writer and up
+  (friction/confirm in the UI, per CLAUDE.md "friction not prohibition"). In a personal space the
+  person using it may delete. How a setlist deletion works is in SYNC_ARCHITECTURE.md, "Deleting
+  setlists"; the Worker checks the role on the server.
 - Invite, remove, change roles, enable/disable sharing: admin and up (owner for disable/transfer).
 
 Undecided: whether writers may edit others' setlists (see "Several people editing a setlist" in
@@ -399,9 +456,11 @@ Google accounts.
 - Pads live only in Drive, so they are copied/moved with Drive calls (`files.copy`, or `files.update`
   `addParents/removeParents` for a move; `supportsAllDrives` for shared-drive targets), not through
   the local DB.
-- **Migration:** create the new team space (pick an empty folder on the shared drive), then move
-  personal → team: songs, setlists, pads. The personal space is then empty and stays as the place
-  for private sets. The same tool serves succession, handing over or splitting a team space.
+- **Migration:** the "Creating a team space" wizard does this as one of its steps: the space is
+  created, then songs, setlists and pads are moved (the default) or copied from the personal space.
+  The personal space is then empty and stays as the place for private sets. A move can delete
+  setlists that are in Drive once "Deleting setlists" (SYNC_ARCHITECTURE.md) is built; until then
+  those stay in the source and are counted in the report. The same tool serves succession, handing over or splitting a team space.
 - Copying out of a team space into your personal space is allowed for any member (it is local data
   in Drives they control). The library's "Add to my library" for a song from another database is
   the one-song version.
@@ -711,8 +770,9 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
 6. [ ] Per-space pads and the "Save to" upload choice.
 7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Storage page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Storage page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
    pad rules, no content persisted (a test asserts no storage writes of bodies).
-8. [ ] UI: Spaces section (create, join, members, invite), header switcher (Separate), then Merged
-   and the preference.
+8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
+   bring, invite, progress), replacing "Share this space"; header switcher (Separate), then Merged
+   and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
 9. [ ] Space-aware immediate sync in the service worker.
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
     switch, "Verify" and rollback. Spike item 7 passed.
