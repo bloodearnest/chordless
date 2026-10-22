@@ -73,7 +73,7 @@ persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold 
 content. They hold only membership, roles, the owner's encrypted token blob and checksums. (Share
 links are the one exception: the Worker caches ciphertext it cannot read.) The space model (personal
 and team spaces, roles, the Worker's team service) is in `docs/SPACES.md`. The word is **space** in the code and the docs;
-in the UI people see **Personal** and **Team** ("Create a new Team", "Account and Teams": the page that lists them is
+in the UI people see **Personal** and **Team** (the list's heading is "Personal and Team Spaces"; "Create a new Team", "Account and Teams": the page that lists them is
 designed in `docs/ACCOUNT.md`), and roles are called worship leader and team member. ("organisation" is the old name; it
 survives only in names already stored on devices and in Drive.)
 

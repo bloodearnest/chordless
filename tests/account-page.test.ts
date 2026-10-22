@@ -66,6 +66,7 @@ describe('account-page', () => {
     await setCurrentSpace(first.id, first.name)
     const el = await page()
     expect(el.shadowRoot?.querySelector('account-card')).to.not.equal(null)
+    expect(el.shadowRoot?.querySelector('h2')?.textContent).to.equal('Personal and Team Spaces')
     expect(cards(el).map(card => card.space.id)).to.include.members([first.id, second.id])
     expect(el.shadowRoot?.querySelector('a#create-team')?.getAttribute('href')).to.equal(
       '/account/new'

@@ -126,7 +126,7 @@ describe('space-manager', () => {
   it('shows a Team’s people as well, and says what the person is in it', async () => {
     const team = await space('Team', { team: { id: 'space-gggg7777', role: 'owner' } })
     const el = await page(team.id)
-    expect(labels(el)).to.deep.equal(['Team', 'owner'])
+    expect(labels(el)).to.deep.equal(['Team', 'Owner'])
     expect(has(el, 'team-share-panel')).to.equal(true)
   })
 
@@ -141,7 +141,7 @@ describe('space-manager', () => {
     const team = await space('Team', { team: { id: 'space-hhhh8888', role: 'reader' } })
     const el = await page(team.id)
     expect(text(el)).to.contain('Team sync')
-    expect(text(el)).to.contain('team member')
+    expect(text(el)).to.contain('Team member')
   })
 
   it('lets a Team member sync with a sign-in that has no Drive', async () => {

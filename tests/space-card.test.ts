@@ -147,7 +147,7 @@ describe('space-card', () => {
     })
     const el = await card('signed-in', { space: team })
     expect(el.shadowRoot?.querySelector('.title')?.textContent).to.equal(team.name)
-    expect(labels(el)).to.deep.equal(['Team', 'worship leader'])
+    expect(labels(el)).to.deep.equal(['Team', 'Worship leader'])
   })
 
   it('marks the space in use, which has no Switch, and gives the others one', async () => {

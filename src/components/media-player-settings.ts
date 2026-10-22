@@ -1,6 +1,7 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { loadMediaSettings, type MediaSettings, saveMediaSettings } from '../js/media-settings.ts'
 import { PadSetsController } from '../js/pad-sets-controller.ts'
+import './pad-set-upload.ts'
 import { fieldStyles, switchStyles } from './shared-styles.ts'
 
 /** The media player settings changed; settings is the new settings */
@@ -37,9 +38,15 @@ export class MediaPlayerSettings extends LitElement {
     emphasiseDownbeat: { type: Boolean, attribute: false },
     autoDoubleClick: { type: Boolean, attribute: false },
     doubleClickBelowBpm: { type: Number, attribute: false },
+    uploads: { type: Boolean },
+    _uploadOpen: { state: true },
   }
 
   declare mediaPlayerEnabled: boolean
+  /** Offer "Upload a new pad set…" in the pad select (the media player page does; the player's own popover does not) */
+  declare uploads: boolean
+  /** The upload form is open, under the select */
+  declare _uploadOpen: boolean
   declare padsEnabled: boolean
   declare metronomeEnabled: boolean
   declare stereoSplitEnabled: boolean
@@ -134,6 +141,8 @@ export class MediaPlayerSettings extends LitElement {
     super()
 
     Object.assign(this, loadMediaSettings())
+    this.uploads = false
+    this._uploadOpen = false
 
     this._padSets = new PadSetsController(this)
   }
@@ -213,8 +222,22 @@ export class MediaPlayerSettings extends LitElement {
     this._saveSettings()
   }
 
+  /** What the select's "Upload a new pad set…" has for a value (no pad set has this id) */
+  static readonly UPLOAD = 'upload-a-new-pad-set'
+
+  /** A pad set was uploaded: the form has done its work, and the list has another set */
+  async _onUploaded(): Promise<void> {
+    this._uploadOpen = false
+    await this._padSets.load(true)
+  }
+
   async _handlePadSetChange(event: Event): Promise<void> {
     const select = event.target as HTMLSelectElement
+    if (select.value === MediaPlayerSettings.UPLOAD) {
+      this._uploadOpen = true
+      return
+    }
+    this._uploadOpen = false
     try {
       await this._padSets.select(select.value)
     } catch (error) {
@@ -241,75 +264,6 @@ export class MediaPlayerSettings extends LitElement {
               this._toggleMediaPlayer,
               { master: true }
             )}
-          </div>
-        </div>
-
-        <!-- Pads settings -->
-        <div class="setting-group">
-          <div class="setting-item ${!this.mediaPlayerEnabled ? 'disabled' : ''}">
-            <div>
-              <div class="setting-label">Enable Pads</div>
-              <div class="setting-description">Background pad audio playback</div>
-            </div>
-            ${this._renderSwitch('Enable Pads', this.padsEnabled, this._togglePads, {
-              disabled: !this.mediaPlayerEnabled,
-            })}
-          </div>
-
-          <div
-            class="setting-item indent ${
-              !this.mediaPlayerEnabled || !this.padsEnabled ? 'disabled' : ''
-            }"
-          >
-            <div style="flex: 1;">
-              <label class="setting-label" for="padset-select">Pad Sound Set</label>
-              <div class="setting-description">
-                ${
-                  this._padSets.list.length || this._padSets.loading
-                    ? 'Select which pad audio library to use'
-                    : html`Chordless has no pads of its own: upload a set you own on the <a href="/media">Media Player page</a>`
-                }
-              </div>
-              <select
-                id="padset-select"
-                name="padset-select"
-                class="field padset-select"
-                @change=${this._handlePadSetChange}
-                ?disabled=${this._padSets.loading || this._padSets.switching || !this.mediaPlayerEnabled || !this.padsEnabled}
-              >
-                ${
-                  // Selected on the option, not .value on the select: Lit sets the
-                  // select's value before rendering its options, so a value whose
-                  // option is new in this render was ignored
-                  this._padSets.list.length
-                    ? html`
-                        ${
-                          this._padSets.activeId
-                            ? nothing
-                            : html`<option value="" selected disabled>Choose a pad set</option>`
-                        }
-                        ${this._padSets.list.map(
-                          set => html`
-                            <option value=${set.id} .selected=${set.id === this._padSets.activeId}>
-                              ${set.name}
-                            </option>
-                          `
-                        )}
-                      `
-                    : html`<option value="" selected disabled>No pad sets yet</option>`
-                }
-              </select>
-              ${
-                this._padSets.loading || this._padSets.switching
-                  ? html`<div class="padset-message">Preparing pad set…</div>`
-                  : ''
-              }
-              ${
-                this._padSets.error
-                  ? html`<div class="padset-message error">${this._padSets.error}</div>`
-                  : ''
-              }
-            </div>
           </div>
         </div>
 
@@ -404,6 +358,97 @@ export class MediaPlayerSettings extends LitElement {
             />
           </div>
         </div>
+        <!-- Pads settings -->
+        <div class="setting-group">
+          <div class="setting-item ${!this.mediaPlayerEnabled ? 'disabled' : ''}">
+            <div>
+              <div class="setting-label">Enable Pads</div>
+              <div class="setting-description">Background pad audio playback</div>
+            </div>
+            ${this._renderSwitch('Enable Pads', this.padsEnabled, this._togglePads, {
+              disabled: !this.mediaPlayerEnabled,
+            })}
+          </div>
+
+          <div
+            class="setting-item indent ${
+              !this.mediaPlayerEnabled || !this.padsEnabled ? 'disabled' : ''
+            }"
+          >
+            <div style="flex: 1;">
+              <label class="setting-label" for="padset-select">Pad Sound Set</label>
+              <div class="setting-description">
+                ${
+                  this._padSets.list.length || this._padSets.loading
+                    ? 'Select which pad audio library to use'
+                    : this.uploads
+                      ? 'Chordless has no pads of its own: choose "Upload a new pad set…" to add a set you own'
+                      : html`Chordless has no pads of its own: upload a set you own on the <a href="/media">Media Player page</a>`
+                }
+              </div>
+              <select
+                id="padset-select"
+                name="padset-select"
+                class="field padset-select"
+                @change=${this._handlePadSetChange}
+                ?disabled=${this._padSets.loading || this._padSets.switching || !this.mediaPlayerEnabled || !this.padsEnabled}
+              >
+                ${
+                  // Selected on the option, not .value on the select: Lit sets the
+                  // select's value before rendering its options, so a value whose
+                  // option is new in this render was ignored
+                  this._padSets.list.length
+                    ? html`
+                        ${
+                          this._padSets.activeId || this._uploadOpen
+                            ? nothing
+                            : html`<option value="" selected disabled>Choose a pad set</option>`
+                        }
+                        ${this._padSets.list.map(
+                          set => html`
+                            <option
+                              value=${set.id}
+                              .selected=${!this._uploadOpen && set.id === this._padSets.activeId}
+                            >
+                              ${set.name}
+                            </option>
+                          `
+                        )}
+                      `
+                    : this._uploadOpen
+                      ? nothing
+                      : html`<option value="" selected disabled>No pad sets yet</option>`
+                }
+                ${
+                  this.uploads
+                    ? html`<option
+                      value=${MediaPlayerSettings.UPLOAD}
+                      .selected=${this._uploadOpen}
+                    >
+                      Upload a new pad set…
+                    </option>`
+                    : nothing
+                }
+              </select>
+              ${
+                this._padSets.loading || this._padSets.switching
+                  ? html`<div class="padset-message">Preparing pad set…</div>`
+                  : ''
+              }
+              ${
+                this._padSets.error
+                  ? html`<div class="padset-message error">${this._padSets.error}</div>`
+                  : ''
+              }
+              ${
+                this._uploadOpen
+                  ? html`<pad-set-upload @pad-set-upload:uploaded=${this._onUploaded}></pad-set-upload>`
+                  : nothing
+              }
+            </div>
+          </div>
+        </div>
+
       </div>
     `
   }

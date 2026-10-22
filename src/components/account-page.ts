@@ -155,7 +155,7 @@ export class AccountPage extends LitElement {
     return html`
       <div class="content">
         <account-card></account-card>
-        <h2>Personal and Teams</h2>
+        <h2>Personal and Team Spaces</h2>
         <div class="spaces">
           ${this._spaces.map(
             space => html`<space-card

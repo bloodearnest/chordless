@@ -56,10 +56,10 @@ describe('how a space is labelled to people', () => {
   })
 
   it('says what the person is in a Team, or that a space is view-only, and nothing for their own', () => {
-    expect(spaceRole({ team: { id: 't', role: 'writer' } })).to.equal('worship leader')
-    expect(spaceRole({ team: { id: 't', role: 'reader' } })).to.equal('team member')
-    expect(spaceRole({ team: { id: 't', role: 'owner' } })).to.equal('owner')
-    expect(spaceRole({ readOnly: true })).to.equal('view only')
+    expect(spaceRole({ team: { id: 't', role: 'writer' } })).to.equal('Worship leader')
+    expect(spaceRole({ team: { id: 't', role: 'reader' } })).to.equal('Team member')
+    expect(spaceRole({ team: { id: 't', role: 'owner' } })).to.equal('Owner')
+    expect(spaceRole({ readOnly: true })).to.equal('View only')
     expect(spaceRole({})).to.equal(null)
   })
 })

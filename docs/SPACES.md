@@ -34,7 +34,7 @@ members of their church. Each space is self-contained, so copyright compliance i
   removed by `SpaceDB.init`, the `localStorage` keys `current-organisation-*` become `current-space-*`
   (`space.ts`), and the `appProperties` of files already in Drive (`organisationId`, read by nothing)
   lose it at their next update.
-- **In the UI, "space" is not used** (decided 2026-10-22: too generic for a menu title). People see
+- **In the UI, "space" is kept out of titles and labels** (decided 2026-10-22: too generic for a menu title; the one place it is used is the list's section heading, "Personal and Team Spaces"). People see
   **Personal** and **Team**: a card shows the space's name with a label beside it, Personal or Team
   (none on a personal space still called "Personal"), and the person's role in a Team; the button is "Create a new Team" and the page that lists them is "Account
   and Teams" (`docs/ACCOUNT.md`). Roles read owner, admin, worship leader (the `writer` role) and

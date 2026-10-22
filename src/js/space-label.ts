@@ -14,8 +14,13 @@ export function spaceKind(space: Pick<Space, 'name' | 'team'>): string | null {
   return space.name === 'Personal' ? null : 'Personal'
 }
 
-/** What the person is in a Team, or that a space is view-only; null for a space of their own */
+/**
+ * What the person is in a Team, or that a space is view-only; null for a space of their own. In
+ * sentence case, to sit beside the other label (Team, Personal): "Worship leader".
+ */
 export function spaceRole(space: Pick<Space, 'team' | 'readOnly'>): string | null {
-  if (space.team) return roleLabel(space.team.role)
-  return space.readOnly ? 'view only' : null
+  if (space.team) return sentenceCase(roleLabel(space.team.role))
+  return space.readOnly ? 'View only' : null
 }
+
+const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
