@@ -125,7 +125,8 @@ describe('Exporting a space, and importing one', () => {
     expect(songs.map(song => song.title).sort()).to.deep.equal(['Alpha', 'Alpha', 'Beta'])
     expect(songs.filter(song => song.id === 'title-alpha' && song.isDefault)).to.have.length(1)
     expect(songs.find(song => song.title === 'Beta')?.key).to.equal('E')
-    expect(songs.every(song => song.importSource === 'import')).to.equal(true)
+    // (where the songs came from is kept; that they arrived by an import is not what a source is)
+    expect(songs.every(song => song.importSource === 'test')).to.equal(true)
 
     const setlist = must(await destination.getSetlist('set-1'))
     expect(setlist.name).to.equal('Harvest')

@@ -28,7 +28,13 @@ Fields stored in the `songs` store (per space):
 - `variantLabel`: friendly label (“Original”, “Simplified”, etc.)
 - `chordproFileId`: FK into the `chordpro` store
 - Metadata extracted from chordpro: `ccliNumber`, `title`, `titleNormalized`, `author`, `copyright`, `key`, `tempo`, `time`
-- Import metadata: `importDate`, `importUser`, `importSource`, `sourceUrl`
+- Import metadata: `importDate`, `importUser`, `importSource`, `sourceUrl`. **`importSource` is where a
+  song came from** (SongSelect, a file, something pasted or typed), **never how it arrived**: not
+  Google Drive (a sync), not a copy between spaces, not an import from a zip. Whatever carries a
+  song keeps its source, its `importDate` and its `importUser` (`song-source.ts`: a recorded `drive`,
+  `copy` or `import` is read as no source, which is empty; the version 8 upgrade empties them in
+  existing databases, and the true origin of such a song is not guessed). There is no place yet for
+  a person to write a source of their own.
 - `modifiedDate`: when this variant was last edited
 - Sync metadata: `fileRef`, `fileModified`, `lastSyncedAt`, `fileProps`, `contentHash`
 

@@ -5,8 +5,10 @@
  * app to tell them), while a chart they changed is left as it is (`heldBack` counts it): see
  * docs/SPACES.md, "Read-only: local edits are never blocked".
  */
+
 import type { Setlist, SongInput, SongRecord } from '../data-types.ts'
 import { withNumericTempos } from '../db.ts'
+import { songSource } from '../song-source.ts'
 import { chartFields, chartIdentity } from '../song-utils.ts'
 import type { StoredFile } from '../storage/types.ts'
 import { hashText } from '../utils/hash.ts'
@@ -409,7 +411,8 @@ async function downloadSong(
     importDate:
       localSong?.importDate || props.importDate || file.created || new Date().toISOString(),
     importUser: localSong?.importUser || props.importUser || null,
-    importSource: 'drive',
+    // (where it came from, whichever device made it: never that Drive carried it here)
+    importSource: songSource(localSong?.importSource) || songSource(props.importSource),
     sourceUrl: localSong?.sourceUrl || null,
     modifiedDate: new Date(file.modified || file.created || Date.now()).toISOString(),
     fileRef: file.ref,

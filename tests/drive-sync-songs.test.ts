@@ -136,6 +136,50 @@ describe('Drive sync: songs', () => {
       expect(await songContent(phone, 'song-1')).to.equal('edited in Drive')
     })
 
+    describe('where a song came from', () => {
+      const setSource = async (device, uuid: string, importSource: string) =>
+        device.db.saveSong({ ...must(await device.db.getSong(uuid)), importSource })
+
+      it('goes to Drive with the song, and arrives on another device unchanged', async () => {
+        const phone = await makeDevice('phone')
+        const tablet = await makeDevice('tablet')
+        await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: '{title: Amazing}' })
+        await setSource(phone, 'song-1', 'songselect')
+        await syncDevice(phone)
+        expect(rig.storage.list(f => f.props.type === 'chordpro')[0].props.importSource).to.equal(
+          'songselect'
+        )
+        await syncDevice(tablet)
+        expect(must(await tablet.db.getSong('song-1')).importSource).to.equal('songselect')
+      })
+
+      it('is not replaced by Drive when a change to the song is pulled', async () => {
+        const phone = await makeDevice('phone')
+        const tablet = await makeDevice('tablet')
+        await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: '{title: Amazing}' })
+        await setSource(phone, 'song-1', 'songselect')
+        await syncDevice(phone)
+        await syncDevice(tablet)
+        await editSong(phone, 'song-1', '{title: Amazing}\n[G]edited')
+        await syncDevice(phone)
+        await syncDevice(tablet)
+        expect(must(await tablet.db.getSong('song-1')).importSource).to.equal('songselect')
+      })
+
+      it('is never Google Drive: a song that only says it came from there has no source', async () => {
+        const phone = await makeDevice('phone')
+        const tablet = await makeDevice('tablet')
+        await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: '{title: Amazing}' })
+        await setSource(phone, 'song-1', 'drive')
+        await syncDevice(phone)
+        expect(rig.storage.list(f => f.props.type === 'chordpro')[0].props.importSource).to.equal(
+          ''
+        )
+        await syncDevice(tablet)
+        expect(must(await tablet.db.getSong('song-1')).importSource).to.equal('')
+      })
+    })
+
     it('creates and updates song files with the metadata from drive-metadata.js', async () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'song-1', title: 'Amazing', content: '{title: Amazing}' })

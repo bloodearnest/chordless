@@ -100,6 +100,21 @@ describe('Songs from the other databases', () => {
     expect(await library.getAllSongs()).to.have.length(1)
   })
 
+  it('keeps where the song came from, and when, rather than saying it was copied', async () => {
+    const original = await addChart(shared, BETA, { ...ADD, importSource: 'songselect' })
+    await shared.saveSong({
+      ...original,
+      importDate: '2026-05-04T16:24:37.261Z',
+      importUser: 'ann',
+    })
+    const [song] = await getSongsElsewhere(libraryId)
+    const added = await addToLibrary(song, library)
+    const record = must(await library.getSong(added.uuid))
+    expect(record.importSource).to.equal('songselect')
+    expect(record.importDate).to.equal('2026-05-04T16:24:37.261Z')
+    expect(record.importUser).to.equal('ann')
+  })
+
   it('adds a different chart of a song the library has as a variant, not the default', async () => {
     const mine = await addChart(library, ALPHA, ADD)
     await addChart(shared, ALPHA_EDITED, ADD)

@@ -109,7 +109,9 @@ export async function addToLibrary(
 ): Promise<SongWithContent> {
   const record = await addChart(library, song.chordpro, {
     variantLabel: song.source?.dbId === SHARED_DB_ID ? 'Shared' : 'Copied',
-    importSource: 'copy',
+    importSource: song.importSource,
+    importDate: song.importDate,
+    importUser: song.importUser,
     makeDefault: 'first',
     title: song.title,
   })

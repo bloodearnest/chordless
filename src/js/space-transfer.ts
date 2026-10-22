@@ -73,8 +73,7 @@ export async function copySongs(
   source: TransferSource,
   destination: ChordlessDB,
   uuids: string[] | null,
-  report: TransferReport = emptyReport(),
-  importSource = 'copy'
+  report: TransferReport = emptyReport()
 ): Promise<SongMap> {
   const wanted = uuids && new Set(uuids)
   const songs = defaultsFirst(
@@ -88,7 +87,11 @@ export async function copySongs(
     const isNew = !known.has(song.contentHash)
     const added = await addChart(destination, chordpro.content, {
       variantLabel: song.variantLabel || 'Copied',
-      importSource,
+      // (a copy keeps where the song came from, and when: not that it was copied)
+      importSource: song.importSource,
+      importDate: song.importDate,
+      importUser: song.importUser,
+      sourceUrl: song.sourceUrl,
       makeDefault: 'first',
       title: song.title,
     })
@@ -152,15 +155,14 @@ export async function transferSetlists(
   destination: ChordlessDB,
   ids: string[] | null,
   mode: TransferMode,
-  report: TransferReport = emptyReport(),
-  importSource = 'copy'
+  report: TransferReport = emptyReport()
 ): Promise<TransferReport> {
   const wanted = ids && new Set(ids)
   const setlists = (await source.getAllSetlists()).filter(
     setlist => !setlist.deletedAt && (!wanted || wanted.has(setlist.id)) && !setlist.received
   )
   const uuids = new Set(setlists.flatMap(setlist => setlist.songs.map(entry => entry.songUuid)))
-  const songs = await copySongs(source, destination, [...uuids], report, importSource)
+  const songs = await copySongs(source, destination, [...uuids], report)
   const sourceSongs = new Set((await source.getAllSongs()).map(song => song.uuid))
 
   const existing = await destination.getAllSetlists()
@@ -196,14 +198,13 @@ export async function transferSetlists(
 export async function transferSpace(
   source: TransferSource,
   destination: ChordlessDB,
-  mode: TransferMode,
-  importSource = 'copy'
+  mode: TransferMode
 ): Promise<TransferReport> {
   const report = emptyReport()
-  await copySongs(source, destination, null, report, importSource)
+  await copySongs(source, destination, null, report)
   // The songs are in; the setlists find them as already there
   const songsBefore = { added: report.songsAdded, skipped: report.songsSkipped }
-  await transferSetlists(source, destination, null, mode, report, importSource)
+  await transferSetlists(source, destination, null, mode, report)
   // transferSetlists counts its songs again, all as skipped now: keep the first count
   report.songsAdded = songsBefore.added
   report.songsSkipped = songsBefore.skipped
@@ -260,15 +261,13 @@ export interface Bring {
 export function bringAcross(
   source: TransferSource,
   destination: ChordlessDB,
-  { songs, setlists, mode }: Bring,
-  importSource = 'copy'
+  { songs, setlists, mode }: Bring
 ): Promise<TransferReport> {
-  if (songs && setlists) return transferSpace(source, destination, mode, importSource)
-  if (setlists)
-    return transferSetlists(source, destination, null, mode, emptyReport(), importSource)
+  if (songs && setlists) return transferSpace(source, destination, mode)
+  if (setlists) return transferSetlists(source, destination, null, mode, emptyReport())
   if (songs) {
     const report = emptyReport()
-    return copySongs(source, destination, null, report, importSource).then(() => report)
+    return copySongs(source, destination, null, report).then(() => report)
   }
   return Promise.resolve(emptyReport())
 }

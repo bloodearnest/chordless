@@ -6,6 +6,7 @@ import type {
   SongRecord,
   TempoInput,
 } from './data-types.ts'
+import { songSource } from './song-source.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
 import { requestResult, transactionDone } from './utils/idb.ts'
@@ -17,7 +18,7 @@ import { ensurePersistentStorage } from './utils/persistence.ts'
 // NOTE: This now stores ALL space data in one database per space.
 // Space metadata is stored separately in the 'spaces' database.
 
-const DB_VERSION = 7
+const DB_VERSION = 8
 
 // Setlist types
 export const SETLIST_TYPES: Readonly<Record<string, string>> = {
@@ -585,8 +586,20 @@ export function withFileFieldsRenamed<T extends object>(record: T): T {
 }
 
 /**
+ * The song with an empty source where it was recorded as how it arrived (Google Drive, a copy,
+ * an import) and not where it came from (docs/SPACES.md; `song-source.ts`). The true origin of
+ * such a song is not known, so it is not guessed.
+ */
+export function withOriginKept<T extends { importSource?: string }>(song: T): T {
+  if (song.importSource === undefined) return song
+  const source = songSource(song.importSource)
+  return source === song.importSource ? song : { ...song, importSource: source }
+}
+
+/**
  * Bring the songs and setlists of a database from `oldVersion` up to date: tempos as numbers
- * (version 6), the file fields under their new names (7). One pass over each store applies every
+ * (version 6), the file fields under their new names (7), and the source of a song kept as where it
+ * came from, not how it arrived (8). One pass over each store applies every
  * step to a record in turn: a cursor for each step would each read the record as it was, and the
  * last to write would undo the others.
  */
@@ -598,6 +611,7 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
     let song = cursor.value
     if (oldVersion < 6) song = withNumericSongTempos(song)
     if (oldVersion < 7) song = withFileFieldsRenamed(song)
+    if (oldVersion < 8) song = withOriginKept(song)
     if (song !== cursor.value) cursor.update(song)
     cursor.continue()
   }

@@ -277,7 +277,7 @@ export function importIntoSpace(
   exported: SpaceExport,
   destination: ChordlessDB
 ): Promise<TransferReport> {
-  return transferSpace(sourceOf(exported), destination, 'import', 'import')
+  return transferSpace(sourceOf(exported), destination, 'import')
 }
 
 /**

@@ -6,7 +6,13 @@ const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
 
-import { ChordlessDB, createSetlist, parseTempo, withFileFieldsRenamed } from '../src/js/db.ts'
+import {
+  ChordlessDB,
+  createSetlist,
+  parseTempo,
+  withFileFieldsRenamed,
+  withOriginKept,
+} from '../src/js/db.ts'
 import { setlistContentHash } from '../src/js/sync/setlist-hash.ts'
 import { transactionDone, transactionError } from '../src/js/utils/idb.ts'
 import { makeSetlist, makeSong } from './builders.ts'
@@ -333,6 +339,71 @@ describe("ChordlessDB version 7: the fields about a record's file are named for 
   it('leaves a record that has none of them as it is', () => {
     const record = { id: 'x', name: 'Plain' }
     expect(withFileFieldsRenamed(record)).to.equal(record)
+  })
+})
+
+describe('ChordlessDB version 8: a song’s source is where it came from, not how it arrived', () => {
+  let dbName: string
+
+  afterEach(async () => {
+    await deleteDatabase(dbName)
+  })
+
+  /** A version 7 database, as it was, with these songs */
+  function makeVersion7(songs: object[]) {
+    return new Promise<void>((resolve, reject) => {
+      const request = indexedDB.open(dbName, 7)
+      request.onupgradeneeded = () => {
+        const db = request.result
+        db.createObjectStore('songs', { keyPath: 'uuid' }).createIndex('id', 'id')
+        db.createObjectStore('chordpro', { keyPath: 'id' })
+        db.createObjectStore('setlists', { keyPath: 'id' })
+        db.createObjectStore('setlist_local', { keyPath: 'setlistId' })
+      }
+      request.onsuccess = () => {
+        const db = request.result
+        const tx = db.transaction(['songs'], 'readwrite')
+        for (const song of songs) tx.objectStore('songs').put(song)
+        tx.oncomplete = () => {
+          db.close()
+          resolve()
+        }
+        tx.onerror = () => reject(tx.error)
+      }
+    })
+  }
+
+  it('empties a source that says Drive, a copy or an import, and keeps any real one', async () => {
+    dbName = `TEST-${uniqueName()}`
+    await makeVersion7([
+      { uuid: 'a', id: 'a', title: 'A', importSource: 'drive' },
+      { uuid: 'b', id: 'b', title: 'B', importSource: 'copy' },
+      { uuid: 'c', id: 'c', title: 'C', importSource: 'import' },
+      { uuid: 'd', id: 'd', title: 'D', importSource: 'songselect' },
+      { uuid: 'e', id: 'e', title: 'E', importSource: 'paste' },
+      { uuid: 'f', id: 'f', title: 'F' },
+    ])
+    const db = new ChordlessDB(dbName)
+    await db.init()
+    const sources = Object.fromEntries(
+      (await db.getAllSongs()).map(song => [song.uuid, song.importSource])
+    )
+    expect(sources).to.deep.equal({
+      a: '',
+      b: '',
+      c: '',
+      d: 'songselect',
+      e: 'paste',
+      f: undefined,
+    })
+    must(db.db).close()
+  })
+
+  it('leaves a song that has a real source, or none recorded, as it is', () => {
+    const real = { importSource: 'songselect' }
+    expect(withOriginKept(real)).to.equal(real)
+    const none = {}
+    expect(withOriginKept(none)).to.equal(none)
   })
 })
 

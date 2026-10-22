@@ -11,6 +11,7 @@
 
 import type { ChordProRecord, ParsedChart, Setlist, SongRecord } from './data-types.ts'
 import { ChordProParser } from './parser.ts'
+import { songSource } from './song-source.ts'
 import type { FileInput } from './storage/types.ts'
 
 /** The name, type and appProperties a Drive file is created or updated with */
@@ -166,7 +167,7 @@ export function songFileMetadata(
       variantLabel,
       importDate: song.importDate || '',
       importUser: song.importUser || '',
-      importSource: song.importSource || '',
+      importSource: songSource(song.importSource),
       appVersion: APP_VERSION,
     },
   }

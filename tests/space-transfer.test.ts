@@ -215,6 +215,35 @@ describe('Copying and moving between spaces', () => {
     expect(await source.getAllSetlists()).to.have.length(0)
   })
 
+  describe('where a song came from', () => {
+    it('is kept by a copy, with when and by whom it was first imported, and never says it was copied', async () => {
+      const chart = await addChart(source, ALPHA, { ...ADD, importSource: 'songselect' })
+      await source.saveSong({
+        ...chart,
+        importDate: '2026-05-04T16:24:37.261Z',
+        importUser: 'ann',
+        sourceUrl: 'https://songselect.example/7102401',
+      })
+      await copySongs(source, destination, null)
+      const copy = must((await destination.getAllSongs()).find(song => song.title === 'Alpha'))
+      expect(copy.importSource).to.equal('songselect')
+      expect(copy.importDate).to.equal('2026-05-04T16:24:37.261Z')
+      expect(copy.importUser).to.equal('ann')
+      expect(copy.sourceUrl).to.equal('https://songselect.example/7102401')
+    })
+
+    it('is empty, not "copy" or "drive", for a song that came with no known source', async () => {
+      const arrived = await addChart(source, ALPHA, ADD)
+      await source.saveSong({ ...arrived, importSource: 'drive' })
+      await addChart(source, BETA, ADD)
+      const unknown = must((await source.getAllSongs()).find(song => song.title === 'Beta'))
+      await source.saveSong({ ...unknown, importSource: '' })
+      await transferSpace(source, destination, 'copy')
+      const sources = (await destination.getAllSongs()).map(song => song.importSource)
+      expect(sources).to.deep.equal(['', ''])
+    })
+  })
+
   describe('what a space holds, and bringing it across', () => {
     it('counts the charts and setlists, and their size, leaving out deleted and received setlists', async () => {
       const alpha = await addChart(source, ALPHA, ADD)

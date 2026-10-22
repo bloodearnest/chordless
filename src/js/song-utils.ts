@@ -16,6 +16,7 @@ import type {
 import type { ChordlessDB } from './db.ts'
 import { getCurrentDB, normalizeTitle } from './db.ts'
 import { ChordProParser } from './parser.ts'
+import { songSource } from './song-source.ts'
 import { hashText } from './utils/hash.ts'
 
 export { hashText }
@@ -283,6 +284,8 @@ interface Provenance {
   importUser: string | null
   importSource: string
   sourceUrl: string | null
+  /** When it was first imported, if that is not now (a copy keeps the original's) */
+  importDate?: string
 }
 
 /** Store a chart as a new song (and its chordpro file) */
@@ -374,6 +377,10 @@ export interface AddChartOptions {
   makeDefault: 'newest' | 'first'
   /** The title to use if the chart has none */
   title?: string
+  /** What a copy keeps of the song it is a copy of: when it was first imported, by whom, from where */
+  importDate?: string
+  importUser?: string | null
+  sourceUrl?: string | null
 }
 
 /**
@@ -384,7 +391,15 @@ export interface AddChartOptions {
 export async function addChart(
   db: ChordlessDB,
   chordpro: string,
-  { variantLabel, importSource, makeDefault, title }: AddChartOptions
+  {
+    variantLabel,
+    importSource,
+    makeDefault,
+    title,
+    importDate,
+    importUser,
+    sourceUrl,
+  }: AddChartOptions
 ): Promise<SongRecord> {
   const contentHash = hashText(chordpro)
   const known = await db.getAllSongs()
@@ -408,7 +423,12 @@ export async function addChart(
       isDefault,
       variantLabel,
     },
-    { importUser: null, importSource, sourceUrl: null }
+    {
+      importUser: importUser ?? null,
+      importSource: songSource(importSource),
+      sourceUrl: sourceUrl ?? null,
+      ...(importDate ? { importDate } : {}),
+    }
   )
 }
 
