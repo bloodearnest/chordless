@@ -46,6 +46,12 @@ export class FakeDrive {
   _nextId: any
 
   corruptUploads: number
+  /** The position of the feed of changes: each change to a file gives it the next one */
+  changeSeq = 0
+  /** Files deleted for good, with the position of their deletion */
+  deletedAt: { id: string; seq: number }[] = []
+  /** Positions at or below this are no longer known to the feed (`forgetChangePositions`) */
+  forgotten = -1
 
   readOnly: boolean
   omitCapabilities: boolean
@@ -93,6 +99,11 @@ export class FakeDrive {
    */
   failRequests({ method, path, status = 500, network = false, times = 1, skip = 0 }: any = {}) {
     this._failures.push({ method, path, status, network, times, skip })
+  }
+
+  /** Make the feed forget every position given so far, as Drive does with one that is too old */
+  forgetChangePositions() {
+    this.forgotten = this.changeSeq
   }
 
   /** Files that aren't folders, optionally filtered by a predicate on the record */
@@ -157,6 +168,7 @@ export class FakeDrive {
     file.md5Checksum = this._checksum(content)
     file.modifiedTime = this.now()
     file.version++
+    file.changeSeq = ++this.changeSeq
   }
 
   // ---------- fetch handling ----------
@@ -242,6 +254,12 @@ export class FakeDrive {
       }
       return new Response(null, { status: 204 })
     }
+    if (path === '/drive/v3/changes/startPageToken' && method === 'GET') {
+      return json({ kind: 'drive#startPageToken', startPageToken: String(this.changeSeq) })
+    }
+    if (path === '/drive/v3/changes' && method === 'GET') {
+      return this._changes(params)
+    }
     if (path === '/drive/v3/files' && method === 'GET') {
       return this._list(params)
     }
@@ -268,6 +286,7 @@ export class FakeDrive {
       const file = this._getOr404(fileMatch[1])
       if (file instanceof Response) return file
       this.files.delete(file.id)
+      this.deletedAt.push({ id: file.id, seq: ++this.changeSeq })
       return new Response(null, { status: 204 })
     }
     if (path === '/upload/drive/v3/files' && method === 'POST') {
@@ -337,6 +356,7 @@ export class FakeDrive {
       binary,
       content,
       md5Checksum: metadata.mimeType === FOLDER_MIME ? undefined : this._checksum(content),
+      changeSeq: ++this.changeSeq,
     }
     this.files.set(file.id, file)
     return json(this._project(file, params.get('fields')))
@@ -356,6 +376,43 @@ export class FakeDrive {
         this._unsupported(`PATCH of metadata field "${key}"`)
       }
     }
+    file.changeSeq = ++this.changeSeq
+  }
+
+  /**
+   * The feed of changes. A position is the number of the last change seen; a page after the first
+   * carries "<position>:<offset>". Like Drive's, it lists a file once, as it is now, and a file
+   * deleted for good as removed.
+   */
+  _changes(params) {
+    const [from, offset = '0'] = (params.get('pageToken') ?? '').split(':')
+    const since = Number(from)
+    if (!/^\d+$/.test(from) || since < this.forgotten) {
+      return json({ error: { code: 400, message: 'Invalid value for pageToken' } }, 400)
+    }
+    const all = [
+      ...[...this.files.values()]
+        .filter(f => f.changeSeq > since)
+        .map(f => ({ seq: f.changeSeq, fileId: f.id, removed: false, file: f })),
+      ...this.deletedAt
+        .filter(d => d.seq > since)
+        .map(d => ({ seq: d.seq, fileId: d.id, removed: true, file: undefined })),
+    ].sort((a, b) => a.seq - b.seq)
+    const pageSize = Math.min(Number(params.get('pageSize')) || 100, this.maxPageSize)
+    const start = Number(offset)
+    const page = all.slice(start, start + pageSize)
+    const fileFields = params.get('fields')?.match(/file\(([^)]*)\)/)?.[1]
+    const result: any = {
+      kind: 'drive#changeList',
+      changes: page.map(c => ({
+        fileId: c.fileId,
+        removed: c.removed,
+        ...(c.file ? { file: this._project(c.file, fileFields) } : {}),
+      })),
+    }
+    if (start + pageSize < all.length) result.nextPageToken = `${since}:${start + pageSize}`
+    else result.newStartPageToken = String(this.changeSeq)
+    return json(result)
   }
 
   _list(params) {

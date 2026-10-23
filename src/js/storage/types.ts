@@ -58,6 +58,32 @@ export interface RootInfo {
   canWrite: boolean | null
 }
 
+/** The feed of changes could not be read from the position given: it is too old, or not one the backend knows */
+export class ChangeTokenLost extends Error {
+  constructor() {
+    super('The backend no longer knows where the last sync left off')
+    this.name = 'ChangeTokenLost'
+  }
+}
+
+/** What changed in a space's collections since a position in the feed */
+export interface SpaceChanges {
+  /** Where the next call starts from: kept only once these changes are applied */
+  token: string
+  /** Files now live in a collection (new, changed or moved in) */
+  changed: { collection: 'songs' | 'setlists'; file: StoredFile }[]
+  /** Files that are not live in the space's collections: deleted, in the bin, or moved out */
+  gone: string[]
+}
+
+/** A backend's feed of what changed, so a sync need not list everything to find out */
+export interface ChangeFeed {
+  /** The position now: changes after it are the ones to come */
+  start(): Promise<string>
+  /** What changed after `token`. Throws ChangeTokenLost if the backend has forgotten it. */
+  since(token: string): Promise<SpaceChanges>
+}
+
 /** A file or folder that exists, wherever it is: what it is, and whether it is in the bin */
 export interface FileStatus extends StoredFile {
   trashed: boolean
@@ -65,6 +91,8 @@ export interface FileStatus extends StoredFile {
 
 /** A space's own files, once its root is known */
 export interface SpaceStorage {
+  /** The feed of changes, or null for a backend that has none (a sync then lists everything) */
+  readonly changes: ChangeFeed | null
   /** The people the space is shared with, for choosing leaders */
   members(): Promise<SpaceMember[]>
   /** The live files of a collection */

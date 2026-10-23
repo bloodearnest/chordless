@@ -362,6 +362,14 @@ export interface DriveFile {
   capabilities?: { canEdit?: boolean; canAddChildren?: boolean }
 }
 
+/** One entry of Drive's feed of changes: a file that changed, or one that is gone for good */
+export interface DriveChange {
+  fileId: string
+  /** The file was deleted for good (or lost to this person): there is no `file` */
+  removed?: boolean
+  file?: DriveFile
+}
+
 /** One page of a Drive file listing */
 export interface DriveFileList {
   /** (Drive lists the files of a page, none if there are none) */

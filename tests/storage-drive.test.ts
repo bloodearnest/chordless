@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { driveStorage } from '../src/js/storage/browser-drive.ts'
+import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { describeStorage } from './storage-conformance.ts'
@@ -258,6 +259,106 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
       .space(root.ref)
       .create('shares', { name: 'a.share', props: {}, type: 'application/octet-stream' }, 'x')
     expect(fake.findByPath(['Chordless', 'Grace Church', 'shares'])).to.not.equal(null)
+  })
+})
+
+describe('Google Drive (on FakeDrive): the feed of changes', () => {
+  const song = { name: 'a.txt', props: { songUuid: 's1' }, type: 'text/plain' }
+  const setlist = {
+    name: '2026-10-25-x.json',
+    props: { setlistId: 'l1' },
+    type: 'application/json',
+  }
+
+  async function openSpace() {
+    const fake = installFakeDrive()
+    drive = fake
+    const space = driveStorage.space((await driveStorage.ensureRoot('Grace Church', 's')).ref)
+    return { fake, space, feed: must(space.changes) }
+  }
+
+  it('shows nothing until something changes, then the files that did, by collection', async () => {
+    const { space, feed } = await openSpace()
+    const start = await feed.start()
+    expect(await feed.since(start)).to.deep.include({ changed: [], gone: [] })
+
+    const a = await space.create('songs', song, 'chart')
+    const b = await space.create('setlists', setlist, '{}')
+    const seen = await feed.since(start)
+    expect(seen.changed.map(c => [c.collection, c.file.ref])).to.have.deep.members([
+      ['songs', a.file.ref],
+      ['setlists', b.file.ref],
+    ])
+    expect(seen.changed[0].file.rev).to.be.a('string')
+    expect(seen.gone).to.deep.equal([])
+
+    // (the next position starts after these)
+    expect(await feed.since(seen.token)).to.deep.include({ changed: [], gone: [] })
+    await space.update(a.file.ref, song, 'chart, fixed')
+    const next = await feed.since(seen.token)
+    expect(next.changed.map(c => c.file.ref)).to.deep.equal([a.file.ref])
+  })
+
+  it('lists a file once, as it is now, however often it changed', async () => {
+    const { space, feed } = await openSpace()
+    const start = await feed.start()
+    const { file } = await space.create('songs', song, 'one')
+    await space.update(file.ref, song, 'two')
+    await space.update(file.ref, song, 'three')
+    const seen = await feed.since(start)
+    expect(seen.changed).to.have.length(1)
+    expect(seen.changed[0].file.rev).to.equal((await space.list('songs'))[0].rev)
+  })
+
+  it('says a file is gone when it is in the bin, deleted for good, or not in this space', async () => {
+    const { fake, space, feed } = await openSpace()
+    const kept = await space.create('songs', song, 'x')
+    const binned = await space.create('songs', { ...song, name: 'b.txt' }, 'x')
+    const deleted = await space.create('setlists', setlist, '{}')
+    const start = await feed.start()
+
+    await space.trash(binned.file.ref)
+    fake.files.delete(deleted.file.ref)
+    fake.deletedAt.push({ id: deleted.file.ref, seq: ++fake.changeSeq })
+    const other = driveStorage.space((await driveStorage.ensureRoot('Elsewhere', 'e')).ref)
+    const there = await other.create('songs', { ...song, name: 'there.txt' }, 'x')
+
+    const seen = await feed.since(start)
+    expect(seen.gone).to.include.members([binned.file.ref, deleted.file.ref, there.file.ref])
+    expect(seen.changed.map(c => c.file.ref)).to.not.include(kept.file.ref)
+  })
+
+  it('reads every page of changes', async () => {
+    const { fake, space, feed } = await openSpace()
+    const start = await feed.start()
+    fake.maxPageSize = 2
+    for (let i = 0; i < 5; i++) await space.create('songs', { ...song, name: `${i}.txt` }, 'x')
+    expect((await feed.since(start)).changed).to.have.length(5)
+  })
+
+  it('says it has forgotten a position that is too old or not its own, and passes on other errors', async () => {
+    const { fake, space, feed } = await openSpace()
+    const old = await feed.start()
+    await space.create('songs', song, 'x')
+    fake.forgetChangePositions()
+    let thrown: unknown
+    try {
+      await feed.since(old)
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).to.be.instanceOf(ChangeTokenLost)
+    expect((await feed.since(await feed.start())).changed).to.deep.equal([])
+
+    fake.failRequests({ path: /\/changes\?/, status: 500 })
+    let failed: unknown
+    try {
+      await feed.since(await feed.start())
+    } catch (error) {
+      failed = error
+    }
+    expect(failed).to.be.instanceOf(Error)
+    expect(failed).to.not.be.instanceOf(ChangeTokenLost)
   })
 })
 

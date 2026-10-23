@@ -16,6 +16,7 @@
  */
 
 import type {
+  DriveChange,
   DriveContent,
   DriveFile,
   DriveFileList,
@@ -175,6 +176,40 @@ export function createDriveApi({
       pageToken = result.nextPageToken
     } while (pageToken)
     return files
+  }
+
+  /** Where the feed of changes stands now: what to ask `listChanges` from, later */
+  async function getStartPageToken(): Promise<string> {
+    const result = await driveRequest<{ startPageToken: string }>(
+      `/changes/startPageToken?${ALL_DRIVES}`
+    )
+    return result.startPageToken
+  }
+
+  /**
+   * Every change since `pageToken`, and where to ask from next time. What Drive shows is what
+   * this app may see (`drive.file`); a token Drive no longer knows is an error with its status.
+   */
+  async function listChanges(
+    pageToken: string
+  ): Promise<{ changes: DriveChange[]; nextToken: string }> {
+    const fields =
+      'nextPageToken,newStartPageToken,changes(fileId,removed,file(id,name,mimeType,parents,trashed,createdTime,modifiedTime,md5Checksum,appProperties))'
+    const changes: DriveChange[] = []
+    let page = pageToken
+    for (;;) {
+      const result = await driveRequest<{
+        changes?: DriveChange[]
+        nextPageToken?: string
+        newStartPageToken?: string
+      }>(
+        `/changes?pageToken=${encodeURIComponent(page)}&pageSize=1000&includeRemoved=true` +
+          `&fields=${encodeURIComponent(fields)}&${ALL_DRIVES_LIST}`
+      )
+      changes.push(...(result.changes ?? []))
+      if (result.nextPageToken) page = result.nextPageToken
+      else return { changes, nextToken: result.newStartPageToken ?? page }
+    }
   }
 
   /**
@@ -809,6 +844,8 @@ export function createDriveApi({
     countWriteRefusals,
     driveRequest,
     listDriveFiles,
+    getStartPageToken,
+    listChanges,
     getFile,
     listFolderPermissions,
     renameFile,

@@ -523,6 +523,7 @@ async function contentOf(body: FileBody): Promise<Content> {
 }
 
 class MemorySpace implements SpaceStorage {
+  readonly changes = null
   #storage: MemoryStorage
   #root: string
 

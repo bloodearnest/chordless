@@ -19,6 +19,8 @@ export function notingRefs(
   room: Pick<TeamSpaceApi, 'addRefs' | 'members'>
 ): SpaceStorage {
   return {
+    // (no feed of changes through the Worker yet: its refs would have to be noted too)
+    changes: null,
     // (the people of a team space are the Durable Object's, not Drive's folder permissions)
     members: () => room.members(),
     async list(collection) {

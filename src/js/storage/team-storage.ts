@@ -122,6 +122,8 @@ function textOf(body: FileBody): string {
 }
 
 class TeamSpace implements SpaceStorage {
+  // (the Worker has no feed of changes yet: a sync lists everything)
+  readonly changes = null
   #client: TeamClient
   #id: string
 

@@ -8,19 +8,22 @@
 import type { DriveFile } from '../data-types.ts'
 import type { DriveApi } from '../drive-client.ts'
 import { md5Hex } from '../utils/md5.ts'
-import type {
-  Collection,
-  FileBody,
-  FileInput,
-  FileStatus,
-  PadFileEntry,
-  PadSetEntry,
-  PadStorage,
-  RootInfo,
-  SpaceStorage,
-  StorageBackend,
-  StoredFile,
-  WriteResult,
+import {
+  type ChangeFeed,
+  ChangeTokenLost,
+  type Collection,
+  type FileBody,
+  type FileInput,
+  type FileStatus,
+  type PadFileEntry,
+  type PadSetEntry,
+  type PadStorage,
+  type RootInfo,
+  type SpaceChanges,
+  type SpaceStorage,
+  type StorageBackend,
+  type StoredFile,
+  type WriteResult,
 } from './types.ts'
 
 /** How many files a many-at-once call has in flight at a time */
@@ -105,6 +108,37 @@ class DriveSpace implements SpaceStorage {
 
   members() {
     return this.#api.listFolderPermissions(this.#rootRef)
+  }
+
+  readonly changes: ChangeFeed = {
+    start: () => this.#api.getStartPageToken(),
+    since: async token => {
+      const [songs, setlists] = [await this.#folder('songs'), await this.#folder('setlists')]
+      let result: Awaited<ReturnType<DriveApi['listChanges']>>
+      try {
+        result = await this.#api.listChanges(token)
+      } catch (error) {
+        // (Drive answers a position it does not know with 400, 404 or 410)
+        const status = (error as { status?: number }).status
+        if ([400, 404, 410].includes(status as number)) throw new ChangeTokenLost()
+        throw error
+      }
+      const changed: SpaceChanges['changed'] = []
+      const gone: string[] = []
+      for (const { fileId, file } of result.changes) {
+        const parents = file?.parents ?? []
+        if (!file || file.trashed) gone.push(fileId)
+        else if (parents.includes(songs) && file.mimeType === 'text/plain') {
+          changed.push({ collection: 'songs', file: toStored(file) })
+        } else if (parents.includes(setlists) && file.name?.includes('.json')) {
+          changed.push({ collection: 'setlists', file: toStored(file) })
+        } else {
+          // (not live in a collection of this space: a file of another space, or one moved out)
+          gone.push(fileId)
+        }
+      }
+      return { token: result.nextToken, changed, gone }
+    },
   }
 
   async list(collection: Collection): Promise<StoredFile[]> {
