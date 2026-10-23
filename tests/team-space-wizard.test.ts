@@ -195,7 +195,7 @@ describe('team-space-wizard', () => {
 
     button('Create team space').click()
     await until(() => text().includes('is ready'), 'created')
-    expect(madeFolders).to.deep.equal([['picked', name]])
+    expect(madeFolders).to.deep.equal([['picked', `${name} Chordless`]])
     const post = must(requests.find(request => request.key === 'POST /api/spaces'))
     expect(post.body).to.deep.equal({ blob: 'blob', rootRef: 'new-folder', name })
     const made = must((await listSpaces()).find(space => space.name === name))

@@ -34,7 +34,7 @@ export async function createTeamSpace(
   const stored = await getStoredBlob()
   if (!stored) throw new Error('Sign in with Google first')
 
-  const rootRef = await folders.createTeamFolder(parentId, teamName)
+  const rootRef = await folders.createTeamFolder(parentId, teamFolderName(teamName))
   const { spaceId, role } = await teamApi.createSpace({
     blob: stored.blob,
     rootRef,
@@ -42,6 +42,11 @@ export async function createTeamSpace(
   })
   const space = await createSpace(await freeName(teamName))
   return updateSpace(space.id, { rootRef, team: { id: spaceId, role } })
+}
+
+/** The Drive folder's name: it says what it is, as it sits beside folders that are not Chordless's */
+function teamFolderName(teamName: string): string {
+  return `${teamName} Chordless`
 }
 
 /** A name for the new space that no space on this device has */

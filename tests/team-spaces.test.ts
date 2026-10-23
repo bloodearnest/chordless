@@ -234,7 +234,7 @@ describe('team spaces on this device', () => {
 
       const created = await createTeamSpace(`  ${name} `, 'picked-parent', drive)
       made.push(created.id)
-      expect(drive.made).to.deep.equal([['picked-parent', name]])
+      expect(drive.made).to.deep.equal([['picked-parent', `${name} Chordless`]])
       expect(requests[0].body).to.deep.equal({ blob: 'the-blob', rootRef: 'new-folder', name })
       expect(created.name).to.equal(name)
       expect(created.rootRef).to.equal('new-folder')

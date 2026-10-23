@@ -70,7 +70,9 @@ folder and how data reaches Drive.
 | Roles | you | owner / admin / writer / reader, enforced by the Worker |
 | Pads | `Chordless/pads/` | `<team folder>/pads/` |
 
-**Folder choice.** On create, the owner picks a *parent* folder; the app then creates `<team name>/`
+**Folder choice.** On create, the owner picks a *parent* folder; the app then creates `<team name> Chordless/`
+(so it is told apart in Drive from the personal `Chordless` and from other folders; the space's own name is
+just `<team name>`; folders made earlier keep their names, and a rename in Drive is safe as the folder is found by `rootRef`)
 inside it (`songs/`, `setlists/`, `shares/`, `pads/`). Because the app creates the team folder,
 `drive.file` grants it everything inside. A Picker-picked folder alone exposes no children (the
 2026-10-13 finding), so the picked folder must not be the team folder itself. The picker copy

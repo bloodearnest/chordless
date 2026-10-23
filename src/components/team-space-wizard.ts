@@ -508,8 +508,8 @@ export class TeamSpaceWizard extends LitElement {
         </div>
         <p class="hint">
           A shared drive is best: the files stay with the team if you leave, and everyone can see them
-          in Drive. A folder in your own Drive works too. Chordless makes a folder named for the team
-          inside the one you choose.
+          in Drive. A folder in your own Drive works too. Chordless makes a folder inside the one you choose,
+          named for the team, with “Chordless” after it.
         </p>
         ${this._renderBring()}
         ${this._message ? html`<p class="status error" role="alert">${this._message}</p>` : nothing}
