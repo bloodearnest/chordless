@@ -465,6 +465,63 @@ save there is nothing to choose. With more than one (Merged), it is a "Save to" 
 with the last one used, offering only places you can write to; in Separate mode it is the active
 space, read-only text. A wrong choice is fixed with "Move to…" (keeps the setlist id).
 
+## Space tabs, and joining by invite (decided and built 2026-10-23)
+
+The reason: someone tries Chordless alone, then their church makes a team and invites them. Their
+songs and setlists must not seem to vanish, and someone whose first contact is an invite should
+never meet a "Personal" space they did not ask for.
+
+**Tabs under the header** of the Setlists, Library and Add Song pages, replacing the title-only
+"Setlists - Gateway Church" as the way to see and change space.
+
+- One tab per place: each Team (by its own name), Personal (by the person's name once signed in),
+  and **Shared** (the `shared-with-me` database, `docs/SHARING.md`). A small Team/Personal label sits
+  beside the name, so two teams are never both "Team".
+- **Only tabs that exist.** One place means no tab bar (the rule under "Presenting spaces"); Shared
+  appears only when something was shared; a Personal space with nothing in it (and not the current
+  one) has no tab. It returns as soon as something is saved there, and the Account and Teams page can
+  always show it.
+- Fixed order (Teams, Personal, Shared), the current tab marked. About three or four fit a phone;
+  beyond that the rest go under a "More" menu, the most recently used staying as tabs.
+- A tab is the existing space switch (a reload) to begin with. Reading another space's database
+  without switching the app is "Merged" (above), later.
+- A `role="tablist"` under the header, with arrow keys (as `chart-diff` does), never in the header,
+  so it stays clear of the live-setlist controls. Account and Teams stays for managing spaces
+  (create, leave, rename), not for switching.
+- "Shared" is a tab of its own, not only a group at the foot of the home page.
+
+**Joining by invite**
+- Accepting an invite makes the team the current space and the first tab.
+- **Bring across what is new.** If the personal space holds anything the team does not already have,
+  ask once: "You have 14 songs and 3 setlists in Personal. Bring them into Gateway Church?" It uses
+  `contentsOf` and `bringAcross`, skipping anything the team space has already (songs by song id,
+  setlists by id), and counts only what would be added. No prompt when nothing would be. Songs are
+  copied; setlists moved or copied, as in the wizard. Declining is harmless and the same action stays
+  on the Account page, on each space's card with its counts.
+- **No Personal space for someone whose first contact is an invite.** It is created lazily
+  (`ensureCurrentSpace`, `getCurrentSpaceFull` in `space.ts`, only when no current space is set). The
+  launch path sees an invite link before any space exists, signs in and joins, so the team is
+  current and Personal is never made. If the join fails (sign-in cancelled, expired code), fall back
+  to creating Personal, so there is always a space. Personal is made later if wanted (saving a song
+  with nowhere else, choosing it in a picker).
+- Check first what else assumes a Personal space: the sign-in rename of "Personal" to the Google
+  name, the repair page, the export.
+- The Import page's "Import into" picker follows the same tabs: a space that is hidden is not
+  offered unless it is the only one.
+
+**As built** (`space-tabs.ts`, `<space-tabs>`, `team-join.ts`), where it differs from the above:
+- The Shared tab is not a space that the app switches to: it opens the home page as `/?shared`, which
+  lists only what was shared, with the tab marked. On the Library and Add Song pages it is a way
+  to that page. (Making `shared-with-me` the current space would put sync and the space record
+  on a database that has neither.)
+- "More" is a native `<select>`; the most recently used tabs (kept in `space-tabs-recent`) stay shown.
+- The offer to bring across is made on the join page once the first sync has run, looking at each
+  personal space in turn; setlists are moved (the wizard's default). The matching action on the
+  Account page's cards is **not built yet**: until it is, the wizard's step is the only other way.
+- Nothing on the invite path makes Personal: the first-use question and the start-up access check
+  both wait when there is no space and the page is `/join`. Sign-in rename, repair page and export
+  all work from the current space and need no Personal one.
+
 ## Copy and move between spaces (also the migration)
 
 One general feature, built early because it unblocks your own migration and needs no Worker:
