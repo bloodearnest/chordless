@@ -156,11 +156,10 @@ storage/sync
 - the Team storage service account should move to a Google Cloud project of its own: docs/CLOUD_MIGRATION.md, step 6
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). Still to do:
-  applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
-  app is open: docs/SYNC_ARCHITECTURE.md, "Pulling while the app is open"; the Worker role replaces the Drive-capabilities
+  applying a setlist that arrives while it is open or live, and pulling while the app is open (60s for setlists
+  dated today or later, 15s for the live one) and syncing on open or back online: docs/SYNC_ARCHITECTURE.md, "Pulling while the app is open"; the Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
-- background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
   Left for now: with immediate sync of the changed record (below) two devices rarely edit the

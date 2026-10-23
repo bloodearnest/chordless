@@ -483,21 +483,33 @@ It can be an optional extra for a closed, installed app.
 
 | State | Pull |
 |---|---|
-| App open | about every 60 s |
-| A setlist is **live** | about every 15 s, and at once when the tab becomes visible or the device comes back online |
+| App opened, or the device back online after a few minutes offline | a full sync if the last one is older than a threshold (about 15 minutes), found out cheaply first: see "The cheap check" |
+| App open | about every 60 s, for setlists dated today or later, and for files new in the space |
+| A setlist is **live** (dated today or later) | about every 15 s, for that setlist and the songs it newly uses only; and at once when the tab becomes visible or the device comes back online |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
 | A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
 
+Setlists dated before today are never polled: the full syncs on open and on coming back online
+cover them. The date comes from the local record. A setlist made on another device has no local
+record yet, which is what the feed in "The cheap check" is for.
+
 The intervals are named constants, not preferences.
 
-- **Cheap:** a live setlist polls its own file (`files.get` with `md5Checksum,modifiedTime`) and
-  pulls only if it differs. The general poll can use Drive's `changes.list` from a stored page
-  token (one request returns every file changed since, charts included) instead of listing the
-  folders. Checked on a real My Drive under `drive.file` (2026-10-19, with the shared-drive probe page, since deleted):
-  it works, and a change shows in the feed after about 5 s, so a tick can be that far behind (fine
-  at 60 s; the live 15 s tick checks the one file directly instead). Not yet checked on a shared
-  drive or through the Worker's team service. Via the Worker's team service (docs/SPACES.md) the same
-  call is a Worker route.
+- **The cheap check: Drive's `changes.list` from a stored page token.** One request returns every
+  file changed since, charts included, and an empty list when nothing changed, instead of listing the
+  folders and the members on every sync. When it is empty, the full sync is skipped; when not, only
+  the files it names are pulled. A real full sync still runs on every explicit Sync press and about
+  once an hour while the app is open, and it is the fallback if the token is lost or the call fails.
+  Checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows in the
+  feed after about 5 s, so a tick can be that far behind (fine at 60 s; the live 15 s tick checks the
+  one file directly instead). **Scope checked 2026-10-23** with `/dev/changes-probe.html`: the feed
+  holds only files the app made or was given. Files made by hand in Drive, in My Drive and inside the
+  app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
+  find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
+  The feed covers every space of the account on this device, so its results are filtered to this
+  space's folder tree by parent ids; a removal arrives as a file id only, so it is looked up locally.
+  Not yet checked on a shared drive or through the Worker's team service. Via the Worker's team
+  service (docs/SPACES.md) the same call is a Worker route.
 - **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
   `md5Checksum`, compared with the record's `fileRev`; only if it differs, `pullSetlistNow(id)`
   (the pull-side twin of `pushSetlistNow`: the same conflict rule as the full pull, nothing else is
