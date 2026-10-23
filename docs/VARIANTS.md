@@ -30,9 +30,12 @@ library has); sync sees the changed hash and uploads it.
    or another space never becomes the default by arriving: today's rule (the newest
    chart wins) goes. Two people setting it at once: the later change wins. In the "Shared with
    me" database there is no space: the default is the earliest there too.
-3. **The song picker chooses a variant.** Choosing a song that has more than one variant opens a
-   second step: the variants, each with its author, space, date and label, the default
-   marked and first. A song with one variant stays one tap. The entry keeps `songUuid`, as now.
+3. **Every variant is a card.** (Decided 2026-10-23, replacing a second "variant step" in the song
+   picker.) The library list and the setlist's Add Song picker list each variant of a song as its own
+   card, together and the default first, each with what it is called (a song with several variants
+   shows "Original" too, to tell it from the others), and a search finds a variant by its name as well
+   as its title, artist and words. Choosing a card opens, or adds to the setlist, that variant: the
+   entry keeps its `songUuid`, as now. A song with one variant looks as it did.
 4. **Versions list** on the song info dialog and in the library: the variants, "make default"
    (write access), rename the label, open one. Deleting a variant waits for the Drive-trash
    design (docs/SYNC_ARCHITECTURE.md): until then a locally deleted synced chart would come back
@@ -79,7 +82,13 @@ meet the usual Drive conflict rule (docs/SYNC_ARCHITECTURE.md).
 docs/DATA_MODEL.md says "Songs are immutable - any edit creates a new variant". That changes:
 a fix is in place.
 
-## Importing a chart the library already has (designed 2026-10-22, not built)
+## Importing a chart the library already has (designed 2026-10-22; built 2026-10-23 except item 5)
+
+Built: `compareCharts` and `chart-diff`, Keep both (`keepBoth`) and the fixed Replace (`replaceSong`) in
+`song-utils.ts`, and the import page's choices with the suggestion below as the highlighted button (the
+same chart again is not asked about). Each side of the comparison says who imported it, when, and its
+source. New imports record the signed-in person's name as `importUser` ("Imported by"); songs from
+before have it backfilled by the library repair (`planImporters`). Not built: item 5, the repair's preview.
 
 **Today.** Importing a chart looks for an existing song by CCLI number, then by normalised title
 (`findExistingSong`, used by `song-import.ts`). A hand-made chart has no CCLI number, so an official
@@ -118,7 +127,27 @@ two identities (`title ...` and `ccli ...`), so the library repair does not see 
 differ (nothing is lost, and the official chart is the obvious default), *Keep mine* when it is only
 a change of key (the same song), nothing pre-selected when the words differ.
 
+## Versions and merging (built 2026-10-23)
+
+The song info dialog has a **Versions** list (`song-versions.ts`, logic in `src/js/song-versions.ts`):
+each variant with who imported it, when, its source and key; **Make default**, **Rename** and
+**Delete** (a second tap; setlists that used it use the default, keeping the key and tempo they
+showed). A song's only version is deleted as the song ("Delete song": the confirmation says how many
+setlists have it, and it is taken out of them); a team's admins are meant to be the only ones who may
+delete songs (docs/SPACES.md, "Roles"), which the Worker does not yet check. **Merge another song into this one** folds a song
+into this one as a variant (`linkSong`): every variant of it takes this song's id, CCLI number and
+title, and the one that was its default becomes a variant of this default. The library repair does
+the same by itself for a song with no CCLI number whose title is exactly one CCLI song's
+(`planLinks`; a title shared by several CCLI songs is left alone, decision 5). Each change marks
+the songs changed for the next sync. A merge also shares the details of the two default charts (artist, copyright, tempo, time, as
+directives in the chart text), unless unticked: each fills what the other lacks and changes none it
+has; but SongSelect is the authority on them, so a chart from SongSelect is never changed, and the
+other is given its details, replacing any that differ. The repair's links do it too. Not done: asking about such a song at import (the repair and
+the merge cover it afterwards); a variant's origin space is not recorded (decision 1).
+
 ## Order of work
+
+(Steps 2 and 3 below are built: the picker is the cards in decision 3, and the versions list is above.)
 
 1. Data: origin fields and their Drive properties, the default rule (earliest import; share and
    copy never displace), the bundle's origin.

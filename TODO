@@ -7,9 +7,21 @@ editing
 - song notes/stickies
 
 song data
-- importing a chart the library already has: say what differs (a verdict and a side-by-side view),
-  offer Keep both, and make Replace take the new CCLI number, source and date: designed in
-  docs/VARIANTS.md, "Importing a chart the library already has"
+- the import page's "Create New Setlist" offers the people of the space the app is in, not the one being
+  imported into (getSpacePeople reads the current space)
+- at import, when the chart's CCLI number finds a song and a song with no CCLI number has the same title,
+  offer to link that one as a variant too (the library repair and "Merge another song into this one" do
+  it afterwards: docs/VARIANTS.md, "Versions and merging")
+- mark what differs in the chart comparison (the import page's Compare tabs, docs/VARIANTS.md): give
+  song-section a `highlight` input (`chords`, `words`, `only`) that draws a coloured bar down the
+  section's edge and a small note, in theme colours, so the charts keep the normal rendering. The
+  values come from `compareCharts(...).stanzas` (each stanza of one chart marked against the other's, by
+  position in the chart). Pass them down through song-display by section index. Not needed until the
+  plain comparison proves hard to read
+- song-section's labelled mode puts its Show/Collapse buttons inside the <summary>, which axe reports as
+  nested-interactive: tests of a page that shows a song ignore that rule (tests/chart-diff.test.ts)
+- the library repair's preview should show the comparison for the songs it merges (docs/VARIANTS.md,
+  "Importing a chart the library already has", item 5)
 - variants of one song are all labelled "Original" after a copy between spaces: label them by what
   differs (the key, say) or ask
 - a free-form source (who wrote a chart) can be supplied nowhere: add an optional field to the import
@@ -25,10 +37,23 @@ information UI
  - mobile header: always show the second row, a key chip, fewer controls while live: see docs/MOBILE_UI.md
  - show leader in setlist page
 
-spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
 
-preferences
-- Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
+
+spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
+some UI tweaks
+ - sync is available on the space card, it should be removed from the space manage modal. Reset from google remains.
+ - remove switch from space management modal
+ - split out Team role managment/invites from space management modal. If you
+   have the right permissions to manage users, add a Users button next to
+   manage, and rename current manage modal to "Data" rather than Manage
+
+
+songlibrary UI
+ - should be a global filter bar at top to filter by space. Defaults to all
+   spaces included, but user can deselect a space to remove its results from
+   search. Users selection should be rememberd in local storage.  preferences
+
+Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
   date format be chosen in preferences, and use it for the other dates too
 
 song edit UI
@@ -148,7 +173,7 @@ storage/sync
   applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
   app is open: docs/SYNC_ARCHITECTURE.md, "Pulling while the app is open"; the Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
-- variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a variant step in the song picker, a versions list, a chart editor for fixes and arrangements)
+- variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
 - background syncing (periodic, and fallbacks)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is
   silently dropped). Idea: keep the losing edit as a conflict copy of the setlist instead.
@@ -312,6 +337,9 @@ sharing
   that when it's built. Not part of the first version.
 - email media team
 - invite people to a team space, copy/move between spaces: DESIGNED, not built (docs/SPACES.md)
+- space tabs under the header of Setlists, Library and Add Song (each Team, Personal, Shared; More beyond
+  about four), bring-across-what-is-new when joining a team by invite, and no Personal space when an
+  invite is the first contact: DESIGNED, not built (docs/SPACES.md, "Space tabs, and joining by invite")
 - team spaces for people with no Google account (raised 2026-10-19): members sign in to the Worker with a Google
   ID token, so any Google account (not only Gmail or Workspace) can join, but not a person with none. Idea, later,
   opt-in per team space: a read-only invite link (the Worker keeps a hash of a random token with the reader role and
