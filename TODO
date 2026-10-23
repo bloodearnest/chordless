@@ -18,8 +18,6 @@ song data
   values come from `compareCharts(...).stanzas` (each stanza of one chart marked against the other's, by
   position in the chart). Pass them down through song-display by section index. Not needed until the
   plain comparison proves hard to read
-- song-section's labelled mode puts its Show/Collapse buttons inside the <summary>, which axe reports as
-  nested-interactive: tests of a page that shows a song ignore that rule (tests/chart-diff.test.ts)
 - the library repair's preview should show the comparison for the songs it merges (docs/VARIANTS.md,
   "Importing a chart the library already has", item 5)
 - variants of one song are all labelled "Original" after a copy between spaces: label them by what
@@ -74,7 +72,7 @@ bugs
 
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc
-  and TARGET in vite.config.js (keep them the same). Reasoning: support devices up to about five
+  and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
   years old; asking people to update their OS is fine, excluding a device that cannot update is
   not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:
   all on 26+, lowest 26.5), but some people dislike updating, so the floor is what the code
@@ -100,11 +98,11 @@ browser support
   older device actually shows
 - Core is setlist navigation (reading and moving through the setlist, offline). The media player
   is optional and may be off on a device without Web Audio: it is not loaded when the device has
-  none or it is switched off in Preferences (media-player-loader.js), and a player that fails to
+  none or it is switched off in Preferences (media-player-loader.ts), and a player that fails to
   load is a warning, not an error. Don't make the core depend on it
 - Usage pattern to design for: a dedicated iPad opened every 3 to 4 weeks, often on poor wifi.
   So: the app must open offline from its cache (done: the build precaches everything,
-  tests/built.playwright.js), data must survive the weeks between (the install nag, below), and
+  tests/built.playwright.ts), data must survive the weeks between (the install nag, below), and
   a signed-in session and the Drive link must still work after weeks (test an expired token with
   no network: local setlists must still show)
 
@@ -127,10 +125,11 @@ navigation
 accessibility (found by the axe checks in the unit tests)
 - song-section's heading is a <summary> containing the collapse and Show buttons
   (nested-interactive): move the controls out of the summary, or replace details/summary
-  with a heading and a toggle button
+  with a heading and a toggle button. Tests of a page that shows a song ignore the rule until it is
+  fixed (tests/chart-diff.test.ts)
 
 styles
-- css/style.css has many rules for elements that now live inside components' shadow
+- src/css/style.css has many rules for elements that now live inside components' shadow
   DOM, where page CSS can't reach (.nav-menu-item, .key-selector, .expand-toggle, ...).
   Remove them, checking each against the light DOM pages and the two light-DOM
   components (chord-display, setlist-overview)
@@ -154,9 +153,7 @@ offline
   DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
-- BEFORE GOING LIVE: move to a new Google Cloud project with a tidy id, with Terraform for what it covers: plan in
-  docs/CLOUD_MIGRATION.md (the consent screen's brand verification is the long pole, so start it early; the
-  data moves by export and import, since drive.file files of the old client are invisible to the new one)
+- the Team storage service account should move to a Google Cloud project of its own: docs/CLOUD_MIGRATION.md, step 6
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). Still to do:
   applying a setlist that arrives while it is open or live, and pulling every ~60s (15s when live) while the
@@ -231,9 +228,7 @@ live mode
  - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
    overview, then the song again (the section observer's first callback): the media
    player is told "no song" in between, and for that moment the edit button and arrow
-   keys act on the overview. tests/live.playwright.js opens songs with the arrow instead
- - button on setlist
- - fullscreen
+   keys act on the overview. tests/live.playwright.ts opens songs with the arrow instead
  - webrtc sync (live session: following the leader's song/section)
 
 tests
@@ -243,11 +238,6 @@ tests
  - coverage: just coverage covers the browser unit tests only, and counts only the files
    they load. Playwright coverage (page.coverage, Chromium) would show what the
    end-to-end tests reach
-
-song import
- - share target on mobile (Web Share Target in the manifest, Chromium/Android only):
-   the service worker takes the shared files and hands them to /import-song, which
-   imports files and pasted ChordPro already
 
 ccli import
  - adding the same song twice to set lists
@@ -325,10 +315,6 @@ sharing
   rights. This breaks the "never mixed into a library" rule in docs/SHARING.md, so update
   that when it's built. Not part of the first version.
 - email media team
-- invite people to a team space, copy/move between spaces: DESIGNED, not built (docs/SPACES.md)
-- space tabs under the header of Setlists, Library and Add Song (each Team, Personal, Shared; More beyond
-  about four), bring-across-what-is-new when joining a team by invite, and no Personal space when an
-  invite is the first contact: DESIGNED, not built (docs/SPACES.md, "Space tabs, and joining by invite")
 - team spaces for people with no Google account (raised 2026-10-19): members sign in to the Worker with a Google
   ID token, so any Google account (not only Gmail or Workspace) can join, but not a person with none. Idea, later,
   opt-in per team space: a read-only invite link (the Worker keeps a hash of a random token with the reader role and
@@ -348,9 +334,9 @@ UI
 - recover when Safari has cleared the storage: the nag is the prevention, this is the cure.
   The JWE key stays in the worker (JWE_ENCRYPTION_KEY): the worker needs it to decrypt the blob
   and use the Google refresh token, and the browser must never hold it. What the browser holds
-  is the encrypted blob in IndexedDB (auth-db.js), and that is what an eviction deletes, along
-  with the spaces and their Drive-folder links (space-db.js), the songs and
-  setlists (db.js) and the current-org marker (localStorage). So there is nothing on the device
+  is the encrypted blob in IndexedDB (auth-db.ts), and that is what an eviction deletes, along
+  with the spaces and their Drive-folder links (space-db.ts), the songs and
+  setlists (db.ts) and the current-space marker (localStorage). So there is nothing on the device
   to restore from: recovery needs either the user or the server.
   - Plan (decided): the server keeps a copy of the blob in a cookie, and the app restores from it.
     - the worker also sets the blob as an HttpOnly, Secure, SameSite=Lax cookie (Path=/session,
@@ -364,7 +350,7 @@ UI
       restoring your setlists from Google Drive" and run the existing first-sign-in sync
       (checkFirstTimeAuth renames the Personal space to the Google name, Sync joins the existing
       same-named Drive folder). No tap needed. If /session/restore says no (no cookie), fall back
-      to asking the user to sign in again: google-auth.js uses access_type: 'offline' with
+      to asking the user to sign in again: google-auth.ts uses access_type: 'offline' with
       prompt: 'consent', so that should be issued a new refresh token (verify with a real wipe)
     - update public/privacy.html in the same change: it says Chordless uses no cookies and the
       worker stores nothing. Say it sets one sign-in cookie (the encrypted token, HttpOnly, how
@@ -410,16 +396,6 @@ UI
   reject, and SPF/DKIM that align with the domain (check that Cloudflare signs the Worker's replies
   with the domain's own DKIM key: not known). Not worth it for one church team; revisit if a
   certificate is bought for another reason.
-- infrastructure as code with the Cloudflare Terraform provider (v5), worth doing so an agent can
-  read the production set-up and change it, not only a person in the dashboard. Start with what is
-  in the dashboard by hand now: the zone's Email Routing settings and the import@chordless.app rule
-  that sends to the Worker (cloudflare_email_routing_settings, cloudflare_email_routing_rule), then
-  the DNS records (cloudflare_dns_record: SPF, DMARC, and BIMI if ever). Leave the Worker and its
-  assets to wrangler (it builds them). Put it in an infra/ directory, `terraform import` what exists
-  first so nothing is recreated, and run plan before apply. The API token goes in the environment
-  (CLOUDFLARE_API_TOKEN, scoped to this zone: DNS and Email Routing edit), never in a file or an
-  argument. Keep state out of git (it can hold secrets): a remote backend, or a gitignored local
-  file. Document it in docs/ (a new INFRASTRUCTURE.md) and in CLAUDE.md so an agent knows it is there.
 
 library
  - ccli report nag
