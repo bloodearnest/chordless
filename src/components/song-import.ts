@@ -1,23 +1,35 @@
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { Person, Setlist, SongRecord } from '../js/data-types.ts'
+import type { Person, Setlist, SongRecord, Space } from '../js/data-types.ts'
 import type { ChordlessDB } from '../js/db.ts'
-import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../js/db.ts'
+import { createSetlist, determineSetlistType, getNextSunday, openSpace } from '../js/db.ts'
 import { parseChartText, songOfChart } from '../js/email-setlist.ts'
 import { type LibrarySong, matchLibrary } from '../js/import-plan.ts'
 import { libraryForMatching } from '../js/import-setlist.ts'
 import { IncomingSongsEvent, takeIncoming } from '../js/incoming-songs.ts'
+import { type ChartComparison, compareCharts } from '../js/library-repair.ts'
 import { ChordProParser } from '../js/parser.ts'
 import { getCurrentPerson, getSpacePeople } from '../js/people.ts'
-import { createSong, findExistingSong, overwriteSong } from '../js/song-utils.ts'
+import {
+  createSong,
+  findExistingSong,
+  importAsOriginal,
+  importAsVariant,
+  replaceSong,
+} from '../js/song-utils.ts'
 import { songSelectLink } from '../js/songselect-link.ts'
 import { formatSetlistDate, toLocalDateString } from '../js/utils/date-utils.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
+import './chart-diff.ts'
+import type { ChartLabel } from './chart-diff.ts'
 import type { SetlistDetailsSaveEvent } from './setlist-details-form.ts'
 import './setlist-details-form.ts'
-import { goTo } from '../js/navigation.ts'
+import { goTo, loadPage } from '../js/navigation.ts'
+import { describeOrigin } from '../js/song-source.ts'
+import { ensureCurrentSpace, setCurrentSpace } from '../js/space.ts'
+import { visibleSpaces } from '../js/space-tabs.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 /** The import is done, and the page is about to go to url. Cancelable: preventDefault() stops the navigation (for tests) */
@@ -58,12 +70,30 @@ export interface IncomingSong {
   skip?: string
 }
 
+/**
+ * What to do with a chart of a song the library has: import it as the original (the library's
+ * chart becomes a variant), import it as a variant (the library's stays the original), update
+ * the library's chart with it, or not import it
+ */
+type DuplicateChoice = 'as-original' | 'as-variant' | 'update' | 'use-existing'
+
 /** A song that was imported, and what to do if it was already in the library */
 interface ImportItem {
   song: SongRecord
   chordproText: string
   isDuplicate: boolean
-  choice: 'update' | 'use-existing' | null
+  choice: DuplicateChoice | null
+  /** The library's chart, for a duplicate */
+  existingText?: string
+  /** How the chart compares with the one the library has, for a duplicate */
+  comparison?: ChartComparison
+  /** What is picked, not yet done: set when it is read, to the suggestion */
+  pick?: DuplicateChoice | null
+  /** The name of the chart that becomes a variant: the library's if imported as the original, else the imported one */
+  label?: string
+  /** Where the chart came from, and who is importing it */
+  source?: string
+  importUser?: string
   /** The key to play it in when added to a setlist (a shared chart's), else the song's own */
   key?: string | null
 }
@@ -101,6 +131,8 @@ export class SongImport extends LitElement {
     _unmatched: { state: true }, // shared PDFs the library has no song for
     _setlists: { state: true },
     _people: { state: true },
+    _spaces: { state: true }, // the spaces an import can go to
+    _spaceId: { state: true }, // the one it goes to
     _newSetlist: { state: true },
   }
 
@@ -111,6 +143,16 @@ export class SongImport extends LitElement {
   declare _unmatched: UnmatchedChart[]
   declare _setlists: Setlist[]
   declare _people: Person[]
+  declare _spaces: Space[]
+  declare _spaceId: string
+  /** The space the app is in, which may not be the one importing into */
+  _currentSpaceId = ''
+  /** What was last read, to read again if the space it goes to is changed */
+  _incoming: IncomingSong[] = []
+  /** The songs this import made new in the space (taken back if it is changed) */
+  _created: SongRecord[] = []
+  /** Whether a choice about a duplicate has been carried out: the space can no longer be changed */
+  _applied = false
   declare _newSetlist: Partial<Setlist> | null
 
   _paste: Ref<HTMLTextAreaElement>
@@ -137,6 +179,28 @@ export class SongImport extends LitElement {
       padding: 2rem 1rem;
     }
 
+    .space-picker {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: var(--font-ui-small);
+    }
+
+    .space-picker select {
+      flex: 1;
+      padding: 0.4rem 0.6rem;
+      font: inherit;
+      border: 2px solid var(--border-light, #ecf0f1);
+      border-radius: 6px;
+      background-color: var(--bg-secondary, #f8f9fa);
+      color: var(--text-color);
+    }
+
+    .page.wide {
+      max-width: none;
+    }
+
     .status {
       text-align: center;
       color: var(--text-secondary, #5f6b6d);
@@ -151,10 +215,13 @@ export class SongImport extends LitElement {
       font-size: var(--font-ui);
     }
 
+    /* The question of what to do with a duplicate: the theme's surface, with an info-coloured
+       edge (a decision, not a warning), so it reads in light and dark */
     .duplicate {
-      background: #fff3cd;
-      color: #1a1a1a;
-      border: 2px solid #ffc107;
+      background: var(--bg-secondary);
+      color: var(--text-color);
+      border: 1px solid var(--border-color);
+      border-left: 5px solid var(--color-info);
       border-radius: 8px;
       padding: 1.5rem;
     }
@@ -171,6 +238,45 @@ export class SongImport extends LitElement {
     .duplicate-actions {
       display: flex;
       gap: 0.75rem;
+      margin: 0.75rem 0;
+    }
+
+    .picks {
+      margin: 0.5rem 0;
+      padding: 0;
+      border: none;
+    }
+
+    .picks legend {
+      padding: 0;
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary);
+    }
+
+    .pick {
+      display: flex;
+      gap: 0.6rem;
+      align-items: flex-start;
+      padding: 0.5rem 0.6rem;
+      margin-top: 0.4rem;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .pick:has(input:checked) {
+      border-color: var(--color-info);
+      background: color-mix(in srgb, var(--color-info) 12%, transparent);
+    }
+
+    .pick input {
+      margin-top: 0.25rem;
+    }
+
+    .pick .help {
+      display: block;
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary);
     }
 
     .duplicate-actions .btn {
@@ -271,16 +377,35 @@ export class SongImport extends LitElement {
     }
 
     .duplicate li {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
       padding: 0.5rem 0;
-      border-bottom: 1px solid #ffc107;
+      border-bottom: 1px solid var(--border-color);
     }
 
-    .duplicate li > span:first-child {
-      flex: 1;
-      min-width: 0;
+    .label-field {
+      display: block;
+      margin: 0.5rem 0;
+      font-size: var(--font-ui-small);
+    }
+
+    .label-field input {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
+      margin-top: 0.25rem;
+      padding: 0.4rem 0.6rem;
+      font: inherit;
+      border: 2px solid var(--border-light, #ecf0f1);
+      border-radius: 6px;
+      background-color: var(--bg-secondary, #f8f9fa);
+      color: var(--text-color);
+    }
+
+    .verdict {
+      margin: 0.25rem 0;
+    }
+
+    .duplicate details {
+      margin: 0.5rem 0;
     }
 
     .duplicate li button {
@@ -366,6 +491,8 @@ export class SongImport extends LitElement {
     this._unmatched = []
     this._setlists = []
     this._people = []
+    this._spaces = []
+    this._spaceId = ''
     this._newSetlist = null
     this._onMessage = this._onMessage.bind(this)
   }
@@ -375,6 +502,7 @@ export class SongImport extends LitElement {
     window.addEventListener('message', this._onMessage)
     window.addEventListener(IncomingSongsEvent.type, this._onIncoming)
     this._signalReady()
+    void this._loadSpaces()
     // Files the system opened with Chordless, or something another app shared to it
     void this._takeIncoming()
   }
@@ -387,6 +515,36 @@ export class SongImport extends LitElement {
 
   _onIncoming = (): void => {
     void this._takeIncoming()
+  }
+
+  /** The spaces to import into, and the one the app is in, which it goes to unless told otherwise */
+  async _loadSpaces(): Promise<void> {
+    this._currentSpaceId = (await ensureCurrentSpace()).id
+    this._spaceId ||= this._currentSpaceId
+    this._spaces = await visibleSpaces(this._currentSpaceId)
+  }
+
+  /** The database of the space being imported into */
+  async _targetDB(): Promise<ChordlessDB> {
+    if (!this._spaceId) this._spaceId = (await ensureCurrentSpace()).id
+    return openSpace(this._spaceId)
+  }
+
+  /**
+   * Import into another space. Songs already read are taken back from the space they were put in
+   * and read again in the new one, so long as nothing has been decided about them.
+   */
+  async _chooseSpace(spaceId: string): Promise<void> {
+    if (spaceId === this._spaceId) return
+    const incoming = this._incoming
+    if (this._state === 'choices') {
+      for (const song of this._created) {
+        await this._database().deleteSong(song.uuid, { remember: false })
+      }
+    }
+    this._created = []
+    this._spaceId = spaceId
+    if (this._state === 'choices') await this.receiveAll(incoming)
   }
 
   async _takeIncoming(): Promise<void> {
@@ -408,7 +566,7 @@ export class SongImport extends LitElement {
    */
   async _matchCharts(pdfs: File[]): Promise<void> {
     try {
-      const db = await getCurrentDB()
+      const db = await this._targetDB()
       this._db = db
       const library = await libraryForMatching(db)
       let readPdf = async (_pdf: ArrayBuffer) => ''
@@ -551,11 +709,14 @@ export class SongImport extends LitElement {
    */
   async receiveAll(songs: IncomingSong[]): Promise<void> {
     this._error = ''
+    this._incoming = songs
+    this._created = []
     try {
-      const db = await getCurrentDB()
+      const db = await this._targetDB()
       this._db = db
       const imports: ImportItem[] = []
       const skipped: string[] = []
+      const importUser = (await getCurrentPerson())?.name
       for (const { chordproText = '', metadata = {}, source, name, skip } of songs) {
         if (skip || !chordproText.trim()) {
           skipped.push(`${name}: ${skip || 'empty'}`)
@@ -568,8 +729,30 @@ export class SongImport extends LitElement {
 
         const existing = await findExistingSong(ccliNumber, title, db)
         const song =
-          existing || (await createSong(chordproText, { ccliNumber, title, importSource: source }))
-        imports.push({ song, chordproText, isDuplicate: Boolean(existing), choice: null })
+          existing ||
+          (await createSong(
+            chordproText,
+            { ccliNumber, title, importSource: source, importUser },
+            db
+          ))
+        if (!existing) this._created.push(song)
+        const item: ImportItem = {
+          song,
+          chordproText,
+          isDuplicate: Boolean(existing),
+          choice: null,
+          source,
+          importUser,
+        }
+        if (existing) {
+          const existingText = (await db.getChordPro(existing.chordproFileId))?.content ?? ''
+          item.existingText = existingText
+          item.comparison = compareCharts(existingText, chordproText)
+          // (the same chart again: nothing to ask)
+          if (item.comparison.verdict === 'identical') item.choice = 'use-existing'
+          else item.pick = this._suggested(item)
+        }
+        imports.push(item)
       }
       this._skipped = skipped
       if (!imports.length) {
@@ -593,9 +776,15 @@ export class SongImport extends LitElement {
   }
 
   /** Go to url, unless an imported listener prevents it */
-  _finish(url: string): void {
+  async _finish(url: string): Promise<void> {
+    // Into another space: the app goes there, to show what was imported
+    const another = this._spaceId !== this._currentSpaceId
+    if (another) await setCurrentSpace(this._spaceId)
     const event = new SongImportedEvent(url)
-    if (this.dispatchEvent(event)) goTo(url)
+    if (!this.dispatchEvent(event)) return
+    /* v8 ignore next -- loading a page would end the test run (navigation.ts) */
+    if (another) loadPage(url)
+    else goTo(url)
   }
 
   async _addToSetlist(setlistId: string): Promise<void> {
@@ -615,7 +804,7 @@ export class SongImport extends LitElement {
       }
       setlist.modifiedDate = new Date().toISOString()
       await db.saveSetlist(setlist)
-      this._finish(`/setlist/${setlistId}`)
+      await this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
       this._showError(`Failed to save song: ${errorMessage(error)}`)
@@ -630,7 +819,7 @@ export class SongImport extends LitElement {
   _libraryOnly(): void {
     // The songs were saved to the library when they arrived
     const [first, ...rest] = this._imports
-    this._finish(rest.length ? '/songs' : `/songs/${first.song.uuid}`)
+    void this._finish(rest.length ? '/songs' : `/songs/${first.song.uuid}`)
   }
 
   /** Open the new setlist form with defaults: next Sunday morning, led by you */
@@ -679,7 +868,9 @@ export class SongImport extends LitElement {
   }
 
   override render() {
-    return html`<div class="page">${this._renderUnmatched()}${this._renderState()}</div>`
+    // (the comparison of two charts wants the whole width)
+    const comparing = this._imports.some(item => item.isDuplicate && !item.choice)
+    return html`<div class="page ${comparing ? 'wide' : ''}">${this._renderSpacePicker()}${this._renderUnmatched()}${this._renderState()}</div>`
   }
 
   _renderState() {
@@ -711,6 +902,30 @@ export class SongImport extends LitElement {
             : ''
         }
       </app-modal>
+    `
+  }
+
+  /** Which space the songs go into (when there is a choice) */
+  _renderSpacePicker() {
+    if (this._spaces.length < 2) return ''
+    return html`
+      <label class="space-picker">
+        Import into
+        <select
+          class="space"
+          .value=${this._spaceId}
+          ?disabled=${this._applied}
+          @change=${(event: Event) => this._chooseSpace((event.target as HTMLSelectElement).value)}
+        >
+          ${this._spaces.map(
+            space => html`
+              <option value=${space.id} ?selected=${space.id === this._spaceId}>
+                ${space.name}${space.team ? ' (Team)' : ''}
+              </option>
+            `
+          )}
+        </select>
+      </label>
     `
   }
 
@@ -756,7 +971,9 @@ export class SongImport extends LitElement {
   _renderSongList() {
     const status: Record<string, string> = {
       update: 'updated',
-      'use-existing': 'already in library',
+      'as-original': 'imported as the original',
+      'as-variant': 'imported as a variant',
+      'use-existing': 'not imported',
     }
     return html`
       <ol class="songs">
@@ -768,85 +985,195 @@ export class SongImport extends LitElement {
     `
   }
 
-  /** Keep the library's copy of a song we already have */
-  _useExisting(item: ImportItem): void {
-    this._setChoice(item, 'use-existing')
+  /** Pick what to do with one duplicate (done when "Import" is pressed) */
+  _pick(item: ImportItem, pick: DuplicateChoice): void {
+    this._imports = this._imports.map(i => (i === item ? { ...i, pick } : i))
   }
 
-  /** Replace the library's copy of the song with the imported one */
-  async _update(item: ImportItem): Promise<void> {
-    try {
-      const song = await overwriteSong(item.song.uuid, item.chordproText, this._database())
-      this._setChoice(item, 'update', song)
-    } catch (error) {
-      console.error('[Import] Failed to update song:', error)
-      this._showError(`Failed to update song: ${errorMessage(error)}`)
+  /** Do what is picked for each duplicate, and go on to where to put the songs */
+  async _applyPicks(items: ImportItem[]): Promise<void> {
+    for (const item of items) {
+      if (!item.pick) continue
+      const incoming = { importSource: item.source ?? '', importUser: item.importUser }
+      const label = item.label?.trim() || undefined
+      const db = this._database()
+      try {
+        let song = item.song
+        if (item.pick === 'update')
+          song = await replaceSong(item.song.uuid, item.chordproText, incoming, db)
+        else if (item.pick === 'as-original') {
+          song = (await importAsOriginal(item.song.uuid, item.chordproText, incoming, label, db))
+            .added
+        } else if (item.pick === 'as-variant') {
+          // (the library's chart stays the song the setlists see; the new variant is its own)
+          song = await importAsVariant(item.song.uuid, item.chordproText, incoming, label, db)
+        }
+        this._applied = true
+        this._setChoice(item, item.pick, song)
+      } catch (error) {
+        console.error('[Import] Failed to import a duplicate:', error)
+        this._showError(`Failed to import the song: ${errorMessage(error)}`)
+        return
+      }
     }
   }
 
-  async _updateAll(items: ImportItem[]): Promise<void> {
-    // Each update replaces only its own entry, so the others are still current
-    for (const item of items) await this._update(item)
-  }
-
-  _setChoice(
-    item: ImportItem,
-    choice: 'update' | 'use-existing',
-    song: SongRecord = item.song
-  ): void {
+  _setChoice(item: ImportItem, choice: DuplicateChoice, song: SongRecord = item.song): void {
     this._imports = this._imports.map(i => (i === item ? { ...i, choice, song } : i))
   }
 
-  _renderDuplicates(unresolved: ImportItem[]) {
-    if (unresolved.length === 1 && this._imports.length === 1) {
-      const [item] = unresolved
-      return html`
-        <div class="duplicate">
-          <strong>⚠️ This song already exists in your library</strong>
-          <p>Do you want to update the song with the new version, or use the existing one?</p>
-          <div class="duplicate-actions">
-            <button class="btn primary update" @click=${() => this._update(item)}>Update Song</button>
-            <button class="btn use-existing" @click=${() => this._useExisting(item)}>Use Existing</button>
-          </div>
-        </div>
-      `
+  /** Which choice to lead with, from how the charts differ; none when the words differ */
+  _suggested(item: ImportItem): DuplicateChoice | null {
+    switch (item.comparison?.verdict) {
+      case 'different-chords':
+        return 'as-variant'
+      case 'same-chart':
+      case 'other-key':
+        return 'use-existing'
+      default:
+        return null
     }
+  }
+
+  _renderDuplicate(item: ImportItem, index: number) {
+    const { comparison } = item
+    /* v8 ignore next -- every duplicate is given its comparison when it is read */
+    const verdict = comparison?.verdict ?? 'different-words'
+    const sentence = {
+      identical: 'The same song.',
+      'same-chart': 'The same words and chords, with other details.',
+      'other-key': 'The same song in another key.',
+      'different-chords': 'The same words, with different chords.',
+      'different-words': 'Different words: another version or arrangement.',
+    }[verdict]
+    // (the library's chart, and the imported one)
+    const charts: [string, string] = [item.existingText as string, item.chordproText]
+    const labels: [ChartLabel, ChartLabel] = [
+      { heading: 'In your library', detail: describeOrigin(item.song) },
+      {
+        heading: 'Importing',
+        detail: describeOrigin({
+          importUser: item.importUser,
+          importDate: new Date().toISOString(),
+          importSource: item.source,
+        }),
+      },
+    ]
+    const options: { value: DuplicateChoice; title: string; help: string }[] = [
+      {
+        value: 'as-original',
+        title: 'Import as original song version',
+        help: 'The imported song becomes the original. Your current song is kept as a variant.',
+      },
+      {
+        value: 'as-variant',
+        title: 'Import as variant of original',
+        help: 'Your current song stays the original. The imported song is kept as a variant.',
+      },
+      {
+        value: 'update',
+        title: 'Update current song',
+        help: 'Replace your current song with the imported one. Setlists keep using it.',
+      },
+      {
+        value: 'use-existing',
+        title: 'Do not import',
+        help: 'Keep your current song as it is.',
+      },
+    ]
+    const naming = item.pick === 'as-original' || item.pick === 'as-variant'
+    return html`
+      <p class="verdict">${sentence}</p>
+      <fieldset class="picks">
+        <legend>What to do with it</legend>
+        ${options.map(
+          ({ value, title, help }) => html`
+            <label class="pick">
+              <input
+                type="radio"
+                class="pick-${value}"
+                name="pick-${index}"
+                .checked=${item.pick === value}
+                @change=${() => this._pick(item, value)}
+              />
+              <span><strong>${title}</strong><span class="help">${help}</span></span>
+            </label>
+          `
+        )}
+      </fieldset>
+      ${
+        naming
+          ? html`
+            <label class="label-field">
+              ${item.pick === 'as-original' ? 'Variant name for your current song' : 'Variant name for the imported song'}
+              <input
+                class="variant-label"
+                type="text"
+                .value=${item.label ?? 'Alternate chords'}
+                @input=${(event: Event) => {
+                  item.label = (event.target as HTMLInputElement).value
+                }}
+              />
+            </label>
+          `
+          : ''
+      }
+      <div class="duplicate-actions">
+        <button
+          class="btn primary apply"
+          ?disabled=${!item.pick}
+          @click=${() => this._applyPicks([item])}
+        >
+          Import
+        </button>
+      </div>
+      <details ?open=${verdict === 'different-chords' || verdict === 'different-words'}>
+        <summary>Compare</summary>
+        <chart-diff
+          .charts=${charts}
+          .keys=${comparison?.keys}
+          .labels=${labels}
+        ></chart-diff>
+      </details>
+    `
+  }
+
+  _renderDuplicates(unresolved: ImportItem[]) {
+    const single = unresolved.length === 1 && this._imports.length === 1
     return html`
       <div class="duplicate">
         <strong>
-          ⚠️ ${unresolved.length} of these songs ${unresolved.length > 1 ? 'are' : 'is'} already in
-          your library
+          ${
+            single
+              ? 'This song already exists in your library'
+              : `${unresolved.length} of these songs ${unresolved.length > 1 ? 'are' : 'is'} already in your library`
+          }
         </strong>
-        <p>Update them with the new versions, or use the existing ones?</p>
+        ${
+          single
+            ? ''
+            : html`
+              <div class="duplicate-actions">
+                <button
+                  class="btn apply-all"
+                  ?disabled=${unresolved.some(item => !item.pick)}
+                  @click=${() => this._applyPicks(unresolved)}
+                >
+                  Import all with these choices
+                </button>
+              </div>
+            `
+        }
         <ul>
           ${unresolved.map(
-            item => html`
+            (item, index) => html`
               <li>
-                <span>${item.song.title}</span>
-                <span class="duplicate-actions">
-                  <button class="btn primary update" @click=${() => this._update(item)}>Update</button>
-                  <button class="btn use-existing" @click=${() => this._useExisting(item)}>
-                    Use Existing
-                  </button>
-                </span>
+                ${single ? '' : html`<strong>${item.song.title}</strong>`}
+                ${this._renderDuplicate(item, index)}
               </li>
             `
           )}
         </ul>
-        <div class="duplicate-actions">
-          <button class="btn primary update update-all" @click=${() => this._updateAll(unresolved)}>
-            Update All
-          </button>
-          <button
-            class="btn use-existing use-existing-all"
-            @click=${() =>
-              unresolved.forEach(item => {
-                this._useExisting(item)
-              })}
-          >
-            Use All Existing
-          </button>
-        </div>
       </div>
     `
   }

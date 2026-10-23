@@ -46,7 +46,9 @@ describe('importFromSongSelect', () => {
    * in `log`; `ready()` plays the import page saying it's ready.
    */
   function fakePage({
-    download = { ok: true, payload: '{title: Test}' } as { ok: boolean; payload?: string } | Error,
+    download = { ok: true, payload: '{title: Test}\n{key: G}' } as
+      | { ok: boolean; payload?: string }
+      | Error,
     popupBlocked = false,
   } = {}) {
     const log: any[][] = []
@@ -54,10 +56,17 @@ describe('importFromSongSelect', () => {
     const tab = { postMessage: (message, origin) => log.push(['post', message, origin]) }
     const page = {
       log,
+      keySelector: { textContent: null, value: 'G' } as {
+        textContent: null
+        value?: string
+      } | null,
       location: { href: 'https://songselect.ccli.com/songs/1234567/test-song' },
       document: {
-        querySelector: () => ({ textContent: ' Test Song ' }),
-        body: { textContent: 'Key: G  Tempo: 72' },
+        // (the chord sheet page's key selector is there only on that page)
+        querySelector: selector =>
+          selector === '#ChordSheetTransposeKeySelectInput'
+            ? page.keySelector
+            : { textContent: ' Test Song ' },
       },
       alert: message => log.push(['alert', message]),
       open: (url, name) => {
@@ -95,11 +104,13 @@ describe('importFromSongSelect', () => {
     await run(page)
     expect(page.log.map(entry => entry[0])).to.deep.equal(['open', 'fetch', 'post'])
     expect(page.log[0].slice(1)).to.deep.equal([`${CHORDLESS}/import-song`, 'chordless'])
-    expect(page.log[1][1]).to.contain('songNumber=1234567&key=G')
+    expect(page.log[1][1]).to.equal(
+      'https://songselect.ccli.com/api/GetSongChordPro?songNumber=1234567&key=G&style=Standard&columns=1'
+    )
     expect(page.log[2][1]).to.deep.equal({
       type: 'CHORDLESS_IMPORT',
       data: {
-        chordproText: '{title: Test}',
+        chordproText: '{title: Test}\n{key: G}',
         metadata: { ccliNumber: '1234567', title: 'Test Song', key: 'G' },
         source: 'songselect',
       },
@@ -160,11 +171,19 @@ describe('importFromSongSelect', () => {
     expect(page.log).to.deep.equal([['alert', '❌ Could not extract song number from URL']])
   })
 
-  it('asks for the key C when the page does not say one', async () => {
+  it('asks for letter chords, not numbers, in no key of its own when the page has no key selector', async () => {
     const page = fakePage()
-    page.document.body.textContent = 'No key here'
+    page.keySelector = null
     await run(page)
-    expect(page.log[1][1]).to.contain('key=C')
+    expect(page.log[1][1]).to.equal(
+      'https://songselect.ccli.com/api/GetSongChordPro?songNumber=1234567&style=Standard&columns=1'
+    )
+  })
+
+  it('takes the key from the chart it was given, and none if the chart has none', async () => {
+    const page = fakePage({ download: { ok: true, payload: '{title: Test}\n[G]No key line' } })
+    await run(page)
+    expect(page.log[2][1].data.metadata.key).to.equal(undefined)
   })
 
   it('tells Chordless the text of a failure that is not an Error', async () => {

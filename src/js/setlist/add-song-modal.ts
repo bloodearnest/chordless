@@ -67,7 +67,7 @@ export class AddSongModal {
 
       const db = this.#getDb()
       const songs = withSongsFromElsewhere(
-        await getLibrarySongs(db),
+        await getLibrarySongs(db, { allVariants: true }),
         await this.#getElsewhere(db.dbName)
       )
       if (songs.length === 0) {

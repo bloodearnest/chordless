@@ -20,8 +20,7 @@
 export interface SongSelectPage {
   location: { href: string }
   document: {
-    querySelector(selector: string): { textContent: string | null } | null
-    body: { textContent: string | null }
+    querySelector(selector: string): { textContent: string | null; value?: string } | null
   }
   alert(message: string): void
   addEventListener(type: 'message', listener: (event: MessageEvent) => void): void
@@ -49,8 +48,11 @@ export async function importFromSongSelect(
   }
   const songNumber = urlMatch[1]
   const title = page.document.querySelector('h1')?.textContent?.trim()
-  const keyMatch = page.document.body.textContent?.match(/Key:\s*([A-G][b#]?)/i)
-  const key = keyMatch ? keyMatch[1] : 'C'
+  // The key picked on the chord sheet page, as SongSelect's own download would use. Elsewhere
+  // there is none, and SongSelect gives the song's default key (the page text has other
+  // "Key:" lines in it, the videos', which are not the song's).
+  const pickedKey = page.document.querySelector('#ChordSheetTransposeKeySelectInput')?.value
+  const keyParameter = pickedKey ? `&key=${encodeURIComponent(pickedKey)}` : ''
 
   // Listen before opening: the import page says it's ready as soon as it loads
   let resolveReady: () => void
@@ -75,7 +77,7 @@ export async function importFromSongSelect(
   let message: unknown
   try {
     const response = await page.fetch(
-      `https://songselect.ccli.com/api/GetSongChordPro?songNumber=${songNumber}&key=${key}&style=Number&columns=1`,
+      `https://songselect.ccli.com/api/GetSongChordPro?songNumber=${songNumber}${keyParameter}&style=Standard&columns=1`,
       { headers: { accept: '*/*', 'client-locale': 'en-GB' }, credentials: 'include' }
     )
     if (!response.ok) throw new Error(`SongSelect download failed: ${response.status}`)
@@ -85,7 +87,11 @@ export async function importFromSongSelect(
       type: 'CHORDLESS_IMPORT',
       data: {
         chordproText,
-        metadata: { ccliNumber: songNumber, title, key },
+        metadata: {
+          ccliNumber: songNumber,
+          title,
+          key: chordproText.match(/\{key:\s*([^}\s]+)\s*\}/i)?.[1],
+        },
         source: 'songselect',
       },
     }

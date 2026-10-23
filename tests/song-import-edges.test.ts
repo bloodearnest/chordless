@@ -1,7 +1,8 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import { SongImportedEvent } from '../src/components/song-import.ts'
-import { createSetlist, getCurrentDB } from '../src/js/db.ts'
+import { createSetlist, getCurrentDB, normalizeTitle } from '../src/js/db.ts'
 import { createSong } from '../src/js/song-utils.ts'
+import { makeSong } from './builders.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
@@ -107,8 +108,44 @@ describe('song-import: corners', () => {
   it('says so when a song cannot be updated', async () => {
     const element = await importer()
     await element.receive({ chordproText: chart(unique('Gone')), source: 'paste' })
-    await element._update({ song: { uuid: 'no-such-song' }, chordproText: 'x' })
-    expect(element._error).to.contain('Failed to update song')
+    await element._applyPicks([
+      { song: { uuid: 'no-such-song' }, chordproText: 'x', pick: 'update' },
+    ])
+    expect(element._error).to.contain('Failed to import the song')
+  })
+
+  it('compares with a chart that is not there as with an empty one', async () => {
+    const db = await getCurrentDB()
+    const title = unique('No chart')
+    await db.saveSong(
+      makeSong({
+        uuid: unique('no-chart'),
+        id: `title-${title}`,
+        title,
+        titleNormalized: normalizeTitle(title),
+        chordproFileId: 'chordpro-missing',
+      })
+    )
+    const element = await importer()
+    await element.receive({ chordproText: chart(title), source: 'paste' })
+    await element.updateComplete
+    expect(element._imports[0].comparison.verdict).to.equal('different-words')
+  })
+
+  it('does nothing for a duplicate with nothing picked', async () => {
+    const element = await importer()
+    await element.receive({ chordproText: chart(unique('Nothing')), source: 'paste' })
+    await element._applyPicks([{ song: { uuid: 'no-such-song' }, chordproText: 'x' }])
+    expect(element._error).to.equal('')
+  })
+
+  it('says so when a duplicate cannot be imported', async () => {
+    const element = await importer()
+    await element.receive({ chordproText: chart(unique('Gone both')), source: 'paste' })
+    await element._applyPicks([
+      { song: { uuid: 'no-such-song' }, chordproText: 'x', pick: 'as-original' },
+    ])
+    expect(element._error).to.contain('Failed to import the song')
   })
 
   it('names setlists with a name, and asks about several songs already in the library', async () => {
@@ -119,11 +156,17 @@ describe('song-import: corners', () => {
     for (const title of titles) await createSong(chart(title))
     const element = await importer()
     await element.receiveAll(
-      titles.map(title => ({ name: title, chordproText: chart(title), source: 'paste' }))
+      titles.map(title => ({
+        name: title,
+        chordproText: chart(title, '[D]Different'),
+        source: 'paste',
+      }))
     )
     await element.updateComplete
     expect(element.shadowRoot.textContent).to.contain('2 of these songs are already')
-    $(element, '.use-existing-all').click()
+    for (const radio of element.shadowRoot.querySelectorAll('.pick-use-existing')) radio.click()
+    await element.updateComplete
+    $(element, '.apply-all').click()
     await waitFor(() => $(element, '.choices'))
     expect($(element, 'select').textContent).to.contain(setlist.name)
   })
