@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { DriveSyncManager } from '../src/js/drive-sync.ts'
+import { DriveSyncManager, MEMBERS_REFRESH_MS } from '../src/js/drive-sync.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import {
@@ -419,6 +419,57 @@ describe('Drive sync: from the feed of changes', () => {
     expect(phone.changeToken.value).to.equal(null)
   })
 
+  describe('the people the folder is shared with', () => {
+    /** Give the device's member cache a time, as the space's record has */
+    function timed(device: Awaited<ReturnType<typeof makeDevice>>, at: string | null) {
+      const cache = device.memberCache as {
+        set(members: unknown): Promise<void>
+        refreshedAt?: () => Promise<string | null>
+      }
+      const set = cache.set.bind(cache)
+      let stamp = at
+      cache.set = async members => {
+        stamp = new Date().toISOString()
+        await set(members)
+      }
+      cache.refreshedAt = async () => stamp
+    }
+    const reads = () => rig.storage.calls.filter(call => call.op === 'members').length
+
+    it('are read on an incremental sync when they never were, and then not again soon', async () => {
+      const { phone } = await twoDevices()
+      timed(phone, null)
+      rig.storage.clearCalls()
+
+      await phone.sync.incrementalSync(null, { push: false })
+      expect(reads()).to.equal(1)
+      expect(phone.memberCache.value).to.be.an('array')
+
+      await phone.sync.incrementalSync(null, { push: false })
+      expect(reads()).to.equal(1)
+    })
+
+    it('are read again when they were last read long ago, and not when recently', async () => {
+      const { phone } = await twoDevices()
+      timed(phone, new Date(Date.now() - MEMBERS_REFRESH_MS - 60_000).toISOString())
+      rig.storage.clearCalls()
+      await phone.sync.incrementalSync(null, { push: false })
+      expect(reads()).to.equal(1)
+
+      timed(phone, new Date(Date.now() - 60_000).toISOString())
+      rig.storage.clearCalls()
+      await phone.sync.incrementalSync(null, { push: false })
+      expect(reads()).to.equal(0)
+    })
+
+    it('are not read by an incremental sync where the cache cannot say how old they are', async () => {
+      const { phone } = await twoDevices()
+      rig.storage.clearCalls()
+      await phone.sync.incrementalSync(null, { push: false })
+      expect(reads()).to.equal(0)
+    })
+  })
+
   it('keeps its place in the space’s own record, where a failure to keep it is only a warning', async () => {
     const space = await createSpace(`Feed ${crypto.randomUUID().slice(0, 8)}`)
     try {
@@ -429,6 +480,8 @@ describe('Drive sync: from the feed of changes', () => {
       expect((await sync.incrementalSync()).full).to.equal(true)
       const place = (await sync.changeToken?.get()) ?? null
       expect(place).to.be.a('string')
+      // (the members are cached with the time they were read)
+      expect(await sync.memberCache?.refreshedAt?.()).to.be.a('string')
       expect((await sync.incrementalSync()).full).to.equal(false)
       sync.spaceDb?.db?.close()
 

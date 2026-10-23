@@ -58,9 +58,14 @@ export interface ChangeTokenStore {
   clear(): Promise<void>
 }
 
+/** How old the cached members may be before an incremental sync reads them again */
+export const MEMBERS_REFRESH_MS = 60 * 60_000
+
 /** Where the space's members are cached for offline use */
 export interface MemberCache {
   set(members: SpaceMember[]): Promise<void>
+  /** When the members were last cached (ISO time), or null if never; without it they are not read again by an incremental sync */
+  refreshedAt?(): Promise<string | null>
   /** Record whether the user can only read the folder (so the app stops offering edits) */
   setReadOnly?(readOnly: boolean): Promise<void>
 }
@@ -214,7 +219,12 @@ function spaceMemberCache(spaceId: string): MemberCache {
     async set(members: SpaceMember[]) {
       const db = new SpaceDB()
       await db.init()
-      await db.updateSpace(spaceId, { members })
+      await db.updateSpace(spaceId, { members, membersRefreshedAt: new Date().toISOString() })
+    },
+    async refreshedAt() {
+      const db = new SpaceDB()
+      await db.init()
+      return (await db.getSpace(spaceId))?.membersRefreshedAt ?? null
     },
     setReadOnly: readOnly => setSpaceReadOnly(spaceId, readOnly),
   }
@@ -587,6 +597,8 @@ export class DriveSyncManager implements SyncSession {
       await this.#changeToken.clear()
       return { ...(await this.sync(progressCallback)), full: true }
     }
+    // (who the folder is shared with changes rarely: read it again now and then, not at every sync)
+    await this.#refreshMembersIfOld()
     if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
       // (nothing to pull and nothing to push: the one request was all it took)
       await this.#changeToken.set(changes.token)
@@ -669,6 +681,14 @@ export class DriveSyncManager implements SyncSession {
     const ids = [...this.pulledSetlistIds]
     this.pulledSetlistIds.clear()
     return ids
+  }
+
+  /** Read the space's members again if they were last read long ago (an incremental sync has no other time to) */
+  async #refreshMembersIfOld(): Promise<void> {
+    const refreshedAt = await this.#memberCache.refreshedAt?.()
+    if (refreshedAt === undefined) return
+    if (refreshedAt && Date.now() - Date.parse(refreshedAt) < MEMBERS_REFRESH_MS) return
+    await this.refreshMembers()
   }
 
   /**

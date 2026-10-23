@@ -284,6 +284,8 @@ export interface Space {
   /** The Google app (OAuth client id) that linked the folder: another app cannot see it (drive.file) */
   driveClientId?: string | null
   members?: SpaceMember[]
+  /** When `members` was last read from storage (ISO time): an incremental sync reads it again when it is old */
+  membersRefreshedAt?: string
   /** The user can only read the Drive folder: sync doesn't push, and nothing syncable is edited */
   readOnly?: boolean
   /** Set once the space is shared with a team */

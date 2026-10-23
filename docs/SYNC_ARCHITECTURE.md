@@ -457,7 +457,7 @@ Tests: the database tells of each save and delete and not of a quiet one or a ba
 syncs once for a burst, not for a storage with no feed, not while hidden, again if a change came
 during a sync, and not after it is stopped.
 
-#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: the members clock)
+#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync, the timers and the members clock, see below)
 
 Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
 only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
@@ -524,8 +524,10 @@ What an incremental sync must do, because the full sync did it by listing everyt
 - **Guard against duplicates** against the local records, as the pull already makes one for every
   file in Drive. The creation rules (the push holding back on a twin, or after an unread file) apply
   unchanged; an unread file is one on the retry list.
-- **Refresh the members on their own, slower clock** (about hourly, and when the people dialog
-  opens), as `permissions.list` is no longer part of every sync.
+- **Refresh the members on their own, slower clock** (built): an incremental sync reads them again
+  when the cache says they were last read over an hour ago (`MEMBERS_REFRESH_MS`; the space's record
+  keeps the time, `membersRefreshedAt`), as `permissions.list` is no longer part of every sync. A full
+  sync and a press of Sync read them as always.
 - **Take the same Web Lock** `chordless-sync` as every other sync.
 
 The feed: checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows
