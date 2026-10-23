@@ -119,6 +119,13 @@ describe('the files in the space', () => {
     assert.equal(await state.owns('file-3'), false)
   })
 
+  test('are picked out of a list of refs, in order, for what a feed says is gone', async () => {
+    const { state } = await made()
+    await state.addRefs(['file-1', 'file-2'])
+    assert.deepEqual(await state.ownedAmong(['file-9', 'file-2', 'file-1']), ['file-2', 'file-1'])
+    assert.deepEqual(await state.ownedAmong([]), [])
+  })
+
   test('are noted in puts no bigger than Cloudflare takes', async () => {
     const { store, state } = await made()
     const refs = Array.from({ length: 300 }, (_, i) => `file-${i}`)

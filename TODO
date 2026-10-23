@@ -158,9 +158,8 @@ storage/sync
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). The sync that
   brings the leader's changes while the app is open is built (docs/SYNC_ARCHITECTURE.md, "Pulling while the app is
   open": the incremental sync, its timers, the members clock, applying a pulled setlist to the open page; no faster
-  poll for the live setlist: the live channel, WebRTC, is the fast way). Still to do: a feed of changes through the
-  Worker, so that a team's members get it too (their storage has none, so they sync on open and on a press of Sync);
-  the Worker role replaces the Drive-capabilities
+  poll for the live setlist: the live channel, WebRTC, is the fast way); team members get the feed through the
+  Worker too. The Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
 - conflict resolution (currently Drive wins when edited on two devices, and the local edit is

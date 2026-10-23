@@ -29,7 +29,7 @@ one space's files in two **collections**, `songs` and `setlists`.
 | `inventory()` | the refs of every live file in the space (finding records whose file has gone) |
 | `status(ref)` | a file wherever it is: `{trashed}`, or null if it does not exist |
 | `readText(ref)`, `readMany(refs)` | a file's text; many files' texts, one entry each in order, null for one that could not be read |
-| `changes` | the feed of what changed, or null for a backend with none: `start()` gives a position, `since(position)` the files now live in `songs` or `setlists` that changed after it, the refs that are gone (in the bin, deleted, or not in this space), and the next position. A position the backend has forgotten throws `ChangeTokenLost`: the sync then lists everything once. Drive's is `changes.list`; the team service has none yet (docs/SYNC_ARCHITECTURE.md, "Incremental sync") |
+| `changes` | the feed of what changed, or null for a backend with none: `start()` gives a position, `since(position)` the files now live in `songs` or `setlists` that changed after it, the refs that are gone (in the bin, deleted, or not in this space), and the next position. A position the backend has forgotten throws `ChangeTokenLost`: the sync then lists everything once. Drive's is `changes.list`; the team service passes it on to members (`/changes/start`, `/changes`), saying only of the space's own files that they are gone (docs/SYNC_ARCHITECTURE.md, "Incremental sync") |
 | `create`, `createMany`, `update`, `updateMany` | write; each says whether the backend stored exactly what was sent (`intact`). The `Many` forms give one entry per item in order, null for one that failed |
 
 ## Pad sets

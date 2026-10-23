@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { TeamStorage, TeamStorageError } from '../src/js/storage/team-storage.ts'
+import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { makeSetlist } from './builders.ts'
 import { memoryFolderLink } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -103,6 +104,33 @@ describe('TeamStorage', () => {
     } finally {
       db.db?.close()
     }
+  })
+
+  it('gives the feed of changes through the Worker, and says when a position is forgotten', async () => {
+    const rig = await makeTeamRig()
+    const feed = must(teamFor(rig).space('space-1').changes)
+    const start = await feed.start()
+    const { file } = await rig.storage.space(rig.spaces[0].root).create('songs', text, 'one')
+
+    const seen = await feed.since(start)
+    expect(seen.changed.map(change => change.file.ref)).to.deep.equal([file.ref])
+    expect(seen.changed[0].collection).to.equal('songs')
+    expect(await feed.since(seen.token)).to.deep.include({ changed: [], gone: [] })
+
+    rig.storage.forgetFeedPositions()
+    let lost: unknown
+    await feed.since(start).catch(error => {
+      lost = error
+    })
+    expect(lost).to.be.instanceOf(ChangeTokenLost)
+
+    rig.storage.feedError = new Error('Drive is down')
+    let failed: unknown
+    await feed.since(seen.token).catch(error => {
+      failed = error
+    })
+    expect(failed).to.be.instanceOf(TeamStorageError)
+    expect(failed).to.not.be.instanceOf(ChangeTokenLost)
   })
 
   it('lets a reader read but not write, and counts the refusal', async () => {

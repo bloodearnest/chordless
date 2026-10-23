@@ -13,6 +13,7 @@ import { createTeamFolder, driveApi } from '../src/js/drive-api.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import { deleteSpace, getSpaceById } from '../src/js/space.ts'
 import { storageFor } from '../src/js/storage/space-storage.ts'
+import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { createTeamSpace, joinSpace, syncTeamSpace } from '../src/js/team-spaces.ts'
 import { encryptBlob } from '../worker/src/blob.ts'
@@ -212,6 +213,63 @@ describe('a team space, end to end', () => {
     expect(must(await ownerDb.getSetlist('sunday')).name).to.equal('Sunday (changed)')
     expect(must(await ownerDb.getSetlist('extra')).name).to.equal('Extra')
     expect([...objects.keys()]).to.deep.equal([team.id])
+  })
+
+  it('has a member who has synced get the owner’s later changes from the feed, listing nothing', async () => {
+    await signInAs(ann, true)
+    const parent = await createTeamFolder('root', 'Church Drive')
+    const owned = await createTeamSpace(
+      `Contract ${crypto.randomUUID().slice(0, 8)}`,
+      parent,
+      driveApi
+    )
+    made.push(owned.id)
+    const team = must(owned.team)
+    const ownerDb = await open(owned.id)
+    await ownerDb.saveSetlist(makeSetlist({ id: 'sunday', date: '2026-12-06', name: 'Before' }))
+    await syncTeamSpace(must(await getSpaceById(owned.id)))
+
+    const { code } = await teamApi.createInvite(team.id, 'reader', bob.email)
+    await signInAs(bob)
+    const joined = await joinSpace(
+      team.id,
+      code,
+      storageFor({ team: { id: team.id, role: 'reader' } })
+    )
+    made.push(joined.id)
+    await syncTeamSpace(must(await getSpaceById(joined.id)))
+    const memberDb = await open(joined.id)
+    expect(must(await memberDb.getSetlist('sunday')).name).to.equal('Before')
+    expect(must((await getSpaceById(joined.id))?.changesToken)).to.be.a('string')
+
+    // The owner changes the setlist and adds one: the member's next sync is from the feed
+    await signInAs(ann, true)
+    await ownerDb.saveSetlist({
+      ...must(await ownerDb.getSetlist('sunday')),
+      name: 'After',
+      modifiedDate: new Date().toISOString(),
+    })
+    await ownerDb.saveSetlist(makeSetlist({ id: 'late', date: '2026-12-13', name: 'Late' }))
+    await syncTeamSpace(must(await getSpaceById(owned.id)))
+
+    await signInAs(bob)
+    const member = must(await getSpaceById(joined.id))
+    drive.requests.length = 0
+    const orchestrator = await createSyncOrchestrator(member.name, member.id)
+    await orchestrator.incrementalSync()
+
+    expect(must(await memberDb.getSetlist('sunday')).name).to.equal('After')
+    expect(must(await memberDb.getSetlist('late')).name).to.equal('Late')
+    const paths = drive.requests.map((request: { path: string }) => request.path)
+    expect(paths.some((path: string) => path.endsWith('/changes'))).to.equal(true)
+    // It read the feed, and listed only the space's folders to tell which collection a file is in:
+    // never a collection's files
+    const lists = drive.requests.filter(
+      (request: { path: string; params: URLSearchParams }) =>
+        request.path.endsWith('/files') && request.params.has('q')
+    )
+    expect(lists).to.have.length(1)
+    expect(lists[0].params.get('q')).to.contain("mimeType='application/vnd.google-apps.folder'")
   })
 
   it('refuses someone who is not in the space, and says who and which space', async () => {

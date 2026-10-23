@@ -222,3 +222,48 @@ test('passes on the status of a client error from the storage, and calls any oth
   rig.storage.fail('list', { network: true })
   assert.equal((await call(rig, 'GET', '/files?collection=songs')).status, 502)
 })
+
+test('gives the feed of changes to every member, a reader included', async () => {
+  const rig = await makeTeamRig()
+  rig.roles.set('reader', 'reader')
+  const as = { token: 'reader' }
+  const { token } = (await call(rig, 'GET', '/changes/start', as)).json()
+  const { file: made } = await rig.storage.space(rig.spaces[0].root).create('songs', file, 'one')
+
+  const since = await call(rig, 'GET', `/changes?token=${token}`, as)
+  assert.equal(since.status, 200)
+  assert.deepEqual(
+    since.json().changed.map((change: { file: { ref: string } }) => change.file.ref),
+    [made.ref]
+  )
+  assert.equal(typeof since.json().token, 'string')
+  assert.deepEqual(since.json().gone, [])
+})
+
+test('answers a feed position it has forgotten with 410, and one that is not given with 400', async () => {
+  const rig = await makeTeamRig()
+  const { token } = (await call(rig, 'GET', '/changes/start')).json()
+  await rig.storage.space(rig.spaces[0].root).create('songs', file, 'one')
+  rig.storage.forgetFeedPositions()
+
+  assert.equal((await call(rig, 'GET', `/changes?token=${token}`)).status, 410)
+  assert.equal((await call(rig, 'GET', '/changes')).status, 400)
+})
+
+test('passes on a failure of the feed that is not a forgotten position', async () => {
+  const rig = await makeTeamRig()
+  rig.storage.feedError = new Error('Drive is down')
+  const { token } = (await call(rig, 'GET', '/changes/start')).json()
+  assert.equal((await call(rig, 'GET', `/changes?token=${token}`)).status, 502)
+})
+
+test('says a space has no feed when its storage has none', async () => {
+  const rig = await makeTeamRig()
+  const space = rig.context.space
+  rig.context.space = async id => {
+    const found = await space(id)
+    return found && { ...found, changes: null }
+  }
+  assert.equal((await call(rig, 'GET', '/changes/start')).status, 404)
+  assert.equal((await call(rig, 'GET', '/changes?token=1')).status, 404)
+})

@@ -16,11 +16,20 @@ import type { TeamSpaceApi } from './team-state.ts'
 /** The space's storage, noting each ref it shows before the answer goes on */
 export function notingRefs(
   space: SpaceStorage,
-  room: Pick<TeamSpaceApi, 'addRefs' | 'members'>
+  room: Pick<TeamSpaceApi, 'addRefs' | 'members' | 'ownedAmong'>
 ): SpaceStorage {
+  const feed = space.changes
   return {
-    // (no feed of changes through the Worker yet: its refs would have to be noted too)
-    changes: null,
+    // (the feed is the storage's: what it says changed is noted like a listing, and what it says is
+    // gone is only said of files the space knows, as the owner's feed covers the rest of their Drive)
+    changes: feed && {
+      start: () => feed.start(),
+      async since(token) {
+        const result = await feed.since(token)
+        await room.addRefs(result.changed.map(change => change.file.ref))
+        return { ...result, gone: await room.ownedAmong(result.gone) }
+      },
+    },
     // (the people of a team space are the Durable Object's, not Drive's folder permissions)
     members: () => room.members(),
     async list(collection) {

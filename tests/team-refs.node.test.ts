@@ -11,6 +11,7 @@ import { notingRefs } from '../worker/src/team-refs.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { MapStore } from './map-store.ts'
 import { MemoryStorage } from './memory-storage.ts'
+import { must } from './must.ts'
 
 const ann: Identity = { provider: 'google', sub: 'g-1', email: 'ann@example.com' }
 const bob: Identity = { provider: 'google', sub: 'g-2', email: 'bob@example.com' }
@@ -60,7 +61,11 @@ describe('noting refs', () => {
     const noted: string[] = []
     const refused = notingRefs(
       { ...storage.space(root), createMany: async (_, items) => items.map(() => null) },
-      { addRefs: async refs => void noted.push(...refs), members: async () => [] }
+      {
+        addRefs: async refs => void noted.push(...refs),
+        members: async () => [],
+        ownedAmong: async () => [],
+      }
     )
     assert.deepEqual(await refused.createMany('songs', [{ input: input('Four'), body: 't' }]), [
       null,
@@ -107,8 +112,40 @@ describe('noting refs', () => {
         throw new Error('storage unavailable')
       },
       members: async () => [],
+      ownedAmong: async () => [],
     })
     await assert.rejects(broken.list('songs'), /storage unavailable/)
+  })
+})
+
+describe('the feed of changes through the Worker', () => {
+  test('notes the files it says changed, and only says gone what the space knows', async () => {
+    const { state, space, direct, other, storage } = await made()
+    const feed = must(space.changes)
+    const start = await feed.start()
+
+    const mine = await direct('Mine')
+    const theirs = await direct('Theirs', other)
+    const binned = await direct('Binned')
+    await space.list('songs')
+    storage.trash(theirs)
+    storage.trash(binned)
+
+    const seen = await feed.since(start)
+    assert.deepEqual(
+      seen.changed.map(change => change.file.ref),
+      [mine]
+    )
+    assert.equal(await state.owns(mine), true)
+    assert.equal(await state.owns(theirs), false)
+    // (the binned file of the owner's other space is not told to a member; the space's own is)
+    assert.deepEqual(seen.gone, [binned])
+  })
+
+  test('has no feed where the storage has none', async () => {
+    const { storage, root, state } = await made()
+    const bare = notingRefs({ ...storage.space(root), changes: null }, state)
+    assert.equal(bare.changes, null)
   })
 })
 

@@ -7,17 +7,19 @@
  * share links and pad audio are not served for team spaces yet.
  */
 import type { SpaceMember } from '../data-types.ts'
-import type {
-  Collection,
-  FileBody,
-  FileInput,
-  FileStatus,
-  PadStorage,
-  RootInfo,
-  SpaceStorage,
-  StorageBackend,
-  StoredFile,
-  WriteResult,
+import {
+  type ChangeFeed,
+  ChangeTokenLost,
+  type Collection,
+  type FileBody,
+  type FileInput,
+  type FileStatus,
+  type PadStorage,
+  type RootInfo,
+  type SpaceStorage,
+  type StorageBackend,
+  type StoredFile,
+  type WriteResult,
 } from './types.ts'
 
 /** An answer from the Worker that was not a success */
@@ -122,14 +124,26 @@ function textOf(body: FileBody): string {
 }
 
 class TeamSpace implements SpaceStorage {
-  // (the Worker has no feed of changes yet: a sync lists everything)
-  readonly changes = null
+  readonly changes: ChangeFeed
   #client: TeamClient
   #id: string
 
   constructor(client: TeamClient, id: string) {
     this.#client = client
     this.#id = id
+    this.changes = {
+      start: async () =>
+        (await client.json<{ token: string }>(id, { path: '/changes/start' })).token,
+      since: async token => {
+        try {
+          return await client.json(id, { path: '/changes', query: { token } })
+        } catch (error) {
+          // (the Worker says 410 when the feed has forgotten the position)
+          if (error instanceof TeamStorageError && error.status === 410) throw new ChangeTokenLost()
+          throw error
+        }
+      },
+    }
   }
 
   members(): Promise<SpaceMember[]> {

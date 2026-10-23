@@ -113,7 +113,14 @@ class DriveSpace implements SpaceStorage {
   readonly changes: ChangeFeed = {
     start: () => this.#api.getStartPageToken(),
     since: async token => {
-      const [songs, setlists] = [await this.#folder('songs'), await this.#folder('setlists')]
+      // (one listing of the space's folders, and nothing made: a collection with no folder has no files)
+      const folders = await this.#api.listDriveFiles(
+        `'${this.#rootRef}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`
+      )
+      const songs = folders.find(folder => folder.name === 'songs')?.id
+      const setlists = folders.find(folder => folder.name === 'setlists')?.id
+      const inFolder = (parents: string[], folder: string | undefined) =>
+        folder !== undefined && parents.includes(folder)
       let result: Awaited<ReturnType<DriveApi['listChanges']>>
       try {
         result = await this.#api.listChanges(token)
@@ -128,9 +135,9 @@ class DriveSpace implements SpaceStorage {
       for (const { fileId, file } of result.changes) {
         const parents = file?.parents ?? []
         if (!file || file.trashed) gone.push(fileId)
-        else if (parents.includes(songs) && file.mimeType === 'text/plain') {
+        else if (inFolder(parents, songs) && file.mimeType === 'text/plain') {
           changed.push({ collection: 'songs', file: toStored(file) })
-        } else if (parents.includes(setlists) && file.name?.includes('.json')) {
+        } else if (inFolder(parents, setlists) && file.name?.includes('.json')) {
           changed.push({ collection: 'setlists', file: toStored(file) })
         } else {
           // (not live in a collection of this space: a file of another space, or one moved out)

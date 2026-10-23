@@ -536,8 +536,17 @@ holds only files the app made or was given. Files made by hand in Drive, in My D
 app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
 find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
 The feed covers every space of the account on this device, so its results are filtered to the
-space's folders. Not yet checked on a shared drive for a folder in someone else's drive, nor through
-the Worker's team service, where the same call is a Worker route (docs/SPACES.md).
+space's folders: one listing of the space's folders per call (to tell a changed file's collection
+by its parent; nothing is made), so a quiet tick is that listing and the feed, two requests. Not yet
+checked on a real shared drive for a folder in someone else's drive.
+
+**Team spaces (built).** The Worker serves the same feed to members: `GET /api/space/<id>/changes/start`
+and `GET /api/space/<id>/changes?token=` (a reader may; 410 for a position the feed forgot, 404 if
+the storage has none), over the owner's Drive. What the feed says changed is noted as the space's files
+like a listing; what it says is gone is told only of files the space knows (`ownedAmong`), as the
+owner's feed covers the rest of their Drive and a member is told nothing of it. `TeamStorage.changes`
+is the client. Checked end to end (`tests/team-contract.test.ts`): a member's next sync reads the
+owner's changes from the feed and lists no collection.
 
 Tests: the random sync tests (`tests/drive-sync-random.test.ts`) run with the incremental path and
 compare the result with a full sync after every step; a lost token, a failed download and a file

@@ -116,6 +116,8 @@ export interface TeamSpaceApi {
   /** Note that these files are in the space's tree (they stay noted when binned); repeats are free */
   addRefs(refs: string[]): Promise<void>
   owns(ref: string): Promise<boolean>
+  /** Those of these refs that are in the space's tree (a feed of changes covers more than the space) */
+  ownedAmong(refs: string[]): Promise<string[]>
   /** The owner's token blob, as encrypted by the Worker's key; null if there is none */
   ownerBlob(): Promise<string | null>
   setOwnerBlob(blob: string): Promise<void>
@@ -268,6 +270,12 @@ export class TeamSpaceState implements TeamSpaceApi {
 
   async owns(ref: string): Promise<boolean> {
     return (await this.#store.get<boolean>(REF + ref)) === true
+  }
+
+  async ownedAmong(refs: string[]): Promise<string[]> {
+    if (refs.length === 0) return []
+    const known = await this.#store.list<boolean>({ prefix: REF })
+    return refs.filter(ref => known.has(REF + ref))
   }
 
   async ownerBlob(): Promise<string | null> {

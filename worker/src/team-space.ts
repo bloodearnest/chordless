@@ -69,6 +69,9 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   owns(ref: string): Promise<boolean> {
     return this.#state.owns(ref)
   }
+  ownedAmong(refs: string[]): Promise<string[]> {
+    return this.#state.ownedAmong(refs)
+  }
   ownerBlob(): Promise<string | null> {
     return this.#state.ownerBlob()
   }

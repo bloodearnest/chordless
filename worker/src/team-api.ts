@@ -10,6 +10,8 @@
  *   GET  /members                           the people the space is shared with
  *   GET  /files?collection=                 list
  *   GET  /inventory                         the refs of every live file
+ *   GET  /changes/start                     {token}: where the feed of changes stands now
+ *   GET  /changes?token=                    what changed since: {token, changed, gone} (410: forgotten)
  *   GET  /files/<ref>                       status (404 for a file that does not exist)
  *   GET  /files/<ref>/text                  the file's text
  *   POST /read-many         {refs}          {texts}
@@ -23,7 +25,12 @@
  * Bodies are text. Share links and pad audio are not served yet.
  */
 import type { SpaceMember } from '../../src/js/data-types.ts'
-import type { Collection, FileInput, SpaceStorage } from '../../src/js/storage/types.ts'
+import {
+  ChangeTokenLost,
+  type Collection,
+  type FileInput,
+  type SpaceStorage,
+} from '../../src/js/storage/types.ts'
 import { isRecord, jsonResponse, message, Refusal, readJson } from './http.ts'
 
 export type Role = 'owner' | 'admin' | 'writer' | 'reader'
@@ -142,6 +149,21 @@ export async function handleTeamRequest(
     }
     if (method === 'GET' && rest === '/inventory') {
       return jsonResponse([...(await space.inventory())])
+    }
+    if (method === 'GET' && (rest === '/changes/start' || rest === '/changes')) {
+      const feed = space.changes
+      if (!feed) return jsonResponse({ error: 'This space has no feed of changes' }, 404)
+      if (rest === '/changes/start') return jsonResponse({ token: await feed.start() })
+      const token = url.searchParams.get('token')
+      if (!token) throw new Refusal(400, 'A feed position is needed')
+      try {
+        return jsonResponse(await feed.since(token))
+      } catch (error) {
+        if (error instanceof ChangeTokenLost) {
+          return jsonResponse({ error: 'That position in the feed is forgotten' }, 410)
+        }
+        throw error
+      }
     }
     if (method === 'POST' && rest === '/read-many') {
       const refs = asList((await readJson(request)).refs, 'refs')
