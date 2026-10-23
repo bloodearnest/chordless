@@ -348,6 +348,8 @@ export class DriveSyncManager implements SyncSession {
       // managed from the Account and Teams page) would otherwise work on the space in use.
       if (this.spaceId) {
         this.spaceDb = new ChordlessDB(this.spaceId)
+        // (what this sync saves is what came from storage, not a change to send)
+        this.spaceDb.quiet = true
         await this.spaceDb.init()
       } else {
         this.spaceDb = await getCurrentDB()

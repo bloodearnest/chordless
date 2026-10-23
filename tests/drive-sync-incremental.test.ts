@@ -424,6 +424,8 @@ describe('Drive sync: from the feed of changes', () => {
     try {
       const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await sync.init()
+      // (what a sync saves is not a change to send)
+      expect(sync.spaceDb?.quiet).to.equal(true)
       expect((await sync.incrementalSync()).full).to.equal(true)
       const place = (await sync.changeToken?.get()) ?? null
       expect(place).to.be.a('string')

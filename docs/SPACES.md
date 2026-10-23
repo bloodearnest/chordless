@@ -632,9 +632,10 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
 - **Owner goes direct**, so it works if the team service is down.
 - **Worker state:** one Durable Object per team space: members, roles, encrypted token blob. Never
   content. If the owner revokes the app, members see "owner needs to sign in again".
-- **Immediate/offline sync** (SYNC_ARCHITECTURE.md) is made space-aware: `syncSoon({type, id,
-  spaceId})` → service worker, ~2s debounce, per-record push, Web Lock `chordless-sync:<spaceId>`, a
-  token provider per transport from the same sign-in blob. No extra offline queue: a dropped push
+- **Immediate/offline sync** (SYNC_ARCHITECTURE.md) is made space-aware: a local save sends
+  `LocalChangeEvent`, and the page's `AutoSync` runs an incremental sync of the space in use after ~2s of
+  quiet (a service worker is not needed: the app is a single page). For a team space it needs the Worker to
+  have a feed of changes (until then a team member's edit goes with the next full sync). No extra offline queue: a dropped push
   leaves the record "changed" (content hash vs `syncedContentHash`). 401/403/409 keep the local
   change and surface it. Role and membership are cached locally so a team space opens offline.
 
@@ -860,7 +861,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    "Share this space" is gone (the Team Space panel links to the wizard). What to bring (songs, setlists; not pads) and the invite step are built too. Not built:
    the shared-drive choice and the service account; header switcher (Separate), then Merged
    and the preference. Needs the Picker (item 3) and setlist deletion (SYNC_ARCHITECTURE.md) first.
-9. [ ] Space-aware immediate sync in the service worker.
+9. [ ] Space-aware immediate sync for team spaces: it works for Drive; the Worker needs a feed of changes.
 10. [ ] Team-managed storage: service-account provider, upgrade flow, deletion of the owner's token on
     switch, "Verify" and rollback. Spike item 7 passed.
 

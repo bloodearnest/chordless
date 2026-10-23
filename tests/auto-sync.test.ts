@@ -2,11 +2,13 @@ import { expect } from '@open-wc/testing'
 import {
   AutoSync,
   type AutoSyncDeps,
+  NUDGE_MS,
   OFFLINE_LONG_MS,
   STALE_AFTER_MS,
   type SyncState,
   TICK_MS,
 } from '../src/js/auto-sync.ts'
+import { LocalChangeEvent } from '../src/js/local-changes.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -30,6 +32,11 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     failNext: false,
     tick: null as null | (() => void),
     stopped: false,
+    /** What `later` was asked to do, and whether it was called off */
+    nudges: [] as { ms: number; fn: () => void; cancelled: boolean }[],
+    /** While set, a sync does not finish until this is called */
+    release: null as null | (() => void),
+    hold: false,
   }
   const deps: AutoSyncDeps = {
     win,
@@ -42,9 +49,17 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     state: async () => world.state,
     run: async () => {
       world.runs++
+      if (world.hold) await new Promise<void>(resolve => (world.release = resolve))
       if (world.failNext) {
         world.failNext = false
         throw new Error('offline')
+      }
+    },
+    later: (ms, fn) => {
+      const nudge = { ms, fn, cancelled: false }
+      world.nudges.push(nudge)
+      return () => {
+        nudge.cancelled = true
       }
     },
     every: (_ms, fn) => {
@@ -201,6 +216,83 @@ describe('Syncing by itself while the app is open', () => {
     world.tick?.()
     await settle()
     expect(world.runs).to.equal(2)
+  })
+
+  describe('when something is saved here', () => {
+    /** Run the nudges still wanted */
+    const fire = (nudges: { fn: () => void; cancelled: boolean }[]) => {
+      for (const nudge of nudges.filter(n => !n.cancelled)) nudge.fn()
+    }
+
+    it('syncs once the edits stop for a moment: a burst is one sync', async () => {
+      const { auto, world, win } = rig({ state: 'feed' })
+      auto.start()
+      await settle()
+      expect(world.runs).to.equal(1)
+
+      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(new LocalChangeEvent())
+      expect(world.nudges.map(n => n.ms)).to.deep.equal([NUDGE_MS, NUDGE_MS, NUDGE_MS])
+      expect(world.nudges.filter(n => !n.cancelled)).to.have.length(1)
+      fire(world.nudges)
+      await settle()
+      expect(world.runs).to.equal(2)
+    })
+
+    it('does not list a whole space for an edit, and does nothing when it cannot sync', async () => {
+      for (const setup of [
+        { state: 'no-feed' as SyncState, lastSync: 0 },
+        { state: 'unavailable' as SyncState, lastSync: 0 },
+      ]) {
+        const { auto, world, win } = rig(setup)
+        auto.start()
+        await settle()
+        win.dispatchEvent(new LocalChangeEvent())
+        fire(world.nudges)
+        await settle()
+        expect(world.runs, setup.state).to.equal(0)
+      }
+
+      const { auto, world, win } = rig({ state: 'feed' })
+      auto.start()
+      await settle()
+      world.visible = false
+      win.dispatchEvent(new LocalChangeEvent())
+      fire(world.nudges)
+      await settle()
+      expect(world.runs).to.equal(1)
+    })
+
+    it('sends a change made while a sync was running, which may have missed it', async () => {
+      const { auto, world, win } = rig({ state: 'feed' })
+      world.hold = true
+      auto.start()
+      await settle()
+      expect(world.runs).to.equal(1)
+
+      win.dispatchEvent(new LocalChangeEvent())
+      world.hold = false
+      world.release?.()
+      await settle()
+      // (the one asked for during the sync is replaced by one asked for when it ended)
+      expect(world.nudges).to.have.length(2)
+      expect(world.nudges.filter(n => !n.cancelled)).to.have.length(1)
+      fire(world.nudges)
+      await settle()
+      expect(world.runs).to.equal(2)
+    })
+
+    it('is called off when stopped', async () => {
+      const { auto, world, win } = rig({ state: 'feed' })
+      auto.start()
+      await settle()
+      win.dispatchEvent(new LocalChangeEvent())
+      auto.stop()
+      expect(world.nudges.at(-1)?.cancelled).to.equal(true)
+      win.dispatchEvent(new LocalChangeEvent())
+      expect(world.nudges).to.have.length(1)
+    })
   })
 
   it('stops listening and ticking when stopped', async () => {

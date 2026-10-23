@@ -6,7 +6,7 @@ the designs for what's next.
 - [Part 1: How sync works today](#part-1-how-sync-works-today)
 - [Part 2: Planned work](#part-2-planned-work)
   - [Deleting setlists](#deleting-setlists) (designed, not built)
-  - [Immediate background sync](#immediate-background-sync) (designed, not built)
+  - [Immediate background sync](#immediate-background-sync) (built)
   - [Later](#later)
 
 Last updated 2026-10-08. Supersedes the earlier "Phase 2.5 / Phase 3" version of this
@@ -428,49 +428,34 @@ setlist gone, pending deletion recorded.
 
 ### Immediate background sync
 
-Status: **designed, not built.** Goal: when the user changes something (adds or
-removes a song in a setlist, changes a key, edits setlist details, edits a chart),
-push *just that record* to Drive straight away, in the background. Opportunistic: if
-it's dropped, the next full sync catches it.
+Status: **built** (as below; the first design, a push of one record from the service worker, is
+not needed). Goal: when the user changes something (adds or removes a song in a setlist, changes a
+key, edits setlist details, edits a chart), send it to Drive straight away, in the background.
+Opportunistic: if it is dropped, the next sync catches it.
 
-#### Where it runs: the service worker
+**How.** The app is a single page, so a request started on one view is not killed by moving to
+another: no service worker is needed. And an incremental sync (below) is cheap and safe: it reads
+the feed, pulls what changed first (so a change from elsewhere is dealt with by the usual rules
+before anything is sent), then sends only the records whose content differs from what was last
+synced. So the immediate push is that sync, started soon after a local save:
 
-Network calls don't block the page anyway; the reason is navigation. The app changes
-pages with full navigations, so a push started on the setlist page would be killed by
-going back home. In the service worker it completes regardless.
+- The database tells the app of a local change: `saveSetlist`, `saveSong`, `saveChordPro`,
+  `deleteSetlist` and `deleteSong` send `LocalChangeEvent` (`local-changes.ts`) on the window. The
+  database of a sync's own (`quiet`) and the batch saves a sync uses do not, so a sync's saves do not
+  start another sync. This replaces a call at each of the ~16 places that save.
+- `AutoSync` hears it and syncs after **2 s of quiet** (`NUDGE_MS`), so a burst of reorders or key
+  changes is one sync. A change made while a sync was running starts another when it ends.
+- Only where the storage has a feed (a storage with none would list the whole space for each edit:
+  it syncs when the app opens or comes back, and on a press of Sync), and only when the app is on
+  screen and online and the person is signed in. Otherwise the next tick sends it.
+- One sync at a time: the Web Lock `chordless-sync`, as for every sync.
+- A dropped send leaves the record "changed since last sync" (its content hash differs from
+  `syncedContentHash`), so the next sync sends it. Nothing new is stored.
+- Deletions go the same way: the next sync puts the deleted song's file in the Drive trash.
 
-- The service worker needs its own access token source: it can't message itself for
-  the blob. Use `setAccessTokenProvider` with a provider that reads the blob from
-  `AuthDB` and refreshes via the worker's `/session/refresh`.
-- `DriveSyncManager` already runs without the DOM (`ChordlessDB` by space id
-  outside a window). The space's folder link and members come from the
-  spaces database, available in the service worker.
-
-#### Trigger: one explicit call
-
-- App code that saves a *user's* change calls `syncSoon({ type, id, spaceId })`
-  (`type` = `setlist` or `song`), which messages the service worker
-  (e.g. `SYNC_RECORD`).
-- Deliberately not a hook in `ChordlessDB.saveSetlist`: sync's own saves (after
-  pulls and pushes) must not trigger it, or it would loop. About 16 `saveSetlist`
-  call sites to review; most are user edits.
-- **Debounced per record** (about 2 seconds of quiet), so a burst of reorders or key
-  changes becomes one push.
-
-#### Pushing one record
-
-- New engine entry points, e.g. `pushSetlistNow(id)` and `pushSongNow(uuid)`, reusing
-  the existing create/update paths and `drive-metadata.js`.
-- **No pull first, so guard against overwriting a remote edit:** before updating,
-  fetch that file's current `md5Checksum`. If it differs from the record's
-  `fileRev` (someone else changed it), skip and leave it to the full sync, which
-  handles conflicts. New records (no `fileRef`) are created as usual.
-- Also run pending deletions (see above) through this path.
-- **Never alongside a full sync:** both take the same Web Lock
-  (`navigator.locks.request('chordless-sync', …)`), which works across pages and the
-  service worker. If a full sync holds it, the record push is skipped; the full sync
-  will include it.
-- Skipped silently when offline, not signed in, or sync isn't set up.
+Tests: the database tells of each save and delete and not of a quiet one or a batch; `AutoSync`
+syncs once for a burst, not for a storage with no feed, not while hidden, again if a change came
+during a sync, and not after it is stopped.
 
 #### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: the members clock)
 
@@ -496,8 +481,8 @@ again (a sync that does all the storage can if the last was over 15 minutes ago,
 the sync when the device is back online (as if opened if it was offline over 5 minutes), and the
 tick every 60 s while the app is on screen and online. Only for the space in use, and only where
 there is a feed: a storage with none is synced when the app opens or comes back, never on a tick.
-Each is an incremental sync that also pushes, so a local edit goes within the minute (until the
-immediate push is built). `sync-lock.ts` holds the Web Lock `chordless-sync`: a press of Sync waits
+Each is an incremental sync that also pushes, and a local save starts one after 2 s (the immediate
+push, above). `sync-lock.ts` holds the Web Lock `chordless-sync`: a press of Sync waits
 for a running sync, and one the app starts is skipped if one is running. A failure is only logged.
 A sync that finishes records the time (the card's "Synced ..."). There is no date
 rule: a request to the feed costs the same whatever the age of the files, so every setlist and chart

@@ -177,9 +177,7 @@ storage/sync
   what (see the doc). The Worker's team service later enforces it and detects conflicts
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
   designed in docs/SYNC_ARCHITECTURE.md, not built
-- immediate background sync of just the changed record (setlist/song), in the
-  service worker, with full sync as the backstop: designed in docs/SYNC_ARCHITECTURE.md,
-  not built. Later: durable offline write queue.
+- a durable offline write queue (the immediate push is built: a local save starts a sync after 2s, see docs/SYNC_ARCHITECTURE.md; a change made offline waits for the next sync once online)
 - richer PWA install UI (Chrome's devtools manifest tab warns): add "screenshots" to
   public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
   or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain

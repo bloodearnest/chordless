@@ -179,8 +179,8 @@ Two new steps in `DriveSyncManager.sync()`, after setlists and songs are pushed:
    - Any leader's sync can do this, not just the sharer's.
 
 Later:
-- **Immediate background sync** (SYNC_ARCHITECTURE.md, "Planned work") pushes share updates
-  moments after a change.
+- **Immediate background sync** (SYNC_ARCHITECTURE.md) sends a change to a setlist moments after it
+  is saved; share updates are made by the sync that follows.
 - **Scheduled sync** would make cleanup more regular. Periodic Background Sync only
   exists in Chromium-based browsers, for installed apps, so until then cleanup runs
   whenever someone opens the app and syncs.

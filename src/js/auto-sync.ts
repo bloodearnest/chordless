@@ -10,6 +10,7 @@
  */
 import { getSignInState } from './google-auth.ts'
 import { lastSyncOf, recordSync } from './last-sync.ts'
+import { LocalChangeEvent } from './local-changes.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator } from './sync-orchestrator.ts'
@@ -20,6 +21,8 @@ export const TICK_MS = 60_000
 export const STALE_AFTER_MS = 15 * 60_000
 /** Coming back online after this long syncs as if the app had just been opened */
 export const OFFLINE_LONG_MS = 5 * 60_000
+/** A change made here is sent after this much quiet, so that a burst of edits is one sync */
+export const NUDGE_MS = 2000
 
 /** What a sync can be done with now */
 export type SyncState =
@@ -44,6 +47,8 @@ export interface AutoSyncDeps {
   run(): Promise<void>
   /** Call `fn` every `ms` until the returned function is called */
   every(ms: number, fn: () => void): () => void
+  /** Call `fn` once after `ms`, unless the returned function is called first */
+  later(ms: number, fn: () => void): () => void
 }
 
 export class AutoSync {
@@ -51,6 +56,10 @@ export class AutoSync {
   #lastAttempt = Number.NEGATIVE_INFINITY
   #offlineSince: number | null = null
   #stop: (() => void) | null = null
+  #cancelNudge: (() => void) | null = null
+  #running = false
+  /** A change was made here while a sync was running: that sync may not have sent it */
+  #changedWhileRunning = false
 
   constructor(deps: AutoSyncDeps) {
     this.#deps = deps
@@ -62,11 +71,14 @@ export class AutoSync {
     doc.addEventListener('visibilitychange', this.#onVisibility)
     win.addEventListener('online', this.#onOnline)
     win.addEventListener('offline', this.#onOffline)
+    win.addEventListener(LocalChangeEvent.type, this.#onLocalChange)
     const stopTimer = every(TICK_MS, () => void this.#sync(false))
     this.#stop = () => {
       doc.removeEventListener('visibilitychange', this.#onVisibility)
       win.removeEventListener('online', this.#onOnline)
       win.removeEventListener('offline', this.#onOffline)
+      win.removeEventListener(LocalChangeEvent.type, this.#onLocalChange)
+      this.#cancelNudge?.()
       stopTimer()
     }
     void this.#catchUp()
@@ -94,6 +106,16 @@ export class AutoSync {
     }
   }
 
+  /** Something to send was saved here: sync soon, once the edits stop for a moment */
+  #onLocalChange = (): void => {
+    if (this.#running) this.#changedWhileRunning = true
+    this.#cancelNudge?.()
+    this.#cancelNudge = this.#deps.later(NUDGE_MS, () => {
+      this.#cancelNudge = null
+      void this.#sync(false)
+    })
+  }
+
   #onOffline = (): void => {
     this.#offlineSince ??= this.#deps.now()
   }
@@ -115,10 +137,19 @@ export class AutoSync {
       const state = await this.#deps.state()
       if (state === 'unavailable' || (state === 'no-feed' && !everything)) return
       this.#lastAttempt = this.#deps.now()
+      this.#running = true
+      this.#changedWhileRunning = false
       await this.#deps.run()
     } catch (error) {
       // (offline, signed out, a failed request: the next tick tries again)
       console.warn('[AutoSync] Sync did not work:', error)
+    } finally {
+      this.#running = false
+    }
+    // A change made while it ran may have missed it: send that too
+    if (this.#changedWhileRunning) {
+      this.#changedWhileRunning = false
+      this.#onLocalChange()
     }
   }
 }
@@ -156,6 +187,10 @@ export function startAutoSync(): AutoSync {
     every: (ms, fn) => {
       const id = setInterval(fn, ms)
       return () => clearInterval(id)
+    },
+    later: (ms, fn) => {
+      const id = setTimeout(fn, ms)
+      return () => clearTimeout(id)
     },
   })
   auto.start()

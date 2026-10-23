@@ -7,6 +7,7 @@ import type {
   SongRecord,
   TempoInput,
 } from './data-types.ts'
+import { noteLocalChange } from './local-changes.ts'
 import { songSource } from './song-source.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
@@ -99,6 +100,11 @@ export class ChordlessDB {
   dbName: string
   spaceId: string
   db: IDBDatabase | null
+  /**
+   * Saves and deletes here are not told to the sync as changes to send (`noteLocalChange`): the
+   * database of a sync's own, whose writes are what came from storage
+   */
+  quiet = false
 
   constructor(spaceId: string) {
     if (!spaceId) {
@@ -110,6 +116,11 @@ export class ChordlessDB {
     this.dbName = spaceId
     this.spaceId = spaceId
     this.db = null
+  }
+
+  /** Something to send was saved or deleted: the sync by itself is told (unless this database is quiet) */
+  #changed(): void {
+    if (!this.quiet) noteLocalChange()
   }
 
   /** A transaction on some stores; the database must have been opened with init() */
@@ -206,7 +217,9 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
     const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
     store.put(stored)
-    return transactionDone(tx, stored)
+    const result = await transactionDone(tx, stored)
+    this.#changed()
+    return result
   }
 
   /**
@@ -244,7 +257,8 @@ export class ChordlessDB {
     const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
     await store.delete(id)
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed()
   }
 
   /**
@@ -270,7 +284,9 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
     store.put(stored)
-    return transactionDone(tx, stored)
+    const result = await transactionDone(tx, stored)
+    this.#changed()
+    return result
   }
 
   async saveSongsBatch(songs: SongInput[]): Promise<void> {
@@ -334,7 +350,8 @@ export class ChordlessDB {
     const tx = this.#transaction(['chordpro'], 'readwrite')
     const store = tx.objectStore('chordpro')
     await store.put(chordpro)
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed()
   }
 
   async getChordPro(id: string): Promise<ChordProRecord | undefined> {
@@ -515,6 +532,7 @@ export class ChordlessDB {
       tx2.objectStore('chordpro').delete(song.chordproFileId)
       await transactionDone(tx2)
     }
+    this.#changed()
   }
 
   /** The files to be put in the Drive trash at the next sync */
