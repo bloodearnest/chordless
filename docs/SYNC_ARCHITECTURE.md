@@ -312,7 +312,13 @@ deletes a song whose file is gone from Drive when it has no other live file ther
 also makes deleting a song's file in the Drive web page stick, where a sync used to upload it again.
 A deletion not yet in the trash counts as an unsynced change, so "Reset from Drive" says so first.
 A change to a song other than its chart (its source, say) is sent by setting `metadataChangedAt`
-on the record. Who may delete songs in a Team (admin and up) is not yet checked by the Worker.
+on the record.
+A change another device made to those properties (which variant is the default, a variant's name, who
+imported it, its song id: `sync/song-metadata.ts`) does not change the file's checksum, so a pull used
+to miss it. Each song now keeps what they were when last synced (`syncedMetadata`, written by a push and
+by a download), and a pull takes, field by field, what Drive changed since then and this device did
+not. A field changed on both is left: the change here is sent, and wins. A song with no such record
+(synced before it was kept) has only its empty fields filled from Drive. Who may delete songs in a Team (admin and up) is not yet checked by the Worker.
 
 ### Deleting setlists
 

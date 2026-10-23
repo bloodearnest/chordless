@@ -21,6 +21,7 @@ import {
 } from './changes.ts'
 import { BATCH_SIZE, type ProgressCallback, type SyncSession } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { metadataOfSong } from './song-metadata.ts'
 
 /** A setlist's file content in Drive */
 function setlistJson(setlist: Setlist): string {
@@ -75,6 +76,7 @@ function recordSongUpload(
   Object.assign(song, driveMarkers(file))
   if (intact) {
     song.fileProps = songDriveProperties(song, chordproFile)
+    song.syncedMetadata = metadataOfSong(song)
     song.lastSyncedAt = new Date().toISOString()
     song.syncedContentHash = hashText(chordproFile.content)
     song.contentHash = chordproFile.contentHash

@@ -20,6 +20,7 @@ import {
 } from './changes.ts'
 import { inBatches, type ProgressCallback, type SyncSession } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
+import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
 
 /** A chord chart in Drive that a pull has decided to download */
 interface SongDownload {
@@ -262,6 +263,10 @@ export async function pullSongs(
   }
 
   const downloads: SongDownload[] = []
+  // Songs whose file is the same but whose properties another device changed (which variant is
+  // the default, what a variant is called, who imported it): there is nothing to download
+  const metadataOnly: { localSong: SongRecord; file: StoredFile; changes: Partial<SongRecord> }[] =
+    []
   for (const entry of latestByUuid.values()) {
     const { songUuid, file, props } = entry
     const localSong = await session.db.getSong(songUuid)
@@ -284,11 +289,18 @@ export async function pullSongs(
       }
     } else if (!chordproRecord) {
       needsDownload = true
+    } else {
+      const changes = remoteMetadataChanges(localSong, props)
+      if (changes) metadataOnly.push({ localSong, file, changes })
     }
 
     if (needsDownload) {
       downloads.push({ songUuid, file, props, localSong })
     }
+  }
+
+  for (const { localSong, file, changes } of metadataOnly) {
+    await session.db.saveSong({ ...localSong, ...changes, ...driveMarkers(file) })
   }
 
   if (downloads.length === 0) {
@@ -423,6 +435,7 @@ async function downloadSong(
     ...driveMarkers(file),
     lastSyncedAt: new Date().toISOString(),
     syncedContentHash: remoteHash,
+    syncedMetadata: metadataOfProps(props),
     fileProps: {
       songId: id,
       songUuid,

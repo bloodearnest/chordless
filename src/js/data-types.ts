@@ -115,6 +115,8 @@ export interface SongRecord {
   syncedContentHash?: string | null
   /** What this device recorded about the synced file */
   fileProps?: SongFileProps | null
+  /** The song's metadata as last synced, in Drive's form (sync/song-metadata.ts): a change since is told from one in Drive */
+  syncedMetadata?: Record<string, string> | null
   /**
    * When something about the song other than its chart changed (its source, say), for sync to send:
    * a change since the last sync is a local change. Not kept from Drive.
@@ -333,6 +335,10 @@ export interface SongWithContent {
   parsed: ParsedChart
   /** Set when the song is from another database than the space's (see other-songs.ts) */
   source?: SongSource
+  /** The space a song of the library is in, set where the device has more than one */
+  spaceName?: string
+  /** How many variants the song has, set by getLibrarySongs when it lists every variant */
+  variantCount?: number
   /** Set by getLibrarySongs when asked: the last setlist the song was played in */
   lastUsageInfo?: { date: string; leader: string; key: string | null }
 }
