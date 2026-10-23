@@ -502,7 +502,7 @@ The intervals are named constants, not preferences.
   once an hour while the app is open, and it is the fallback if the token is lost or the call fails.
   Checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows in the
   feed after about 5 s, so a tick can be that far behind (fine at 60 s; the live 15 s tick checks the
-  one file directly instead). **Scope checked 2026-10-23** with `/dev/changes-probe.html`: the feed
+  one file directly instead). **Scope checked 2026-10-23** with a throwaway probe page (since deleted): the feed
   holds only files the app made or was given. Files made by hand in Drive, in My Drive and inside the
   app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
   find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
