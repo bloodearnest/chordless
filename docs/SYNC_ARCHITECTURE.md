@@ -472,7 +472,7 @@ going back home. In the service worker it completes regardless.
   will include it.
 - Skipped silently when offline, not signed in, or sync isn't set up.
 
-#### Pulling while the app is open (designed 2026-10-19, not built)
+#### Pulling while the app is open (designed 2026-10-19; the incremental sync is built, the timers not yet)
 
 Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
 only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
@@ -514,11 +514,18 @@ What an incremental sync must do, because the full sync did it by listing everyt
   The folder ids (root, `songs`, `setlists`, `shares`, `pads`) are cached with the space, and
   a change belongs to the space if its parent is one of them. A file moved in or out shows as a
   parent change.
-- **Keep a retry list** of files whose download failed. The feed does not report them again; each
-  tick tries them again, and the full sync clears the list.
+- **Leave the place where it was when a file could not be downloaded.** The feed does not name
+  that file again, but the old place does: the next call reads the same changes, skips what is
+  already applied (the checksums match) and tries that file again. The same holds for a full
+  sync (a failed download, or a folder that could not be listed, so that removals were not seen):
+  it keeps the old place rather than the new one. A reset clears the place as soon as it clears the
+  device, and keeps the new one only if it finished without a failed download.
 - **Read a removal as a file id** (a trashed or deleted file arrives with no other fields), and
   find the local record by `fileRef`. The rule for a setlist deleted in Drive is the same as in the
-  full sync: removed locally unless edited here since its last sync.
+  full sync: removed locally unless edited here since its last sync. The feed says a file is gone
+  **once**, so a record kept because it was edited here lets go of its file at once (as a record
+  never uploaded, with the push making a new file); one not edited keeps its link and what it
+  knows of the file, so that a pull can still bring Drive's version over it.
 - **Guard against duplicates** against the local records, as the pull already makes one for every
   file in Drive. The creation rules (the push holding back on a twin, or after an unread file) apply
   unchanged; an unread file is one on the retry list.

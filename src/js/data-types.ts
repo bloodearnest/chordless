@@ -279,6 +279,8 @@ export interface Space {
   createdDate: string
   modifiedDate: string
   rootRef?: string | null
+  /** Where sync stands in the storage's feed of changes: the next incremental sync asks from here */
+  changesToken?: string | null
   /** The Google app (OAuth client id) that linked the folder: another app cannot see it (drive.file) */
   driveClientId?: string | null
   members?: SpaceMember[]

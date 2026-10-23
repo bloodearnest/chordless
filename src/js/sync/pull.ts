@@ -108,10 +108,11 @@ async function downloadSetlist(
  */
 export async function pullSetlists(
   session: SyncSession,
-  progressCallback: ProgressCallback | null = null
+  progressCallback: ProgressCallback | null = null,
+  files?: StoredFile[]
 ): Promise<void> {
-  // Get all setlists from Drive
-  const driveSetlists = await session.space.list('setlists')
+  // Get all setlists from Drive (or only those given: the ones the feed of changes named)
+  const driveSetlists = files ?? (await session.space.list('setlists'))
   session.liveSetlistFiles = driveSetlists
   session.pullIncomplete = false
 
@@ -147,6 +148,7 @@ export async function pullSetlists(
       }
     } catch (error) {
       session.pullIncomplete = true
+      session.downloadsFailed = true
       console.error(`[DriveSync] Failed to pull setlist ${driveFile.name}:`, error)
     }
   }
@@ -188,6 +190,7 @@ export async function pullSetlists(
           })
         } else {
           session.pullIncomplete = true
+          session.downloadsFailed = true
           console.error('[DriveSync] Failed to download setlist:', result.reason)
         }
       }
@@ -222,9 +225,10 @@ export async function pullSetlists(
  */
 export async function pullSongs(
   session: SyncSession,
-  progressCallback: ProgressCallback | null = null
+  progressCallback: ProgressCallback | null = null,
+  files?: StoredFile[]
 ): Promise<void> {
-  const driveFiles = await session.space.list('songs')
+  const driveFiles = files ?? (await session.space.list('songs'))
 
   const latestByUuid = new Map<
     string,
@@ -340,6 +344,7 @@ export async function pullSongs(
       }
       for (const result of results) {
         if (result.status === 'rejected') {
+          session.downloadsFailed = true
           console.error('[DriveSync] Failed to download song:', result.reason)
         }
       }

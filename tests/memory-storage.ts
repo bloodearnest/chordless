@@ -11,19 +11,22 @@
  * FakeDrive, with the same conformance suite (tests/storage-conformance.ts).
  */
 import type { SpaceMember } from '../src/js/data-types.ts'
-import type {
-  Collection,
-  FileBody,
-  FileInput,
-  FileStatus,
-  PadFileEntry,
-  PadSetEntry,
-  PadStorage,
-  RootInfo,
-  SpaceStorage,
-  StorageBackend,
-  StoredFile,
-  WriteResult,
+import {
+  type ChangeFeed,
+  ChangeTokenLost,
+  type Collection,
+  type FileBody,
+  type FileInput,
+  type FileStatus,
+  type PadFileEntry,
+  type PadSetEntry,
+  type PadStorage,
+  type RootInfo,
+  type SpaceChanges,
+  type SpaceStorage,
+  type StorageBackend,
+  type StoredFile,
+  type WriteResult,
 } from '../src/js/storage/types.ts'
 import { md5Hex } from '../src/js/utils/md5.ts'
 
@@ -147,6 +150,16 @@ export class MemoryStorage implements StorageBackend {
   omitCapabilities = false
   /** The next n writes report another content than was sent, as if the backend stored other bytes */
   corruptWrites = 0
+  /** The refs of files changed, in order: a position in the feed of changes is how many there are */
+  changeLog: string[] = []
+  /** Positions below this are no longer known to the feed (`forgetFeedPositions`) */
+  #forgotten = 0
+  /** How many times the feed was read (`since`), for tests of how often a sync asks */
+  feedReads = 0
+  /** Set to fail the next read of the feed with this error */
+  feedError: Error | null = null
+  /** Set to fail the next read of where the feed stands now with this error */
+  feedStartError: Error | null = null
   #failures: Failure[] = []
   #refused = 0
   #nextId = 1
@@ -231,6 +244,7 @@ export class MemoryStorage implements StorageBackend {
     const copy: MemoryFile = { ...original, props: { ...original.props }, ...changes }
     if ('content' in changes && !('rev' in changes)) copy.rev = md5Hex(copy.content)
     this.files.set(copy.ref, copy)
+    this.changeLog.push(copy.ref)
     return copy
   }
 
@@ -242,26 +256,31 @@ export class MemoryStorage implements StorageBackend {
   /** Put a file or a root in the bin */
   trash(ref: string): void {
     const file = this.files.get(ref)
-    if (file) file.trashed = true
-    else this.root(ref).trashed = true
+    if (file) {
+      file.trashed = true
+      this.changeLog.push(ref)
+    } else this.root(ref).trashed = true
   }
 
   /** Take a file or a root out of the bin */
   restore(ref: string): void {
     const file = this.files.get(ref)
-    if (file) file.trashed = false
-    else this.root(ref).trashed = false
+    if (file) {
+      file.trashed = false
+      this.changeLog.push(ref)
+    } else this.root(ref).trashed = false
   }
 
   /** Delete a root and everything in it, for good: what another app sees of this one's folder */
   removeRoot(ref: string): void {
     this.roots.delete(ref)
-    for (const file of this.everything(f => f.root === ref)) this.files.delete(file.ref)
+    for (const file of this.everything(f => f.root === ref)) this.remove(file.ref)
   }
 
   /** Delete a file for good */
   remove(ref: string): void {
     this.files.delete(ref)
+    this.changeLog.push(ref)
   }
 
   /** The file `ref` is replaced by a copy with another ref, as when duplicates are cleaned up */
@@ -270,6 +289,39 @@ export class MemoryStorage implements StorageBackend {
     this.files.delete(ref)
     file.ref = newRef
     this.files.set(newRef, file)
+    this.changeLog.push(ref, newRef)
+  }
+
+  /** Make the feed forget the positions given so far, as a backend does with one that is too old */
+  forgetFeedPositions(): void {
+    this.#forgotten = this.changeLog.length
+  }
+
+  /** The feed of changes for the files of one root */
+  feed(root: string): ChangeFeed {
+    return {
+      start: async () => {
+        if (this.feedStartError) throw this.feedStartError
+        return String(this.changeLog.length)
+      },
+      since: async token => {
+        this.feedReads++
+        if (this.feedError) throw this.feedError
+        const from = Number(token)
+        if (!Number.isInteger(from) || from < this.#forgotten || from > this.changeLog.length) {
+          throw new ChangeTokenLost()
+        }
+        const changed: SpaceChanges['changed'] = []
+        const gone: string[] = []
+        for (const ref of new Set(this.changeLog.slice(from))) {
+          const file = this.files.get(ref)
+          if (!file || file.trashed || file.root !== root || file.collection === 'shares') {
+            gone.push(ref)
+          } else changed.push({ collection: file.collection, file: toStored(file) })
+        }
+        return { token: String(this.changeLog.length), changed, gone }
+      },
+    }
   }
 
   // ---------- the backend ----------
@@ -377,6 +429,7 @@ export class MemoryStorage implements StorageBackend {
     file.content = content
     file.rev = md5Hex(content)
     file.modified = this.now()
+    this.changeLog.push(file.ref)
   }
 
   #info(root: MemoryRoot): RootInfo {
@@ -523,13 +576,14 @@ async function contentOf(body: FileBody): Promise<Content> {
 }
 
 class MemorySpace implements SpaceStorage {
-  readonly changes = null
+  readonly changes: ChangeFeed
   #storage: MemoryStorage
   #root: string
 
   constructor(storage: MemoryStorage, root: string) {
     this.#storage = storage
     this.#root = root
+    this.changes = storage.feed(root)
   }
 
   async members(): Promise<SpaceMember[]> {
@@ -620,7 +674,10 @@ class MemorySpace implements SpaceStorage {
   async trash(ref: string): Promise<void> {
     this.#storage.enter('trash', ref)
     const file = this.#storage.files.get(ref)
-    if (file) file.trashed = true
+    if (file) {
+      file.trashed = true
+      this.#storage.changeLog.push(ref)
+    }
   }
 
   async update(ref: string, input: FileInput, body: FileBody): Promise<WriteResult> {

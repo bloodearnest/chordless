@@ -450,6 +450,44 @@ export class ChordlessDB {
   }
 
   /**
+   * Let go of the files with these refs, keeping the setlists and songs: each is as one that was
+   * never uploaded, so the next push makes a new file. For records kept although their file is
+   * gone (they were edited here), by a sync that is told of a file once and cannot list the rest.
+   * @returns how many records were let go
+   */
+  async unlinkFiles(refs: Set<string>): Promise<number> {
+    const tx = this.#transaction(['setlists', 'songs'], 'readwrite')
+    const unlinked = {
+      fileRef: null,
+      fileModified: null,
+      fileRev: null,
+      lastSyncedAt: null,
+      syncedContentHash: null,
+    }
+    let count = 0
+    const setlists = tx.objectStore('setlists')
+    const songs = tx.objectStore('songs')
+    const setlistsRequest = setlists.getAll()
+    const songsRequest = songs.getAll()
+    setlistsRequest.onsuccess = () => {
+      for (const setlist of setlistsRequest.result as Setlist[]) {
+        if (!setlist.fileRef || !refs.has(setlist.fileRef)) continue
+        setlists.put({ ...setlist, ...unlinked, _lastSyncHash: null })
+        count++
+      }
+    }
+    songsRequest.onsuccess = () => {
+      for (const song of songsRequest.result as SongRecord[]) {
+        if (!song.fileRef || !refs.has(song.fileRef)) continue
+        songs.put({ ...song, ...unlinked, fileProps: null })
+        count++
+      }
+    }
+    await transactionDone(tx)
+    return count
+  }
+
+  /**
    * Delete a song and its chart. If it has a file in Drive, that is noted, for the next sync to
    * put in the Drive trash: without that, the file would bring the song back. A song deleted
    * because Drive no longer has its file passes `remember: false`.

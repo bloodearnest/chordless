@@ -20,6 +20,9 @@ suppressConsoleLogs()
  * - an edit is never lost: the last edit of a setlist (made by its one owner) is what everyone
  *   ends up with, unless someone trashed the setlist in Drive at some point
  *
+ * With `incremental` devices sync from the feed of changes (sometimes only pulling), and the
+ * feed sometimes forgets its positions; the promises are those of `owner`.
+ *
  * Two harder modes loosen what can be promised: with `conflicts` any device edits any setlist
  * (Drive wins a conflict, so only the first two hold), and with `collisions` devices make
  * setlists for the same date, leader, type and name (a device keeps its own record of one Drive
@@ -92,7 +95,7 @@ describe('Drive sync: random histories', () => {
     }
   }
 
-  type Mode = 'owner' | 'conflicts' | 'collisions'
+  type Mode = 'owner' | 'conflicts' | 'collisions' | 'incremental'
 
   async function runHistory(seed: number, mode: Mode) {
     const rng = random(seed)
@@ -117,9 +120,11 @@ describe('Drive sync: random histories', () => {
         makeEntry({ order, songId: `song-${rng.int(8)}`, songUuid: `uuid-${rng.int(8)}` })
       )
 
-    async function syncDevice(device: Device) {
+    async function syncDevice(device: Device, { quiet = false } = {}) {
       try {
-        await device.sync.sync()
+        if (mode === 'incremental') {
+          await device.sync.incrementalSync(null, { push: quiet || rng.int(4) > 0 })
+        } else await device.sync.sync()
       } catch (error) {
         // Only an injected failure may make a sync fail
         expect(failuresQueued, `${device.name} sync failed: ${(error as Error).message}`).to.equal(
@@ -205,6 +210,10 @@ describe('Drive sync: random histories', () => {
           }
         }
       },
+      async forget() {
+        rig.storage.forgetFeedPositions()
+        log.push('the feed forgets its positions')
+      },
       async fail() {
         rig.storage.fail(rng.pick(FAILING_CALLS), {
           status: 500,
@@ -220,11 +229,12 @@ describe('Drive sync: random histories', () => {
       ...Array(4).fill('create'),
       ...Array(4).fill('edit'),
       ...Array(8).fill('sync'),
-      ...Array(1).fill('trash'),
+      ...Array(mode === 'incremental' ? 3 : 1).fill('trash'),
       ...Array(1).fill('restore'),
       ...Array(1).fill('reid'),
       ...Array(1).fill('reset'),
       ...Array(1).fill('fail'),
+      ...Array(mode === 'incremental' ? 1 : 0).fill('forget'),
     ]
 
     const label = (step: number) => `seed ${seed}, step ${step}\n  ${log.slice(-12).join('\n  ')}`
@@ -238,7 +248,7 @@ describe('Drive sync: random histories', () => {
     rig.storage.clearFailures()
     failuresQueued = false
     for (let round = 0; round < 3; round++) {
-      for (const device of devs) await syncDevice(device)
+      for (const device of devs) await syncDevice(device, { quiet: true })
       checkDriveHasNoDuplicates(`${label(STEPS)} (round ${round})`)
     }
 
@@ -272,7 +282,7 @@ describe('Drive sync: random histories', () => {
     }
   }
 
-  for (const mode of ['owner', 'conflicts', 'collisions'] as Mode[]) {
+  for (const mode of ['owner', 'conflicts', 'collisions', 'incremental'] as Mode[]) {
     for (const seed of SEEDS) {
       it(`keeps devices and Drive consistent (${mode}, seed ${seed})`, async function (this: {
         timeout(ms: number): void

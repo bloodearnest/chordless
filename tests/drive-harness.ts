@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
+import { type ChangeTokenStore, DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import type { StorageBackend } from '../src/js/storage/types.ts'
 import { makeSong } from './builders.ts'
@@ -13,6 +13,20 @@ const { beforeEach, afterEach } = window
 
 /** In-memory stand-in for the space's stored Drive folder link */
 export const memoryFolderLink = (): FolderLink & { value: string | null } => ({
+  value: null as string | null,
+  async get() {
+    return this.value
+  },
+  async set(value: string) {
+    this.value = value
+  },
+  async clear() {
+    this.value = null
+  },
+})
+
+/** In-memory stand-in for the space's stored place in the feed of changes */
+export const memoryChangeToken = (): ChangeTokenStore & { value: string | null } => ({
   value: null as string | null,
   async get() {
     return this.value
@@ -90,14 +104,16 @@ function makeRig(storage: () => StorageBackend | undefined) {
         this.readOnly = readOnly
       },
     }
+    const changeToken = memoryChangeToken()
     const sync = new DriveSyncManager(spaceName, TEST_SPACE.id, {
       db,
       folderLink,
       memberCache,
+      changeToken,
       storage: storage(),
     })
     await sync.init()
-    const device = { name, db, sync, folderLink, memberCache }
+    const device = { name, db, sync, folderLink, memberCache, changeToken }
     devices.push(device)
     return device
   }
@@ -108,6 +124,7 @@ function makeRig(storage: () => StorageBackend | undefined) {
       db: device.db,
       folderLink: device.folderLink,
       memberCache: device.memberCache,
+      changeToken: device.changeToken,
       storage: storage(),
     })
     await device.sync.init()
