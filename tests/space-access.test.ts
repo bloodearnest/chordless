@@ -5,6 +5,7 @@ import {
   createSpace,
   deleteSpace,
   getCurrentSpace,
+  listSpaces,
   setCurrentSpace,
   setSpaceReadOnly,
   syncsBack,
@@ -64,6 +65,14 @@ describe('Knowing whether the user can write to the space folder', () => {
     })
     await deleteSpace(unlinked.id)
     expect(message).to.contain('not in Google Drive')
+  })
+
+  it('makes no space to ask about when there is none yet (an invite may be about to give one)', async () => {
+    const count = (await listSpaces()).length
+    localStorage.removeItem('current-space-id')
+    await refreshSpaceAccess()
+    expect(localStorage.getItem('current-space-id')).to.equal(null)
+    expect((await listSpaces()).length).to.equal(count)
   })
 
   it('asks Drive and keeps the answer', async () => {

@@ -10,7 +10,7 @@ import type { Space } from './data-types.ts'
 import { folderGoneMessage } from './drive-sync.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { goTo } from './navigation.ts'
-import { getCurrentSpaceFull, setSpaceReadOnly } from './space.ts'
+import { getCurrentSpaceFull, hasCurrentSpace, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage } from './storage/types.ts'
@@ -81,6 +81,9 @@ function tellOfProblem(spaceId: string, problem: DriveFolderProblem): void {
  * is: this never turns a user read-only on a failure. A folder that is gone is told at once.
  */
 export async function refreshSpaceAccess(): Promise<void> {
+  // With no space yet there is no folder to ask about (and asking would make a Personal one: the
+  // person may be about to join a team by invite, docs/SPACES.md "Joining by invite")
+  if (!hasCurrentSpace()) return
   try {
     const found = await inspectFolder()
     if (!found) return

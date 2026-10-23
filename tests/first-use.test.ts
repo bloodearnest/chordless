@@ -2,7 +2,13 @@ import { expect } from '@open-wc/testing'
 import { getCurrentDB } from '../src/js/db.ts'
 import { maybeShowFirstUseSetup } from '../src/js/first-use.ts'
 import { createSong } from '../src/js/song-utils.ts'
-import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  listSpaces,
+  setCurrentSpace,
+} from '../src/js/space.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
@@ -50,6 +56,21 @@ describe('maybeShowFirstUseSetup', () => {
     await maybeShowFirstUseSetup()
     expect(shown()).to.equal(false)
     expect(localStorage.getItem('setup-done')).to.equal('1')
+  })
+
+  it('leaves someone who opens an invite with no space alone: no Personal space is made for them', async () => {
+    const spacesBefore = (await listSpaces()).length
+    localStorage.removeItem('current-space-id')
+    window.history.replaceState(null, '', '/join#space-aaaa1111.abcdefghijklmnopqrstuv')
+    try {
+      await maybeShowFirstUseSetup()
+    } finally {
+      window.history.replaceState(null, '', '/')
+      await setCurrentSpace(spaceId)
+    }
+    expect(shown()).to.equal(false)
+    expect(localStorage.getItem('setup-done')).to.equal(null)
+    expect((await listSpaces()).length).to.equal(spacesBefore)
   })
 
   it('asks a new user', async () => {

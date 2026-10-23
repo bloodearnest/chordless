@@ -82,6 +82,11 @@ export function getCurrentSpace(): { id: string | null; name: string } {
   return { id, name }
 }
 
+/** Whether a space is set as current yet (none is until the first use, or until an invite is joined) */
+export function hasCurrentSpace(): boolean {
+  return Boolean(localStorage.getItem(SPACE_ID_KEY))
+}
+
 /**
  * Whether the user can only read the current space's Drive folder (known after a sync
  * has asked Drive). Read from localStorage, so it can be asked at any moment.
