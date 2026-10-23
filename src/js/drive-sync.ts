@@ -499,7 +499,7 @@ export class DriveSyncManager implements SyncSession {
       try {
         if (!this.readOnly) await this.syncShares()
         if (!this.readOnly) {
-          progressCallback?.({ stage: 'pushing', message: 'Uploading to Drive...' })
+          progressCallback?.({ stage: 'pushing', message: 'Checking for changes to upload...' })
           await this.pushToDrive(progressCallback)
         }
       } catch (error) {

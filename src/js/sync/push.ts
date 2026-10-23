@@ -227,7 +227,8 @@ export async function pushSetlists(
     })
   progressCallback?.({
     stage: 'pushing',
-    message: `Uploading ${toSync.length} setlists...`,
+    message:
+      toSync.length > 0 ? `Uploading ${toSync.length} setlists...` : 'No setlist changes to upload',
     current: 0,
     total: Math.max(1, toSync.length),
   })
@@ -360,7 +361,7 @@ export async function pushSongs(
     })
   progressCallback?.({
     stage: 'pushing',
-    message: `Uploading ${total} songs...`,
+    message: total > 0 ? `Uploading ${total} songs...` : 'No song changes to upload',
     current: 0,
     total: Math.max(1, total),
   })
