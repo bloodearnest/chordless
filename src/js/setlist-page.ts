@@ -111,7 +111,9 @@ export class SetlistPage {
   /** A setlist received by link: nothing to edit, and nothing of a space's */
   _readOnly: boolean
   _setlistId: string
+  /** The song the route names, until the setlist has been shown (then the page follows the route) */
   _initialSongIndex: number
+  _starting = true
   _abort: AbortController
   _disposed: boolean
   db: ChordlessDB | null
@@ -266,6 +268,7 @@ export class SetlistPage {
     this.db ??= await getCurrentDB()
 
     await this.renderSetlist(this._setlistId, this._initialSongIndex)
+    this._starting = false
     if (this._disposed) return
 
     this.setupKeyboardNavigation()
@@ -301,6 +304,12 @@ export class SetlistPage {
   }
 
   routeChanged(route: { songIndex: number }) {
+    // (back, back: the route can move on while the setlist is still loading, and what is shown
+    // when it has loaded is the route as it is then)
+    if (this._starting) {
+      this._initialSongIndex = route.songIndex
+      return
+    }
     if (this._disposed || !this.currentSetlist) return
     const index = route.songIndex
     const section = index >= 0 ? `song-${index}` : 'overview'
@@ -352,6 +361,8 @@ export class SetlistPage {
     try {
       // Load setlist from IndexedDB
       const setlist = await this._database().getSetlist(setlistId)
+      // (the view can be left while this loads: back, back. A page that is gone shows nothing)
+      if (this._disposed) return
 
       if (!setlist) {
         console.error('[ERROR] Setlist not found in IndexedDB:', setlistId)
@@ -403,6 +414,7 @@ export class SetlistPage {
         parser: this.parser,
         fontSize: CONFIG.DEFAULT_FONT_SIZE,
       })
+      if (this._disposed) return
 
       // Store songs for navigation
       this.songs = songs
@@ -419,7 +431,8 @@ export class SetlistPage {
       this.sections.states = {}
       this.loadState()
 
-      // Which view to start in comes from the route; a song that isn't there means the overview
+      // Which view to start in comes from the route, as it is now; a song that isn't there means the overview
+      if (this._starting) songIndex = this._initialSongIndex
       const shouldShowSongDirectly = songIndex >= 0 && songIndex < songs.length
       if (songIndex >= 0 && !shouldShowSongDirectly) this.navigateTo(-1, { replace: true })
 
@@ -994,14 +1007,15 @@ export class SetlistPage {
     const container = this.root.querySelector<HTMLElement>('.song-container')
     if (!container) return
 
-    // Track the most recently visible section to avoid duplicate updates
-    this._lastVisibleSection = null
+    // (_lastVisibleSection, the section shown so far, is kept: the observer's first report is of
+    // that section, and taking it for a scroll would write the song to the URL, over wherever the
+    // router has gone since, as with back, back)
 
     // Observer watches which section is currently in view
     this.sectionObserver = new IntersectionObserver(
       entries => {
-        // Skip if this is a programmatic scroll
-        if (this._isProgrammaticScroll) return
+        // Skip if this is a programmatic scroll, or the page has gone
+        if (this._isProgrammaticScroll || this._disposed) return
 
         // Find the most visible entry
         let mostVisible: IntersectionObserverEntry | null = null

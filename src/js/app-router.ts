@@ -254,8 +254,11 @@ export class AppRouter {
   #onPopState = (): void => {
     this.#keyEntry()
     const route = matchRoute(window.location)
-    /* v8 ignore next 6 -- reloading the page would end the test run */
+    /* v8 ignore next 9 -- reloading the page would end the test run */
     if (this.handles(route)) {
+      // Back and forward end any change of view still on its way: it was for an entry the
+      // person has now left, and would otherwise show over the one they came back to
+      this.#navigation++
       this.#show(route)
     } else {
       // biome-ignore lint/plugin: no view for this entry, so load it as a page
@@ -319,7 +322,10 @@ export class AppRouter {
       // kept for the entry this view is for, if it was left before
       this.#remember(this.#shownKey, this.#view?.captureViewState?.())
       view.restoredState = this.#viewStates.get(window.history.state?.key)
-      await this.#swap(() => this.#outlet.replaceChildren(view))
+      // (not if a newer navigation took over while the transition was starting)
+      await this.#swap(() => {
+        if (navigation === this.#navigation) this.#outlet.replaceChildren(view)
+      })
       if (navigation !== this.#navigation) return
       this.#view = view
     }

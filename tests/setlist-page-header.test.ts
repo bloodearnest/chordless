@@ -177,6 +177,46 @@ describe('the setlist page: header, menu and keys', () => {
       expect(rig.page.currentSongIndex).to.equal(-1)
     })
 
+    it('shows where the route is by the time the setlist has loaded, not where it was', async () => {
+      const setlist = await rig.open()
+      rig.page.dispose()
+      const { SetlistPage } = await import('../src/js/setlist-page.ts')
+      rig.page = new SetlistPage({
+        root: rig.root,
+        setlistId: setlist.id,
+        db: rig.db,
+        songIndex: 1,
+      })
+      // (back, back: the route moves on to the overview while the setlist is loading)
+      const started = rig.page.start()
+      rig.page.routeChanged({ songIndex: -1 })
+      await started
+      expect(rig.page.currentSongIndex).to.equal(-1)
+      // ...and from then on the page follows it
+      rig.page.routeChanged({ songIndex: 2 })
+      expect(rig.page.currentSongIndex).to.equal(2)
+    })
+
+    it('shows nothing, and goes nowhere, when the page is left while its setlist loads', async () => {
+      const setlist = await rig.open()
+      rig.page.dispose()
+      const { SetlistPage } = await import('../src/js/setlist-page.ts')
+      rig.page = new SetlistPage({
+        root: rig.root,
+        setlistId: setlist.id,
+        db: rig.db,
+        songIndex: 0,
+      })
+      rig.visited = []
+      const started = rig.page.start()
+      rig.page.dispose()
+      await started
+      await rig.flush()
+      await rig.flush()
+      expect(rig.page.songs).to.have.length(0)
+      expect(rig.visited).to.deep.equal([])
+    })
+
     it('ignores the route before a setlist is shown, or once it is gone', async () => {
       await rig.open()
       rig.page.dispose()

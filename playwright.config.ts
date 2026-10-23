@@ -9,11 +9,13 @@ const BUILT_PORT = 8792
 // The built app is a `vite build` away: skip it when the run names test files, or the chromium
 // project, and none of them is the built one (`just test-browser-headless tests/live.playwright.ts`)
 const args = process.argv.slice(2)
-const named = args.filter(a => /\.playwright\.|^--project/.test(a))
+const files = args.filter(a => /\.playwright\./.test(a))
+const projects = args.filter(a => /^--project/.test(a))
 const needsBuilt =
-  named.length === 0 ||
-  named.some(a => /built|--project[= ]?built/.test(a)) ||
-  args.includes('--ui')
+  args.includes('--ui') ||
+  files.some(a => /built/.test(a)) ||
+  projects.some(a => /built$/.test(a)) ||
+  (files.length === 0 && (projects.length === 0 || projects.some(a => /built/.test(a))))
 
 // WebKit (Safari's engine) roughly doubles the run, so it is opt-in: `just test-webkit`, or
 // --project=webkit. Plain runs, and `just test`, stay on Chromium
@@ -62,6 +64,15 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${BUILT_PORT}` },
       testMatch: 'built.playwright.{js,ts}',
     },
+    ...(webkit
+      ? [
+          {
+            name: 'built-webkit',
+            use: { ...devices['Desktop Safari'], baseURL: `http://localhost:${BUILT_PORT}` },
+            testMatch: 'built.playwright.{js,ts}',
+          },
+        ]
+      : []),
   ],
 
   webServer: [

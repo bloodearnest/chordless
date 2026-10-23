@@ -183,6 +183,26 @@ describe('AppRouter', () => {
       document.title = title
     })
 
+    it('goes back to the view it is on when back is pressed as another is swapping in', async () => {
+      if (!document.startViewTransition) return
+      const title = document.title
+      window.history.replaceState(null, '', '/account')
+      makeRouter({ transitions: true })
+      await router.start()
+      const first = router.navigate('/songs')
+      // Let the first get as far as swapping the view, which the transition takes a frame over
+      await new Promise(resolve => setTimeout(resolve))
+      const back = routeChanged()
+      window.history.back()
+      await Promise.all([first, back])
+      await new Promise(resolve => setTimeout(resolve, 50))
+      expect(window.location.pathname).to.equal('/account')
+      expect(outlet.children).to.have.length(1)
+      expect(outlet.firstElementChild.dataset.view).to.equal('account')
+      expect(router.route.name).to.equal('account')
+      document.title = title
+    })
+
     it('tells the document, with the route it left', async () => {
       const changed = routeChanged()
       router.navigate('/songs')

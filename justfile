@@ -88,7 +88,7 @@ test-browser-headless *args:
 # Run the browser tests in WebKit (Safari's engine) instead of Chromium; opt-in, as it is slow: just test-webkit tests/app.playwright.ts
 test-webkit *args:
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
-    npx playwright test --project=webkit {{args}}
+    npx playwright test --project=webkit --project=built-webkit {{args}}
 
 # Run browser tests with Playwright UI
 test-browser-ui:

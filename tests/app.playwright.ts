@@ -311,13 +311,24 @@ test.describe('Account and Teams page', () => {
     expect(dialogs).toEqual([])
   })
 
-  test('says when signing in to Google fails', async ({ page }) => {
-    // Without Google's sign-in script, signing in fails straight away
-    await page.route('https://accounts.google.com/**', route => route.abort())
-    await page.goto('/account')
+  test.describe('with no sign-in script', () => {
+    // (no service worker: WebKit does not route a request that one saw and passed on, and the
+    // app's reload when it takes over could land after the click)
+    test.use({ serviceWorkers: 'block' })
 
-    await page.locator('account-card').getByRole('button', { name: 'Sign in with Google' }).click()
-    await expect(page.locator('account-card').getByRole('alert')).toContainText('Signing in failed')
+    test('says when signing in to Google fails', async ({ page }) => {
+      // Without Google's sign-in script, signing in fails straight away
+      await page.route('https://accounts.google.com/**', route => route.abort())
+      await page.goto('/account')
+
+      await page
+        .locator('account-card')
+        .getByRole('button', { name: 'Sign in with Google' })
+        .click()
+      await expect(page.locator('account-card').getByRole('alert')).toContainText(
+        'Signing in failed'
+      )
+    })
   })
 
   test('works signed out: a space is managed in a modal, and deleting one asks first', async ({

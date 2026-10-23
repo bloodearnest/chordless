@@ -1,9 +1,16 @@
 // Shared Playwright set-up: import test and expect from here, not @playwright/test.
-import { test as base, expect } from '@playwright/test'
+import { type BrowserContext, test as base, expect } from '@playwright/test'
 import type { ChordProRecord, SongInput } from '../src/js/data-types.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 
-const CANCELLED_IMPORT = /^TypeError: Importing a module script failed/
+const CANCELLED_IMPORT = /^TypeError: Importing a module script failed|^Context is stopped$/
+
+// What Vite's client (the development server's, not the app's) throws in WebKit when the network
+// goes: its check that the server is back fails
+const OFFLINE_NOISE = /^TypeError: Load failed$|\/@vite\/client\.?$/
+
+/** The contexts a test took offline */
+const wentOffline = new WeakSet<BrowserContext>()
 
 export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
   // The first-use setup modal blocks the page, so every test starts with it answered. Tests of
@@ -14,6 +21,11 @@ export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
     // current year ("Sun, 11 Oct"). Pin the date so that stays true after the year ends; the
     // clock still runs.
     await context.clock.install({ time: new Date('2026-10-14T12:00:00') })
+    const setOffline = context.setOffline.bind(context)
+    context.setOffline = async offline => {
+      if (offline) wentOffline.add(context)
+      await setOffline(offline)
+    }
     if (!firstUse) await context.addInitScript(() => localStorage.setItem('setup-done', '1'))
     await use(context)
   },
@@ -32,7 +44,11 @@ export const test = base.extend<{ pageErrors: string[]; firstUse: boolean }>({
         }
       })
       await use(errors)
-      expect(errors, 'uncaught errors in the page').toEqual([])
+      const offline = wentOffline.has(page.context())
+      expect(
+        errors.filter(error => !(offline && OFFLINE_NOISE.test(error))),
+        'uncaught errors in the page'
+      ).toEqual([])
     },
     { auto: true },
   ],

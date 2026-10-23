@@ -89,7 +89,12 @@ test('checking for updates, and an update that arrives', async ({ page }) => {
   expect(await page.evaluate(() => sessionStorage.getItem('asked'))).toBe('SKIP_WAITING')
 })
 
-test('the install panel offers the browser prompt when there is one', async ({ page }) => {
+test('the install panel offers the browser prompt when there is one', async ({
+  page,
+  browserName,
+}) => {
+  // (Safari has no install prompt: it is told to add the app to the Dock, tested in install.test.ts)
+  test.skip(browserName === 'webkit', 'Safari has no install prompt')
   await openApp(page, '/about')
   const about = page.locator('app-about')
   await expect(about.locator('#install-status')).toHaveAttribute('data-state', 'none')

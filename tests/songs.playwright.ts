@@ -152,7 +152,7 @@ test.describe('Song info', () => {
 
     const modal = page.locator('#setlist-info-dialog app-modal')
     await expect(modal).toHaveAttribute('open', '')
-    await expect(modal).toHaveAttribute('heading', 'Sunday, 11 October 2026')
+    await expect(modal).toHaveAttribute('heading', /^Sunday,? 11 October 2026$/)
     const info = page.locator('#setlist-info-dialog setlist-info')
     await expect(info).toContainText('Ann')
     await expect(info).toContainText('1 song')
@@ -204,7 +204,7 @@ test.describe('Song info', () => {
 
     // Back to read-only, showing the saved details
     const modal = dialog.locator('app-modal')
-    await expect(modal).toHaveAttribute('heading', 'Sunday, 18 October 2026 - Harvest')
+    await expect(modal).toHaveAttribute('heading', /^Sunday,? 18 October 2026 - Harvest$/)
     await expect(dialog.locator('setlist-info')).toContainText('Ben Smi-th')
     // The page header uses the short format (with the year once 2026 is past)
     await expect(page.locator('#app-header')).toContainText(/Sun,? 18 Oct( 2026)? - Harvest/)

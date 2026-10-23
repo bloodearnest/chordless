@@ -41,7 +41,11 @@ test('SW routes non-root pages to correct HTML', async ({ page }) => {
   await expect(page).toHaveTitle('Setlist - Chordless')
 })
 
-test('page reloads successfully while offline', async ({ page, context }) => {
+test('page reloads successfully while offline', async ({ page, context, browserName }) => {
+  // (the dev server has no precache, so what the worker has cached when the network goes depends
+  // on timing, and WebKit under load is slower than Chromium: offline use is tested on the
+  // build, in built.playwright.ts, which runs on WebKit too)
+  test.skip(browserName === 'webkit', 'Offline use is tested on the build')
   // Load the page so the SW installs and populates the cache
   await page.goto('/')
   await waitForSW(page)
@@ -61,7 +65,15 @@ test('page reloads successfully while offline', async ({ page, context }) => {
   }
 })
 
-test('a setlist opened online can be reloaded while offline', async ({ page, context }) => {
+test('a setlist opened online can be reloaded while offline', async ({
+  page,
+  context,
+  browserName,
+}) => {
+  // (the dev server has no precache, so what the worker has cached when the network goes depends
+  // on timing, and WebKit under load is slower than Chromium: offline use is tested on the
+  // build, in built.playwright.ts, which runs on WebKit too)
+  test.skip(browserName === 'webkit', 'Offline use is tested on the build')
   // Only the home page is precached; the other pages are cached when first opened
   await seedSetlist(page, { setlistId: 'offline-setlist' })
   await page.goto('/setlist/offline-setlist')
@@ -90,7 +102,11 @@ test.describe('Reloads on purpose, while offline', () => {
     await page.waitForLoadState('networkidle')
   }
 
-  test('restarting with no network', async ({ page, context }) => {
+  test('restarting with no network', async ({ page, context, browserName }) => {
+    // (the dev server has no precache, so what the worker has cached when the network goes depends
+    // on timing, and WebKit under load is slower than Chromium: offline use is tested on the
+    // build, in built.playwright.ts, which runs on WebKit too)
+    test.skip(browserName === 'webkit', 'Offline use is tested on the build')
     await openAccountOnline(page)
     await context.setOffline(true)
     try {
@@ -104,7 +120,15 @@ test.describe('Reloads on purpose, while offline', () => {
     }
   })
 
-  test('switching space, then restarting, with no network', async ({ page, context }) => {
+  test('switching space, then restarting, with no network', async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    // (the dev server has no precache, so what the worker has cached when the network goes depends
+    // on timing, and WebKit under load is slower than Chromium: offline use is tested on the
+    // build, in built.playwright.ts, which runs on WebKit too)
+    test.skip(browserName === 'webkit', 'Offline use is tested on the build')
     await openAccountOnline(page)
     await context.setOffline(true)
     try {
