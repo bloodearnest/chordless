@@ -7,6 +7,8 @@ import type { AppModal } from './app-modal.ts'
 import './app-modal.ts'
 import type { Appearance } from './song-info.ts'
 import './song-info.ts'
+import type { SongVersionsChangedEvent } from './song-versions.ts'
+import './song-versions.ts'
 import './status-message.ts'
 
 /** What the dialog shows: a song and where it has been played */
@@ -122,6 +124,18 @@ export class SongInfoDialog extends LitElement {
   _renderInfo({ song = null, appearances = [], loading = false }: Partial<InfoData>) {
     return html`
       <song-info .song=${song} .appearances=${appearances} .loading=${loading}></song-info>
+      ${
+        song
+          ? html`<song-versions
+              .songId=${song.id}
+              .db=${this.db}
+              @song-versions:changed=${(event: SongVersionsChangedEvent) => {
+                // (the song is gone: so is what the dialog shows)
+                if (event.songDeleted) this.close()
+              }}
+            ></song-versions>`
+          : ''
+      }
     `
   }
 

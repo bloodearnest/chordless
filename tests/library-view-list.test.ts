@@ -6,6 +6,7 @@
 import { expect } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
+import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import type { Route } from '../src/js/router.ts'
@@ -125,6 +126,42 @@ describe('the library view', () => {
       view.route = { name: 'songs', search: 'beta' }
       await view.updateComplete
       expect(searchBox().value).to.equal('beta')
+    })
+
+    it('lists a card for each variant of a song, with its name, and finds one by its name', async () => {
+      await addChart(db, ALPHA, ADD)
+      await addChart(db, ALPHA.replace('[G]Alpha words', '[A]Alpha words'), {
+        ...ADD,
+        variantLabel: 'Capo 2',
+      })
+      await open()
+      expect(titles()).to.have.length(2)
+      expect(titles().filter(card => card.includes('Alpha Song'))).to.have.length(2)
+      expect(titles().some(card => card.includes('Capo 2'))).to.equal(true)
+      expect(titles().some(card => card.includes('Test'))).to.equal(true)
+
+      searchBox().value = 'capo'
+      searchBox().dispatchEvent(new Event('input'))
+      await view.updateComplete
+      await wait(50)
+      expect(titles()).to.have.length(1)
+      expect(titles()[0]).to.contain('Capo 2')
+    })
+
+    it('looks again when the versions of a song change, and goes back to the list when the song is gone', async () => {
+      await addChart(db, ALPHA, ADD)
+      await open()
+      expect(titles()).to.have.length(1)
+      await addChart(db, BETA, ADD)
+      const dialog = must(view.querySelector('song-info-dialog'))
+      dialog.dispatchEvent(new SongVersionsChangedEvent())
+      await wait(300)
+      expect(titles()).to.have.length(2)
+      expect(visited).to.deep.equal([])
+
+      dialog.dispatchEvent(new SongVersionsChangedEvent(true))
+      await wait(100)
+      expect(visited).to.deep.equal([{ url: '/songs', replace: true }])
     })
 
     it('does not put a search in the URL that is there already, or when a song is open', async () => {

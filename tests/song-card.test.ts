@@ -52,10 +52,41 @@ describe('song-card', () => {
       expect(text(await show({ song: song({ metadata: null }) }), '.meta')).to.equal('')
     })
 
+    it('does not say the unit twice when the chart gives the tempo as "61 bpm"', async () => {
+      const card = await show({ song: song({ metadata: { key: 'E', tempo: '61 bpm' } }) })
+      expect(text(card, '.meta')).to.equal('Key: E BPM: 61')
+    })
+
     it('leaves the artist out in a setlist, and for a song with none', async () => {
       const inSetlist = await show({ song: song(), variant: 'setlist' })
       expect(part(inSetlist, 'artist')).to.equal(null)
       expect(part(await show({ song: song({ artist: null }) }), 'artist')).to.equal(null)
+    })
+
+    it('names the version of the song, unless it is just the original', async () => {
+      const named = await show({
+        song: song({ variantLabel: 'Simon, capo 3' }),
+        variant: 'setlist',
+      })
+      expect(text(named, '.variant-label')).to.equal('Simon, capo 3')
+      expect(
+        part(await show({ song: song({ variantLabel: 'Original' }) }), 'variant-label')
+      ).to.equal(null)
+      expect(part(await show({ song: song({ variantLabel: '' }) }), 'variant-label')).to.equal(null)
+      expect(part(await show({ song: song() }), 'variant-label')).to.equal(null)
+    })
+
+    it('says "Original" where the song has other versions to tell it from, and marks a search in the name', async () => {
+      const several = await show({ song: song({ variantLabel: 'Original', variantCount: 2 }) })
+      expect(text(several, '.variant-label')).to.equal('Original')
+      const unnamed = await show({ song: song({ variantLabel: '', variantCount: 2 }) })
+      expect(text(unnamed, '.variant-label')).to.equal('Original')
+      const alone = await show({ song: song({ variantLabel: 'Original', variantCount: 1 }) })
+      expect(part(alone, 'variant-label')).to.equal(null)
+      const searched = await show({ song: song({ variantLabel: 'Capo 3' }), search: 'capo' })
+      expect(searched.shadowRoot?.querySelector('.variant-label mark')?.textContent).to.equal(
+        'Capo'
+      )
     })
 
     it('cleans the artist: the credit words go, and more than two become “et al”', async () => {
@@ -94,6 +125,22 @@ describe('song-card', () => {
       expect(last(await show({ song: song({ source: { label: 'Shared with me' } }) }))).to.equal(
         'From Shared with me'
       )
+    })
+
+    it('says which space the song is in, then who led it and how long ago', async () => {
+      expect(last(await show({ song: song({ spaceName: 'Gateway Church' }) }))).to.equal(
+        'Gateway Church'
+      )
+      const card = await show({
+        song: song({
+          spaceName: 'Gateway Church',
+          lastUsageInfo: { date: '2020-01-05', leader: 'Ann', key: 'A' },
+        }),
+      })
+      expect(last(card)).to.match(/^Gateway Church • Ann • in A • \d+ years? ago$/)
+      expect(
+        last(await show({ song: song({ spaceName: 'Gateway Church', lastUsedAt: '2020-01-05' }) }))
+      ).to.match(/^Gateway Church • Last played \d+ years? ago$/)
     })
 
     it('says who led it, in which key, and how long ago', async () => {

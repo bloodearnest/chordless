@@ -11,6 +11,8 @@ import './key-selector.ts'
 export interface SongCardSong {
   title: string
   artist?: string | null
+  /** Which version of the song this is, if it is named ("Original" is not worth saying) */
+  variantLabel?: string | null
   /** The chart, to show where a search matched its lyrics */
   parsed?: ParsedChart | null
   metadata?: {
@@ -24,6 +26,10 @@ export interface SongCardSong {
   lastUsageInfo?: { date: string; leader: string; key: string | null }
   /** Set for a song from another database than the space's: where it is from */
   source?: { label: string }
+  /** The space the song is in, to say so where the library holds more than one space's songs */
+  spaceName?: string
+  /** How many variants the song has, where every variant is listed */
+  variantCount?: number
   /** The older record of when it was last played */
   lastUsedAt?: string
 }
@@ -190,6 +196,19 @@ export class SongCard extends LitElement {
       line-height: 1.3;
       flex: 1;
       min-width: 0;
+    }
+
+    .variant-label {
+      align-self: center;
+      max-width: 50%;
+      padding: 0.05rem 0.5rem;
+      border-radius: 1em;
+      border: 1px solid var(--border-light, #ccc);
+      font-size: var(--font-ui-small);
+      color: var(--text-secondary, #5f6b6d);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .artist {
@@ -401,6 +420,7 @@ export class SongCard extends LitElement {
           <div class="card-content">
             <div class="line1">
               <div class="title" part="title">${this._mark(this.song.title)}</div>
+              ${this._renderVariantLabel()}
               ${
                 this.variant !== 'setlist' && this.song.artist
                   ? html`
@@ -463,6 +483,14 @@ export class SongCard extends LitElement {
     </div>`
   }
 
+  /** The version of the song, when it has a name worth showing */
+  _renderVariantLabel() {
+    const label = this.song?.variantLabel?.trim() || 'Original'
+    // "Original" is only worth saying where the song has other versions to tell it from
+    if (label === 'Original' && !((this.song?.variantCount ?? 1) > 1)) return ''
+    return html`<div class="variant-label" part="variant-label">${this._mark(label)}</div>`
+  }
+
   _renderMeta(): string {
     const metadata = this.song?.metadata
     if (!metadata) return ''
@@ -474,7 +502,8 @@ export class SongCard extends LitElement {
     }
 
     if (metadata.tempo) {
-      items.push(`BPM: ${metadata.tempo}`)
+      // (a chart may say "61 bpm": the unit is in the label)
+      items.push(`BPM: ${String(metadata.tempo).replace(/\s*bpm$/i, '')}`)
     }
 
     if (metadata.timeSignature) {
@@ -497,17 +526,17 @@ export class SongCard extends LitElement {
   }
 
   _renderLastPlayed() {
-    const { lastUsageInfo, lastUsedAt, source } = this.song as SongCardSong
+    const { lastUsageInfo, lastUsedAt, source, spaceName } = this.song as SongCardSong
 
     if (source) {
       return html`<div class="last-played" part="last-played">From ${source.label}</div>`
     }
 
+    // The space the song is in (where there are several), then when it was last played
+    const parts: string[] = spaceName ? [spaceName] : []
+
     // Use new lastUsageInfo if available
     if (lastUsageInfo?.date) {
-      const weeksAgo = getWeeksAgo(lastUsageInfo.date)
-      const parts: string[] = []
-
       // Add leader if available
       if (lastUsageInfo.leader) {
         parts.push(lastUsageInfo.leader)
@@ -519,18 +548,15 @@ export class SongCard extends LitElement {
       }
 
       // Add time ago
-      parts.push(weeksAgo)
-
-      return html`<div class="last-played" part="last-played">${parts.join(' • ')}</div>`
+      parts.push(getWeeksAgo(lastUsageInfo.date))
+    } else if (lastUsedAt) {
+      // Fallback to old lastUsedAt field
+      parts.push(`Last played ${getWeeksAgo(lastUsedAt)}`)
     }
 
-    // Fallback to old lastUsedAt field
-    if (lastUsedAt) {
-      const weeksAgo = getWeeksAgo(lastUsedAt)
-      return html`<div class="last-played" part="last-played">Last played ${weeksAgo}</div>`
-    }
-
-    return ''
+    return parts.length
+      ? html`<div class="last-played" part="last-played">${parts.join(' • ')}</div>`
+      : ''
   }
 
   _renderKeyEdit() {

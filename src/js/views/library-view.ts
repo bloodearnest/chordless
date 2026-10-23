@@ -21,6 +21,7 @@ import '../../components/song-card.ts'
 import '../../components/space-tabs.ts'
 import '../../components/song-display.ts'
 import type { SongInfoDialog } from '../../components/song-info-dialog.ts'
+import type { SongVersionsChangedEvent } from '../../components/song-versions.ts'
 import '../../components/song-info-dialog.ts'
 import type { SongSelectEvent } from '../../components/song-list.ts'
 import '../../components/song-list.ts'
@@ -39,12 +40,14 @@ import {
   getSongFromAnywhere,
   getSongsElsewhere,
   withSongsFromElsewhere,
+  withSpaceName,
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
+import { getCurrentSpace, listSpaces } from '../space.ts'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
 import { filterSongs } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
@@ -93,8 +96,9 @@ export class LibraryView extends PageView {
   #songs = new Task(this, {
     task: async () => {
       const db = await getCurrentDB()
+      const own = await getLibrarySongs(db, { withLastUsage: true, allVariants: true })
       return withSongsFromElsewhere(
-        await getLibrarySongs(db, { withLastUsage: true }),
+        withSpaceName(own, (await listSpaces()).length, getCurrentSpace().name),
         await getSongsElsewhere(db.dbName)
       )
     },
@@ -506,6 +510,12 @@ export class LibraryView extends PageView {
     }
   }
 
+  /** The versions of a song changed: the list may; and the song may be gone, so back to the list */
+  #versionsChanged(event: SongVersionsChangedEvent): void {
+    void this.#songs.run()
+    if (event.songDeleted) void goTo(buildUrl({ name: 'songs' }), { replace: true })
+  }
+
   async #showInfo(): Promise<void> {
     if (!this.#parsed || !this.#song || this.#song.source) return
     const dialog = this.#infoDialog.value as SongInfoDialog
@@ -561,6 +571,7 @@ export class LibraryView extends PageView {
           <div class="song-meta-compact" id="library-song-meta-header" style="display: none"></div>
         </div>
       </app-header>
+      <space-tabs></space-tabs>
 
       <main class="songs-main">
         <div class="songs-content-container" id="songs-content-container">
@@ -571,7 +582,6 @@ export class LibraryView extends PageView {
                 type="search"
                 id="song-search"
                 class="song-search-input"
-      <space-tabs></space-tabs>
                 placeholder="Search songs by title, artist, or lyrics..."
                 .value=${this._search}
                 @input=${(event: Event) => this.#typed((event.target as HTMLInputElement).value)}
@@ -618,7 +628,11 @@ export class LibraryView extends PageView {
         </div>
       </main>
 
-      <song-info-dialog id="library-song-info-dialog" ${ref(this.#infoDialog)}></song-info-dialog>
+      <song-info-dialog
+        id="library-song-info-dialog"
+        ${ref(this.#infoDialog)}
+        @song-versions:changed=${(event: SongVersionsChangedEvent) => this.#versionsChanged(event)}
+      ></song-info-dialog>
 
       <app-modal
         id="library-reset-confirm-modal"

@@ -1,5 +1,6 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/song-info-dialog.ts'
+import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
 import { must } from './must.ts'
 import { A11Y, wait } from './test-helpers.ts'
 
@@ -77,6 +78,21 @@ describe('song-info-dialog', () => {
     await wait(200)
     expect(modal().heading).to.equal('Fast Song')
     expect(dialog.shadowRoot.querySelector('song-info').song.title).to.equal('Fast Song')
+  })
+
+  it('closes when the song it is showing is deleted, but not when only its versions change', async () => {
+    await setUp()
+    let closed = 0
+    dialog.close = () => {
+      closed++
+    }
+    await dialog.show('fast')
+    await wait(100)
+    const versions = dialog.shadowRoot.querySelector('song-versions')
+    versions.dispatchEvent(new SongVersionsChangedEvent())
+    expect(closed).to.equal(0)
+    versions.dispatchEvent(new SongVersionsChangedEvent(true))
+    expect(closed).to.equal(1)
   })
 
   it("shows the chart's CCLI number and trailer", async () => {

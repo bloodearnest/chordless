@@ -75,9 +75,15 @@ describe('filterSongs', () => {
     expect(matchedFields(song, 'newton')).to.deep.equal({
       title: false,
       artist: true,
+      label: false,
       lyrics: false,
     })
-    expect(matchedFields(song, 'grace')).to.deep.equal({ title: true, artist: false, lyrics: true })
+    expect(matchedFields(song, 'grace')).to.deep.equal({
+      title: true,
+      artist: false,
+      label: false,
+      lyrics: true,
+    })
     expect(lyricSnippet(parsed, 'how sweet')).to.deep.equal({
       before: 'Amazing grace, ',
       match: 'how sweet',
@@ -99,11 +105,26 @@ describe('matching in songs with missing fields, and quoting long lines', () => 
     ],
   })
 
+  it('finds a variant by what it is called', () => {
+    const songs = [
+      { title: 'Grace', variantLabel: 'Capo 3' },
+      { title: 'Grace', variantLabel: 'Original' },
+    ]
+    expect(filterSongs(songs, 'capo')).to.deep.equal([songs[0]])
+    expect(matchedFields(songs[0], 'CAPO').label).to.equal(true)
+  })
+
   it('matches nothing in a song with no title or artist, and nothing at all for no search', () => {
-    expect(matchedFields({}, 'grace')).to.deep.equal({ title: false, artist: false, lyrics: false })
+    expect(matchedFields({}, 'grace')).to.deep.equal({
+      title: false,
+      artist: false,
+      label: false,
+      lyrics: false,
+    })
     expect(matchedFields({ title: 'Grace' }, '  ')).to.deep.equal({
       title: false,
       artist: false,
+      label: false,
       lyrics: false,
     })
     expect(lyricSnippet(chart('Amazing grace'), '  ')).to.equal(undefined)

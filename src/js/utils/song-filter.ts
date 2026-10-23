@@ -3,6 +3,8 @@ import type { ParsedChart } from '../data-types.ts'
 interface SearchableSong {
   title?: string | null
   artist?: string | null
+  /** What the variant is called */
+  variantLabel?: string | null
   parsed?: ParsedChart | null
 }
 
@@ -37,6 +39,7 @@ export function matchedFields(song: SearchableSong, searchTerm: string) {
   return {
     title: !!term && (song.title || '').toLowerCase().includes(term),
     artist: !!term && (song.artist || '').toLowerCase().includes(term),
+    label: !!term && (song.variantLabel || '').toLowerCase().includes(term),
     lyrics: !!term && !!song.parsed && lyricsOf(song.parsed).lower.includes(term),
   }
 }
@@ -69,13 +72,13 @@ export function lyricSnippet(
 }
 
 /**
- * The songs whose title, artist or lyrics contain the search term, ignoring case.
+ * The songs whose title, artist, variant name or lyrics contain the search term, ignoring case.
  * An empty search matches every song (and gives back the same array).
  */
 export function filterSongs<T extends SearchableSong>(songs: T[], searchTerm: string): T[] {
   if (!normalizeTerm(searchTerm)) return songs
   return songs.filter(song => {
     const found = matchedFields(song, searchTerm)
-    return found.title || found.artist || found.lyrics
+    return found.title || found.artist || found.label || found.lyrics
   })
 }
