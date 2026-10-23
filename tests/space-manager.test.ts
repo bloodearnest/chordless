@@ -1,13 +1,12 @@
 /**
- * Managing one space (space-manager.ts): what it shows for a Personal space and for a Team,
- * switching, and deleting from this device. The sign-in is the fake service worker's and Drive a
+ * One space's data (space-manager.ts): what it shows for a Personal space and for a Team, and
+ * deleting from this device. The sign-in is the fake service worker's and Drive a
  * fake Drive.
  */
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { SpaceImportedEvent } from '../src/components/space-export-panel.ts'
 import { SpaceGoneEvent, type SpaceManager } from '../src/components/space-manager.ts'
-import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
 import '../src/components/space-manager.ts'
 import type { Space } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
@@ -113,7 +112,7 @@ describe('space-manager', () => {
     expect(has(el, 'space-export-panel')).to.equal(true)
     expect(has(el, 'team-share-panel')).to.equal(false)
     expect(text(el)).to.contain('Delete from this device')
-    expect(has(el, '#switch')).to.equal(true)
+    expect(has(el, '#switch')).to.equal(false)
   })
 
   it('labels nothing for a personal space that is still called Personal', async () => {
@@ -123,25 +122,23 @@ describe('space-manager', () => {
     expect(labels(el)).to.deep.equal([])
   })
 
-  it('shows a Team’s people as well, and says what the person is in it', async () => {
+  it('says what the person is in a Team, and leaves the people to their own modal', async () => {
     const team = await space('Team', { team: { id: 'space-gggg7777', role: 'owner' } })
     const el = await page(team.id)
     expect(labels(el)).to.deep.equal(['Team', 'Owner'])
-    expect(has(el, 'team-share-panel')).to.equal(true)
+    expect(has(el, 'team-share-panel')).to.equal(false)
   })
 
-  it('says it is gone when the person leaves the Team', async () => {
-    const team = await space('Team', { team: { id: 'space-kkkk1111', role: 'writer' } })
-    const el = await page(team.id)
-    must(el.shadowRoot?.querySelector('team-share-panel')).dispatchEvent(new TeamShareLeftEvent())
-    expect(gone).to.equal(1)
+  it('has no sync button of its own: that is on the card', async () => {
+    const mine = await space('Mine')
+    const el = await page(mine.id)
+    expect(text(el)).to.not.contain('Sync with Drive')
   })
 
-  it('gives a Team member the Team sync, which needs no Drive', async () => {
+  it('offers a Team member the Team copy, which needs no Drive', async () => {
     const team = await space('Team', { team: { id: 'space-hhhh8888', role: 'reader' } })
     const el = await page(team.id)
-    expect(text(el)).to.contain('Team sync')
-    expect(text(el)).to.contain('Team member')
+    expect(text(el)).to.contain('Team copy')
   })
 
   it('lets a Team member sync with a sign-in that has no Drive', async () => {
@@ -202,46 +199,15 @@ describe('space-manager', () => {
   })
 
   describe('the space in use', () => {
-    it('is marked as current, has no Switch, and cannot be deleted', async () => {
+    it('is marked as current, and cannot be deleted', async () => {
       const mine = await space('Mine')
       await setCurrentSpace(mine.id, mine.name)
       const el = await page(mine.id)
       expect(text(el)).to.contain('Current')
-      expect(has(el, '#switch')).to.equal(false)
       expect(must(el.shadowRoot?.querySelector<HTMLButtonElement>('#delete')).disabled).to.equal(
         true
       )
       expect(text(el)).to.contain('switch to another first')
-    })
-  })
-
-  describe('switching', () => {
-    it('asks first, naming the space, then switches and shows it', async () => {
-      const mine = await space('Mine')
-      const other = await space('Other')
-      await setCurrentSpace(other.id, other.name)
-      const el = await page(mine.id)
-      let shown = 0
-      el.show = () => {
-        shown++
-      }
-      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#switch')).click()
-      const modal = await answer(el, 'Switch?', true)
-      expect(modal.message).to.contain(`Switch to "${mine.name}"?`)
-      for (let i = 0; i < 50 && shown === 0; i++) await wait(20)
-      expect(shown).to.equal(1)
-      expect(getCurrentSpace().id).to.equal(mine.id)
-    })
-
-    it('stays when told no', async () => {
-      const mine = await space('Mine')
-      const other = await space('Other')
-      await setCurrentSpace(other.id, other.name)
-      const el = await page(mine.id)
-      must(el.shadowRoot?.querySelector<HTMLButtonElement>('#switch')).click()
-      await answer(el, 'Switch?', false)
-      await wait(50)
-      expect(getCurrentSpace().id).to.equal(other.id)
     })
   })
 

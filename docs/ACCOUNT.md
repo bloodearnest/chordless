@@ -72,33 +72,36 @@ This device
 - **"Create a new Team"** goes to `/account/new` (the wizard, docs/SPACES.md "Creating a team
   space"). There is no conversion of a personal space.
 
-## One space's Manage modal
+## One space's Data modal, and a Team's Users modal
 
-"Manage" on a card opens a modal over the list, like the app's other settings (Preferences, Help, the
+"Data" on a card (it was "Manage") opens a modal over the list, like the app's other settings (Preferences, Help, the
 info dialogs): not a page of its own with a back button. Whether the app should move to forward/back
 settings pages everywhere is a decision for the whole app, not for this feature, so this follows what
 it has. The cost is that a space's management has no address of its own.
 
 ```
 +- Gateway Church ---------------------------------------- x -+
-| [Team] [owner]                                      [Switch] |
+| [Team] [owner]                                     Current  |
 | 31 songs - 6 setlists - about 190 KB                         |
 |                                                              |
-| Sync     Last synced 5 min ago   [Sync now]   Reset...  Start over...
+| Google Drive   [Reset from Google Drive]  Start over...      |
 | Export and import   [Export...]  [Import...]                 |
-| People   (a Team only) who is in it and their roles, invite someone, invites waiting
 | Delete from this device   [Delete...]                        |
 +--------------------------------------------------------------+
 ```
 
 The space's name is the modal's heading. On the list, the kind (Personal, Team) and the person's role
-in a Team are labels after the name on the left, Current is flush right where it never moves, and Switch is flush right, on the card and in the modal's header. It works
+in a Team are labels after the name on the left, Current is flush right where it never moves, and Switch is flush right on the card (not in the modal: sync and switch are the card's). It works
 for any space, not only the one in use, so nothing is switched to be managed. That is possible
 because the first sync takes the space's own database (`syncTeamSpace`), export and delete need only
 that database, and the people and invite calls need only the team id. Every destructive action asks
-first (CLAUDE.md: friction, not prohibition). A Personal space has no People section. Deleting a
-space, or leaving a Team, closes the modal (`SpaceGoneEvent`) and the list is read again; closing it
-any other way reads the list again too.
+first (CLAUDE.md: friction, not prohibition). Deleting a space closes the modal (`SpaceGoneEvent`)
+and the list is read again; closing it any other way reads the list again too.
+
+A Team's people are in a second modal, from a **Users** button on a Team's card (after Data): who is in
+it and their roles, invite someone, invites waiting, stop sharing, and leave. Every member gets the
+button, not only those who may manage people, because leaving is there and a member can see who is
+in the Team. The controls inside follow the role. Leaving, or closing the modal, reads the list again.
 
 ## Pad sets and the media player: their own page, `/media`
 

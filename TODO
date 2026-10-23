@@ -40,13 +40,6 @@ information UI
 
 
 spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
-some UI tweaks
- - sync is available on the space card, it should be removed from the space manage modal. Reset from google remains.
- - remove switch from space management modal
- - split out Team role managment/invites from space management modal. If you
-   have the right permissions to manage users, add a Users button next to
-   manage, and rename current manage modal to "Data" rather than Manage
-
 
 songlibrary UI
  - should be a global filter bar at top to filter by space. Defaults to all

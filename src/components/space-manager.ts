@@ -4,7 +4,7 @@ import type { Space } from '../js/data-types.ts'
 import type { SignInState } from '../js/google-auth.ts'
 import { forgetSync } from '../js/last-sync.ts'
 import { loadMediaSettings } from '../js/media-settings.ts'
-import { deleteSpace, getCurrentSpace, getSpaceById, switchSpace } from '../js/space.ts'
+import { deleteSpace, getCurrentSpace, getSpaceById } from '../js/space.ts'
 import { spaceKind, spaceRole } from '../js/space-label.ts'
 import { type SpaceSummary, summaryOf } from '../js/space-summary.ts'
 import { isTeamMember } from '../js/storage/space-storage.ts'
@@ -15,9 +15,8 @@ import './app-modal.ts'
 import './drive-sync-panel.ts'
 import { buttonStyles, panelStyles } from './shared-styles.ts'
 import './space-export-panel.ts'
-import './team-share-panel.ts'
 
-/** The space is gone from this device (deleted, or the person left the Team): whoever shows this can close it */
+/** The space is gone from this device (deleted): whoever shows this can close it */
 export class SpaceGoneEvent extends Event {
   static readonly type = 'space-manager:gone'
   constructor() {
@@ -26,12 +25,13 @@ export class SpaceGoneEvent extends Event {
 }
 
 /**
- * Everything to do with one Personal space or Team (docs/ACCOUNT.md): sync, export and import, its
- * people (a Team), and deleting it from this device. It is shown in a modal over the list, like the
- * app's other settings, and works on any space on this device, not only the one in use; switching
- * to it is a button, not a step. The name is the modal's heading, so it is not repeated here.
+ * The data of one Personal space or Team (docs/ACCOUNT.md): resetting it from Drive, export and
+ * import, and deleting it from this device. (Syncing and switching are on the space's card, and a
+ * Team's people in their own modal: team-share-panel.ts.) It is shown in a modal over the list, like
+ * the app's other settings, and works on any space on this device, not only the one in use. The name
+ * is the modal's heading, so it is not repeated here.
  *
- * @fires SpaceGoneEvent - when the space is deleted, or the person leaves the Team
+ * @fires SpaceGoneEvent - when the space is deleted
  */
 export class SpaceManager extends LitElement {
   static override properties = {
@@ -51,11 +51,7 @@ export class SpaceManager extends LitElement {
   declare _missing: boolean
   declare _error: string
 
-  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
-  show: (() => unknown) | undefined = undefined
-
   _deleteModal: Ref<AppModal> = createRef()
-  _switchModal: Ref<AppModal> = createRef()
 
   static override styles = [
     panelStyles,
@@ -133,13 +129,6 @@ export class SpaceManager extends LitElement {
     return this._signIn === 'signed-in'
   }
 
-  async _switch(): Promise<void> {
-    const space = this._space as Space
-    const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${space.name}"?`
-    if (await modal.ask()) await switchSpace(space.id, this.show)
-  }
-
   async _delete(): Promise<void> {
     const space = this._space as Space
     const modal = this._deleteModal.value as AppModal
@@ -184,11 +173,7 @@ export class SpaceManager extends LitElement {
           ${kind ? html`<span class="chip">${kind}</span>` : nothing}
           ${role ? html`<span class="chip">${role}</span>` : nothing}
           <span class="spacer"></span>
-          ${
-            this._current
-              ? html`<span class="badge">Current</span>`
-              : html`<button class="btn" id="switch" @click=${this._switch}>Switch</button>`
-          }
+          ${this._current ? html`<span class="badge">Current</span>` : nothing}
         </div>
         ${
           summary
@@ -201,14 +186,12 @@ export class SpaceManager extends LitElement {
         }
 
         <div class="panel">
-          <h3>${isTeamMember(space) ? 'Team sync' : 'Sync'}</h3>
+          <h3>${isTeamMember(space) ? 'Team copy' : 'Google Drive'}</h3>
           <p>
             ${
               isTeamMember(space)
-                ? "Sync this Team's songs and setlists with the rest of the Team."
-                : space.team
-                  ? "Sync this Team's songs and setlists with Google Drive, where the Team gets them."
-                  : 'Sync your songs and setlists with Google Drive. Your data is kept in the "Chordless" folder.'
+                ? "Replace this device's songs and setlists with the Team's copy. Sync is on the space's card."
+                : "Replace this device's songs and setlists with the copy in Google Drive. Sync is on the space's card."
             }
           </p>
           <drive-sync-panel .space=${space} ?disabled=${!this._canSync}></drive-sync-panel>
@@ -239,16 +222,6 @@ export class SpaceManager extends LitElement {
           ></space-export-panel>
         </div>
 
-        ${
-          space.team
-            ? html`<team-share-panel
-              .space=${space}
-              @team-share-panel:changed=${this._refresh}
-              @team-share-panel:left=${() => this.dispatchEvent(new SpaceGoneEvent())}
-            ></team-share-panel>`
-            : nothing
-        }
-
         <div class="panel danger-zone">
           <h3>Delete from this device</h3>
           <p>
@@ -266,13 +239,6 @@ export class SpaceManager extends LitElement {
         type="confirm"
         heading="Delete from this device?"
         confirm-label="Delete"
-      ></app-modal>
-      <app-modal
-        ${ref(this._switchModal)}
-        type="confirm"
-        size="small"
-        heading="Switch?"
-        confirm-label="Switch"
       ></app-modal>
     `
   }

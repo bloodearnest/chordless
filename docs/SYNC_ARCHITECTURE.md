@@ -36,7 +36,7 @@ document and SETLIST_DELETION.md.
 ### Layers
 
 ```
-UI (main thread)          drive-sync-panel.js (Sync / Reset from Google Drive buttons)
+UI (main thread)          drive-sync-panel.js (Reset from Google Drive; Sync is on the space's card)
         │
 Orchestration             sync-orchestrator.ts: wraps the engine, reports progress
         │                 (to a callback)

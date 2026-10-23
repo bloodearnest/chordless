@@ -41,11 +41,21 @@ export class SpaceManageEvent extends Event {
   }
 }
 
+/** A person asked to look after this Team's people: the page shows them in a modal */
+export class SpaceUsersEvent extends Event {
+  static readonly type = 'space-card:users'
+  readonly spaceId: string
+  constructor(spaceId: string) {
+    super(SpaceUsersEvent.type, { bubbles: true, composed: true })
+    this.spaceId = spaceId
+  }
+}
+
 /**
  * One space on the Account and Teams page (docs/ACCOUNT.md): its name, with what kind it is (and
  * the person's role in a Team) as labels on the right, how big it is, when it last synced, and the
- * things done most: switch to it, sync it. Everything else is under "Manage", which asks the page
- * to show it in a modal.
+ * things done most: switch to it, sync it. Its data (export and import, resetting from Drive, delete)
+ * is under "Data", and a Team's people under "Users"; each asks the page to show it in a modal.
  */
 export class SpaceCard extends LitElement {
   static override properties = {
@@ -227,8 +237,15 @@ export class SpaceCard extends LitElement {
               : nothing
           }
           <button class="btn" id="manage" @click=${() => this.dispatchEvent(new SpaceManageEvent(space.id))}>
-            Manage
+            Data
           </button>
+          ${
+            space.team
+              ? html`<button class="btn" id="users" @click=${() => this.dispatchEvent(new SpaceUsersEvent(space.id))}>
+                Users
+              </button>`
+              : nothing
+          }
           ${
             this.current
               ? nothing

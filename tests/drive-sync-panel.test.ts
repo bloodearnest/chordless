@@ -12,7 +12,6 @@ import {
 } from '../src/js/space.ts'
 import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { makeSetlist } from './builders.ts'
-import { FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -72,12 +71,12 @@ describe('drive-sync-panel', () => {
 
   it('is ready to sync when it is connected, and checks again when it stops being disabled', async () => {
     const el = await show()
-    expect(text(el)).to.contain('Ready to sync')
+    expect(text(el)).to.contain('Ready')
     expect(text(el)).to.not.contain('Last synced')
     el.disabled = true
     await el.updateComplete
     el.disabled = false
-    await waitUntil(() => text(el).includes('Ready to sync'), 'it is ready again')
+    await waitUntil(() => text(el).includes('Ready'), 'it is ready again')
   })
 
   it('says when it last synced', async () => {
@@ -141,74 +140,31 @@ describe('drive-sync-panel', () => {
       const el = await show()
       el.syncError = 'It broke'
       await el.updateComplete
-      expect(text(el)).to.contain('Sync failed')
+      expect(text(el)).to.contain('Failed')
       expect(text(el)).to.contain('It broke')
     })
   })
 
-  describe('syncing', () => {
-    it('syncs, says so, and goes back to ready', async function () {
-      this.timeout(8000)
-      const el = await show()
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done')
-      expect(localStorage.getItem(`last-sync-time:${spaceId}`)).to.be.a('string')
-      expect(text(el)).to.contain('Last synced')
-      await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
-      expect(text(el)).to.contain('Ready to sync')
-    })
-
-    it('says a space with view-only access uploads nothing', async function () {
-      this.timeout(8000)
-      const el = await show()
-      // The Drive folder is made by the first sync: after that the user can only read it
-      const { name, id } = getCurrentSpace()
-      await (await createSyncOrchestrator(name, id)).sync()
-      must(drive).readOnly = true
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('view-only access'), 'it says so', { timeout: 4000 })
-    })
-
-    it('says what went wrong', async () => {
-      const el = await show()
-      must(drive).failRequests({ status: 500, times: 100 })
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync failed'), 'it says so', { timeout: 4000 })
-      expect(el.syncing).to.equal(false)
-      expect(el.syncError).to.be.a('string')
-    })
-
-    it('does nothing while it is syncing, or cannot', async () => {
+  describe('doing nothing', () => {
+    it('does nothing while it is working, or cannot', async () => {
       const el = await show()
       el.syncing = true
-      await el._handleSync()
       await el._handleReset()
       expect(el.syncProgress).to.equal(null)
       el.syncing = false
       el.syncAvailable = false
-      await el._handleSync()
+      await el._handleReset()
       expect(el.syncProgress).to.equal(null)
-    })
-
-    it('names the space after the Google account before it syncs', async () => {
-      const auth = installFakeAuthWorker(new FakeAuthWorker())
-      try {
-        const el = await show()
-        button(el, /Sync with Drive/)?.click()
-        await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done', {
-          timeout: 4000,
-        })
-      } finally {
-        auth.uninstall()
-      }
     })
   })
 
   describe('a space that is not the one in use', () => {
     let otherId: string
+    let otherName: string
 
     beforeEach(async () => {
-      otherId = (await createSpace(`Other ${crypto.randomUUID().slice(0, 8)}`)).id
+      otherName = `Other ${crypto.randomUUID().slice(0, 8)}`
+      otherId = (await createSpace(otherName)).id
       const db = new ChordlessDB(otherId)
       await db.init()
       await db.saveSetlist(makeSetlist({ id: 'other-list', date: '2026-12-20' }))
@@ -220,26 +176,11 @@ describe('drive-sync-panel', () => {
       await deleteSpace(otherId)
     })
 
-    it('syncs that space, and says when it did', async function () {
-      this.timeout(8000)
-      const el = await show(true, otherId)
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done', {
-        timeout: 4000,
-      })
-      const files = must(drive).listFiles(file => Boolean(file.appProperties.setlistId))
-      expect(files.map(file => file.appProperties.setlistId)).to.deep.equal(['other-list'])
-      expect(localStorage.getItem(`last-sync-time:${otherId}`)).to.be.a('string')
-      expect(localStorage.getItem(`last-sync-time:${spaceId}`)).to.equal(null)
-    })
-
     it('resets that space without starting the app afresh, as nothing is showing it', async function () {
       this.timeout(8000)
       const el = await show(true, otherId)
       // (a reset refuses while the space has changes Drive does not: sync them first)
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync complete!'), 'it is synced', { timeout: 4000 })
-      await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
+      await (await createSyncOrchestrator(otherName, otherId)).sync()
       let reloads = 0
       el.reload = () => {
         reloads++
@@ -285,7 +226,7 @@ describe('drive-sync-panel', () => {
       must(el._resetModal.value as AppModal).ask = async () => true
       must(drive).failRequests({ status: 500, times: 100 })
       button(el, /Reset from Google Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync failed'), 'it says so', { timeout: 4000 })
+      await waitUntil(() => text(el).includes('Failed'), 'it says so', { timeout: 4000 })
       expect(el.syncing).to.equal(false)
     })
   })
@@ -307,17 +248,6 @@ describe('drive-sync-panel', () => {
       expect(button(el, /Start over in Drive/)).to.not.equal(undefined)
     })
 
-    it('shows it, not a failure, when a sync finds out', async () => {
-      const el = await show()
-      await afterFolderGone()
-      button(el, /Sync with Drive/)?.click()
-      await waitUntil(() => text(el).includes('Drive folder not found'), 'it says so', {
-        timeout: 4000,
-      })
-      expect(text(el)).to.not.contain('Sync failed')
-      expect(el.syncing).to.equal(false)
-    })
-
     it('asks first, and does nothing when told not to', async () => {
       await afterFolderGone()
       const el = await show()
@@ -334,13 +264,13 @@ describe('drive-sync-panel', () => {
       const el = await show()
       must(el._startOverModal.value as AppModal).ask = async () => true
       button(el, /Start over in Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync complete!'), 'it says it is done', {
+      await waitUntil(() => text(el).includes('Started over in Drive'), 'it says it is done', {
         timeout: 4000,
       })
       expect(text(el)).to.not.contain('Drive folder not found')
       expect(must(drive).findByPath(['Chordless', getCurrentSpace().name])).to.not.equal(undefined)
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
-      expect(text(el)).to.contain('Ready to sync')
+      expect(text(el)).to.contain('Ready')
     })
 
     it('says what went wrong when starting over fails', async function () {
@@ -350,7 +280,7 @@ describe('drive-sync-panel', () => {
       must(el._startOverModal.value as AppModal).ask = async () => true
       must(drive).failRequests({ status: 500, times: 100 })
       button(el, /Start over in Drive/)?.click()
-      await waitUntil(() => text(el).includes('Sync failed'), 'it says so', { timeout: 4000 })
+      await waitUntil(() => text(el).includes('Failed'), 'it says so', { timeout: 4000 })
       expect(el.syncing).to.equal(false)
     })
 

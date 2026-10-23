@@ -69,7 +69,7 @@ test.describe('Themes', () => {
     await page.emulateMedia({ colorScheme: 'dark' })
     await seedSong(page)
     await page.goto('/account')
-    await page.locator('space-card').getByRole('button', { name: 'Manage' }).click()
+    await page.locator('space-card').getByRole('button', { name: 'Data' }).click()
     const card = page.locator('account-page > app-modal').locator('.modal-content').first()
     await expect(card).toBeVisible()
     const { cardBg, pageBg, border } = await card.evaluate(element => ({
@@ -343,9 +343,9 @@ test.describe('Account and Teams page', () => {
     await page
       .locator('space-card')
       .filter({ hasText: 'Second Org' })
-      .getByRole('button', { name: 'Manage' })
+      .getByRole('button', { name: 'Data' })
       .click()
-    const manage = page.locator('account-page > app-modal')
+    const manage = page.locator('account-page > app-modal').first()
     await expect(manage).toHaveAttribute('open', '')
     await expect(manage).toContainText('Second Org')
     await expect(page).toHaveURL(/\/account$/) // a modal, not a page: nothing to go back from

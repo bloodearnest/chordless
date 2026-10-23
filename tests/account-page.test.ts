@@ -12,14 +12,17 @@ import {
   SpaceManageEvent,
   SpaceSwitchEvent,
   SpaceSyncedEvent,
+  SpaceUsersEvent,
 } from '../src/components/space-card.ts'
 import { SpaceGoneEvent } from '../src/components/space-manager.ts'
+import { TeamShareLeftEvent } from '../src/components/team-share-panel.ts'
 import {
   createSpace,
   deleteSpace,
   getCurrentSpace,
   renameSpace,
   setCurrentSpace,
+  updateSpace,
 } from '../src/js/space.ts'
 import { installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
@@ -205,6 +208,62 @@ describe('account-page', () => {
     it('does nothing for a space that is not on the list', async () => {
       const el = await page()
       el.dispatchEvent(new SpaceManageEvent('no-such-space'))
+      await wait(50)
+      expect(modal(el).open).to.equal(false)
+    })
+  })
+
+  describe('a Team’s people', () => {
+    const modal = (el: AccountPage) =>
+      must(el.shadowRoot?.querySelectorAll<AppModal>('app-modal')[1])
+    const panel = (el: AccountPage) => el.shadowRoot?.querySelector('team-share-panel') ?? null
+
+    async function team(name: string) {
+      const created = await space(name)
+      return updateSpace(created.id, {
+        team: { id: `space-${crypto.randomUUID()}`, role: 'writer' },
+      })
+    }
+
+    async function showUsers(el: AccountPage, id: string) {
+      must(cards(el).find(each => each.space.id === id)).dispatchEvent(new SpaceUsersEvent(id))
+      for (let i = 0; i < 50 && !modal(el).open; i++) await wait(20)
+      await el.updateComplete
+    }
+
+    it('opens in a modal named for the Team, apart from its data', async () => {
+      const first = await team('Band')
+      const el = await page()
+      expect(panel(el)).to.equal(null)
+      await showUsers(el, first.id)
+      expect(modal(el).open).to.equal(true)
+      expect(modal(el).heading).to.equal(`${first.name}: people`)
+      expect(panel(el)?.space?.id).to.equal(first.id)
+      expect(el.shadowRoot?.querySelector('space-manager')).to.equal(null)
+    })
+
+    it('goes when closed, and reads the list again', async () => {
+      const first = await team('Band')
+      const el = await page()
+      await showUsers(el, first.id)
+      modal(el).close()
+      for (let i = 0; i < 50 && panel(el); i++) await wait(20)
+      expect(panel(el)).to.equal(null)
+    })
+
+    it('closes when the person leaves the Team', async () => {
+      const first = await team('Band')
+      const el = await page()
+      await showUsers(el, first.id)
+      must(panel(el)).dispatchEvent(new TeamShareLeftEvent())
+      for (let i = 0; i < 50 && modal(el).open; i++) await wait(20)
+      expect(modal(el).open).to.equal(false)
+    })
+
+    it('stays closed for a space that is not a Team', async () => {
+      const first = await space('Mine')
+      const el = await page()
+      el.dispatchEvent(new SpaceUsersEvent(first.id))
       await wait(50)
       expect(modal(el).open).to.equal(false)
     })

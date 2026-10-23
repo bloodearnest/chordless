@@ -9,6 +9,7 @@ import {
   SpaceManageEvent,
   SpaceSwitchEvent,
   SpaceSyncedEvent,
+  SpaceUsersEvent,
 } from '../src/components/space-card.ts'
 import '../src/components/space-card.ts'
 import type { Space } from '../src/js/data-types.ts'
@@ -130,7 +131,31 @@ describe('space-card', () => {
     expect(asked).to.deep.equal([space.id])
   })
 
-  it('puts Sync and Manage on the left, and Switch flush right', async () => {
+  it('has a Users button for a Team only, which asks the page to show its people', async () => {
+    const own = await card('signed-in')
+    expect(button(own, 'users')).to.equal(null)
+    const team = await make(`Team ${crypto.randomUUID().slice(0, 8)}`, {
+      team: { id: 't-2', role: 'reader' },
+    })
+    const el = await card('signed-in', { space: team })
+    const asked: string[] = []
+    el.addEventListener(SpaceUsersEvent.type, event =>
+      asked.push((event as SpaceUsersEvent).spaceId)
+    )
+    must(button(el, 'users')).click()
+    expect(asked).to.deep.equal([team.id])
+    expect(order(el)).to.deep.equal(['sync', 'manage', 'users', 'switch'])
+  })
+
+  it('calls the button for a space’s data Data', async () => {
+    const el = await card('signed-out')
+    expect(button(el, 'manage')?.textContent?.trim()).to.equal('Data')
+  })
+
+  const order = (el: SpaceCard) =>
+    Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(each => each.id)
+
+  it('puts Sync and Data on the left, and Switch flush right', async () => {
     const el = await card('signed-in')
     const order = Array.from(el.shadowRoot?.querySelectorAll('.actions button') ?? []).map(
       each => each.id

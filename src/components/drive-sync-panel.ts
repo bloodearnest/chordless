@@ -2,10 +2,9 @@ import type { PropertyValues } from 'lit'
 import { css, html, LitElement } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { Space } from '../js/data-types.ts'
-import { DriveFolderGoneError } from '../js/drive-sync.ts'
 import { nameSpaceBeforeSync } from '../js/first-time-auth.ts'
 import { formatSyncTime, lastSyncOf, recordSync } from '../js/last-sync.ts'
-import { getCurrentSpace, getSpaceById, syncsBack } from '../js/space.ts'
+import { getCurrentSpace } from '../js/space.ts'
 import { driveFolderProblem } from '../js/space-access.ts'
 import {
   createSyncOrchestrator,
@@ -240,61 +239,6 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
-  async _handleSync(): Promise<void> {
-    if (this.syncing || !this.syncAvailable || this.disabled) return
-
-    this.syncing = true
-    this.syncError = null
-    this.syncProgress = { stage: 'starting', message: 'Initializing...' }
-
-    try {
-      await nameSpaceBeforeSync(this.space)
-      const { id, name } = this.space
-
-      const orchestrator = await createSyncOrchestrator(name, id)
-
-      await orchestrator.sync(progress => {
-        this.syncProgress = progress
-        this.requestUpdate()
-      })
-
-      await this._syncSucceeded()
-    } catch (error) {
-      this._syncFailed(error)
-    }
-  }
-
-  /** Show success briefly */
-  async _syncSucceeded(): Promise<void> {
-    this._recordSyncTime()
-    this.folderProblem = null
-    // (the sync may have found the space is read-only: ask the record, not the one this page was given)
-    const fresh = (await getSpaceById(this.space.id)) as Space
-    this.syncProgress = {
-      stage: 'success',
-      message: syncsBack(fresh)
-        ? '✓ Sync complete!'
-        : '✓ Sync complete (view-only access: your changes stay on this device)',
-    }
-    setTimeout(() => {
-      this.syncing = false
-      this.syncProgress = null
-    }, 2000)
-  }
-
-  _syncFailed(error: unknown): void {
-    console.error('[DriveSyncPanel] Sync failed:', error)
-    this.syncing = false
-    if (error instanceof DriveFolderGoneError) {
-      // Told with the way on, rather than as an error
-      this.folderProblem = error.message
-      this.syncProgress = null
-      return
-    }
-    this.syncError = errorMessage(error)
-    this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
-  }
-
   /** Let go of the folder that is gone, and upload everything on this device to a new one */
   async _handleStartOver(): Promise<void> {
     if (this.syncing || !this.syncAvailable || this.disabled) return
@@ -311,9 +255,18 @@ export class DriveSyncPanel extends LitElement {
         this.syncProgress = progress
         this.requestUpdate()
       })
-      await this._syncSucceeded()
+      this._recordSyncTime()
+      this.folderProblem = null
+      this.syncProgress = { stage: 'success', message: '✓ Started over in Drive' }
+      setTimeout(() => {
+        this.syncing = false
+        this.syncProgress = null
+      }, 2000)
     } catch (error) {
-      this._syncFailed(error)
+      console.error('[DriveSyncPanel] Starting over in Drive failed:', error)
+      this.syncing = false
+      this.syncError = errorMessage(error)
+      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
     }
   }
 
@@ -338,12 +291,6 @@ export class DriveSyncPanel extends LitElement {
             ? this._renderFolderProblem()
             : this._renderSyncStatus()
         }
-
-        <button class="btn primary" ?disabled=${this.syncing} @click=${this._handleSync}>
-          ${
-            this.syncing ? html`<span class="spinner"></span> Syncing...` : html`🔄 Sync with Drive`
-          }
-        </button>
 
         <button class="btn" ?disabled=${this.syncing} @click=${this._handleReset}>
           ⤓ Reset from Google Drive
@@ -397,7 +344,7 @@ export class DriveSyncPanel extends LitElement {
         <div class="sync-status">
           <div class="status-row">
             <span class="status-icon">☁️</span>
-            <span class="status-text">Ready to sync</span>
+            <span class="status-text">Ready</span>
           </div>
         </div>
       `
@@ -408,7 +355,7 @@ export class DriveSyncPanel extends LitElement {
         <div class="sync-status error">
           <div class="status-row">
             <span class="status-icon">❌</span>
-            <span class="status-text">Sync failed</span>
+            <span class="status-text">Failed</span>
           </div>
           <div class="error-message">${this.syncError}</div>
         </div>
