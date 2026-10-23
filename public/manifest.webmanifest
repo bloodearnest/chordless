@@ -33,7 +33,7 @@
     {
       "action": "/import-song",
       "accept": {
-        "text/plain": [".cho", ".chordpro", ".crd", ".chopro"]
+        "text/x-chordpro": [".cho", ".chordpro", ".crd", ".chopro"]
       },
       "launch_type": "single-client"
     }
@@ -49,7 +49,7 @@
       "files": [
         {
           "name": "files",
-          "accept": ["text/*", "application/pdf", ".cho", ".chordpro", ".crd", ".chopro", ".txt"]
+          "accept": ["text/*", "application/pdf", ".cho", ".chordpro", ".crd", ".chopro"]
         }
       ]
     }

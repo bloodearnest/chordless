@@ -32,6 +32,9 @@ test('opening a ChordPro file goes to the import page, for the extensions a char
   for (const extension of ['.cho', '.chordpro']) assert.ok(extensions.includes(extension))
   // Not every text file: Chordless should not become what opens .txt
   assert.ok(!extensions.includes('.txt'))
+  // Nor text/plain: Linux lists a web app for a file by MIME type alone (the .desktop file's
+  // MimeType line has no extensions), so that would offer Chordless for every .txt file
+  assert.ok(!('text/plain' in handler.accept))
 })
 
 test('a share is a POST of files and text to the address the service worker handles', () => {
@@ -44,6 +47,8 @@ test('a share is a POST of files and text to the address the service worker hand
   assert.equal(target.params.files[0].name, 'files')
   // A leader's charts are PDFs
   assert.ok(target.params.files[0].accept.includes('application/pdf'))
+  // Nor does it name .txt, as the file handler above does not
+  assert.ok(!target.params.files[0].accept.includes('.txt'))
   // It is not a page of its own: the service worker answers it with a redirect
   assert.ok(!isView(target.action))
 })
