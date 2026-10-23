@@ -97,6 +97,18 @@ describe('the home view', () => {
   const modal = () => must(view.querySelector<AppModal>('app-modal'))
   const form = () => must(view.querySelector<SetlistDetailsForm>('setlist-details-form'))
 
+  it('shows only what was shared, with the Shared tab marked, when opened as /?shared', async () => {
+    await db.saveSetlist(makeSetlist({ id: 'own', date: '2001-03-04' }))
+    window.history.replaceState(null, '', '/?shared')
+    try {
+      await open()
+      expect(view.querySelector('setlist-group')).to.equal(null)
+      expect(view.querySelector('space-tabs')?.hasAttribute('shared')).to.equal(true)
+    } finally {
+      window.history.replaceState(null, '', '/')
+    }
+  })
+
   it('shows the welcome card to someone with no setlists', async () => {
     await open()
     expect(view.querySelector('welcome-card')).to.not.equal(null)

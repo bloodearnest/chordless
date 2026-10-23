@@ -29,6 +29,14 @@ export function setPageTitle(title: string | null) {
   router?.setTitle?.(title)
 }
 
+/* v8 ignore start -- loading a page would end the test run */
+/** Load a URL as a page, afresh: for after the space has changed, which the app reads once, as it starts */
+export function loadPage(url: string) {
+  // biome-ignore lint/plugin: the whole app starts afresh in the other space
+  window.location.assign(url)
+}
+/* v8 ignore stop */
+
 export async function goTo(url: string, options?: GoOptions) {
   /* v8 ignore next 4 -- loading a page would end the test run: tests give a router instead */
   if (router && (await router.navigate(url, options))) return

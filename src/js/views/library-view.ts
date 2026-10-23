@@ -18,6 +18,7 @@ import '../../components/app-modal.ts'
 import type { KeyChangeEvent, KeySelector } from '../../components/key-selector.ts'
 import '../../components/key-selector.ts'
 import '../../components/song-card.ts'
+import '../../components/space-tabs.ts'
 import '../../components/song-display.ts'
 import type { SongInfoDialog } from '../../components/song-info-dialog.ts'
 import '../../components/song-info-dialog.ts'
@@ -570,6 +571,7 @@ export class LibraryView extends PageView {
                 type="search"
                 id="song-search"
                 class="song-search-input"
+      <space-tabs></space-tabs>
                 placeholder="Search songs by title, artist, or lyrics..."
                 .value=${this._search}
                 @input=${(event: Event) => this.#typed((event.target as HTMLInputElement).value)}

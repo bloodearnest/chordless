@@ -410,6 +410,17 @@ describe('team-space-wizard', () => {
       }
     }
 
+    it('does not offer a space with nothing in it as a source', async () => {
+      const empty = await createSpace(`${prefix} empty ${crypto.randomUUID().slice(0, 8)}`)
+      await sourceSpace()
+      await open()
+      await until(() => text().includes('Bring across'), 'something to bring')
+      const offered = [
+        ...(page.shadowRoot?.querySelectorAll<HTMLOptionElement>('#source option') ?? []),
+      ]
+      expect(offered.map(option => option.value)).to.not.include(empty.id)
+    })
+
     it('offers only the setlists of a space that has setlists and no songs', async () => {
       const made = await createSpace(`${prefix} lists ${crypto.randomUUID().slice(0, 8)}`)
       source = made

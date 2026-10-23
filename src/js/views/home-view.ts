@@ -13,13 +13,13 @@ import type {
 import '../../components/setlist-details-form.ts'
 import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts'
 import '../../components/setlist-group.ts'
+import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
 import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
-import { getCurrentSpace } from '../space.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
 import { errorMessage } from '../utils/errors.ts'
@@ -96,8 +96,14 @@ export class HomeView extends PageView {
   #modal = createRef<AppModal>()
   #form = createRef<SetlistDetailsForm>()
 
+  /** The Shared tab was chosen: the page shows what was shared with the user, in place of the space's setlists */
+  #sharedOnly = new URLSearchParams(window.location.search).has('shared')
+
   #groups = new Task(this, {
-    task: async () => {
+    task: async (): Promise<{ groups: SetlistYear[]; shared: SetlistYear[] }> => {
+      if (this.#sharedOnly) {
+        return { groups: [], shared: sharedGroup(await listSharedWithMe().catch(() => [])) }
+      }
       const db = await getCurrentDB()
       // One-off: record leader ids on setlists from before they existed
       await claimSetlistsOnce(db, db.spaceId)
@@ -177,9 +183,8 @@ export class HomeView extends PageView {
   }
 
   override render() {
-    const { name } = getCurrentSpace()
     return html`
-      <app-header id="home-app-header" heading="Setlists - ${name}">
+      <app-header id="home-app-header" heading="Setlists">
         <button
               slot="actions"
               class="create-setlist-button"
@@ -190,6 +195,7 @@ export class HomeView extends PageView {
               <app-icon name="add" size="24"></app-icon>
             </button>
       </app-header>
+      <space-tabs ?shared=${this.#sharedOnly}></space-tabs>
 
       <main class="home-content">
         <div id="setlist-list" class="setlist-list">
