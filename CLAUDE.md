@@ -102,10 +102,13 @@ When a test fails and the cause turns out to be a real defect in the app code (n
 a flake, or an intended change of behaviour), append one JSON line to `docs/test-catches.jsonl`
 before moving on:
 
-    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "short sha, or uncommitted"}
+    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "short sha, or uncommitted", "caught_by": "new-test|existing-test"}
 
 - `regression` is a bug in code being changed at the time; `existing-bug` was already there.
 - A bug caught in work in progress counts: that is a test doing its job.
+- `caught_by` (for `regression` and `existing-bug` only) is `existing-test` when a test that was
+  already there failed, which is what keeping a suite pays for, and `new-test` when a test written
+  with the change found it. Leave it off `test-bug` and `flaky`.
 - Also log failures where the test was wrong or flaky, with `kind` `test-bug` or `flaky`, so we can
   see which tests cost more than they catch.
 - Don't log an expected failure (a test written first), or a failure whose cause is not diagnosed
