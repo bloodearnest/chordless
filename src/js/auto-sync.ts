@@ -1,0 +1,164 @@
+/**
+ * Syncing by itself while the app is open (docs/SYNC_ARCHITECTURE.md, "Pulling while the app is
+ * open"): an incremental sync when the app is opened or comes back after a long time, when the
+ * device comes back online after a while offline, and every minute while the app is on screen.
+ * A timer in the open page, not a browser background task: those are Chromium-only, rare and
+ * absent on iPad. Only the space in use is synced; the others have the Sync button on their card.
+ *
+ * What it does is injected (`AutoSyncDeps`), so the rules are tested without a clock or a network;
+ * `startAutoSync` gives it the real ones.
+ */
+import { getSignInState } from './google-auth.ts'
+import { lastSyncOf, recordSync } from './last-sync.ts'
+import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
+import { isTeamMember, storageFor } from './storage/space-storage.ts'
+import { createSyncOrchestrator } from './sync-orchestrator.ts'
+
+/** How often the app syncs while it is on screen */
+export const TICK_MS = 60_000
+/** Opening the app, or coming back to it, after this long syncs whatever the storage can do */
+export const STALE_AFTER_MS = 15 * 60_000
+/** Coming back online after this long syncs as if the app had just been opened */
+export const OFFLINE_LONG_MS = 5 * 60_000
+
+/** What a sync can be done with now */
+export type SyncState =
+  /** Not signed in, no folder yet, or nothing to sync with */
+  | 'unavailable'
+  /** The storage has a feed of changes: a sync is cheap, so it is done every minute */
+  | 'feed'
+  /** It has none: a sync lists everything, so it is done only when the app opens or comes back */
+  | 'no-feed'
+
+export interface AutoSyncDeps {
+  /** Where its events come from: the window ('online', 'offline') and the document ('visibilitychange') */
+  win: EventTarget
+  doc: EventTarget
+  now(): number
+  visible(): boolean
+  online(): boolean
+  /** When the space last synced on this device (ISO time), or null if it never has */
+  lastSync(): string | null
+  state(): Promise<SyncState>
+  /** The sync itself, for the space in use (skipped if another is running); throws if it fails */
+  run(): Promise<void>
+  /** Call `fn` every `ms` until the returned function is called */
+  every(ms: number, fn: () => void): () => void
+}
+
+export class AutoSync {
+  #deps: AutoSyncDeps
+  #lastAttempt = Number.NEGATIVE_INFINITY
+  #offlineSince: number | null = null
+  #stop: (() => void) | null = null
+
+  constructor(deps: AutoSyncDeps) {
+    this.#deps = deps
+  }
+
+  start(): void {
+    const { win, doc, online, now, every } = this.#deps
+    if (!online()) this.#offlineSince = now()
+    doc.addEventListener('visibilitychange', this.#onVisibility)
+    win.addEventListener('online', this.#onOnline)
+    win.addEventListener('offline', this.#onOffline)
+    const stopTimer = every(TICK_MS, () => void this.#sync(false))
+    this.#stop = () => {
+      doc.removeEventListener('visibilitychange', this.#onVisibility)
+      win.removeEventListener('online', this.#onOnline)
+      win.removeEventListener('offline', this.#onOffline)
+      stopTimer()
+    }
+    void this.#catchUp()
+  }
+
+  stop(): void {
+    this.#stop?.()
+    this.#stop = null
+  }
+
+  /** Whether the space has gone too long without a sync for a quick one to do */
+  #stale(): boolean {
+    const last = this.#deps.lastSync()
+    return !last || this.#deps.now() - Date.parse(last) > STALE_AFTER_MS
+  }
+
+  /** The app opened or came back: a sync that does all it can if the last was long ago, else a tick */
+  async #catchUp(): Promise<void> {
+    await this.#sync(this.#stale())
+  }
+
+  #onVisibility = (): void => {
+    if (this.#deps.visible() && this.#deps.now() - this.#lastAttempt >= TICK_MS) {
+      void this.#catchUp()
+    }
+  }
+
+  #onOffline = (): void => {
+    this.#offlineSince ??= this.#deps.now()
+  }
+
+  #onOnline = (): void => {
+    const since = this.#offlineSince
+    this.#offlineSince = null
+    const long = since !== null && this.#deps.now() - since > OFFLINE_LONG_MS
+    void this.#sync(long || this.#stale())
+  }
+
+  /**
+   * Sync once if it can be done now. `everything` is for the app opening or coming back after a
+   * while: a storage with no feed is synced then too, not on a tick.
+   */
+  async #sync(everything: boolean): Promise<void> {
+    if (!this.#deps.visible() || !this.#deps.online()) return
+    try {
+      const state = await this.#deps.state()
+      if (state === 'unavailable' || (state === 'no-feed' && !everything)) return
+      this.#lastAttempt = this.#deps.now()
+      await this.#deps.run()
+    } catch (error) {
+      // (offline, signed out, a failed request: the next tick tries again)
+      console.warn('[AutoSync] Sync did not work:', error)
+    }
+  }
+}
+
+/* v8 ignore start -- wiring to the real clock, network and sync: the Playwright tests run the app */
+async function currentState(): Promise<SyncState> {
+  const space = await getCurrentSpaceFull()
+  if (!space.rootRef) return 'unavailable'
+  const signIn = await getSignInState()
+  const canSync = signIn === 'signed-in' || (signIn === 'no-drive' && isTeamMember(space))
+  if (!canSync) return 'unavailable'
+  return storageFor(space).space(space.rootRef).changes ? 'feed' : 'no-feed'
+}
+
+async function runSync(): Promise<void> {
+  const space = await getCurrentSpaceFull()
+  const orchestrator = await createSyncOrchestrator(space.name, space.id)
+  if (await orchestrator.incrementalSync(null, { skipIfBusy: true })) recordSync(space.id)
+}
+
+/** Start syncing the space in use while the app is open */
+export function startAutoSync(): AutoSync {
+  const auto = new AutoSync({
+    win: window,
+    doc: document,
+    now: () => Date.now(),
+    visible: () => document.visibilityState === 'visible',
+    online: () => navigator.onLine,
+    lastSync: () => {
+      const { id } = getCurrentSpace()
+      return id ? lastSyncOf(id) : null
+    },
+    state: currentState,
+    run: runSync,
+    every: (ms, fn) => {
+      const id = setInterval(fn, ms)
+      return () => clearInterval(id)
+    },
+  })
+  auto.start()
+  return auto
+}
+/* v8 ignore stop */

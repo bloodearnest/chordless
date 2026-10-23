@@ -472,7 +472,7 @@ going back home. In the service worker it completes regardless.
   will include it.
 - Skipped silently when offline, not signed in, or sync isn't set up.
 
-#### Pulling while the app is open (designed 2026-10-19; the incremental sync is built, the timers not yet)
+#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: the live 15 s check, applying in place, the members clock)
 
 Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
 only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
@@ -489,7 +489,17 @@ It can be an optional extra for a closed, installed app.
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
 | A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
 
-The intervals and the offline threshold are named constants, not preferences. There is no date
+The intervals and the offline threshold are named constants, not preferences.
+
+**Built (`src/js/auto-sync.ts`, started by `app.ts`):** the sync on open or when the app is shown
+again (a sync that does all the storage can if the last was over 15 minutes ago, else a quick one),
+the sync when the device is back online (as if opened if it was offline over 5 minutes), and the
+tick every 60 s while the app is on screen and online. Only for the space in use, and only where
+there is a feed: a storage with none is synced when the app opens or comes back, never on a tick.
+Each is an incremental sync that also pushes, so a local edit goes within the minute (until the
+immediate push is built). `sync-lock.ts` holds the Web Lock `chordless-sync`: a press of Sync waits
+for a running sync, and one the app starts is skipped if one is running. A failure is only logged.
+A sync that finishes records the time (the card's "Synced ..."). There is no date
 rule: a request to the feed costs the same whatever the age of the files, so every setlist and chart
 is covered.
 

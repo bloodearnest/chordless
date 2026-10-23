@@ -33,7 +33,12 @@ describe('SyncOrchestrator', () => {
     console.error = realError
   })
 
-  type Operation = 'sync' | 'pushToDrive' | 'pullFromDrive' | 'resetLocalFromDrive'
+  type Operation =
+    | 'sync'
+    | 'incrementalSync'
+    | 'pushToDrive'
+    | 'pullFromDrive'
+    | 'resetLocalFromDrive'
 
   /** A manager whose one operation reports `reports`, then fails with `failure` if given */
   function orchestratorWith(
@@ -64,6 +69,49 @@ describe('SyncOrchestrator', () => {
     await call(progress => messages.push(progress))
     return messages
   }
+
+  describe('an incremental sync, the one the app makes by itself', () => {
+    it('runs the manager’s, tells it whether to push, and says it ran', async () => {
+      const calls: unknown[] = []
+      const orchestrator = new SyncOrchestrator('Test Church', null)
+      orchestrator.syncManager = {
+        resetSetlists: [],
+        incrementalSync: async (_progress: unknown, options: unknown) => {
+          calls.push(options)
+        },
+      } as unknown as DriveSyncManager
+
+      expect(await orchestrator.incrementalSync()).to.equal(true)
+      expect(await orchestrator.incrementalSync(null, { push: false })).to.equal(true)
+      expect(calls).to.deep.equal([{ push: true }, { push: false }])
+    })
+
+    it('is skipped when asked to, if a sync is already running, and its failure is thrown', async () => {
+      let release = () => {}
+      const held = new Promise<void>(resolve => {
+        release = resolve
+      })
+      const running = orchestratorWith('sync')
+      const manager = running.syncManager as unknown as { sync: () => Promise<void> }
+      manager.sync = () => held
+      const first = running.sync()
+      await new Promise(resolve => setTimeout(resolve, 20))
+
+      const other = orchestratorWith('incrementalSync')
+      expect(await other.incrementalSync(null, { skipIfBusy: true })).to.equal(false)
+      release()
+      await first
+
+      const failing = orchestratorWith('incrementalSync', [], new Error('offline'))
+      let thrown: Error | null = null
+      try {
+        await failing.incrementalSync()
+      } catch (error) {
+        thrown = error as Error
+      }
+      expect(thrown?.message).to.equal('offline')
+    })
+  })
 
   describe('a successful run', () => {
     const progress = { stage: 'pulling', message: 'Pulling songs', current: 1, total: 2 }

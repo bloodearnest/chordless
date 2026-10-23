@@ -10,6 +10,7 @@ import type { SyncProgress } from './drive-sync.ts'
 import { createSyncManager, DriveSyncManager, isSyncAvailable } from './drive-sync.ts'
 import type { ResetSetlist } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
+import { withSyncLock } from './sync-lock.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
 
@@ -106,10 +107,27 @@ export class SyncOrchestrator {
   }
 
   /**
+   * Run one of the manager's operations, one sync at a time (a press of Sync waits for one that is
+   * running; see sync-lock.ts)
+   */
+  async #run(
+    name: string,
+    messages: Messages,
+    progressCallback: BroadcastCallback | null,
+    operation: (
+      syncManager: DriveSyncManager,
+      progress: (progress: SyncProgress) => void
+    ) => Promise<unknown>
+  ): Promise<{ success: true }> {
+    await withSyncLock(() => this.#execute(name, messages, progressCallback, operation))
+    return { success: true }
+  }
+
+  /**
    * Run one of the manager's operations, reporting its progress to the callback: what it says as it
    * starts and ends, then what the manager reports, and its error if it fails (thrown again)
    */
-  async #run(
+  async #execute(
     name: string,
     messages: Messages,
     progressCallback: BroadcastCallback | null,
@@ -154,6 +172,26 @@ export class SyncOrchestrator {
         await tellOfReset(manager)
       }
     )
+  }
+
+  /**
+   * Sync from the storage's feed of changes (see DriveSyncManager.incrementalSync): what the app
+   * does by itself while it is open. With `skipIfBusy`, nothing is done if a sync is running.
+   * @returns whether it ran
+   */
+  async incrementalSync(
+    progressCallback: BroadcastCallback | null = null,
+    { push = true, skipIfBusy = false }: { push?: boolean; skipIfBusy?: boolean } = {}
+  ): Promise<boolean> {
+    const result = await withSyncLock(
+      () =>
+        this.#execute('Incremental sync', {}, progressCallback, async (manager, progress) => {
+          await manager.incrementalSync(progress, { push })
+          await tellOfReset(manager)
+        }),
+      { skipIfBusy }
+    )
+    return result.ran
   }
 
   /**
