@@ -472,7 +472,7 @@ going back home. In the service worker it completes regardless.
   will include it.
 - Skipped silently when offline, not signed in, or sync isn't set up.
 
-#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: the live 15 s check, applying in place, the members clock)
+#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: applying a pulled setlist in place, the members clock)
 
 Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
 only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
@@ -485,7 +485,7 @@ It can be an optional extra for a closed, installed app.
 |---|---|
 | App opened, or the device back online after a few minutes offline | an **incremental sync** (below) |
 | App open | an incremental sync about every 60 s |
-| A setlist is **live** | about every 15 s, for that setlist and the songs it newly uses only (a direct check, below); and at once when the tab becomes visible or the device comes back online |
+| A setlist is **live** | the same tick, every 60 s. There is no faster poll for the live setlist: a late song within a minute is enough, and the fast way is the live channel (below) |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
 | A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
 
@@ -544,8 +544,7 @@ What an incremental sync must do, because the full sync did it by listing everyt
 - **Take the same Web Lock** `chordless-sync` as every other sync.
 
 The feed: checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows
-after about 5 s, so a tick can be that far behind (fine at 60 s; the live 15 s tick checks the one
-file directly instead). **Scope checked 2026-10-23** with a throwaway probe page (since deleted): it
+after about 5 s, so a tick can be that far behind (fine at 60 s). **Scope checked 2026-10-23** with a throwaway probe page (since deleted): it
 holds only files the app made or was given. Files made by hand in Drive, in My Drive and inside the
 app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
 find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
@@ -557,16 +556,14 @@ Tests: the random sync tests (`tests/drive-sync-random.test.ts`) run with the in
 compare the result with a full sync after every step; a lost token, a failed download and a file
 moved between folders each have a test of their own.
 
-- **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
-  `md5Checksum`, compared with the record's `fileRev`; only if it differs, `pullSetlistNow(id)`
-  (the pull-side twin of `pushSetlistNow`: the same conflict rule as the full pull, nothing else is
-  listed or touched). The setlist may now use a song this device has never had, so that pull also
-  fetches the charts the setlist needs and the device lacks, found by their `songUuid` property
-  (`files.list` with `appProperties has { key='songUuid' and value='…' }`), as there is no Drive
-  file id for them yet. A chart already in the setlist that the leader fixed does not change the
-  setlist's file: the 60 s general poll picks that up.
 - **Same lock and guards as the push:** the Web Lock `chordless-sync`, skipped when offline or
   signed out; never alongside a full sync.
+- **The fast way is the live channel, later.** A leader's changes to a live setlist (an added song,
+  a key, the order) go straight to followers over a session (WebRTC, peer to peer; the Worker's
+  team service may tell members that one has started, and relays nothing it keeps). It is opt-in,
+  and it adds to what a lone user can do. The 60 s tick stays as the fallback for anyone not on it
+  or whose connection drops. A change arrives as the setlist record and lands as below; charts
+  still come through the storage.
 - **A pull that changes the open setlist applies in place:** the page follows its setlist record.
   It stays on the current song by song id, says what changed with the same summary as the reader's
   toast (`sync/setlist-diff.ts`), and a reader whose changes were replaced can Undo. A leader's
