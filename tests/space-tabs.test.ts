@@ -1,7 +1,8 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import '../src/components/space-tabs.ts'
-import type { SpaceTabs } from '../src/components/space-tabs.ts'
+import { SpaceTabs } from '../src/components/space-tabs.ts'
 import { ChordlessDB } from '../src/js/db.ts'
+import { setRouter } from '../src/js/navigation.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart } from '../src/js/song-utils.ts'
 import {
@@ -212,6 +213,21 @@ describe('the tabs of the spaces on this device', () => {
     await element.updateComplete
     await element._open({ id: SHARED_DB_ID, name: 'Shared', kind: null })
     expect(sharedOpened).to.equal(1)
+
+    // (without one of its own it goes there through the router, afresh)
+    const visited: [string, unknown][] = []
+    setRouter({
+      navigate: async (url: string, options?: unknown) => {
+        visited.push([url, options])
+        return true
+      },
+    })
+    try {
+      new SpaceTabs().openShared()
+      expect(visited).to.deep.equal([['/?shared', { fresh: true }]])
+    } finally {
+      setRouter(null)
+    }
   })
 
   it('draws no tabs, and does not fail, when the spaces cannot be read', async () => {

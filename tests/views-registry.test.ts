@@ -40,6 +40,13 @@ describe('the views of the app shell', () => {
     expect(same?.(setlist('a'), { name: 'home' })).to.equal(false)
   })
 
+  it('makes a new home view to show what was shared, and back', () => {
+    const same = views.home.sameView
+    expect(same?.({ name: 'home' }, { name: 'home' })).to.equal(true)
+    expect(same?.({ name: 'home' }, { name: 'home', shared: true })).to.equal(false)
+    expect(same?.({ name: 'home', shared: true }, { name: 'home' })).to.equal(false)
+  })
+
   it('keeps the shared setlist view for moves within a share, and not to another', () => {
     const share = (fileId: string, songIndex = -1) =>
       ({ name: 'share', fileId, songIndex }) as Route

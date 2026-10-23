@@ -1,6 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Space } from '../js/data-types.ts'
-import { loadPage } from '../js/navigation.ts'
+import { goTo } from '../js/navigation.ts'
 import { SHARED_DB_ID } from '../js/share-receiver.ts'
 import { getCurrentSpace, switchSpace } from '../js/space.ts'
 import { loadSpaceTabs, noteTabUsed, type SpaceTab, splitTabs } from '../js/space-tabs.ts'
@@ -35,8 +35,7 @@ export class SpaceTabs extends LitElement {
   /* v8 ignore next -- switching reloads the page, which would end the test run: tests give their own */
   switchTo: (spaceId: string) => Promise<void> = spaceId => switchSpace(spaceId)
   /** Opens the page of what was shared (a test gives its own) */
-  /* v8 ignore next -- loading a page would end the test run: tests give their own */
-  openShared: () => void = () => loadPage('/?shared')
+  openShared: () => void = () => void goTo('/?shared', { fresh: true })
 
   static override styles = css`
     :host {

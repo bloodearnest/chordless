@@ -205,7 +205,7 @@ export class AppRouter {
    */
   async navigate(
     target: string | Route,
-    { replace = false }: { replace?: boolean } = {}
+    { replace = false, fresh = false }: { replace?: boolean; fresh?: boolean } = {}
   ): Promise<boolean> {
     const route = typeof target === 'string' ? matchRoute(target) : target
     if (!this.handles(route)) return false
@@ -233,7 +233,7 @@ export class AppRouter {
         window.history.replaceState(state, '', url)
       }
     }
-    await this.#show(route, commit)
+    await this.#show(route, commit, fresh)
     return true
   }
 
@@ -293,10 +293,10 @@ export class AppRouter {
    * Show a route: load its view (or keep the current one if it stays the same),
    * then `commit` the URL, then show it.
    */
-  async #show(route: Route, commit: () => void = ignore): Promise<void> {
+  async #show(route: Route, commit: () => void = ignore, fresh = false): Promise<void> {
     const previous = this.#route
     const entry = this.#views[route.name]
-    const keep = this.#view && previous && this.#isSameView(previous, route)
+    const keep = !fresh && this.#view && previous && this.#isSameView(previous, route)
     // Only a navigation that loads a view can be overtaken by a newer one. A move within the
     // view is done at once, and must not cancel a change of view that is still loading (as a
     // search put in the URL after a pause would when the user has just tapped a link)
@@ -321,7 +321,7 @@ export class AppRouter {
       // What the view being left shows, kept for if its entry is come back to; and what was
       // kept for the entry this view is for, if it was left before
       this.#remember(this.#shownKey, this.#view?.captureViewState?.())
-      view.restoredState = this.#viewStates.get(window.history.state?.key)
+      view.restoredState = fresh ? undefined : this.#viewStates.get(window.history.state?.key)
       // (not if a newer navigation took over while the transition was starting)
       await this.#swap(() => {
         if (navigation === this.#navigation) this.#outlet.replaceChildren(view)

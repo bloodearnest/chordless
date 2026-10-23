@@ -12,6 +12,8 @@ interface Navigates {
 
 export interface GoOptions {
   replace?: boolean
+  /** Make the view afresh even if the route is the one shown (the space it reads has changed) */
+  fresh?: boolean
 }
 
 let router: Navigates | null = null

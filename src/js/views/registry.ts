@@ -48,7 +48,11 @@ export const views: Record<string, ViewEntry> = {
     () => import('./not-found-view.ts'),
     () => 'Not found - Chordless'
   ),
-  home: view('home-view', () => import('./home-view.ts')),
+  home: {
+    ...view('home-view', () => import('./home-view.ts')),
+    // What was shared is another list, so another view
+    sameView: (previous, next) => 'shared' in previous === 'shared' in next,
+  },
   account: view(
     'account-view',
     () => import('./account-view.ts'),

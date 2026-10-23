@@ -96,8 +96,10 @@ export class HomeView extends PageView {
   #modal = createRef<AppModal>()
   #form = createRef<SetlistDetailsForm>()
 
-  /** The Shared tab was chosen: the page shows what was shared with the user, in place of the space's setlists */
-  #sharedOnly = new URLSearchParams(window.location.search).has('shared')
+  /** The Shared tab was chosen (/?shared): the page shows what was shared with the user, in place of the space's setlists */
+  get #sharedOnly(): boolean {
+    return Boolean(this.route && 'shared' in this.route)
+  }
 
   #groups = new Task(this, {
     task: async (): Promise<{ groups: SetlistYear[]; shared: SetlistYear[] }> => {

@@ -6,7 +6,8 @@
  * can be shared by the page code and the service worker.
  *
  * A route is a plain object (see Route):
- *   { name: 'home' }
+ *   { name: 'home' }                          /
+ *   { name: 'home', shared: true }            /?shared: the home page of what was shared by link
  *   { name: 'songs', songUuid?: string }     /songs, /songs/<song uuid>
  *   { name: 'songs', search: string }        /songs?q=<search>: the list, searched
  *   { name: 'preferences' | 'account' | 'import-song' | 'import-setlist' | 'bookmarklet' | 'about' | 'join' | 'new-team-space' | 'media' }
@@ -37,6 +38,7 @@ export type PageName =
 
 export type Route =
   | { name: PageName }
+  | { name: 'home'; shared: true }
   | { name: 'songs'; songUuid?: string; search?: string }
   | { name: 'setlist'; setlistId: string; songIndex: number }
   | { name: 'share'; fileId: string; songIndex: number }
@@ -103,8 +105,8 @@ function decode(part: string): string {
 
 /**
  * Parse a location into a route.
- * @param location a URL string or path, or a Location/URL. Only the library's ?q= is read of
- *   the query string; the hash is ignored.
+ * @param location a URL string or path, or a Location/URL. Only the library's ?q= and the home
+ *   page's ?shared are read of the query string; the hash is ignored.
  */
 export function matchRoute(location: string | { pathname: string; search?: string }): Route {
   let pathname: string
@@ -126,6 +128,9 @@ export function matchRoute(location: string | { pathname: string; search?: strin
     const query = new URLSearchParams(search).get('q')
     return query ? { name: 'songs', search: query } : { name: 'songs' }
   }
+  // The home page can show what was shared: /?shared
+  if (page === 'home' && new URLSearchParams(search).has('shared'))
+    return { name: 'home', shared: true }
   if (page) return { name: page }
 
   const librarySong = path.match(SONGS_SONG_PATH)
@@ -168,6 +173,8 @@ export function buildUrl(route: Route): string {
     }
     case 'not-found':
       return route.path
+    case 'home':
+      return 'shared' in route ? '/?shared' : '/'
     default: {
       const path = PAGE_PATHS[route.name]
       if (!path) throw new Error(`Unknown route: ${route.name}`)

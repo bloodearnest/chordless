@@ -82,9 +82,12 @@ describe('the home view', () => {
     if (before.id) await setCurrentSpace(before.id, before.name)
   })
 
-  async function open(restoredState?: HomeView['restoredState']) {
+  async function open(
+    restoredState?: HomeView['restoredState'],
+    route: HomeView['route'] = { name: 'home' }
+  ) {
     view = document.createElement('home-view')
-    view.route = { name: 'home' }
+    view.route = route
     view.restoredState = restoredState
     outlet.append(view)
     await view.updateComplete
@@ -99,14 +102,9 @@ describe('the home view', () => {
 
   it('shows only what was shared, with the Shared tab marked, when opened as /?shared', async () => {
     await db.saveSetlist(makeSetlist({ id: 'own', date: '2001-03-04' }))
-    window.history.replaceState(null, '', '/?shared')
-    try {
-      await open()
-      expect(view.querySelector('setlist-group')).to.equal(null)
-      expect(view.querySelector('space-tabs')?.hasAttribute('shared')).to.equal(true)
-    } finally {
-      window.history.replaceState(null, '', '/')
-    }
+    await open(undefined, { name: 'home', shared: true })
+    expect(view.querySelector('setlist-group')).to.equal(null)
+    expect(view.querySelector('space-tabs')?.hasAttribute('shared')).to.equal(true)
   })
 
   it('shows the welcome card to someone with no setlists', async () => {

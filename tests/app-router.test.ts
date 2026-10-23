@@ -168,6 +168,14 @@ describe('AppRouter', () => {
       expect(outlet.firstElementChild).to.equal(view)
     })
 
+    it('makes the view afresh when asked, as when the space it reads has changed', async () => {
+      await router.navigate('/songs')
+      const view = outlet.firstElementChild
+      await router.navigate('/songs', { fresh: true })
+      expect(outlet.firstElementChild).to.not.equal(view)
+      expect(outlet.firstElementChild?.getAttribute('data-view')).to.equal('songs')
+    })
+
     it('shows only the last of two moves made at once, in a view transition', async () => {
       if (!document.startViewTransition) return
       const title = document.title

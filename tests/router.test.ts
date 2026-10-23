@@ -43,6 +43,8 @@ describe('matchRoute', () => {
     ),
     ['/', { name: 'home' }],
     ['/index.html', { name: 'home' }],
+    // What was shared by link is the home page's other list
+    ['/?shared', { name: 'home', shared: true }],
     // An invite link: the space and the code are in the fragment, which the route leaves out
     ['/join#space-aaaa1111.abcdefghijklmnopqrstuv', { name: 'join' }],
     ['/media', { name: 'media' }],
@@ -110,6 +112,7 @@ describe('matchRoute', () => {
 describe('buildUrl', () => {
   const routes: [Route, string][] = [
     [{ name: 'home' }, '/'],
+    [{ name: 'home', shared: true }, '/?shared'],
     [{ name: 'songs' }, '/songs'],
     [{ name: 'songs', search: 'amazing grace' }, '/songs?q=amazing%20grace'],
     [{ name: 'songs', songUuid: 'abc-123' }, '/songs/abc-123'],
