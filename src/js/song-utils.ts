@@ -104,25 +104,33 @@ export async function getSongWithContent(
  * The library's songs, by title: one entry for each song (its default variant, not
  * every variant), with its chart parsed. A song that can't be loaded is left out.
  * @param db the space's database
+ * @param options.allVariants list every variant of a song, not only its default (each with
+ *   `variantCount`), for choosing which to open or add
  * @param options.withLastUsage also set lastUsageInfo on each song, from the setlist it was
  *   last played in: {date, leader, key}
  */
 export async function getLibrarySongs(
   db: ChordlessDB,
-  { withLastUsage = false }: { withLastUsage?: boolean } = {}
+  {
+    withLastUsage = false,
+    allVariants = false,
+  }: { withLastUsage?: boolean; allVariants?: boolean } = {}
 ): Promise<SongWithContent[]> {
   const records = await db.getAllSongs()
 
-  // One song per deterministic id, not one per variant
+  // One song per deterministic id (its default), or every variant of each
   const byId = new Map<string, SongRecord>()
+  const variantCounts = new Map<string, number>()
   for (const record of records) {
+    variantCounts.set(record.id, (variantCounts.get(record.id) ?? 0) + 1)
     if (record.isDefault || !byId.has(record.id)) byId.set(record.id, record)
   }
 
   const songs: SongWithContent[] = []
-  for (const record of byId.values()) {
+  for (const record of allVariants ? records : byId.values()) {
     try {
       const song = await getSongWithContent(record.uuid, db)
+      if (allVariants) song.variantCount = variantCounts.get(record.id)
       if (withLastUsage) {
         const usage = await db.getSongUsageFromSetlists(song.id)
         if (usage?.length > 0) {
@@ -139,8 +147,13 @@ export async function getLibrarySongs(
     }
   }
 
-  return songs.sort((a, b) =>
-    (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase())
+  // By title; the variants of a song together, the default first
+  return songs.sort(
+    (a, b) =>
+      (a.title || '').toLowerCase().localeCompare((b.title || '').toLowerCase()) ||
+      a.id.localeCompare(b.id) ||
+      Number(b.isDefault) - Number(a.isDefault) ||
+      (a.importDate || '').localeCompare(b.importDate || '')
   )
 }
 
@@ -333,14 +346,15 @@ export interface CreateSongOptions {
 }
 
 /**
- * Create a new song from a chart in the current space's database. Throws if the song
+ * Create a new song from a chart in the current space's database (or `database`, another space's). Throws if the song
  * is already there, unless forceNew makes this a variant of it.
  */
 export async function createSong(
   chordproContent: string,
-  options: CreateSongOptions = {}
+  options: CreateSongOptions = {},
+  database: ChordlessDB | null = null
 ): Promise<SongRecord> {
-  const db = await getCurrentDB()
+  const db = database ?? (await getCurrentDB())
   const { metadata } = parser.parse(chordproContent)
   const identity = chartIdentity(metadata, options)
 
@@ -362,7 +376,7 @@ export async function createSong(
       variantLabel: options.variantLabel || 'Original',
     },
     {
-      importUser: options.importUser || 'default-user',
+      importUser: options.importUser || null,
       importSource: options.importSource || 'manual',
       sourceUrl: options.sourceUrl || null,
     }
@@ -377,6 +391,8 @@ export interface AddChartOptions {
   makeDefault: 'newest' | 'first'
   /** The title to use if the chart has none */
   title?: string
+  /** The CCLI number to use if the chart has none (a chart of a song that has one) */
+  ccliNumber?: string | null
   /** What a copy keeps of the song it is a copy of: when it was first imported, by whom, from where */
   importDate?: string
   importUser?: string | null
@@ -396,6 +412,7 @@ export async function addChart(
     importSource,
     makeDefault,
     title,
+    ccliNumber,
     importDate,
     importUser,
     sourceUrl,
@@ -407,7 +424,7 @@ export async function addChart(
   if (same) return same
 
   const { metadata } = parser.parse(chordpro)
-  const identity = chartIdentity(metadata, { title })
+  const identity = chartIdentity(metadata, { title, ccliNumber })
   const sameSong = known.filter(existing => existing.id === identity.id)
   const currentDefault = sameSong.find(existing => existing.isDefault)
   const isDefault = makeDefault === 'newest' || !currentDefault
@@ -494,6 +511,159 @@ export async function overwriteSong(
   return database.saveSong(updated)
 }
 
+/** Who made a chart that replaces or joins the library's: where it is from, and who imported it */
+export interface IncomingChart {
+  importSource: string
+  importUser?: string | null
+}
+
+/**
+ * Make every variant of a song (and the setlist entries that name it) the song a chart is of:
+ * its id, CCLI number and title. An official chart of a hand-made song is the same song under
+ * the CCLI number, and its variants have to follow.
+ */
+export async function moveToIdentity(
+  db: ChordlessDB,
+  oldId: string,
+  identity: ChartIdentity,
+  now: string
+): Promise<void> {
+  if (oldId === identity.id) return
+  for (const variant of await db.getSongVariants(oldId)) {
+    await db.saveSong({
+      ...variant,
+      id: identity.id,
+      ccliNumber: identity.ccliNumber,
+      title: identity.title,
+      titleNormalized: identity.titleNormalized,
+      metadataChangedAt: now,
+    })
+  }
+  for (const setlist of await db.getAllSetlists()) {
+    if (!setlist.songs.some(entry => entry.songId === oldId)) continue
+    await db.saveSetlist({
+      ...setlist,
+      songs: setlist.songs.map(entry =>
+        entry.songId === oldId ? { ...entry, songId: identity.id } : entry
+      ),
+      modifiedDate: now,
+    })
+  }
+}
+
+/**
+ * The identity of the song an incoming chart is of, when the library already has it: the chart's
+ * own CCLI number and title, else the library song's (a hand-made chart added to an official
+ * song is still that song).
+ */
+function identityOver(existing: SongRecord, chordproContent: string): ChartIdentity {
+  return chartIdentity(parser.parse(chordproContent).metadata, {
+    ccliNumber: existing.ccliNumber,
+    title: existing.title,
+  })
+}
+
+/**
+ * Replace a song's chart with a newer one of the same song, and with it the song's identity:
+ * the new chart's CCLI number, title, source, importer and import date (an official chart that
+ * replaces a hand-made one is no longer hand-made). Every variant of the song follows the new
+ * id; the song keeps its uuid, so setlists carry on using it.
+ */
+export async function replaceSong(
+  songUuid: string,
+  chordproContent: string,
+  { importSource, importUser }: IncomingChart,
+  db: ChordlessDB | null = null
+): Promise<SongRecord> {
+  const database = db ?? (await getCurrentDB())
+  const replaced = await overwriteSong(songUuid, chordproContent, database)
+  const now = new Date().toISOString()
+  const identity = identityOver(replaced, chordproContent)
+  await moveToIdentity(database, replaced.id, identity, now)
+  return database.saveSong({
+    ...((await database.getSong(songUuid)) as SongRecord),
+    id: identity.id,
+    ccliNumber: identity.ccliNumber,
+    title: identity.title,
+    titleNormalized: identity.titleNormalized,
+    importSource: songSource(importSource),
+    importUser: importUser ?? null,
+    importDate: now,
+    metadataChangedAt: now,
+  })
+}
+
+/**
+ * Import a chart as the song's original (its default), and keep the library's chart as a variant
+ * of it, called `variantLabel`. The incoming chart has its own CCLI number, source, importer
+ * and date; the library's keeps its source and date. Setlists that used the library's chart
+ * keep using it.
+ */
+export async function importAsOriginal(
+  songUuid: string,
+  chordproContent: string,
+  { importSource, importUser }: IncomingChart,
+  variantLabel = 'Alternate chords',
+  db: ChordlessDB | null = null
+): Promise<{ added: SongRecord; kept: SongRecord }> {
+  const database = db ?? (await getCurrentDB())
+  const existing = await database.getSong(songUuid)
+  if (!existing) throw new Error(`Song not found: ${songUuid}`)
+  const now = new Date().toISOString()
+  await moveToIdentity(database, existing.id, identityOver(existing, chordproContent), now)
+
+  const added = await addChart(database, chordproContent, {
+    variantLabel: 'Original',
+    importSource,
+    importUser: importUser ?? null,
+    makeDefault: 'newest',
+    ccliNumber: existing.ccliNumber,
+    title: existing.title,
+  })
+  if (added.uuid === songUuid) throw new Error('The library already has this chart')
+  // (addChart took the default from the old default; the old chart hangs from the new one)
+  const kept = await database.saveSong({
+    ...(await database.getSong(songUuid)),
+    isDefault: false,
+    variantOf: added.uuid,
+    variantLabel,
+    metadataChangedAt: now,
+  } as SongInput)
+  return { added, kept }
+}
+
+/**
+ * Import a chart as a variant, called `variantLabel`, of the library's: the library's chart stays
+ * the song's original (its default).
+ */
+export async function importAsVariant(
+  songUuid: string,
+  chordproContent: string,
+  { importSource, importUser }: IncomingChart,
+  variantLabel = 'Alternate chords',
+  db: ChordlessDB | null = null
+): Promise<SongRecord> {
+  const database = db ?? (await getCurrentDB())
+  const existing = await database.getSong(songUuid)
+  if (!existing) throw new Error(`Song not found: ${songUuid}`)
+  await moveToIdentity(
+    database,
+    existing.id,
+    identityOver(existing, chordproContent),
+    new Date().toISOString()
+  )
+  const added = await addChart(database, chordproContent, {
+    variantLabel,
+    importSource,
+    importUser: importUser ?? null,
+    makeDefault: 'first',
+    ccliNumber: existing.ccliNumber,
+    title: existing.title,
+  })
+  if (added.uuid === songUuid) throw new Error('The library already has this chart')
+  return added
+}
+
 /**
  * Create a variant of an existing song
  *
@@ -531,8 +701,12 @@ export async function createVariant(
  *
  * @param songUuid - UUID of variant to make default
  */
-export async function setDefaultVariant(songUuid: string): Promise<void> {
-  const db = await getCurrentDB()
+export async function setDefaultVariant(
+  songUuid: string,
+  database: ChordlessDB | null = null
+): Promise<void> {
+  const db = database ?? (await getCurrentDB())
+  const now = new Date().toISOString()
 
   const song = await db.getSong(songUuid)
   if (!song) {
@@ -546,7 +720,8 @@ export async function setDefaultVariant(songUuid: string): Promise<void> {
   for (const variant of variants) {
     if (variant.isDefault && variant.uuid !== songUuid) {
       variant.isDefault = false
-      variant.modifiedDate = new Date().toISOString()
+      variant.modifiedDate = now
+      variant.metadataChangedAt = now
       await db.saveSong(variant)
     }
   }
@@ -554,7 +729,8 @@ export async function setDefaultVariant(songUuid: string): Promise<void> {
   // Set this one as default
   if (!song.isDefault) {
     song.isDefault = true
-    song.modifiedDate = new Date().toISOString()
+    song.modifiedDate = now
+    song.metadataChangedAt = now
     await db.saveSong(song)
   }
 }

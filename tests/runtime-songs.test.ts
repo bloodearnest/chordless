@@ -45,7 +45,10 @@ describe('buildRuntimeSongs', () => {
   })
 
   /** Save a library song with the chart given, and return its id */
-  async function addSong(chart, { tempo, key }: { tempo?: TempoInput; key?: string } = {}) {
+  async function addSong(
+    chart,
+    { tempo, key, variantLabel }: { tempo?: TempoInput; key?: string; variantLabel?: string } = {}
+  ) {
     const unique = crypto.randomUUID()
     await db.saveChordPro({
       id: `chordpro-${unique}`,
@@ -61,6 +64,7 @@ describe('buildRuntimeSongs', () => {
       tempo,
       key,
       isDefault: true,
+      variantLabel,
       chordproFileId: `chordpro-${unique}`,
       modifiedDate: new Date().toISOString(),
     })
@@ -87,6 +91,12 @@ describe('buildRuntimeSongs', () => {
     expect(song.currentFontSize).to.equal(1.6)
     expect(song.currentCapo).to.equal(0)
     expect(song.hasLocalEdits).to.equal(false)
+  })
+
+  it("carries the song's version label, for the card to show", async () => {
+    const songId = await addSong(chart(), { variantLabel: 'Simon, capo 3' })
+    const [song] = await build([{ songId, order: 0 }])
+    expect(song.variantLabel).to.equal('Simon, capo 3')
   })
 
   it("transposes to the setlist's key, keeping the original", async () => {

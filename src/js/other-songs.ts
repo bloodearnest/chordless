@@ -69,6 +69,18 @@ export async function getSongsElsewhere(currentDbId: string): Promise<SongWithCo
 }
 
 /**
+ * The songs of a space marked with its name, where the device has more than one space (with one,
+ * saying which each is in is noise): the library lists them with songs of other spaces
+ */
+export function withSpaceName(
+  songs: SongWithContent[],
+  spaceCount: number,
+  spaceName: string
+): SongWithContent[] {
+  return spaceCount > 1 ? songs.map(song => ({ ...song, spaceName })) : songs
+}
+
+/**
  * The library to search: the space's songs, and the other databases' songs it
  * doesn't have (a song it has is its own, whatever the others hold), by title.
  */

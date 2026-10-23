@@ -699,7 +699,12 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
 export async function getCurrentDB(): Promise<ChordlessDB> {
   const { ensureCurrentSpace } = await import('./space.ts')
   const { id } = await ensureCurrentSpace()
-  const db = new ChordlessDB(id)
+  return openSpace(id)
+}
+
+/** The database of a space, which need not be the current one (an import may go to another) */
+export async function openSpace(spaceId: string): Promise<ChordlessDB> {
+  const db = new ChordlessDB(spaceId)
   await db.init()
   return db
 }

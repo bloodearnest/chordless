@@ -39,6 +39,8 @@ export interface RuntimeSong {
   currentFontSize: number
   currentCapo: number
   songId: string
+  /** Which version of the song this is: the stored song's label */
+  variantLabel: string | null
   sourceText: string
   hasLocalEdits: boolean
   /** Kept to make the song's model */
@@ -182,6 +184,7 @@ export async function buildRuntimeSongs(
       currentFontSize: fontSize,
       currentCapo: 0, // Capo is loaded from localStorage in loadState()
       songId: songEntry.songId,
+      variantLabel: canonicalSong?.variantLabel ?? null,
       sourceText: sourceText,
       hasLocalEdits: Boolean(songEntry.chordproEdits),
       // Store references needed for model creation

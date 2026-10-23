@@ -5,6 +5,7 @@ import {
   getSongFromAnywhere,
   getSongsElsewhere,
   withSongsFromElsewhere,
+  withSpaceName,
 } from '../src/js/other-songs.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
 import { addChart, getLibrarySongs } from '../src/js/song-utils.ts'
@@ -69,6 +70,13 @@ describe('Songs from the other databases', () => {
       'Alpha',
       'Beta (elsewhere)',
     ])
+  })
+
+  it("names the space of the library's songs, when the device has more than one", async () => {
+    await addChart(library, ALPHA, ADD)
+    const own = await getLibrarySongs(library)
+    expect(withSpaceName(own, 2, 'Gateway').map(song => song.spaceName)).to.deep.equal(['Gateway'])
+    expect(withSpaceName(own, 1, 'Gateway').map(song => song.spaceName)).to.deep.equal([undefined])
   })
 
   it('finds a song by uuid in the library, else in another database', async () => {

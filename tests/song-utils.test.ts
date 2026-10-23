@@ -13,7 +13,10 @@ import {
   getSongVariants,
   getSongWithContent,
   hashText,
+  importAsOriginal,
+  importAsVariant,
   overwriteSong,
+  replaceSong,
   setDefaultVariant,
 } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
@@ -231,6 +234,28 @@ describe('getLibrarySongs', () => {
     expect(matching[0].id).to.equal(song.id)
   })
 
+  it('lists every variant of a song, together, the default first then the oldest, when asked, each with how many there are', async () => {
+    const title = unique('Every variant')
+    const song = await createSong(chart(title))
+    const newer = await createVariant(song.uuid, 'Newer', chart(title, { key: 'A' }))
+    const older = await createVariant(song.uuid, 'Older', chart(title, { key: 'B' }))
+    const db = await getCurrentDB()
+    // (the order they were made in is not what is under test)
+    await db.saveSong({ ...must(await db.getSong(newer.uuid)), importDate: '2026-02-01T00:00:00Z' })
+    await db.saveSong({ ...must(await db.getSong(older.uuid)), importDate: '2026-01-01T00:00:00Z' })
+    const matching = (await getLibrarySongs(db, { allVariants: true })).filter(
+      entry => entry.title === title
+    )
+    expect(matching.map(entry => [entry.variantLabel, entry.variantCount])).to.deep.equal([
+      ['Original', 3],
+      ['Older', 3],
+      ['Newer', 3],
+    ])
+    // (and the count is not given when only the defaults are listed)
+    const defaults = (await getLibrarySongs(db)).filter(entry => entry.title === title)
+    expect(defaults[0].variantCount).to.equal(undefined)
+  })
+
   it('says when and by whom a song was last played, only when asked', async () => {
     const title = unique('Last played')
     const song = await createSong(chart(title))
@@ -395,5 +420,122 @@ describe('who a chart is', () => {
     expect(first.title).to.equal('Untitled')
     expect(first.id).to.match(/^song-/)
     expect(chartIdentity({}).id).to.not.equal(first.id)
+  })
+})
+
+describe('an incoming chart of a song the library has', () => {
+  let ccli = 7000000
+  const official = (title, body = '[A]Amazing [D]grace') =>
+    `{title: ${title}}\n{key: A}\n{ccli: ${ccli}}\n${body}`
+  const incoming = { importSource: 'songselect', importUser: 'Jo' }
+
+  it('replaces the chart and takes the new CCLI number, source, importer and date', async () => {
+    ccli++
+    const title = unique('Replaced')
+    const old = await createSong(chart(title), { importSource: 'Simon' } as never)
+    const db = await getCurrentDB()
+    const other = await createVariant(old.uuid, 'Simpler', chart(title, { body: '[G]Other' }))
+    const setlist = makeSetlist({ songs: [makeEntry({ songUuid: old.uuid, songId: old.id })] })
+    await db.saveSetlist(setlist)
+
+    const replaced = await replaceSong(old.uuid, official(title), incoming)
+
+    expect(replaced.uuid).to.equal(old.uuid)
+    expect(replaced.id).to.equal(`ccli-${ccli}`)
+    expect(replaced.ccliNumber).to.equal(String(ccli))
+    expect(replaced.importSource).to.equal('songselect')
+    expect(replaced.importUser).to.equal('Jo')
+    expect(replaced.importDate).to.not.equal(old.importDate)
+    expect(must(await db.getChordPro(replaced.chordproFileId)).content).to.contain('[A]Amazing')
+    expect(must(await db.getSong(other.uuid)).id).to.equal(`ccli-${ccli}`)
+    expect(must(await db.getSetlist(setlist.id)).songs[0]).to.include({
+      songUuid: old.uuid,
+      songId: `ccli-${ccli}`,
+    })
+  })
+
+  it("imports as the original: the incoming chart is the default, the library's hangs from it, setlists keep theirs", async () => {
+    ccli++
+    const title = unique('Both')
+    const old = await createSong(chart(title), {
+      importSource: 'Simon',
+      importUser: 'Simon',
+    } as never)
+    const db = await getCurrentDB()
+    const setlist = makeSetlist({ songs: [makeEntry({ songUuid: old.uuid, songId: old.id })] })
+    await db.saveSetlist(setlist)
+
+    const { added, kept } = await importAsOriginal(old.uuid, official(title), incoming)
+
+    expect(added.isDefault).to.equal(true)
+    expect(added.id).to.equal(`ccli-${ccli}`)
+    expect(added.importSource).to.equal('songselect')
+    expect(added.importUser).to.equal('Jo')
+    expect(kept.uuid).to.equal(old.uuid)
+    expect(kept.isDefault).to.equal(false)
+    expect(kept.variantOf).to.equal(added.uuid)
+    expect(kept.variantLabel).to.equal('Alternate chords')
+    expect(kept.id).to.equal(added.id)
+    expect(kept.importDate).to.equal(old.importDate)
+    expect(kept.metadataChangedAt).to.be.a('string')
+    expect((await getSongVariants(added.id)).map(v => v.uuid).sort()).to.deep.equal(
+      [added.uuid, old.uuid].sort()
+    )
+    expect(must(await db.getSetlist(setlist.id)).songs[0]).to.include({
+      songUuid: old.uuid,
+      songId: `ccli-${ccli}`,
+    })
+  })
+
+  it('will not import the same chart as the original or a variant', async () => {
+    ccli++
+    const title = unique('Same')
+    const text = official(title)
+    const old = await createSong(text)
+    let failure = ''
+    await importAsOriginal(old.uuid, text, incoming).catch(error => {
+      failure = error.message
+    })
+    expect(failure).to.contain('already has this chart')
+    failure = ''
+    await importAsVariant(old.uuid, text, incoming).catch(error => {
+      failure = error.message
+    })
+    expect(failure).to.contain('already has this chart')
+  })
+
+  it('imports as a variant: the library keeps the default, the import hangs from it with its label', async () => {
+    ccli++
+    const title = unique('As variant')
+    const old = await createSong(chart(title))
+    const db = await getCurrentDB()
+    const added = await importAsVariant(old.uuid, official(title), incoming, 'Official')
+    expect(added.isDefault).to.equal(false)
+    expect(added.variantOf).to.equal(old.uuid)
+    expect(added.variantLabel).to.equal('Official')
+    expect(added.importUser).to.equal('Jo')
+    expect(added.id).to.equal(`ccli-${ccli}`)
+    const kept = must(await db.getSong(old.uuid))
+    expect(kept.isDefault).to.equal(true)
+    expect(kept.id).to.equal(`ccli-${ccli}`)
+    expect(kept.ccliNumber).to.equal(String(ccli))
+  })
+
+  it('does not lose the CCLI number when the incoming chart has none', async () => {
+    ccli++
+    const title = unique('Keeps ccli')
+    const old = await createSong(official(title))
+    const db = await getCurrentDB()
+    const handMade = `{title: ${title}}\n{key: G}\n[G]Amazing [C]grace`
+    const added = await importAsVariant(old.uuid, handMade, incoming)
+    expect(added.id).to.equal(`ccli-${ccli}`)
+    expect(added.ccliNumber).to.equal(String(ccli))
+    expect(must(await db.getSong(old.uuid)).id).to.equal(`ccli-${ccli}`)
+    const replaced = await replaceSong(
+      old.uuid,
+      `{title: ${title}}\n[D]Other words entirely`,
+      incoming
+    )
+    expect(replaced.ccliNumber).to.equal(String(ccli))
   })
 })
