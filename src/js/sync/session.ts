@@ -79,6 +79,8 @@ export interface SyncSession {
   pullIncomplete: boolean
   /** Whether a file the pull meant to download could not be (a setlist or a song) */
   downloadsFailed: boolean
+  /** The ids of the setlists a pull saved: what an open page showing one must now follow */
+  pulledSetlistIds: Set<string>
   /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
   pendingDeletedRefs: Set<string>
   /** The ids of the songs that have a live file in Drive, as listed by the last pull (null: not listed) */

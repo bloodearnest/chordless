@@ -472,7 +472,7 @@ going back home. In the service worker it completes regardless.
   will include it.
 - Skipped silently when offline, not signed in, or sync isn't set up.
 
-#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: applying a pulled setlist in place, the members clock)
+#### Pulling while the app is open (designed 2026-10-19; built: the incremental sync and the timers, see below; not built: the members clock)
 
 Immediate push is only half of it: the leader's late song reaches Drive at once, but a follower
 only sees it if their device pulls. Once pushes are immediate, the Storage-page sync will rarely
@@ -564,11 +564,17 @@ moved between folders each have a test of their own.
   and it adds to what a lone user can do. The 60 s tick stays as the fallback for anyone not on it
   or whose connection drops. A change arrives as the setlist record and lands as below; charts
   still come through the storage.
-- **A pull that changes the open setlist applies in place:** the page follows its setlist record.
-  It stays on the current song by song id, says what changed with the same summary as the reader's
-  toast (`sync/setlist-diff.ts`), and a reader whose changes were replaced can Undo. A leader's
-  late song must never be held back, in or out of live mode (CLAUDE.md, "permissive in the
-  moment"). WebRTC pushes feed the same step.
+- **A pull that changes the open setlist applies in place (built):** a sync that saves setlists tells
+  the app (`pulled-setlists.ts`: an event on the window, and a BroadcastChannel for the app's other
+  tabs, carrying only ids). The setlist page (`applyPulledSetlist`) reads its setlist again, shows it,
+  stays on the song being viewed by its song id (or goes to the overview if that song is gone) and
+  says what changed with the summary of `sync/setlist-diff.ts`. It matters beyond looks: the page
+  saves its whole in-memory copy of the setlist when anything changes, so a copy left as it was
+  would overwrite what came in with the next edit. Where this device's unsaved edit and Drive's
+  both changed the setlist, Drive's version is what the pull saved and what is shown, as in any
+  pull; a reader's replaced changes keep their Undo (`tellOfReset`). A leader's late song is never
+  held back, in or out of live mode (CLAUDE.md, "permissive in the moment"). WebRTC pushes feed
+  the same step.
 
 #### Why nothing new needs storing
 

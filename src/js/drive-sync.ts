@@ -244,6 +244,8 @@ export class DriveSyncManager implements SyncSession {
   pullIncomplete: boolean
   /** Whether a file the last pull meant to download could not be */
   downloadsFailed = false
+  /** The ids of the setlists pulled since this was last read and cleared (`takePulledSetlistIds`) */
+  pulledSetlistIds = new Set<string>()
   /** During an incremental sync: the refs the feed said are gone (there is no inventory to ask) */
   #goneRefs: Set<string> | null = null
   /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
@@ -658,6 +660,13 @@ export class DriveSyncManager implements SyncSession {
       if (!chart || songHasLocalChanges(song, chart)) edited.add(song.fileRef)
     }
     if (edited.size > 0) await this.db.unlinkFiles(edited)
+  }
+
+  /** The ids of the setlists pulled since the last call, for the app to tell its open pages */
+  takePulledSetlistIds(): string[] {
+    const ids = [...this.pulledSetlistIds]
+    this.pulledSetlistIds.clear()
+    return ids
   }
 
   /**

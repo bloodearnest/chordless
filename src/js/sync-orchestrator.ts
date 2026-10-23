@@ -8,6 +8,7 @@
 import type { SetlistEntry } from './data-types.ts'
 import type { SyncProgress } from './drive-sync.ts'
 import { createSyncManager, DriveSyncManager, isSyncAvailable } from './drive-sync.ts'
+import { announceSetlistsPulled } from './pulled-setlists.ts'
 import type { ResetSetlist } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
@@ -170,6 +171,7 @@ export class SyncOrchestrator {
       async (manager, progress) => {
         await manager.sync(progress)
         await tellOfReset(manager)
+        announceSetlistsPulled(manager.takePulledSetlistIds())
       }
     )
   }
@@ -188,6 +190,7 @@ export class SyncOrchestrator {
         this.#execute('Incremental sync', {}, progressCallback, async (manager, progress) => {
           await manager.incrementalSync(progress, { push })
           await tellOfReset(manager)
+          announceSetlistsPulled(manager.takePulledSetlistIds())
         }),
       { skipIfBusy }
     )
@@ -247,6 +250,7 @@ export class SyncOrchestrator {
       async (manager, progress) => {
         await manager.pullFromDrive(progress)
         await tellOfReset(manager)
+        announceSetlistsPulled(manager.takePulledSetlistIds())
       }
     )
   }

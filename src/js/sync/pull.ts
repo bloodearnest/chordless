@@ -199,6 +199,7 @@ export async function pullSetlists(
 
   if (setlistsToSave.length > 0) {
     await session.db.saveSetlistsBatch(setlistsToSave)
+    for (const setlist of setlistsToSave) session.pulledSetlistIds.add(setlist.id)
     for (const after of setlistsToSave) {
       const before = resetting.get(after.id)
       if (before) session.resetSetlists.push({ before, after })

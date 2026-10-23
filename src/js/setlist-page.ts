@@ -45,6 +45,7 @@ import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-se
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
+import { SetlistsPulledEvent } from './pulled-setlists.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
@@ -63,6 +64,8 @@ import { SectionController } from './setlist/section-controller.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
 import { syncsBack } from './space.ts'
 import { differsFromOfficial } from './sync/revert.ts'
+import { describeSetlistChange } from './sync/setlist-diff.ts'
+import { setlistContentHash } from './sync/setlist-hash.ts'
 import { toast } from './toast.ts'
 import { getAvailableKeys, transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
@@ -273,6 +276,7 @@ export class SetlistPage {
 
     this.setupKeyboardNavigation()
     this.setupDoubleClickToggle()
+    this.setupPulledSetlists()
     this.setupNavigationMenu()
 
     const { signal } = this._abort
@@ -357,7 +361,11 @@ export class SetlistPage {
     this.dispatchSongChange(null)
   }
 
-  async renderSetlist(setlistId: string, songIndex = -1) {
+  /**
+   * Show the setlist as it is in the database. `songIndex` is the song to show (-1: the overview);
+   * `keepSongId` is one to stay on instead, wherever it now is in the setlist, else the overview.
+   */
+  async renderSetlist(setlistId: string, songIndex = -1, keepSongId?: string) {
     try {
       // Load setlist from IndexedDB
       const setlist = await this._database().getSetlist(setlistId)
@@ -431,6 +439,9 @@ export class SetlistPage {
       this.sections.states = {}
       this.loadState()
 
+      if (keepSongId) {
+        songIndex = songs.findIndex(song => song._setlistEntry.songId === keepSongId)
+      }
       // Which view to start in comes from the route, as it is now; a song that isn't there means the overview
       if (this._starting) songIndex = this._initialSongIndex
       const shouldShowSongDirectly = songIndex >= 0 && songIndex < songs.length
@@ -1739,6 +1750,58 @@ export class SetlistPage {
     if (songDisplay) {
       songDisplay.capo = normalized
     }
+  }
+
+  /** A sync that saves this page's setlist is followed (see applyPulledSetlist) */
+  setupPulledSetlists() {
+    window.addEventListener(
+      SetlistsPulledEvent.type,
+      event => {
+        if (this.currentSetlistId && event.ids.includes(this.currentSetlistId)) {
+          void this.applyPulledSetlist()
+        }
+      },
+      { signal: this._abort.signal }
+    )
+  }
+
+  /**
+   * A sync saved this page's setlist: show the new version, staying on the song being viewed and
+   * saying what changed. The page works on its own copy of the setlist and saves that whole copy
+   * when something changes, so a copy left as it was would overwrite what came in with the next
+   * edit. Where this device's own edits and Drive's were both made, Drive's version won, as in any
+   * pull. A late song is never held back, live or not.
+   */
+  async applyPulledSetlist() {
+    const before = this.currentSetlist
+    if (!before) return
+    const id = before.id
+    const latest = await this._database().getSetlist(id)
+    // (the setlist can be gone, and the view with it)
+    if (this._disposed || !latest) return
+    if (setlistContentHash(latest) === setlistContentHash(before)) {
+      // Nothing to show: only what sync keeps of the file changed, which later saves must carry
+      this.currentSetlist = latest
+      return
+    }
+
+    const titles = new Map(this.songs.map(song => [song._setlistEntry.songId, song.title]))
+    const viewing = this.songs[this.currentSongIndex]?._setlistEntry.songId
+    await this.renderSetlist(id, -1, viewing)
+    if (this._disposed) return
+    for (const song of this.songs) titles.set(song._setlistEntry.songId, song.title)
+    // The song being viewed is where it now is in the setlist, or it is the overview
+    const index = viewing ? this.songs.findIndex(song => song._setlistEntry.songId === viewing) : -1
+    this.navigateTo(index, { replace: true })
+
+    const changes = describeSetlistChange(
+      before,
+      latest,
+      entry => titles.get(entry.songId) ?? entry.songId
+    )
+    toast(
+      `${setlistTitle(latest, 'short')} was updated${changes.length ? `: ${changes.join(', ')}` : ''}`
+    )
   }
 
   /** The media player's speed button remembers the choice for the song being viewed */
