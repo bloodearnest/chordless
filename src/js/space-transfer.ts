@@ -243,6 +243,28 @@ export async function contentsOf(source: TransferSource): Promise<Contents> {
   return { songs, setlists }
 }
 
+/**
+ * What bringing a space's contents into another would add: songs the destination has no chart of
+ * (by content hash) and setlists it has no setlist with the id of. Counts only, nothing is changed.
+ */
+export async function whatWouldBeAdded(
+  source: TransferSource,
+  destination: TransferSource
+): Promise<{ songs: number; setlists: number }> {
+  const known = new Set((await destination.getAllSongs()).map(song => song.contentHash))
+  let songs = 0
+  for (const song of await source.getAllSongs()) {
+    if (known.has(song.contentHash)) continue
+    // (a chart with no text is not brought, so is not counted)
+    if (await source.getChordPro(song.chordproFileId)) songs++
+  }
+  const have = new Set((await destination.getAllSetlists()).map(setlist => setlist.id))
+  const setlists = (await source.getAllSetlists()).filter(
+    setlist => bringable(setlist) && !have.has(setlist.id)
+  ).length
+  return { songs, setlists }
+}
+
 /** What to bring into a new space (the wizard's step, docs/SPACES.md "Creating a team space") */
 export interface Bring {
   songs: boolean

@@ -7,8 +7,17 @@
 import { expect } from '@open-wc/testing'
 import '../src/components/team-join.ts'
 import { parseInvite, type TeamJoin } from '../src/components/team-join.ts'
+import { ChordlessDB } from '../src/js/db.ts'
 import { offerLink, takeLink } from '../src/js/incoming-link.ts'
-import { deleteSpace, getCurrentSpace, listSpaces, setCurrentSpace } from '../src/js/space.ts'
+import { addChart } from '../src/js/song-utils.ts'
+import {
+  createSpace,
+  deleteSpace,
+  getCurrentSpace,
+  listSpaces,
+  setCurrentSpace,
+} from '../src/js/space.ts'
+import { makeSetlist } from './builders.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -207,6 +216,127 @@ describe('the join page', () => {
     expect(synced).to.have.length(1)
     expect(requested).to.include('POST /api/spaces/join')
     expect((await listSpaces()).some(space => space.team?.id === TEAM)).to.equal(true)
+  })
+
+  it('makes the team the space in use, and asks nothing when the personal space has nothing new', async () => {
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes('You have joined'), 'to be joined')
+    const team = must((await listSpaces()).find(space => space.team?.id === TEAM))
+    expect(getCurrentSpace().id).to.equal(team.id)
+    expect(text()).to.not.contain('Bring them into')
+  })
+
+  it('offers once to bring in what a personal space has that the team has not, and does so when asked', async () => {
+    const personal = await createSpace(`Pat Church personal ${crypto.randomUUID().slice(0, 8)}`)
+    const db = new ChordlessDB(personal.id)
+    await db.init()
+    await addChart(db, '{title: Alpha}\n{key: G}\n[G]Alpha line', {
+      variantLabel: 'Test',
+      importSource: 'test',
+      makeDefault: 'first',
+    })
+    db.db?.close()
+
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes('You have 1 song in'), 'the question')
+    expect(text()).to.contain('Bring them into')
+
+    button('Bring them in').click()
+    await until(() => text().includes('Brought 1 song and 0 setlists into'), 'it to be brought')
+    expect(text()).to.not.contain('Bring them in?')
+  })
+
+  it('says so, and lets them try again, when bringing across does not work; and does not offer when it cannot look', async () => {
+    const personal = await createSpace(`Pat Church personal ${crypto.randomUUID().slice(0, 8)}`)
+    const db = new ChordlessDB(personal.id)
+    await db.init()
+    await addChart(db, '{title: Gamma}\n{key: G}\n[G]Gamma line', {
+      variantLabel: 'Test',
+      importSource: 'test',
+      makeDefault: 'first',
+    })
+    await db.saveSetlist(makeSetlist({ id: 'pat-set', date: '2026-12-06' }))
+    db.db?.close()
+
+    const realInit = ChordlessDB.prototype.init
+    let failFor = ''
+    ChordlessDB.prototype.init = function (this: ChordlessDB) {
+      return this.spaceId === failFor ? Promise.reject(new Error('disk full')) : realInit.call(this)
+    }
+    try {
+      await open()
+      await until(() => text().includes('Join the team space'), 'the offer')
+      button('Join the team space').click()
+      await until(() => text().includes('You have 1 song and 1 setlist in'), 'the question')
+      failFor = must((await listSpaces()).find(space => space.team?.id === TEAM)).id
+      button('Bring them in').click()
+      await until(() => text().includes('disk full'), 'the failure')
+      expect(text()).to.contain('Bring them in')
+      failFor = ''
+      button('Bring them in').click()
+      await until(() => text().includes('Brought 1 song and 1 setlist into'), 'it to be brought')
+    } finally {
+      ChordlessDB.prototype.init = realInit
+    }
+  })
+
+  it('offers nothing, and still joins, when it cannot look at the team space', async () => {
+    const realInit = ChordlessDB.prototype.init
+    let cannotLook = false
+    routes['POST /api/spaces/join'] = () => {
+      cannotLook = true
+      return Response.json({ spaceId: TEAM, role: 'writer' })
+    }
+    ChordlessDB.prototype.init = function (this: ChordlessDB) {
+      return cannotLook ? Promise.reject(new Error('no database')) : realInit.call(this)
+    }
+    try {
+      await open()
+      await until(() => text().includes('Join the team space'), 'the offer')
+      button('Join the team space').click()
+      await until(() => text().includes('You have joined'), 'to be joined')
+      expect(text()).to.not.contain('Bring them into')
+    } finally {
+      ChordlessDB.prototype.init = realInit
+    }
+  })
+
+  it('says only what there is when it is setlists alone', async () => {
+    const personal = await createSpace(`Pat Church personal ${crypto.randomUUID().slice(0, 8)}`)
+    const db = new ChordlessDB(personal.id)
+    await db.init()
+    await db.saveSetlist(makeSetlist({ id: 'only-set', date: '2026-12-06' }))
+    db.db?.close()
+
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes('You have 1 setlist in'), 'the question')
+    expect(text()).to.not.match(/\d songs?\b/)
+  })
+
+  it('leaves the personal space alone when told not now', async () => {
+    const personal = await createSpace(`Pat Church personal ${crypto.randomUUID().slice(0, 8)}`)
+    const db = new ChordlessDB(personal.id)
+    await db.init()
+    await addChart(db, '{title: Beta}\n{key: G}\n[G]Beta line', {
+      variantLabel: 'Test',
+      importSource: 'test',
+      makeDefault: 'first',
+    })
+    db.db?.close()
+
+    await open()
+    await until(() => text().includes('Join the team space'), 'the offer')
+    button('Join the team space').click()
+    await until(() => text().includes('You have 1 song in'), 'the question')
+    button('Not now').click()
+    await until(() => !text().includes('Bring them into'), 'the question to go')
+    expect(text()).to.not.contain('Brought')
   })
 
   it('joins all the same when the first sync does not work, and offers to try again', async () => {

@@ -1,5 +1,6 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { Space, TeamLink } from '../js/data-types.ts'
+import { ChordlessDB } from '../js/db.ts'
 import {
   authorizeWithGoogle,
   getCurrentUserInfo,
@@ -7,8 +8,10 @@ import {
   SignInExpiredError,
 } from '../js/google-auth.ts'
 import { IncomingLinkEvent, takeLink } from '../js/incoming-link.ts'
-import { switchSpace } from '../js/space.ts'
-import { storageFor } from '../js/storage/space-storage.ts'
+import { withSource } from '../js/other-songs.ts'
+import { listSpaces, setCurrentSpace, switchSpace } from '../js/space.ts'
+import { bringAcross, type TransferReport, whatWouldBeAdded } from '../js/space-transfer.ts'
+import { isTeamMember, storageFor } from '../js/storage/space-storage.ts'
 import { TeamError } from '../js/team-client.ts'
 import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
@@ -30,6 +33,15 @@ export function parseInvite(fragment: string): { teamId: string; code: string } 
   return match ? { teamId: match[1], code: match[2] } : null
 }
 
+/** What a personal space holds that the team space has not, offered to be brought in */
+interface Offer {
+  source: Space
+  songs: number
+  setlists: number
+}
+
+const plural = (count: number, one: string) => `${count} ${one}${count === 1 ? '' : 's'}`
+
 /**
  * Join a team space (docs/SPACES.md, "Setting up and joining a team space") with the link an admin
  * sent: /join#<space id>.<code>. The person signs in with Google if they have not (for who they
@@ -45,6 +57,9 @@ export class TeamJoin extends LitElement {
     _joined: { state: true },
     _role: { state: true },
     _syncError: { state: true },
+    _offer: { state: true },
+    _brought: { state: true },
+    _bringError: { state: true },
   }
 
   declare _state: State
@@ -56,6 +71,11 @@ export class TeamJoin extends LitElement {
   declare _role: string
   /** Why the first sync did not work, if it did not */
   declare _syncError: string
+  /** What there is to bring across from a personal space, until it is brought or declined */
+  declare _offer: Offer | null
+  /** What bringing it across did */
+  declare _brought: TransferReport | null
+  declare _bringError: string
 
   /** Starts the app afresh at the home page, once this device has the space (a test gives its own) */
   /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
@@ -90,6 +110,9 @@ export class TeamJoin extends LitElement {
     this._joined = null
     this._role = ''
     this._syncError = ''
+    this._offer = null
+    this._brought = null
+    this._bringError = ''
   }
 
   override connectedCallback(): void {
@@ -161,6 +184,8 @@ export class TeamJoin extends LitElement {
         storageFor({ team: { id: invite.teamId, role: 'reader' } })
       )
       this._joined = joined
+      // The team is the space in use from now (and first among the tabs), whether or not they open it here
+      await setCurrentSpace(joined.id, joined.name)
       this._role = roleWithArticle((joined.team as TeamLink).role)
     } catch (error) {
       this._message = this._explain(error)
@@ -179,7 +204,59 @@ export class TeamJoin extends LitElement {
     } catch (error) {
       this._syncError = this._explain(error)
     }
+    await this._findOffer()
     this._state = 'joined'
+  }
+
+  /**
+   * Whether a personal space holds anything the team space does not: asked once, and only if it
+   * would add something (docs/SPACES.md, "Joining by invite")
+   */
+  async _findOffer(): Promise<void> {
+    this._offer = null
+    const team = this._joined as Space
+    try {
+      const destination = new ChordlessDB(team.id)
+      await destination.init()
+      try {
+        for (const source of (await listSpaces()).filter(space => !isTeamMember(space))) {
+          const added = await withSource(source.id, db => whatWouldBeAdded(db, destination))
+          if (added.songs + added.setlists > 0) {
+            this._offer = { source, ...added }
+            return
+          }
+        }
+      } finally {
+        destination.db?.close()
+      }
+    } catch (error) {
+      // Only an offer is lost: the Account page has the same action
+      console.error('[TeamJoin] Could not look for what to bring across:', error)
+    }
+  }
+
+  /** Bring the personal space's songs and setlists into the team (setlists moved, as the wizard does) */
+  async _bring(): Promise<void> {
+    const offer = this._offer as Offer
+    this._bringError = ''
+    try {
+      const destination = new ChordlessDB((this._joined as Space).id)
+      await destination.init()
+      try {
+        this._brought = await withSource(offer.source.id, source =>
+          bringAcross(source, destination, { songs: true, setlists: true, mode: 'move' })
+        )
+        this._offer = null
+      } finally {
+        destination.db?.close()
+      }
+    } catch (error) {
+      this._bringError = errorMessage(error)
+    }
+  }
+
+  _decline(): void {
+    this._offer = null
   }
 
   /** What to tell them of a refusal */
@@ -202,6 +279,35 @@ export class TeamJoin extends LitElement {
 
   override render() {
     return html`<div class="page">${this._renderState()}</div>`
+  }
+
+  /** The one question about what is in a personal space, or what was done about it */
+  _renderOffer() {
+    const offer = this._offer
+    if (this._brought) {
+      const { songsAdded, setlistsAdded } = this._brought
+      return html`<p class="status" role="status">
+        Brought ${plural(songsAdded, 'song')} and ${plural(setlistsAdded, 'setlist')} into
+        ${this._joined?.name}.
+      </p>`
+    }
+    if (!offer) return nothing
+    const what = [
+      offer.songs ? plural(offer.songs, 'song') : '',
+      offer.setlists ? plural(offer.setlists, 'setlist') : '',
+    ]
+      .filter(Boolean)
+      .join(' and ')
+    return html`
+      <div class="offer" role="group" aria-label="Bring your songs across">
+        <p>You have ${what} in ${offer.source.name}. Bring them into ${this._joined?.name}?</p>
+        ${this._bringError ? html`<p class="status error" role="alert">${this._bringError}</p>` : nothing}
+        <div class="actions">
+          <button class="btn primary" @click=${this._bring}>Bring them in</button>
+          <button class="btn" @click=${this._decline}>Not now</button>
+        </div>
+      </div>
+    `
   }
 
   _renderState() {
@@ -257,6 +363,7 @@ export class TeamJoin extends LitElement {
             }
           </p>
           ${this._syncError ? html`<p class="status error" role="alert">${this._syncError}</p>` : nothing}
+          ${this._renderOffer()}
           <div class="actions">
             ${this._syncError ? html`<button class="btn" @click=${this._sync}>Try again</button>` : nothing}
             <button class="btn primary" @click=${this._open}>Open ${this._joined?.name}</button>
