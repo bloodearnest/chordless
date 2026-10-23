@@ -103,8 +103,9 @@ a re-pointing of the folder.
   not available for the space being worked in (switch first), and after a confirmation that names it. It removes the space's record and
   its local database (setlists, songs, charts); nothing in Google Drive is touched, so a folder it
   synced to stays there for the user to delete.
-- Spaces are completely isolated: songs and setlists belong to exactly one; switching reloads the
-  app on the other database; a setlist references only its own space's songs; the same CCLI song in
+- Spaces are completely isolated: songs and setlists belong to exactly one; switching shows the
+  home page afresh on the other database (no page reload: `switchSpace` in `space.ts` sets the
+  current space, tells `SpaceChangeEvent`, and goes to `/` with `{ fresh: true }`); a setlist references only its own space's songs; the same CCLI song in
   two spaces is two separate instances.
 
 ### Finding the Drive folder
@@ -483,7 +484,7 @@ never meet a "Personal" space they did not ask for.
   always show it.
 - Fixed order (Teams, Personal, Shared), the current tab marked. About three or four fit a phone;
   beyond that the rest go under a "More" menu, the most recently used staying as tabs.
-- A tab is the existing space switch (a reload) to begin with. Reading another space's database
+- A tab is the space switch (the home page, made afresh: no reload). Reading another space's database
   without switching the app is "Merged" (above), later.
 - A `role="tablist"` under the header, with arrow keys (as `chart-diff` does), never in the header,
   so it stays clear of the live-setlist controls. Account and Teams stays for managing spaces
@@ -510,8 +511,8 @@ never meet a "Personal" space they did not ask for.
   offered unless it is the only one.
 
 **As built** (`space-tabs.ts`, `<space-tabs>`, `team-join.ts`), where it differs from the above:
-- The Shared tab is not a space that the app switches to: it opens the home page as `/?shared`, which
-  lists only what was shared, with the tab marked. On the Library and Add Song pages it is a way
+- The Shared tab is not a space that the app switches to: it goes to `/?shared` (the route
+  `{ name: 'home', shared: true }`, its own view), which lists only what was shared, with the tab marked. On the Library and Add Song pages it is a way
   to that page. (Making `shared-with-me` the current space would put sync and the space record
   on a database that has neither.)
 - "More" is a native `<select>`; the most recently used tabs (kept in `space-tabs-recent`) stay shown.

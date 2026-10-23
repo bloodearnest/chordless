@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { setRouter } from '../src/js/navigation.ts'
 import {
   createSpace,
   deleteSpace as deleteSpaceAndData,
@@ -9,6 +10,7 @@ import {
   listSpaces,
   migrateLegacyKeys,
   renameSpace,
+  SpaceChangeEvent,
   setCurrentSpace,
   switchSpace,
 } from '../src/js/space.ts'
@@ -190,19 +192,53 @@ describe('keeping the current space when it cannot be read', () => {
 describe('switching space', () => {
   const unique = name => `${name} ${crypto.randomUUID().slice(0, 8)}`
 
-  it('makes it the current one, with its name, and starts the app afresh', async () => {
+  it('makes it the current one, with its name, and shows it', async () => {
     const space = await createSpace(unique('Switch'))
-    let reloads = 0
-    await switchSpace(space.id, () => reloads++)
+    let shown = 0
+    await switchSpace(space.id, () => shown++)
     expect(getCurrentSpace()).to.deep.equal({ id: space.id, name: space.name })
-    expect(reloads).to.equal(1)
+    expect(shown).to.equal(1)
+  })
+
+  it('shows the home page afresh, through the router, unless told otherwise', async () => {
+    const space = await createSpace(unique('Switch'))
+    const visited: [string, unknown][] = []
+    setRouter({
+      navigate: async (url: string, options?: unknown) => {
+        visited.push([url, options])
+        return true
+      },
+    })
+    try {
+      await switchSpace(space.id)
+    } finally {
+      setRouter(null)
+    }
+    expect(visited).to.deep.equal([['/', { fresh: true }]])
+  })
+
+  it('tells the window when the space in use changes, and not when it stays', async () => {
+    const one = await createSpace(unique('Change'))
+    const two = await createSpace(unique('Change'))
+    await setCurrentSpace(one.id)
+    const told: string[] = []
+    const listener = (event: Event) => told.push((event as SpaceChangeEvent).spaceId)
+    window.addEventListener(SpaceChangeEvent.type, listener)
+    try {
+      await setCurrentSpace(one.id)
+      expect(told).to.deep.equal([])
+      await setCurrentSpace(two.id)
+      expect(told).to.deep.equal([two.id])
+    } finally {
+      window.removeEventListener(SpaceChangeEvent.type, listener)
+    }
   })
 
   it('switches to one it has no record of, too', async () => {
-    let reloads = 0
-    await switchSpace('unknown-id', () => reloads++)
+    let shown = 0
+    await switchSpace('unknown-id', () => shown++)
     expect(getCurrentSpace().id).to.equal('unknown-id')
-    expect(reloads).to.equal(1)
+    expect(shown).to.equal(1)
   })
 
   it('still switches when the space cannot be read', async () => {
@@ -212,10 +248,10 @@ describe('switching space', () => {
       return calls++ === 0 ? Promise.reject(new Error('unreadable')) : realGet.call(this, id)
     }
     try {
-      let reloads = 0
-      await switchSpace('another-id', () => reloads++)
+      let shown = 0
+      await switchSpace('another-id', () => shown++)
       expect(getCurrentSpace().id).to.equal('another-id')
-      expect(reloads).to.equal(1)
+      expect(shown).to.equal(1)
     } finally {
       SpaceDB.prototype.getSpace = realGet
     }

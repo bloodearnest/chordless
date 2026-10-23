@@ -112,18 +112,18 @@ describe('account-page', () => {
     expect(cards(el).every(card => card.signIn === 'expired')).to.equal(true)
   })
 
-  it('switches to the space asked for, and starts the app afresh', async () => {
+  it('switches to the space asked for, and shows it', async () => {
     const first = await space('First')
     const second = await space('Second')
     await setCurrentSpace(first.id, first.name)
     const el = await page()
-    let reloads = 0
-    el.reload = () => {
-      reloads++
+    let shown = 0
+    el.show = () => {
+      shown++
     }
     must(el.shadowRoot?.querySelector('space-card')).dispatchEvent(new SpaceSwitchEvent(second.id))
-    for (let i = 0; i < 50 && reloads === 0; i++) await wait(20)
-    expect(reloads).to.equal(1)
+    for (let i = 0; i < 50 && shown === 0; i++) await wait(20)
+    expect(shown).to.equal(1)
     expect(getCurrentSpace().id).to.equal(second.id)
   })
 

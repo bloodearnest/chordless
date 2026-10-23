@@ -75,7 +75,7 @@ describe('the join page', () => {
   let codeResponse: { code?: string; error?: string }
   let signInAnswer: () => Response
   let page: TeamJoin
-  let reloads: number
+  let shown: number
   let synced: string[]
   let syncFails: boolean
   let before: { id: string | null; name: string }
@@ -110,8 +110,8 @@ describe('the join page', () => {
     }
     page = document.createElement('team-join')
     page.fragment = fragment
-    page.reload = () => {
-      reloads++
+    page.show = () => {
+      shown++
     }
     page.syncSpace = async space => {
       synced.push(space.name)
@@ -124,7 +124,7 @@ describe('the join page', () => {
   beforeEach(() => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     before = getCurrentSpace()
-    reloads = 0
+    shown = 0
     synced = []
     syncFails = false
     requested = []
@@ -425,7 +425,7 @@ describe('the join page', () => {
     await until(() => text().includes('You have joined'), 'to be joined')
 
     button('Open Pat Church').click()
-    await until(() => reloads === 1, 'the app to start afresh')
+    await until(() => shown === 1, 'the space to be shown')
     const joined = must((await listSpaces()).find(space => space.team?.id === TEAM))
     expect(getCurrentSpace().id).to.equal(joined.id)
   })

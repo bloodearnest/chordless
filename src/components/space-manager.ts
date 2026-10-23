@@ -51,10 +51,8 @@ export class SpaceManager extends LitElement {
   declare _missing: boolean
   declare _error: string
 
-  /** Starts the app afresh in the space switched to (a test gives its own) */
-  /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
-  // biome-ignore lint/plugin: the database is another space's now, so start afresh
-  reload: () => void = () => window.location.reload()
+  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
+  show: (() => unknown) | undefined = undefined
 
   _deleteModal: Ref<AppModal> = createRef()
   _switchModal: Ref<AppModal> = createRef()
@@ -138,8 +136,8 @@ export class SpaceManager extends LitElement {
   async _switch(): Promise<void> {
     const space = this._space as Space
     const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${space.name}"? This reloads the page.`
-    if (await modal.ask()) await switchSpace(space.id, this.reload)
+    modal.message = `Switch to "${space.name}"?`
+    if (await modal.ask()) await switchSpace(space.id, this.show)
   }
 
   async _delete(): Promise<void> {

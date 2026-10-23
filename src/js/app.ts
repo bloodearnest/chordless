@@ -13,6 +13,7 @@ import './install.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
 import { setRouter } from './navigation.ts'
+import { SpaceChangeEvent } from './space.ts'
 import { views } from './views/registry.ts'
 
 // Answer the service worker's requests for a Google ID token
@@ -50,7 +51,11 @@ startFullscreen()
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
 // Whether the user can write to the space's Drive folder (a sync asks too)
-import('./space-access.ts').then(({ refreshSpaceAccess }) => refreshSpaceAccess())
+import('./space-access.ts').then(({ refreshSpaceAccess }) => {
+  void refreshSpaceAccess()
+  // ...and again for the space switched to
+  window.addEventListener(SpaceChangeEvent.type, () => void refreshSpaceAccess())
+})
 void appUpdate.start()
 // Files the system opens with the installed app, and links for its open window
 listenForLaunches()

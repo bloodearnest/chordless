@@ -9,7 +9,7 @@ import { loadSpaceTabs, noteTabUsed, type SpaceTab, splitTabs } from '../js/spac
  * The places the person's songs and setlists are kept, as tabs under the header (docs/SPACES.md,
  * "Space tabs, and joining by invite"): each Team and Personal by name with a small label, and
  * Shared. Nothing is drawn when there is one place or none, so a person with a single space never
- * sees it. A tab is the space switch, which starts the app afresh in that space; the Shared tab
+ * sees it. A tab is the space switch, which shows the home page afresh in that space; the Shared tab
  * opens the home page showing what was shared.
  *
  * Usage:
@@ -31,8 +31,7 @@ export class SpaceTabs extends LitElement {
   declare _tabs: SpaceTab[]
   declare _currentId: string | null
 
-  /** Switches space (a test gives its own: the real one reloads the page) */
-  /* v8 ignore next -- switching reloads the page, which would end the test run: tests give their own */
+  /** Switches space (a test gives its own) */
   switchTo: (spaceId: string) => Promise<void> = spaceId => switchSpace(spaceId)
   /** Opens the page of what was shared (a test gives its own) */
   openShared: () => void = () => void goTo('/?shared', { fresh: true })

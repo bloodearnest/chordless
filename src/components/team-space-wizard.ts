@@ -95,14 +95,13 @@ export class TeamSpaceWizard extends LitElement {
   _saved = false
   _modal: Ref<AppModal> = createRef()
 
-  /** The folder chooser, Drive, and starting the app afresh in the new space (tests give their own) */
+  /** The folder chooser and Drive (tests give their own) */
   pick: () => Promise<PickedFolder | null> = () => pickFolder()
   folders: TeamFolders = driveApi
   /** Saves the new space's songs and setlists to Drive for the team to get (a test gives its own) */
   syncSpace: (space: Space) => Promise<void> = syncTeamSpace
-  /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
-  // biome-ignore lint/plugin: the database is another space's now, so start afresh
-  reload: () => void = () => window.location.assign('/')
+  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
+  show: (() => unknown) | undefined = undefined
 
   static override styles = [
     buttonStyles,
@@ -315,7 +314,7 @@ export class TeamSpaceWizard extends LitElement {
 
   /** The space is on this device: start the app afresh in it */
   _open(): void {
-    if (this._created) void switchSpace(this._created.id, this.reload)
+    if (this._created) void switchSpace(this._created.id, this.show)
   }
 
   override render() {

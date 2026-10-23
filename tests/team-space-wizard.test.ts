@@ -50,7 +50,7 @@ describe('team-space-wizard', () => {
   let asked: string[]
   let codeResponse: { code?: string; error?: string }
   let page: TeamSpaceWizard
-  let reloads: number
+  let shown: number
   let madeFolders: [string, string][]
   let synced: string[]
   let syncFails: boolean
@@ -93,8 +93,8 @@ describe('team-space-wizard', () => {
       }
     }
     page = document.createElement('team-space-wizard')
-    page.reload = () => {
-      reloads++
+    page.show = () => {
+      shown++
     }
     if (ownPick) page.pick = async () => ({ id: 'picked', name: 'Church Drive' })
     page.folders = {
@@ -114,7 +114,7 @@ describe('team-space-wizard', () => {
   beforeEach(() => {
     ;({ worker, uninstall: uninstallWorker } = installFakeAuthWorker())
     before = getCurrentSpace()
-    reloads = 0
+    shown = 0
     requests = []
     asked = []
     codeResponse = { code: 'the-code' }
@@ -202,7 +202,7 @@ describe('team-space-wizard', () => {
     expect(made.team).to.deep.equal({ id: 'space-dddd4444', role: 'owner' })
 
     button('Open').click()
-    await until(() => reloads === 1, 'starts the app afresh')
+    await until(() => shown === 1, 'shows the space')
     expect(getCurrentSpace().id).to.equal(made.id)
   })
 

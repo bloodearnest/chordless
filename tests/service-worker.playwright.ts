@@ -129,18 +129,25 @@ test.describe('Reloads on purpose, while offline', () => {
     // on timing, and WebKit under load is slower than Chromium: offline use is tested on the
     // build, in built.playwright.ts, which runs on WebKit too)
     test.skip(browserName === 'webkit', 'Offline use is tested on the build')
+    // (a switch shows the home page, whose module the dev server's worker has only if it was opened)
+    await seedSetlist(page, { setlistId: 'offline-reload-setlist' })
+    await page.goto('/')
+    await waitForSW(page)
+    await page.reload()
+    await expect(page.locator('home-view')).toBeVisible()
+    await page.waitForLoadState('networkidle')
     await openAccountOnline(page)
     await context.setOffline(true)
     try {
-      await Promise.all([
-        page.waitForEvent('load'),
-        page.evaluate(async () => {
-          const { getCurrentSpace, switchSpace } = await import('/js/space.ts')
-          await switchSpace(getCurrentSpace().id as string)
-        }),
-      ])
-      await expect(page.locator('account-view')).toBeVisible()
-      await expect(page).toHaveTitle('Account and Teams - Chordless')
+      await page.evaluate(async () => {
+        const { getCurrentSpace, switchSpace } = await import('/js/space.ts')
+        await switchSpace(getCurrentSpace().id as string)
+      })
+      // (the home page, made afresh: no page load)
+      await expect(page.locator('home-view')).toBeVisible()
+      // ...and the app restarts there with no network
+      await page.reload()
+      await expect(page.locator('home-view')).toBeVisible()
     } finally {
       await context.setOffline(false)
     }

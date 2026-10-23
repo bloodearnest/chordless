@@ -36,10 +36,8 @@ export class AccountPage extends LitElement {
 
   _modal: Ref<AppModal> = createRef()
 
-  /** Starts the app afresh in the space switched to (a test gives its own) */
-  /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
-  // biome-ignore lint/plugin: the database is another space's now, so start afresh
-  reload: () => void = () => window.location.reload()
+  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
+  show: (() => unknown) | undefined = undefined
 
   static override styles = [
     panelStyles,
@@ -114,7 +112,7 @@ export class AccountPage extends LitElement {
   }
 
   _onSwitch = (event: Event): void => {
-    void switchSpace((event as SpaceSwitchEvent).spaceId, this.reload)
+    void switchSpace((event as SpaceSwitchEvent).spaceId, this.show)
   }
 
   /** Show everything to do with a space in a modal */
@@ -180,7 +178,7 @@ export class AccountPage extends LitElement {
       >
         ${
           this._managing
-            ? html`<space-manager .spaceId=${this._managing.id} .reload=${this.reload}></space-manager>`
+            ? html`<space-manager .spaceId=${this._managing.id} .show=${this.show}></space-manager>`
             : nothing
         }
       </app-modal>

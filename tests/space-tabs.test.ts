@@ -214,6 +214,21 @@ describe('the tabs of the spaces on this device', () => {
     await element._open({ id: SHARED_DB_ID, name: 'Shared', kind: null })
     expect(sharedOpened).to.equal(1)
 
+    // (without its own, a tab switches space and shows the home page afresh)
+    const home: [string, unknown][] = []
+    setRouter({
+      navigate: async (url: string, options?: unknown) => {
+        home.push([url, options])
+        return true
+      },
+    })
+    try {
+      await new SpaceTabs().switchTo(ids[0])
+      expect(home).to.deep.equal([['/', { fresh: true }]])
+    } finally {
+      setRouter(null)
+    }
+
     // (without one of its own it goes there through the router, afresh)
     const visited: [string, unknown][] = []
     setRouter({

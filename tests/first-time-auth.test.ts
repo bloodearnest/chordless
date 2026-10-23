@@ -5,6 +5,7 @@ import {
   handleFirstTimeAuth,
   nameSpaceBeforeSync,
 } from '../src/js/first-time-auth.ts'
+import { setRouter } from '../src/js/navigation.ts'
 import {
   createSpace,
   deleteSpace,
@@ -90,6 +91,23 @@ describe('the first sign-in', () => {
       expect(await checkFirstTimeAuth(switchTo)).to.equal(false)
       expect(switched).to.deep.equal([])
       expect(localStorage.getItem(KEY)).to.equal(null)
+    })
+
+    it('stays on the page it is on, afresh, when it switches without being given a way to', async () => {
+      signIn('Ann Smith')
+      const visited: [string, unknown][] = []
+      setRouter({
+        navigate: async (url: string, options?: unknown) => {
+          visited.push([url, options])
+          return true
+        },
+      })
+      try {
+        expect(await checkFirstTimeAuth()).to.equal(true)
+      } finally {
+        setRouter(null)
+      }
+      expect(visited).to.deep.equal([[location.pathname + location.search, { fresh: true }]])
     })
 
     it('renames "Personal" to the name of the account, and switches to it, once', async () => {

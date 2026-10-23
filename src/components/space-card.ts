@@ -171,7 +171,7 @@ export class SpaceCard extends LitElement {
 
   async _switch(): Promise<void> {
     const modal = this._switchModal.value as AppModal
-    modal.message = `Switch to "${this.space.name}"? This reloads the page.`
+    modal.message = `Switch to "${this.space.name}"?`
     if (await modal.ask()) this.dispatchEvent(new SpaceSwitchEvent(this.space.id))
   }
 

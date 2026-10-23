@@ -5,6 +5,7 @@
  * rename the "Personal" space to their name and switch to it.
  */
 
+import { goTo } from './navigation.ts'
 import { getCurrentSpace, renameSpace, switchSpace } from './space.ts'
 
 const FIRST_AUTH_KEY = 'first-auth-done'
@@ -23,16 +24,22 @@ function markFirstAuthComplete(): void {
   localStorage.setItem(FIRST_AUTH_KEY, 'true')
 }
 
+/** Switch to a space, staying on the page the person is on (it is shown afresh, as the space's name changed) */
+function switchHere(spaceId: string): Promise<void> {
+  // biome-ignore lint/plugin: the page the person is on, to be shown again
+  return switchSpace(spaceId, () => goTo(location.pathname + location.search, { fresh: true }))
+}
+
 /**
  * Handle first-time authentication
  * If user has authenticated for the first time and is using "Personal" space,
  * rename it to their name and switch to it
  *
- * @param switchTo - switches to the space, which reloads the page (a test gives its own)
+ * @param switchTo - switches to the space, and shows this page afresh, now it has its new name (a test gives its own)
  * @returns True if space was renamed and switched
  */
 export async function handleFirstTimeAuth(
-  switchTo: (spaceId: string) => Promise<void> = switchSpace
+  switchTo: (spaceId: string) => Promise<void> = switchHere
 ): Promise<boolean> {
   // Check if this is first auth
   if (!isFirstAuth()) {
@@ -115,7 +122,7 @@ export async function nameSpaceBeforeSync(
  * Call this from your main app initialization
  */
 export async function checkFirstTimeAuth(
-  switchTo: (spaceId: string) => Promise<void> = switchSpace
+  switchTo: (spaceId: string) => Promise<void> = switchHere
 ): Promise<boolean> {
   if (!isFirstAuth()) {
     return false

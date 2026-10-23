@@ -216,20 +216,20 @@ describe('space-manager', () => {
   })
 
   describe('switching', () => {
-    it('asks first, naming the space, then switches and starts the app afresh', async () => {
+    it('asks first, naming the space, then switches and shows it', async () => {
       const mine = await space('Mine')
       const other = await space('Other')
       await setCurrentSpace(other.id, other.name)
       const el = await page(mine.id)
-      let reloads = 0
-      el.reload = () => {
-        reloads++
+      let shown = 0
+      el.show = () => {
+        shown++
       }
       must(el.shadowRoot?.querySelector<HTMLButtonElement>('#switch')).click()
       const modal = await answer(el, 'Switch?', true)
       expect(modal.message).to.contain(`Switch to "${mine.name}"?`)
-      for (let i = 0; i < 50 && reloads === 0; i++) await wait(20)
-      expect(reloads).to.equal(1)
+      for (let i = 0; i < 50 && shown === 0; i++) await wait(20)
+      expect(shown).to.equal(1)
       expect(getCurrentSpace().id).to.equal(mine.id)
     })
 

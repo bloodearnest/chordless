@@ -77,10 +77,8 @@ export class TeamJoin extends LitElement {
   declare _brought: TransferReport | null
   declare _bringError: string
 
-  /** Starts the app afresh at the home page, once this device has the space (a test gives its own) */
-  /* v8 ignore next 3 -- reloading the page would end the test run: tests give their own */
-  // biome-ignore lint/plugin: the database is another space's now, so start afresh
-  reload: () => void = () => window.location.assign('/')
+  /** Shows the space once it is the one in use (a test gives its own; by default the home page, afresh) */
+  show: (() => unknown) | undefined = undefined
   /** Gets the team's files for the space just joined (a test gives its own) */
   syncSpace: (space: Space) => Promise<void> = syncTeamSpace
   /** The invite, once the link is read */
@@ -274,7 +272,7 @@ export class TeamJoin extends LitElement {
 
   /** The space is on this device: start the app afresh in it */
   _open(): void {
-    if (this._joined) void switchSpace(this._joined.id, this.reload)
+    if (this._joined) void switchSpace(this._joined.id, this.show)
   }
 
   override render() {

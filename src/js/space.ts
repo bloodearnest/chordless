@@ -6,6 +6,7 @@
 // - Current space NAME cached in localStorage: current-space-name (for sync access)
 
 import type { Space } from './data-types.ts'
+import { goTo } from './navigation.ts'
 import { SpaceDB } from './space-db.ts'
 
 const SPACE_ID_KEY = 'current-space-id'
@@ -35,6 +36,20 @@ export function migrateLegacyKeys(): void {
 }
 
 migrateLegacyKeys()
+
+/**
+ * The space in use has changed (to another, not just renamed). Told on window, for what holds
+ * something of the old space: the app watches it to ask about the new one's access. Views
+ * need not: they read the space when they are made, and a switch makes them again.
+ */
+export class SpaceChangeEvent extends Event {
+  static readonly type = 'space:change'
+  readonly spaceId: string
+  constructor(spaceId: string) {
+    super(SpaceChangeEvent.type)
+    this.spaceId = spaceId
+  }
+}
 
 let spaceDB: SpaceDB | null = null
 let initPromise: Promise<SpaceDB> | null = null
@@ -224,6 +239,7 @@ export async function setCurrentSpace(
   spaceId: string,
   spaceName: string | null = null
 ): Promise<void> {
+  const changed = localStorage.getItem(SPACE_ID_KEY) !== spaceId
   localStorage.setItem(SPACE_ID_KEY, spaceId)
 
   // Cache the name if provided, and whether the folder is read-only
@@ -235,18 +251,18 @@ export async function setCurrentSpace(
   } catch (error) {
     console.error('[Space] Failed to read the space:', error)
   }
+  if (changed) window.dispatchEvent(new SpaceChangeEvent(spaceId))
 }
 
 /**
- * Switch to a different space (saves ID and reloads app)
+ * Switch to a different space: it is the space in use from now, and the home page is shown afresh,
+ * which reads it. The page is not reloaded.
  * @param spaceId - ID of space to switch to
- * @param reload - starts the app afresh (the page reloads: a test gives its own)
+ * @param show - shows the new space (a test gives its own)
  */
 export async function switchSpace(
   spaceId: string,
-  /* v8 ignore next 2 -- reloading the page would end the test run: tests give their own */
-  // biome-ignore lint/plugin: the database is another space's now, so start afresh
-  reload: () => void = () => window.location.reload()
+  show: () => unknown = () => goTo('/', { fresh: true })
 ): Promise<void> {
   // Get the space to cache its name
   try {
@@ -262,7 +278,7 @@ export async function switchSpace(
     await setCurrentSpace(spaceId)
   }
 
-  reload()
+  await show()
 }
 
 /**

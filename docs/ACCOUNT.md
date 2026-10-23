@@ -25,7 +25,7 @@ for any space once syncing can work, and the card runs the sync itself (`space-s
 | One space | Space switcher, Sync, Team Space, Export and import, Pad Sets (account-level for now) |
 
 The space panels all act on the space in use, and say nothing of which that is. To do anything to
-another space you must switch to it, which reloads the app. A space's operations are in five
+another space you must switch to it, which shows its home page. A space's operations are in five
 panels, and its size is nowhere. A signed-out person (a normal state) sees the sync, team and
 export panels turn into "connect above" hints. Developer tools sit in the main UI. And the switcher
 marks the current space by comparing names, not ids, so two spaces called the same both read
@@ -65,7 +65,7 @@ This device
 - **Cards:** in the order the spaces were added (the Personal space is always first), whichever is in use; the one in use says Current and the others have Switch. A personal
   space's name is the account name once signed in (`first-time-auth.ts`); one still called
   "Personal" shows just "Personal". A team shows the person's role.
-- **Switch** (not "Open") is the word, and the only thing that reloads the app.
+- **Switch** (not "Open") is the word. It does not reload the app: it shows the home page afresh in that space.
 - **Sizes** are estimates: IndexedDB reports usage for the whole origin only, so a space's size is
   its records (setlist JSON and chart text), as the team wizard's "Bring across" step counts them.
   "This device" is the browser's own total; the caches (app, media) belong to it, not to a space.

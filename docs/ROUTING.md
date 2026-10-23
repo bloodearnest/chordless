@@ -13,7 +13,7 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 
 | URL | Route | View |
 | --- | --- | --- |
-| `/` | `home` | `home-view.js` |
+| `/`, `/?shared` (what was shared by link: `{ name: 'home', shared: true }`, its own view) | `home` | `home-view.js` |
 | `/songs`, `/songs?q=<search>`, `/songs/<uuid>` | `songs` | `library-view.js` |
 | `/setlist/<id>`, `/setlist/<id>/song/<n>` | `setlist` (`songIndex` -1 is the overview) | `setlist-view.js` |
 | `/account` (Account and Teams, docs/ACCOUNT.md; `/storage` opens it too), `/account/new`, `/media`, `/preferences`, `/import-song`, `/import-setlist`, `/bookmarklet`, `/join` | by name | `*-view.js` |
@@ -32,7 +32,9 @@ URLs are paths; the router doesn't use `#hashes` (a lint rule forbids them).
 - The route is also a Lit context (`js/route-context.js`) for components that need it.
 
 To move from code, use `goTo(url)` (`js/navigation.js`), not `location`. Links in markup
-(`<a href="/songs">`) need nothing: the router follows them.
+(`<a href="/songs">`) need nothing: the router follows them. `goTo(url, { fresh: true })` makes the
+view afresh even when the route is the one shown: for after the space it reads has changed
+(`switchSpace`), as the app does not reload for that.
 
 ## Views
 
