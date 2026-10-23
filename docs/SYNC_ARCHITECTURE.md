@@ -9,7 +9,10 @@ the designs for what's next.
   - [Immediate background sync](#immediate-background-sync) (built)
   - [Later](#later)
 
-Last updated 2026-10-08. Supersedes the earlier "Phase 2.5 / Phase 3" version of this
+Last updated 2026-10-23: the sync by itself (an incremental sync from the storage's feed of changes, on
+timers and after a local save, one at a time) is built; it is in Part 2, "Pulling while the app is open"
+and "Immediate background sync". Part 1 below describes the full sync, which is still the fallback, the
+Sync button and the first sync. Supersedes the earlier "Phase 2.5 / Phase 3" version of this
 document and SETLIST_DELETION.md.
 
 ---
@@ -537,7 +540,9 @@ app's own folder, did not appear, with or without the all-drives flags, and `fil
 find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
 The feed covers every space of the account on this device, so its results are filtered to the
 space's folders: one listing of the space's folders per call (to tell a changed file's collection
-by its parent; nothing is made), so a quiet tick is that listing and the feed, two requests. Not yet
+by its parent; nothing is made). A quiet tick is about four requests, none of them a listing of
+files: finding the space's folder (to see it is not in the bin), the listing of its folders, the feed,
+and the check that the person may write (before a push). Each is small; Drive allows far more. Not yet
 checked on a real shared drive for a folder in someone else's drive.
 
 **Team spaces (built).** The Worker serves the same feed to members: `GET /api/space/<id>/changes/start`
