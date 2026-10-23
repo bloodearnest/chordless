@@ -345,6 +345,74 @@ describe('the library view', () => {
     })
   })
 
+  describe('the spaces filter', () => {
+    let shared: ChordlessDB
+    const KEY = 'library-places-left-out'
+    beforeEach(async () => {
+      localStorage.removeItem(KEY)
+      shared = new (await import('../src/js/db.ts')).ChordlessDB(SHARED_DB_ID)
+      await shared.init()
+    })
+    afterEach(() => {
+      shared.db?.close()
+      localStorage.removeItem(KEY)
+    })
+    const bar = () => view.querySelector('library-space-filter')
+    const chip = (id: string) =>
+      must(bar()?.shadowRoot?.querySelector<HTMLButtonElement>(`[data-place="${id}"]`))
+
+    it('is not there when the songs are all from one place', async () => {
+      await addChart(db, ALPHA, ADD)
+      await open()
+      expect(bar()?.shadowRoot?.querySelector('button')).to.equal(null)
+    })
+
+    it('starts with every place on, and leaves out the songs of one switched off', async () => {
+      await addChart(db, ALPHA, ADD)
+      await addChart(shared, BETA, ADD)
+      await open()
+      expect(titles()).to.have.length(2)
+      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('true')
+
+      chip(SHARED_DB_ID).click()
+      await view.updateComplete
+      await wait(50)
+      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('false')
+      expect(titles()).to.have.length(1)
+      expect(titles()[0]).to.contain('Alpha Song')
+
+      chip(SHARED_DB_ID).click()
+      await view.updateComplete
+      await wait(50)
+      expect(titles()).to.have.length(2)
+      expect(localStorage.getItem(KEY)).to.equal(null)
+    })
+
+    it('is remembered for the next time the library is opened', async () => {
+      await addChart(db, ALPHA, ADD)
+      await addChart(shared, BETA, ADD)
+      await open()
+      chip(SHARED_DB_ID).click()
+      await view.updateComplete
+      expect(JSON.parse(localStorage.getItem(KEY) as string)).to.deep.equal([SHARED_DB_ID])
+      view.remove()
+      await open()
+      expect(titles()).to.have.length(1)
+      expect(chip(SHARED_DB_ID).getAttribute('aria-pressed')).to.equal('false')
+    })
+
+    it('says no songs match when every place is off, and still searches the rest', async () => {
+      await addChart(db, ALPHA, ADD)
+      await addChart(shared, BETA, ADD)
+      await open()
+      chip(spaceId).click()
+      await view.updateComplete
+      await wait(50)
+      expect(titles()).to.have.length(1)
+      expect(titles()[0]).to.contain('Beta Song')
+    })
+  })
+
   describe('a song of another database', () => {
     let shared: ChordlessDB
     beforeEach(async () => {

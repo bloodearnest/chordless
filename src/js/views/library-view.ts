@@ -17,6 +17,8 @@ import type { AppModal } from '../../components/app-modal.ts'
 import '../../components/app-modal.ts'
 import type { KeyChangeEvent, KeySelector } from '../../components/key-selector.ts'
 import '../../components/key-selector.ts'
+import type { LeftOutChangeEvent } from '../../components/library-space-filter.ts'
+import '../../components/library-space-filter.ts'
 import '../../components/song-card.ts'
 import '../../components/space-tabs.ts'
 import '../../components/song-display.ts'
@@ -34,6 +36,7 @@ import '../../components/song-section.ts'
 import '../../components/status-message.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
 import { getCurrentDB } from '../db.ts'
+import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
 import { goTo } from '../navigation.ts'
 import {
   addToLibrary,
@@ -58,12 +61,15 @@ export class LibraryView extends PageView {
     _search: { state: true },
     _heading: { state: true },
     _source: { state: true },
+    _leftOut: { state: true },
   }
 
   declare _search: string
   declare _heading: string
   /** Where the open song is from, if not this space's library */
   declare _source: string
+  /** The ids of the spaces whose songs are left out of the list */
+  declare _leftOut: string[]
 
   #libraryList = createRef<HTMLElement>()
   #songView = createRef<HTMLElement>()
@@ -87,6 +93,7 @@ export class LibraryView extends PageView {
     this._search = ''
     this._heading = 'Song Library'
     this._source = ''
+    this._leftOut = loadLeftOut()
   }
 
   /**
@@ -525,6 +532,11 @@ export class LibraryView extends PageView {
 
   // ==================== Template ====================
 
+  #leftOutChanged(event: LeftOutChangeEvent): void {
+    this._leftOut = event.leftOut
+    saveLeftOut(event.leftOut)
+  }
+
   #renderList(songs: SongWithContent[]) {
     if (songs.length === 0) {
       return html`<status-message
@@ -533,10 +545,17 @@ export class LibraryView extends PageView {
         detail="Import setlists to populate the song library."
       ></status-message>`
     }
-    return html`<song-list
+    const { id, name } = getCurrentSpace()
+    const here = { id: id as string, label: name }
+    return html`<library-space-filter
+        .places=${placesOf(songs, here)}
+        .leftOut=${this._leftOut}
+        @library-space-filter:change=${(event: LeftOutChangeEvent) => this.#leftOutChanged(event)}
+      ></library-space-filter>
+      <song-list
       variant="library"
       empty-message="No songs match your search."
-      .songs=${filterSongs(songs, this._search)}
+      .songs=${filterSongs(filterByPlace(songs, this._leftOut, here), this._search)}
       .search=${this._search}
       @song-list:select=${(event: SongSelectEvent) => event.song && this.#openSong(event.song)}
     ></song-list>`

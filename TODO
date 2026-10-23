@@ -41,12 +41,8 @@ information UI
 
 spaces (personal and team): the plan, the order of work and the status list are in docs/SPACES.md
 
-songlibrary UI
- - should be a global filter bar at top to filter by space. Defaults to all
-   spaces included, but user can deselect a space to remove its results from
-   search. Users selection should be rememberd in local storage.  preferences
-
-Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
+preferences
+- Date format: the copied song list ("Songs for Sunday 18th October") is UK style for now; let the
   date format be chosen in preferences, and use it for the other dates too
 
 song edit UI

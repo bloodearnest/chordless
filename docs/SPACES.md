@@ -451,7 +451,7 @@ Worker in chunks, or the size cap is lowered).
 Setting "Spaces: Merged / Separate" in Preferences.
 - **Hidden entirely with one space** (the common case): no switcher, no badges, no choice.
 - **Merged (default once there is more than one space):** Home lists setlists from all spaces
-  badged/grouped by space; the library already merges (`other-songs.ts`). New setlist uses a default
+  badged/grouped by space; the library already merges (`other-songs.ts`), with a filter bar over the list (`library-space-filter.ts`, shown with two or more places) to switch a space's songs off; what is left out is kept in this browser (`library-spaces.ts`). New setlist uses a default
   space (last used, changeable).
 - **Separate:** one active space, header switcher, everything scoped to it (today's model, with the
   switcher moved from the Account and Teams page to the header).
