@@ -481,35 +481,65 @@ service worker while a page is open), not a browser background task: Periodic Ba
 Chromium-only, for installed apps, with an interval the browser picks (hours), and absent on iPad.
 It can be an optional extra for a closed, installed app.
 
-| State | Pull |
+| State | Sync |
 |---|---|
-| App opened, or the device back online after a few minutes offline | a full sync if the last one is older than a threshold (about 15 minutes), found out cheaply first: see "The cheap check" |
-| App open | about every 60 s, for setlists dated today or later, and for files new in the space |
-| A setlist is **live** (dated today or later) | about every 15 s, for that setlist and the songs it newly uses only; and at once when the tab becomes visible or the device comes back online |
+| App opened, or the device back online after a few minutes offline | an **incremental sync** (below) |
+| App open | an incremental sync about every 60 s |
+| A setlist is **live** | about every 15 s, for that setlist and the songs it newly uses only (a direct check, below); and at once when the tab becomes visible or the device comes back online |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
 | A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
 
-Setlists dated before today are never polled: the full syncs on open and on coming back online
-cover them. The date comes from the local record. A setlist made on another device has no local
-record yet, which is what the feed in "The cheap check" is for.
+The intervals and the offline threshold are named constants, not preferences. There is no date
+rule: a request to the feed costs the same whatever the age of the files, so every setlist and chart
+is covered.
 
-The intervals are named constants, not preferences.
+##### Incremental sync: the default, from Drive's change feed
 
-- **The cheap check: Drive's `changes.list` from a stored page token.** One request returns every
-  file changed since, charts included, and an empty list when nothing changed, instead of listing the
-  folders and the members on every sync. When it is empty, the full sync is skipped; when not, only
-  the files it names are pulled. A real full sync still runs on every explicit Sync press and about
-  once an hour while the app is open, and it is the fallback if the token is lost or the call fails.
-  Checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows in the
-  feed after about 5 s, so a tick can be that far behind (fine at 60 s; the live 15 s tick checks the
-  one file directly instead). **Scope checked 2026-10-23** with a throwaway probe page (since deleted): the feed
-  holds only files the app made or was given. Files made by hand in Drive, in My Drive and inside the
-  app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
-  find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
-  The feed covers every space of the account on this device, so its results are filtered to this
-  space's folder tree by parent ids; a removal arrives as a file id only, so it is looked up locally.
-  Not yet checked on a shared drive or through the Worker's team service. Via the Worker's team
-  service (docs/SPACES.md) the same call is a Worker route.
+Drive's `changes.list`, read from a stored page token, returns every file changed since, charts
+included, and an empty list when nothing changed. An incremental sync asks it what changed and
+applies just that, instead of listing the folders and the members each time. The full sync
+(`DriveSyncManager.sync()`, above) is no longer the usual sync but the fallback.
+
+A full sync still runs:
+- **the first time on a device** (and for a space with no stored token): there is nothing to ask the feed about;
+- **when the feed refuses the token** (an error: the docs give no lifetime), once, to store a new one;
+- **on every press of Sync** on a space card, which is the "something looks wrong" button and must
+  not trust the feed;
+- **Reset from Drive and Start over in Drive**, as now;
+- **about once a day when the app opens**, as a safety net, until the incremental sync has run well in use.
+
+What an incremental sync must do, because the full sync did it by listing everything:
+- **Store the token only after the changes are applied.** Closing the app halfway means the next run sees them again.
+- **Know the space's folders.** A changed song has the `songs/` folder as its parent, not the space folder.
+  The folder ids (root, `songs`, `setlists`, `shares`, `pads`) are cached with the space, and
+  a change belongs to the space if its parent is one of them. A file moved in or out shows as a
+  parent change.
+- **Keep a retry list** of files whose download failed. The feed does not report them again; each
+  tick tries them again, and the full sync clears the list.
+- **Read a removal as a file id** (a trashed or deleted file arrives with no other fields), and
+  find the local record by `fileRef`. The rule for a setlist deleted in Drive is the same as in the
+  full sync: removed locally unless edited here since its last sync.
+- **Guard against duplicates** against the local records, as the pull already makes one for every
+  file in Drive. The creation rules (the push holding back on a twin, or after an unread file) apply
+  unchanged; an unread file is one on the retry list.
+- **Refresh the members on their own, slower clock** (about hourly, and when the people dialog
+  opens), as `permissions.list` is no longer part of every sync.
+- **Take the same Web Lock** `chordless-sync` as every other sync.
+
+The feed: checked on a real My Drive under `drive.file` (2026-10-19): it works, and a change shows
+after about 5 s, so a tick can be that far behind (fine at 60 s; the live 15 s tick checks the one
+file directly instead). **Scope checked 2026-10-23** with a throwaway probe page (since deleted): it
+holds only files the app made or was given. Files made by hand in Drive, in My Drive and inside the
+app's own folder, did not appear, with or without the all-drives flags, and `files.list` did not
+find them either. (Google's docs do not say this for `changes.list`; the probe is the evidence.)
+The feed covers every space of the account on this device, so its results are filtered to the
+space's folders. Not yet checked on a shared drive for a folder in someone else's drive, nor through
+the Worker's team service, where the same call is a Worker route (docs/SPACES.md).
+
+Tests: the random sync tests (`tests/drive-sync-random.test.ts`) run with the incremental path and
+compare the result with a full sync after every step; a lost token, a failed download and a file
+moved between folders each have a test of their own.
+
 - **A live tick is for one setlist, not a sync.** One `files.get` of the live setlist's file for its
   `md5Checksum`, compared with the record's `fileRev`; only if it differs, `pullSetlistNow(id)`
   (the pull-side twin of `pushSetlistNow`: the same conflict rule as the full pull, nothing else is
