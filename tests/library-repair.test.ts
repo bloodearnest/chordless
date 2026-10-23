@@ -9,14 +9,19 @@ import type { SongRecord } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import {
   applyRepair,
+  type ChartComparison,
   chartFingerprint,
+  compareCharts,
   hasCcliBumph,
   keyOfChart,
+  planImporters,
+  planLinks,
   planMerge,
   planRepair,
   planSources,
   type SongWithText,
   usageOf,
+  wordSimilarity,
 } from '../src/js/library-repair.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
@@ -35,6 +40,214 @@ const chart = (key: string, chords: [string, string, string], extra = '') =>
 const IN_G = chart('G', ['G', 'C', 'D'])
 const IN_A = chart('A', ['A', 'D', 'E'])
 const IN_G_ARRANGED = chart('G', ['G', 'Em', 'D'])
+
+describe('comparing two charts', () => {
+  const verdict = (a: string, b: string) => compareCharts(a, b).verdict
+
+  it('says identical, the same chart with other details, another key, other chords, other words', () => {
+    expect(verdict(IN_G, IN_G)).to.equal('identical')
+    expect(verdict(IN_G, IN_G.replace('2017 Somebody', 'Other'))).to.equal('same-chart')
+    expect(verdict(IN_G, IN_A)).to.equal('other-key')
+    expect(verdict(IN_G, IN_G_ARRANGED)).to.equal('different-chords')
+    expect(verdict(IN_G, IN_G.replace('Hallelujah', 'Glory'))).to.equal('different-words')
+  })
+
+  it('gives the two keys', () => {
+    expect(compareCharts(IN_G, IN_A).keys).to.deep.equal(['G', 'A'])
+  })
+
+  const marks = (side: ChartComparison['stanzas'][0]) =>
+    side.map(stanza => [stanza.heading, stanza.status])
+
+  it('marks no stanza for a change of key', () => {
+    const { stanzas } = compareCharts(IN_G, IN_A)
+    expect(marks(stanzas[0])).to.deep.equal([
+      ['Verse 1', 'same'],
+      ['Chorus', 'same'],
+    ])
+    expect(marks(stanzas[1])).to.deep.equal(marks(stanzas[0]))
+    expect(stanzas[0][0].lines[0]).to.contain('[G]Amazing')
+    expect(stanzas[1][0].lines[0]).to.contain('[A]Amazing')
+  })
+
+  it('marks the stanza whose chords differ, and only that, in both charts', () => {
+    const { stanzas } = compareCharts(IN_G, IN_G_ARRANGED)
+    const expected = [
+      ['Verse 1', 'chords'],
+      ['Chorus', 'same'],
+    ]
+    expect(marks(stanzas[0])).to.deep.equal(expected)
+    expect(marks(stanzas[1])).to.deep.equal(expected)
+  })
+
+  it('marks a stanza with other words, and a stanza only one chart has', () => {
+    const extra = IN_G.replace(
+      '{comment: Chorus}',
+      '{comment: Bridge}\n[A]New line\n{comment: Chorus}'
+    )
+    const { stanzas } = compareCharts(IN_G, extra)
+    expect(marks(stanzas[0])).to.deep.equal([
+      ['Verse 1', 'same'],
+      ['Chorus', 'same'],
+    ])
+    expect(marks(stanzas[1])).to.deep.equal([
+      ['Verse 1', 'same'],
+      ['Bridge', 'only'],
+      ['Chorus', 'same'],
+    ])
+    const long = IN_G.replace('Hallelujah', 'Hallelujah praise the Lord')
+    const reworded = compareCharts(long, long.replace('Lord', 'King'))
+    expect(reworded.stanzas[0][1].status).to.equal('words')
+    expect(reworded.stanzas[0][1].matched).to.equal('Chorus')
+  })
+
+  it('pairs a repeated or moved stanza with its closest, not by position', () => {
+    const swapped = `{title: Amazing}\n{key: G}\n{comment: Chorus}\n[G]Hallelujah\n{comment: Verse 1}\n[G]Amazing [C]grace how [D]sweet\n`
+    expect(marks(compareCharts(IN_G, swapped).stanzas[0])).to.deep.equal([
+      ['Verse 1', 'same'],
+      ['Chorus', 'same'],
+    ])
+  })
+
+  it('compares charts with nothing in them', () => {
+    expect(compareCharts('', '').stanzas).to.deep.equal([[], []])
+    expect(verdict('', IN_G)).to.equal('different-words')
+  })
+})
+
+describe('the words of two charts', () => {
+  const lines = (...parts: string[]) => `{title: Alone}\n{key: E}\n${parts.join('\n')}`
+  const LIBRARY = lines(
+    '{comment: Verse 1}',
+    'In Christ a[C#m7]lone my hope is',
+    '[G#m7]found, He is my [Amaj7]light my strength my song',
+    'This Corner[C#m7]stone this solid [G#m7]Ground, firm through the [Amaj7]fiercest drought and storm'
+  )
+  const OFFICIAL = lines(
+    '{comment: Verse 1}',
+    'In [4]Christ a -',
+    '[1]lone my [4]hope is',
+    '[5]found',
+    '[1/3]He is my [4]light, [1/3]my [2m7]strength, [4/5]my [1]song',
+    'This [4]Corner -',
+    '[1]stone, this [4]solid [5]Ground',
+    '[1/3]Firm through the [4]fierc - [1/3]est [2m7]drought [4/5]and [1]storm'
+  )
+
+  it('are the same whatever the line breaks, hyphens, punctuation and case', () => {
+    expect(wordSimilarity(LIBRARY, OFFICIAL)).to.equal(1)
+    expect(compareCharts(LIBRARY, OFFICIAL).verdict).to.equal('different-chords')
+  })
+
+  it('forgive a typo, and tell different words', () => {
+    const typo = LIBRARY.replace('fiercest', 'fiercset').replace('Ground', 'Grund')
+    expect(wordSimilarity(typo, LIBRARY)).to.be.greaterThan(0.95)
+    expect(compareCharts(typo, LIBRARY).verdict).to.equal('same-chart')
+    const other = lines('Something else entirely, not at all the same song to sing')
+    expect(wordSimilarity(other, LIBRARY)).to.be.lessThan(0.3)
+    expect(compareCharts(other, LIBRARY).verdict).to.equal('different-words')
+  })
+
+  it('compare the chords in order, whatever the lines, so a layout change in another key is the same chart', () => {
+    const broken = IN_A.replace('grace how [E]sweet', 'grace\nhow [E]sweet')
+    expect(compareCharts(IN_G, broken).verdict).to.equal('other-key')
+  })
+
+  it('are matched stanza by stanza, however the lines break: the verse has other chords, nothing else', () => {
+    const { stanzas } = compareCharts(LIBRARY, OFFICIAL)
+    expect(stanzas[0].map(stanza => [stanza.heading, stanza.status])).to.deep.equal([
+      ['Verse 1', 'chords'],
+    ])
+    expect(stanzas[0][0].similarity).to.equal(1)
+  })
+})
+
+describe('songs to fold into another', () => {
+  const song = (uuid: string, id: string, title: string, ccli: string | null = null) =>
+    withText(
+      record({
+        uuid,
+        id,
+        title,
+        titleNormalized: title.toLowerCase(),
+        ccliNumber: ccli,
+      }),
+      IN_G
+    )
+
+  it("are the songs with no CCLI number whose title is a CCLI song's", () => {
+    expect(
+      planLinks([
+        song('hand', 'title-in christ alone', 'In Christ Alone'),
+        song('official', 'ccli-3350395', 'In Christ Alone', '3350395'),
+        song('other', 'title-other', 'Other'),
+      ])
+    ).to.deep.equal([
+      { fromId: 'title-in christ alone', intoId: 'ccli-3350395', title: 'In Christ Alone' },
+    ])
+  })
+
+  it("leave alone a title that is several CCLI songs's, and a song with a CCLI number", () => {
+    expect(
+      planLinks([
+        song('hand', 'title-holy', 'Holy'),
+        song('a', 'ccli-1', 'Holy', '1'),
+        song('b', 'ccli-2', 'Holy', '2'),
+      ])
+    ).to.deep.equal([])
+    expect(planLinks([song('a', 'ccli-1', 'Holy', '1')])).to.deep.equal([])
+  })
+
+  it('count each song once, however many variants it has, and are in title order', () => {
+    const links = planLinks([
+      song('z1', 'title-zeal', 'Zeal'),
+      song('z2', 'title-zeal', 'Zeal'),
+      song('a1', 'title-amen', 'Amen'),
+      song('zc', 'ccli-9', 'Zeal', '9'),
+      song('ac', 'ccli-8', 'Amen', '8'),
+    ])
+    expect(links.map(link => link.title)).to.deep.equal(['Amen', 'Zeal'])
+  })
+})
+
+describe('the stanzas of a chart', () => {
+  it('begin at a comment or a start_of_ directive, and end_of_ ones are not stanzas or lines', () => {
+    const text = `{title: X}\n[G]Before any heading\n{start_of_verse: Verse 1}\n[G]In the verse\n{end_of_verse}\n{soc}\n[G]In the chorus\n{eoc}\n{comment}\n[G]Untitled`
+    const { stanzas } = compareCharts(text, text)
+    expect(stanzas[0].map(stanza => stanza.heading)).to.deep.equal([
+      '',
+      'Verse 1',
+      '{soc}',
+      '{comment}',
+    ])
+    expect(stanzas[0][1].lines).to.deep.equal(['[G]In the verse'])
+  })
+
+  it('match by chords when they have no words, by heading when the chords differ, and not otherwise', () => {
+    const a = '{comment: Instrumental}\n[G] [C] [D]'
+    const same = compareCharts(a, '{comment: Instrumental}\n[G] [C] [D]')
+    expect(same.stanzas[0][0].status).to.equal('same')
+    const other = compareCharts(a, '{comment: Instrumental}\n[G] [Em] [D]')
+    expect(other.stanzas[0][0].status).to.equal('chords')
+    const renamed = compareCharts(a, '{comment: Outro}\n[G] [Em] [D]')
+    expect(renamed.stanzas[0][0].status).to.equal('only')
+  })
+
+  it('leave the CCLI trailer out of the words', () => {
+    const trailer = '\nCCLI Song # 7000001\nFor use solely with the SongSelect Terms of Use.'
+    expect(wordSimilarity('[G]amazing grace', `[G]amazing grace${trailer}`)).to.equal(1)
+  })
+
+  it('treat a word one typo away as the same word, and a short word as different', () => {
+    expect(wordSimilarity('[G]grace is amazing', '[G]grace is amazng')).to.equal(1)
+    expect(wordSimilarity('[G]grace is amazing', '[G]grace is amazzing')).to.equal(1)
+    expect(wordSimilarity('[G]grace is amazing', '[G]grace is amazang')).to.equal(1)
+    expect(wordSimilarity('[G]grace is the way', '[G]grace is the war')).to.be.lessThan(1)
+    expect(wordSimilarity('[G]amazing grace', '[G]amazing graces')).to.equal(1)
+    expect(wordSimilarity('[G]amazing grace', '[G]amazing gracefully')).to.be.lessThan(1)
+    expect(wordSimilarity('[G]one two three', '')).to.equal(0)
+  })
+})
 
 describe('a chart, set apart from what is about the song', () => {
   it('knows the CCLI material SongSelect puts on its charts, and a chart without it', () => {
@@ -315,6 +528,8 @@ describe('repairing a library', () => {
     await duplicated()
     const report = await applyRepair(db, await planRepair(db, 'Simon Davy'))
     expect(report).to.deep.equal({
+      songsLinked: 0,
+      importersSet: 2,
       sourcesSet: 2,
       songsRemoved: 1,
       setlistsChanged: 1,
@@ -370,6 +585,62 @@ describe('repairing a library', () => {
     expect(must(await db.getSong('june')).metadataChangedAt).to.be.a('string')
   })
 
+  it('reports the songs it would merge but does not merge them when told not to', async () => {
+    await duplicated()
+    const plan = await planRepair(db, 'Simon Davy', { merge: false })
+    expect(plan.merging).to.equal(false)
+    expect(plan.merges).to.deep.equal([])
+    expect(plan.sources.length).to.be.greaterThan(0)
+    const report = await applyRepair(db, plan)
+    expect(report.songsRemoved).to.equal(0)
+    expect(await db.getAllSongs()).to.have.length(2)
+    expect((await planRepair(db, 'Simon Davy')).merging).to.equal(true)
+  })
+
+  it('will not plan with no name to give the songs', async () => {
+    await duplicated()
+    let failure = ''
+    await planRepair(db, '  ').catch(error => {
+      failure = error.message
+    })
+    expect(failure).to.contain('blank')
+  })
+
+  it('folds a song with no CCLI number into the CCLI song of its title, as a variant', async () => {
+    await addSong('official', IN_G, { importUser: 'Jo', importSource: 'songselect' })
+    await addSong('hand', `${IN_G}x`, {
+      id: 'title-amazing',
+      ccliNumber: null,
+      titleNormalized: 'amazing',
+      isDefault: true,
+      importUser: 'Jo',
+      importSource: 'songselect',
+    })
+    const plan = await planRepair(db, 'Simon Davy')
+    expect(plan.links.map(link => [link.fromId, link.intoId])).to.deep.equal([
+      ['title-amazing', 'ccli-1'],
+    ])
+    const report = await applyRepair(db, plan)
+    expect(report.songsLinked).to.equal(1)
+    expect(must(await db.getSong('hand')).id).to.equal('ccli-1')
+    expect(must(await db.getSong('hand')).variantOf).to.equal('official')
+    expect((await planRepair(db, 'Simon Davy')).links).to.deep.equal([])
+  })
+
+  it('skips a link whose song has gone since the plan', async () => {
+    await addSong('official', IN_G, { importUser: 'Jo', importSource: 'songselect' })
+    await addSong('hand', IN_G, {
+      id: 'title-amazing',
+      ccliNumber: null,
+      titleNormalized: 'amazing',
+      importUser: 'Jo',
+      importSource: 'songselect',
+    })
+    const plan = await planRepair(db, 'Simon Davy')
+    await db.deleteSong('hand')
+    expect((await applyRepair(db, plan)).songsLinked).to.equal(0)
+  })
+
   it('leaves nothing to do the second time', async () => {
     await duplicated()
     await applyRepair(db, await planRepair(db, 'Simon Davy'))
@@ -377,6 +648,8 @@ describe('repairing a library', () => {
     expect(again.merges).to.deep.equal([])
     expect(again.sources).to.deep.equal([])
     expect(await applyRepair(db, again)).to.deep.equal({
+      songsLinked: 0,
+      importersSet: 0,
       sourcesSet: 0,
       songsRemoved: 0,
       setlistsChanged: 0,
@@ -406,6 +679,23 @@ describe('repairing a library', () => {
     expect(left.arrangement.isDefault).to.equal(false)
   })
 
+  it('gives the songs with no importer the owner, and leaves a song that has one', async () => {
+    const apart = (id: string) => ({ id: `title-${id}`, titleNormalized: id, ccliNumber: null })
+    await addSong('old', IN_G, { importUser: 'default-user', ...apart('one') })
+    await addSong('blank', IN_A, { importUser: null, ...apart('two') })
+    await addSong('known', IN_A, { importUser: 'Jo', ...apart('three') })
+    const plan = await planRepair(db, 'Simon Davy')
+    expect(plan.importers.map(change => change.uuid).sort()).to.deep.equal(['blank', 'old'])
+    expect(planImporters([])).to.deep.equal([])
+
+    const report = await applyRepair(db, plan)
+    expect(report.importersSet).to.equal(2)
+    const users = Object.fromEntries((await db.getAllSongs()).map(s => [s.uuid, s.importUser]))
+    expect(users).to.deep.equal({ old: 'Simon Davy', blank: 'Simon Davy', known: 'Jo' })
+    expect(must(await db.getSong('old')).metadataChangedAt).to.be.a('string')
+    expect((await planRepair(db, 'Simon Davy')).importers).to.deep.equal([])
+  })
+
   it('skips a song in the plan that has been deleted since', async () => {
     await duplicated()
     const plan = await planRepair(db, 'Simon Davy')
@@ -416,12 +706,14 @@ describe('repairing a library', () => {
   })
 
   it('does not touch a library with nothing the matter with it', async () => {
-    await addSong('one', `${IN_G}${BUMPH}`, { importSource: 'songselect' })
+    await addSong('one', `${IN_G}${BUMPH}`, { importSource: 'songselect', importUser: 'Jo' })
     await db.saveSetlist(makeSetlist({ songs: [makeEntry({ songUuid: 'one' })] }))
     const plan = await planRepair(db, 'Simon Davy')
     expect(plan.merges).to.deep.equal([])
     expect(plan.sources).to.deep.equal([])
     expect(await applyRepair(db, plan)).to.deep.equal({
+      songsLinked: 0,
+      importersSet: 0,
       sourcesSet: 0,
       songsRemoved: 0,
       setlistsChanged: 0,

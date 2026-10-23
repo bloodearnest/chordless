@@ -29,9 +29,14 @@ async function withDb(spaceId, use) {
   }
 }
 
+/** Whether songs may be deleted from a space: not in a Team, unless its admin */
+const canDelete = space => !isTeamMember(space) || space.team?.role === 'admin'
+
 /** The plan for a space, read now; nothing is changed */
 async function plan(spaceId, by) {
-  return withDb(spaceId, db => planRepair(db, by))
+  const space = (await listSpaces()).find(each => each.id === spaceId)
+  // (merging repeated songs deletes some, which is for a Team's admin; the rest is not)
+  return withDb(spaceId, db => planRepair(db, by, { merge: !space || canDelete(space) }))
 }
 
 /** Apply a plan to a space, downloading an export of it first if asked */
@@ -77,8 +82,16 @@ function describe(thePlan) {
     <h2>The plan</h2>
     <p>${thePlan.songs} songs and ${thePlan.setlists} setlists in this space.</p>
     <ul>
-      <li><strong>${thePlan.merges.length}</strong> songs are repeated: ${removed} extra records would be
-        removed, leaving ${thePlan.songs - removed} (${keyChange} of the repeats are in another key).</li>
+      ${
+        thePlan.merging
+          ? `<li><strong>${thePlan.merges.length}</strong> songs are repeated: ${removed} extra records would be
+        removed, leaving ${thePlan.songs - removed} (${keyChange} of the repeats are in another key).</li>`
+          : '<li>Repeated songs are not merged here: that deletes songs, which is for a Team’s admin.</li>'
+      }
+      <li><strong>${thePlan.links.length}</strong> songs with no CCLI number are the same song as one that has
+        one, and would become its variants: ${thePlan.links.map(link => esc(link.title)).join(', ') || 'none'}.</li>
+      <li><strong>${thePlan.importers.length}</strong> songs have no “imported by” and would be given
+        “${esc(thePlan.writtenBy)}”.</li>
       <li><strong>${thePlan.sources.length}</strong> songs would be given a source:
         ${byCcli} SongSelect, ${byHand} “${esc(thePlan.writtenBy)}”.</li>
       <li>${thePlan.distinct.length} songs have different arrangements, which are kept.</li>
@@ -127,7 +140,7 @@ async function applyClicked() {
   applyButton.textContent = 'Apply'
   try {
     const report = await apply(current.spaceId, current.plan, { download: backup.checked })
-    output.innerHTML = `<p class="done">Done: ${report.songsRemoved} songs removed, ${report.sourcesSet} sources set,
+    output.innerHTML = `<p class="done">Done: ${report.songsRemoved} songs removed, ${report.sourcesSet} sources set, ${report.importersSet} “imported by” set, ${report.songsLinked} linked as variants,
       ${report.entriesMoved} setlist entries moved in ${report.setlistsChanged} setlists.</p>
       <p>Now sync this space (Account and Teams, Sync) so Drive gets it: the removed songs' files go in the Drive trash.</p>`
     current = null
@@ -142,10 +155,8 @@ async function start() {
   for (const space of spaces) {
     const option = document.createElement('option')
     option.value = space.id
-    // (deleting songs in a Team is for its admin and owner)
-    const blocked = isTeamMember(space) && space.team?.role !== 'admin'
-    option.disabled = blocked
-    option.textContent = `${space.name}${space.team ? ' (Team)' : ''}${blocked ? ' — not an admin' : ''}`
+    // (deleting songs in a Team is for its admin and owner: others can run the rest)
+    option.textContent = `${space.name}${space.team ? ' (Team)' : ''}${canDelete(space) ? '' : ' — no merging (not an admin)'}`
     spaceSelect.append(option)
   }
   const user = await getCurrentUserInfo().catch(() => null)

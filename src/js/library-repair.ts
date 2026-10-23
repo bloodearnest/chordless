@@ -18,13 +18,12 @@
  * database, so they can be checked on an export). Applying does.
  */
 
-import type { Setlist, SetlistEntry, SongRecord } from './data-types.ts'
+import type { Setlist, SongRecord } from './data-types.ts'
 import type { ChordlessDB } from './db.ts'
-import { songSource } from './song-source.ts'
+import { lyricsOf } from './import-plan.ts'
+import { SONGSELECT, songSource } from './song-source.ts'
+import { linkSong, moveEntries } from './song-versions.ts'
 import { convertChordToNashville } from './transpose.ts'
-
-/** The source of a chart with SongSelect's material on it */
-export const SONGSELECT = 'songselect'
 
 /** A song with the text of its chart, which is all the planning needs to know */
 export interface SongWithText {
@@ -76,33 +75,253 @@ const ABOUT_THE_SONG = new Set([
  * Two charts with the same fingerprint are the same chart.
  */
 export function chartFingerprint(chordpro: string): string {
+  return chartLines(chordpro)
+    .map(line => line.chords)
+    .join('\n')
+}
+
+/** One line of a chart that is part of the chart: as written, and as it is compared */
+interface ChartLine {
+  /** As written (trimmed) */
+  text: string
+  /** The words alone, with no chords */
+  words: string
+  /** The words and the chords as numbers from the key */
+  chords: string
+}
+
+/** The lines of a chart that are the chart: not blank, not about the song, not the CCLI trailer */
+function chartLines(chordpro: string): ChartLine[] {
   const key = keyOfChart(chordpro)
-  const lines: string[] = []
+  const lines: ChartLine[] = []
   for (const raw of chordpro.split(/\r?\n/)) {
-    const line = raw.trim()
-    if (!line) continue
+    const text = raw.trim()
+    if (!text) continue
     // (everything from the CCLI Song # line on is the trailer)
-    if (/^CCLI Song #/i.test(line)) break
-    const directive = /^\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}\s*(.*)$/i.exec(line)
+    if (/^CCLI Song #/i.test(text)) break
+    const directive = /^\{\s*([a-z_]+)\s*(?::\s*(.*?))?\s*\}\s*(.*)$/i.exec(text)
     if (directive) {
       const name = directive[1].toLowerCase()
       if (ABOUT_THE_SONG.has(name)) continue
-      lines.push(`{${name}:${plain(directive[2] ?? '')}} ${plain(directive[3])}`.trim())
+      const same = `{${name}:${plain(directive[2] ?? '')}} ${plain(directive[3])}`.trim()
+      lines.push({ text, words: same, chords: same })
       continue
     }
-    lines.push(
-      line
-        .split(/(\[[^\]]*\])/)
+    const parts = text.split(/(\[[^\]]*\])/)
+    lines.push({
+      text,
+      words: plain(parts.filter(part => !/^\[[^\]]*\]$/.test(part)).join('')),
+      chords: parts
         .map(part => {
           const chord = /^\[([^\]]*)\]$/.exec(part)
           return chord ? `[${convertChordToNashville(chord[1], key)}]` : plain(part)
         })
         .join('')
         .replace(/\s*(\[[^\]]*\])\s*/g, '$1')
-        .trim()
-    )
+        .trim(),
+    })
   }
-  return lines.join('\n')
+  return lines
+}
+
+// ---- comparing two charts ----
+
+/** How two charts of a song differ, from least to most */
+export type ChartVerdict =
+  | 'identical' // the same text
+  | 'same-chart' // the same words and chords, other details (title, copyright, ...)
+  | 'other-key' // the same chart in another key
+  | 'different-chords' // the same words, other chords
+  | 'different-words' // another version or arrangement
+
+/** How one stanza of a chart stands against the other chart's */
+export type StanzaStatus = 'same' | 'chords' | 'words' | 'only'
+
+/** A stanza (a verse, the chorus: what a section heading begins) of one chart */
+export interface Stanza {
+  /** The section heading ("Verse 1"), empty for lines before the first */
+  heading: string
+  /** The lines under the heading, as written */
+  lines: string[]
+  /**
+   * 'same' (the same words and chords, apart from the key); 'chords' (the same words, other
+   * chords); 'words' (its closest stanza in the other chart has other words); 'only' (the other
+   * chart has nothing like it)
+   */
+  status: StanzaStatus
+  /** The heading of the other chart's stanza it was matched with, if any */
+  matched: string | null
+  /** How alike the words of the two stanzas are, 0 to 1 */
+  similarity: number
+}
+
+export interface ChartComparison {
+  verdict: ChartVerdict
+  /** The key each chart says it is in */
+  keys: [string | null, string | null]
+  /** How alike the words of the whole charts are, 0 to 1 */
+  wordSimilarity: number
+  /** The stanzas of each chart, marked against the other's */
+  stanzas: [Stanza[], Stanza[]]
+}
+
+/** The words count as the same when this much of them is: it forgives a typo or a different hyphenation */
+const SAME_WORDS = 0.9
+/** Stanzas are matched when their words are at least this alike */
+const SAME_STANZA = 0.5
+
+/** Whether two words are the same, or (in a longer word) one typo apart */
+function sameWord(a: string, b: string): boolean {
+  if (a === b) return true
+  if (a.length < 5 || b.length < 5 || Math.abs(a.length - b.length) > 1) return false
+  let i = 0
+  while (a[i] === b[i]) i++
+  // After the first difference, one letter changed, or one added or dropped
+  if (a.length === b.length) return a.slice(i + 1) === b.slice(i + 1)
+  const [shorter, longer] = a.length < b.length ? [a, b] : [b, a]
+  return shorter.slice(i) === longer.slice(i + 1)
+}
+
+/** How alike two lists of words are, 0 to 1 (the longest run they share, in order, a typo allowed) */
+function wordListSimilarity(x: string[], y: string[]): number {
+  if (!x.length && !y.length) return 1
+  let previous = new Array<number>(y.length + 1).fill(0)
+  for (let i = 1; i <= x.length; i++) {
+    const row = new Array<number>(y.length + 1).fill(0)
+    for (let j = 1; j <= y.length; j++) {
+      row[j] = sameWord(x[i - 1], y[j - 1])
+        ? previous[j - 1] + 1
+        : Math.max(previous[j], row[j - 1])
+    }
+    previous = row
+  }
+  return (2 * previous[y.length]) / (x.length + y.length)
+}
+
+/** The words of a chart (or of lines of one), without the CCLI trailer and the other material around it */
+const wordsOf = (chordpro: string): string[] =>
+  lyricsOf(
+    chartLines(chordpro)
+      .map(line => line.text)
+      .join('\n')
+  )
+    .split(' ')
+    .filter(Boolean)
+
+/** How alike the words of two charts are, 0 to 1, whatever their line breaks, case or punctuation */
+export function wordSimilarity(a: string, b: string): number {
+  return wordListSimilarity(wordsOf(a), wordsOf(b))
+}
+
+/** The chords of a chart (or of lines of one) in order, as numbers from its key */
+function chordSequence(lines: ChartLine[]): string {
+  return lines.flatMap(line => line.chords.match(/\[[^\]]*\]/g) ?? []).join('')
+}
+
+/** A directive that begins a section: a comment, as SongSelect writes "Verse 1", or a start of one */
+const SECTION =
+  /^\{\s*(?:c|comment|ci|comment_italic|cb|comment_box|start_of_[a-z]+|so[a-z])\s*(?::\s*(.*?))?\s*\}/i
+
+/** A directive that ends a section (end_of_verse, eov): it has no words, and begins nothing */
+const SECTION_END = /^\{\s*(?:end_of_[a-z]+|eo[a-z])\s*\}/i
+
+/** The stanzas of a chart: each section heading and the lines under it */
+function stanzasOf(chordpro: string): { heading: string; lines: ChartLine[] }[] {
+  const stanzas: { heading: string; lines: ChartLine[] }[] = []
+  for (const line of chartLines(chordpro)) {
+    const section = SECTION.exec(line.text)
+    if (section) {
+      stanzas.push({ heading: (section[1] ?? '').trim() || line.text, lines: [] })
+      continue
+    }
+    if (SECTION_END.test(line.text)) continue
+    if (!stanzas.length) stanzas.push({ heading: '', lines: [] })
+    stanzas[stanzas.length - 1].lines.push(line)
+  }
+  return stanzas
+}
+
+/** The stanzas of two charts, each matched with its closest in the other and marked */
+function compareStanzas(a: string, b: string): [Stanza[], Stanza[]] {
+  const make = (chordpro: string) =>
+    stanzasOf(chordpro).map(stanza => ({
+      heading: stanza.heading,
+      raw: stanza.lines.map(line => line.text),
+      words: wordsOf(stanza.lines.map(line => line.text).join('\n')),
+      chords: chordSequence(stanza.lines),
+    }))
+  const left = make(a)
+  const right = make(b)
+  // Every pair, the most alike first, taken where neither is taken
+  const pairs: { i: number; j: number; score: number }[] = []
+  for (let i = 0; i < left.length; i++) {
+    for (let j = 0; j < right.length; j++) {
+      const score =
+        left[i].words.length || right[j].words.length
+          ? wordListSimilarity(left[i].words, right[j].words)
+          : // (chords alone: the same chords, or the same heading, are the same stanza)
+            left[i].chords === right[j].chords
+            ? 1
+            : left[i].heading === right[j].heading
+              ? SAME_WORDS
+              : 0
+      if (score >= SAME_STANZA) pairs.push({ i, j, score })
+    }
+  }
+  // (a tie goes to the stanzas in the same place)
+  pairs.sort((p, q) => q.score - p.score || Math.abs(p.i - p.j) - Math.abs(q.i - q.j))
+  const matchA = new Map<number, { j: number; score: number }>()
+  const matchB = new Map<number, { i: number; score: number }>()
+  for (const { i, j, score } of pairs) {
+    if (matchA.has(i) || matchB.has(j)) continue
+    matchA.set(i, { j, score })
+    matchB.set(j, { i, score })
+  }
+  const mark = (
+    mine: typeof left,
+    theirs: typeof left,
+    match: Map<number, { j?: number; i?: number; score: number }>
+  ): Stanza[] =>
+    mine.map((stanza, n) => {
+      const found = match.get(n)
+      if (!found) {
+        return {
+          heading: stanza.heading,
+          lines: stanza.raw,
+          status: 'only',
+          matched: null,
+          similarity: 0,
+        }
+      }
+      const other = theirs[(found.j ?? found.i) as number]
+      const status: StanzaStatus =
+        found.score < SAME_WORDS ? 'words' : stanza.chords === other.chords ? 'same' : 'chords'
+      return {
+        heading: stanza.heading,
+        lines: stanza.raw,
+        status,
+        matched: other.heading,
+        similarity: found.score,
+      }
+    })
+  return [mark(left, right, matchA), mark(right, left, matchB)]
+}
+
+/**
+ * Say how two charts of a song differ, stanza by stanza. The words are compared as a whole (the
+ * same words broken into other lines, hyphenated differently or with a typo are the same words),
+ * the chords in order as numbers from the key, so a change of key marks nothing.
+ */
+export function compareCharts(a: string, b: string): ChartComparison {
+  const keys: [string | null, string | null] = [keyOfChart(a), keyOfChart(b)]
+  const similarity = wordSimilarity(a, b)
+  const sameChords = chordSequence(chartLines(a)) === chordSequence(chartLines(b))
+  let verdict: ChartVerdict
+  if (a.trim() === b.trim()) verdict = 'identical'
+  else if (similarity < SAME_WORDS) verdict = 'different-words'
+  else if (!sameChords) verdict = 'different-chords'
+  else verdict = keys[0] === keys[1] ? 'same-chart' : 'other-key'
+  return { verdict, keys, wordSimilarity: similarity, stanzas: compareStanzas(a, b) }
 }
 
 /** Words as they are compared: no case, no punctuation, one space between */
@@ -230,10 +449,68 @@ export function planSources(songs: SongWithText[], writtenBy: string): SourceCha
   return changes
 }
 
+/** A song whose importer (the person who imported or made it) is to be set */
+export interface ImporterChange {
+  uuid: string
+  title: string
+}
+
+/** What an import recorded as its importer before it recorded the real one */
+const NO_AUTHOR = new Set(['', 'default-user'])
+
+/**
+ * The songs with no importer: imported before the signed-in person was recorded. They are
+ * given `writtenBy`, the owner of the library, who imported them. A song with an importer is left alone.
+ */
+export function planImporters(songs: SongWithText[]): ImporterChange[] {
+  return songs
+    .filter(({ song }) => NO_AUTHOR.has(song.importUser ?? ''))
+    .map(({ song }) => ({ uuid: song.uuid, title: song.title }))
+}
+
+/** A song with no CCLI number that is the same song as one that has: folded into it as a variant */
+export interface Link {
+  fromId: string
+  intoId: string
+  title: string
+}
+
+/**
+ * The songs to fold into another: a song with no CCLI number (a hand-made chart) whose title is
+ * the title of exactly one song that has one. Two CCLI songs with a title (several songs called
+ * "Holy") leave it alone: it is not known which it is.
+ */
+export function planLinks(songs: SongWithText[]): Link[] {
+  const withCcli = new Map<string, Set<string>>()
+  const without = new Map<string, SongRecord>()
+  for (const { song } of songs) {
+    if (song.ccliNumber) {
+      withCcli.set(
+        song.titleNormalized,
+        (withCcli.get(song.titleNormalized) ?? new Set()).add(song.id)
+      )
+    } else if (!without.has(song.id)) {
+      without.set(song.id, song)
+    }
+  }
+  const links: Link[] = []
+  for (const song of without.values()) {
+    const same = withCcli.get(song.titleNormalized)
+    if (same?.size === 1) {
+      links.push({ fromId: song.id, intoId: [...same][0], title: song.title })
+    }
+  }
+  return links.sort((a, b) => a.title.localeCompare(b.title))
+}
+
 // ---- the library ----
 
 /** What there is to do to a library */
 export interface RepairPlan extends MergePlan {
+  /** Whether repeated songs are merged (which deletes some); not for a Team's non-admin */
+  merging: boolean
+  links: Link[]
+  importers: ImporterChange[]
   sources: SourceChange[]
   writtenBy: string
   /** How many songs and setlists there are, to say what the plan is of */
@@ -242,15 +519,27 @@ export interface RepairPlan extends MergePlan {
 }
 
 /** Read a library and say what repairing it would do. Changes nothing. */
-export async function planRepair(db: ChordlessDB, writtenBy: string): Promise<RepairPlan> {
+export async function planRepair(
+  db: ChordlessDB,
+  writtenBy: string,
+  { merge = true }: { merge?: boolean } = {}
+): Promise<RepairPlan> {
+  // (the name goes on every song with no importer or source: blank would leave them as they are)
+  if (!writtenBy.trim()) throw new Error('Fill in the name to give the songs: it is blank')
   const records = await db.getAllSongs()
   const songs: SongWithText[] = []
   for (const song of records) {
     songs.push({ song, text: (await db.getChordPro(song.chordproFileId))?.content ?? '' })
   }
   const setlists = await db.getAllSetlists()
+  const merging = planMerge(songs, usageOf(setlists))
   return {
-    ...planMerge(songs, usageOf(setlists)),
+    ...merging,
+    // (merging deletes songs: where that is not allowed, what would be merged is only reported)
+    merges: merge ? merging.merges : [],
+    merging: merge,
+    links: planLinks(songs),
+    importers: planImporters(songs),
     sources: planSources(songs, writtenBy),
     writtenBy,
     songs: records.length,
@@ -260,40 +549,12 @@ export async function planRepair(db: ChordlessDB, writtenBy: string): Promise<Re
 
 /** What applying a plan did */
 export interface RepairReport {
+  songsLinked: number
+  importersSet: number
   sourcesSet: number
   songsRemoved: number
   setlistsChanged: number
   entriesMoved: number
-}
-
-/** The key a song is shown in when nothing else says: its own, else the chart's */
-const showsKey = (song: SongRecord): string | null => song.key || song.originalKey || null
-
-/** The setlist's entries moved from the removed songs to the one kept, keeping what they showed */
-function moveEntries(
-  setlist: Setlist,
-  merges: MergeGroup[]
-): { setlist: Setlist; moved: number } | null {
-  const removed = new Map<string, MergeGroup>()
-  for (const group of merges) {
-    for (const record of group.remove) removed.set(record.uuid, group)
-  }
-  let moved = 0
-  const songs = setlist.songs.map((entry): SetlistEntry => {
-    const group = removed.get(entry.songUuid)
-    if (!group) return entry
-    const gone = group.remove.find(record => record.uuid === entry.songUuid) as SongRecord
-    moved++
-    return {
-      ...entry,
-      songUuid: group.keep.uuid,
-      songId: group.keep.id,
-      // (an entry that used the removed song's own key or tempo keeps showing them)
-      key: entry.key || (showsKey(gone) !== showsKey(group.keep) ? showsKey(gone) : null),
-      tempo: entry.tempo ?? (gone.tempo !== group.keep.tempo ? gone.tempo : null),
-    }
-  })
-  return moved > 0 ? { setlist: { ...setlist, songs }, moved } : null
 }
 
 /**
@@ -302,12 +563,21 @@ function moveEntries(
  */
 export async function applyRepair(db: ChordlessDB, plan: RepairPlan): Promise<RepairReport> {
   const report: RepairReport = {
+    songsLinked: 0,
+    importersSet: 0,
     sourcesSet: 0,
     songsRemoved: 0,
     setlistsChanged: 0,
     entriesMoved: 0,
   }
   const now = new Date().toISOString()
+
+  for (const change of plan.importers) {
+    const song = await db.getSong(change.uuid)
+    if (!song) continue
+    await db.saveSong({ ...song, importUser: plan.writtenBy, metadataChangedAt: now })
+    report.importersSet++
+  }
 
   for (const change of plan.sources) {
     const song = await db.getSong(change.uuid)
@@ -349,6 +619,12 @@ export async function applyRepair(db: ChordlessDB, plan: RepairPlan): Promise<Re
     if (kept && !stillDefault) {
       await db.saveSong({ ...kept, isDefault: true, variantOf: null })
     }
+  }
+  // Last, so that a song folded into another is not also merged: the records, as they are now
+  for (const link of plan.links) {
+    if ((await db.getSongVariants(link.fromId)).length === 0) continue
+    await linkSong(db, link.fromId, link.intoId)
+    report.songsLinked++
   }
   return report
 }

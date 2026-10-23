@@ -107,7 +107,7 @@ test('previews, then applies, a repair of a library with a song twice', async ({
   ])
 })
 
-test('does not let a Team’s member repair its library, but its admin, and shows the console handle', async ({
+test('lets a Team’s member repair its library, without merging, and its admin merge, and shows the console handle', async ({
   page,
 }) => {
   await page.goto('/dev/library-repair.html')
@@ -120,9 +120,11 @@ test('does not let a Team’s member repair its library, but its admin, and show
   })
   await page.reload()
   const member = page.locator('#space option', { hasText: 'As member' })
-  await expect(member).toBeDisabled()
-  await expect(member).toContainText('not an admin')
-  await expect(page.locator('#space option', { hasText: 'As admin' })).toBeEnabled()
+  await expect(member).toBeEnabled()
+  await expect(member).toContainText('no merging')
+  await expect(page.locator('#space option', { hasText: 'As admin' })).not.toContainText(
+    'no merging'
+  )
   expect(
     await page.evaluate(() => typeof (globalThis as { libraryRepair?: unknown }).libraryRepair)
   ).toBe('object')
