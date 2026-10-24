@@ -35,6 +35,7 @@ import type {
 import '../../components/song-section.ts'
 import '../../components/status-message.ts'
 import type { HideMode, ParsedChart, SectionState, SongWithContent } from '../data-types.ts'
+import { watchData } from '../data-watcher.ts'
 import { getCurrentDB } from '../db.ts'
 import { filterByPlace, loadLeftOut, placesOf, saveLeftOut } from '../library-spaces.ts'
 import { goTo } from '../navigation.ts'
@@ -94,6 +95,9 @@ export class LibraryView extends PageView {
     this._heading = 'Song Library'
     this._source = ''
     this._leftOut = loadLeftOut()
+    // Songs, their charts or the setlists using them were written (by the page, a sync, another
+    // tab): the list is as it is now (the old one stays until then)
+    watchData(this, ['song', 'chart', 'setlist'], () => void this.#songs.run())
   }
 
   /**
@@ -517,9 +521,8 @@ export class LibraryView extends PageView {
     }
   }
 
-  /** The versions of a song changed: the list may; and the song may be gone, so back to the list */
+  /** The versions of a song changed (the list follows the writes): and the song may be gone, so back to the list */
   #versionsChanged(event: SongVersionsChangedEvent): void {
-    void this.#songs.run()
     if (event.songDeleted) void goTo(buildUrl({ name: 'songs' }), { replace: true })
   }
 
@@ -609,7 +612,9 @@ export class LibraryView extends PageView {
             <div id="song-library-list" class="song-library-list">
               ${this.#songs.render({
                 pending: () =>
-                  html`<status-message state="loading" message="Loading songs..."></status-message>`,
+                  this.#songs.value
+                    ? this.#renderList(this.#songs.value)
+                    : html`<status-message state="loading" message="Loading songs..."></status-message>`,
                 complete: songs => this.#renderList(songs),
                 error: error => {
                   console.error('Error loading songs:', error)

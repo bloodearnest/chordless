@@ -7,7 +7,7 @@ import { expect } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
-import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
+import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import type { Route } from '../src/js/router.ts'
 import { SHARED_DB_ID } from '../src/js/share-receiver.ts'
@@ -162,6 +162,25 @@ describe('the library view', () => {
       dialog.dispatchEvent(new SongVersionsChangedEvent(true))
       await wait(100)
       expect(visited).to.deep.equal([{ url: '/songs', replace: true }])
+    })
+
+    it('shows the songs a sync saved, and keeps what was typed in the search', async () => {
+      await addChart(db, ALPHA, ADD)
+      await open()
+      searchBox().value = 'song'
+      searchBox().dispatchEvent(new Event('input'))
+      await view.updateComplete
+      expect(titles()).to.have.length(1)
+
+      // (a sync’s own handle on the database: the write is announced as the sync’s)
+      const sync = new ChordlessDB(db.dbName, 'sync')
+      await sync.init()
+      await addChart(sync, BETA, ADD)
+      sync.db?.close()
+      await wait(400)
+
+      expect(titles()).to.have.length(2)
+      expect(searchBox().value).to.equal('song')
     })
 
     it('does not put a search in the URL that is there already, or when a song is open', async () => {

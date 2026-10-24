@@ -15,8 +15,8 @@ import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts
 import '../../components/setlist-group.ts'
 import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
-import { DataChangeEvent, touches } from '../data-changes.ts'
 import type { Setlist } from '../data-types.ts'
+import { watchData } from '../data-watcher.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
@@ -119,18 +119,11 @@ export class HomeView extends PageView {
   })
 
   /** Setlists were saved or removed (by a sync, another tab, or the page itself): show the list as it is now (the old one stays until then) */
-  #onChanged = ({ change }: DataChangeEvent): void => {
-    if (!this.#sharedOnly && touches(change, 'setlist')) void this.#groups.run()
-  }
-
-  override connectedCallback(): void {
-    super.connectedCallback()
-    window.addEventListener(DataChangeEvent.type, this.#onChanged)
-  }
-
-  override disconnectedCallback(): void {
-    super.disconnectedCallback()
-    window.removeEventListener(DataChangeEvent.type, this.#onChanged)
+  constructor() {
+    super()
+    watchData(this, ['setlist'], () => {
+      if (!this.#sharedOnly) void this.#groups.run()
+    })
   }
 
   async #openCreate(): Promise<void> {
