@@ -1,7 +1,9 @@
 // Sets up the real-Drive suite's credentials (docs/DRIVE_TESTS.md): `just drive-test-login`.
-// Takes the DEV project's OAuth client id and secret from .drive-test.env, or asks (the secret is not
-// shown as you type); never the app's own client from .dev.vars, so tests cannot use its quota; opens Google's sign-in for the test account, and writes the refresh token it gives
-// back to .drive-test.env (readable by you only). Nothing secret is printed.
+// Takes the DEV project's OAuth client from .dev.vars (only when it is the dev client of
+// .env.development, so production's values are never used), or else from .drive-test.env, or asks
+// (the secret is not shown as you type); opens Google's sign-in for the test account, and writes the
+// client and the refresh token it gives back to .drive-test.env (readable by you only). Nothing
+// secret is printed.
 //
 // Google does not take an account's password from a script: it is typed on Google's own page.
 import { execFile } from 'node:child_process'
@@ -10,6 +12,7 @@ import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { CREDENTIAL_VARIABLES, consentUrl, withEnvVariable } from '../tests/drive/node-side.ts'
 import { ask } from './ask.ts'
+import { devClient, parseVars } from './dev-vars-lib.ts'
 
 const ENV_FILE = '.drive-test.env'
 const ACCOUNT_VARIABLE = 'DRIVE_TEST_ACCOUNT'
@@ -23,13 +26,28 @@ function keep(name: string, value: string) {
 
 const env = (name: string) => process.env[name] || undefined
 
+const readVars = (file: string) => (existsSync(file) ? parseVars(readFileSync(file, 'utf8')) : {})
+const fromDevVars = devClient(
+  readVars('.dev.vars'),
+  readVars('.env.development').VITE_GOOGLE_CLIENT_ID
+)
+if (fromDevVars) {
+  keep(CREDENTIAL_VARIABLES.clientId, fromDevVars.id)
+  keep(CREDENTIAL_VARIABLES.clientSecret, fromDevVars.secret)
+  console.log("Using the dev client from .dev.vars (the same one 'npm run dev' signs in with).")
+}
 const clientId =
-  env(CREDENTIAL_VARIABLES.clientId) ?? (await ask('OAuth client id (the test client): '))
-if (!env(CREDENTIAL_VARIABLES.clientId)) keep(CREDENTIAL_VARIABLES.clientId, clientId)
+  fromDevVars?.id ??
+  env(CREDENTIAL_VARIABLES.clientId) ??
+  (await ask('OAuth client id (the test client): '))
+if (!fromDevVars && !env(CREDENTIAL_VARIABLES.clientId))
+  keep(CREDENTIAL_VARIABLES.clientId, clientId)
 const clientSecret =
+  fromDevVars?.secret ??
   env(CREDENTIAL_VARIABLES.clientSecret) ??
   (await ask('OAuth client secret (not shown): ', { hidden: true }))
-if (!env(CREDENTIAL_VARIABLES.clientSecret)) keep(CREDENTIAL_VARIABLES.clientSecret, clientSecret)
+if (!fromDevVars && !env(CREDENTIAL_VARIABLES.clientSecret))
+  keep(CREDENTIAL_VARIABLES.clientSecret, clientSecret)
 if (!clientId || !clientSecret) {
   console.error('Both the client id and its secret are needed.')
   process.exit(1)

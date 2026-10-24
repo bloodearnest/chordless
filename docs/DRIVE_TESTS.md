@@ -53,12 +53,12 @@ folder, and it only ever touches folders it made (`drive.file` could not see oth
    app's.
    (Under `drive.file` an app sees only the files it made itself, so the client that makes the
    files must be the client that reads them, and the suite's files are invisible to the real app.)
-2. `just drive-test-login` takes the client's id and secret from `.drive-test.env` (`DRIVE_TEST_CLIENT_ID`,
-   `DRIVE_TEST_CLIENT_SECRET`), or else asks for them (the secret is not shown as you type), and
-   keeps them in `.drive-test.env`. It never uses the app's own client from `.dev.vars`: that one
-   is the production project's, and the suite would use up its quota. The app's local development
-   (`npm run dev`) stays on the production client for now, because the page's client id is a constant
-   in `src/js/google-auth.ts`; moving it to the dev client means making that id configurable.
+2. `just drive-test-login` uses the dev project's client that `npm run dev` signs in with: the id and
+   secret in `.dev.vars` (made by `just dev-vars`), taken only when that id is the dev one in
+   `.env.development`, so production's values can never be used and the suite's Drive quota is the dev
+   project's. It copies them into `.drive-test.env` (`DRIVE_TEST_CLIENT_ID`, `DRIVE_TEST_CLIENT_SECRET`),
+   which is what the suite reads; run it again after a new secret is made. With no usable `.dev.vars`
+   it takes them from `.drive-test.env`, or asks (the secret is not shown as you type).
    The login listens on `http://127.0.0.1:8976` (`DRIVE_TEST_LOGIN_PORT` changes it): a Desktop-app
    client takes that without setup; a web client needs it added to its authorized redirect URIs.
 3. It opens Google's sign-in, pre-filled with `DRIVE_TEST_ACCOUNT` (default `chordless.test.user@gmail.com`);

@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, isOtherEnvironment, parseVars } from '../scripts/dev-vars-lib.ts'
+import { devClient, fillTemplate, isOtherEnvironment, parseVars } from '../scripts/dev-vars-lib.ts'
 
 test('vars are read as KEY=value lines, with quotes and comments set aside', () => {
   assert.deepEqual(parseVars('# note\nA=1\n  B = "two words"\nnot a line\nC=\n'), {
@@ -28,4 +28,13 @@ test('a file for another client is another environment’s, and so is not kept',
   assert.equal(isOtherEnvironment({ GOOGLE_CLIENT_ID: 'prod' }, 'dev'), true)
   assert.equal(isOtherEnvironment({ GOOGLE_CLIENT_ID: 'dev' }, 'dev'), false)
   assert.equal(isOtherEnvironment({}, 'dev'), false)
+})
+
+test('the suite takes the client in .dev.vars only when it is the dev one and has a secret', () => {
+  const vars = { GOOGLE_CLIENT_ID: 'dev-id', GOOGLE_CLIENT_SECRET: 'shh' }
+  assert.deepEqual(devClient(vars, 'dev-id'), { id: 'dev-id', secret: 'shh' })
+  assert.equal(devClient(vars, 'another-id'), undefined, "production's file is never taken")
+  assert.equal(devClient({ ...vars, GOOGLE_CLIENT_SECRET: '' }, 'dev-id'), undefined)
+  assert.equal(devClient({}, 'dev-id'), undefined)
+  assert.equal(devClient(vars, ''), undefined)
 })

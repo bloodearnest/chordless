@@ -26,3 +26,17 @@ export function fillTemplate(template: string, values: Record<string, string | u
 export function isOtherEnvironment(existing: Record<string, string>, clientId: string): boolean {
   return Boolean(existing.GOOGLE_CLIENT_ID) && existing.GOOGLE_CLIENT_ID !== clientId
 }
+
+/**
+ * The dev OAuth client a .dev.vars holds, for the real-Drive suite to use too: only when its client
+ * id is the dev one (`.env.development`), so a file with production's values is never taken, and
+ * only when it has a secret.
+ */
+export function devClient(
+  existing: Record<string, string>,
+  devClientId: string
+): { id: string; secret: string } | undefined {
+  const secret = existing.GOOGLE_CLIENT_SECRET
+  if (!devClientId || existing.GOOGLE_CLIENT_ID !== devClientId || !secret) return undefined
+  return { id: devClientId, secret }
+}
