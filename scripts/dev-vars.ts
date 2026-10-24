@@ -18,7 +18,7 @@ import { fillTemplate, isOtherEnvironment, parseVars } from './dev-vars-lib.ts'
 
 const FILE = '.dev.vars'
 const BACKUP = '.dev.vars.prod-backup'
-const PROJECT = 'setalight'
+const PROJECT = 'chordless-dev'
 
 const run = (command: string, args: string[], cwd?: string) =>
   execFileSync('mise', ['exec', '--', command, ...args], { cwd, encoding: 'utf8' }).trim()

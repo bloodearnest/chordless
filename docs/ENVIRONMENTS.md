@@ -4,7 +4,7 @@ Two Google Cloud projects, so that development and tests never touch users' data
 
 | | Dev | Prod |
 |---|---|---|
-| Project | `setalight` (named `chordless-dev`; `infra/google-dev/`) | `chordless-app` (`infra/google-chordless/`) |
+| Project | `chordless-dev` (`infra/google-dev/`) | `chordless-app` (`infra/google-chordless/`) |
 | Used by | `npm run dev`, the tests, `just test-drive` | `vite build`, so what is deployed |
 | Page's client and Picker app id | `.env.development` | `.env.production` |
 | Worker's secrets | `.dev.vars` (`.dev.vars.example` names them) | Worker secrets, set with `wrangler secret put NAME` |
@@ -27,7 +27,7 @@ names every secret `wrangler.toml` lists.
    `.env.development`, the dev project's two API keys from gcloud (their ids are Terraform outputs of
    `infra/google-dev/`), and a new `JWE_ENCRYPTION_KEY`. It asks for the client secret (not shown; or set
    `DEV_CLIENT_SECRET`): that is in neither gcloud nor Terraform, and the console shows it once, when the
-   secret is made (use "Add secret" on the OAuth client of project `setalight` for a new one). A `.dev.vars` that
+   secret is made (use "Add secret" on the OAuth client of project `chordless-dev` for a new one). A `.dev.vars` that
    holds another client's values (production's, as it used to) is moved to `.dev.vars.prod-backup` (delete
    it when you no longer need it); otherwise values already there are kept and only gaps are filled.
 2. The dev OAuth client needs `http://localhost:8787` (and `http://127.0.0.1:8787`) as authorized JavaScript

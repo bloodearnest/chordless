@@ -7,9 +7,9 @@
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-# The dev project's Sharing Key (Drive only): gcloud services api-keys get-key-string 4bc5b8b1-c544-4255-a08f-bf52b7804486 --project setalight
+# The dev project's Sharing Key (Drive only): gcloud services api-keys get-key-string 409ba946-112a-4cdb-9edb-055a35e2a9ad --project chordless-dev
 GOOGLE_API_KEY=
-# The dev project's Team Key (Picker only, local addresses): ... get-key-string 97aa76c6-71d6-4a27-b74c-a373c345e1c6 --project setalight
+# The dev project's Team Key (Picker only, local addresses): ... get-key-string 317d6be6-1aeb-4db7-be5a-0c527c01e2de --project chordless-dev
 PICKER_API_KEY=
 
 # Any random 32 bytes, base64: openssl rand -base64 32. Its own value in dev, so blobs made in one

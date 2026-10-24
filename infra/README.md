@@ -8,7 +8,7 @@ own state, so a mistake in one cannot touch the other. `google-chordless/` creat
 | Stack | Holds |
 |---|---|
 | `cloudflare/` | the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
-| `google-dev/` | the DEV project (id `setalight`, named `chordless-dev`; restored from deletion 2026-10-24 and imported): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
+| `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
 
 ## Who owns what

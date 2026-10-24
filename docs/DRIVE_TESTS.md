@@ -46,7 +46,7 @@ Use a throwaway Google account, **not your own**: the suite makes, edits and tra
 Everything it makes is in folders named `chordless-drive-test …` under the account's `Chordless`
 folder, and it only ever touches folders it made (`drive.file` could not see others).
 
-1. Use the dev project's OAuth client (`infra/google-dev/`: project `setalight`, named `chordless-dev`),
+1. Use the dev project's OAuth client (`infra/google-dev/`: project `chordless-dev`),
    not the app's own. Make an OAuth client in it by hand (type Web application with the redirect URI
    `http://127.0.0.1:8976` below, or Desktop app), and a consent screen in Testing mode with the
    test account as a test user. Drive API quota is per project, so the suite cannot use up the real
