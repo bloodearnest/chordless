@@ -1,9 +1,6 @@
-import { expect } from '@open-wc/testing'
-import type { Setlist } from '../src/js/data-types.ts'
-import { createSetlist } from '../src/js/db.ts'
-import { makeEntry } from './builders.ts'
 import { useSyncRig } from './drive-harness.ts'
 import type { StorageOp } from './memory-storage.ts'
+import { type HistoryFile, type Mode, runHistory, type World } from './sync-history.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it } = window
@@ -11,9 +8,10 @@ const { describe, it } = window
 suppressConsoleLogs()
 
 /**
- * Random histories: several devices share one fake Drive and do random things (create and edit
- * setlists, sync, go quiet, have files trashed, restored or re-id'd in Drive, reset, hit failing
- * requests), then everything is synced until it is quiet. What must hold, whatever the history:
+ * Random histories (the engine and what must hold: sync-history.ts): several devices share one fake
+ * Drive and do random things (create and edit setlists, sync, go quiet, have files trashed,
+ * restored or re-id'd in Drive, reset, hit failing requests), then everything is synced until it
+ * is quiet. What must hold, whatever the history:
  *
  * - Drive never holds two live files for one setlist, or for one date/leader/type/name
  * - once quiet, every device has exactly the setlists Drive has, with the same contents
@@ -22,6 +20,8 @@ suppressConsoleLogs()
  *
  * With `incremental` devices sync from the feed of changes (sometimes only pulling), and the
  * feed sometimes forgets its positions; the promises are those of `owner`.
+ *
+ * With `concurrent` devices sometimes sync at the same moment; the promises are those of `owner`.
  *
  * Two harder modes loosen what can be promised: with `conflicts` any device edits any setlist
  * (Drive wins a conflict, so only the first two hold), and with `collisions` devices make
@@ -36,22 +36,6 @@ suppressConsoleLogs()
 const DEVICES = 3
 const STEPS = 45
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1)
-
-/** A small seeded random number generator, so a failing history can be replayed */
-function random(seed: number) {
-  let a = seed
-  const next = () => {
-    a = (a + 0x6d2b79f5) | 0
-    let t = Math.imul(a ^ (a >>> 15), 1 | a)
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-  return {
-    next,
-    int: (n: number) => Math.floor(next() * n),
-    pick: <T>(items: T[]): T => items[Math.floor(next() * items.length)],
-  }
-}
 
 /** The calls a history may make fail */
 const FAILING_CALLS: StorageOp[] = [
@@ -68,227 +52,34 @@ const FAILING_CALLS: StorageOp[] = [
   'updateMany',
 ]
 
-type Device = Awaited<ReturnType<ReturnType<typeof useSyncRig>['makeDevice']>>
-
 describe('Drive sync: random histories', () => {
   const rig = useSyncRig()
-  const { makeDevice } = rig
 
-  const liveSetlistFiles = () => rig.storage.list(f => Boolean(f.props.setlistId))
+  const files = (found: ReturnType<typeof rig.storage.list>): HistoryFile[] =>
+    found.map(f => ({ ref: f.ref, setlistId: f.props.setlistId, content: f.content }))
 
-  const keyOf = (s: Setlist) => [s.date, s.time, s.owner, s.type, s.name].join('|')
+  /** The in-memory Drive, as the engine sees it */
+  const world = (): World => ({
+    makeDevice: name => rig.makeDevice(name),
+    live: async () => files(rig.storage.list(f => Boolean(f.props.setlistId))),
+    trashed: async () =>
+      files(rig.storage.everything(f => Boolean(f.props.setlistId) && f.trashed)),
+    trash: async ref => rig.storage.trash(ref),
+    restore: async ref => rig.storage.restore(ref),
+    reid: async ref => rig.storage.rekey(ref, `reid-${crypto.randomUUID()}`),
+    forgetFeedPositions: async () => rig.storage.forgetFeedPositions(),
+    failures: FAILING_CALLS,
+    fail: (kind, options) => rig.storage.fail(kind as StorageOp, options),
+    clearFailures: () => rig.storage.clearFailures(),
+  })
 
-  const songsOf = (setlist: Pick<Setlist, 'songs'>) => JSON.stringify(setlist.songs)
-
-  /** What must hold at every moment, not only once quiet */
-  function checkDriveHasNoDuplicates(label: string) {
-    const ids = new Set<string>()
-    const keys = new Set<string>()
-    for (const file of liveSetlistFiles()) {
-      const content = JSON.parse(file.content) as Setlist
-      const id = file.props.setlistId
-      expect(ids.has(id), `${label}: two live files for setlist ${id}`).to.equal(false)
-      ids.add(id)
-      const key = keyOf(content)
-      expect(keys.has(key), `${label}: two live files for ${key}`).to.equal(false)
-      keys.add(key)
-    }
-  }
-
-  type Mode = 'owner' | 'conflicts' | 'collisions' | 'incremental'
-
-  async function runHistory(seed: number, mode: Mode) {
-    const rng = random(seed)
-    const devs: Device[] = []
-    for (let i = 0; i < DEVICES; i++) devs.push(await makeDevice(`device-${i}`))
-
-    /** Each setlist is edited by the device that made it, so edits never conflict */
-    const ownerOf = new Map<string, Device>()
-    const lastEdit = new Map<string, string>()
-    const trashedEver = new Set<string>()
-    let clock = Date.parse('2026-10-01T00:00:00Z')
-    let created = 0
-    let failuresQueued = false
-    const log: string[] = []
-
-    const stamp = () => {
-      clock += 1000
-      return new Date(clock).toISOString()
-    }
-    const someSongs = () =>
-      Array.from({ length: 1 + rng.int(4) }, (_, order) =>
-        makeEntry({ order, songId: `song-${rng.int(8)}`, songUuid: `uuid-${rng.int(8)}` })
-      )
-
-    async function syncDevice(device: Device, { quiet = false } = {}) {
-      try {
-        if (mode === 'incremental') {
-          await device.sync.incrementalSync(null, { push: quiet || rng.int(4) > 0 })
-        } else await device.sync.sync()
-      } catch (error) {
-        // Only an injected failure may make a sync fail
-        expect(failuresQueued, `${device.name} sync failed: ${(error as Error).message}`).to.equal(
-          true
-        )
-      }
-    }
-
-    const operations: Record<string, () => Promise<void>> = {
-      async create() {
-        const device = rng.pick(devs)
-        const day = mode === 'collisions' ? rng.int(3) : created++
-        const date = new Date(Date.UTC(2026, 0, 1 + day)).toISOString().slice(0, 10)
-        // One device doesn't make the same setlist twice; devices may make the same one
-        if ((await device.db.getAllSetlists()).some(s => s.date === date)) return
-        const setlist = {
-          ...createSetlist({ date, owner: 'Sam', type: 'Church Service' }),
-          songs: someSongs(),
-          modifiedDate: stamp(),
-        }
-        await device.db.saveSetlist(setlist)
-        ownerOf.set(setlist.id, device)
-        lastEdit.set(setlist.id, songsOf(setlist))
-        log.push(`${device.name} creates ${date}`)
-      },
-      async edit() {
-        const device = rng.pick(devs)
-        const mine = (await device.db.getAllSetlists()).filter(
-          s => mode === 'conflicts' || ownerOf.get(s.id) === device
-        )
-        if (mine.length === 0) return
-        const setlist = rng.pick(mine)
-        setlist.songs = someSongs()
-        setlist.modifiedDate = stamp()
-        await device.db.saveSetlist(setlist)
-        lastEdit.set(setlist.id, songsOf(setlist))
-        log.push(`${device.name} edits ${setlist.date}`)
-      },
-      async sync() {
-        const device = rng.pick(devs)
-        log.push(`${device.name} syncs`)
-        await syncDevice(device)
-      },
-      async trash() {
-        const files = liveSetlistFiles()
-        if (files.length === 0) return
-        const file = rng.pick(files)
-        rig.storage.trash(file.ref)
-        trashedEver.add(file.props.setlistId)
-        log.push(`Drive trashes ${file.props.setlistId.slice(0, 8)}`)
-      },
-      async restore() {
-        const trashed = rig.storage.everything(f => Boolean(f.props.setlistId) && f.trashed)
-        if (trashed.length === 0) return
-        const file = rng.pick(trashed)
-        // Only if nothing took its place meanwhile: restoring beside a copy is the user's doing
-        const content = JSON.parse(file.content) as Setlist
-        const taken = liveSetlistFiles().some(f => {
-          const other = JSON.parse(f.content) as Setlist
-          return f.props.setlistId === file.props.setlistId || keyOf(other) === keyOf(content)
-        })
-        if (taken) return
-        rig.storage.restore(file.ref)
-        log.push(`Drive restores ${file.props.setlistId.slice(0, 8)}`)
-      },
-      async reid() {
-        // A duplicate was cleaned up, leaving another file for the setlist: same content, new id
-        const files = liveSetlistFiles()
-        if (files.length === 0) return
-        const file = rng.pick(files)
-        rig.storage.rekey(file.ref, `reid-${crypto.randomUUID()}`)
-        log.push(`Drive re-ids ${file.props.setlistId.slice(0, 8)}`)
-      },
-      async reset() {
-        const device = rng.pick(devs)
-        try {
-          await device.sync.resetLocalFromDrive()
-          log.push(`${device.name} resets`)
-        } catch (error) {
-          // Refused because of changes not in Drive, or by an injected failure
-          if ((error as Error).name !== 'UnsyncedChangesError') {
-            expect(failuresQueued, `reset failed: ${(error as Error).message}`).to.equal(true)
-          }
-        }
-      },
-      async forget() {
-        rig.storage.forgetFeedPositions()
-        log.push('the feed forgets its positions')
-      },
-      async fail() {
-        rig.storage.fail(rng.pick(FAILING_CALLS), {
-          status: 500,
-          network: rng.int(2) === 0,
-          times: 1 + rng.int(2),
-          skip: rng.int(4),
-        })
-        failuresQueued = true
-        log.push('requests start failing')
-      },
-    }
-    const weighted = [
-      ...Array(4).fill('create'),
-      ...Array(4).fill('edit'),
-      ...Array(8).fill('sync'),
-      ...Array(mode === 'incremental' ? 3 : 1).fill('trash'),
-      ...Array(1).fill('restore'),
-      ...Array(1).fill('reid'),
-      ...Array(1).fill('reset'),
-      ...Array(1).fill('fail'),
-      ...Array(mode === 'incremental' ? 1 : 0).fill('forget'),
-    ]
-
-    const label = (step: number) => `seed ${seed}, step ${step}\n  ${log.slice(-12).join('\n  ')}`
-
-    for (let step = 0; step < STEPS; step++) {
-      await operations[rng.pick(weighted)]()
-      checkDriveHasNoDuplicates(label(step))
-    }
-
-    // Quiet: no more failures, everyone syncs until nothing changes
-    rig.storage.clearFailures()
-    failuresQueued = false
-    for (let round = 0; round < 3; round++) {
-      for (const device of devs) await syncDevice(device, { quiet: true })
-      checkDriveHasNoDuplicates(`${label(STEPS)} (round ${round})`)
-    }
-
-    if (mode === 'collisions') return
-
-    // Every device has what Drive has
-    const inDrive = new Map(
-      liveSetlistFiles().map(f => [f.props.setlistId, songsOf(JSON.parse(f.content))])
-    )
-    for (const device of devs) {
-      const local = new Map(
-        (await device.db.getAllSetlists()).map(s => [s.id, songsOf(s)] as [string, string])
-      )
-      expect([...local.keys()].sort(), `${label(STEPS)}: ${device.name} setlists`).to.deep.equal(
-        [...inDrive.keys()].sort()
-      )
-      for (const [id, songs] of local) {
-        expect(songs, `${label(STEPS)}: ${device.name} content of ${id}`).to.equal(inDrive.get(id))
-      }
-    }
-
-    // No edit is lost, and nothing appears from nowhere
-    for (const id of inDrive.keys()) {
-      expect(ownerOf.has(id), `${label(STEPS)}: ${id} was never created`).to.equal(true)
-    }
-    if (mode === 'conflicts') return
-    for (const [id, songs] of lastEdit) {
-      if (trashedEver.has(id)) continue
-      expect(inDrive.has(id), `${label(STEPS)}: setlist ${id} was lost`).to.equal(true)
-      expect(inDrive.get(id), `${label(STEPS)}: last edit of ${id} was lost`).to.equal(songs)
-    }
-  }
-
-  for (const mode of ['owner', 'conflicts', 'collisions', 'incremental'] as Mode[]) {
+  for (const mode of ['owner', 'conflicts', 'collisions', 'incremental', 'concurrent'] as Mode[]) {
     for (const seed of SEEDS) {
       it(`keeps devices and Drive consistent (${mode}, seed ${seed})`, async function (this: {
         timeout(ms: number): void
       }) {
         this.timeout(60000)
-        await runHistory(seed, mode)
+        await runHistory(world(), seed, mode, { devices: DEVICES, steps: STEPS })
       })
     }
   }
