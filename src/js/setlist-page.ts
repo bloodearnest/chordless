@@ -745,7 +745,7 @@ export class SetlistPage {
 
     if (!appHeader) return
 
-    if (!this._readOnly) appHeader.showEditToggle = true
+    appHeader.showEditToggle = true
 
     // Check if content is actually changing
     const titleChanged = appHeader.heading !== newTitle

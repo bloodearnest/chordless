@@ -7,6 +7,7 @@ editing
 - song notes/stickies
 
 song data
+- chart editor (fix a typo in place): plan in docs/CHART_EDITOR.md, not built
 - the import page's "Create New Setlist" offers the people of the space the app is in, not the one being
   imported into (getSpacePeople reads the current space)
 - at import, when the chart's CCLI number finds a song and a song with no CCLI number has the same title,

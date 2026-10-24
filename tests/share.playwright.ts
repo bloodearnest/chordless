@@ -101,10 +101,10 @@ test.describe('A setlist shared by link', () => {
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace')
     await expect(page.locator('setlist-overview')).toContainText('Be Still')
 
-    // Nothing to edit, and no way into edit mode
-    await expect(header.locator('.edit-toggle, [aria-label*="dit mode" i]')).toHaveCount(0)
+    // Edit mode is there (it is how chords and sections are hidden), but not entered
+    await expect(header.locator('.edit-toggle, [aria-label*="dit mode" i]')).not.toHaveCount(0)
     await expect(page.locator('body')).not.toHaveClass(/edit-mode/)
-    // ...though the setlist's details can be read, with no way to edit, delete or share it
+    // The setlist's details can be read, with no way to edit, delete or share it
     await expect(header.locator('.info-button')).toHaveCount(1)
     await header.locator('.info-button').click()
     const info = page.locator('setlist-info-dialog')

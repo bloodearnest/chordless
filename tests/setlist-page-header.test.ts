@@ -420,11 +420,12 @@ describe('the setlist page: header, menu and keys', () => {
       expect(header().showEditToggle).to.equal(true)
     })
 
-    it('leaves the edit toggle to a setlist that was received by link', async () => {
+    it('shows the edit toggle on a setlist that was received by link (it hides chords and sections)', async () => {
       await rig.open(3, {}, { readOnly: true })
-      const before = header().showEditToggle
       await rig.page.updateHeader(null, true)
-      expect(header().showEditToggle).to.equal(before)
+      expect(header().showEditToggle).to.equal(true)
+      await rig.page.updateHeader(rig.page.songs[0], true)
+      expect(header().showEditToggle).to.equal(true)
     })
 
     it('shows a song with no key without a key list', async () => {
