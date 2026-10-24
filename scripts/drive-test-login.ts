@@ -1,24 +1,73 @@
-// Gets the refresh token for the real-Drive suite (docs/DRIVE_TESTS.md): `just drive-test-login`.
-// Sign in as the TEST Google account in the browser that opens; the token is written to
-// .drive-test.env (readable by you only) and never printed.
+// Sets up the real-Drive suite's credentials (docs/DRIVE_TESTS.md): `just drive-test-login`.
+// Asks for what .drive-test.env lacks (the OAuth client's id and secret; the secret is not shown as
+// you type), opens Google's sign-in for the test account, and writes the refresh token it gives
+// back to .drive-test.env (readable by you only). Nothing secret is printed.
+//
+// Google does not take an account's password from a script: it is typed on Google's own page.
+import { execFile } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import {
-  CREDENTIAL_VARIABLES,
-  consentUrl,
-  credentialsFromEnv,
-  withRefreshToken,
-} from '../tests/drive/node-side.ts'
+import { createInterface } from 'node:readline/promises'
+import { CREDENTIAL_VARIABLES, consentUrl, withEnvVariable } from '../tests/drive/node-side.ts'
 
 const ENV_FILE = '.drive-test.env'
+const ACCOUNT_VARIABLE = 'DRIVE_TEST_ACCOUNT'
+const DEFAULT_ACCOUNT = 'chordless.test.user@gmail.com'
 
-const found = credentialsFromEnv({ ...process.env, [CREDENTIAL_VARIABLES.refreshToken]: 'later' })
-if ('missing' in found) {
-  console.error(`Put ${found.missing.join(' and ')} in ${ENV_FILE} first (docs/DRIVE_TESTS.md).`)
+const read = () => (existsSync(ENV_FILE) ? readFileSync(ENV_FILE, 'utf8') : '')
+function keep(name: string, value: string) {
+  writeFileSync(ENV_FILE, withEnvVariable(read(), name, value), { mode: 0o600 })
+  chmodSync(ENV_FILE, 0o600)
+}
+
+/** One line from the terminal; with `hidden`, nothing is shown while it is typed */
+async function ask(question: string, { hidden = false } = {}): Promise<string> {
+  if (!hidden) {
+    const rl = createInterface({ input: process.stdin, output: process.stdout })
+    const answer = await rl.question(question)
+    rl.close()
+    return answer.trim()
+  }
+  process.stdout.write(question)
+  return new Promise(resolve => {
+    let typed = ''
+    process.stdin.setRawMode(true)
+    process.stdin.resume()
+    process.stdin.setEncoding('utf8')
+    const onData = (chunk: string) => {
+      for (const char of chunk) {
+        if (char === '\u0003') process.exit(130)
+        if (char === '\r' || char === '\n') {
+          process.stdin.setRawMode(false)
+          process.stdin.pause()
+          process.stdin.off('data', onData)
+          process.stdout.write('\n')
+          resolve(typed.trim())
+          return
+        }
+        typed = char === '\u007f' ? typed.slice(0, -1) : typed + char
+      }
+    }
+    process.stdin.on('data', onData)
+  })
+}
+
+const env = (name: string) => process.env[name] || undefined
+
+const clientId =
+  env(CREDENTIAL_VARIABLES.clientId) ?? (await ask('OAuth client id (the test client): '))
+if (!env(CREDENTIAL_VARIABLES.clientId)) keep(CREDENTIAL_VARIABLES.clientId, clientId)
+const clientSecret =
+  env(CREDENTIAL_VARIABLES.clientSecret) ??
+  (await ask('OAuth client secret (not shown): ', { hidden: true }))
+if (!env(CREDENTIAL_VARIABLES.clientSecret)) keep(CREDENTIAL_VARIABLES.clientSecret, clientSecret)
+if (!clientId || !clientSecret) {
+  console.error('Both the client id and its secret are needed.')
   process.exit(1)
 }
-const { clientId, clientSecret } = found.credentials
+const account = env(ACCOUNT_VARIABLE) ?? DEFAULT_ACCOUNT
+if (!env(ACCOUNT_VARIABLE)) keep(ACCOUNT_VARIABLE, account)
 
 const verifier = randomBytes(32).toString('base64url')
 const state = randomBytes(16).toString('base64url')
@@ -49,9 +98,7 @@ const server = createServer(async (request, response) => {
     console.error(`Google sent no refresh token: ${body.error_description ?? reply.status}`)
     process.exit(1)
   }
-  const text = existsSync(ENV_FILE) ? readFileSync(ENV_FILE, 'utf8') : ''
-  writeFileSync(ENV_FILE, withRefreshToken(text, body.refresh_token), { mode: 0o600 })
-  chmodSync(ENV_FILE, 0o600)
+  keep(CREDENTIAL_VARIABLES.refreshToken, body.refresh_token)
   response.writeHead(200).end('Done: you can close this tab.')
   console.log(`Saved ${CREDENTIAL_VARIABLES.refreshToken} in ${ENV_FILE}.`)
   server.close()
@@ -59,13 +106,15 @@ const server = createServer(async (request, response) => {
 
 server.listen(0, '127.0.0.1', () => {
   const redirectUri = `http://127.0.0.1:${(server.address() as { port: number }).port}`
-  console.log('Open this address, signed in as the TEST account, and allow access:\n')
-  console.log(
-    consentUrl({
-      clientId,
-      redirectUri,
-      state,
-      codeChallenge: createHash('sha256').update(verifier).digest('base64url'),
-    })
-  )
+  const address = consentUrl({
+    clientId,
+    redirectUri,
+    state,
+    codeChallenge: createHash('sha256').update(verifier).digest('base64url'),
+    loginHint: account,
+  })
+  console.log(`Sign in as ${account} and allow access. If the browser does not open, use:\n`)
+  console.log(address)
+  // (best effort: where there is no opener, the address above is enough)
+  execFile(process.platform === 'darwin' ? 'open' : 'xdg-open', [address], () => undefined)
 })

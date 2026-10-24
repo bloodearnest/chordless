@@ -12,7 +12,7 @@ import {
   mintAccessToken,
   parseSeeds,
   settingsFromEnv,
-  withRefreshToken,
+  withEnvVariable,
 } from './drive/node-side.ts'
 
 const credentials = { clientId: 'id', clientSecret: 'secret', refreshToken: 'refresh-1' }
@@ -149,6 +149,7 @@ test('the consent address asks for offline access to the files the suite makes, 
       redirectUri: 'http://127.0.0.1:5',
       state: 's1',
       codeChallenge: 'c',
+      loginHint: 'test@example.com',
     })
   )
   assert.equal(url.origin, 'https://accounts.google.com')
@@ -156,14 +157,25 @@ test('the consent address asks for offline access to the files the suite makes, 
   assert.equal(url.searchParams.get('access_type'), 'offline')
   assert.equal(url.searchParams.get('prompt'), 'consent')
   assert.equal(url.searchParams.get('state'), 's1')
+  assert.equal(url.searchParams.get('login_hint'), 'test@example.com')
   assert.equal(url.searchParams.get('code_challenge_method'), 'S256')
 })
 
-test('the refresh token is added to an env file, or replaces the one in it', () => {
-  assert.equal(withRefreshToken('', 'abc'), 'DRIVE_TEST_REFRESH_TOKEN=abc\n')
-  assert.equal(withRefreshToken('A=1', 'abc'), 'A=1\nDRIVE_TEST_REFRESH_TOKEN=abc\n')
+test('a variable is added to an env file, or replaces the one in it', () => {
   assert.equal(
-    withRefreshToken('A=1\nDRIVE_TEST_REFRESH_TOKEN=old\nB=2\n', 'new$&'),
+    withEnvVariable('', 'DRIVE_TEST_REFRESH_TOKEN', 'abc'),
+    'DRIVE_TEST_REFRESH_TOKEN=abc\n'
+  )
+  assert.equal(
+    withEnvVariable('A=1', 'DRIVE_TEST_REFRESH_TOKEN', 'abc'),
+    'A=1\nDRIVE_TEST_REFRESH_TOKEN=abc\n'
+  )
+  assert.equal(
+    withEnvVariable(
+      'A=1\nDRIVE_TEST_REFRESH_TOKEN=old\nB=2\n',
+      'DRIVE_TEST_REFRESH_TOKEN',
+      'new$&'
+    ),
     'A=1\nDRIVE_TEST_REFRESH_TOKEN=new$&\nB=2\n'
   )
 })

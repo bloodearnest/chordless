@@ -161,6 +161,8 @@ export function consentUrl(options: {
   redirectUri: string
   state: string
   codeChallenge: string
+  /** The account to sign in as, filled in on Google's page */
+  loginHint?: string
 }): string {
   const query = new URLSearchParams({
     client_id: options.clientId,
@@ -174,14 +176,15 @@ export function consentUrl(options: {
     state: options.state,
     code_challenge: options.codeChallenge,
     code_challenge_method: 'S256',
+    ...(options.loginHint && { login_hint: options.loginHint }),
   })
   return `https://accounts.google.com/o/oauth2/v2/auth?${query}`
 }
 
-/** An env file's text with the refresh token set (replacing the one there, or added) */
-export function withRefreshToken(envText: string, token: string): string {
-  const line = `${CREDENTIAL_VARIABLES.refreshToken}=${token}`
-  const pattern = new RegExp(`^${CREDENTIAL_VARIABLES.refreshToken}=.*$`, 'm')
+/** An env file's text with a variable set (replacing the line it has, or added) */
+export function withEnvVariable(envText: string, name: string, value: string): string {
+  const line = `${name}=${value}`
+  const pattern = new RegExp(`^${name}=.*$`, 'm')
   if (pattern.test(envText)) return envText.replace(pattern, () => line)
   return `${envText}${envText === '' || envText.endsWith('\n') ? '' : '\n'}${line}\n`
 }
