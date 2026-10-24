@@ -46,17 +46,20 @@ Use a throwaway Google account, **not your own**: the suite makes, edits and tra
 Everything it makes is in folders named `chordless-drive-test …` under the account's `Chordless`
 folder, and it only ever touches folders it made (`drive.file` could not see others).
 
-1. Use the app's own OAuth client (simplest: the files the suite makes are then the app's to see
-   too), or make an OAuth client of type **Desktop app** just for the tests.
+1. Use the dev project's OAuth client (`infra/google-dev/`: project `setalight`, named `chordless-dev`),
+   not the app's own. Make an OAuth client in it by hand (type Web application with the redirect URI
+   `http://127.0.0.1:8976` below, or Desktop app), and a consent screen in Testing mode with the
+   test account as a test user. Drive API quota is per project, so the suite cannot use up the real
+   app's.
    (Under `drive.file` an app sees only the files it made itself, so the client that makes the
    files must be the client that reads them. A separate client keeps the suite apart from the
    app's own and needs no change to its redirect addresses.) If the consent screen is in testing,
    add the test account as a test user.
 2. `just drive-test-login` takes the client's id and secret from `.drive-test.env` (`DRIVE_TEST_CLIENT_ID`,
-   `DRIVE_TEST_CLIENT_SECRET`), or else from the app's own `.dev.vars` (`GOOGLE_CLIENT_ID`,
-   `GOOGLE_CLIENT_SECRET`), or else asks for them (the secret is not shown as you type), and
+   `DRIVE_TEST_CLIENT_SECRET`), or else from `.dev.vars` (`GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`, which should then be the dev client's: local development uses the dev project), or else asks for them (the secret is not shown as you type), and
    keeps them in `.drive-test.env`. It listens on `http://127.0.0.1:8976` (`DRIVE_TEST_LOGIN_PORT`
-   changes it): a Desktop-app client takes that without setup; the app's web client needs
+   changes it): a Desktop-app client takes that without setup; a web client needs
    `http://127.0.0.1:8976` added to its authorized redirect URIs.
 3. It opens Google's sign-in, pre-filled with `DRIVE_TEST_ACCOUNT` (default `chordless.test.user@gmail.com`);
    sign in as the test account. It writes
