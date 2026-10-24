@@ -36,6 +36,7 @@ import {
   type SongSettingsPopover,
 } from '../components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
+import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
@@ -45,7 +46,6 @@ import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-se
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
-import { SetlistsPulledEvent } from './pulled-setlists.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
@@ -276,7 +276,7 @@ export class SetlistPage {
 
     this.setupKeyboardNavigation()
     this.setupDoubleClickToggle()
-    this.setupPulledSetlists()
+    this.setupChangedSetlists()
     this.setupNavigationMenu()
 
     const { signal } = this._abort
@@ -1752,13 +1752,15 @@ export class SetlistPage {
     }
   }
 
-  /** A sync that saves this page's setlist is followed (see applyPulledSetlist) */
-  setupPulledSetlists() {
+  /** A write to this page's setlist that it did not make (a sync's, or another tab's) is followed (see applyChangedSetlist) */
+  setupChangedSetlists() {
     window.addEventListener(
-      SetlistsPulledEvent.type,
-      event => {
-        if (this.currentSetlistId && event.ids.includes(this.currentSetlistId)) {
-          void this.applyPulledSetlist()
+      DataChangeEvent.type,
+      ({ change }) => {
+        const id = this.currentSetlistId
+        if (!id || change.spaceId !== this._database().spaceId) return
+        if ((change.origin === 'sync' || change.remote) && touches(change, 'setlist', id)) {
+          void this.applyChangedSetlist()
         }
       },
       { signal: this._abort.signal }
@@ -1772,7 +1774,7 @@ export class SetlistPage {
    * edit. Where this device's own edits and Drive's were both made, Drive's version won, as in any
    * pull. A late song is never held back, live or not.
    */
-  async applyPulledSetlist() {
+  async applyChangedSetlist() {
     const before = this.currentSetlist
     if (!before) return
     const id = before.id

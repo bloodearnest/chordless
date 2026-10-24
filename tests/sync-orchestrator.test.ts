@@ -51,7 +51,6 @@ describe('SyncOrchestrator', () => {
     const manager = {
       db,
       resetSetlists,
-      takePulledSetlistIds: () => [],
       [operation]: async (progress: ProgressCallback) => {
         for (const report of reports) progress(report as Parameters<ProgressCallback>[0])
         if (failure) throw failure
@@ -77,7 +76,6 @@ describe('SyncOrchestrator', () => {
       const orchestrator = new SyncOrchestrator('Test Church', null)
       orchestrator.syncManager = {
         resetSetlists: [],
-        takePulledSetlistIds: () => [],
         incrementalSync: async (_progress: unknown, options: unknown) => {
           calls.push(options)
         },

@@ -3,9 +3,9 @@ import { expect } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { SetlistDetailsForm } from '../src/components/setlist-details-form.ts'
 import { SetlistDetailsSaveEvent } from '../src/components/setlist-details-form.ts'
+import { announceDataChange } from '../src/js/data-changes.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
-import { announceSetlistsPulled } from '../src/js/pulled-setlists.ts'
 import {
   createSpace,
   deleteSpace,
@@ -118,12 +118,12 @@ describe('the home view', () => {
     expect(rows()).to.deep.equal(['a'])
 
     await db.saveSetlist(makeSetlist({ id: 'b', date: '2001-04-04' }))
-    announceSetlistsPulled(['b'])
+    announceDataChange({ spaceId, kind: 'setlist', ids: ['b'], origin: 'sync' })
     await wait(100)
     expect(rows()).to.have.members(['a', 'b'])
 
     await db.deleteSetlist('a')
-    announceSetlistsPulled(['a'])
+    announceDataChange({ spaceId, kind: 'setlist', ids: ['a'], origin: 'sync' })
     await wait(100)
     expect(rows()).to.deep.equal(['b'])
   })

@@ -126,11 +126,11 @@ interface LiveSession {
   new ticket each time (which also handles the hour-long ID token). While it is down nothing
   breaks; the tick carries on.
 - **Receive** is the same for every session: validate, skip if the hash equals the local
-  `setlistContentHash`, save **quietly** (so the follower does not push it to Drive), then
-  `announceSetlistsPulled([id])` (`pulled-setlists.ts`). The setlist page already follows that:
-  `applyPulledSetlist` re-reads, keeps the current song by its id, and toasts the
+  `setlistContentHash`, save it through a database handle opened with origin `'sync'` (so the follower does not push it
+  to Drive); the database announces the write on the change bus (`data-changes.ts`, docs/STATE.md).
+  The setlist page already follows that: `applyChangedSetlist` re-reads, keeps the current song by its id, and toasts the
   `describeSetlistChange` summary with Undo. The page knows nothing of transports.
-- **Send:** the leader's `LocalChangeEvent` (`local-changes.ts`) for the live setlist publishes after a
+- **Send:** the leader's own `DataChangeEvent` (origin `'local'`, `data-changes.ts`) for the live setlist publishes after a
   short coalesce (about 300 ms, so a burst of reorders is one frame), not the 2 s Drive nudge. Readers
   and non-leaders never send.
 - **Connect:** on a `state` frame the client applies it if its `modifiedDate` is later than the local

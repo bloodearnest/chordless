@@ -1,3 +1,4 @@
+import { announceDataChange, type DataKind, type DataOrigin } from './data-changes.ts'
 import type {
   ChordProRecord,
   PendingDeletion,
@@ -7,7 +8,6 @@ import type {
   SongRecord,
   TempoInput,
 } from './data-types.ts'
-import { noteLocalChange } from './local-changes.ts'
 import { songSource } from './song-source.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { parseLocalDate, toLocalDateString } from './utils/date-utils.ts'
@@ -121,13 +121,10 @@ export class ChordlessDB {
   dbName: string
   spaceId: string
   db: IDBDatabase | null
-  /**
-   * Saves and deletes here are not told to the sync as changes to send (`noteLocalChange`): the
-   * database of a sync's own, whose writes are what came from storage
-   */
-  quiet = false
+  /** Who is writing through this handle: a sync's writes are what came from storage, not changes to send */
+  readonly origin: DataOrigin
 
-  constructor(spaceId: string) {
+  constructor(spaceId: string, origin: DataOrigin = 'local') {
     if (!spaceId) {
       throw new Error('spaceId is required for ChordlessDB')
     }
@@ -136,12 +133,18 @@ export class ChordlessDB {
     // This allows renaming spaces without database migration
     this.dbName = spaceId
     this.spaceId = spaceId
+    this.origin = origin
     this.db = null
   }
 
-  /** Something to send was saved or deleted: the sync by itself is told (unless this database is quiet) */
-  #changed(): void {
-    if (!this.quiet) noteLocalChange()
+  /** A write was committed: whoever shows or sends this data is told (data-changes.ts) */
+  #changed(kind: DataKind, ids: string[] | null): void {
+    announceDataChange({ spaceId: this.spaceId, kind, ids, origin: this.origin })
+  }
+
+  /** Everything of each kind was written or cleared */
+  #changedAll(): void {
+    for (const kind of ['setlist', 'song', 'chart'] as const) this.#changed(kind, null)
   }
 
   /** A transaction on some stores; the database must have been opened with init() */
@@ -239,8 +242,8 @@ export class ChordlessDB {
     const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
     // A page's copy of a setlist that was not in Drive yet has no link to its file: if a sync sent
     // it meanwhile, saving that copy as it is would drop the link, and the next sync would send
-    // the setlist again as a second file. The link is the sync's (its own database is quiet)
-    if (!this.quiet && !stored.fileRef) {
+    // the setlist again as a second file. The link is the sync's (its own handle is a sync's)
+    if (this.origin === 'local' && !stored.fileRef) {
       const current = (await requestResult(store.get(stored.id))) as Setlist | undefined
       if (current?.fileRef) {
         for (const field of SYNC_LINK_FIELDS) {
@@ -250,7 +253,7 @@ export class ChordlessDB {
     }
     store.put(stored)
     const result = await transactionDone(tx, stored)
-    this.#changed()
+    this.#changed('setlist', [stored.id])
     return result
   }
 
@@ -273,7 +276,11 @@ export class ChordlessDB {
       }
       store.put(cloneForStorage(updated))
     }
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed(
+      'setlist',
+      sent.map(setlist => setlist.id)
+    )
   }
 
   /**
@@ -290,7 +297,11 @@ export class ChordlessDB {
       store.put(cloneForStorage(withNumericTempos(setlist)))
     }
 
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed(
+      'setlist',
+      setlists.map(setlist => setlist.id)
+    )
   }
 
   async getSetlist(id: string): Promise<Setlist | undefined> {
@@ -312,7 +323,7 @@ export class ChordlessDB {
     const store = tx.objectStore('setlists')
     await store.delete(id)
     await transactionDone(tx)
-    this.#changed()
+    this.#changed('setlist', [id])
   }
 
   /**
@@ -338,7 +349,7 @@ export class ChordlessDB {
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
     // (as saveSetlist: a copy made before a sync sent the song must not drop the link to its file)
-    if (!this.quiet && !stored.fileRef) {
+    if (this.origin === 'local' && !stored.fileRef) {
       const current = (await requestResult(store.get(stored.uuid))) as SongRecord | undefined
       if (current?.fileRef) {
         for (const field of SONG_LINK_FIELDS) {
@@ -348,7 +359,7 @@ export class ChordlessDB {
     }
     store.put(stored)
     const result = await transactionDone(tx, stored)
-    this.#changed()
+    this.#changed('song', [stored.uuid])
     return result
   }
 
@@ -373,7 +384,11 @@ export class ChordlessDB {
       }
       store.put(withNumericSongTempos(updated))
     }
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed(
+      'song',
+      sent.map(song => song.uuid)
+    )
   }
 
   async saveSongsBatch(songs: SongInput[]): Promise<void> {
@@ -386,7 +401,11 @@ export class ChordlessDB {
       store.put(withNumericSongTempos(song))
     }
 
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed(
+      'song',
+      songs.map(song => song.uuid)
+    )
   }
 
   async getSong(uuid: string): Promise<SongRecord | undefined> {
@@ -438,7 +457,7 @@ export class ChordlessDB {
     const store = tx.objectStore('chordpro')
     await store.put(chordpro)
     await transactionDone(tx)
-    this.#changed()
+    this.#changed('chart', [chordpro.id])
   }
 
   async getChordPro(id: string): Promise<ChordProRecord | undefined> {
@@ -519,7 +538,8 @@ export class ChordlessDB {
     for (const name of ['setlists', 'songs', 'chordpro']) {
       tx.objectStore(name).clear()
     }
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changedAll()
   }
 
   /**
@@ -550,7 +570,9 @@ export class ChordlessDB {
         songs.put({ ...song, ...unlinked, fileProps: null })
       }
     }
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changed('setlist', null)
+    this.#changed('song', null)
   }
 
   /**
@@ -588,6 +610,10 @@ export class ChordlessDB {
       }
     }
     await transactionDone(tx)
+    if (count > 0) {
+      this.#changed('setlist', null)
+      this.#changed('song', null)
+    }
     return count
   }
 
@@ -618,8 +644,9 @@ export class ChordlessDB {
       const tx2 = this.#transaction(['chordpro'], 'readwrite')
       tx2.objectStore('chordpro').delete(song.chordproFileId)
       await transactionDone(tx2)
+      this.#changed('chart', [song.chordproFileId])
     }
-    this.#changed()
+    this.#changed('song', [uuid])
   }
 
   /** The files to be put in the Drive trash at the next sync */
@@ -653,7 +680,8 @@ export class ChordlessDB {
     await chordproStore.clear()
     await localStore.clear()
 
-    return transactionDone(tx)
+    await transactionDone(tx)
+    this.#changedAll()
   }
 }
 
@@ -839,15 +867,15 @@ function migrateRecords(transaction: IDBTransaction, oldVersion: number) {
  * Helper to get current space database
  * Returns a database instance for the currently active space
  */
-export async function getCurrentDB(): Promise<ChordlessDB> {
+export async function getCurrentDB(origin?: DataOrigin): Promise<ChordlessDB> {
   const { ensureCurrentSpace } = await import('./space.ts')
   const { id } = await ensureCurrentSpace()
-  return openSpace(id)
+  return openSpace(id, origin)
 }
 
 /** The database of a space, which need not be the current one (an import may go to another) */
-export async function openSpace(spaceId: string): Promise<ChordlessDB> {
-  const db = new ChordlessDB(spaceId)
+export async function openSpace(spaceId: string, origin?: DataOrigin): Promise<ChordlessDB> {
+  const db = new ChordlessDB(spaceId, origin)
   await db.init()
   return db
 }

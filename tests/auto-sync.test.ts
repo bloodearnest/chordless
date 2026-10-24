@@ -8,8 +8,20 @@ import {
   type SyncState,
   TICK_MS,
 } from '../src/js/auto-sync.ts'
-import { LocalChangeEvent } from '../src/js/local-changes.ts'
+import { type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
+
+/** A write the user made on this page */
+function savedHere(fields: Partial<DataChange> = {}): DataChangeEvent {
+  return new DataChangeEvent({
+    spaceId: 'space',
+    kind: 'setlist',
+    ids: ['a'],
+    origin: 'local',
+    remote: false,
+    ...fields,
+  })
+}
 
 const { describe, it } = window
 
@@ -230,14 +242,23 @@ describe('Syncing by itself while the app is open', () => {
       await settle()
       expect(world.runs).to.equal(1)
 
-      win.dispatchEvent(new LocalChangeEvent())
-      win.dispatchEvent(new LocalChangeEvent())
-      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(savedHere())
+      win.dispatchEvent(savedHere())
+      win.dispatchEvent(savedHere())
       expect(world.nudges.map(n => n.ms)).to.deep.equal([NUDGE_MS, NUDGE_MS, NUDGE_MS])
       expect(world.nudges.filter(n => !n.cancelled)).to.have.length(1)
       fire(world.nudges)
       await settle()
       expect(world.runs).to.equal(2)
+    })
+
+    it('does not sync for what a sync saved, or for what another tab saved: that tab sends its own', async () => {
+      const { auto, world, win } = rig({ state: 'feed' })
+      auto.start()
+      await settle()
+      win.dispatchEvent(savedHere({ origin: 'sync' }))
+      win.dispatchEvent(savedHere({ remote: true }))
+      expect(world.nudges).to.have.length(0)
     })
 
     it('does not list a whole space for an edit, and does nothing when it cannot sync', async () => {
@@ -248,7 +269,7 @@ describe('Syncing by itself while the app is open', () => {
         const { auto, world, win } = rig(setup)
         auto.start()
         await settle()
-        win.dispatchEvent(new LocalChangeEvent())
+        win.dispatchEvent(savedHere())
         fire(world.nudges)
         await settle()
         expect(world.runs, setup.state).to.equal(0)
@@ -258,7 +279,7 @@ describe('Syncing by itself while the app is open', () => {
       auto.start()
       await settle()
       world.visible = false
-      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(savedHere())
       fire(world.nudges)
       await settle()
       expect(world.runs).to.equal(1)
@@ -271,7 +292,7 @@ describe('Syncing by itself while the app is open', () => {
       await settle()
       expect(world.runs).to.equal(1)
 
-      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(savedHere())
       world.hold = false
       world.release?.()
       await settle()
@@ -287,10 +308,10 @@ describe('Syncing by itself while the app is open', () => {
       const { auto, world, win } = rig({ state: 'feed' })
       auto.start()
       await settle()
-      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(savedHere())
       auto.stop()
       expect(world.nudges.at(-1)?.cancelled).to.equal(true)
-      win.dispatchEvent(new LocalChangeEvent())
+      win.dispatchEvent(savedHere())
       expect(world.nudges).to.have.length(1)
     })
   })

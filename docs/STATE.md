@@ -60,7 +60,7 @@ is one declaration of "what I show" and not a load plus a hand-wired refresh.
 
 The setlist page keeps its parsed songs (they are costly to build), but not the record they came
 from: it reads the setlist again on a change and applies the difference to what it shows (it
-already does this for a pulled setlist, `applyPulledSetlist`), whatever the origin.
+already does this for a changed setlist, `applyChangedSetlist`), whatever the origin.
 
 ## The steps
 

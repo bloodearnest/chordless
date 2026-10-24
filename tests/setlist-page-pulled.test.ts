@@ -3,7 +3,7 @@
  * version, on the song being viewed, and says what changed (docs/SYNC_ARCHITECTURE.md).
  */
 import { expect } from '@open-wc/testing'
-import { announceSetlistsPulled, SetlistsPulledEvent } from '../src/js/pulled-setlists.ts'
+import { announceDataChange, type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
 import { makeEntry } from './builders.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { clearToasts, shownToast, wait } from './test-helpers.ts'
@@ -28,14 +28,23 @@ describe('the setlist page: a sync saves its setlist', () => {
   let movedTo: number | undefined
 
   /** Tell the page, and give it time to show the new version */
-  async function pulled(ids: string[]) {
+  async function pulled(ids: string[] | null, fields: Partial<DataChange> = {}) {
     movedTo = undefined
     const navigateTo = rig.page.navigateTo.bind(rig.page)
     rig.page.navigateTo = (index, options) => {
       movedTo ??= index
       return navigateTo(index, options)
     }
-    window.dispatchEvent(new SetlistsPulledEvent(ids))
+    window.dispatchEvent(
+      new DataChangeEvent({
+        spaceId: rig.db.spaceId,
+        kind: 'setlist',
+        ids,
+        origin: 'sync',
+        remote: false,
+        ...fields,
+      })
+    )
     await wait(100)
     await rig.flush()
   }
@@ -107,6 +116,29 @@ describe('the setlist page: a sync saves its setlist', () => {
     expect(shownToast()?.message).to.match(/was updated$/)
   })
 
+  it('follows another tab’s edit as it follows a sync’s, but not the page’s own save, nor another space’s', async () => {
+    const setlist = await rig.open(2)
+    const shown = rig.page.songs
+    await savedWith(setlist.id, [song(0), song(1), song(2)])
+
+    await pulled([setlist.id], { origin: 'local' })
+    expect(rig.page.songs).to.equal(shown)
+    await pulled([setlist.id], { spaceId: 'another-space' })
+    expect(rig.page.songs).to.equal(shown)
+
+    await pulled([setlist.id], { origin: 'local', remote: true })
+    expect(rig.page.songs).to.have.length(3)
+  })
+
+  it('follows a change of all the setlists, as a reset from Drive makes', async () => {
+    const setlist = await rig.open(2)
+    await savedWith(setlist.id, [song(0), song(1), song(2)])
+    await pulled([])
+    expect(rig.page.songs).to.have.length(2)
+    await pulled(null)
+    expect(rig.page.songs).to.have.length(3)
+  })
+
   it('ignores a sync of other setlists', async () => {
     const setlist = await rig.open(2)
     const shown = rig.page.songs
@@ -135,7 +167,7 @@ describe('the setlist page: a sync saves its setlist', () => {
   it('does nothing before it has shown a setlist, and does not move on when it was left while showing the new one', async () => {
     const { SetlistPage } = await import('../src/js/setlist-page.ts')
     const bare = new SetlistPage({ root: rig.root, setlistId: 'none', db: rig.db })
-    await bare.applyPulledSetlist()
+    await bare.applyChangedSetlist()
     expect(bare.currentSetlist).to.equal(undefined)
 
     const setlist = await rig.open(2)
@@ -151,7 +183,12 @@ describe('the setlist page: a sync saves its setlist', () => {
     const setlist = await rig.open(2)
     await savedWith(setlist.id, [song(0), song(1), song(2)])
 
-    announceSetlistsPulled([setlist.id])
+    announceDataChange({
+      spaceId: rig.db.spaceId,
+      kind: 'setlist',
+      ids: [setlist.id],
+      origin: 'sync',
+    })
     await wait(100)
     await rig.flush()
 

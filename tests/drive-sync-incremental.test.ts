@@ -1,7 +1,9 @@
 import { expect } from '@open-wc/testing'
+import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { DriveSyncManager, MEMBERS_REFRESH_MS } from '../src/js/drive-sync.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { makeSetlist } from './builders.ts'
 import {
   addSong,
   editSong,
@@ -352,26 +354,40 @@ describe('Drive sync: from the feed of changes', () => {
     ).to.equal(true)
   })
 
-  it('names a setlist it sent among those pulled, so a page holding an old copy takes the link to its file', async () => {
-    const { phone } = await twoDevices()
-    const setlist = await addSetlist(phone, { name: 'New' })
+  it('announces what it saves, a pull, a removal and a send, as the sync’s own writes', async () => {
+    const space = await createSpace(`Bus ${crypto.randomUUID().slice(0, 8)}`)
+    const seen: string[] = []
+    const listener = ({ change }: DataChangeEvent) => {
+      if (change.spaceId === space.id && change.kind === 'setlist') {
+        seen.push(`${change.ids?.join(',')}:${change.origin}`)
+      }
+    }
+    window.addEventListener(DataChangeEvent.type, listener)
+    try {
+      const { tablet } = await twoDevices()
+      const setlist = await addSetlist(tablet, { name: 'From the tablet' })
+      await syncDevice(tablet)
+      const sync = new DriveSyncManager(TEST_SPACE.name, space.id, { storage: rig.storage })
+      await sync.init()
+      expect(sync.spaceDb?.origin).to.equal('sync')
 
-    await phone.sync.incrementalSync()
+      await sync.incrementalSync()
+      expect(seen).to.include(`${setlist.id}:sync`)
 
-    expect(phone.sync.takePulledSetlistIds()).to.deep.equal([setlist.id])
-  })
+      seen.length = 0
+      for (const file of rig.driveSetlistFiles()) rig.storage.trash(file.ref)
+      await sync.incrementalSync()
+      expect(seen).to.deep.equal([`${setlist.id}:sync`])
 
-  it('names a setlist it removed among those pulled, so open pages read the list again', async () => {
-    const { phone, tablet } = await twoDevices()
-    const setlist = await addSetlist(tablet, { name: 'Soon gone' })
-    await syncDevice(tablet)
-    await phone.sync.incrementalSync()
-    phone.sync.takePulledSetlistIds()
-    for (const file of rig.driveSetlistFiles()) rig.storage.trash(file.ref)
-
-    await phone.sync.incrementalSync()
-
-    expect(phone.sync.takePulledSetlistIds()).to.deep.equal([setlist.id])
+      const own = await must(sync.spaceDb).saveSetlist(makeSetlist({ id: 'own-new' }))
+      seen.length = 0
+      await sync.incrementalSync()
+      expect(seen).to.deep.equal([`${own.id}:sync`])
+      sync.spaceDb?.db?.close()
+    } finally {
+      window.removeEventListener(DataChangeEvent.type, listener)
+      await deleteSpace(space.id)
+    }
   })
 
   it('leaves no place when a reset stops short after clearing the device', async () => {
@@ -546,7 +562,7 @@ describe('Drive sync: from the feed of changes', () => {
       const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
       await sync.init()
       // (what a sync saves is not a change to send)
-      expect(sync.spaceDb?.quiet).to.equal(true)
+      expect(sync.spaceDb?.origin).to.equal('sync')
       expect((await sync.incrementalSync()).full).to.equal(true)
       const place = (await sync.changeToken?.get()) ?? null
       expect(place).to.be.a('string')

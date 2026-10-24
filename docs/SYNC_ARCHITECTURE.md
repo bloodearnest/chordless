@@ -442,10 +442,10 @@ the feed, pulls what changed first (so a change from elsewhere is dealt with by 
 before anything is sent), then sends only the records whose content differs from what was last
 synced. So the immediate push is that sync, started soon after a local save:
 
-- The database tells the app of a local change: `saveSetlist`, `saveSong`, `saveChordPro`,
-  `deleteSetlist` and `deleteSong` send `LocalChangeEvent` (`local-changes.ts`) on the window. The
-  database of a sync's own (`quiet`) and the batch saves a sync uses do not, so a sync's saves do not
-  start another sync. This replaces a call at each of the ~16 places that save.
+- The database tells the app of every write (`data-changes.ts`, docs/STATE.md): a `DataChangeEvent`
+  on the window, with the kind of record, which ones, and the origin. The database of a sync's own
+  is opened with origin `'sync'`, and `AutoSync` acts only on `'local'` writes made in this tab, so a
+  sync's saves do not start another sync. This replaces a call at each of the ~16 places that save.
 - `AutoSync` hears it and syncs after **2 s of quiet** (`NUDGE_MS`), so a burst of reorders or key
   changes is one sync. A change made while a sync was running starts another when it ends.
 - Only where the storage has a feed (a storage with none would list the whole space for each edit:
@@ -566,8 +566,9 @@ moved between folders each have a test of their own.
   as the fallback for anyone not on it or whose connection drops. A change arrives as the setlist
   (without chart text) and lands as below; charts still come through the storage.
 - **A pull that changes the open setlist applies in place (built):** a sync that saves setlists tells
-  the app (`pulled-setlists.ts`: an event on the window, and a BroadcastChannel for the app's other
-  tabs, carrying only ids). The setlist page (`applyPulledSetlist`) reads its setlist again, shows it,
+  the app: every write is a `DataChangeEvent` on the window, and over a BroadcastChannel to the
+  app's other tabs (`data-changes.ts`), carrying only ids. The setlist page (`applyChangedSetlist`,
+  for a change a sync or another tab made) reads its setlist again, shows it,
   stays on the song being viewed by its song id (or goes to the overview if that song is gone) and
   says what changed with the summary of `sync/setlist-diff.ts`. It matters beyond looks: the page
   saves its whole in-memory copy of the setlist when anything changes, so a copy left as it was

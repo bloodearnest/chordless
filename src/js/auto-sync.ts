@@ -8,9 +8,10 @@
  * What it does is injected (`AutoSyncDeps`), so the rules are tested without a clock or a network;
  * `startAutoSync` gives it the real ones.
  */
+
+import { DataChangeEvent } from './data-changes.ts'
 import { getSignInState } from './google-auth.ts'
 import { lastSyncOf, recordSync } from './last-sync.ts'
-import { LocalChangeEvent } from './local-changes.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator } from './sync-orchestrator.ts'
@@ -71,13 +72,13 @@ export class AutoSync {
     doc.addEventListener('visibilitychange', this.#onVisibility)
     win.addEventListener('online', this.#onOnline)
     win.addEventListener('offline', this.#onOffline)
-    win.addEventListener(LocalChangeEvent.type, this.#onLocalChange)
+    win.addEventListener(DataChangeEvent.type, this.#onDataChange)
     const stopTimer = every(TICK_MS, () => void this.#sync(false))
     this.#stop = () => {
       doc.removeEventListener('visibilitychange', this.#onVisibility)
       win.removeEventListener('online', this.#onOnline)
       win.removeEventListener('offline', this.#onOffline)
-      win.removeEventListener(LocalChangeEvent.type, this.#onLocalChange)
+      win.removeEventListener(DataChangeEvent.type, this.#onDataChange)
       this.#cancelNudge?.()
       stopTimer()
     }
@@ -106,8 +107,17 @@ export class AutoSync {
     }
   }
 
-  /** Something to send was saved here: sync soon, once the edits stop for a moment */
-  #onLocalChange = (): void => {
+  /**
+   * Something was saved here by the user: sync soon, once the edits stop for a moment. What a sync
+   * saved is not to be sent, and another tab's edit is sent by that tab (it is not sent twice)
+   */
+  #onDataChange = (event: Event): void => {
+    const { change } = event as DataChangeEvent
+    if (change.origin !== 'local' || change.remote) return
+    this.#nudge()
+  }
+
+  #nudge(): void {
     if (this.#running) this.#changedWhileRunning = true
     this.#cancelNudge?.()
     this.#cancelNudge = this.#deps.later(NUDGE_MS, () => {
@@ -149,7 +159,7 @@ export class AutoSync {
     // A change made while it ran may have missed it: send that too
     if (this.#changedWhileRunning) {
       this.#changedWhileRunning = false
-      this.#onLocalChange()
+      this.#nudge()
     }
   }
 }

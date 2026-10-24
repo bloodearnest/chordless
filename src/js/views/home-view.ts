@@ -15,11 +15,11 @@ import type { SetlistGroup, SetlistRow } from '../../components/setlist-group.ts
 import '../../components/setlist-group.ts'
 import '../../components/space-tabs.ts'
 import '../../components/status-message.ts'
+import { DataChangeEvent, touches } from '../data-changes.ts'
 import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
-import { SetlistsPulledEvent } from '../pulled-setlists.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
@@ -118,19 +118,19 @@ export class HomeView extends PageView {
     args: () => [],
   })
 
-  /** A sync saved or removed setlists: show the list as it is now (the old one stays until then) */
-  #onPulled = (): void => {
-    if (!this.#sharedOnly) void this.#groups.run()
+  /** Setlists were saved or removed (by a sync, another tab, or the page itself): show the list as it is now (the old one stays until then) */
+  #onChanged = ({ change }: DataChangeEvent): void => {
+    if (!this.#sharedOnly && touches(change, 'setlist')) void this.#groups.run()
   }
 
   override connectedCallback(): void {
     super.connectedCallback()
-    window.addEventListener(SetlistsPulledEvent.type, this.#onPulled)
+    window.addEventListener(DataChangeEvent.type, this.#onChanged)
   }
 
   override disconnectedCallback(): void {
     super.disconnectedCallback()
-    window.removeEventListener(SetlistsPulledEvent.type, this.#onPulled)
+    window.removeEventListener(DataChangeEvent.type, this.#onChanged)
   }
 
   async #openCreate(): Promise<void> {

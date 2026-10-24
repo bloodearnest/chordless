@@ -254,8 +254,6 @@ export class DriveSyncManager implements SyncSession {
   pullIncomplete: boolean
   /** Whether a file the last pull meant to download could not be */
   downloadsFailed = false
-  /** The ids of the setlists pulled since this was last read and cleared (`takePulledSetlistIds`) */
-  pulledSetlistIds = new Set<string>()
   /** During an incremental sync: the refs the feed said are gone (there is no inventory to ask) */
   #goneRefs: Set<string> | null = null
   /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
@@ -357,12 +355,11 @@ export class DriveSyncManager implements SyncSession {
       // sync of a space that is not in use (the first sync of one just made or joined, or one
       // managed from the Account and Teams page) would otherwise work on the space in use.
       if (this.spaceId) {
-        this.spaceDb = new ChordlessDB(this.spaceId)
         // (what this sync saves is what came from storage, not a change to send)
-        this.spaceDb.quiet = true
+        this.spaceDb = new ChordlessDB(this.spaceId, 'sync')
         await this.spaceDb.init()
       } else {
-        this.spaceDb = await getCurrentDB()
+        this.spaceDb = await getCurrentDB('sync')
       }
       // Ensure we keep the actual space ID from the DB (in case caller passed null)
       this.spaceId = this.spaceDb.spaceId
@@ -676,13 +673,6 @@ export class DriveSyncManager implements SyncSession {
     if (edited.size > 0) await this.db.unlinkFiles(edited)
   }
 
-  /** The ids of the setlists pulled, removed or sent since the last call, for the app to tell its open pages */
-  takePulledSetlistIds(): string[] {
-    const ids = [...this.pulledSetlistIds]
-    this.pulledSetlistIds.clear()
-    return ids
-  }
-
   /** Read the space's members again if they were last read long ago (an incremental sync has no other time to) */
   async #refreshMembersIfOld(): Promise<void> {
     const refreshedAt = await this.#memberCache.refreshedAt?.()
@@ -856,8 +846,6 @@ export class DriveSyncManager implements SyncSession {
       if (this.hasLiveFileOfItsOwn(setlist)) continue
       if (setlistHasLocalChanges(setlist)) continue
       await this.db.deleteSetlist(setlist.id)
-      // (the pages showing the setlists are told, as of one pulled: they read them again)
-      this.pulledSetlistIds.add(setlist.id)
       removed++
     }
     return removed
