@@ -74,7 +74,9 @@ describe('the setlist page: a sync saves its setlist', () => {
     await savedWith(setlist.id, [song(3), song(0), song(1)])
     await pulled([setlist.id])
 
-    expect(loadSetlistLocalState(setlist.id).sectionState).to.deep.equal({ 2: { 0: hidden } })
+    expect(
+      loadSetlistLocalState(setlist.id, must(rig.page.currentSetlist).songs).sectionState
+    ).to.deep.equal({ 2: { 0: hidden } })
     expect(rig.page.sections.states).to.deep.equal({ 2: { 0: hidden } })
   })
 

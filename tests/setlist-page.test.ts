@@ -230,7 +230,9 @@ describe('the setlist page', () => {
       await page.moveSong(0, 2)
 
       expect(page.sections.states).to.deep.equal({ 2: { 0: hidden } })
-      expect(loadSetlistLocalState(setlist.id).sectionState).to.deep.equal({ 2: { 0: hidden } })
+      expect(
+        loadSetlistLocalState(setlist.id, page.currentSetlist?.songs ?? []).sectionState
+      ).to.deep.equal({ 2: { 0: hidden } })
     })
 
     it('shifts the states of the songs it passes over by one place', async () => {
@@ -345,14 +347,20 @@ describe('the setlist page', () => {
     it('keeps the sections shown and the capos of the songs after it, which move up', async () => {
       const setlist = await open()
       const hidden = { hideMode: 'none' as const, isCollapsed: true, isHidden: true }
-      saveSetlistLocalState(setlist.id, {
-        sectionState: { 0: { 0: hidden }, 1: { 0: hidden }, 2: { 1: hidden } },
-        capoValues: { 1: 2, 2: 3 },
-      })
+      saveSetlistLocalState(
+        setlist.id,
+        {
+          sectionState: { 0: { 0: hidden }, 1: { 0: hidden }, 2: { 1: hidden } },
+          capoValues: { 1: 2, 2: 3 },
+        },
+        setlist.songs
+      )
 
       await page.deleteSongFromSetlist(1)
 
-      expect(loadSetlistLocalState(setlist.id)).to.deep.equal({
+      expect(
+        loadSetlistLocalState(setlist.id, must(await db.getSetlist(setlist.id)).songs)
+      ).to.deep.equal({
         sectionState: { 0: { 0: hidden }, 1: { 1: hidden } },
         capoValues: { 1: 3 },
       })

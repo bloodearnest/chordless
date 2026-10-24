@@ -92,12 +92,15 @@ a view used to be stale.
    (`currentSetlist`), read by the header, menu and dialogs, and the page does not follow a write
    made in the same tab by something else (the key and tempo `SetlistSong` saves are the page's own
    by sharing its entry objects, so following every local write would show them as external edits).
-5. **Device-local state (accepted, not on the bus).** Capo and the sections shown are in
-   localStorage, written whole by the page that owns them, for this person on this device and never
-   synced. The one other writer is a second tab of the same setlist, and last write wins on a capo
-   is harmless, so there is no event for it. What does matter is that it is keyed by a song's place
-   in the setlist: a change made by someone else (a pull, another tab) renumbers it with the song
-   (`afterSetlistChange`, as the page's own move and remove do).
+5. **Device-local state (built, not on the bus).** Capo and the sections shown are in localStorage
+   (`setlist/local-state.ts`), for this person on this device, never synced. They are kept **by song**
+   (its uuid), not by its place in the setlist, so a setlist that someone else reorders or adds to
+   leaves them with the song they were set for; the page still works on them by place, as the songs
+   are on the page, and translates at load and save. What was kept by place (older versions) is read
+   as it was and becomes kept-by-song at the next save, on demand. What is kept for a song that is
+   out of the setlist stays for when it is back. A song in a setlist twice shares what is set. There
+   is no event for it: the one other writer is a second tab of the same setlist, and last write
+   wins on a capo is harmless.
 
 ## How it is held
 

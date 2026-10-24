@@ -52,8 +52,6 @@ import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   afterMove,
-  afterRemoval,
-  afterSetlistChange,
   clearSetlistLocalState,
   loadSetlistLocalState,
   renumberSongs,
@@ -1101,7 +1099,10 @@ export class SetlistPage {
 
   /** Load this setlist's section states and capos, as this device kept them (local-state.ts) */
   loadState() {
-    const { sectionState, capoValues } = loadSetlistLocalState(this.currentSetlistId)
+    const { sectionState, capoValues } = loadSetlistLocalState(
+      this.currentSetlistId,
+      this.songs.map(song => song._setlistEntry)
+    )
     this.sections.states = sectionState
     if (this._capoEnabled) {
       for (const [songIndex, capo] of Object.entries(capoValues)) {
@@ -1153,7 +1154,11 @@ export class SetlistPage {
         }
       })
     }
-    saveSetlistLocalState(this.currentSetlistId, { sectionState: this.sections.states, capoValues })
+    saveSetlistLocalState(
+      this.currentSetlistId,
+      { sectionState: this.sections.states, capoValues },
+      this.songs.map(song => song._setlistEntry)
+    )
   }
 
   /** The model that saves a song's changes in this setlist (loaded when first needed) */
@@ -1805,14 +1810,8 @@ export class SetlistPage {
       return
     }
 
-    // What was set for each song on this device (capo, sections) goes with the song
+    // (what this device set for each song is kept by song, so it follows the song to its new place)
     this.saveState()
-    const moved = afterSetlistChange(before.songs, latest.songs)
-    const kept = loadSetlistLocalState(id)
-    saveSetlistLocalState(id, {
-      sectionState: renumberSongs(kept.sectionState, moved),
-      capoValues: renumberSongs(kept.capoValues, moved),
-    })
 
     const titles = new Map(this.songs.map(song => [song._setlistEntry.songId, song.title]))
     const viewing = this.songs[this.currentSongIndex]?._setlistEntry.songId
@@ -2004,7 +2003,7 @@ export class SetlistPage {
       }
 
       // Remove the song from the setlist as it is stored
-      const saved = await this.editSetlist(stored => {
+      await this.editSetlist(stored => {
         if (!sameEntry(stored.songs[index], shown)) return NO_CHANGE
         stored.songs.splice(index, 1)
         stored.songs.forEach((entry, i) => {
@@ -2012,15 +2011,7 @@ export class SetlistPage {
         })
       })
 
-      if (saved) {
-        // The songs after it are one place earlier, with what was set for them
-        const kept = loadSetlistLocalState(id)
-        saveSetlistLocalState(id, {
-          sectionState: renumberSongs(kept.sectionState, afterRemoval(index)),
-          capoValues: renumberSongs(kept.capoValues, afterRemoval(index)),
-        })
-      }
-
+      // (what this device set for the songs after it is kept by song, so it moves up with them)
       // Reload the setlist
       await this.renderSetlist(id)
     } catch (error) {

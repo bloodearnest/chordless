@@ -2,6 +2,7 @@
  * What the setlist page does with a song's sections, key, tempo, capo and settings, and the state
  * it keeps. (Moving between songs and the header are in setlist-page-header.test.ts.)
  */
+
 import { expect, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import { CapoChangeEvent } from '../src/components/capo-selector.ts'
@@ -19,6 +20,7 @@ import {
   SectionDefaultsEvent,
   setCapoPreference,
 } from '../src/js/preferences.ts'
+import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { getSongUserPrefs, saveSongUserPrefs } from '../src/js/song-user-prefs.ts'
 import { getCurrentSpace, setSpaceReadOnly } from '../src/js/space.ts'
 import { chartOf, must, useSetlistPage } from './setlist-page-harness.ts'
@@ -268,18 +270,19 @@ describe('the setlist page: sections, key, tempo and capo', () => {
         0: { 0: { hideMode: 'chords', isCollapsed: false, isHidden: false } },
       }
       rig.page.saveState()
-      const kept = JSON.parse(must(localStorage.getItem(`state-${setlist.id}`)))
+      const kept = loadSetlistLocalState(setlist.id, setlist.songs)
       expect(kept.capoValues).to.deep.equal({ 1: 4 })
       expect(kept.sectionState[0][0].hideMode).to.equal('chords')
+      // (and under the songs, not their places)
+      const stored = JSON.parse(must(localStorage.getItem(`state-${setlist.id}`)))
+      expect(stored.capos).to.deep.equal({ [setlist.songs[1].songUuid]: 4 })
     })
 
     it('saves no capos when the capo is off', async () => {
       const setlist = await rig.open()
       rig.page.songs[1].currentCapo = 4
       rig.page.saveState()
-      expect(
-        JSON.parse(must(localStorage.getItem(`state-${setlist.id}`))).capoValues
-      ).to.deep.equal({})
+      expect(loadSetlistLocalState(setlist.id, setlist.songs).capoValues).to.deep.equal({})
     })
 
     it('puts the sections back when the user’s defaults change, once the setlist is shown', async () => {

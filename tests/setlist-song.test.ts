@@ -279,9 +279,9 @@ describe('SetlistSong', () => {
       song.setCapo(4)
       await song.save()
 
-      const stateKey = `state-${setlist.id}`
-      const state = JSON.parse(must(localStorage.getItem(stateKey)))
-      expect(state.capoValues['0']).to.equal(4)
+      // (kept under the song, not its place in the setlist; this fixture has no uuid, so by its id)
+      const state = JSON.parse(must(localStorage.getItem(`state-${setlist.id}`)))
+      expect(state.capos[setlist.songs[0].songId]).to.equal(4)
     })
   })
 
@@ -350,7 +350,7 @@ describe('SetlistSong, with little recorded about the song or the setlist', () =
     song.setCapo(3)
     await song.save()
     const state = JSON.parse(must(localStorage.getItem(stateKey)))
-    expect(state.capoValues).to.deep.equal({ 0: 3 })
+    expect(Object.values(state.capos)).to.deep.equal([3])
   })
 
   it('can be reset when it has no key or tempo at all', async () => {

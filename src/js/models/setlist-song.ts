@@ -1,6 +1,11 @@
 import type { LoadedSong, ParsedChart, SetlistEntry } from '../data-types.ts'
 import { type ChordlessDB, NO_CHANGE } from '../db.ts'
-import { loadSetlistLocalState, saveSetlistLocalState } from '../setlist/local-state.ts'
+import {
+  loadSetlistLocalState,
+  loadSongCapo,
+  type SongRef,
+  saveSetlistLocalState,
+} from '../setlist/local-state.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { normalizeCapo } from '../utils/capo.ts'
 import { SongModel } from './song-model.ts'
@@ -127,8 +132,8 @@ export class SetlistSong extends SongModel {
     }
 
     // Priority 1: Setlist localStorage
-    const { capoValues } = loadSetlistLocalState(this._setlistId)
-    if (capoValues[this._songIndex] !== undefined) return normalizeCapo(capoValues[this._songIndex])
+    const kept = loadSongCapo(this._setlistId, this._songEntry, this._songIndex)
+    if (kept !== undefined) return normalizeCapo(kept)
 
     // Priority 2: Song-user-prefs (conditional on key match)
     const currentKey = this.getKey()
@@ -150,6 +155,22 @@ export class SetlistSong extends SongModel {
   }
 
   // ==================== Persistence ====================
+
+  /** Keep this song's capo on this device (none: forget it), among those of the setlist's songs as stored */
+  async _keepCapo(capo: number | undefined): Promise<void> {
+    const stored = (await this._db.getSetlist(this._setlistId))?.songs ?? []
+    // (the songs as the page has them, if the setlist has moved on: the capo is for this song)
+    const here = stored.findIndex(
+      entry =>
+        entry.songId === this._songEntry.songId && entry.songUuid === this._songEntry.songUuid
+    )
+    const songs: SongRef[] = here >= 0 ? stored : [this._songEntry]
+    const index = Math.max(here, 0)
+    const state = loadSetlistLocalState(this._setlistId, songs)
+    if (capo === undefined) delete state.capoValues[index]
+    else state.capoValues[index] = capo
+    saveSetlistLocalState(this._setlistId, state, songs)
+  }
 
   override async save(): Promise<void> {
     // Save key and tempo to setlist entry in IndexedDB
@@ -176,9 +197,7 @@ export class SetlistSong extends SongModel {
 
     // Save the capo to the setlist's local state
     if (this._pendingChanges.capo !== null) {
-      const state = loadSetlistLocalState(this._setlistId)
-      state.capoValues[this._songIndex] = this._pendingChanges.capo
-      saveSetlistLocalState(this._setlistId, state)
+      await this._keepCapo(this._pendingChanges.capo)
     }
 
     // Clear pending changes
@@ -195,9 +214,7 @@ export class SetlistSong extends SongModel {
     this._pendingChanges.tempo = this.getOriginalTempo() ?? null
 
     // Forget the capo this device kept for the song
-    const state = loadSetlistLocalState(this._setlistId)
-    delete state.capoValues[this._songIndex]
-    saveSetlistLocalState(this._setlistId, state)
+    await this._keepCapo(undefined)
 
     this._pendingChanges.capo = 0
 

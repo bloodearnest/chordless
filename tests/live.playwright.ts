@@ -99,8 +99,10 @@ test.describe('Sections', () => {
       .poll(() =>
         page.evaluate(
           () =>
-            JSON.parse(localStorage.getItem('state-seeded-setlist') as string)
-              ?.sectionState?.[0]?.[1]?.hideMode
+            // (kept by song: the first song's sections are the only ones)
+            Object.values(
+              JSON.parse(localStorage.getItem('state-seeded-setlist') as string)?.sections ?? {}
+            )[0]?.[1]?.hideMode
         )
       )
       .toBe('hide')
