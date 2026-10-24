@@ -2,7 +2,12 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { afterMove, afterRemoval, renumberSongs } from '../src/js/setlist/local-state.ts'
+import {
+  afterMove,
+  afterRemoval,
+  afterSetlistChange,
+  renumberSongs,
+} from '../src/js/setlist/local-state.ts'
 
 const places = (remap: (index: number) => number | null, count = 5) =>
   Array.from({ length: count }, (_, index) => remap(index))
@@ -21,4 +26,18 @@ test('removing a song drops it and shifts the ones after it up', () => {
 
 test('a record is renumbered by its keys, as numbers or as the text they were saved as', () => {
   assert.deepEqual(renumberSongs({ 0: 'a', 1: 'b', '2': 'c' }, afterRemoval(1)), { 0: 'a', 1: 'c' })
+})
+
+const entry = (songId: string, songUuid = songId) => ({ songId, songUuid })
+
+test('a setlist changed by someone else: each song keeps what was set for it', () => {
+  const before = [entry('a'), entry('b'), entry('c')]
+  const after = [entry('c'), entry('x'), entry('a')]
+  assert.deepEqual(places(afterSetlistChange(before, after), 3), [2, null, 0])
+})
+
+test('the same song twice is matched in order', () => {
+  const before = [entry('a'), entry('b'), entry('a')]
+  const after = [entry('b'), entry('a'), entry('a')]
+  assert.deepEqual(places(afterSetlistChange(before, after), 3), [1, 0, 2])
 })

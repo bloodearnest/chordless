@@ -4,6 +4,7 @@
  */
 import { expect } from '@open-wc/testing'
 import { announceDataChange, type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
+import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { makeEntry } from './builders.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
 import { clearToasts, shownToast, wait } from './test-helpers.ts'
@@ -62,6 +63,19 @@ describe('the setlist page: a sync saves its setlist', () => {
     expect(rig.page.songs[2].title).to.equal('Bravo')
     expect(rig.visited.some(visit => visit.replace && visit.url.includes('/song/2'))).to.equal(true)
     expect(shownToast()?.message).to.contain('+ Delta')
+  })
+
+  it('keeps what this device set for a song with the song when the setlist is reordered elsewhere', async () => {
+    const setlist = await rig.open(3, {}, { songIndex: 1 })
+    const hidden = { hideMode: 'chords' as const, isCollapsed: false, isHidden: false }
+    rig.page.sections.states = { 1: { 0: hidden }, 2: { 0: hidden } }
+
+    // Bravo (1) is now last, and Charlie (2) is gone
+    await savedWith(setlist.id, [song(3), song(0), song(1)])
+    await pulled([setlist.id])
+
+    expect(loadSetlistLocalState(setlist.id).sectionState).to.deep.equal({ 2: { 0: hidden } })
+    expect(rig.page.sections.states).to.deep.equal({ 2: { 0: hidden } })
   })
 
   it('goes to the overview when the song being viewed is no longer in the setlist', async () => {

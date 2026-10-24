@@ -53,6 +53,7 @@ import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   afterMove,
   afterRemoval,
+  afterSetlistChange,
   clearSetlistLocalState,
   loadSetlistLocalState,
   renumberSongs,
@@ -1803,6 +1804,15 @@ export class SetlistPage {
       this.currentSetlist = latest
       return
     }
+
+    // What was set for each song on this device (capo, sections) goes with the song
+    this.saveState()
+    const moved = afterSetlistChange(before.songs, latest.songs)
+    const kept = loadSetlistLocalState(id)
+    saveSetlistLocalState(id, {
+      sectionState: renumberSongs(kept.sectionState, moved),
+      capoValues: renumberSongs(kept.capoValues, moved),
+    })
 
     const titles = new Map(this.songs.map(song => [song._setlistEntry.songId, song.title]))
     const viewing = this.songs[this.currentSongIndex]?._setlistEntry.songId

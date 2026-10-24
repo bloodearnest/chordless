@@ -92,10 +92,12 @@ a view used to be stale.
    (`currentSetlist`), read by the header, menu and dialogs, and the page does not follow a write
    made in the same tab by something else (the key and tempo `SetlistSong` saves are the page's own
    by sharing its entry objects, so following every local write would show them as external edits).
-5. **Device-local state (not done).** Capo and the sections shown are in localStorage, written whole
-   by the page that owns them. Two tabs of the same setlist overwrite each other's; that is the same
-   class, but it needs one person on one device with two tabs open on one setlist, and the browser's
-   own `storage` event is the way to hear it, not this bus. Left until it is seen.
+5. **Device-local state (accepted, not on the bus).** Capo and the sections shown are in
+   localStorage, written whole by the page that owns them, for this person on this device and never
+   synced. The one other writer is a second tab of the same setlist, and last write wins on a capo
+   is harmless, so there is no event for it. What does matter is that it is keyed by a song's place
+   in the setlist: a change made by someone else (a pull, another tab) renumbers it with the song
+   (`afterSetlistChange`, as the page's own move and remove do).
 
 ## How it is held
 

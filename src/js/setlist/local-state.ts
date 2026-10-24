@@ -74,6 +74,26 @@ export const afterRemoval = (removed: number) => (index: number) => {
   return index > removed ? index - 1 : index
 }
 
+/**
+ * Where each song of `before` is in `after` (null: it is gone), for a setlist changed by someone
+ * else: what was set for a song goes with the song. The same song twice is matched in order.
+ */
+export function afterSetlistChange(
+  before: { songId: string; songUuid?: string }[],
+  after: { songId: string; songUuid?: string }[]
+) {
+  const taken = new Set<number>()
+  const places = before.map(entry => {
+    const place = after.findIndex(
+      (other, index) =>
+        !taken.has(index) && other.songId === entry.songId && other.songUuid === entry.songUuid
+    )
+    if (place >= 0) taken.add(place)
+    return place >= 0 ? place : null
+  })
+  return (index: number) => places[index] ?? null
+}
+
 /** Forget it all: the setlist has been deleted */
 export function clearSetlistLocalState(setlistId: string) {
   localStorage.removeItem(keyFor(setlistId))
