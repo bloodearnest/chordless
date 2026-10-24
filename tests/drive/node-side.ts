@@ -188,13 +188,3 @@ export function withEnvVariable(envText: string, name: string, value: string): s
   if (pattern.test(envText)) return envText.replace(pattern, () => line)
   return `${envText}${envText === '' || envText.endsWith('\n') ? '' : '\n'}${line}\n`
 }
-
-/** The values in a `.dev.vars` file (KEY=value lines, optionally quoted) */
-export function readDevVars(text: string): Record<string, string> {
-  const vars: Record<string, string> = {}
-  for (const line of text.split('\n')) {
-    const found = /^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line)
-    if (found) vars[found[1]] = found[2].replace(/^(['"])(.*)\1$/, '$2')
-  }
-  return vars
-}

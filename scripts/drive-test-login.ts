@@ -1,6 +1,6 @@
 // Sets up the real-Drive suite's credentials (docs/DRIVE_TESTS.md): `just drive-test-login`.
-// Takes the OAuth client's id and secret from .drive-test.env, or from the app's own .dev.vars
-// (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET), or asks (the secret is not shown as you type); opens Google's sign-in for the test account, and writes the refresh token it gives
+// Takes the DEV project's OAuth client id and secret from .drive-test.env, or asks (the secret is not
+// shown as you type); never the app's own client from .dev.vars, so tests cannot use its quota; opens Google's sign-in for the test account, and writes the refresh token it gives
 // back to .drive-test.env (readable by you only). Nothing secret is printed.
 //
 // Google does not take an account's password from a script: it is typed on Google's own page.
@@ -9,12 +9,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { createInterface } from 'node:readline/promises'
-import {
-  CREDENTIAL_VARIABLES,
-  consentUrl,
-  readDevVars,
-  withEnvVariable,
-} from '../tests/drive/node-side.ts'
+import { CREDENTIAL_VARIABLES, consentUrl, withEnvVariable } from '../tests/drive/node-side.ts'
 
 const ENV_FILE = '.drive-test.env'
 const ACCOUNT_VARIABLE = 'DRIVE_TEST_ACCOUNT'
@@ -58,21 +53,15 @@ async function ask(question: string, { hidden = false } = {}): Promise<string> {
   })
 }
 
-const devVars = existsSync('.dev.vars') ? readDevVars(readFileSync('.dev.vars', 'utf8')) : {}
 const env = (name: string) => process.env[name] || undefined
 
-const fromDevVars = !env(CREDENTIAL_VARIABLES.clientId) && devVars.GOOGLE_CLIENT_ID
 const clientId =
-  env(CREDENTIAL_VARIABLES.clientId) ??
-  devVars.GOOGLE_CLIENT_ID ??
-  (await ask('OAuth client id (the test client): '))
+  env(CREDENTIAL_VARIABLES.clientId) ?? (await ask('OAuth client id (the test client): '))
 if (!env(CREDENTIAL_VARIABLES.clientId)) keep(CREDENTIAL_VARIABLES.clientId, clientId)
 const clientSecret =
   env(CREDENTIAL_VARIABLES.clientSecret) ??
-  devVars.GOOGLE_CLIENT_SECRET ??
   (await ask('OAuth client secret (not shown): ', { hidden: true }))
 if (!env(CREDENTIAL_VARIABLES.clientSecret)) keep(CREDENTIAL_VARIABLES.clientSecret, clientSecret)
-if (fromDevVars) console.log("Using the app's own OAuth client, from .dev.vars.")
 if (!clientId || !clientSecret) {
   console.error('Both the client id and its secret are needed.')
   process.exit(1)

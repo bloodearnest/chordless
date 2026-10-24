@@ -52,15 +52,15 @@ folder, and it only ever touches folders it made (`drive.file` could not see oth
    test account as a test user. Drive API quota is per project, so the suite cannot use up the real
    app's.
    (Under `drive.file` an app sees only the files it made itself, so the client that makes the
-   files must be the client that reads them. A separate client keeps the suite apart from the
-   app's own and needs no change to its redirect addresses.) If the consent screen is in testing,
-   add the test account as a test user.
+   files must be the client that reads them, and the suite's files are invisible to the real app.)
 2. `just drive-test-login` takes the client's id and secret from `.drive-test.env` (`DRIVE_TEST_CLIENT_ID`,
-   `DRIVE_TEST_CLIENT_SECRET`), or else from `.dev.vars` (`GOOGLE_CLIENT_ID`,
-   `GOOGLE_CLIENT_SECRET`, which should then be the dev client's: local development uses the dev project), or else asks for them (the secret is not shown as you type), and
-   keeps them in `.drive-test.env`. It listens on `http://127.0.0.1:8976` (`DRIVE_TEST_LOGIN_PORT`
-   changes it): a Desktop-app client takes that without setup; a web client needs
-   `http://127.0.0.1:8976` added to its authorized redirect URIs.
+   `DRIVE_TEST_CLIENT_SECRET`), or else asks for them (the secret is not shown as you type), and
+   keeps them in `.drive-test.env`. It never uses the app's own client from `.dev.vars`: that one
+   is the production project's, and the suite would use up its quota. The app's local development
+   (`npm run dev`) stays on the production client for now, because the page's client id is a constant
+   in `src/js/google-auth.ts`; moving it to the dev client means making that id configurable.
+   The login listens on `http://127.0.0.1:8976` (`DRIVE_TEST_LOGIN_PORT` changes it): a Desktop-app
+   client takes that without setup; a web client needs it added to its authorized redirect URIs.
 3. It opens Google's sign-in, pre-filled with `DRIVE_TEST_ACCOUNT` (default `chordless.test.user@gmail.com`);
    sign in as the test account. It writes
    `DRIVE_TEST_REFRESH_TOKEN` into `.drive-test.env` (readable by you only) and prints nothing secret.
