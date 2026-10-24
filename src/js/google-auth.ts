@@ -70,8 +70,9 @@ type WorkerMessageType =
   | 'PROCESS_QUEUE'
 
 // Configuration
-export const GOOGLE_CLIENT_ID =
-  '818185619377-gi719ehrq0937cmuf0qapms2r68vl3dc.apps.googleusercontent.com'
+// (the client of the Google Cloud project this build is for: .env.development / .env.production)
+/* v8 ignore next -- Node (the Worker's tests) has no Vite env; the page always does */
+export const GOOGLE_CLIENT_ID = import.meta.env?.VITE_GOOGLE_CLIENT_ID ?? ''
 const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.file'
 const IDENTITY_SCOPES = 'openid email profile'
 const GOOGLE_SCOPES = `${DRIVE_SCOPE} ${IDENTITY_SCOPES}`

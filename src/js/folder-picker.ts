@@ -21,8 +21,9 @@ async function pickerApiKey(): Promise<string> {
   return pickerApiKey
 }
 
-/** The Picker's app id: the Google Cloud project number of `chordless-app` */
-const PICKER_APP_ID = '818185619377'
+/** The Picker's app id: the number of the Google Cloud project this build is for (.env.development / .env.production) */
+/* v8 ignore next -- Node has no Vite env; the page always does */
+const PICKER_APP_ID = import.meta.env?.VITE_PICKER_APP_ID ?? ''
 
 const GAPI_URL = 'https://apis.google.com/js/api.js'
 

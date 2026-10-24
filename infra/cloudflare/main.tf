@@ -1,7 +1,7 @@
 # Cloudflare config for chordless.app that wrangler does not own.
 #
 # NOT here, on purpose: the Worker, its assets and the rate limiters. `wrangler deploy` owns those (wrangler.toml); managing them here too would make
-# two tools fight over the same objects. Secrets are `wrangler secret put` (push-secrets.sh).
+# two tools fight over the same objects. Secrets are `wrangler secret put` (docs/ENVIRONMENTS.md).
 #
 # Here: the Worker's custom domain (the one thing about the Worker that is zone infrastructure, not
 # code: wrangler.toml has no `routes` for it, so a deploy never touches it), and Email Routing, which sends import@chordless.app to the Worker's email() handler

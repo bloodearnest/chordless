@@ -1,0 +1,20 @@
+# Copy to .dev.vars (git ignores it) for `npm run dev`. These are the DEV Google Cloud project's
+# (infra/google-dev/): never the production values (those are Worker secrets, set with
+# `wrangler secret put NAME`, which prompts and keeps nothing in a file).
+# docs/ENVIRONMENTS.md says where each comes from.
+
+# The dev OAuth client: the id must be VITE_GOOGLE_CLIENT_ID in .env.development
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+
+# The dev project's Sharing Key (Drive only): gcloud services api-keys get-key-string 4bc5b8b1-c544-4255-a08f-bf52b7804486 --project setalight
+GOOGLE_API_KEY=
+# The dev project's Team Key (Picker only, local addresses): ... get-key-string 97aa76c6-71d6-4a27-b74c-a373c345e1c6 --project setalight
+PICKER_API_KEY=
+
+# Any random 32 bytes, base64: openssl rand -base64 32. Its own value in dev, so blobs made in one
+# environment are no use in the other.
+JWE_ENCRYPTION_KEY=
+
+# Used when the client sends no redirect_uri
+GOOGLE_REDIRECT_URI=

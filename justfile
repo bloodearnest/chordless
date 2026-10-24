@@ -64,9 +64,6 @@ preview: build
 deploy:
     npm run deploy
 
-secrets:
-    bash push-secrets.sh
-
 # Keep the same URL: browser data (IndexedDB, sign-in) is tied to that origin.
 # Expose local server via Tailscale Funnel on https://<machine>.<tailnet>.ts.net (port 443)
 funnel:

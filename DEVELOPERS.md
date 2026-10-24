@@ -68,7 +68,6 @@ just format lint test
 | `just build` | Builds the app and the Worker into `dist/` |
 | `just preview` | Serves the build in `dist/` on port 8788, as production would |
 | `just deploy` | Builds, then deploys the Worker and the built app to Cloudflare |
-| `just secrets` | Pushes the secrets in `.dev.vars` to Cloudflare |
 
 ## Conventions
 

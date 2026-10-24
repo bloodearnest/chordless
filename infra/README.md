@@ -15,7 +15,7 @@ own state, so a mistake in one cannot touch the other. `google-chordless/` creat
 
 - **Terraform:** the above. Zone and account facts that change rarely.
 - **Wrangler** (`wrangler.toml`, `just deploy`): the Worker's code, assets, bindings, rate limiters,
-  `workers_dev`/`preview_urls`, and the secrets (`push-secrets.sh`). Never in Terraform: two tools
+  `workers_dev`/`preview_urls`, and the secrets (`wrangler secret put NAME`). Never in Terraform: two tools
   would fight over one object, and Cloudflare's own guidance keeps the two complementary.
 - **By hand:** the OAuth consent screen and web client (the provider cannot manage them), service
   account keys and API key values (they would land in the state file), adding the service account to a

@@ -9,7 +9,7 @@ the move, and what is left of it is step 6 (a project of its own for the service
 | 0. Decide | Done: ids and names below. |
 | 1. App project in Terraform | Done: `infra/google-chordless/`. |
 | 2. Consent screen and web client | Done by hand; brand verified the same day. |
-| 3. Wire it in | Done and deployed: client id in `google-auth.ts`, Worker secrets (pushed with `just secrets`), Picker app id. |
+| 3. Wire it in | Done and deployed: client id in `google-auth.ts`, Worker secrets (`wrangler secret put`), Picker app id. |
 | 4. Move the data | Done: **Start over in Drive** (below) replaces export and import, and the checks passed. |
 | 5. Retire the old project | Done 2026-10-21: deleted at Google. |
 | 6. Team storage project | Not yet. |
@@ -58,7 +58,7 @@ Found in the repo; each changes with a new project.
 | What | Where | Changes to |
 |---|---|---|
 | The OAuth client id | `GOOGLE_CLIENT_ID` in `src/js/google-auth.ts` (public) | the new client's id |
-| The client id and secret | Worker secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`scripts/push-secrets.sh`, `.dev.vars`, DEVELOPERS.md) | the new client's |
+| The client id and secret | Worker secrets `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (`wrangler secret put`; `.dev.vars` in dev, DEVELOPERS.md) | the new client's |
 | The sharing key | Worker secret `GOOGLE_API_KEY`: Drive API only, **no** referrer restriction, since the Worker sends none | a new key in the app project |
 | The Picker key | typed on the dev pages today; a public build-time setting in the product, restricted to the Picker API and to `https://chordless.app/*` and the dev address | a new key in the app project |
 | The Picker app id | the project **number**, in `src/dev/*.js`, the probe page, docs/SPACES.md | the new project number, `818185619377` (done) |
@@ -124,7 +124,7 @@ recorded; publish to production and submit the brand for verification. Everythin
 so start it first. `drive.file` is not a sensitive scope, so I expect the brand verification only and
 not a full app review, but that is an expectation to check, not a fact.
 
-**3. Wire it in:** the new client id in `google-auth.ts`; the Worker secrets (`push-secrets.sh`) and
+**3. Wire it in:** the new client id in `google-auth.ts`; the Worker secrets (`wrangler secret put`) and
 `.dev.vars`; the Picker app id (the new project number) and key; the docs. Allow the new client in the
 Workspace admin console if third-party apps are controlled.
 

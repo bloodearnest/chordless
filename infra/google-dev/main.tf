@@ -41,3 +41,85 @@ resource "google_project_service" "drive" {
   service            = "drive.googleapis.com"
   disable_on_destroy = false
 }
+
+# Needed to manage the API keys below, and the service account.
+resource "google_project_service" "apikeys" {
+  project            = google_project.dev.project_id
+  service            = "apikeys.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "iam" {
+  project            = google_project.dev.project_id
+  service            = "iam.googleapis.com"
+  disable_on_destroy = false
+}
+
+# The Google Picker (team-space folder picker) in dev: Picker only, from the local addresses only
+# (not chordless.app: the production page uses the app project's key). Its value is PICKER_API_KEY
+# in .dev.vars. Imported: it came back with the project.
+import {
+  to = google_apikeys_key.team
+  id = "projects/setalight/locations/global/keys/97aa76c6-71d6-4a27-b74c-a373c345e1c6"
+}
+
+resource "google_apikeys_key" "team" {
+  name         = "97aa76c6-71d6-4a27-b74c-a373c345e1c6"
+  display_name = "Team Key"
+  project      = google_project.dev.project_id
+
+  restrictions {
+    api_targets {
+      service = "picker.googleapis.com"
+    }
+    browser_key_restrictions {
+      allowed_referrers = [
+        "http://localhost:8787/*",
+        "http://127.0.0.1:8787/*",
+      ]
+    }
+  }
+
+  depends_on = [google_project_service.apikeys]
+}
+
+# Server key (GOOGLE_API_KEY in .dev.vars) for share link downloads in dev: Drive only.
+import {
+  to = google_apikeys_key.sharing
+  id = "projects/setalight/locations/global/keys/4bc5b8b1-c544-4255-a08f-bf52b7804486"
+}
+
+resource "google_apikeys_key" "sharing" {
+  name         = "4bc5b8b1-c544-4255-a08f-bf52b7804486"
+  display_name = "Sharing Key"
+  project      = google_project.dev.project_id
+
+  restrictions {
+    api_targets {
+      service = "drive.googleapis.com"
+    }
+  }
+
+  depends_on = [google_project_service.apikeys]
+}
+
+# The first app's service account came back with the project, and its key (made 2026-10-20) with
+# it. Nothing uses it: disabled, so neither it nor its key works.
+import {
+  to = google_service_account.broker
+  id = "projects/setalight/serviceAccounts/broker@setalight.iam.gserviceaccount.com"
+}
+
+resource "google_service_account" "broker" {
+  account_id  = "broker"
+  description = "Chordless account to maintain shared Teams files"
+  project     = google_project.dev.project_id
+  disabled    = true
+
+  depends_on = [google_project_service.iam]
+}
+
+output "project_number" {
+  description = "The Picker app id in .env.development."
+  value       = google_project.dev.number
+}

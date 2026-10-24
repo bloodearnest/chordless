@@ -272,7 +272,7 @@ a CORS error). A room of people on one wifi opening a link looks the same. So
 `worker/src/share.ts` serves `GET /api/share/<fileId>`:
 
 - It fetches the file from Drive with the API key, which is a Worker secret
-  (`GOOGLE_API_KEY`, in `.dev.vars` and `push-secrets.sh`) and never reaches a browser.
+  (`GOOGLE_API_KEY`: `.dev.vars` in dev, a Worker secret in production) and never reaches a browser.
 - It caches each answer at the edge for 60 seconds, so Drive sees about one request per file
   a minute however many people open the link. The cache is deliberately short, not matched to
   `expires`: updates must reach recipients, and a stopped or expired share must start giving

@@ -12,6 +12,7 @@
   "include": [
     "tests/*.test.*",
     "tests/drive/*.drive.test.*",
+    "src/env.d.ts",
     "tests/fake-drive.*",
     "tests/test-helpers.*"
   ],
