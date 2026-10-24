@@ -11,6 +11,7 @@ import {
   readPadSetsForExport,
   type SpaceExport,
 } from '../js/space-export.ts'
+import { planReset, type ResetPlan, resetToExport } from '../js/space-restore.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -54,6 +55,7 @@ export class SpaceExportPanel extends LitElement {
     _busy: { state: true },
     _message: { state: true },
     _pending: { state: true },
+    _reset: { state: true },
   }
 
   static override styles = [
@@ -104,6 +106,8 @@ export class SpaceExportPanel extends LitElement {
   declare _busy: boolean
   declare _message: { text: string; kind: 'info' | 'error' } | null
   declare _pending: PendingImport | null
+  /** What a reset to the chosen export would do, shown for the user to confirm */
+  declare _reset: ResetPlan | null
 
   constructor() {
     super()
@@ -114,6 +118,7 @@ export class SpaceExportPanel extends LitElement {
     this._busy = false
     this._message = null
     this._pending = null
+    this._reset = null
   }
 
   override connectedCallback() {
@@ -182,6 +187,7 @@ export class SpaceExportPanel extends LitElement {
     try {
       const exported = await readExport(file)
       this._pending = { exported, pads: false }
+      this._reset = null
     } catch (error) {
       this._pending = null
       this._message = { text: errorMessage(error), kind: 'error' }
@@ -222,6 +228,106 @@ export class SpaceExportPanel extends LitElement {
     }
   }
 
+  /** Work out what a reset to the chosen export would change, and show it */
+  async _planReset() {
+    const pending = this._pending
+    if (!pending) return
+    this._busy = true
+    this._message = null
+    try {
+      this._reset = await withSource(this.space.id, db => planReset(pending.exported, db))
+    } catch (error) {
+      this._message = { text: `Could not check the space: ${errorMessage(error)}`, kind: 'error' }
+    } finally {
+      this._busy = false
+    }
+  }
+
+  async _doReset() {
+    const pending = this._pending
+    if (!pending || !this._reset) return
+    this._busy = true
+    this._message = null
+    try {
+      const where = this.space.name
+      const report = await withSource(this.space.id, db => resetToExport(pending.exported, db))
+      this._pending = null
+      this._reset = null
+      this.dispatchEvent(new SpaceImportedEvent())
+      this._message = {
+        text:
+          `Reset ${where} from the export: ${report.songsReplaced} charts and ${report.setlistsReplaced} setlists replaced` +
+          `, ${report.songsAdded} charts and ${report.setlistsAdded} setlists added` +
+          `, ${report.songsSame} charts and ${report.setlistsSame} setlists were already the same` +
+          (report.songsOnlyHere + report.setlistsOnlyHere > 0
+            ? `; ${report.songsOnlyHere} charts and ${report.setlistsOnlyHere} setlists that are not in the file were kept`
+            : '') +
+          '. Sync sends the changes to Drive.',
+        kind: 'info',
+      }
+    } catch (error) {
+      this._message = { text: `Resetting failed: ${errorMessage(error)}`, kind: 'error' }
+    } finally {
+      this._busy = false
+    }
+  }
+
+  _renderReset(plan: ResetPlan) {
+    const replaced = plan.songsReplaced.length + plan.setlistsReplaced.length
+    const added = plan.songsAdded.length + plan.setlistsAdded.length
+    const newer = [...plan.songsReplaced, ...plan.setlistsReplaced].filter(item => item.newerHere)
+    return html`
+      <fieldset>
+        <legend>Reset ${this.space.name} to this export</legend>
+        <p class="meta">
+          ${plan.songsReplaced.length} charts and ${plan.setlistsReplaced.length} setlists here will be
+          replaced by the file's, and ${plan.songsAdded.length} charts and ${plan.setlistsAdded.length}
+          setlists added. ${plan.songsSame + plan.setlistsSame} are already the same.
+          ${
+            plan.songsOnlyHere + plan.setlistsOnlyHere > 0
+              ? html`${plan.songsOnlyHere} charts and ${plan.setlistsOnlyHere} setlists that are here
+                  and not in the file are kept: nothing is deleted.`
+              : nothing
+          }
+          They keep their place in Drive, so sync sends the changes as edits to the same files.
+        </p>
+        ${
+          newer.length > 0
+            ? html`<p class="message error" role="alert">
+                ${newer.length} changed here after the file was made, and the file's version will
+                replace it: ${newer
+                  .slice(0, 8)
+                  .map(item => item.label)
+                  .join(', ')}${newer.length > 8 ? `, and ${newer.length - 8} more` : ''}.
+              </p>`
+            : nothing
+        }
+        <div class="row">
+          <div>
+            <button class="btn" id="reset-backup" ?disabled=${this._busy} @click=${() => this._download()}>
+              📦 Export this space first, as a backup
+            </button>
+          </div>
+          <div>
+            <button
+              class="btn primary"
+              id="reset-confirm"
+              ?disabled=${this._busy || replaced + added === 0}
+              @click=${() => this._doReset()}
+            >
+              ${this._busy ? 'Resetting…' : replaced + added === 0 ? 'Nothing to change' : 'Reset'}
+            </button>
+            <button class="btn" id="reset-cancel" ?disabled=${this._busy} @click=${() => {
+              this._reset = null
+            }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      </fieldset>
+    `
+  }
+
   _renderPending(pending: PendingImport) {
     const { manifest } = pending.exported
     const { songs, setlists, padSets } = manifest.counts
@@ -232,7 +338,8 @@ export class SpaceExportPanel extends LitElement {
         <p class="meta">
           Exported from ${manifest.space}, ${when}: ${songs} charts, ${setlists} setlists${
             padSets > 0 ? html`, ${padSets} pad sets` : nothing
-          }. Nothing is deleted: only what is missing is added.
+          }. Import adds only what is missing and deletes nothing; “Reset from this export” also replaces
+          the charts and setlists here that differ from the file's.
         </p>
         <div class="row">
           ${
@@ -255,10 +362,14 @@ export class SpaceExportPanel extends LitElement {
           }
           <div>
             <button class="btn primary" id="import" ?disabled=${this._busy} @click=${() => this._import()}>
-              ${this._busy ? 'Importing…' : 'Import'}
+              ${this._busy && !this._reset ? 'Importing…' : 'Import'}
+            </button>
+            <button class="btn" id="reset-start" ?disabled=${this._busy} @click=${() => this._planReset()}>
+              Reset from this export…
             </button>
             <button class="btn" id="import-cancel" ?disabled=${this._busy} @click=${() => {
               this._pending = null
+              this._reset = null
             }}>
               Cancel
             </button>
@@ -296,6 +407,7 @@ export class SpaceExportPanel extends LitElement {
           <input type="file" accept=".zip,application/zip" @change=${(event: Event) => this._fileChosen(event)} />
         </div>
         ${this._pending ? this._renderPending(this._pending) : nothing}
+        ${this._pending && this._reset ? this._renderReset(this._reset) : nothing}
         ${
           this._message
             ? html`<p

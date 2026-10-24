@@ -7,7 +7,7 @@ import {
 import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
 import { uploadPadSet } from '../src/js/pad-set-service.ts'
-import { addChart } from '../src/js/song-utils.ts'
+import { addChart, hashText } from '../src/js/song-utils.ts'
 import {
   createSpace,
   deleteSpace,
@@ -171,6 +171,163 @@ describe('the export panel', () => {
     button(el, 'import').click()
     await waitUntil(() => text(el).includes('0 charts and 0 setlists added'), 'the second import')
     expect(text(el)).to.contain('1 charts and 1 setlists were already there')
+  })
+
+  describe('reset from an export', () => {
+    const FIXED = '{title: Alpha}\n{key: G}\n[G]Alpha fixed line'
+
+    /** The space holds Alpha as it was; the file is its export with Alpha repaired */
+    async function repairedFile() {
+      const el = await mount()
+      await choose(el, await exportOf('Elsewhere'))
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      button(el, 'import').click()
+      await waitUntil(() => text(el).includes('Imported into Export'), 'the import')
+      const db = await getCurrentDB()
+      const song = must((await db.getAllSongs())[0])
+      const chart = (content: string) =>
+        db.saveChordPro({ id: song.chordproFileId, content, contentHash: hashText(content) })
+      await chart(FIXED)
+      const file = new File([await createExport(db, 'Repaired')], 'repaired.zip')
+      await chart(ALPHA)
+      return { el, db, song, file }
+    }
+
+    it('shows what a reset would change, then replaces the charts that differ and keeps the rest', async () => {
+      const { el, db, song, file } = await repairedFile()
+      let imported = 0
+      el.addEventListener(SpaceImportedEvent.type, () => imported++)
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+      expect(text(el)).to.contain('1 charts and 0 setlists here will be replaced')
+      expect(text(el)).to.contain('1 are already the same')
+      expect(must(await db.getChordPro(song.chordproFileId)).content, 'not yet').to.equal(ALPHA)
+
+      button(el, 'reset-confirm').click()
+      await waitUntil(() => text(el).includes('from the export:'), 'the reset')
+      expect(text(el)).to.contain('1 charts and 0 setlists replaced')
+      expect(must(await db.getChordPro(song.chordproFileId)).content).to.equal(FIXED)
+      expect(must(await db.getSong(song.uuid)).chordproFileId).to.equal(song.chordproFileId)
+      expect(imported).to.equal(1)
+      expect(text(el)).to.not.contain('to this export')
+    })
+
+    it('offers a backup of the space first, and can be cancelled without changing anything', async () => {
+      const { el, db, song, file } = await repairedFile()
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+
+      button(el, 'reset-backup').click()
+      await waitUntil(() => downloads.length === 1, 'the backup')
+
+      button(el, 'reset-cancel').click()
+      await el.updateComplete
+      expect(text(el)).to.not.contain('Reset Export')
+      expect(must(await db.getChordPro(song.chordproFileId)).content).to.equal(ALPHA)
+    })
+
+    it('does nothing when asked to plan or reset with no export chosen', async () => {
+      const el = await mount()
+      await el._planReset()
+      await el._doReset()
+      expect(text(el)).to.not.contain('Reset')
+    })
+
+    it('says what it keeps, and which changes made here after the file it would undo', async () => {
+      const { el, db, song, file } = await repairedFile()
+      // (a chart only here, and Alpha changed here since the file was made)
+      await addChart(db, '{title: Gamma}\n[A]Gamma line', ADD)
+      await db.saveSong({ ...song, modifiedDate: '2999-01-01T00:00:00.000Z' })
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+      expect(text(el)).to.contain(
+        '1 charts and 0 setlists that are here and not in the file are kept'
+      )
+      expect(text(el)).to.contain('1 changed here after the file was made')
+      expect(text(el)).to.contain('replace it: Alpha.')
+
+      button(el, 'reset-confirm').click()
+      await waitUntil(() => text(el).includes('from the export:'), 'the reset')
+      expect(text(el)).to.contain('1 charts and 0 setlists that are not in the file were kept')
+    })
+
+    it('names the first eight of many changes made here, and counts the rest', async () => {
+      const { el, file } = await repairedFile()
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      const item = (n: number) => ({ id: `s${n}`, label: `Song ${n}`, newerHere: true })
+      el._reset = {
+        songsReplaced: Array.from({ length: 10 }, (_, n) => item(n)),
+        songsAdded: [],
+        songsSame: 0,
+        songsOnlyHere: 0,
+        setlistsReplaced: [],
+        setlistsAdded: [],
+        setlistsSame: 0,
+        setlistsOnlyHere: 0,
+      }
+      await el.updateComplete
+      expect(text(el)).to.contain('10 changed here after the file was made')
+      expect(text(el)).to.contain('Song 7, and 2 more.')
+    })
+
+    it('says why the space could not be checked, and changes nothing', async () => {
+      const { el, file } = await repairedFile()
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      const real = ChordlessDB.prototype.getAllSongs
+      ChordlessDB.prototype.getAllSongs = async () => {
+        throw new Error('database closed')
+      }
+      try {
+        button(el, 'reset-start').click()
+        await waitUntil(
+          () => text(el).includes('Could not check the space: database closed'),
+          'the failure'
+        )
+      } finally {
+        ChordlessDB.prototype.getAllSongs = real
+      }
+      expect(text(el)).to.not.contain('to this export')
+    })
+
+    it('has nothing to do for a file that is what the space holds', async () => {
+      const { el, db, file } = await repairedFile()
+      await choose(el, new File([await createExport(db, 'Same')], 'same.zip'))
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+      expect(button(el, 'reset-confirm').disabled).to.equal(true)
+      expect(text(el)).to.contain('Nothing to change')
+      expect(file.size).to.be.greaterThan(0)
+    })
+
+    it('says why a reset could not be made, and changes nothing', async () => {
+      const { el, db, song, file } = await repairedFile()
+      await choose(el, file)
+      await waitUntil(() => text(el).includes('Import this export'), 'the question')
+      button(el, 'reset-start').click()
+      await waitUntil(() => text(el).includes('to this export'), 'the plan')
+      const real = ChordlessDB.prototype.saveChordPro
+      ChordlessDB.prototype.saveChordPro = async () => {
+        throw new Error('disk full')
+      }
+      try {
+        button(el, 'reset-confirm').click()
+        await waitUntil(() => text(el).includes('Resetting failed: disk full'), 'the failure')
+      } finally {
+        ChordlessDB.prototype.saveChordPro = real
+      }
+      expect(must(await db.getChordPro(song.chordproFileId)).content).to.equal(ALPHA)
+    })
   })
 
   it('exports and imports for the space it is given, not the one in use', async () => {

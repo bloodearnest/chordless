@@ -616,6 +616,20 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
   no "import into a new space", as an import only adds, so merging cannot harm the space, and keeping
   libraries apart is what team spaces are for. An imported setlist is local until the space syncs,
   like any other.
+- **Reset from this export (built 2026-10-24, `space-restore.ts`)** is the other half: where an import
+  only adds, a reset also *replaces* the charts and setlists here that differ from the file's, so a
+  library can be repaired once, off to the side (edit the export, or take it from another space), and
+  then taken by a space. Matching is by identity, a chart's uuid and a setlist's id, so the capo and
+  sections kept on a device for a song stay with it, and a setlist's entries still find their songs.
+  A record the file changes keeps its link to its file in Drive, so the next sync sends the change as
+  an ordinary edit of the same file (no second file, no "start over"), and other devices take it like
+  any edit. A record only in the file is added with its uuid. A record only here is **kept**, and
+  counted: nothing is deleted, as deleting a file in Drive is a separate decision (and a setlist in
+  Drive cannot be deleted yet). Before it does anything it shows the plan (what is replaced, added and
+  the same, and which charts were changed here *after* the file was made, which the reset undoes),
+  offers an export of the space as a backup, and asks. A setlist deleted here that the file has comes
+  back. Limit: a space with two default variants of a song (one only here, one from the file) is not
+  tidied. Chart text is compared, not the stored hash, which old records may not have right.
 - **Importing pads** uploads them to Drive and is a separate tick; a pad set with the same name there
   is replaced.
 - **Refused with a reason:** not a zip, no manifest, another kind of file, an export from a newer
