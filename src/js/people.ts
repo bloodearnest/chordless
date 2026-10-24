@@ -7,7 +7,7 @@
  */
 
 import type { Person } from './data-types.ts'
-import type { ChordlessDB } from './db.ts'
+import { type ChordlessDB, NO_CHANGE } from './db.ts'
 import { getCurrentUserInfo } from './google-auth.ts'
 import { getCurrentSpaceFull } from './space.ts'
 
@@ -55,13 +55,14 @@ export async function claimSetlistsWithoutOwnerId(
     if (setlist.ownerId) continue
     const owner = setlist.owner?.trim() || ''
     if (owner && owner.toLowerCase() !== me.name.toLowerCase()) continue
-    await db.saveSetlist({
-      ...setlist,
-      owner: me.name,
-      ownerId: me.id,
-      modifiedDate: new Date().toISOString(),
+    const saved = await db.updateSetlist(setlist.id, stored => {
+      // (as it is stored now: another writer may have given it a leader since it was read)
+      if (stored.ownerId) return NO_CHANGE
+      stored.owner = me.name
+      stored.ownerId = me.id
+      stored.modifiedDate = new Date().toISOString()
     })
-    claimed++
+    if (saved) claimed++
   }
   return claimed
 }

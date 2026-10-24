@@ -790,20 +790,20 @@ export class SongImport extends LitElement {
   async _addToSetlist(setlistId: string): Promise<void> {
     try {
       const db = this._database()
-      const setlist = await db.getSetlist(setlistId)
-      if (!setlist) throw new Error('Setlist not found')
-      for (const { song, key } of this._imports) {
-        setlist.songs.push({
-          order: setlist.songs.length,
-          songId: song.id,
-          songUuid: song.uuid,
-          key: key ?? null,
-          tempo: null,
-          notes: '',
-        })
-      }
-      setlist.modifiedDate = new Date().toISOString()
-      await db.saveSetlist(setlist)
+      const saved = await db.updateSetlist(setlistId, setlist => {
+        for (const { song, key } of this._imports) {
+          setlist.songs.push({
+            order: setlist.songs.length,
+            songId: song.id,
+            songUuid: song.uuid,
+            key: key ?? null,
+            tempo: null,
+            notes: '',
+          })
+        }
+        setlist.modifiedDate = new Date().toISOString()
+      })
+      if (!saved) throw new Error('Setlist not found')
       await this._finish(`/setlist/${setlistId}`)
     } catch (error) {
       console.error('[Import] Error:', error)
@@ -846,6 +846,7 @@ export class SongImport extends LitElement {
       createdBy: (await getCurrentPerson())?.id,
     })
     try {
+      // biome-ignore lint/plugin: a new setlist, with no stored one to write over
       await this._database().saveSetlist(setlist)
     } catch (error) {
       console.error('[Import] Error creating setlist:', error)

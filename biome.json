@@ -187,6 +187,17 @@
     {
       "path": "lint/no-page-navigation.grit",
       "includes": ["**/src/components/**", "**/src/js/**"]
+    },
+    {
+      "path": "lint/no-whole-record-save.grit",
+      "includes": [
+        "**/src/components/**",
+        "**/src/js/views/**",
+        "**/src/js/models/**",
+        "**/src/js/setlist-page.ts",
+        "**/src/js/people.ts",
+        "**/src/js/share-manager.ts"
+      ]
     }
   ]
 }

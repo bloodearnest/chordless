@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { DataChangeEvent, type DataOrigin } from '../src/js/data-changes.ts'
-import { ChordlessDB, openSpace } from '../src/js/db.ts'
+import { ChordlessDB, NO_CHANGE, openSpace } from '../src/js/db.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import { makeSetlist, makeSong } from './builders.ts'
 import { must } from './must.ts'
@@ -259,13 +259,24 @@ describe('Changing a record as it is stored', () => {
     const told = await announced(async () => {
       const stored = await db.updateSetlist('kept', setlist => {
         setlist.name = 'Not saved'
-        return false
+        return NO_CHANGE
       })
       expect(stored).to.equal(undefined)
       expect(await db.updateSetlist('nothing', () => undefined)).to.equal(undefined)
     })
     expect((await db.getSetlist('kept'))?.name).to.equal('Kept')
     expect(told).to.deep.equal([])
+  })
+
+  it('changes the setlist whatever the change returns, unless it returns NO_CHANGE', async () => {
+    await open()
+    await db.saveSetlist(makeSetlist({ id: 'returns', name: 'Before' }))
+    // (an expression that happens to be false must not be taken for "leave it")
+    await db.updateSetlist('returns', setlist => {
+      setlist.name = 'After'
+      return false
+    })
+    expect((await db.getSetlist('returns'))?.name).to.equal('After')
   })
 
   it('changes a song the same way, and saves its tempo as a number', async () => {
@@ -282,7 +293,7 @@ describe('Changing a record as it is stored', () => {
         song.tempo = '96' as never
       })
       expect(stored).to.include({ title: 'Retitled', fileRef: 'file-4', tempo: 96 })
-      expect(await db.updateSong('song-u', () => false)).to.equal(undefined)
+      expect(await db.updateSong('song-u', () => NO_CHANGE)).to.equal(undefined)
       expect(await db.updateSong('nothing', () => undefined)).to.equal(undefined)
     })
     expect(told).to.deep.equal(['song:song-u'])

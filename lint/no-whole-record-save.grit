@@ -1,0 +1,14 @@
+language js
+
+// What a page shows is a copy of a stored record; saving the copy back writes over whatever was
+// stored since it was loaded (a sync's link to the file, a pull). A page changes the stored record
+// instead: db.updateSetlist / db.updateSong (docs/STATE.md). A record that is new has no stored
+// version to write over: say so with a biome-ignore.
+or {
+  `$db.saveSetlist($...)` where {
+    register_diagnostic(span=$db, message="Do not save a copy of a setlist: change the stored one with db.updateSetlist (docs/STATE.md)", severity="error")
+  },
+  `$db.saveSong($...)` where {
+    register_diagnostic(span=$db, message="Do not save a copy of a song: change the stored one with db.updateSong (docs/STATE.md)", severity="error")
+  }
+}

@@ -149,6 +149,7 @@ export class HomeView extends PageView {
         ...event.details,
         createdBy: (await getCurrentPerson())?.id,
       })
+      // biome-ignore lint/plugin: a new setlist, with no stored one to write over
       await (await getCurrentDB()).saveSetlist(newSetlist)
       this.#modal.value?.close()
       await goTo(`/setlist/${newSetlist.id}`)

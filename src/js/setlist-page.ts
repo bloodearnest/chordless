@@ -38,7 +38,7 @@ import {
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
-import { type ChordlessDB, getCurrentDB } from './db.ts'
+import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
 import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
 import { goTo, setPageTitle } from './navigation.ts'
@@ -948,15 +948,15 @@ export class SetlistPage {
   /**
    * Change the setlist as it is stored now, and stamp it as modified. The page never saves its own
    * copy back (that would undo what a sync saved since it was loaded: docs/STATE.md); it takes the
-   * stored setlist, once changed, as its copy. `change` may say false (the stored setlist is not as
+   * stored setlist, once changed, as its copy. `change` may return NO_CHANGE (the stored setlist is not as
    * this page showed it) to change nothing.
    * @returns the setlist as stored, or undefined if it is gone or `change` said false
    */
-  async editSetlist(change: (setlist: Setlist) => void | false): Promise<Setlist | undefined> {
+  async editSetlist(change: (setlist: Setlist) => unknown): Promise<Setlist | undefined> {
     const id = this.currentSetlistId
     if (!id) return undefined
     const stored = await this._database().updateSetlist(id, draft => {
-      if (change(draft) === false) return false
+      if (change(draft) === NO_CHANGE) return NO_CHANGE
       draft.modifiedDate = new Date().toISOString()
     })
     if (stored && !this._disposed) this.currentSetlist = stored
@@ -1568,7 +1568,7 @@ export class SetlistPage {
 
     // Reorder songs in the setlist, as it is stored
     const saved = await this.editSetlist(stored => {
-      if (!sameEntry(stored.songs[startIndex], moving)) return false
+      if (!sameEntry(stored.songs[startIndex], moving)) return NO_CHANGE
       stored.songs.splice(newIndex, 0, ...stored.songs.splice(startIndex, 1))
       stored.songs.forEach((song, index) => {
         song.order = index
@@ -1978,7 +1978,7 @@ export class SetlistPage {
     if (!shown) return
     await this.editSetlist(stored => {
       const entry = stored.songs[index]
-      if (!entry || !sameEntry(entry, shown)) return false
+      if (!entry || !sameEntry(entry, shown)) return NO_CHANGE
       change(entry)
     })
     if (this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
@@ -1995,7 +1995,7 @@ export class SetlistPage {
 
       // Remove the song from the setlist as it is stored
       const saved = await this.editSetlist(stored => {
-        if (!sameEntry(stored.songs[index], shown)) return false
+        if (!sameEntry(stored.songs[index], shown)) return NO_CHANGE
         stored.songs.splice(index, 1)
         stored.songs.forEach((entry, i) => {
           entry.order = i

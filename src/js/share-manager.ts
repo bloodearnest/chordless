@@ -139,12 +139,17 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
     try {
       if (isExpired(share.expires, today)) {
         await stopShare(share, ctx.space)
-        await ctx.db.saveSetlist({ ...setlist, share: null })
+        // (the setlist as it is stored now: ending the share took a while)
+        await ctx.db.updateSetlist(setlist.id, stored => {
+          stored.share = null
+        })
         changed++
       } else {
         const refreshed = await refreshShare({ ...setlist, share }, ctx)
         if (refreshed !== share) {
-          await ctx.db.saveSetlist({ ...setlist, share: refreshed })
+          await ctx.db.updateSetlist(setlist.id, stored => {
+            stored.share = refreshed
+          })
           changed++
         }
       }

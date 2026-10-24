@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { ChordlessDB } from '../src/js/db.ts'
+import { ChordlessDB, NO_CHANGE } from '../src/js/db.ts'
 import {
   claimSetlistsOnce,
   claimSetlistsWithoutOwnerId,
@@ -74,6 +74,22 @@ describe('claimSetlistsWithoutOwnerId', () => {
     expect(await get('someone-else')).to.include({ owner: 'Ann Smith' })
     expect((await get('someone-else')).ownerId).to.equal(undefined)
     expect(await get('already-has-id')).to.include({ ownerId: 'ann@example.com' })
+  })
+
+  it('leaves a setlist that was given a leader after it was read', async () => {
+    await save('led-meanwhile', { owner: '' })
+    const read = db.getAllSetlists.bind(db)
+    db.getAllSetlists = async () => {
+      const setlists = await read()
+      // (another writer gives it a leader before the claim is made)
+      await db.updateSetlist('led-meanwhile', stored => {
+        stored.ownerId = 'ann@example.com'
+      })
+      return setlists.map(setlist => ({ ...setlist, ownerId: undefined }))
+    }
+
+    expect(await claimSetlistsWithoutOwnerId(db, me)).to.equal(0)
+    expect(await db.getSetlist('led-meanwhile')).to.include({ ownerId: 'ann@example.com' })
   })
 
   it('does nothing without a signed-in person', async () => {
@@ -163,7 +179,12 @@ describe('the signed-in person and the space’s people', () => {
         saved,
         db: {
           getAllSetlists: async () => setlists,
-          saveSetlist: async (setlist: object) => saved.push(setlist),
+          updateSetlist: async (id: string, change: (setlist: object) => unknown) => {
+            const stored = setlists.find(setlist => (setlist as { id: string }).id === id)
+            if (!stored || change(stored) === NO_CHANGE) return undefined
+            saved.push(stored)
+            return stored
+          },
         } as unknown as ChordlessDB,
       }
     }

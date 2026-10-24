@@ -242,7 +242,10 @@ export class SetlistShare extends LitElement {
         space: manager.space, // (init found or made its folder)
       })
       setlist.share = share
-      await db.saveSetlist(setlist)
+      // (on the setlist as it is stored now: making the share took a while)
+      await db.updateSetlist(setlist.id, stored => {
+        stored.share = share
+      })
       this.requestUpdate()
       this.dispatchEvent(new SetlistShareChangeEvent())
     })
@@ -260,7 +263,9 @@ export class SetlistShare extends LitElement {
       )
       if (share !== setlist.share) {
         setlist.share = share
-        await db.saveSetlist(setlist)
+        await db.updateSetlist(setlist.id, stored => {
+          stored.share = share
+        })
       }
       this.requestUpdate()
       this.dispatchEvent(new SetlistShareChangeEvent())
@@ -275,7 +280,9 @@ export class SetlistShare extends LitElement {
       const manager = await createSyncManager(name, id)
       await stopShare(setlist.share, manager.space)
       setlist.share = null
-      await db.saveSetlist(setlist)
+      await db.updateSetlist(setlist.id, stored => {
+        stored.share = null
+      })
       this.requestUpdate()
       this.dispatchEvent(new SetlistShareChangeEvent())
     })

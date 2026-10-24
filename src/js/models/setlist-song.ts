@@ -1,5 +1,5 @@
 import type { LoadedSong, ParsedChart, SetlistEntry } from '../data-types.ts'
-import type { ChordlessDB } from '../db.ts'
+import { type ChordlessDB, NO_CHANGE } from '../db.ts'
 import { loadSetlistLocalState, saveSetlistLocalState } from '../setlist/local-state.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { normalizeCapo } from '../utils/capo.ts'
@@ -163,7 +163,7 @@ export class SetlistSong extends SongModel {
           entry.songId !== this._songEntry.songId ||
           entry.songUuid !== this._songEntry.songUuid
         ) {
-          return false
+          return NO_CHANGE
         }
         if (key !== null) entry.key = key
         if (tempo !== null) entry.tempo = tempo

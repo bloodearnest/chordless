@@ -71,9 +71,20 @@ a view used to be stale.
    replaces `quiet`. Replaces `LocalChangeEvent`, `SetlistsPulledEvent` and the sync's
    `pulledSetlistIds`.
 2. **`watchData`** on the home list, the library and the add-song modal.
-3. **Mutations.** `updateSetlist`, `updateSong`, `recordSync`; the setlist page's eight save sites,
-   the other callers and the sync's push use them; saving a copy of a record is for import and
-   tests only (a lint rule says so).
+3. **Mutations (built).** `db.updateSetlist(id, change)` and `db.updateSong(uuid, change)` read,
+   change and write in one transaction (`change` returns `NO_CHANGE` to leave the record). The setlist
+   page's edits (`editSetlist`: details, add, remove, move, key, tempo, leaving edit mode), the
+   key and tempo of `SetlistSong` and `LibrarySong`, sharing, import into a setlist and the one-off
+   leader claim use them; the page takes the stored result as its copy, and an edit that names a
+   song at a place checks it is still that song there. Sync's own writer of the link and markers is
+   `saveSetlistsSent` / `saveSongsSent` (they write only those fields, on the record as stored). A
+   lint rule (`lint/no-whole-record-save.grit`) bans `saveSetlist` / `saveSong` in the components,
+   views, models, the setlist page, `people.ts` and `share-manager.ts`; a new record says so with a
+   `biome-ignore`. Left as they are: the library maintenance in `song-versions.ts`,
+   `library-repair.ts` and `song-utils.ts`, which read a record and write it straight back (no
+   network or user between), and import, samples, transfer and the sync's pull, which write records
+   that came from elsewhere. `saveSetlist` / `saveSong` also keep a stored link when a copy with
+   none is saved from a page's handle, as a net under what is not converted.
 4. **The setlist page** reads through the stored setlist and applies external changes of any origin
    (this tab's other views, another tab, a sync).
 5. **Device-local state** (capo, sections) on the bus.
