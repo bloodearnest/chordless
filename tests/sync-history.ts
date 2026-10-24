@@ -80,6 +80,8 @@ export interface World {
     options: { status: number; network: boolean; times: number; skip: number }
   ): void
   clearFailures(): void
+  /** Wait for the Drive to catch up with itself (a real one answers listings a little behind its writes) */
+  settle?(): Promise<void>
 }
 
 export interface HistoryOptions {
@@ -279,6 +281,7 @@ export async function runHistory(
   world.clearFailures()
   failuresQueued = false
   for (let round = 0; round < settleRounds; round++) {
+    await world.settle?.()
     for (const device of devs) await syncDevice(device, { quiet: true })
     await checkDriveHasNoDuplicates(`${label(steps)} (round ${round})`)
   }
@@ -286,6 +289,7 @@ export async function runHistory(
   if (mode === 'collisions') return
 
   // Every device has what Drive has
+  await world.settle?.()
   const inDrive = new Map(
     (await world.live()).map(f => [f.setlistId, songsOf(JSON.parse(f.content))])
   )

@@ -34,3 +34,7 @@ dist/
 # Real charts and emails for trying the importer locally (copyrighted: never commit)
 tests/fixtures/private/
 .stats/
+
+# The real-Drive suite: the test account's credentials and the access token it last minted
+.drive-test.env
+.drive-test/

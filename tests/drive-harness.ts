@@ -81,7 +81,7 @@ export async function editSong(device: { db: ChordlessDB }, uuid: string, conten
  * What the two sync rigs share: simulated devices (each with its own database) that sync one space
  * through a storage backend, and the helpers that edit their records the way the app does.
  */
-function makeRig(storage: () => StorageBackend | undefined) {
+export function makeRig(storage: () => StorageBackend | undefined) {
   const devices: any[] = []
 
   /** A simulated device: its own local database, syncing the shared space */

@@ -79,6 +79,17 @@ funnel:
 help-images:
     npx playwright test --config=playwright.help-images.config.ts
 
+# The real-Drive suite (docs/DRIVE_TESTS.md): random histories of several devices syncing through a
+# real Google Drive folder, to find what the in-memory fake cannot. Not part of `just test`. Needs
+# the test account's credentials in .drive-test.env. Which histories: DRIVE_SEEDS=1-5 DRIVE_STEPS=30
+# DRIVE_DEVICES=3 DRIVE_MODES=owner,concurrent just test-drive
+test-drive *args:
+    node --env-file-if-exists=.drive-test.env node_modules/.bin/web-test-runner --config web-test-runner.drive.config.js {{args}}
+
+# Get the refresh token for the real-Drive suite, signing in as the test account (docs/DRIVE_TESTS.md)
+drive-test-login:
+    node --env-file-if-exists=.drive-test.env scripts/drive-test-login.ts
+
 # Run browser tests with Playwright (headless), optionally with files/options: just test-browser-headless tests/live.playwright.ts --repeat-each=5
 test-browser-headless *args:
     @echo "Running browser tests with Playwright..."

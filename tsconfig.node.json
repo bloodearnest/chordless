@@ -16,6 +16,7 @@
     "*.config.*",
     "vite-plugins",
     "scripts/*.ts",
+    "tests/drive/node-side.*",
     "tests/*.node.test.*",
     "tests/*.playwright.*",
     "tests/fixtures.*",

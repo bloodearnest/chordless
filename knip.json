@@ -5,6 +5,7 @@
     "src/dev/*.js",
     "scripts/*.ts",
     "web-test-runner.config.js",
+    "web-test-runner.drive.config.js",
     "tests/**/*.{ts,js}"
   ],
   "project": ["src/**/*.{ts,js}", "worker/src/**/*.ts", "scripts/**/*.{ts,js}", "tests/**/*.ts"],

@@ -9,6 +9,11 @@
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.tests.tsbuildinfo"
   },
   // The browser unit tests (Web Test Runner)
-  "include": ["tests/*.test.*", "tests/fake-drive.*", "tests/test-helpers.*"],
-  "exclude": ["tests/*.node.test.*"]
+  "include": [
+    "tests/*.test.*",
+    "tests/drive/*.drive.test.*",
+    "tests/fake-drive.*",
+    "tests/test-helpers.*"
+  ],
+  "exclude": ["tests/*.node.test.*", "tests/drive/node-side.*"]
 }

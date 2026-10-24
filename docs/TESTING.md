@@ -11,6 +11,10 @@ Run it before committing.
 
 New test files are picked up by their name; there's no list to add them to.
 
+A fourth suite, **`just test-drive`**, runs random histories of several devices syncing through a
+real Google Drive. It is not part of `just test` (it needs a test account and calls Google):
+`docs/DRIVE_TESTS.md`.
+
 `just test` ends with `just stats`, which records each suite's test count, failures, run time and
 coverage (lines, branches, functions; the end-to-end suite has none, and the node suite's is of
 `worker/src` only, with the files it cannot see, such as `worker/src/index.ts` which runs under
