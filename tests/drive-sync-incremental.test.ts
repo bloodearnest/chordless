@@ -304,6 +304,27 @@ describe('Drive sync: from the feed of changes', () => {
     expect(phone.changeToken.value).to.equal(place)
   })
 
+  it('keeps an edit saved while its setlist was being sent, and sends that edit next time', async () => {
+    const { phone } = await twoDevices()
+    const setlist = await addSetlist(phone, { name: 'Before' })
+    // (saved just as the file is written: the copy the sync holds is the old one)
+    const record = phone.db.saveSetlistsSent.bind(phone.db)
+    phone.db.saveSetlistsSent = async sent => {
+      phone.db.saveSetlistsSent = record
+      const edited = must(await phone.db.getSetlist(setlist.id))
+      await phone.db.saveSetlist({ ...edited, name: 'During' })
+      return record(sent)
+    }
+
+    await phone.sync.incrementalSync()
+
+    const stored = must(await phone.db.getSetlist(setlist.id))
+    expect(stored.name).to.equal('During')
+    expect(stored.fileRef).to.be.a('string')
+    await phone.sync.incrementalSync()
+    expect(rig.driveSetlist(setlist.id).name).to.equal('During')
+  })
+
   it('names a setlist it sent among those pulled, so a page holding an old copy takes the link to its file', async () => {
     const { phone } = await twoDevices()
     const setlist = await addSetlist(phone, { name: 'New' })

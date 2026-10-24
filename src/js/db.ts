@@ -244,6 +244,28 @@ export class ChordlessDB {
   }
 
   /**
+   * Record that setlists were sent to Drive: what each keeps of its file is put on the setlist
+   * as it is stored now, not on the copy that was sent, so that an edit saved while it was being
+   * sent is not undone. (It is then a change the next sync sends: the content it was synced
+   * with is the content that was sent.) A setlist deleted meanwhile is not put back.
+   */
+  async saveSetlistsSent(sent: Setlist[]): Promise<void> {
+    if (sent.length === 0) return
+    const tx = this.#transaction(['setlists'], 'readwrite')
+    const store = tx.objectStore('setlists')
+    for (const setlist of sent) {
+      const current = (await requestResult(store.get(setlist.id))) as Setlist | undefined
+      if (!current) continue
+      const updated = { ...current }
+      for (const field of SYNC_LINK_FIELDS) {
+        if (setlist[field] !== undefined) updated[field] = setlist[field]
+      }
+      store.put(cloneForStorage(updated))
+    }
+    return transactionDone(tx)
+  }
+
+  /**
    * Batch save multiple setlists in one transaction (faster)
    */
   async saveSetlistsBatch(setlists: Setlist[]): Promise<void> {

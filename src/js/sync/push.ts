@@ -258,7 +258,7 @@ export async function pushSetlists(
       recordSetlistUpload(setlist, result)
       saved.push(setlist)
     })
-    if (saved.length > 0) await session.db.saveSetlistsBatch(saved)
+    if (saved.length > 0) await session.db.saveSetlistsSent(saved)
     for (const setlist of saved) session.pulledSetlistIds.add(setlist.id)
     return saved.length
   }
@@ -310,7 +310,7 @@ export async function pushSetlist(session: SyncSession, setlist: Setlist): Promi
         await session.space.update(setlist.fileRef, updateInput(metadata, 'setlist'), content)
       : await session.space.create('setlists', fileInput(metadata), content)
     recordSetlistUpload(setlist, result)
-    await session.db.saveSetlist(setlist)
+    await session.db.saveSetlistsSent([setlist])
     // (a page showing it holds a copy that has no link to the file yet, or an old one)
     session.pulledSetlistIds.add(setlist.id)
   } catch (error) {

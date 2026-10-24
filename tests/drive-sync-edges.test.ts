@@ -513,13 +513,13 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       await addSetlist(phone, { id: 'a', name: 'A' })
       await addSetlist(phone, { id: 'b', name: 'B' })
-      phone.db.saveSetlistsBatch = async () => {
-        throw new Error('disk full')
-      }
-      const real = phone.db.saveSetlist.bind(phone.db)
-      phone.db.saveSetlist = async setlist => {
-        if (setlist.id === 'b' && setlist.fileRef) throw new Error('still full')
-        return real(setlist)
+      const real = phone.db.saveSetlistsSent.bind(phone.db)
+      phone.db.saveSetlistsSent = async sent => {
+        // (the batch cannot be saved, nor can b alone)
+        if (sent.length > 1 || sent.some(setlist => setlist.id === 'b')) {
+          throw new Error('disk full')
+        }
+        return real(sent)
       }
       await syncDevice(phone)
       expect(rig.driveSetlistFiles().length).to.be.greaterThan(0)
