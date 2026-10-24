@@ -46,17 +46,20 @@ Use a throwaway Google account, **not your own**: the suite makes, edits and tra
 Everything it makes is in folders named `chordless-drive-test …` under the account's `Chordless`
 folder, and it only ever touches folders it made (`drive.file` could not see others).
 
-1. In the Google Cloud project, make an OAuth client of type **Desktop app** just for the tests.
+1. Use the app's own OAuth client (simplest: the files the suite makes are then the app's to see
+   too), or make an OAuth client of type **Desktop app** just for the tests.
    (Under `drive.file` an app sees only the files it made itself, so the client that makes the
-   files must be the client that reads them: a separate client keeps the suite apart from the
-   app's own, and needs no change to its redirect addresses.) If the consent screen is in testing,
+   files must be the client that reads them. A separate client keeps the suite apart from the
+   app's own and needs no change to its redirect addresses.) If the consent screen is in testing,
    add the test account as a test user.
-2. Put its id and secret in `.drive-test.env` (git ignores it):
-
-       DRIVE_TEST_CLIENT_ID=…
-       DRIVE_TEST_CLIENT_SECRET=…
-
-3. `just drive-test-login`, and open the address it prints, signed in as the test account. It writes
+2. `just drive-test-login` takes the client's id and secret from `.drive-test.env` (`DRIVE_TEST_CLIENT_ID`,
+   `DRIVE_TEST_CLIENT_SECRET`), or else from the app's own `.dev.vars` (`GOOGLE_CLIENT_ID`,
+   `GOOGLE_CLIENT_SECRET`), or else asks for them (the secret is not shown as you type), and
+   keeps them in `.drive-test.env`. It listens on `http://127.0.0.1:8976` (`DRIVE_TEST_LOGIN_PORT`
+   changes it): a Desktop-app client takes that without setup; the app's web client needs
+   `http://127.0.0.1:8976` added to its authorized redirect URIs.
+3. It opens Google's sign-in, pre-filled with `DRIVE_TEST_ACCOUNT` (default `chordless.test.user@gmail.com`);
+   sign in as the test account. It writes
    `DRIVE_TEST_REFRESH_TOKEN` into `.drive-test.env` (readable by you only) and prints nothing secret.
 
 The refresh token is the long-term secret. Each run mints an access token from it, or reuses the

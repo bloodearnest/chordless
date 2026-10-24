@@ -11,6 +11,7 @@ import {
   credentialsFromEnv,
   mintAccessToken,
   parseSeeds,
+  readDevVars,
   settingsFromEnv,
   withEnvVariable,
 } from './drive/node-side.ts'
@@ -177,5 +178,14 @@ test('a variable is added to an env file, or replaces the one in it', () => {
       'new$&'
     ),
     'A=1\nDRIVE_TEST_REFRESH_TOKEN=new$&\nB=2\n'
+  )
+})
+
+test('a .dev.vars file is read as KEY=value lines, with quotes and comments set aside', () => {
+  assert.deepEqual(
+    readDevVars(
+      '# the app\nGOOGLE_CLIENT_ID=abc\n  GOOGLE_CLIENT_SECRET = "s e"\nnot a line\nX=\n'
+    ),
+    { GOOGLE_CLIENT_ID: 'abc', GOOGLE_CLIENT_SECRET: 's e', X: '' }
   )
 })
