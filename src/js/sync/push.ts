@@ -377,7 +377,7 @@ export async function pushSongs(
       recordSongUpload(song, chordproFile, result)
       saved.push(song)
     })
-    if (saved.length > 0) await session.db.saveSongsBatch(saved)
+    if (saved.length > 0) await session.db.saveSongsSent(saved)
     return saved.length
   }
   const uploadOne = ({ song, chordproFile }: SongUpload) =>
@@ -434,7 +434,7 @@ export async function pushSongVariant(
         )
       : await session.space.create('songs', fileInput(metadata), chordproFile.content)
     recordSongUpload(song, chordproFile, result)
-    await session.db.saveSong(song)
+    await session.db.saveSongsSent([song])
   } catch (error) {
     console.error(`[DriveSync] Failed to push song ${song.id}/${songUuidOf(song)}:`, error)
     throw error

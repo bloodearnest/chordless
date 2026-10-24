@@ -134,3 +134,33 @@ describe('Saving a setlist whose copy was made before it was sent', () => {
     expect(saved?.fileRef).to.equal(undefined)
   })
 })
+
+describe('Saving a song whose copy was made before it was sent', () => {
+  it('keeps the link to its file', async () => {
+    const db = new ChordlessDB(uniqueName())
+    await db.init()
+    try {
+      await db.saveSong(makeSong({ uuid: 'late-song', id: 'late-song' }))
+      const sync = new ChordlessDB(db.dbName)
+      await sync.init()
+      sync.quiet = true
+      await sync.saveSong({
+        ...makeSong({ uuid: 'late-song', id: 'late-song' }),
+        fileRef: 'file-9',
+        fileRev: 'rev-9',
+        lastSyncedAt: '2026-10-24T08:43:32.000Z',
+      })
+      sync.db?.close()
+
+      await db.saveSong(makeSong({ uuid: 'late-song', id: 'late-song', title: 'Renamed' }))
+
+      const saved = await db.getSong('late-song')
+      expect(saved?.title).to.equal('Renamed')
+      expect(saved?.fileRef).to.equal('file-9')
+      expect(saved?.fileRev).to.equal('rev-9')
+    } finally {
+      db.db?.close()
+      await deleteDatabase(db.dbName)
+    }
+  })
+})

@@ -468,9 +468,9 @@ describe('Drive sync: the less common turns', () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       await addSong(phone, { uuid: 'song-2', title: 'Two', content: '{title: Two}\n[G]Two' })
-      const real = phone.db.saveSongsBatch.bind(phone.db)
+      const real = phone.db.saveSongsSent.bind(phone.db)
       let failed = false
-      phone.db.saveSongsBatch = async songs => {
+      phone.db.saveSongsSent = async songs => {
         if (!failed) {
           failed = true
           throw new Error('disk full')
@@ -484,13 +484,8 @@ describe('Drive sync: the less common turns', () => {
     it('are left for the next sync when they cannot be uploaded one by one either', async () => {
       const phone = await makeDevice('phone')
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
-      phone.db.saveSongsBatch = async () => {
+      phone.db.saveSongsSent = async () => {
         throw new Error('disk full')
-      }
-      const real = phone.db.saveSong.bind(phone.db)
-      phone.db.saveSong = async song => {
-        if (song.fileRef) throw new Error('still full')
-        return real(song)
       }
       await syncDevice(phone)
     })

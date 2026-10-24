@@ -325,6 +325,33 @@ describe('Drive sync: from the feed of changes', () => {
     expect(rig.driveSetlist(setlist.id).name).to.equal('During')
   })
 
+  it('keeps a song edited while it was being sent as changed, and sends it next time', async () => {
+    const { phone } = await twoDevices()
+    await addSong(phone, {
+      uuid: 'song-1',
+      title: 'One',
+      content: '{title: One}\n[G]One',
+    })
+    const record = phone.db.saveSongsSent.bind(phone.db)
+    phone.db.saveSongsSent = async sent => {
+      phone.db.saveSongsSent = record
+      const edited = must(await phone.db.getSong('song-1'))
+      await phone.db.saveSong({
+        ...edited,
+        metadataChangedAt: new Date(Date.now() + 1000).toISOString(),
+      })
+      return record(sent)
+    }
+
+    await phone.sync.incrementalSync()
+
+    const stored = must(await phone.db.getSong('song-1'))
+    expect(stored.fileRef).to.be.a('string')
+    expect(
+      stored.metadataChangedAt && stored.metadataChangedAt > (stored.lastSyncedAt ?? '')
+    ).to.equal(true)
+  })
+
   it('names a setlist it sent among those pulled, so a page holding an old copy takes the link to its file', async () => {
     const { phone } = await twoDevices()
     const setlist = await addSetlist(phone, { name: 'New' })

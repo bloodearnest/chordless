@@ -106,6 +106,17 @@ const SYNC_LINK_FIELDS = [
   '_lastSyncHash',
 ] as const
 
+/** What a song keeps of its file in Drive, and of what was last sent */
+const SONG_LINK_FIELDS = [
+  'fileRef',
+  'fileModified',
+  'fileRev',
+  'fileProps',
+  'syncedMetadata',
+  'lastSyncedAt',
+  'syncedContentHash',
+] as const
+
 export class ChordlessDB {
   dbName: string
   spaceId: string
@@ -326,10 +337,43 @@ export class ChordlessDB {
     const tx = this.#transaction(['songs'], 'readwrite')
     const store = tx.objectStore('songs')
     const stored = withNumericSongTempos(song)
+    // (as saveSetlist: a copy made before a sync sent the song must not drop the link to its file)
+    if (!this.quiet && !stored.fileRef) {
+      const current = (await requestResult(store.get(stored.uuid))) as SongRecord | undefined
+      if (current?.fileRef) {
+        for (const field of SONG_LINK_FIELDS) {
+          if (current[field] !== undefined) Object.assign(stored, { [field]: current[field] })
+        }
+      }
+    }
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed()
     return result
+  }
+
+  /**
+   * Record that songs were sent to Drive (see saveSetlistsSent): what each keeps of its file goes
+   * on the song as stored now. A song whose details were changed while it was sent is not marked
+   * as synced, so the next sync sends it again.
+   */
+  async saveSongsSent(sent: SongRecord[]): Promise<void> {
+    if (sent.length === 0) return
+    const tx = this.#transaction(['songs'], 'readwrite')
+    const store = tx.objectStore('songs')
+    for (const song of sent) {
+      const current = (await requestResult(store.get(song.uuid))) as SongRecord | undefined
+      if (!current) continue
+      const updated: SongRecord = { ...current }
+      for (const field of SONG_LINK_FIELDS) {
+        if (song[field] !== undefined) Object.assign(updated, { [field]: song[field] })
+      }
+      if ((current.metadataChangedAt ?? '') > (song.metadataChangedAt ?? '')) {
+        updated.lastSyncedAt = current.lastSyncedAt
+      }
+      store.put(withNumericSongTempos(updated))
+    }
+    return transactionDone(tx)
   }
 
   async saveSongsBatch(songs: SongInput[]): Promise<void> {
