@@ -7,6 +7,15 @@ editing
 - song notes/stickies
 
 song data
+- "Reset from import", like Reset from Drive: put a space back to what an export file holds (a restore from
+  a backup), so a library can be repaired once, off to the side, and every device can take the fixed one.
+  An import only adds (a changed chart arrives as a variant, the old one stays the default, existing
+  setlists are skipped), so a repaired export cannot replace anything. Things to settle: keep the songs'
+  and setlists' uuids (the capo and sections kept per song are keyed by uuid); in a space that syncs, the
+  restored records have no Drive file, so it must be paired with Start over in Drive (or the old files
+  stay behind as orphans and come back at the next pull); say what is dropped first (anything newer than
+  the export), as Reset from Drive does for unsynced changes. Needed because the repair pages
+  (/dev/library-repair.html) are dev only and dev can no longer reach production data (docs/ENVIRONMENTS.md)
 - the import page's "Create New Setlist" offers the people of the space the app is in, not the one being
   imported into (getSpacePeople reads the current space)
 - at import, when the chart's CCLI number finds a song and a song with no CCLI number has the same title,
