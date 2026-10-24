@@ -23,7 +23,7 @@ Three things follow:
 - **A write is a change to what is stored, not a save of a copy.** An edit reads the record, changes
   it and writes it in one IndexedDB transaction (`updateSetlist(id, draft => …)`), so it cannot
   undo a change made since the view loaded. Sync's own markers are written by sync alone
-  (`recordSync`), so a page cannot drop a link and a sync cannot undo an edit.
+  (`saveSetlistsSent`), so a page cannot drop a link and a sync cannot undo an edit.
 - **Every committed write says so, once, from the database.** Whoever made it (a page, an import, a
   sync, another tab), the same event is sent, saying what kind of record, which ones, and where the
   change came from. No writer announces for itself, and none can stay silent.
@@ -85,9 +85,22 @@ a view used to be stale.
    network or user between), and import, samples, transfer and the sync's pull, which write records
    that came from elsewhere. `saveSetlist` / `saveSong` also keep a stored link when a copy with
    none is saved from a page's handle, as a net under what is not converted.
-4. **The setlist page** reads through the stored setlist and applies external changes of any origin
-   (this tab's other views, another tab, a sync).
-5. **Device-local state** (capo, sections) on the bus.
+4. **The setlist page (built, in effect).** Every edit it makes is a mutation of the stored setlist
+   and its copy is replaced by what was stored, so the copy is only for showing and is never written
+   back; it follows a write of a sync or another tab (`applyChangedSetlist`, which compares content
+   hashes, keeps the song being viewed and says what changed). Not done: the copy is still a field
+   (`currentSetlist`), read by the header, menu and dialogs, and the page does not follow a write
+   made in the same tab by something else (the key and tempo `SetlistSong` saves are the page's own
+   by sharing its entry objects, so following every local write would show them as external edits).
+5. **Device-local state (not done).** Capo and the sections shown are in localStorage, written whole
+   by the page that owns them. Two tabs of the same setlist overwrite each other's; that is the same
+   class, but it needs one person on one device with two tabs open on one setlist, and the browser's
+   own `storage` event is the way to hear it, not this bus. Left until it is seen.
 
-A test for each step, and a random-history test of the whole: interleaved page edits, syncs and
-writes from another tab, then "what each view shows is what is stored".
+## How it is held
+
+`tests/db-state-random.test.ts` runs seeded histories of a page's edits, a sync recording a send, a
+pull and a page saving an old copy, against a model: each writer keeps its part (content, or the
+link to the file), whatever the order. Taking out the link-keeping or the markers-only writer fails
+it. The sync's own random histories (`tests/drive-sync-random.test.ts`) run the whole engine.
+
