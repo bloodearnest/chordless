@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import type { ParsedChart } from '../src/js/data-types.ts'
+import { ChordProParser } from '../src/js/parser.ts'
 import { makeChart } from './builders.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 
@@ -402,6 +403,14 @@ describe('Nashville numbers', () => {
     const converted = convertNashvilleChordToStandard('#4sus', 'C')
     assertEquals(converted, 'F#sus', 'Nashville #4sus in C -> F#sus')
   })
+  it('detects and converts the two halves of a split bracket', () => {
+    expect(isNashvilleChord('(4sus')).to.equal(true)
+    expect(isNashvilleChord('1)')).to.equal(true)
+    expect(convertNashvilleChordToStandard('(4sus', 'C')).to.equal('(Fsus')
+    expect(convertNashvilleChordToStandard('1)', 'C')).to.equal('C)')
+    expect(convertChordToNashville('(Gsus', 'G')).to.equal('(1sus')
+    expect(convertChordToNashville('G)', 'G')).to.equal('1)')
+  })
   it("convertChordToNashville('F#sus', 'C')", () => {
     const nashville = convertChordToNashville('F#sus', 'C')
     assertEquals(nashville, '#4sus', 'Chord to Nashville with accidental')
@@ -517,6 +526,30 @@ describe('transposeSong', () => {
     const parsed = makeChart(['1', '4', '5/7', '6m'])
     transposeSong(parsed, 'D', 'D')
     expect(chordsOf(parsed)).to.deep.equal([['D', 'G', 'A/C#', 'Bm']])
+  })
+
+  it('transposes a bracket split over two chords, as SongSelect writes "[(Gsus] [G)]"', () => {
+    const parsed = makeChart(['G', '(Gsus', 'G)'])
+    transposeSong(parsed, 'G', 'A')
+    const segments = parsed.sections[0].lines[0].segments
+    expect(segments.map(segment => segment.chord)).to.deep.equal(['A', '(Asus', 'A)'])
+    expect(segments.every(segment => segment.valid !== false)).to.equal(true)
+  })
+
+  it('transposes the last line of a chorus written with a split bracket (Nothing Else)', () => {
+    const parsed = new ChordProParser().parse(
+      '{key: G}\n{comment: Chorus}\nI just want [G]You    [(Gsus]    [G)]  (To Bridge)\n'
+    )
+    transposeSong(parsed, 'G', 'A')
+    const segments = parsed.sections[0].lines[0].segments
+    expect(segments.map(segment => segment.chord)).to.deep.equal(['', 'A', '(Asus', 'A)'])
+    expect(segments[3].lyrics).to.equal(' (To Bridge)')
+  })
+
+  it('reads the two halves of a split bracket as Nashville numbers', () => {
+    const parsed = makeChart(['1', '(4sus', '1)'])
+    transposeSong(parsed, 'D', 'D')
+    expect(chordsOf(parsed)).to.deep.equal([['D', '(Gsus', 'D)']])
   })
 
   it('marks chords it cannot read as not valid, leaving the rest', () => {
