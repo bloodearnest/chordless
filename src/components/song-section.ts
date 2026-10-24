@@ -2,6 +2,7 @@ import { css, html, LitElement, nothing } from 'lit'
 import { classMap } from 'lit/directives/class-map.js'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
 import type { ChartLine, ChartSegment, HideMode } from '../js/data-types.ts'
+import { groupSegmentsIntoUnits } from '../js/utils/chart-line-units.ts'
 import { isBarMarker } from '../js/utils/chord-utils.ts'
 import {
   formatHiddenLyricsText,
@@ -369,6 +370,11 @@ export class SongSection extends LitElement {
       flex-wrap: wrap;
     }
 
+    /* A word and the chords over it: the line breaks between units, never inside one */
+    .song-section-wrapper .chord-unit {
+      display: inline-flex;
+    }
+
     .song-section-wrapper .chord-segment {
       display: inline-flex;
       flex-direction: column;
@@ -392,6 +398,13 @@ export class SongSection extends LitElement {
       font-family: 'Source Sans Pro', 'Segoe UI', sans-serif;
       display: inline-block;
       white-space: nowrap;
+    }
+
+    /* A chord over words that go on under the next chord's room takes no width of its own */
+    .song-section-wrapper .chord-segment.chord-spills .chord {
+      width: 0;
+      padding-right: 0;
+      overflow: visible;
     }
 
     .song-section-wrapper .chord.bar {
@@ -688,43 +701,47 @@ export class SongSection extends LitElement {
     // Check if this line has ANY chords
     const lineHasChords = normalizedSegments.some(seg => seg.chord?.trim())
 
+    // What each segment shows (lyrics that are only hyphens or spaces show none)
     let hasPreviousLyrics = false
+    const shown: ChartSegment[] = normalizedSegments.map(segment => {
+      const hasLyrics = this._segmentHasLyrics(segment)
+      const lyrics = hasLyrics
+        ? this._formatLyricsText(segment.lyrics, hasPreviousLyrics, !!segment.__joinWithPrev)
+        : ''
+      if (hasLyrics) hasPreviousLyrics = true
+      return { ...segment, lyrics }
+    })
+
+    // The line wraps between units: words, with the chords over them, never inside a word
+    const units = lineHasChords
+      ? groupSegmentsIntoUnits(shown, { reserveChords: this.hideMode !== 'chords' })
+      : shown.map(segment => [segment])
 
     return html`
       <div class="chord-line" data-line-index=${index}>
-        ${normalizedSegments.map(segment => {
-          const joinWithPrev = !!segment.__joinWithPrev
-          const rendered = this._renderSegment(
-            segment,
-            hasPreviousLyrics,
-            joinWithPrev,
-            lineHasChords
-          )
-          if (this._segmentHasLyrics(segment)) {
-            hasPreviousLyrics = true
-          }
-          return rendered
-        })}
+        ${units.map(
+          unit =>
+            html`<span class="chord-unit">${unit.map((piece, at) =>
+              // (a chord spills over the chordless words after it, which the unit has made room for)
+              this._renderSegment(
+                piece,
+                lineHasChords,
+                !!piece.chord && unit[at + 1] !== undefined && !unit[at + 1].chord
+              )
+            )}</span>`
+        )}
       </div>
     `
   }
 
-  _renderSegment(
-    segment: RenderedSegment,
-    previousHadLyrics = false,
-    joinWithPrev = false,
-    lineHasChords = true
-  ) {
-    const hasLyrics = this._segmentHasLyrics(segment)
+  _renderSegment(segment: ChartSegment, lineHasChords = true, chordSpills = false) {
+    const hasLyrics = segment.lyrics.length > 0
     const chordText = segment.chord || ''
     const classes = classMap({
       'chord-segment': true,
       'chord-only': !hasLyrics,
+      'chord-spills': chordSpills && hasLyrics,
     })
-
-    const lyricsText = hasLyrics
-      ? this._formatLyricsText(segment.lyrics as string, previousHadLyrics, joinWithPrev)
-      : ''
 
     // If the line has no chords at all, don't render chord placeholders
     const shouldRenderChordSpace = lineHasChords
@@ -738,7 +755,7 @@ export class SongSection extends LitElement {
               : html`<span class="chord chord-empty">&nbsp;</span>`
             : nothing
         }
-        ${hasLyrics ? html`<span class="lyrics">${lyricsText}</span>` : nothing}
+        ${hasLyrics ? html`<span class="lyrics">${segment.lyrics}</span>` : nothing}
       </span>
     `
   }

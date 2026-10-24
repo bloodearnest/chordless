@@ -142,6 +142,118 @@ describe('song-section content', () => {
       expect(lines[1].querySelector('.chord, .chord-empty')).to.equal(null)
     })
 
+    it('are made of words, with the chords over them, so a line can break between words', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: '', lyrics: 'More than any - ' },
+            { chord: 'Am', lyrics: 'thing that you' },
+          ],
+        },
+      ])
+      const units = [...(el.shadowRoot?.querySelectorAll('.chord-unit') ?? [])]
+      expect(units.map(unit => unit.textContent?.replace(/\s+/g, ' ').trim())).to.deep.equal([
+        'More',
+        'than',
+        'any',
+        '-', // a hyphen between words is still shown
+        'Am thing',
+        'that',
+        'you',
+      ])
+    })
+
+    it('keep a word with the chords inside it, and a chord over a gap with the word after it', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: 'G', lyrics: 'You ' },
+            { chord: '(Gsus', lyrics: ' ' },
+            { chord: 'G)', lyrics: ' (To Bridge)' },
+          ],
+        },
+        {
+          segments: [
+            { chord: 'Am', lyrics: 'won' },
+            { chord: 'C', lyrics: 'der' },
+          ],
+        },
+      ])
+      const lines = [...(el.shadowRoot?.querySelectorAll('.chord-line') ?? [])]
+      const chordsOf = (unit: Element) =>
+        [...unit.querySelectorAll('.chord:not(.chord-empty)')].map(chord =>
+          chord.textContent?.replace(/\s+/g, '')
+        )
+      expect([...lines[0].querySelectorAll('.chord-unit')].map(chordsOf)).to.deep.equal([
+        ['G'],
+        ['(Gsus', 'G)'], // (and "Bridge)", for the chords to sit over)
+      ])
+      expect([...lines[1].querySelectorAll('.chord-unit')].map(chordsOf)).to.deep.equal([
+        ['Am', 'C'],
+      ])
+    })
+
+    it('lets a chord spill over the words after it, with no gap after its own word', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: '', lyrics: 'I walk ' },
+            { chord: 'Am7(4)', lyrics: 'it is a wonderful day ' },
+            { chord: 'Em7', lyrics: 'now' },
+          ],
+        },
+      ])
+      const pieces = [...(el.shadowRoot?.querySelectorAll('.chord-segment') ?? [])]
+      const spilling = pieces.filter(piece => piece.classList.contains('chord-spills'))
+      // (the chord over "it" spills over "is a wonderful"; "Em7" is last, with nothing to spill over)
+      expect(spilling.map(piece => piece.textContent?.replace(/\s+/g, ' ').trim())).to.deep.equal([
+        'Am7(4) it',
+      ])
+      const chordWord = spilling[0]
+      const text = document.createRange()
+      text.selectNodeContents(chordWord.querySelector('.lyrics') as HTMLElement)
+      const next = chordWord.nextElementSibling as HTMLElement
+      // no gap: the next word starts where the text of the chord's word ends
+      expect(Math.round(next.getBoundingClientRect().left)).to.equal(
+        Math.round(text.getBoundingClientRect().right)
+      )
+    })
+
+    it('does not let a chord spill when another chord is in the next piece', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: 'Am', lyrics: 'won' },
+            { chord: 'C', lyrics: 'der' },
+          ],
+        },
+      ])
+      expect(el.shadowRoot?.querySelector('.chord-spills')).to.equal(null)
+    })
+
+    it('wrap between units and never inside one, when the line is narrower than the text', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: '', lyrics: 'More than any - ' },
+            { chord: 'Am7(4)', lyrics: 'thing that you can ' },
+            { chord: 'C2', lyrics: 'do I just want ' },
+            { chord: 'G', lyrics: 'You ' },
+            { chord: '(Gsus', lyrics: ' ' },
+            { chord: 'G)', lyrics: ' (To Bridge)' },
+          ],
+        },
+      ])
+      el.style.display = 'block'
+      el.style.width = '260px'
+      const line = el.shadowRoot?.querySelector('.chord-line') as HTMLElement
+      const tops = (unit: Element) => [...unit.children].map(c => c.getBoundingClientRect().top)
+      const units = [...line.querySelectorAll('.chord-unit')]
+      // (the line did wrap, and every unit sits on one row)
+      expect(new Set(units.map(unit => unit.getBoundingClientRect().top)).size).to.be.greaterThan(1)
+      for (const unit of units) expect(new Set(tops(unit)).size).to.equal(1)
+    })
+
     it('mark an invalid chord', async () => {
       const el = await show([
         { segments: [{ chord: 'Xyz', lyrics: 'oops', valid: false } as never] },
