@@ -258,6 +258,30 @@ export class ChordlessDB {
   }
 
   /**
+   * Change a setlist as it is stored now: it is read, changed by `change` and written in one
+   * transaction, so nothing saved since a page loaded it is undone (a page that saves its own
+   * copy of a setlist writes over a link a sync made, or over a pull). `change` is given the
+   * stored setlist to change in place, and must not wait; returning false leaves it as it is.
+   * @returns the setlist as stored once changed, or undefined if there is none or `change` said false
+   */
+  async updateSetlist(
+    id: string,
+    change: (setlist: Setlist) => void | false
+  ): Promise<Setlist | undefined> {
+    const tx = this.#transaction(['setlists'], 'readwrite')
+    const store = tx.objectStore('setlists')
+    const current = (await requestResult(store.get(id))) as Setlist | undefined
+    if (!current) return undefined
+    const draft = cloneForStorage(current) as Setlist
+    if (change(draft) === false) return undefined
+    const stored = cloneForStorage(withNumericTempos(draft)) as Setlist
+    store.put(stored)
+    const result = await transactionDone(tx, stored)
+    this.#changed('setlist', [id])
+    return result
+  }
+
+  /**
    * Record that setlists were sent to Drive: what each keeps of its file is put on the setlist
    * as it is stored now, not on the copy that was sent, so that an edit saved while it was being
    * sent is not undone. (It is then a change the next sync sends: the content it was synced
@@ -360,6 +384,24 @@ export class ChordlessDB {
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed('song', [stored.uuid])
+    return result
+  }
+
+  /** Change a song as it is stored now, as updateSetlist does a setlist (keyed by the song's uuid) */
+  async updateSong(
+    uuid: string,
+    change: (song: SongRecord) => void | false
+  ): Promise<SongRecord | undefined> {
+    const tx = this.#transaction(['songs'], 'readwrite')
+    const store = tx.objectStore('songs')
+    const current = (await requestResult(store.get(uuid))) as SongRecord | undefined
+    if (!current) return undefined
+    const draft = cloneForStorage(current) as SongRecord
+    if (change(draft) === false) return undefined
+    const stored = withNumericSongTempos(draft)
+    store.put(stored)
+    const result = await transactionDone(tx, stored)
+    this.#changed('song', [uuid])
     return result
   }
 

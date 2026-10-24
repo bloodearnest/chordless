@@ -629,18 +629,26 @@ describe('the setlist page: header, menu and keys', () => {
       expect(header().heading).to.equal('Alpha')
     })
 
-    it('are put back, and said so, when they cannot be saved', async () => {
+    it('are left as they were, and said so, when they cannot be saved', async () => {
       await rig.open(3, { name: 'Original' })
-      const real = Object.getPrototypeOf(rig.db).saveSetlist
-      Object.getPrototypeOf(rig.db).saveSetlist = () => Promise.reject(new Error('disk full'))
+      const real = Object.getPrototypeOf(rig.db).updateSetlist
+      Object.getPrototypeOf(rig.db).updateSetlist = () => Promise.reject(new Error('disk full'))
       try {
         await rig.page.saveSetlistDetails(changes('Lost'))
       } finally {
-        Object.getPrototypeOf(rig.db).saveSetlist = real
+        Object.getPrototypeOf(rig.db).updateSetlist = real
       }
       expect(rig.page.currentSetlist?.name).to.equal('Original')
       expect(shownToast()).to.include({ kind: 'error', details: 'disk full' })
       expect(shownToast()?.message).to.contain("Couldn't save the setlist details")
+    })
+
+    it('are not saved for a setlist that has gone', async () => {
+      const setlist = await rig.open(2, { name: 'Original' })
+      await rig.db.deleteSetlist(setlist.id)
+      await rig.page.saveSetlistDetails(changes('Lost'))
+      expect(shownToast()).to.equal(null)
+      expect(await rig.db.getSetlist(setlist.id)).to.equal(undefined)
     })
 
     it('are not saved with no setlist', async () => {

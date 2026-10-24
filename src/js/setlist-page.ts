@@ -37,7 +37,7 @@ import {
 } from '../components/song-settings-popover.ts'
 import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
-import type { Setlist, SongWithContent } from './data-types.ts'
+import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB } from './db.ts'
 import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
 import { wantsMediaPlayer } from './media-player-loader.ts'
@@ -76,6 +76,14 @@ import { showStatusMessage } from './utils/status-message.ts'
 import type { ViewState } from './views/page-view.ts'
 
 // Configuration constants
+/** Whether two entries of a setlist are the same song (a page holds a copy, and the stored setlist may have moved on) */
+function sameEntry(
+  a: { songId: string; songUuid?: string } | undefined,
+  b: { songId: string; songUuid?: string }
+): boolean {
+  return a?.songId === b.songId && a?.songUuid === b.songUuid
+}
+
 const CONFIG = {
   // Font sizes
   DEFAULT_FONT_SIZE: 1.6, // rem
@@ -713,14 +721,8 @@ export class SetlistPage {
       // Update all sections to reflect non-edit mode
       this.sections.applyAll()
 
-      // Save setlist to IndexedDB
-      if (this.currentSetlist) {
-        // Update timestamp
-        this.currentSetlist.modifiedDate = new Date().toISOString()
-
-        // Save to database
-        await this._database().saveSetlist(this.currentSetlist)
-      }
+      // Stamp the setlist as modified (each edit saved itself as it was made)
+      await this.editSetlist(() => undefined)
     }
   }
 
@@ -944,19 +946,34 @@ export class SetlistPage {
   }
 
   /**
+   * Change the setlist as it is stored now, and stamp it as modified. The page never saves its own
+   * copy back (that would undo what a sync saved since it was loaded: docs/STATE.md); it takes the
+   * stored setlist, once changed, as its copy. `change` may say false (the stored setlist is not as
+   * this page showed it) to change nothing.
+   * @returns the setlist as stored, or undefined if it is gone or `change` said false
+   */
+  async editSetlist(change: (setlist: Setlist) => void | false): Promise<Setlist | undefined> {
+    const id = this.currentSetlistId
+    if (!id) return undefined
+    const stored = await this._database().updateSetlist(id, draft => {
+      if (change(draft) === false) return false
+      draft.modifiedDate = new Date().toISOString()
+    })
+    if (stored && !this._disposed) this.currentSetlist = stored
+    return stored
+  }
+
+  /**
    * Save edited setlist details (date, time, type, name, leader) from the info
    * dialog. On failure the dialog stays in edit mode with what was typed.
    */
   async saveSetlistDetails(changes: SetlistInfoSaveEvent['changes']) {
     const dialog = this.root.querySelector<SetlistInfoDialog>('#setlist-info-dialog')
-    const setlist = this.currentSetlist
-    if (!setlist) return
-    const previous = { ...setlist }
+    if (!this.currentSetlist) return
+    let setlist: Setlist | undefined
     try {
-      Object.assign(setlist, changes, { modifiedDate: new Date().toISOString() })
-      await this._database().saveSetlist(setlist)
+      setlist = await this.editSetlist(stored => void Object.assign(stored, changes))
     } catch (error) {
-      Object.assign(setlist, previous)
       console.error('[SetlistInfo] Failed to save setlist details:', error)
       toast("Couldn't save the setlist details. They are as they were.", {
         kind: 'error',
@@ -964,6 +981,8 @@ export class SetlistPage {
       })
       return
     }
+    // (the setlist is gone)
+    if (!setlist) return
 
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
     this.updateHeader(song, true)
@@ -1173,12 +1192,9 @@ export class SetlistPage {
         // Update all sections based on edit mode
         this.sections.applyAll()
       } else {
+        // (each edit saved itself as it was made: this stamps the setlist as modified)
         leaveEditMode(this.root, appHeader, async () => {
-          // Save the setlist to IndexedDB
-          if (this.currentSetlist) {
-            this.currentSetlist.modifiedDate = new Date().toISOString()
-            await this._database().saveSetlist(this.currentSetlist)
-          }
+          await this.editSetlist(() => undefined)
         })
         // Refresh song sections immediately so their controls begin fading out in sync
         this.sections.applyAll()
@@ -1547,17 +1563,22 @@ export class SetlistPage {
    * setlist and on the page, and save it.
    */
   async moveSong(startIndex: number, newIndex: number) {
-    const setlist = this.currentSetlist
-    if (!setlist) return
+    const moving = this.currentSetlist?.songs[startIndex]
+    if (!moving) return
 
-    // Reorder songs in the setlist
-    const movedSong = setlist.songs.splice(startIndex, 1)[0]
-    setlist.songs.splice(newIndex, 0, movedSong)
-
-    // Update order field for each song
-    setlist.songs.forEach((song, index) => {
-      song.order = index
+    // Reorder songs in the setlist, as it is stored
+    const saved = await this.editSetlist(stored => {
+      if (!sameEntry(stored.songs[startIndex], moving)) return false
+      stored.songs.splice(newIndex, 0, ...stored.songs.splice(startIndex, 1))
+      stored.songs.forEach((song, index) => {
+        song.order = index
+      })
     })
+    if (!saved) {
+      // It is not as this page showed it: show it as it is
+      if (this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
+      return
+    }
 
     // Reorder runtime songs array
     const movedRuntimeSong = this.songs.splice(startIndex, 1)[0]
@@ -1566,10 +1587,6 @@ export class SetlistPage {
     // What was set for each song (its sections shown, its capo) goes with it
     this.sections.states = renumberSongs(this.sections.states, afterMove(startIndex, newIndex))
     this.saveState()
-
-    // Save to database
-    setlist.modifiedDate = new Date().toISOString()
-    await this._database().saveSetlist(setlist)
 
     // Re-order song sections in the DOM to match new order
     const container = this._songContainer()
@@ -1888,11 +1905,9 @@ export class SetlistPage {
   }
 
   async addSongToSetlist(song: SongWithContent) {
-    let undo: () => unknown = () => undefined // what puts the setlist back if the save fails
     try {
-      // Get current setlist
-      const setlist = this.currentSetlist
-      if (!setlist) {
+      const id = this.currentSetlistId
+      if (!id) {
         console.error('No current setlist')
         return
       }
@@ -1903,36 +1918,30 @@ export class SetlistPage {
       const songCurrentKey = song.metadata?.key || song.parsed?.metadata?.key || null
       const songCurrentTempo = (song.metadata?.tempo || null) as number | null
 
-      const newSongEntry = {
-        order: setlist.songs.length,
-        songId: song.id,
-        songUuid: song.uuid,
-        key: songCurrentKey, // Explicit snapshot of canonical key
-        tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
-        notes: '',
-      }
-
       // Preload pads for the song's current key in the background
       if (songCurrentKey) {
         preloadPadKey(songCurrentKey)
       }
 
-      // Add to setlist
-      setlist.songs.push(newSongEntry)
-      // Not saved: not in the setlist, or trying again would add it twice
-      undo = () => setlist.songs.splice(setlist.songs.indexOf(newSongEntry), 1)
-      setlist.modifiedDate = new Date().toISOString()
-
-      // Save to database
-      await this._database().saveSetlist(setlist)
+      // Add to the setlist as it is stored (nothing is changed if this cannot be saved)
+      const saved = await this.editSetlist(stored => {
+        stored.songs.push({
+          order: stored.songs.length,
+          songId: song.id,
+          songUuid: song.uuid,
+          key: songCurrentKey, // Explicit snapshot of canonical key
+          tempo: songCurrentTempo, // Explicit snapshot of canonical tempo
+          notes: '',
+        })
+      })
+      if (!saved) return
 
       this._addSongModal.close()
 
       // Reload the setlist to show the new song
-      await this.renderSetlist(setlist.id)
+      await this.renderSetlist(id)
     } catch (error) {
       console.error('Error adding song to setlist:', error)
-      undo()
       toast("Couldn't add the song to the setlist.", {
         kind: 'error',
         details: errorMessage(error),
@@ -1952,68 +1961,60 @@ export class SetlistPage {
   }
 
   async changeSongKeyInSetlist(index: number, newKey: string) {
-    const setlist = this.currentSetlist
-    if (!setlist?.songs?.[index]) return
-
-    setlist.songs[index].key = newKey
-    setlist.modifiedDate = new Date().toISOString()
-    await this._database().saveSetlist(setlist)
-
-    await this.renderSetlist(setlist.id)
+    await this.#changeEntry(index, entry => {
+      entry.key = newKey
+    })
   }
 
   async changeSongBpmInSetlist(index: number, bpm: number) {
-    const setlist = this.currentSetlist
-    if (!setlist?.songs?.[index]) return
+    await this.#changeEntry(index, entry => {
+      entry.tempo = bpm
+    })
+  }
 
-    setlist.songs[index].tempo = bpm
-    setlist.modifiedDate = new Date().toISOString()
-    await this._database().saveSetlist(setlist)
-
-    await this.renderSetlist(setlist.id)
+  /** Change the song at `index`, in the setlist as it is stored, and show it so */
+  async #changeEntry(index: number, change: (entry: SetlistEntry) => void) {
+    const shown = this.currentSetlist?.songs?.[index]
+    if (!shown) return
+    await this.editSetlist(stored => {
+      const entry = stored.songs[index]
+      if (!entry || !sameEntry(entry, shown)) return false
+      change(entry)
+    })
+    if (this.currentSetlistId) await this.renderSetlist(this.currentSetlistId)
   }
 
   async deleteSongFromSetlist(index: number) {
-    let undo: () => unknown = () => undefined // what puts the setlist back if the save fails
     try {
-      const setlist = this.currentSetlist
-      if (!setlist) {
+      const id = this.currentSetlistId
+      const shown = this.currentSetlist?.songs[index]
+      if (!id || !shown) {
         console.error('No current setlist')
         return
       }
 
-      // Remove song from array
-      const removed = setlist.songs.splice(index, 1)[0]
-      // Not saved: it is still in the setlist, or trying again would remove the next song
-      undo = () => {
-        setlist.songs.splice(index, 0, removed)
-        setlist.songs.forEach((entry, i) => {
+      // Remove the song from the setlist as it is stored
+      const saved = await this.editSetlist(stored => {
+        if (!sameEntry(stored.songs[index], shown)) return false
+        stored.songs.splice(index, 1)
+        stored.songs.forEach((entry, i) => {
           entry.order = i
+        })
+      })
+
+      if (saved) {
+        // The songs after it are one place earlier, with what was set for them
+        const kept = loadSetlistLocalState(id)
+        saveSetlistLocalState(id, {
+          sectionState: renumberSongs(kept.sectionState, afterRemoval(index)),
+          capoValues: renumberSongs(kept.capoValues, afterRemoval(index)),
         })
       }
 
-      // Update order for remaining songs
-      setlist.songs.forEach((song, i) => {
-        song.order = i
-      })
-
-      setlist.modifiedDate = new Date().toISOString()
-
-      // Save to database
-      await this._database().saveSetlist(setlist)
-
-      // The songs after it are one place earlier, with what was set for them
-      const kept = loadSetlistLocalState(setlist.id)
-      saveSetlistLocalState(setlist.id, {
-        sectionState: renumberSongs(kept.sectionState, afterRemoval(index)),
-        capoValues: renumberSongs(kept.capoValues, afterRemoval(index)),
-      })
-
       // Reload the setlist
-      await this.renderSetlist(setlist.id)
+      await this.renderSetlist(id)
     } catch (error) {
       console.error('Error deleting song from setlist:', error)
-      undo()
       toast("Couldn't remove the song from the setlist.", {
         kind: 'error',
         details: errorMessage(error),

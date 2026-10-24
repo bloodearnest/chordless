@@ -154,17 +154,23 @@ export class SetlistSong extends SongModel {
   override async save(): Promise<void> {
     // Save key and tempo to setlist entry in IndexedDB
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
-      const setlist = await this._db.getSetlist(this._setlistId)
-      if (setlist?.songs[this._songIndex]) {
-        if (this._pendingChanges.key !== null) {
-          setlist.songs[this._songIndex].key = this._pendingChanges.key
-          this._songEntry.key = this._pendingChanges.key
+      const { key, tempo } = this._pendingChanges
+      // (the setlist as it is stored now: a sync may have saved it since this song was loaded)
+      const saved = await this._db.updateSetlist(this._setlistId, setlist => {
+        const entry = setlist.songs[this._songIndex]
+        if (
+          !entry ||
+          entry.songId !== this._songEntry.songId ||
+          entry.songUuid !== this._songEntry.songUuid
+        ) {
+          return false
         }
-        if (this._pendingChanges.tempo !== null) {
-          setlist.songs[this._songIndex].tempo = this._pendingChanges.tempo
-          this._songEntry.tempo = this._pendingChanges.tempo
-        }
-        await this._db.saveSetlist(setlist)
+        if (key !== null) entry.key = key
+        if (tempo !== null) entry.tempo = tempo
+      })
+      if (saved?.songs[this._songIndex]) {
+        if (key !== null) this._songEntry.key = key
+        if (tempo !== null) this._songEntry.tempo = tempo
       }
     }
 

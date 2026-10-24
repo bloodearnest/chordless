@@ -202,3 +202,89 @@ describe('Saving a song whose copy was made before it was sent', () => {
     }
   })
 })
+
+describe('Changing a record as it is stored', () => {
+  let db: ChordlessDB
+  afterEach(async () => {
+    db.db?.close()
+    await deleteDatabase(db.dbName)
+  })
+
+  async function open() {
+    db = new ChordlessDB(uniqueName())
+    await db.init()
+  }
+
+  /** The changes announced for this database while `work` ran, as 'kind:ids' */
+  async function announced(work: () => Promise<unknown>) {
+    const seen: string[] = []
+    const listener = ({ change }: DataChangeEvent) => {
+      if (change.spaceId === db.spaceId) seen.push(`${change.kind}:${change.ids?.join(',')}`)
+    }
+    window.addEventListener(DataChangeEvent.type, listener)
+    try {
+      await work()
+    } finally {
+      window.removeEventListener(DataChangeEvent.type, listener)
+    }
+    return seen
+  }
+
+  it('changes a setlist on what is stored, so a link a sync saved meanwhile is kept', async () => {
+    await open()
+    const copy = makeSetlist({ id: 'updated' })
+    await db.saveSetlist(copy)
+    const sync = new ChordlessDB(db.dbName, 'sync')
+    await sync.init()
+    await sync.saveSetlist({ ...copy, fileRef: 'file-3', fileRev: 'rev-3' })
+    sync.db?.close()
+
+    let seen: string | null | undefined
+    const seenAnnounced = await announced(async () => {
+      const stored = await db.updateSetlist('updated', setlist => {
+        seen = setlist.fileRef
+        setlist.name = 'Changed'
+      })
+      expect(stored).to.include({ name: 'Changed', fileRef: 'file-3' })
+    })
+
+    expect(seen).to.equal('file-3')
+    expect(await db.getSetlist('updated')).to.include({ name: 'Changed', fileRef: 'file-3' })
+    expect(seenAnnounced).to.deep.equal(['setlist:updated'])
+  })
+
+  it('leaves a setlist as it is when the change says false, and says so of one that is not there', async () => {
+    await open()
+    await db.saveSetlist(makeSetlist({ id: 'kept', name: 'Kept' }))
+    const told = await announced(async () => {
+      const stored = await db.updateSetlist('kept', setlist => {
+        setlist.name = 'Not saved'
+        return false
+      })
+      expect(stored).to.equal(undefined)
+      expect(await db.updateSetlist('nothing', () => undefined)).to.equal(undefined)
+    })
+    expect((await db.getSetlist('kept'))?.name).to.equal('Kept')
+    expect(told).to.deep.equal([])
+  })
+
+  it('changes a song the same way, and saves its tempo as a number', async () => {
+    await open()
+    await db.saveSong(makeSong({ uuid: 'song-u', id: 'song-u' }))
+    const sync = new ChordlessDB(db.dbName, 'sync')
+    await sync.init()
+    await sync.saveSong({ ...makeSong({ uuid: 'song-u', id: 'song-u' }), fileRef: 'file-4' })
+    sync.db?.close()
+
+    const told = await announced(async () => {
+      const stored = await db.updateSong('song-u', song => {
+        song.title = 'Retitled'
+        song.tempo = '96' as never
+      })
+      expect(stored).to.include({ title: 'Retitled', fileRef: 'file-4', tempo: 96 })
+      expect(await db.updateSong('song-u', () => false)).to.equal(undefined)
+      expect(await db.updateSong('nothing', () => undefined)).to.equal(undefined)
+    })
+    expect(told).to.deep.equal(['song:song-u'])
+  })
+})

@@ -190,6 +190,19 @@ describe('SetlistSong', () => {
       const loaded = await db.getSetlist(setlist.id)
       expect(loaded.songs[0].tempo).to.equal(120)
     })
+
+    it('saves nothing when the song is no longer at its place in the stored setlist', async () => {
+      const song = new SetlistSong(setlist.songs[0], canonicalSong, setlist.id, db, spaceId)
+      song.setKey('A')
+      await db.updateSetlist(setlist.id, stored => {
+        stored.songs[0].songId = 'another-song'
+      })
+
+      await song.save()
+
+      const loaded = await db.getSetlist(setlist.id)
+      expect(loaded.songs[0].key).to.equal('G')
+    })
   })
 
   describe('Capo (priority cascade)', () => {

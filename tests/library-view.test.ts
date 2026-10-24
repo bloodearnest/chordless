@@ -424,15 +424,15 @@ describe('the library view, with a song open', () => {
       toggleEditMode()
       control<KeySelector>('library-key-selector').dispatchEvent(new KeyChangeEvent('A'))
       await wait(100)
-      const real = db.constructor.prototype.saveSong
-      db.constructor.prototype.saveSong = async () => {
+      const real = db.constructor.prototype.updateSong
+      db.constructor.prototype.updateSong = async () => {
         throw new Error('disk full')
       }
       try {
         toggleEditMode()
         await wait(200)
       } finally {
-        db.constructor.prototype.saveSong = real
+        db.constructor.prototype.updateSong = real
       }
       expect(document.body.classList.contains('edit-mode')).to.equal(false)
     })

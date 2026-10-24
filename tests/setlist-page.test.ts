@@ -15,7 +15,7 @@ import '../src/components/song-section.ts'
 import { CapoChangeEvent } from '../src/components/capo-selector.ts'
 import { SongChangeEvent } from '../src/js/app-events.ts'
 import type { Setlist, SongWithContent } from '../src/js/data-types.ts'
-import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
+import { ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import { CapoPreferenceEvent, setCapoPreference } from '../src/js/preferences.ts'
 import { loadSetlistLocalState, saveSetlistLocalState } from '../src/js/setlist/local-state.ts'
@@ -91,6 +91,14 @@ describe('the setlist page', () => {
   async function until(check: () => Promise<boolean>) {
     for (let i = 0; i < 100 && !(await check()); i++) await wait(20)
   }
+
+  const asLibrarySong = (song: { uuid: string; id: string; title: string }, key = 'G') =>
+    ({
+      uuid: song.uuid,
+      id: song.id,
+      title: song.title,
+      metadata: { key, tempo: 90 },
+    }) as unknown as SongWithContent
 
   const titles = (list: { title: string }[]) => list.map(song => song.title)
   const savedTitles = async (id: string) => {
@@ -252,14 +260,6 @@ describe('the setlist page', () => {
   })
 
   describe('adding a song', () => {
-    const asLibrarySong = (song: { uuid: string; id: string; title: string }, key = 'G') =>
-      ({
-        uuid: song.uuid,
-        id: song.id,
-        title: song.title,
-        metadata: { key, tempo: 90 },
-      }) as unknown as SongWithContent
-
     it('adds it at the end with the key and tempo it has now, and shows it', async () => {
       const setlist = await open(2)
 
@@ -281,14 +281,14 @@ describe('the setlist page', () => {
 
     it('says so and keeps what was saved when the save fails', async () => {
       const setlist = await open(2)
-      const realSave = db.saveSetlist
-      db.saveSetlist = async () => {
+      const realSave = db.updateSetlist
+      db.updateSetlist = async () => {
         throw new Error('disk full')
       }
       try {
         await page.addSongToSetlist(asLibrarySong(songs[3]))
       } finally {
-        db.saveSetlist = realSave
+        db.updateSetlist = realSave
       }
 
       expect(shownToast()).to.include({
@@ -303,14 +303,14 @@ describe('the setlist page', () => {
 
     it('adds the song once, not twice, when Try again is pressed after a failed save', async () => {
       const setlist = await open(2)
-      const realSave = db.saveSetlist
-      db.saveSetlist = async () => {
+      const realSave = db.updateSetlist
+      db.updateSetlist = async () => {
         throw new Error('disk full')
       }
       try {
         await page.addSongToSetlist(asLibrarySong(songs[3]))
       } finally {
-        db.saveSetlist = realSave
+        db.updateSetlist = realSave
       }
       expect(page.currentSetlist?.songs).to.have.length(2)
 
@@ -360,14 +360,14 @@ describe('the setlist page', () => {
 
     it('says so when the save fails', async () => {
       await open()
-      const realSave = db.saveSetlist
-      db.saveSetlist = async () => {
+      const realSave = db.updateSetlist
+      db.updateSetlist = async () => {
         throw new Error('disk full')
       }
       try {
         await page.deleteSongFromSetlist(0)
       } finally {
-        db.saveSetlist = realSave
+        db.updateSetlist = realSave
       }
       expect(shownToast()).to.include({
         message: "Couldn't remove the song from the setlist.",
@@ -391,30 +391,93 @@ describe('the setlist page', () => {
       expect(shownToast()?.details).to.equal('unreadable chart')
       expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo'])
     })
+  })
 
-    it('is said so, with nothing to put back, when it cannot be removed', async () => {
-      await open()
-      must(page.currentSetlist).songs.splice = () => {
-        throw new Error('frozen')
-      }
+  describe('a setlist that changed behind the page', () => {
+    /** The stored setlist, in the other order (a sync saved it) */
+    async function reversedBehindThePage(id: string) {
+      await db.updateSetlist(id, setlist => {
+        setlist.songs.reverse()
+        setlist.songs.forEach((entry, order) => {
+          entry.order = order
+        })
+      })
+    }
+
+    it('does not remove the song now at that place, and shows the setlist as stored', async () => {
+      const setlist = await open(3)
+      await reversedBehindThePage(setlist.id)
 
       await page.deleteSongFromSetlist(0)
 
-      expect(shownToast()?.details).to.equal('frozen')
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Charlie', 'Bravo', 'Alpha'])
+      expect(titles(page.songs)).to.deep.equal(['Charlie', 'Bravo', 'Alpha'])
+    })
+
+    it('does not change the key of the song now at that place', async () => {
+      const setlist = await open(3)
+      await reversedBehindThePage(setlist.id)
+
+      await page.changeSongKeyInSetlist(0, 'D')
+
+      const saved = must(await db.getSetlist(setlist.id))
+      expect(saved.songs.map(entry => entry.key)).to.deep.equal(['G', 'G', 'G'])
+      expect(titles(page.songs)).to.deep.equal(['Charlie', 'Bravo', 'Alpha'])
+    })
+
+    it('does not move the song now at that place, and shows the setlist as stored', async () => {
+      const setlist = await open(3)
+      await reversedBehindThePage(setlist.id)
+
+      await page.moveSong(0, 2)
+
+      expect(await savedTitles(setlist.id)).to.deep.equal(['Charlie', 'Bravo', 'Alpha'])
+      expect(titles(page.songs)).to.deep.equal(['Charlie', 'Bravo', 'Alpha'])
+    })
+
+    it('keeps a link to its file that a sync saved after the page loaded it, through an edit', async () => {
+      const setlist = await open(2)
+      const sync = new ChordlessDB(db.dbName, 'sync')
+      await sync.init()
+      await sync.saveSetlist({ ...must(await db.getSetlist(setlist.id)), fileRef: 'file-1' })
+      sync.db?.close()
+
+      await page.changeSongBpmInSetlist(0, 100)
+
+      const saved = must(await db.getSetlist(setlist.id))
+      expect(saved.fileRef).to.equal('file-1')
+      expect(saved.songs[0].tempo).to.equal(100)
+      expect(page.currentSetlist?.fileRef).to.equal('file-1')
+    })
+
+    it('does nothing for a setlist that has gone', async () => {
+      const setlist = await open(2)
+      await db.deleteSetlist(setlist.id)
+
+      await page.addSongToSetlist(asLibrarySong(songs[3]))
+      expect(shownToast()).to.equal(null)
+      expect(await page.editSetlist(() => undefined)).to.equal(undefined)
+    })
+
+    it('says so in the log, and removes nothing, when no setlist is shown', async () => {
+      const unstarted = new SetlistPage({ root, setlistId: 'nope', db })
+      await unstarted.deleteSongFromSetlist(0)
+      expect(errors.map(args => args[0])).to.deep.equal(['No current setlist'])
+      expect(await unstarted.editSetlist(() => undefined)).to.equal(undefined)
     })
   })
 
   describe('removing a song that cannot be saved', () => {
     it('keeps it in place, and Try again removes that song and not the next', async () => {
       const setlist = await open()
-      const realSave = db.saveSetlist
-      db.saveSetlist = async () => {
+      const realSave = db.updateSetlist
+      db.updateSetlist = async () => {
         throw new Error('disk full')
       }
       try {
         await page.deleteSongFromSetlist(0)
       } finally {
-        db.saveSetlist = realSave
+        db.updateSetlist = realSave
       }
       expect(page.currentSetlist?.songs.map(entry => entry.order)).to.deep.equal([0, 1, 2])
       expect(await savedTitles(setlist.id)).to.deep.equal(['Alpha', 'Bravo', 'Charlie'])

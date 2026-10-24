@@ -162,18 +162,16 @@ export class LibrarySong extends SongModel {
   override async save(): Promise<void> {
     // Save key and tempo to database
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
-      const song = await this._db.getSong(this._song.uuid)
-      if (song) {
-        if (this._pendingChanges.key !== null) {
-          song.key = this._pendingChanges.key
-          this._song.key = this._pendingChanges.key
-        }
-        if (this._pendingChanges.tempo !== null) {
-          song.tempo = this._pendingChanges.tempo
-          this._song.tempo = this._pendingChanges.tempo
-        }
+      const { key, tempo } = this._pendingChanges
+      // (the song as it is stored now: a sync may have saved it since it was loaded)
+      const saved = await this._db.updateSong(this._song.uuid, song => {
+        if (key !== null) song.key = key
+        if (tempo !== null) song.tempo = tempo
         song.modifiedDate = new Date().toISOString()
-        await this._db.saveSong(song)
+      })
+      if (saved) {
+        if (key !== null) this._song.key = key
+        if (tempo !== null) this._song.tempo = tempo
       }
     }
 
