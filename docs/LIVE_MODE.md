@@ -52,8 +52,8 @@ interface LiveState { url: string; title: string; startedAt: number }
 - It stores a *URL* (`/setlist/<id>`, or `/s/<id>#<key>` for a share), not a setlist id,
   because a shared setlist is not in the library and its key is in the fragment. See
   [SHARING.md](SHARING.md). `title` is the setlist's name, to say what is live.
-- It is not synced through Drive. It describes this device. (Cross-device sync is the WebRTC
-  idea below, and would be separate.)
+- It is not synced through Drive. It describes this device. (Cross-device sync is a separate
+  channel, designed in [LIVE_SYNC.md](LIVE_SYNC.md).)
 
 ### Entering and leaving
 
@@ -76,7 +76,7 @@ short list, wired by hand.
 | --- | --- | --- |
 | Wake lock, on every page | no | The existing `WakeLockController`: the lock is wanted when a setlist is open or live. Re-acquired when the page is visible (`visibilitychange`). |
 | Fullscreen | yes | Wanted but not active (after switching apps, or Esc) is re-requested on the next tap, key or swipe, once per entry: if the user left it themselves, don't fight them. Hidden where `document.fullscreenEnabled` is false. |
-| Sync (future) | no | WebRTC link between instances. Probably wants its own settings (a session, leader or follower). |
+| Sync (future) | no | A WebSocket session per live team setlist ([LIVE_SYNC.md](LIVE_SYNC.md)): the leader is the setlist's `ownerId`; a preference turns it off. |
 
 Services run while live **and** the page is visible, on every page, not just the live
 setlist: searching the library mid-service shouldn't drop fullscreen or let the screen sleep.
@@ -135,4 +135,6 @@ In the existing wake lock section, which becomes "Screen and live mode":
 - Nothing shows that the device is live on other pages (the library, Preferences), so a stale
   live state could go unnoticed there until the setlist's overview is opened. If that matters,
   something small is needed there.
-- What Sync needs from the live record (session id, role) before it is designed.
+- What Sync needs from the live record: settled in [LIVE_SYNC.md](LIVE_SYNC.md). The session is the
+  setlist's id within its space and the role comes from the setlist's `ownerId`, so the live record
+  gains nothing.

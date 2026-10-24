@@ -475,7 +475,7 @@ It can be an optional extra for a closed, installed app.
 | App open | an incremental sync about every 60 s |
 | A setlist is **live** | the same tick, every 60 s. There is no faster poll for the live setlist: a late song within a minute is enough, and the fast way is the live channel (below) |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
-| A WebRTC session is up (later) | the leader's changes are pushed to followers; the poll stays as the fallback, back at 60 s |
+| A live session is up (later) | the leader's changes are pushed to followers over a WebSocket (LIVE_SYNC.md); the poll stays as the fallback, back at 60 s |
 
 The intervals and the offline threshold are named constants, not preferences.
 
@@ -560,11 +560,11 @@ moved between folders each have a test of their own.
 - **Same lock and guards as the push:** the Web Lock `chordless-sync`, skipped when offline or
   signed out; never alongside a full sync.
 - **The fast way is the live channel, later.** A leader's changes to a live setlist (an added song,
-  a key, the order) go straight to followers over a session (WebRTC, peer to peer; the Worker's
-  team service may tell members that one has started, and relays nothing it keeps). It is opt-in,
-  and it adds to what a lone user can do. The 60 s tick stays as the fallback for anyone not on it
-  or whose connection drops. A change arrives as the setlist record and lands as below; charts
-  still come through the storage.
+  a key, the order) go straight to followers over a session (a WebSocket relay in the space's Durable Object, which
+  keeps only the latest structure of the setlist, never a chart; designed in LIVE_SYNC.md, which
+  chose it over WebRTC). It is opt-in, and it adds to what a lone user can do. The 60 s tick stays
+  as the fallback for anyone not on it or whose connection drops. A change arrives as the setlist
+  (without chart text) and lands as below; charts still come through the storage.
 - **A pull that changes the open setlist applies in place (built):** a sync that saves setlists tells
   the app (`pulled-setlists.ts`: an event on the window, and a BroadcastChannel for the app's other
   tabs, carrying only ids). The setlist page (`applyPulledSetlist`) reads its setlist again, shows it,
@@ -574,7 +574,7 @@ moved between folders each have a test of their own.
   would overwrite what came in with the next edit. Where this device's unsaved edit and Drive's
   both changed the setlist, Drive's version is what the pull saved and what is shown, as in any
   pull; a reader's replaced changes keep their Undo (`tellOfReset`). A leader's late song is never
-  held back, in or out of live mode (CLAUDE.md, "permissive in the moment"). WebRTC pushes feed
+  held back, in or out of live mode (CLAUDE.md, "permissive in the moment"). Live pushes feed
   the same step.
 
 #### Why nothing new needs storing

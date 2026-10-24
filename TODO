@@ -198,7 +198,7 @@ storage/sync
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). The sync that
   brings the leader's changes while the app is open is built (docs/SYNC_ARCHITECTURE.md, "Pulling while the app is
   open": the incremental sync, its timers, the members clock, applying a pulled setlist to the open page; no faster
-  poll for the live setlist: the live channel, WebRTC, is the fast way); team members get the feed through the
+  poll for the live setlist: the live channel, a WebSocket relay, is the fast way: docs/LIVE_SYNC.md); team members get the feed through the
   Worker too. The Worker role replaces the Drive-capabilities
   trigger later (docs/SPACES.md)
 - variants and editing a chart: plan in docs/VARIANTS.md (origin on each variant, the space's default, a chart editor for fixes and arrangements; the picker's cards and the versions list are built)
@@ -268,7 +268,9 @@ live mode
    overview, then the song again (the section observer's first callback): the media
    player is told "no song" in between, and for that moment the edit button and arrow
    keys act on the overview. tests/live.playwright.ts opens songs with the arrow instead
- - webrtc sync (live session: following the leader's song/section)
+ - live sync of team setlists over a WebSocket relay (designed, not built: docs/LIVE_SYNC.md)
+ - follow the leader's current song/section in a live session (after live sync; an optional `current` in the live setlist)
+ - live sync for share links: faster polling (Step A), then a nudge channel (Step B) (docs/LIVE_SYNC.md, "Share links")
 
 tests
  - tests/songs.playwright.ts "choosing a song opens it at its own URL, and back returns to the
