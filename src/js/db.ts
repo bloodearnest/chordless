@@ -96,6 +96,16 @@ export interface SongUsage {
   order: number
 }
 
+/** What a setlist keeps of its file in Drive: the link, and what was last synced with it */
+const SYNC_LINK_FIELDS = [
+  'fileRef',
+  'fileModified',
+  'fileRev',
+  'lastSyncedAt',
+  'syncedContentHash',
+  '_lastSyncHash',
+] as const
+
 export class ChordlessDB {
   dbName: string
   spaceId: string
@@ -216,6 +226,17 @@ export class ChordlessDB {
     const tx = this.#transaction(['setlists'], 'readwrite')
     const store = tx.objectStore('setlists')
     const stored = cloneForStorage(withNumericTempos(setlist)) as Setlist
+    // A page's copy of a setlist that was not in Drive yet has no link to its file: if a sync sent
+    // it meanwhile, saving that copy as it is would drop the link, and the next sync would send
+    // the setlist again as a second file. The link is the sync's (its own database is quiet)
+    if (!this.quiet && !stored.fileRef) {
+      const current = (await requestResult(store.get(stored.id))) as Setlist | undefined
+      if (current?.fileRef) {
+        for (const field of SYNC_LINK_FIELDS) {
+          if (current[field] !== undefined) stored[field] = current[field]
+        }
+      }
+    }
     store.put(stored)
     const result = await transactionDone(tx, stored)
     this.#changed()

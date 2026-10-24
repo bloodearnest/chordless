@@ -81,3 +81,56 @@ describe('Telling the sync of changes made here', () => {
     expect(count).to.equal(1)
   })
 })
+
+describe('Saving a setlist whose copy was made before it was sent', () => {
+  let db: ChordlessDB
+  afterEach(async () => {
+    db.db?.close()
+    await deleteDatabase(db.dbName)
+  })
+
+  async function open(quiet = false) {
+    db = new ChordlessDB(uniqueName())
+    await db.init()
+    db.quiet = quiet
+  }
+  const link = {
+    fileRef: 'file-1',
+    fileModified: '2026-10-24T08:43:31.439Z',
+    fileRev: 'rev-1',
+    lastSyncedAt: '2026-10-24T08:43:32.000Z',
+    syncedContentHash: 'hash-1',
+  }
+
+  it('keeps the link to its file: a sync sent it after the copy was made', async () => {
+    await open()
+    const copy = makeSetlist({ id: 'late-link' })
+    await db.saveSetlist(copy)
+    // (the sync sends it: its own database is quiet, and saves the link)
+    const sync = new ChordlessDB(db.dbName)
+    await sync.init()
+    sync.quiet = true
+    await sync.saveSetlist({ ...copy, ...link })
+    sync.db?.close()
+
+    await db.saveSetlist({ ...copy, songs: [] })
+
+    expect(await db.getSetlist('late-link')).to.include(link)
+  })
+
+  it('leaves what a sync saves as it is: it is the one that sets the link', async () => {
+    await open(true)
+    await db.saveSetlist({ ...makeSetlist({ id: 'sync-own' }), ...link })
+    await db.saveSetlist({ ...makeSetlist({ id: 'sync-own' }), fileRef: null })
+    expect((await db.getSetlist('sync-own'))?.fileRef).to.equal(null)
+  })
+
+  it('saves a setlist that is not in Drive as it is', async () => {
+    await open()
+    await db.saveSetlist(makeSetlist({ id: 'never-sent' }))
+    await db.saveSetlist(makeSetlist({ id: 'never-sent', name: 'Renamed' }))
+    const saved = await db.getSetlist('never-sent')
+    expect(saved?.name).to.equal('Renamed')
+    expect(saved?.fileRef).to.equal(undefined)
+  })
+})

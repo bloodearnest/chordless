@@ -304,6 +304,15 @@ describe('Drive sync: from the feed of changes', () => {
     expect(phone.changeToken.value).to.equal(place)
   })
 
+  it('names a setlist it sent among those pulled, so a page holding an old copy takes the link to its file', async () => {
+    const { phone } = await twoDevices()
+    const setlist = await addSetlist(phone, { name: 'New' })
+
+    await phone.sync.incrementalSync()
+
+    expect(phone.sync.takePulledSetlistIds()).to.deep.equal([setlist.id])
+  })
+
   it('names a setlist it removed among those pulled, so open pages read the list again', async () => {
     const { phone, tablet } = await twoDevices()
     const setlist = await addSetlist(tablet, { name: 'Soon gone' })

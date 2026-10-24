@@ -79,7 +79,7 @@ export interface SyncSession {
   pullIncomplete: boolean
   /** Whether a file the pull meant to download could not be (a setlist or a song) */
   downloadsFailed: boolean
-  /** The ids of the setlists a pull saved: what an open page showing one must now follow */
+  /** The ids of the setlists a pull saved or removed, or a push linked: what an open page showing one must now follow */
   pulledSetlistIds: Set<string>
   /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
   pendingDeletedRefs: Set<string>

@@ -259,6 +259,7 @@ export async function pushSetlists(
       saved.push(setlist)
     })
     if (saved.length > 0) await session.db.saveSetlistsBatch(saved)
+    for (const setlist of saved) session.pulledSetlistIds.add(setlist.id)
     return saved.length
   }
   const uploadOne = (setlist: Setlist) => pushSetlist(session, setlist)
@@ -310,6 +311,8 @@ export async function pushSetlist(session: SyncSession, setlist: Setlist): Promi
       : await session.space.create('setlists', fileInput(metadata), content)
     recordSetlistUpload(setlist, result)
     await session.db.saveSetlist(setlist)
+    // (a page showing it holds a copy that has no link to the file yet, or an old one)
+    session.pulledSetlistIds.add(setlist.id)
   } catch (error) {
     console.error(`[DriveSync] Failed to push setlist ${setlist.id}:`, error)
     throw error // Re-throw for Promise.allSettled
