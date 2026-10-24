@@ -4,7 +4,7 @@
  * dev pages are hidden, and the email handler. The logic of the routes is tested in Node on its own
  * (worker-router.node.test.ts, worker-session.node.test.ts), so this checks the wiring.
  *
- * The secrets are made up here, so no .dev.vars is needed.
+ * The secrets are made up here (shaped as real ones are), so no .dev.vars is needed.
  */
 
 import assert from 'node:assert/strict'
@@ -15,9 +15,10 @@ import type { TeamSpaceApi } from '../worker/src/team-state.ts'
 import { email } from './make-email.ts'
 
 const secrets = {
-  GOOGLE_CLIENT_ID: 'test-client-id',
-  GOOGLE_CLIENT_SECRET: 'test-client-secret',
-  GOOGLE_API_KEY: 'test-api-key',
+  // (shaped as the real ones are: the Worker checks them as it starts, worker/src/config.ts)
+  GOOGLE_CLIENT_ID: '123456789-testclient.apps.googleusercontent.com',
+  GOOGLE_CLIENT_SECRET: 'GOCSPX-test-client-secret',
+  GOOGLE_API_KEY: `AIza${'x'.repeat(35)}`,
   JWE_ENCRYPTION_KEY: Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64'),
 }
 

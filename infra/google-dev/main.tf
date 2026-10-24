@@ -123,3 +123,13 @@ output "project_number" {
   description = "The Picker app id in .env.development."
   value       = google_project.dev.number
 }
+
+# The ids of the two keys, for `just dev-vars` (it reads their values with gcloud; the values are
+# not in Terraform's outputs).
+output "team_key_uid" {
+  value = google_apikeys_key.team.uid
+}
+
+output "sharing_key_uid" {
+  value = google_apikeys_key.sharing.uid
+}

@@ -39,13 +39,3 @@ test('the page takes its project from the environment, and names none itself', (
     assert.doesNotMatch(source, /['"]\d{12}['"]/, `${file} has a project number in it`)
   }
 })
-
-test('.dev.vars.example names every secret wrangler.toml lists', () => {
-  const example = readFileSync('.dev.vars.example', 'utf8')
-  const toml = readFileSync('wrangler.toml', 'utf8')
-  const secrets = [...toml.matchAll(/^# - (\w+):/gm)].map(match => match[1])
-  assert.ok(secrets.length >= 5, 'wrangler.toml lists the secrets')
-  for (const name of secrets) {
-    assert.match(example, new RegExp(`^${name}=`, 'm'), `${name} is in .dev.vars.example`)
-  }
-})

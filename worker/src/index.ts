@@ -10,6 +10,7 @@
 
 /* v8 ignore start -- needs `cloudflare:email` and the Workers cache: only workerd has them (worker.node.test.ts runs it there, unmeasured) */
 import { EmailMessage } from 'cloudflare:email'
+import { misconfigured } from './config.ts'
 import { handleEmail, type IncomingEmail } from './email.ts'
 import type { Env } from './env.ts'
 import { handleRequest } from './router.ts'
@@ -23,7 +24,10 @@ export { TeamSpace } from './team-space.ts'
  */
 export default {
   fetch(request: Request, env: Env, ctx: { waitUntil(promise: Promise<unknown>): void }) {
-    return handleRequest(request, env, ctx, (caches as unknown as { default: ShareCache }).default)
+    return (
+      misconfigured(request, env) ??
+      handleRequest(request, env, ctx, (caches as unknown as { default: ShareCache }).default)
+    )
   },
 
   /** An email sent to the import address (Cloudflare Email Routing): answered with a link */

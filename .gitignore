@@ -38,3 +38,6 @@ tests/fixtures/private/
 # The real-Drive suite: the test account's credentials and the access token it last minted
 .drive-test.env
 .drive-test/
+
+# .dev.vars when it was production's (just dev-vars moves it here)
+.dev.vars.prod-backup

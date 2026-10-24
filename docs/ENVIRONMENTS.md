@@ -23,13 +23,33 @@ names every secret `wrangler.toml` lists.
 
 ## Setting up dev
 
-1. `.dev.vars` from `.dev.vars.example`: the dev client's id and secret (console, project `setalight`;
-   the id is the one in `.env.development`), the two keys (the `gcloud services api-keys get-key-string`
-   commands in the example), a new `JWE_ENCRYPTION_KEY`.
+1. `just dev-vars` writes `.dev.vars` (readable by you only, from `.dev.vars.example`): the client id from
+   `.env.development`, the dev project's two API keys from gcloud (their ids are Terraform outputs of
+   `infra/google-dev/`), and a new `JWE_ENCRYPTION_KEY`. It asks for the client secret (not shown; or set
+   `DEV_CLIENT_SECRET`): that is in neither gcloud nor Terraform, and the console shows it once, when the
+   secret is made (use "Add secret" on the OAuth client of project `setalight` for a new one). A `.dev.vars` that
+   holds another client's values (production's, as it used to) is moved to `.dev.vars.prod-backup` (delete
+   it when you no longer need it); otherwise values already there are kept and only gaps are filled.
 2. The dev OAuth client needs `http://localhost:8787` (and `http://127.0.0.1:8787`) as authorized JavaScript
-   origins, and the consent screen in Testing mode with the test accounts as test users.
+   origins, and the consent screen in Testing mode with the test accounts as test users. (By hand: the
+   Terraform provider cannot manage them.)
 3. Use a browser profile of its own for development: a profile signed in to prod holds blobs the dev
    Worker cannot read and links to real folders.
+
+## Configuration is declared once and checked
+
+- **The Worker's secrets** are listed in `worker/src/config.ts` (name, whether it is needed, what it is for,
+  what a good value looks like). The Worker checks them as it starts and answers its own paths with a
+  500 naming what is wrong (never the values); `tests/config.node.test.ts` checks that `wrangler.toml` and
+  `.dev.vars.example` list the same ones.
+- **The page's project** is `.env.development` / `.env.production`; `tests/environments.node.test.ts` checks
+  they name different projects, and the Playwright tests check that the build carries production's and the
+  dev server development's.
+- **The Terraform stacks:** `just lint` runs `terraform fmt -check` and `validate` on each (no credentials).
+  `just deploy` first runs `just predeploy`: every stack's plan must say "No changes" (a change made in a
+  console shows up as drift) and the production Worker must have all its required secrets
+  (`scripts/check-prod-secrets.ts`, names only). It needs `gcloud auth login` and `CLOUDFLARE_API_TOKEN`
+  (`infra/README.md`); `INFRA_DRIFT_SKIP="cloudflare"` leaves a stack out, aloud.
 
 ## Production secrets
 

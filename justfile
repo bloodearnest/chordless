@@ -24,6 +24,8 @@ lint:
     npx @biomejs/biome check .
     @echo "Running the TypeScript check..."
     npx tsc -b
+    @echo "Checking the Terraform stacks (format, validity)..."
+    scripts/infra-check.sh lint
     @echo "Running knip (unused files, exports and dependencies)..."
     npx knip --no-progress
     @echo "Checking wrangler.toml (a warning fails)..."
@@ -61,7 +63,17 @@ build:
 preview: build
     npm run preview -- --port 8788
 
-deploy:
+# Write .dev.vars for local development from gcloud and Terraform (docs/ENVIRONMENTS.md)
+dev-vars:
+    node scripts/dev-vars.ts
+
+# Before a deploy: the Terraform stacks match what is real, and the production Worker has its
+# secrets (needs gcloud and CLOUDFLARE_API_TOKEN: infra/README.md; INFRA_DRIFT_SKIP="cloudflare" leaves a stack out)
+predeploy:
+    scripts/infra-check.sh drift
+    node scripts/check-prod-secrets.ts
+
+deploy: predeploy
     npm run deploy
 
 # Keep the same URL: browser data (IndexedDB, sign-in) is tied to that origin.

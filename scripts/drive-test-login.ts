@@ -8,8 +8,8 @@ import { execFile } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { createInterface } from 'node:readline/promises'
 import { CREDENTIAL_VARIABLES, consentUrl, withEnvVariable } from '../tests/drive/node-side.ts'
+import { ask } from './ask.ts'
 
 const ENV_FILE = '.drive-test.env'
 const ACCOUNT_VARIABLE = 'DRIVE_TEST_ACCOUNT'
@@ -19,38 +19,6 @@ const read = () => (existsSync(ENV_FILE) ? readFileSync(ENV_FILE, 'utf8') : '')
 function keep(name: string, value: string) {
   writeFileSync(ENV_FILE, withEnvVariable(read(), name, value), { mode: 0o600 })
   chmodSync(ENV_FILE, 0o600)
-}
-
-/** One line from the terminal; with `hidden`, nothing is shown while it is typed */
-async function ask(question: string, { hidden = false } = {}): Promise<string> {
-  if (!hidden) {
-    const rl = createInterface({ input: process.stdin, output: process.stdout })
-    const answer = await rl.question(question)
-    rl.close()
-    return answer.trim()
-  }
-  process.stdout.write(question)
-  return new Promise(resolve => {
-    let typed = ''
-    process.stdin.setRawMode(true)
-    process.stdin.resume()
-    process.stdin.setEncoding('utf8')
-    const onData = (chunk: string) => {
-      for (const char of chunk) {
-        if (char === '\u0003') process.exit(130)
-        if (char === '\r' || char === '\n') {
-          process.stdin.setRawMode(false)
-          process.stdin.pause()
-          process.stdin.off('data', onData)
-          process.stdout.write('\n')
-          resolve(typed.trim())
-          return
-        }
-        typed = char === '\u007f' ? typed.slice(0, -1) : typed + char
-      }
-    }
-    process.stdin.on('data', onData)
-  })
 }
 
 const env = (name: string) => process.env[name] || undefined

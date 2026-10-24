@@ -40,6 +40,12 @@ own state, so a mistake in one cannot touch the other. `google-chordless/` creat
 `plan` should say "No changes" (in `google-chordless/` too: `terraform output project_number` is the Picker app id). If it does not, someone changed something in a console: either put
 the change in the code or revert it. Prefer a short-lived token, limited to this machine's IP, and delete it after.
 
+## Checks
+
+`just lint` runs `terraform fmt -check` and `validate` on every stack (`scripts/infra-check.sh lint`: no
+credentials). `just deploy` runs `just predeploy` first: `scripts/infra-check.sh drift` (each stack's plan must
+say "No changes") and a check that the production Worker has its secrets (docs/ENVIRONMENTS.md).
+
 ## State
 
 Local, gitignored (`*.tfstate`, `.terraform/`), kept on the developer's machine. It is cheap to lose:
