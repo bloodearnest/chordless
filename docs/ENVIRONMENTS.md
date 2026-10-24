@@ -9,10 +9,15 @@ Two Google Cloud projects, so that development and tests never touch users' data
 | Page's client and Picker app id | `.env.development` | `.env.production` |
 | Worker's secrets | `.dev.vars` (`.dev.vars.example` names them) | Worker secrets, set with `wrangler secret put NAME` |
 | Where the files are | the Drive of the test account(s) | users' own Drives |
+| Folder in My Drive | `Chordless-dev` (`VITE_DRIVE_ROOT_FOLDER` in `.env.development`) | `Chordless` (`.env.production`) |
 
 Under `drive.file` a client sees only the files it made, so dev cannot see prod's files or the reverse:
 local work starts with an empty Drive, and a test account is a safe place for destructive tests.
-Drive API quota and the OAuth consent screen are per project too.
+Drive API quota and the OAuth consent screen are per project too. The two apps keep their files in
+differently named folders (`Chordless-dev` and `Chordless`), because they cannot see each other's and
+would otherwise leave two folders of one name in the same My Drive. The tests read the name the same
+way (`ROOT_FOLDER_NAME` in `drive-client.ts`), and a test checks the production build carries `Chordless`
+and not the dev name.
 
 ## What must agree
 

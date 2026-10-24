@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
 import { driveStorage } from '../src/js/storage/browser-drive.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
 import { type FakeDrive, installFakeDrive } from './fake-drive.ts'
@@ -173,12 +174,14 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
       const { file } = await space.create('shares', share, allBytes, { publicLink: true })
       const stored = fake.files.get(file.ref)
       expect(stored.parents).to.deep.equal([
-        fake.findByPath(['Chordless', 'Grace Church', 'shares']).id,
+        fake.findByPath([ROOT_FOLDER_NAME, 'Grace Church', 'shares']).id,
       ])
       expect(stored.permissions).to.deep.equal([
         { id: 'anyoneWithLink', type: 'anyone', role: 'reader', allowFileDiscovery: false },
       ])
-      expect(fake.findByPath(['Chordless', 'Grace Church', 'shares']).permissions).to.deep.equal([])
+      expect(
+        fake.findByPath([ROOT_FOLDER_NAME, 'Grace Church', 'shares']).permissions
+      ).to.deep.equal([])
       expect(fake.anonymousDownload(file.ref)).to.deep.equal({ status: 200, bytes: allBytes })
     })
 
@@ -254,11 +257,11 @@ describe('Google Drive (on FakeDrive): what the interface leaves to it', () => {
     drive = fake
     const root = await driveStorage.ensureRoot('Grace Church', 'space-1')
     expect(await driveStorage.space(root.ref).list('shares')).to.deep.equal([])
-    expect(fake.findByPath(['Chordless', 'Grace Church', 'shares'])).to.equal(null)
+    expect(fake.findByPath([ROOT_FOLDER_NAME, 'Grace Church', 'shares'])).to.equal(null)
     await driveStorage
       .space(root.ref)
       .create('shares', { name: 'a.share', props: {}, type: 'application/octet-stream' }, 'x')
-    expect(fake.findByPath(['Chordless', 'Grace Church', 'shares'])).to.not.equal(null)
+    expect(fake.findByPath([ROOT_FOLDER_NAME, 'Grace Church', 'shares'])).to.not.equal(null)
   })
 })
 

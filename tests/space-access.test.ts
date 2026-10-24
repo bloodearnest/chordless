@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
@@ -124,7 +125,7 @@ describe('Knowing whether the user can write to the space folder', () => {
   })
 
   describe('the folder being gone', () => {
-    const folderOf = () => drive.findByPath(['Chordless', getCurrentSpace().name])
+    const folderOf = () => drive.findByPath([ROOT_FOLDER_NAME, getCurrentSpace().name])
 
     it('is not a problem while the folder is there', async () => {
       expect(await driveFolderProblem()).to.equal(null)

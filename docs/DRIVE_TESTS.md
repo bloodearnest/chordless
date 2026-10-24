@@ -50,7 +50,7 @@ folder, and it only ever touches folders it made (`drive.file` could not see oth
    not the app's own. Make an OAuth client in it by hand (type Web application with the redirect URI
    `http://127.0.0.1:8976` below, or Desktop app), and a consent screen in Testing mode with the
    test account as a test user. Drive API quota is per project, so the suite cannot use up the real
-   app's.
+   app's. Its files go in a `Chordless-dev` folder (`.env.development`), not `Chordless`.
    (Under `drive.file` an app sees only the files it made itself, so the client that makes the
    files must be the client that reads them, and the suite's files are invisible to the real app.)
 2. `just drive-test-login` uses the dev project's client that `npm run dev` signs in with: the id and

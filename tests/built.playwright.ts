@@ -192,4 +192,7 @@ test('the build is for the production Google project, and carries nothing of the
   expect(built).toContain(prod.VITE_PICKER_APP_ID)
   expect(built).not.toContain(dev.VITE_GOOGLE_CLIENT_ID)
   expect(built).not.toContain(dev.VITE_PICKER_APP_ID)
+  // (the production build keeps its folder in `Chordless`, never the dev app's)
+  expect(built).not.toContain(dev.VITE_DRIVE_ROOT_FOLDER)
+  expect(prod.VITE_DRIVE_ROOT_FOLDER).toBe('Chordless')
 })

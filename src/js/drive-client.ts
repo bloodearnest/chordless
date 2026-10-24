@@ -28,7 +28,13 @@ import { APP_VERSION } from './drive-metadata.ts'
 const DRIVE_API_BASE = 'https://www.googleapis.com/drive/v3'
 const UPLOAD_API_BASE = 'https://www.googleapis.com/upload/drive/v3'
 
-const ROOT_FOLDER_NAME = 'Chordless'
+/**
+ * The folder in My Drive that the space folders go in: `Chordless`, and in dev `Chordless-dev`
+ * (.env.development), so the two apps' folders, which cannot see each other, are not mistaken
+ * for one another
+ */
+/* v8 ignore next -- Node has no Vite env; the page always does */
+export const ROOT_FOLDER_NAME = import.meta.env?.VITE_DRIVE_ROOT_FOLDER ?? 'Chordless'
 const PADS_FOLDER_NAME = 'pads'
 const PADSET_CATEGORY = 'padset'
 const PADSET_FILE_CATEGORY = 'padsetFile'

@@ -378,4 +378,6 @@ test('the development server is for the development Google project, not producti
   const source = await (await page.request.get('/js/google-auth.ts')).text()
   expect(source).toContain(clientOf(dev))
   expect(source).not.toContain(clientOf(prod))
+  const driveClient = await (await page.request.get('/js/drive-client.ts')).text()
+  expect(driveClient).toContain('"VITE_DRIVE_ROOT_FOLDER": "Chordless-dev"')
 })

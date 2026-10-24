@@ -32,6 +32,12 @@ test('dev and prod are different projects, with different clients', () => {
   assert.notEqual(dev.VITE_GOOGLE_CLIENT_ID, prod.VITE_GOOGLE_CLIENT_ID)
 })
 
+test('dev and prod keep their space folders in differently named folders in Drive', () => {
+  assert.equal(prod.VITE_DRIVE_ROOT_FOLDER, 'Chordless')
+  assert.ok(dev.VITE_DRIVE_ROOT_FOLDER)
+  assert.notEqual(dev.VITE_DRIVE_ROOT_FOLDER, prod.VITE_DRIVE_ROOT_FOLDER)
+})
+
 test('the page takes its project from the environment, and names none itself', () => {
   for (const file of ['src/js/google-auth.ts', 'src/js/folder-picker.ts']) {
     const source = readFileSync(file, 'utf8')

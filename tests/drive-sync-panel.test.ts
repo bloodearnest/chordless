@@ -2,6 +2,7 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
 import type { DriveSyncPanel } from '../src/components/drive-sync-panel.ts'
 import { ChordlessDB } from '../src/js/db.ts'
+import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
 import {
   createSpace,
   deleteSpace,
@@ -237,7 +238,7 @@ describe('drive-sync-panel', () => {
       drive = installFakeDrive()
       const { name, id } = getCurrentSpace()
       await (await createSyncOrchestrator(name, id)).sync()
-      drive.files.delete(drive.findByPath(['Chordless', name]).id)
+      drive.files.delete(drive.findByPath([ROOT_FOLDER_NAME, name]).id)
     }
 
     it('says so as soon as it is shown, with the way on', async () => {
@@ -268,7 +269,9 @@ describe('drive-sync-panel', () => {
         timeout: 4000,
       })
       expect(text(el)).to.not.contain('Drive folder not found')
-      expect(must(drive).findByPath(['Chordless', getCurrentSpace().name])).to.not.equal(undefined)
+      expect(must(drive).findByPath([ROOT_FOLDER_NAME, getCurrentSpace().name])).to.not.equal(
+        undefined
+      )
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
       expect(text(el)).to.contain('Ready')
     })
