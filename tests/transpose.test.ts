@@ -133,6 +133,15 @@ describe('parseChord', () => {
     assertEquals(parsed.root, 'A', 'Parse optional chord root')
     assertEquals(parsed.extensions, '2', 'Parse optional chord extension')
   })
+  // SongSelect splits one bracket over two chords: "[(Gsus] [G)]"
+  it('transposes the two halves of a bracket split over two chords', () => {
+    expect(transposeChord('(Gsus', 'G', 'A').chord).to.equal('(Asus')
+    expect(transposeChord('G)', 'G', 'A').chord).to.equal('A)')
+  })
+  it('keeps the bracket in a chord such as Am7(4) as part of the chord', () => {
+    expect(parseChord('Am7(4)').wrapperSuffix).to.equal('')
+    expect(transposeChord('(Am7(4))', 'G', 'A').chord).to.equal('(Bm7(4))')
+  })
 })
 
 describe('transposeNote', () => {

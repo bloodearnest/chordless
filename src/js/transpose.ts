@@ -143,6 +143,28 @@ export interface TransposeResult {
 /**
  * Parse a chord string into components
  */
+/**
+ * Split off the brackets round a chord. A chord can be wrapped by one pair, or by half of a pair
+ * that spans two chords ("[(Gsus] [G)]"): a leading '(' is always a wrapper, and a trailing ')' is
+ * one unless it closes a '(' inside the chord, as in "Am7(4)".
+ */
+function splitParentheses(text: string): { prefix: string; core: string; suffix: string } {
+  let core = text
+  let prefix = ''
+  let suffix = ''
+  if (core.startsWith('(') && core.length > 1) {
+    prefix = '('
+    core = core.slice(1).trim()
+  }
+  const opened = core.split('(').length - 1
+  const closed = core.split(')').length - 1
+  if (core.endsWith(')') && closed > opened) {
+    suffix = ')'
+    core = core.slice(0, -1).trim()
+  }
+  return { prefix, core, suffix }
+}
+
 export function parseChord(chordString: string): ParsedChord {
   // Skip special non-chord values
   if (
@@ -167,15 +189,11 @@ export function parseChord(chordString: string): ParsedChord {
   }
 
   const original = chordString
-  let coreChord = (chordString || '').trim()
-  let wrapperPrefix = ''
-  let wrapperSuffix = ''
-
-  if (coreChord.startsWith('(') && coreChord.endsWith(')') && coreChord.length > 2) {
-    wrapperPrefix = '('
-    wrapperSuffix = ')'
-    coreChord = coreChord.slice(1, -1).trim()
-  }
+  const {
+    prefix: wrapperPrefix,
+    core: coreChord,
+    suffix: wrapperSuffix,
+  } = splitParentheses((chordString || '').trim())
 
   // Split on slash to separate bass note
   const parts = coreChord.split('/')
@@ -536,10 +554,7 @@ function accidentToOffset(accidental: string | undefined): number {
 
 export function isNashvilleChord(chordText: string | null | undefined): boolean {
   if (!chordText) return false
-  let text = chordText.trim()
-  if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
-    text = text.slice(1, -1).trim()
-  }
+  const text = splitParentheses(chordText.trim()).core
   const parts = text.split('/')
   if (!NASHVILLE_CORE_REGEX.test(parts[0])) return false
   if (parts[1] && !NASHVILLE_CORE_REGEX.test(parts[1])) return false
@@ -565,14 +580,7 @@ export function convertNashvilleChordToStandard(
   if (!isNashvilleChord(chordText) || !key) {
     return chordText
   }
-  let text = chordText.trim()
-  let prefix = ''
-  let suffix = ''
-  if (text.startsWith('(') && text.endsWith(')') && text.length > 2) {
-    prefix = '('
-    suffix = ')'
-    text = text.slice(1, -1).trim()
-  }
+  const { prefix, core: text, suffix } = splitParentheses(chordText.trim())
   // (it is a Nashville chord: the root, and the bass if there is one, match)
   const parts = text.split('/')
   const mainMatch = parts[0].match(NASHVILLE_CORE_REGEX) as RegExpMatchArray
