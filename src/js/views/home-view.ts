@@ -19,6 +19,7 @@ import type { Setlist } from '../data-types.ts'
 import { createSetlist, determineSetlistType, getCurrentDB, getNextSunday } from '../db.ts'
 import { goTo } from '../navigation.ts'
 import { claimSetlistsOnce, getCurrentPerson, getSpacePeople } from '../people.ts'
+import { SetlistsPulledEvent } from '../pulled-setlists.ts'
 import { listSharedWithMe } from '../share-receiver.ts'
 import { toast } from '../toast.ts'
 import { setlistTitle, toLocalDateString } from '../utils/date-utils.ts'
@@ -117,6 +118,21 @@ export class HomeView extends PageView {
     args: () => [],
   })
 
+  /** A sync saved or removed setlists: show the list as it is now (the old one stays until then) */
+  #onPulled = (): void => {
+    if (!this.#sharedOnly) void this.#groups.run()
+  }
+
+  override connectedCallback(): void {
+    super.connectedCallback()
+    window.addEventListener(SetlistsPulledEvent.type, this.#onPulled)
+  }
+
+  override disconnectedCallback(): void {
+    super.disconnectedCallback()
+    window.removeEventListener(SetlistsPulledEvent.type, this.#onPulled)
+  }
+
   async #openCreate(): Promise<void> {
     const { people, me } = await getSpacePeople()
     const date = toLocalDateString(getNextSunday())
@@ -203,7 +219,9 @@ export class HomeView extends PageView {
         <div id="setlist-list" class="setlist-list">
           ${this.#groups.render({
             pending: () =>
-              html`<status-message state="loading" message="Loading setlists..."></status-message>`,
+              this.#groups.value
+                ? this.#renderGroups(this.#groups.value)
+                : html`<status-message state="loading" message="Loading setlists..."></status-message>`,
             complete: groups => this.#renderGroups(groups),
             error: error => {
               console.error('Error loading setlists:', error)

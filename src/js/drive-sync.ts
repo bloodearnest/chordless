@@ -676,7 +676,7 @@ export class DriveSyncManager implements SyncSession {
     if (edited.size > 0) await this.db.unlinkFiles(edited)
   }
 
-  /** The ids of the setlists pulled since the last call, for the app to tell its open pages */
+  /** The ids of the setlists pulled or removed since the last call, for the app to tell its open pages */
   takePulledSetlistIds(): string[] {
     const ids = [...this.pulledSetlistIds]
     this.pulledSetlistIds.clear()
@@ -856,6 +856,8 @@ export class DriveSyncManager implements SyncSession {
       if (this.hasLiveFileOfItsOwn(setlist)) continue
       if (setlistHasLocalChanges(setlist)) continue
       await this.db.deleteSetlist(setlist.id)
+      // (the pages showing the setlists are told, as of one pulled: they read them again)
+      this.pulledSetlistIds.add(setlist.id)
       removed++
     }
     return removed

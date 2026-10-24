@@ -5,6 +5,7 @@ import type { SetlistDetailsForm } from '../src/components/setlist-details-form.
 import { SetlistDetailsSaveEvent } from '../src/components/setlist-details-form.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
 import { setRouter } from '../src/js/navigation.ts'
+import { announceSetlistsPulled } from '../src/js/pulled-setlists.ts'
 import {
   createSpace,
   deleteSpace,
@@ -105,6 +106,26 @@ describe('the home view', () => {
     await open(undefined, { name: 'home', shared: true })
     expect(view.querySelector('setlist-group')).to.equal(null)
     expect(view.querySelector('space-tabs')?.hasAttribute('shared')).to.equal(true)
+  })
+
+  it('shows a setlist a sync saved, or removed, without being reopened', async () => {
+    await db.saveSetlist(makeSetlist({ id: 'a', date: '2001-03-04' }))
+    await open()
+    const rows = () =>
+      [...view.querySelectorAll('setlist-group')].flatMap(group =>
+        (group as HTMLElement & { setlists: { id: string }[] }).setlists.map(s => s.id)
+      )
+    expect(rows()).to.deep.equal(['a'])
+
+    await db.saveSetlist(makeSetlist({ id: 'b', date: '2001-04-04' }))
+    announceSetlistsPulled(['b'])
+    await wait(100)
+    expect(rows()).to.have.members(['a', 'b'])
+
+    await db.deleteSetlist('a')
+    announceSetlistsPulled(['a'])
+    await wait(100)
+    expect(rows()).to.deep.equal(['b'])
   })
 
   it('shows the welcome card to someone with no setlists', async () => {
