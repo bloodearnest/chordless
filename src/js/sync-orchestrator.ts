@@ -7,7 +7,12 @@
 
 import type { SetlistEntry } from './data-types.ts'
 import type { SyncProgress } from './drive-sync.ts'
-import { createSyncManager, DriveSyncManager, isSyncAvailable } from './drive-sync.ts'
+import {
+  createSyncManager,
+  createUnlinkedSyncManager,
+  DriveSyncManager,
+  isSyncAvailable,
+} from './drive-sync.ts'
 import type { ResetSetlist } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
@@ -220,6 +225,29 @@ export class SyncOrchestrator {
     await new DriveSyncManager(this.spaceName, this.spaceId).startOver()
     this.syncManager = null
     return this.sync(progressCallback)
+  }
+
+  /**
+   * Replace this device's data with the copy in the Drive folder of this space's name that can be
+   * seen, and link to it (see DriveSyncManager.resetFromFolderByName). For when the linked folder is
+   * gone, which init() would stop at. Whatever is only on this device is lost.
+   * @param progressCallback - Optional callback
+   */
+  async resetFromFolderByName(
+    progressCallback: BroadcastCallback | null = null
+  ): Promise<{ success: true }> {
+    this.syncManager = await createUnlinkedSyncManager(this.spaceName, this.spaceId)
+    try {
+      return await this.#run(
+        'Reset from a Drive folder',
+        {},
+        progressCallback,
+        (manager, progress) => manager.resetFromFolderByName(progress)
+      )
+    } finally {
+      // (the next operation looks for the folder afresh)
+      this.syncManager = null
+    }
   }
 
   /**

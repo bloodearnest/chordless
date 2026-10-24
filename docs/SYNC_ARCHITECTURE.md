@@ -274,6 +274,25 @@ on the device and is uploaded as new files to a folder found or made by name. Th
 first: a setlist with a `fileRef` that is not in the folder, and no changes, is read as deleted in
 Drive and removed here. An old folder that can still be seen is left alone, for the user to delete.
 
+### Replace with the copy in Drive (the linked folder is gone, and another device has synced)
+
+The other way out of the same situation (added 2026-10-25). Start over uploads what this device has.
+When another device has already synced the space with this version of the app, this one wants
+the opposite: to throw away what it has and take that copy. "Reset from Google Drive" cannot,
+because it starts from the stored folder link, which is the old folder, and so stops with the
+folder-gone message. The sync panel's folder-not-found box also offers **Replace with the copy in
+Drive** (`DriveSyncManager.resetFromFolderByName`, via `SyncOrchestrator.resetFromFolderByName`):
+
+- It looks for a folder of the space's name that the signed-in app can see (`findRootByName`,
+  which never makes one). If there is none it changes nothing and says so, so a wrong name cannot
+  empty the device.
+- It links the folder it found, and resets from it as "Reset from Google Drive" does, except that
+  changes not yet in Drive are discarded (`discardLocal`), which is what the person chose, behind a
+  confirmation that says so. The page reloads afterwards.
+- If the reset fails, the old link is put back and the device's data is untouched (it is only
+  cleared once Drive's files have been listed).
+- The space's name must match the Drive folder's: it is how a device finds the folder.
+
 ### Safety rules
 
 - Nothing in sync permanently deletes song or setlist files. (Pad set uploads replace

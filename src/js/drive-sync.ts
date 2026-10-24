@@ -890,8 +890,14 @@ export class DriveSyncManager implements SyncSession {
    * losing work it changes nothing if Drive can't be listed, or if any local
    * record has changes that aren't in Drive (throws UnsyncedChangesError).
    * Per-setlist device preferences (setlist_local) are kept.
+   *
+   * With `discardLocal` the changes that are not in Drive are thrown away too, as a reset from
+   * a folder found by name does (resetFromFolderByName).
    */
-  async resetLocalFromDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
+  async resetLocalFromDrive(
+    progressCallback: ProgressCallback | null = null,
+    { discardLocal = false }: { discardLocal?: boolean } = {}
+  ): Promise<void> {
     try {
       const feedPosition = await this.#feedPosition()
       this.downloadsFailed = false
@@ -901,10 +907,12 @@ export class DriveSyncManager implements SyncSession {
         throw new Error("Couldn't list your Drive files, so nothing was changed. Try again.")
       }
 
-      progressCallback?.({ stage: 'scanning', message: 'Checking for unsynced changes...' })
-      const unsynced = await this.findUnsyncedChanges()
-      if (unsynced.length > 0) {
-        throw new UnsyncedChangesError(unsynced)
+      if (!discardLocal) {
+        progressCallback?.({ stage: 'scanning', message: 'Checking for unsynced changes...' })
+        const unsynced = await this.findUnsyncedChanges()
+        if (unsynced.length > 0) {
+          throw new UnsyncedChangesError(unsynced)
+        }
       }
 
       progressCallback?.({ stage: 'clearing', message: 'Clearing local copy...' })
@@ -922,6 +930,36 @@ export class DriveSyncManager implements SyncSession {
       this._driveFileIds = null
       this.liveSetlistFiles = null
       this.liveSongUuids = null
+    }
+  }
+
+  /**
+   * Replace this device's data with the copy in the folder of this space's name that the signed-in
+   * Google app can see, and link to that folder. For when the linked folder is gone
+   * (DriveFolderGoneError), as after a move to a new Google app that cannot see the old one's
+   * folder, and the folder by name was made by this app on another device. Whatever is only on
+   * this device is lost, so it is for the person to choose. It looks for the folder first and
+   * changes nothing, and makes no folder, if there is none; if the reset fails, the old link
+   * is put back.
+   */
+  async resetFromFolderByName(progressCallback: ProgressCallback | null = null): Promise<void> {
+    await this.open()
+    const folder = await this.storage.findRootByName(this.spaceName)
+    if (!folder || folder.trashed) {
+      throw new Error(
+        `There is no Google Drive folder called "${this.spaceName}" that this app can see, so nothing was changed. Sync it from the device that has the data first.`
+      )
+    }
+    const before = await this.#folderLink.get()
+    await this.#folderLink.set(folder.ref)
+    this.rootRef = folder.ref
+    try {
+      await this.resetLocalFromDrive(progressCallback, { discardLocal: true })
+    } catch (error) {
+      if (before) await this.#folderLink.set(before)
+      else await this.#folderLink.clear()
+      this.rootRef = null
+      throw error
     }
   }
 
@@ -1029,9 +1067,20 @@ export async function createSyncManager(
   spaceName: string,
   spaceId: string | null
 ): Promise<DriveSyncManager> {
-  // (no id means the current space, as the manager itself takes it)
-  const space = await getSpaceById(spaceId ?? getCurrentSpace().id)
-  const manager = new DriveSyncManager(spaceName, spaceId, { storage: storageFor(space) })
+  const manager = await createUnlinkedSyncManager(spaceName, spaceId)
   await manager.init()
   return manager
+}
+
+/**
+ * A manager that has not looked for the space's Drive folder: init() stops if the linked folder
+ * is gone, which is when the way on (starting over, resetting from a folder by name) is needed
+ */
+export async function createUnlinkedSyncManager(
+  spaceName: string,
+  spaceId: string | null
+): Promise<DriveSyncManager> {
+  // (no id means the current space, as the manager itself takes it)
+  const space = await getSpaceById(spaceId ?? getCurrentSpace().id)
+  return new DriveSyncManager(spaceName, spaceId, { storage: storageFor(space) })
 }

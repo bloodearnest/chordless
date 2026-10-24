@@ -10,6 +10,7 @@ import {
   getSpaceById,
   setCurrentSpace,
   setSpaceReadOnly,
+  updateSpace,
 } from '../src/js/space.ts'
 import { createSyncOrchestrator } from '../src/js/sync-orchestrator.ts'
 import { makeSetlist } from './builders.ts'
@@ -285,6 +286,61 @@ describe('drive-sync-panel', () => {
       button(el, /Start over in Drive/)?.click()
       await waitUntil(() => text(el).includes('Failed'), 'it says so', { timeout: 4000 })
       expect(el.syncing).to.equal(false)
+    })
+
+    it('offers to replace this device’s copy with the folder of its name that can be seen', async function () {
+      this.timeout(8000)
+      // (another device made the folder by name; this device's link is to one this app cannot see)
+      drive = installFakeDrive()
+      const { name, id } = getCurrentSpace()
+      await (await createSyncOrchestrator(name, id)).sync()
+      await updateSpace(must(id), { rootRef: 'a-folder-this-app-cannot-see' })
+      const db = new ChordlessDB(must(id))
+      await db.init()
+      await db.saveSetlist(makeSetlist({ id: 'only-here', name: 'Only on this device' }))
+      const el = await show(false) // (keeping the Drive that has the folder)
+      expect(text(el)).to.contain('Drive folder not found')
+
+      must(el._replaceModal.value as AppModal).ask = async () => true
+      let reloads = 0
+      el.reload = () => {
+        reloads++
+      }
+      button(el, /Replace with the copy in Drive/)?.click()
+      await waitUntil(() => reloads === 1, 'it reloads', { timeout: 4000 })
+
+      expect(await db.getSetlist('only-here')).to.equal(undefined)
+      expect(text(el)).to.not.contain('Drive folder not found')
+    })
+
+    it('asks first, and changes nothing when told not to', async () => {
+      await afterFolderGone()
+      const el = await show()
+      must(el._replaceModal.value as AppModal).ask = async () => false
+      button(el, /Replace with the copy in Drive/)?.click()
+      await wait(100)
+      expect(el.syncProgress).to.equal(null)
+      expect(text(el)).to.contain('Drive folder not found')
+    })
+
+    it('says so, and changes nothing, when there is no folder of its name to take it from', async function () {
+      this.timeout(8000)
+      await afterFolderGone()
+      const el = await show()
+      must(el._replaceModal.value as AppModal).ask = async () => true
+      button(el, /Replace with the copy in Drive/)?.click()
+      await waitUntil(() => text(el).includes('nothing was changed'), 'it says so', {
+        timeout: 4000,
+      })
+      expect(el.syncing).to.equal(false)
+    })
+
+    it('does nothing while it is syncing, when replacing', async () => {
+      await afterFolderGone()
+      const el = await show()
+      el.syncing = true
+      await el._handleReplaceFromFolder()
+      expect(el.syncProgress).to.equal(null)
     })
 
     it('does nothing while it is syncing', async () => {

@@ -59,6 +59,7 @@ export class DriveSyncPanel extends LitElement {
 
   _resetModal: Ref<AppModal>
   _startOverModal: Ref<AppModal>
+  _replaceModal: Ref<AppModal>
 
   static override styles = [
     buttonStyles,
@@ -162,6 +163,7 @@ export class DriveSyncPanel extends LitElement {
     super()
     this._resetModal = createRef()
     this._startOverModal = createRef()
+    this._replaceModal = createRef()
     this.folderProblem = null
     this.syncAvailable = false
     this.syncing = false
@@ -270,6 +272,35 @@ export class DriveSyncPanel extends LitElement {
     }
   }
 
+  /** Replace what is on this device with the copy in the Drive folder of this space's name that this app can see */
+  async _handleReplaceFromFolder(): Promise<void> {
+    if (this.syncing || !this.syncAvailable || this.disabled) return
+    if (!(await this._replaceModal.value?.ask())) return
+
+    this.syncing = true
+    this.syncError = null
+    this.syncProgress = { stage: 'starting', message: 'Replacing from Drive...' }
+
+    try {
+      await nameSpaceBeforeSync(this.space)
+      const { id, name } = this.space
+      await new SyncOrchestrator(name, id).resetFromFolderByName(progress => {
+        this.syncProgress = progress
+        this.requestUpdate()
+      })
+      this._recordSyncTime()
+      this.folderProblem = null
+      // Local data changed underneath every page, so reload to show it
+      this.syncProgress = { stage: 'success', message: '✓ Replaced from Drive, reloading...' }
+      setTimeout(() => this.reload(), 1000)
+    } catch (error) {
+      console.error('[DriveSyncPanel] Replacing from a Drive folder failed:', error)
+      this.syncing = false
+      this.syncError = errorMessage(error)
+      this.syncProgress = { stage: 'error', message: `Failed: ${errorMessage(error)}` }
+    }
+  }
+
   override render() {
     if (!this.syncAvailable || this.disabled) {
       return html`
@@ -333,6 +364,17 @@ export class DriveSyncPanel extends LitElement {
           heading="Start over in Google Drive?"
           confirm-label="Start over"
           message="Everything on this device is kept, and uploaded again to a new Drive folder. Share links to this space's setlists stop working: make them again. If you can still see the old folder in Drive, it is left alone: delete it by hand when you are sure."
+        ></app-modal>
+        <button class="btn" ?disabled=${this.syncing} @click=${this._handleReplaceFromFolder}>
+          ⤓ Replace with the copy in Drive
+        </button>
+        <app-modal
+          ${ref(this._replaceModal)}
+          type="confirm"
+          size="small"
+          heading="Replace this device's copy?"
+          confirm-label="Replace"
+          message="For when another device has already synced this space with this version of the app. This device's setlists and songs are replaced with the folder of this name in Google Drive, and anything only on this device is lost. If there is no such folder, nothing is changed."
         ></app-modal>
       </div>
     `
