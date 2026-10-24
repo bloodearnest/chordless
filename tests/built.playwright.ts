@@ -1,5 +1,6 @@
 // The production build (npm run build, served by vite preview): what the dev server can't show.
 
+import { readdirSync, readFileSync } from 'node:fs'
 import { linkFor } from './email-link-for.ts'
 import { expect, test, waitForServiceWorker } from './fixtures.ts'
 import { email } from './make-email.ts'
@@ -171,4 +172,24 @@ test('opening a setlist link works under the Content-Security-Policy', async ({ 
     'https://songselect.ccli.com/songs/1234567'
   )
   expect(violations).toEqual([])
+})
+
+test('the build is for the production Google project, and carries nothing of the development one', () => {
+  const ids = (file: string) =>
+    Object.fromEntries(
+      readFileSync(file, 'utf8')
+        .split('\n')
+        .filter(line => /^VITE_/.test(line))
+        .map(line => line.split(/=(.*)/s).slice(0, 2))
+    ) as Record<string, string>
+  const prod = ids('.env.production')
+  const dev = ids('.env.development')
+  const built = readdirSync('dist/client/assets', { recursive: true })
+    .filter(file => String(file).endsWith('.js'))
+    .map(file => readFileSync(`dist/client/assets/${file}`, 'utf8'))
+    .join('\n')
+  expect(built).toContain(prod.VITE_GOOGLE_CLIENT_ID)
+  expect(built).toContain(prod.VITE_PICKER_APP_ID)
+  expect(built).not.toContain(dev.VITE_GOOGLE_CLIENT_ID)
+  expect(built).not.toContain(dev.VITE_PICKER_APP_ID)
 })

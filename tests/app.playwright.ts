@@ -1,5 +1,6 @@
 // App-wide: themes, loading, display preferences, the menu, modals and the
 // Account and Teams page
+import { readFileSync } from 'node:fs'
 import { expect, openApp, seedSetlist, seedSong, test } from './fixtures.ts'
 import { must } from './must.ts'
 
@@ -365,4 +366,16 @@ test.describe('Account and Teams page', () => {
     await expect(page.locator('space-card')).toHaveCount(1)
     await expect(page.locator('space-card')).toContainText('Current')
   })
+})
+
+test('the development server is for the development Google project, not production', async ({
+  page,
+}) => {
+  const ids = (file: string) => readFileSync(file, 'utf8')
+  const dev = ids('.env.development')
+  const prod = ids('.env.production')
+  const clientOf = (env: string) => env.match(/VITE_GOOGLE_CLIENT_ID=(\S+)/)?.[1] as string
+  const source = await (await page.request.get('/js/google-auth.ts')).text()
+  expect(source).toContain(clientOf(dev))
+  expect(source).not.toContain(clientOf(prod))
 })

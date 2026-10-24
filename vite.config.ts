@@ -18,6 +18,8 @@ export default defineConfig(({ command, isPreview }) => {
 
   return {
     root: 'src',
+    // (the .env.development / .env.production files are at the top: Vite looks in `root` by default)
+    envDir: fileURLToPath(new URL('.', import.meta.url)),
     publicDir: '../public',
     // A server started for the tests (CHORDLESS_PORT) keeps its dependency cache apart: sharing
     // one with the development server on 8787 makes each rewrite the other's, and the browser
