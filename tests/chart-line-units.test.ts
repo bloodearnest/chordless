@@ -24,7 +24,7 @@ describe('groupSegmentsIntoUnits: where a line may break', () => {
     ])
   })
 
-  it('keeps leading space with the chord, so the chord stays over the gap before its word', () => {
+  it('gives the space before a chord’s word to the word before it, so no row starts with a space', () => {
     const units = breakRules([
       { chord: '', lyrics: 'I walk along the ' },
       { chord: 'Am7(4)', lyrics: 'river ' },
@@ -35,10 +35,27 @@ describe('groupSegmentsIntoUnits: where a line may break', () => {
       [['', 'walk ']],
       [['', 'along ']],
       [['', 'the ']],
-      [['Am7(4)', 'river ']],
-      [['C2', ' and ']],
+      [['Am7(4)', 'river  ']],
+      [['C2', 'and ']],
       [['', 'I ']],
       [['', 'just']],
+    ])
+  })
+
+  it('leaves a space where there is no word before it to take it', () => {
+    expect(shape(breakRules([{ chord: 'G', lyrics: ' word' }]))).to.deep.equal([[['G', ' word']]])
+    expect(
+      shape(
+        breakRules([
+          { chord: 'G', lyrics: '' },
+          { chord: 'C', lyrics: ' word' },
+        ])
+      )
+    ).to.deep.equal([
+      [
+        ['G', ''],
+        ['C', ' word'],
+      ],
     ])
   })
 
@@ -84,8 +101,8 @@ describe('groupSegmentsIntoUnits: where a line may break', () => {
     expect(shape(units)).to.deep.equal([
       [['G', 'You ']],
       [
-        ['(Gsus', ' '],
-        ['G)', ' (To '],
+        ['(Gsus', '  '],
+        ['G)', '(To '],
       ],
       [['', 'Bridge)']],
     ])
@@ -136,9 +153,9 @@ describe('groupSegmentsIntoUnits: where a line may break', () => {
       { chord: 'C', lyrics: 'na' },
     ])
     expect(shape(units)).to.deep.equal([
-      [['A', 'Ho']],
+      [['A', 'Ho ']],
       [
-        ['B', ' san'],
+        ['B', 'san'],
         ['C', 'na'],
       ],
     ])

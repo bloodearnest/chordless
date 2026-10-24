@@ -231,6 +231,23 @@ describe('song-section content', () => {
       expect(el.shadowRoot?.querySelector('.chord-spills')).to.equal(null)
     })
 
+    it('never start a word with a space, so a word that starts a row is not indented', async () => {
+      const el = await show([
+        {
+          segments: [
+            { chord: '', lyrics: 'presence ' },
+            { chord: 'C2', lyrics: '  I never ' },
+            { chord: 'G', lyrics: ' want' },
+          ],
+        },
+      ])
+      const texts = [...(el.shadowRoot?.querySelectorAll('.chord-unit .lyrics') ?? [])].map(
+        lyrics => lyrics.textContent as string
+      )
+      expect(texts.every(text => !/^\s/.test(text))).to.equal(true)
+      expect(texts).to.deep.equal(['presence   ', 'I ', 'never  ', 'want'])
+    })
+
     it('wrap between units and never inside one, when the line is narrower than the text', async () => {
       const el = await show([
         {
