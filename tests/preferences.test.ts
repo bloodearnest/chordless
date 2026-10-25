@@ -155,28 +155,28 @@ describe('preferences', () => {
       expect(preferences.getKeepAwakePreference()).to.equal(false)
     })
 
-    it('has a limit of an hour until one is chosen, and only takes the ones on offer', async () => {
+    it('has a limit of half an hour until one is chosen, and only takes the ones on offer', async () => {
       const preferences = await fresh()
-      expect(preferences.getKeepAwakeMinutes()).to.equal(60)
+      expect(preferences.getKeepAwakeMinutes()).to.equal(30)
       const events = heard<InstanceType<Preferences['KeepAwakeLimitEvent']>>(
         'preferences:keep-awake-limit-changed',
         () => {
-          preferences.setKeepAwakeMinutes(30)
+          preferences.setKeepAwakeMinutes(60)
           preferences.setKeepAwakeMinutes(7)
         }
       )
-      expect(events.map(event => event.minutes)).to.deep.equal([30, 60])
+      expect(events.map(event => event.minutes)).to.deep.equal([60, 30])
       preferences.setKeepAwakeMinutes(120)
       expect(preferences.getKeepAwakeMinutes()).to.equal(120)
       localStorage.setItem('keep_awake_minutes', '7')
-      expect(preferences.getKeepAwakeMinutes()).to.equal(60)
+      expect(preferences.getKeepAwakeMinutes()).to.equal(30)
     })
 
     it('turns the limit into milliseconds, or none', async () => {
       const preferences = await fresh()
       expect(preferences.keepAwakeLimitMs(15)).to.equal(15 * 60 * 1000)
       expect(preferences.keepAwakeLimitMs(0)).to.equal(Number.POSITIVE_INFINITY)
-      expect(preferences.keepAwakeLimitMs()).to.equal(60 * 60 * 1000)
+      expect(preferences.keepAwakeLimitMs()).to.equal(30 * 60 * 1000)
     })
   })
 
@@ -200,7 +200,7 @@ describe('preferences', () => {
       const preferences = await fresh()
       block()
       expect(preferences.getKeepAwakePreference()).to.equal(true)
-      expect(preferences.getKeepAwakeMinutes()).to.equal(60)
+      expect(preferences.getKeepAwakeMinutes()).to.equal(30)
       expect(() => preferences.setKeepAwakePreference(false)).to.not.throw()
       expect(() => preferences.setKeepAwakeMinutes(30)).to.not.throw()
     })

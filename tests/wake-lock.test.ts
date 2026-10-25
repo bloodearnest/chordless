@@ -399,12 +399,12 @@ describe('WakeLockController', () => {
 describe('the keep-awake limit setting', () => {
   afterEach(() => localStorage.removeItem('keep_awake_minutes'))
 
-  it('is an hour until chosen, and holds what is chosen', () => {
-    expect(getKeepAwakeMinutes()).to.equal(60)
-    expect(keepAwakeLimitMs()).to.equal(60 * 60 * 1000)
-    setKeepAwakeMinutes(30)
+  it('is half an hour until chosen, and holds what is chosen', () => {
     expect(getKeepAwakeMinutes()).to.equal(30)
     expect(keepAwakeLimitMs()).to.equal(30 * 60 * 1000)
+    setKeepAwakeMinutes(60)
+    expect(getKeepAwakeMinutes()).to.equal(60)
+    expect(keepAwakeLimitMs()).to.equal(60 * 60 * 1000)
   })
 
   it('has no limit at 0, and ignores a value that is not on offer', () => {
@@ -412,8 +412,8 @@ describe('the keep-awake limit setting', () => {
     expect(getKeepAwakeMinutes()).to.equal(0)
     expect(keepAwakeLimitMs()).to.equal(Number.POSITIVE_INFINITY)
     setKeepAwakeMinutes(7)
-    expect(getKeepAwakeMinutes()).to.equal(60)
+    expect(getKeepAwakeMinutes()).to.equal(30)
     localStorage.setItem('keep_awake_minutes', 'banana')
-    expect(getKeepAwakeMinutes()).to.equal(60)
+    expect(getKeepAwakeMinutes()).to.equal(30)
   })
 })

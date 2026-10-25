@@ -17,7 +17,7 @@ import {
  * SetlistView), and on any page while live, if the user has not turned that off in Preferences;
  * never otherwise, to spare the battery.
  *
- * It is also let go after a time with no touch, key press or scroll (an hour unless the user
+ * It is also let go after a time with no touch, key press or scroll (half an hour unless the user
  * chose another: see keepAwakeLimitMs), so a tablet left on a stand overnight does not stay
  * lit: the next touch takes it again. On mains power there is no limit: the Battery Status API
  * (Chromium only) says when the device is charging, which a device with no battery always is, and where it is not available the limit

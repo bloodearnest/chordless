@@ -79,7 +79,7 @@ const KEEP_AWAKE_MINUTES_KEY = 'keep_awake_minutes'
 
 /** The longest the screen is kept awake with no touch, in minutes: 0 is no limit */
 export const KEEP_AWAKE_LIMITS = [15, 30, 60, 120, 240, 0] as const
-export const DEFAULT_KEEP_AWAKE_MINUTES = 60
+export const DEFAULT_KEEP_AWAKE_MINUTES = 30
 
 let cachedUseNashville: boolean | null = null
 let cachedUseUnicodeAccidentals: boolean | null = null

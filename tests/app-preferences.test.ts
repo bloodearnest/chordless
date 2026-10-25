@@ -149,7 +149,7 @@ describe('app-preferences', () => {
       pretend(wakeLock, 'live', false)
       pretend(wakeLock, 'onMains', false)
       expect((await display('active')).detail).to.match(
-        /awake, until there is no touch for 1 hour\.$/
+        /awake, until there is no touch for 30 minutes\.$/
       )
       restores.pop()
       pretend(wakeLock, 'live', true)

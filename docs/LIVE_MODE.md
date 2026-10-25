@@ -78,7 +78,7 @@ setlist: searching the library mid-service shouldn't let the screen sleep.
 
 ### Idle expiry
 
-The wake lock's idle limit (`keepAwakeLimitMs`, default an hour; unlimited on mains power where
+The wake lock's idle limit (`keepAwakeLimitMs`, default half an hour; unlimited on mains power where
 the Battery Status API says so) stays where it is and applies to the lock whether it is wanted
 by an open setlist or by live mode. After the limit with no touch, key press or scroll the lock
 is let go (state `expired`) and the next touch takes it again. The live state is kept: a tablet

@@ -103,13 +103,13 @@ test('the Preferences panel shows the state, and keeps the screen awake while li
   await expect(panel.locator('#keep-awake-limit')).toBeDisabled()
 })
 
-test('the longest time with no touch is chosen in Preferences, and is an hour at first', async ({
+test('the longest time with no touch is chosen in Preferences, and is half an hour at first', async ({
   page,
 }) => {
   await openApp(page, '/preferences')
   const panel = page.locator('app-preferences')
   const limit = panel.locator('#keep-awake-limit')
-  await expect(limit).toHaveValue('60')
+  await expect(limit).toHaveValue('30')
   await expect(limit.locator('option')).toHaveText([
     '15 minutes',
     '30 minutes',
@@ -120,10 +120,10 @@ test('the longest time with no touch is chosen in Preferences, and is an hour at
   ])
 
   await setLive(page, true)
-  await expect(panel.locator('#wake-lock-status')).toContainText('1 hour')
-  await limit.selectOption('30')
   await expect(panel.locator('#wake-lock-status')).toContainText('30 minutes')
-  expect(await page.evaluate(() => localStorage.getItem('keep_awake_minutes'))).toBe('30')
+  await limit.selectOption('60')
+  await expect(panel.locator('#wake-lock-status')).toContainText('1 hour')
+  expect(await page.evaluate(() => localStorage.getItem('keep_awake_minutes'))).toBe('60')
   await limit.selectOption('0')
   await expect(panel.locator('#wake-lock-status')).not.toContainText('no touch for')
 })
@@ -134,7 +134,7 @@ test('there is no time limit on mains power', async ({ page }) => {
   const status = panel.locator('#wake-lock-status')
   await expect(panel.locator('#wake-power')).toContainText('On battery')
   await setLive(page, true)
-  await expect(status).toContainText('until there is no touch for 1 hour')
+  await expect(status).toContainText('until there is no touch for 30 minutes')
 
   await page.evaluate(() => {
     const { battery } = window as unknown as { battery: EventTarget & { charging: boolean } }
