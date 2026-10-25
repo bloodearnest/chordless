@@ -530,7 +530,7 @@ describe('the setlist page: header, menu and keys', () => {
       dialog.dispatchEvent(new SetlistRevertedEvent())
       expect(rendered).to.deep.equal([rig.page.currentSetlistId])
       // (and it is set up once)
-      rig.page._setupDiffers()
+      rig.page._refreshDiffers()
       button.click()
       expect(shown).to.equal(2)
     })

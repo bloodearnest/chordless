@@ -218,14 +218,10 @@ describe('the setlist page: corners', () => {
       $(selector)?.remove()
     }
     rig.page._showHeaderButtons(true)
-    rig.page._setupShare()
-    rig.page._setupDiffers()
-    rig.page._setupLive()
+    rig.page._refreshShare()
+    rig.page._refreshDiffers()
     rig.page._refreshLiveButton()
-    rig.page._appHeaderEventsSetup = false
-    rig.page.setupAppHeaderEvents()
-    rig.page._editModeSetup = false
-    rig.page.setupEditMode()
+    rig.page._listenToControls()
     rig.page.setupKeySelector()
     rig.page.sections.listen()
     rig.page.setupSectionObserver()

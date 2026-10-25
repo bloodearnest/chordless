@@ -340,9 +340,13 @@ describe('the setlist page: sections, key, tempo and capo', () => {
 
     it('has the selector set up once', async () => {
       await rig.open()
-      const handler = rig.page._keyChangeHandler
       rig.page.setupKeySelector()
-      expect(rig.page._keyChangeHandler).to.equal(handler)
+      const changed: string[] = []
+      rig.page.handleKeyChange = async key => {
+        changed.push(key)
+      }
+      document.querySelector('#key-selector')?.dispatchEvent(new KeyChangeEvent('D'))
+      expect(changed).to.deep.equal(['D'])
     })
   })
 
@@ -400,9 +404,15 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       window.dispatchEvent(new CapoPreferenceEvent(true))
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('')
       rig.page.setupCapoSelector()
-      const handler = rig.page._capoChangeHandler
       rig.page.setupCapoSelector()
-      expect(rig.page._capoChangeHandler).to.equal(handler)
+      const changed: unknown[] = []
+      const real = rig.page.handleCapoChange
+      rig.page.handleCapoChange = async value => {
+        changed.push(value)
+      }
+      $('#capo-selector')?.dispatchEvent(new CapoChangeEvent(3))
+      expect(changed).to.deep.equal([3])
+      rig.page.handleCapoChange = real
       setCapoPreference(false)
       window.dispatchEvent(new CapoPreferenceEvent(false))
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('none')

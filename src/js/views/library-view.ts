@@ -47,6 +47,7 @@ import {
   withSpaceName,
 } from '../other-songs.ts'
 import { buildUrl, type Route } from '../router.ts'
+import { isEditMode, setBodyEditMode } from '../setlist/edit-mode-ui.ts'
 import { createLibrarySongModel } from '../song-model-factory.ts'
 import { setSongUserPref } from '../song-user-prefs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
@@ -331,14 +332,12 @@ export class LibraryView extends PageView {
   // ==================== Edit mode ====================
 
   get #editMode(): boolean {
-    return document.body.classList.contains('edit-mode')
+    return isEditMode()
   }
 
   #setEditMode(on: boolean): void {
     const header = this.querySelector<AppHeader>('#library-app-header')
-    document.body.classList.toggle('edit-mode', on)
-    if (on) document.body.setAttribute('data-edit-mode', '')
-    else document.body.removeAttribute('data-edit-mode')
+    setBodyEditMode(on)
     if (header) header.editMode = on
     const keySelector = this.#control<KeySelector>('library-key-selector')
     if (keySelector) keySelector.editMode = on

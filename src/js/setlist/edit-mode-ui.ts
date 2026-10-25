@@ -11,6 +11,17 @@ import type { MusicalMetadataDisplay } from '../../components/musical-metadata-d
 /** How long the controls take to fade, as the CSS has it */
 const FADE_MS = 250
 
+/** Whether edit mode is on: it is <body>'s, for the stylesheet and every page to see */
+export function isEditMode(): boolean {
+  return document.body.classList.contains('edit-mode')
+}
+
+/** Turn edit mode on or off on <body> (what a page shows for it is the page's) */
+export function setBodyEditMode(on: boolean): void {
+  document.body.classList.toggle('edit-mode', on)
+  document.body.toggleAttribute('data-edit-mode', on)
+}
+
 const all = (root: ParentNode, selector: string) => root.querySelectorAll<HTMLElement>(selector)
 
 /** Edit controls fade in, the normal ones out */
@@ -19,8 +30,7 @@ export function enterEditMode(
   appHeader: AppHeader,
   { capoEnabled }: { capoEnabled: boolean }
 ) {
-  document.body.classList.add('edit-mode')
-  document.body.setAttribute('data-edit-mode', '')
+  setBodyEditMode(true)
   appHeader.editMode = true
 
   const musicalMetadata = root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
@@ -44,8 +54,7 @@ export function enterEditMode(
 
 /** Everything fades at once; `whenFaded` is called once it has */
 export function leaveEditMode(root: ParentNode, appHeader: AppHeader, whenFaded: () => void) {
-  document.body.classList.remove('edit-mode')
-  document.body.removeAttribute('data-edit-mode')
+  setBodyEditMode(false)
   appHeader.editMode = false
 
   const musicalMetadata = root.querySelector<MusicalMetadataDisplay>('#musical-metadata')

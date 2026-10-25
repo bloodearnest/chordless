@@ -14,6 +14,7 @@ import {
 import type { HideMode, SectionState } from '../data-types.ts'
 import { getSectionDefaults } from '../preferences.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
+import { isEditMode } from './edit-mode-ui.ts'
 import type { SectionStates } from './local-state.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
 import { defaultHideMode, sectionLabel } from './section-defaults.ts'
@@ -39,7 +40,7 @@ export class SectionController {
   }
 
   applyAll(root: ParentNode = this.host.root) {
-    const isEditMode = document.body.classList.contains('edit-mode')
+    const editing = isEditMode()
 
     // Find all song-section elements, including those inside song-display shadow DOMs
     const sections: SongSection[] = []
@@ -66,7 +67,7 @@ export class SectionController {
       section.hideMode = state.hideMode
       section.isCollapsed = state.isCollapsed
       section.isHidden = state.isHidden
-      section.editMode = isEditMode
+      section.editMode = editing
     })
   }
 
@@ -224,7 +225,7 @@ export class SectionController {
     const wrapper = details.closest<HTMLElement>('.song-section-wrapper') || details
     if (!content) return
 
-    const isEditMode = document.body.classList.contains('edit-mode')
+    const editing = isEditMode()
 
     // Determine if we're opening or closing based on current state
     const isCurrentlyCollapsed = state.isCollapsed
@@ -240,7 +241,7 @@ export class SectionController {
       wrapper.classList.remove('section-collapsed')
 
       // In normal mode, open details; in edit mode it's always open
-      if (!isEditMode) {
+      if (!editing) {
         details.open = true
       }
 
@@ -286,7 +287,7 @@ export class SectionController {
           wrapper.classList.add('section-collapsed')
 
           // In normal mode, close details; in edit mode keep it open
-          if (!isEditMode) {
+          if (!editing) {
             details.open = false
           }
 
@@ -304,12 +305,12 @@ export class SectionController {
       return
     }
     const state = this.resolve(songIndex, sectionIndex, component)
-    const isEditMode = document.body.classList.contains('edit-mode')
+    const editing = isEditMode()
     // Apply state via reactive properties
     component.hideMode = state.hideMode
     component.isCollapsed = state.isCollapsed
     component.isHidden = state.isHidden
-    component.editMode = isEditMode
+    component.editMode = editing
   }
 
   listen() {

@@ -48,7 +48,12 @@ import { getSpacePeople } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
-import { enterEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
+import {
+  enterEditMode,
+  isEditMode,
+  leaveEditMode,
+  setBodyEditMode,
+} from './setlist/edit-mode-ui.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   afterMove,
@@ -138,17 +143,10 @@ export class SetlistPage {
   overviewEditMode: boolean
   _overviewComponent: SetlistOverview | null
   _capoEnabled: boolean
-  _capoChangeHandler: ((event: CapoChangeEvent) => void) | null
-  _keyChangeHandler?: (event: KeyChangeEvent) => void
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
   _currentKeyForCapo: string
   _currentSongForInfo?: RuntimeSong | null
-  _shareSetup = false
-  _differsSetup = false
-  _liveSetup = false
-  _editModeSetup?: boolean
-  _appHeaderEventsSetup?: boolean
   _lastVisibleSection?: string | null
   _isProgrammaticScroll?: boolean
   _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
@@ -213,7 +211,6 @@ export class SetlistPage {
     this.overviewEditMode = false // Track whether overview is in edit mode
     this._overviewComponent = null
     this._capoEnabled = getCapoPreference()
-    this._capoChangeHandler = null
     this._currentKeyForCapo = ''
     this._onSectionDefaultsChanged = this._handleSectionDefaultsChanged.bind(this)
     this._onCapoPreferenceChange = this._handleCapoPreferenceChange.bind(this)
@@ -262,18 +259,20 @@ export class SetlistPage {
     }
   }
 
-  /** The space's database; start() opens it */
   /** The space the setlist is in (a section's song may have preferences of the user's) */
   spaceId(): string {
     return this._database().spaceId
   }
 
+  /** The space's database; start() opens it */
   _database(): ChordlessDB {
     if (!this.db) throw new Error('The setlist page has not been started')
     return this.db
   }
 
   async start() {
+    // (before anything is shown: the header's buttons work as soon as it shows the setlist)
+    this._listenToControls()
     // Initialize IndexedDB with current space
     this.db ??= await getCurrentDB()
 
@@ -294,7 +293,6 @@ export class SetlistPage {
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
   }
 
-  /** The route changed within this setlist: show the song it names */
   /** How far each song (and the overview) is scrolled, to put back if the user returns */
   captureViewState(): SetlistPageState | undefined {
     const scrolls: Record<string, number> = {}
@@ -314,6 +312,7 @@ export class SetlistPage {
     }
   }
 
+  /** The route changed within this setlist: show the song it names */
   routeChanged(route: { songIndex: number }) {
     // (back, back: the route can move on while the setlist is still loading, and what is shown
     // when it has loaded is the route as it is then)
@@ -396,18 +395,13 @@ export class SetlistPage {
         this.songs = []
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
-        this._setupShare()
-        this._setupDiffers()
-        this._setupLive()
+        this._refreshShare()
+        this._refreshDiffers()
+        this._refreshLiveButton()
         this._setOverviewComponent(null)
 
         // Update header to show setlist info
         this.updateHeader(null, true)
-
-        // Header buttons (info, edit mode) must work on an empty setlist too.
-        // Both are guarded, so the full setup after the first song is added is fine.
-        this.setupEditMode()
-        this.setupAppHeaderEvents()
 
         // Clear container (will show Add Song button via overview)
         const container = this._songContainer()
@@ -435,9 +429,9 @@ export class SetlistPage {
       this.songs = songs
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
-      this._setupShare()
-      this._setupDiffers()
-      this._setupLive()
+      this._refreshShare()
+      this._refreshDiffers()
+      this._refreshLiveButton()
 
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs)
@@ -488,11 +482,6 @@ export class SetlistPage {
         this.dispatchSongChange(null)
       }
       this.updateNavigationMenu()
-
-      // The header's buttons (edit mode, info) work as soon as the header shows the setlist,
-      // not a frame later
-      this.setupEditMode()
-      this.setupAppHeaderEvents()
 
       // Wait for layout to complete before other setup
       requestAnimationFrame(() => {
@@ -595,22 +584,6 @@ export class SetlistPage {
     button.title = label
   }
 
-  /** Go live from the header's button, or leave */
-  _setupLive() {
-    const button = this.root.querySelector<HTMLElement>('#live-button')
-    if (!button) return
-    this._refreshLiveButton()
-    if (this._liveSetup) return
-    this._liveSetup = true
-    button.addEventListener('click', () => {
-      if (button.getAttribute('aria-pressed') === 'true') {
-        leaveLive()
-        return
-      }
-      goLive(this._liveUrl(), this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : '')
-    })
-  }
-
   _refreshOverviewComponentEditMode() {
     if (this._overviewComponent) {
       this._overviewComponent.editMode = this.overviewEditMode
@@ -700,13 +673,11 @@ export class SetlistPage {
   }
 
   async exitEditMode() {
-    const isEditMode = document.body.classList.contains('edit-mode')
-    if (isEditMode) {
+    if (isEditMode()) {
       const appHeader = this.root.querySelector<AppHeader>('#app-header')
       const keySelector = this.root.querySelector<KeySelector>('#key-selector')
       const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-      document.body.classList.remove('edit-mode')
-      document.body.removeAttribute('data-edit-mode')
+      setBodyEditMode(false)
       if (appHeader) {
         appHeader.editMode = false
       }
@@ -844,44 +815,101 @@ export class SetlistPage {
     button.classList.toggle('shared', Boolean(this.currentSetlist?.share))
   }
 
-  /** Open the "differs from official" dialog from the header's button, and show the setlist again once reverted */
-  _setupDiffers() {
-    const button = this.root.querySelector<HTMLElement>('#differs-button')
+  /** Hand the "differs from official" dialog the setlist */
+  _refreshDiffers() {
     const dialog = this.root.querySelector<SetlistDiffers>('#setlist-differs')
-    if (!button || !dialog || !this.currentSetlist) return
+    if (!dialog || !this.currentSetlist) return
     dialog.setlist = this.currentSetlist
     dialog.db = this._database()
-    if (this._differsSetup) return
-    this._differsSetup = true
-    button.addEventListener('click', () => {
-      dialog.setlist = this.currentSetlist ?? null
-      dialog.show()
-    })
-    dialog.addEventListener(SetlistRevertedEvent.type, () => {
-      if (this.currentSetlistId) void this.renderSetlist(this.currentSetlistId)
-    })
   }
 
-  /** Hand the share dialog its setlist, and open it from the header's button */
-  _setupShare() {
-    const button = this.root.querySelector<HTMLElement>('#share-button')
+  /** Hand the share dialog the setlist */
+  _refreshShare() {
     const dialog = this.root.querySelector<SetlistShare>('#setlist-share')
-    if (!button || !dialog || !this.currentSetlist) return
+    if (!dialog || !this.currentSetlist) return
     dialog.setlist = this.currentSetlist
     dialog.db = this._database()
     dialog.songs = this.songs
     dialog.linkable = syncsBack()
-    if (this._shareSetup) return
-    this._shareSetup = true
-    button.addEventListener('click', () => {
-      // The page may have a newer copy of the setlist (after its details were edited)
-      dialog.setlist = this.currentSetlist ?? null
-      dialog.songs = this.songs
-      dialog.show()
-    })
-    dialog.addEventListener(SetlistShareChangeEvent.type, () => {
-      button.classList.toggle('shared', Boolean(dialog.setlist?.share))
-    })
+  }
+
+  /**
+   * Listen to the header and its controls, once, for as long as the page is shown: the buttons
+   * (live, share, differs, edit mode, info), the song's settings, and the key and capo pickers.
+   * What each shows is set as the setlist and the song change (the `_refresh...` methods).
+   */
+  _listenToControls() {
+    const { signal } = this._abort
+    const $ = <T extends HTMLElement>(selector: string) => this.root.querySelector<T>(selector)
+
+    const live = $('#live-button')
+    live?.addEventListener(
+      'click',
+      () => {
+        if (live.getAttribute('aria-pressed') === 'true') {
+          leaveLive()
+          return
+        }
+        const title = this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : ''
+        goLive(this._liveUrl(), title)
+      },
+      { signal }
+    )
+
+    const share = $('#share-button')
+    const shareDialog = $<SetlistShare>('#setlist-share')
+    if (share && shareDialog) {
+      share.addEventListener(
+        'click',
+        () => {
+          if (!this.currentSetlist) return
+          // The page may have a newer copy of the setlist (after its details were edited)
+          shareDialog.setlist = this.currentSetlist
+          shareDialog.songs = this.songs
+          shareDialog.show()
+        },
+        { signal }
+      )
+      shareDialog.addEventListener(
+        SetlistShareChangeEvent.type,
+        () => share.classList.toggle('shared', Boolean(shareDialog.setlist?.share)),
+        { signal }
+      )
+    }
+
+    const differs = $('#differs-button')
+    const differsDialog = $<SetlistDiffers>('#setlist-differs')
+    if (differs && differsDialog) {
+      differs.addEventListener(
+        'click',
+        () => {
+          if (!this.currentSetlist) return
+          differsDialog.setlist = this.currentSetlist
+          differsDialog.show()
+        },
+        { signal }
+      )
+      differsDialog.addEventListener(
+        SetlistRevertedEvent.type,
+        () => {
+          if (this.currentSetlistId) void this.renderSetlist(this.currentSetlistId)
+        },
+        { signal }
+      )
+    }
+
+    this._listenToHeader(signal)
+
+    $<KeySelector>('#key-selector')?.addEventListener(
+      KeyChangeEvent.type,
+      event => void this.handleKeyChange(event.value),
+      { signal }
+    )
+    $<CapoSelector>('#capo-selector')?.addEventListener(
+      CapoChangeEvent.type,
+      event => void this.handleCapoChange(event.value),
+      { signal }
+    )
   }
 
   dispatchSongChange(song: RuntimeSong | null) {
@@ -1174,67 +1202,69 @@ export class SetlistPage {
     )
   }
 
-  setupEditMode() {
-    if (this._editModeSetup) return
-    this._editModeSetup = true
-
+  /** The header's edit mode and info buttons, its expanding, and the song's settings */
+  _listenToHeader(signal: AbortSignal) {
     const appHeader = this.root.querySelector<AppHeader>('#app-header')
     if (!appHeader) return
 
     // Listen to the edit-mode-toggle event from app-header
-    appHeader.addEventListener(EditModeToggleEvent.type, async () => {
-      // Check if we're on overview or song view
-      if (this.currentSongIndex < 0) {
-        // We're on overview - toggle overview edit mode
-        this.toggleOverviewEditMode()
-        return
-      }
+    appHeader.addEventListener(
+      EditModeToggleEvent.type,
+      () => {
+        // Check if we're on overview or song view
+        if (this.currentSongIndex < 0) {
+          // We're on overview - toggle overview edit mode
+          this.toggleOverviewEditMode()
+          return
+        }
 
-      // We're on song view - handle song edit mode
-      if (!document.body.classList.contains('edit-mode')) {
-        enterEditMode(this.root, appHeader, {
-          capoEnabled: this._capoEnabled,
-        })
-        // Update all sections based on edit mode
-        this.sections.applyAll()
-      } else {
-        // (each edit saved itself as it was made: this stamps the setlist as modified)
-        leaveEditMode(this.root, appHeader, async () => {
-          await this.editSetlist(() => undefined)
-        })
-        // Refresh song sections immediately so their controls begin fading out in sync
-        this.sections.applyAll()
-      }
-    })
-  }
-
-  setupAppHeaderEvents() {
-    if (this._appHeaderEventsSetup) return
-    this._appHeaderEventsSetup = true
-
-    const appHeader = this.root.querySelector<AppHeader>('#app-header')
-    if (!appHeader) return
+        // We're on song view - handle song edit mode
+        if (!isEditMode()) {
+          enterEditMode(this.root, appHeader, {
+            capoEnabled: this._capoEnabled,
+          })
+          // Update all sections based on edit mode
+          this.sections.applyAll()
+        } else {
+          // (each edit saved itself as it was made: this stamps the setlist as modified)
+          leaveEditMode(this.root, appHeader, async () => {
+            await this.editSetlist(() => undefined)
+          })
+          // Refresh song sections immediately so their controls begin fading out in sync
+          this.sections.applyAll()
+        }
+      },
+      { signal }
+    )
 
     // Listen to info button clicks
-    appHeader.addEventListener(HeaderInfoClickEvent.type, () => {
-      if (this._currentSongForInfo) {
-        this.showSongInfo(this._currentSongForInfo)
-      } else {
-        this.showSetlistInfo()
-      }
-    })
+    appHeader.addEventListener(
+      HeaderInfoClickEvent.type,
+      () => {
+        if (this._currentSongForInfo) {
+          this.showSongInfo(this._currentSongForInfo)
+        } else {
+          this.showSetlistInfo()
+        }
+      },
+      { signal }
+    )
 
     // Listen for header-expand-toggle event
-    appHeader.addEventListener(HeaderExpandToggleEvent.type, e => {
-      const { expanded } = e
-      if (expanded) {
-        document.body.classList.add('header-expanded')
-        document.documentElement.style.setProperty('--header-expanded', '1')
-      } else {
-        document.body.classList.remove('header-expanded')
-        document.documentElement.style.setProperty('--header-expanded', '0')
-      }
-    })
+    appHeader.addEventListener(
+      HeaderExpandToggleEvent.type,
+      e => {
+        const { expanded } = e
+        if (expanded) {
+          document.body.classList.add('header-expanded')
+          document.documentElement.style.setProperty('--header-expanded', '1')
+        } else {
+          document.body.classList.remove('header-expanded')
+          document.documentElement.style.setProperty('--header-expanded', '0')
+        }
+      },
+      { signal }
+    )
 
     // Setup song settings popover
     const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
@@ -1245,30 +1275,39 @@ export class SetlistPage {
       songSettingsPopover.setTriggerButton(musicalMetadata)
 
       // Listen to musical metadata clicks (only works in edit mode)
-      musicalMetadata.addEventListener(SongSettingsClickEvent.type, () => {
-        songSettingsPopover.toggle()
-      })
+      musicalMetadata.addEventListener(
+        SongSettingsClickEvent.type,
+        () => songSettingsPopover.toggle(),
+        { signal }
+      )
 
-      songSettingsPopover.addEventListener(BpmChangeEvent.type, async e => {
-        const newValue = e.value
-        await this.handleBPMChange(newValue)
-      })
+      songSettingsPopover.addEventListener(
+        BpmChangeEvent.type,
+        event => void this.handleBPMChange(event.value),
+        { signal }
+      )
 
-      songSettingsPopover.addEventListener(PadSetChoiceEvent.type, e => {
-        this.saveSongMediaPref('padSetId', e.value)
-      })
+      songSettingsPopover.addEventListener(
+        PadSetChoiceEvent.type,
+        event => this.saveSongMediaPref('padSetId', event.value),
+        { signal }
+      )
 
-      songSettingsPopover.addEventListener(SongResetClickEvent.type, async () => {
-        // Close the settings first, so the question is the only thing showing
-        songSettingsPopover.close()
-        const modal = this.root.querySelector<AppModal>('#reset-confirm-modal')
-        if (modal) {
-          const confirmed = await modal.ask()
-          if (confirmed) {
-            await this.resetCurrentSong()
+      songSettingsPopover.addEventListener(
+        SongResetClickEvent.type,
+        async () => {
+          // Close the settings first, so the question is the only thing showing
+          songSettingsPopover.close()
+          const modal = this.root.querySelector<AppModal>('#reset-confirm-modal')
+          if (modal) {
+            const confirmed = await modal.ask()
+            if (confirmed) {
+              await this.resetCurrentSong()
+            }
           }
-        }
-      })
+        },
+        { signal }
+      )
     }
   }
 
@@ -1289,7 +1328,7 @@ export class SetlistPage {
     keySelector.value = selectedKey
     keySelector.keys = keys
     keySelector.originalKey = originalKey ?? ''
-    keySelector.editMode = document.body.classList.contains('edit-mode')
+    keySelector.editMode = isEditMode()
   }
 
   updateCapoSelector(value: unknown, currentKey: string | null | undefined = null) {
@@ -1299,21 +1338,11 @@ export class SetlistPage {
     capoSelector.value = normalizeCapo(value)
     capoSelector.referenceKey = currentKey || this._currentKeyForCapo || ''
     this._currentKeyForCapo = capoSelector.referenceKey
-    capoSelector.editMode = document.body.classList.contains('edit-mode')
+    capoSelector.editMode = isEditMode()
   }
 
+  /** Show the current song's key in the key picker */
   setupKeySelector() {
-    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-    if (!keySelector) return
-
-    if (!this._keyChangeHandler) {
-      this._keyChangeHandler = async e => {
-        const newKey = e.value
-        await this.handleKeyChange(newKey)
-      }
-      keySelector.addEventListener(KeyChangeEvent.type, this._keyChangeHandler)
-    }
-
     // Initialize with current song's key
     if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
       const currentKey = this.songs[this.currentSongIndex].currentKey
@@ -1330,14 +1359,6 @@ export class SetlistPage {
     capoSelector.style.display = this._capoEnabled ? '' : 'none'
     if (!this._capoEnabled) {
       return
-    }
-
-    if (!this._capoChangeHandler) {
-      this._capoChangeHandler = event => {
-        const newValue = event.value
-        this.handleCapoChange(newValue)
-      }
-      capoSelector.addEventListener(CapoChangeEvent.type, this._capoChangeHandler)
     }
 
     // (no song is current on the overview: its index is -1)
@@ -1383,31 +1404,37 @@ export class SetlistPage {
     this.dispatchSongChange(song)
   }
 
+  /**
+   * Save a change to a song's settings (through its SongModel), show the new value in the
+   * header's metadata, and bring the settings popover up to date
+   */
+  async _saveSongSetting(
+    song: RuntimeSong,
+    change: (model: Awaited<ReturnType<SetlistPage['_songModel']>>) => void,
+    shown: Partial<Pick<MusicalMetadataDisplay, 'keyValue' | 'capoValue' | 'bpm'>>
+  ) {
+    const model = await this._songModel(song)
+    change(model)
+    await model.save()
+    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
+    if (musicalMetadata) Object.assign(musicalMetadata, shown)
+    this.updateSongSettingsPopover()
+  }
+
+  /** Tell the media player which song is current now (its tempo, time or key may have changed) */
+  _tellMediaPlayer() {
+    const song = this.songs[this.currentSongIndex]
+    if (song) this.dispatchSongChange(song)
+  }
+
   async handleBPMChange(newValue: number) {
     if (this.currentSongIndex < 0) return
     const song = this.songs[this.currentSongIndex]
     if (!song || song.currentBPM === newValue) return
 
     song.currentBPM = newValue
-
-    // Use SongModel to persist the change
-    const model = await this._songModel(song)
-    model.setTempo(newValue)
-    await model.save()
-
-    // Update the musical metadata display with the new BPM
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    if (musicalMetadata) {
-      musicalMetadata.bpm = newValue
-    }
-
-    // Update the song settings popover
-    this.updateSongSettingsPopover()
-
-    // Notify media player so it refreshes tempo data
-    if (this.songs[this.currentSongIndex]) {
-      this.dispatchSongChange(this.songs[this.currentSongIndex])
-    }
+    await this._saveSongSetting(song, model => model.setTempo(newValue), { bpm: newValue })
+    this._tellMediaPlayer()
   }
 
   async handleCapoChange(newValue: unknown) {
@@ -1417,57 +1444,26 @@ export class SetlistPage {
     if (!song || song.currentCapo === normalized) return
 
     song.currentCapo = normalized
-
-    // Use SongModel to persist the change
-    const model = await this._songModel(song)
-    model.setCapo(normalized)
-    await model.save()
-
+    const index = this.currentSongIndex
+    await this._saveSongSetting(song, model => model.setCapo(normalized), {
+      capoValue: normalized,
+    })
     this.updateCapoSelector(normalized, song.currentKey)
-    this._updateSongDisplayCapo(this.currentSongIndex, normalized)
-
-    // Update the musical metadata display with the new capo value
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    if (musicalMetadata) {
-      musicalMetadata.capoValue = normalized
-    }
-
-    // Update the song settings popover
-    this.updateSongSettingsPopover()
+    this._updateSongDisplayCapo(index, normalized)
   }
 
   async handleKeyChange(newKey: string) {
     if (!newKey || this.currentSongIndex < 0) return
 
     const song = this.songs[this.currentSongIndex]
-
-    // Update key in runtime song object
     song.currentKey = newKey
-
-    // Use SongModel to persist the change
-    const model = await this._songModel(song)
-    model.setKey(newKey)
-    await model.save()
+    const index = this.currentSongIndex
+    await this._saveSongSetting(song, model => model.setKey(newKey), { keyValue: newKey })
 
     // Re-render the song with transposition
-    await this.reRenderSong(this.currentSongIndex)
-
-    // Update the key selector with the new key
+    await this.reRenderSong(index)
     this.updateKeySelector(newKey)
-
-    // Update the musical metadata display with the new key
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    if (musicalMetadata) {
-      musicalMetadata.keyValue = newKey
-    }
-
-    // Update the song settings popover
-    this.updateSongSettingsPopover()
-
-    // Notify media player so it refreshes tempo/time/key data
-    if (this.songs[this.currentSongIndex]) {
-      this.dispatchSongChange(this.songs[this.currentSongIndex])
-    }
+    this._tellMediaPlayer()
 
     // Ensure the pad for this key is cached for upcoming playback
     preloadPadKey(newKey)
@@ -1850,7 +1846,7 @@ export class SetlistPage {
       goTo: index => this.navigateTo(index),
       scrollAmount: CONFIG.KEYBOARD_SCROLL_AMOUNT,
       onEscape: () => {
-        if (!document.body.classList.contains('edit-mode')) return false
+        if (!isEditMode()) return false
         this.root.querySelector<AppHeader>('#app-header')?.dispatchEvent(new EditModeToggleEvent())
         return true
       },
