@@ -36,8 +36,9 @@ of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and
 | `ci-ok` | | every job above passed or was skipped | all |
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
-ruleset. The macOS and Windows jobs are new to CI and `continue-on-error`: they show their result but
-do not fail `ci-ok`. Make them required (drop `continue-on-error`) once they have been green for a while.
+ruleset. The macOS and Windows jobs are new to CI: they show their result, but `ci-ok` does not wait for
+them and they are `continue-on-error`. Make them required (add `e2e` to `ci-ok`'s `needs`, drop
+`continue-on-error`) once they have been green for a while.
 
 `just ci` runs the Linux jobs' checks in order, and fails if they changed any file. CI never writes to
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or

@@ -25,10 +25,11 @@ mkdir -p "$dir"
 curl --fail --silent --show-error --location --retry 3 --output "$dir/$name" \
   "https://github.com/jdx/mise/releases/download/v$VERSION/mise-v$VERSION-$platform"
 
+# (from stdin: given a path with a backslash, as on Windows, sha256sum puts one before the sum)
 if command -v sha256sum >/dev/null; then
-  actual=$(sha256sum "$dir/$name" | cut -d' ' -f1)
+  actual=$(sha256sum <"$dir/$name" | cut -d' ' -f1)
 else
-  actual=$(shasum -a 256 "$dir/$name" | cut -d' ' -f1)
+  actual=$(shasum -a 256 <"$dir/$name" | cut -d' ' -f1)
 fi
 if [ "$actual" != "$sum" ]; then
   rm -f "$dir/$name"
