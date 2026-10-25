@@ -7,7 +7,7 @@ import {
   saveSongUserPrefs,
 } from '../song-user-prefs.ts'
 import { normalizeCapo } from '../utils/capo.ts'
-import { SongModel } from './song-model.ts'
+import type { SongModel } from './song-model.ts'
 
 /**
  * LibrarySong - Song model for library view
@@ -29,7 +29,7 @@ interface PendingChanges {
   sectionStates: Record<number, SectionState>
 }
 
-export class LibrarySong extends SongModel {
+export class LibrarySong implements SongModel {
   _song: LoadedSong
   _db: ChordlessDB
   _spaceId: string
@@ -41,7 +41,6 @@ export class LibrarySong extends SongModel {
    * @param spaceId - Space ID
    */
   constructor(song: LoadedSong, db: ChordlessDB, spaceId: string) {
-    super()
     this._song = song
     this._db = db
     this._spaceId = spaceId
@@ -57,29 +56,29 @@ export class LibrarySong extends SongModel {
 
   // ==================== Core Properties ====================
 
-  override get id(): string {
+  get id(): string {
     return this._song.id
   }
 
-  override get uuid(): string {
+  get uuid(): string {
     return this._song.uuid
   }
 
-  override get title(): string {
+  get title(): string {
     return this._song.title || 'Untitled'
   }
 
-  override get artist(): string | null {
+  get artist(): string | null {
     return this._song.author || this._song.artist || null
   }
 
-  override get parsed(): ParsedChart {
+  get parsed(): ParsedChart {
     return this._song.parsed
   }
 
   // ==================== Mutable Properties ====================
 
-  override getKey(): string | null | undefined {
+  getKey(): string | null | undefined {
     // Return pending change if it exists, otherwise current key
     if (this._pendingChanges.key !== null) {
       return this._pendingChanges.key
@@ -87,15 +86,15 @@ export class LibrarySong extends SongModel {
     return this._song.key
   }
 
-  override setKey(key: string): void {
+  setKey(key: string): void {
     this._pendingChanges.key = key
   }
 
-  override getOriginalKey(): string | null | undefined {
+  getOriginalKey(): string | null | undefined {
     return this._song.originalKey || this._song.key
   }
 
-  override getTempo(): number | null | undefined {
+  getTempo(): number | null | undefined {
     // Return pending change if it exists, otherwise current tempo
     if (this._pendingChanges.tempo !== null) {
       return this._pendingChanges.tempo
@@ -103,15 +102,15 @@ export class LibrarySong extends SongModel {
     return this._song.tempo
   }
 
-  override setTempo(tempo: number): void {
+  setTempo(tempo: number): void {
     this._pendingChanges.tempo = tempo
   }
 
-  override getOriginalTempo(): number | null | undefined {
+  getOriginalTempo(): number | null | undefined {
     return this._song.originalTempo || this._song.tempo
   }
 
-  override getCapo(): number {
+  getCapo(): number {
     // Return pending change if it exists
     if (this._pendingChanges.capo !== null) {
       return this._pendingChanges.capo
@@ -126,7 +125,7 @@ export class LibrarySong extends SongModel {
     return 0
   }
 
-  override setCapo(capo: number | string): void {
+  setCapo(capo: number | string): void {
     this._pendingChanges.capo = normalizeCapo(capo)
   }
 
@@ -159,7 +158,7 @@ export class LibrarySong extends SongModel {
 
   // ==================== Persistence ====================
 
-  override async save(): Promise<void> {
+  async save(): Promise<void> {
     // Save key and tempo to database
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
       const { key, tempo } = this._pendingChanges
@@ -208,7 +207,7 @@ export class LibrarySong extends SongModel {
     }
   }
 
-  override async reset(): Promise<void> {
+  async reset(): Promise<void> {
     // Reset key and tempo to original values
     this._pendingChanges.key = this.getOriginalKey() ?? null
     this._pendingChanges.tempo = this.getOriginalTempo() ?? null

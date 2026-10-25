@@ -194,6 +194,9 @@ offline
   DevTools are awkward (a ChromeOS tablet).
 
 storage/sync
+- `DriveSyncManager` (drive-sync.ts) syncs team storage too: a name for what it is (`SyncManager`)
+- `hashText` (utils/hash.ts), which sync compares to tell an edit, is a 32-bit hash: a collision is a
+  missed change. A stronger one (SHA-256) means a migration of the hashes kept on records
 - the Team storage service account should move to a Google Cloud project of its own: docs/CLOUD_MIGRATION.md, step 6
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). The sync that

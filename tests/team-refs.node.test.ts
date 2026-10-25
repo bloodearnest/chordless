@@ -157,6 +157,7 @@ describe('a member of the team, with the owner syncing straight to Drive', () =>
       space: async () => rig.space,
       root: async () => ({ ref: rig.root, name: 'Team', trashed: false }),
       owns: (_, ref) => rig.state.owns(ref),
+      ownedAmong: (_, refs) => rig.state.ownedAmong(refs),
     }
     const call = (path: string, init?: RequestInit) =>
       handleTeamRequest(

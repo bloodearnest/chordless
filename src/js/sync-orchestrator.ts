@@ -18,6 +18,7 @@ import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
+import { errorMessage } from './utils/errors.ts'
 
 /** Progress as this layer sends it: with the time, and the error's message on failure */
 export interface SyncBroadcast extends SyncProgress {
@@ -26,10 +27,6 @@ export interface SyncBroadcast extends SyncProgress {
 }
 
 export type BroadcastCallback = (progress: SyncBroadcast) => void
-
-function messageOf(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
-}
 
 /** How much of what changed a toast spells out */
 const SUMMARY_LIMIT = 4
@@ -74,7 +71,7 @@ async function tellOfReset(manager: DriveSyncManager): Promise<void> {
             db.saveSetlist(before).catch(error =>
               toast("Couldn't put your changes back.", {
                 kind: 'error',
-                details: messageOf(error),
+                details: errorMessage(error),
               })
             )
           }
@@ -155,8 +152,8 @@ export class SyncOrchestrator {
       console.error(`[SyncOrchestrator] ${name} failed:`, error)
       progressCallback?.({
         stage: 'error',
-        message: messageOf(error),
-        error: messageOf(error),
+        message: errorMessage(error),
+        error: errorMessage(error),
         timestamp: new Date().toISOString(),
       })
       throw error

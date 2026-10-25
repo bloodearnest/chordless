@@ -3,6 +3,7 @@
  * file's md5Checksum. WebCrypto has no MD5 (it is broken for security), but here it only checks
  * that Drive stored the bytes we sent, so it is fine.
  */
+import { toHex } from './bytes.ts'
 
 const SHIFTS = [
   ...Array(4).fill([7, 12, 17, 22]).flat(),
@@ -65,5 +66,5 @@ export function md5Hex(text: string): string {
 
   const out = new DataView(new ArrayBuffer(16))
   for (const [i, word] of [a0, b0, c0, d0].entries()) out.setInt32(i * 4, word, true)
-  return [...new Uint8Array(out.buffer)].map(byte => byte.toString(16).padStart(2, '0')).join('')
+  return toHex(new Uint8Array(out.buffer))
 }

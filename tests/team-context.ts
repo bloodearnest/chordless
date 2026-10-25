@@ -49,6 +49,11 @@ export async function makeTeamRig(): Promise<TeamRig> {
       const root = rootOf(id)
       return storage.everything(f => f.root === root && f.ref === ref).length > 0
     },
+    async ownedAmong(id, refs) {
+      const root = rootOf(id)
+      const here = new Set(storage.everything(f => f.root === root).map(f => f.ref))
+      return refs.filter(ref => here.has(ref))
+    },
   }
 
   const fetchTeam = (async (input: RequestInfo | URL, init?: RequestInit) => {

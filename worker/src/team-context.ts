@@ -34,13 +34,17 @@ function resolve(env: Env, deps: TeamDeps) {
   }
 }
 
+/** A space's Durable Object, by the space's id */
+const roomsOf = (teamSpaces: NonNullable<Env['TEAM_SPACE']>) => (spaceId: string) =>
+  teamSpaces.get(teamSpaces.idFromName(spaceId))
+
 export function createTeamContext(
   env: Env,
   teamSpaces: NonNullable<Env['TEAM_SPACE']>,
   deps: TeamDeps = {}
 ): TeamContext {
   const { providers, google, now } = resolve(env, deps)
-  const room = (spaceId: string) => teamSpaces.get(teamSpaces.idFromName(spaceId))
+  const room = roomsOf(teamSpaces)
 
   // (a request's space is looked up once; its token source is shared by the calls it makes)
   const drives = new Map<string, ReturnType<typeof open>>()
@@ -72,6 +76,7 @@ export function createTeamContext(
       return root && { ref: root.ref, name: root.name, trashed: root.trashed }
     },
     owns: (spaceId, ref) => room(spaceId).owns(ref),
+    ownedAmong: (spaceId, refs) => room(spaceId).ownedAmong(refs),
   }
 }
 
@@ -84,7 +89,7 @@ export function createAdminContext(
   const { providers, google, now } = resolve(env, deps)
   return {
     identify: request => authenticate(request, providers),
-    room: spaceId => teamSpaces.get(teamSpaces.idFromName(spaceId)),
+    room: roomsOf(teamSpaces),
     async inspectRoot(blob, owner, rootRef) {
       // (the blob is not stored yet: it is what the space would be made from)
       const info = { rootRef, name: '', owner, createdAt: '' }

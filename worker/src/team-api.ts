@@ -50,6 +50,8 @@ export interface TeamContext {
    * knows another file's ref gets nothing of it.
    */
   owns(spaceId: string, ref: string): Promise<boolean>
+  /** Those of these refs that belong to the space: one question for a batch */
+  ownedAmong(spaceId: string, refs: string[]): Promise<string[]>
 }
 
 const COLLECTIONS: Collection[] = ['songs', 'setlists', 'shares']
@@ -123,6 +125,7 @@ export async function handleTeamRequest(
       if (!atLeast(role, 'writer')) throw new Refusal(403, 'This role may not change files')
     }
     const owned = async (ref: string) => (await context.owns(spaceId, ref)) === true
+    const ownedOf = async (refs: string[]) => new Set(await context.ownedAmong(spaceId, refs))
 
     if (method === 'GET' && rest === '/root') {
       const root = await context.root(spaceId)
@@ -160,10 +163,10 @@ export async function handleTeamRequest(
       const refs = asList((await readJson(request)).refs, 'refs')
       const wanted = refs.filter((ref): ref is string => typeof ref === 'string')
       if (wanted.length !== refs.length) throw new Refusal(400, 'A ref is not text')
-      const here = await Promise.all(wanted.map(owned))
-      const texts = await space.readMany(wanted.filter((_, i) => here[i]))
+      const here = await ownedOf(wanted)
+      const texts = await space.readMany(wanted.filter(ref => here.has(ref)))
       let next = 0
-      return jsonResponse({ texts: wanted.map((_, i) => (here[i] ? texts[next++] : null)) })
+      return jsonResponse({ texts: wanted.map(ref => (here.has(ref) ? texts[next++] : null)) })
     }
     if (method === 'POST' && rest === '/files') {
       write()
@@ -189,10 +192,12 @@ export async function handleTeamRequest(
         if (!isRecord(item) || typeof item.ref !== 'string') throw new Refusal(400, 'No ref')
         return { ref: item.ref, ...asWrite(item) }
       })
-      const here = await Promise.all(items.map(item => owned(item.ref)))
-      const results = await space.updateMany(items.filter((_, i) => here[i]))
+      const here = await ownedOf(items.map(item => item.ref))
+      const results = await space.updateMany(items.filter(item => here.has(item.ref)))
       let next = 0
-      return jsonResponse({ results: items.map((_, i) => (here[i] ? results[next++] : null)) })
+      return jsonResponse({
+        results: items.map(item => (here.has(item.ref) ? results[next++] : null)),
+      })
     }
 
     const file = /^\/files\/([^/]+)(\/text|\/unpublish|\/trash)?$/.exec(rest)

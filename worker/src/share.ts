@@ -10,6 +10,8 @@
  * The worker only ever handles ciphertext: the key is in the link's `#` and never gets here.
  */
 
+import { toHex } from '../../src/js/utils/bytes.ts'
+
 /** A file id as Drive makes them, and nothing that could change the URL we fetch */
 const FILE_ID = /^[\w-]{10,100}$/
 
@@ -43,7 +45,7 @@ const text = (body: string, status: number, headers: Record<string, string> = {}
 
 async function etagOf(bytes: ArrayBuffer) {
   const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))
-  return `"${Array.from(digest.subarray(0, 16), b => b.toString(16).padStart(2, '0')).join('')}"`
+  return `"${toHex(digest.subarray(0, 16))}"`
 }
 
 /** The id from /api/share/<id>, or null if this isn't a share download path */

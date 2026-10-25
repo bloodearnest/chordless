@@ -8,7 +8,7 @@ import {
 } from '../setlist/local-state.ts'
 import { getSongUserPrefs } from '../song-user-prefs.ts'
 import { normalizeCapo } from '../utils/capo.ts'
-import { SongModel } from './song-model.ts'
+import type { SongModel } from './song-model.ts'
 
 /** Changes made but not yet saved */
 interface PendingChanges {
@@ -28,7 +28,7 @@ interface PendingChanges {
  * Conditional capo inheritance:
  * - Only applies song-user-prefs capo if setlist entry key === canonical song key
  */
-export class SetlistSong extends SongModel {
+export class SetlistSong implements SongModel {
   _songEntry: SetlistEntry
   _canonical: LoadedSong
   _setlistId: string
@@ -53,7 +53,6 @@ export class SetlistSong extends SongModel {
     spaceId: string,
     songIndex = 0
   ) {
-    super()
     this._songEntry = songEntry
     this._canonical = canonicalSong
     this._setlistId = setlistId
@@ -71,29 +70,29 @@ export class SetlistSong extends SongModel {
 
   // ==================== Core Properties ====================
 
-  override get id(): string {
+  get id(): string {
     return this._songEntry.songId
   }
 
-  override get uuid(): string {
+  get uuid(): string {
     return this._canonical.uuid
   }
 
-  override get title(): string {
+  get title(): string {
     return this._canonical.title || 'Untitled'
   }
 
-  override get artist(): string | null {
+  get artist(): string | null {
     return this._canonical.author || this._canonical.artist || null
   }
 
-  override get parsed(): ParsedChart {
+  get parsed(): ParsedChart {
     return this._canonical.parsed
   }
 
   // ==================== Mutable Properties ====================
 
-  override getKey(): string | null | undefined {
+  getKey(): string | null | undefined {
     // Return pending change if it exists, otherwise entry's explicit key
     if (this._pendingChanges.key !== null) {
       return this._pendingChanges.key
@@ -101,15 +100,15 @@ export class SetlistSong extends SongModel {
     return this._songEntry.key
   }
 
-  override setKey(key: string): void {
+  setKey(key: string): void {
     this._pendingChanges.key = key
   }
 
-  override getOriginalKey(): string | null | undefined {
+  getOriginalKey(): string | null | undefined {
     return this._canonical.originalKey || this._canonical.key
   }
 
-  override getTempo(): number | null | undefined {
+  getTempo(): number | null | undefined {
     // Return pending change if it exists, otherwise entry's explicit tempo
     if (this._pendingChanges.tempo !== null) {
       return this._pendingChanges.tempo
@@ -117,15 +116,15 @@ export class SetlistSong extends SongModel {
     return this._songEntry.tempo
   }
 
-  override setTempo(tempo: number): void {
+  setTempo(tempo: number): void {
     this._pendingChanges.tempo = tempo
   }
 
-  override getOriginalTempo(): number | null | undefined {
+  getOriginalTempo(): number | null | undefined {
     return this._canonical.originalTempo || this._canonical.tempo
   }
 
-  override getCapo(): number {
+  getCapo(): number {
     // Return pending change if it exists
     if (this._pendingChanges.capo !== null) {
       return this._pendingChanges.capo
@@ -150,7 +149,7 @@ export class SetlistSong extends SongModel {
     return 0
   }
 
-  override setCapo(capo: number | string): void {
+  setCapo(capo: number | string): void {
     this._pendingChanges.capo = normalizeCapo(capo)
   }
 
@@ -172,7 +171,7 @@ export class SetlistSong extends SongModel {
     saveSetlistLocalState(this._setlistId, state, songs)
   }
 
-  override async save(): Promise<void> {
+  async save(): Promise<void> {
     // Save key and tempo to setlist entry in IndexedDB
     if (this._pendingChanges.key !== null || this._pendingChanges.tempo !== null) {
       const { key, tempo } = this._pendingChanges
@@ -208,7 +207,7 @@ export class SetlistSong extends SongModel {
     }
   }
 
-  override async reset(): Promise<void> {
+  async reset(): Promise<void> {
     // Reset key and tempo to original from canonical song
     this._pendingChanges.key = this.getOriginalKey() ?? null
     this._pendingChanges.tempo = this.getOriginalTempo() ?? null

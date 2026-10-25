@@ -4,6 +4,7 @@
  */
 
 import type { Setlist, SetlistEntry } from './data-types.ts'
+import { sha256Hex } from './utils/bytes.ts'
 
 export const SHARE_FORMAT = 'chordless-share'
 const SHARE_VERSION = 1
@@ -112,13 +113,6 @@ export function buildShareBundle(
       songs,
     },
   }
-}
-
-const sha256Hex = async (text: string) => {
-  const digest = new Uint8Array(
-    await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text))
-  )
-  return Array.from(digest, b => b.toString(16).padStart(2, '0')).join('')
 }
 
 /** A hash of what a recipient would see: changes when the content does, and not otherwise */

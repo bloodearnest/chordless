@@ -35,6 +35,7 @@ export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
 import { ChangeTokenLost } from './storage/types.ts'
 import type { ProgressCallback, ResetSetlist, SyncSession } from './sync/session.ts'
+import { errorMessage } from './utils/errors.ts'
 
 /** A local setlist or song with changes that are not in Drive */
 export interface UnsyncedChange {
@@ -530,7 +531,7 @@ export class DriveSyncManager implements SyncSession {
       console.error('[DriveSync] Sync failed:', error)
       progressCallback?.({
         stage: 'error',
-        message: `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Sync failed: ${errorMessage(error)}`,
       })
       throw error
     } finally {
@@ -637,7 +638,7 @@ export class DriveSyncManager implements SyncSession {
       console.error('[DriveSync] Incremental sync failed:', error)
       progressCallback?.({
         stage: 'error',
-        message: `Sync failed: ${error instanceof Error ? error.message : String(error)}`,
+        message: `Sync failed: ${errorMessage(error)}`,
       })
       throw error
     } finally {

@@ -8,7 +8,9 @@
  * Members are keyed by `identityKey` (provider and sub), not by email: an email is for showing and
  * for matching an invite, but it is the account that is a member.
  */
+import { toBase64Url } from '../../src/js/base64url.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
+import { sha256Hex } from '../../src/js/utils/bytes.ts'
 import { type Identity, identityKey } from './identity.ts'
 
 /** The part of a Durable Object's storage this uses, so a test can give it a Map */
@@ -39,17 +41,11 @@ interface InviteRecord {
 }
 
 /** The hash an invite is kept under: the code is a secret, so it is not stored */
-async function hashOf(code: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code))
-  return [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('')
-}
+const hashOf = sha256Hex
 
 /** A new code: 128 random bits, as URL-safe text */
 function newCode(): string {
-  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '')
+  return toBase64Url(crypto.getRandomValues(new Uint8Array(16)))
 }
 
 interface MemberRecord {
