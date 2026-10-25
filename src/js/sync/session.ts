@@ -75,7 +75,7 @@ export interface SyncReport {
 
 /**
  * One sync (or pull, push or reset), and what it finds out as it goes: what is in the space, which
- * files are live, whether the user can only read. Made afresh for each by the DriveSyncManager and
+ * files are live, whether the user can only read. Made afresh for each by the SyncManager and
  * passed to the pull and the push (pull.ts, push.ts), so nothing one finds out is carried into the
  * next; what it reports is its `report()`.
  */

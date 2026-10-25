@@ -1,8 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
+import { SyncManager } from '../src/js/sync-manager.ts'
 import { TeamError } from '../src/js/worker-call.ts'
 import { makeSetlist } from './builders.ts'
 import { memoryFolderLink } from './drive-harness.ts'
@@ -89,7 +89,7 @@ describe('TeamStorage', () => {
     await db.init()
     const folderLink = memoryFolderLink()
     folderLink.value = 'space-1'
-    const sync = new DriveSyncManager('Team space-1', 'member-space', {
+    const sync = await SyncManager.open('Team space-1', 'member-space', {
       db,
       folderLink,
       memberCache: { set: async () => {}, setReadOnly: async () => {} } as never,

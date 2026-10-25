@@ -1,6 +1,5 @@
 import { expect } from '@open-wc/testing'
 import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
-import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { setRouter } from '../src/js/navigation.ts'
 import {
   createSpace,
@@ -17,6 +16,7 @@ import {
   refreshSpaceAccess,
 } from '../src/js/space-access.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { SyncManager } from '../src/js/sync-manager.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { clearToasts, shownToast, suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -36,9 +36,9 @@ describe('Knowing whether the user can write to the space folder', () => {
     spaceId = space.id
     await setCurrentSpace(space.id, space.name)
     // The first sync finds or makes the Drive folder and links it
-    const sync = new DriveSyncManager(space.name, space.id)
+    const sync = await SyncManager.open(space.name, space.id)
     await sync.init()
-    sync.spaceDb?.db?.close()
+    sync.db.db?.close()
   })
 
   afterEach(async () => {

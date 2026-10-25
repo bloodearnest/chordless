@@ -1,21 +1,21 @@
 /**
  * Sync Orchestrator
  *
- * Wraps the sync engine (DriveSyncManager) for the UI: it reports progress to a callback, with the
+ * Wraps the sync engine (SyncManager) for the UI: it reports progress to a callback, with the
  * time and the message of any error, and throws the error again.
  */
 
 import type { SetlistEntry } from './data-types.ts'
-import type { SyncProgress } from './drive-sync.ts'
-import {
-  createSyncManager,
-  createUnlinkedSyncManager,
-  DriveSyncManager,
-  isSyncAvailable,
-} from './drive-sync.ts'
 import type { ResetSetlist, SyncReport } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
+import type { SyncProgress } from './sync-manager.ts'
+import {
+  createSyncManager,
+  createUnlinkedSyncManager,
+  isSyncAvailable,
+  SyncManager,
+} from './sync-manager.ts'
 import { toast } from './toast.ts'
 import { setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
@@ -37,7 +37,7 @@ const SUMMARY_LIMIT = 4
  * offer to put theirs back (docs/SPACES.md, "Read-only: local edits are never blocked")
  */
 async function tellOfReset(
-  manager: DriveSyncManager,
+  manager: SyncManager,
   { resetSetlists: reset }: SyncReport
 ): Promise<void> {
   if (reset.length === 0) return
@@ -94,7 +94,7 @@ interface Messages {
 export class SyncOrchestrator {
   spaceName: string
   spaceId: string | null
-  syncManager: DriveSyncManager | null
+  syncManager: SyncManager | null
 
   constructor(spaceName: string, spaceId: string | null) {
     this.spaceName = spaceName
@@ -118,7 +118,7 @@ export class SyncOrchestrator {
     messages: Messages,
     progressCallback: BroadcastCallback | null,
     operation: (
-      syncManager: DriveSyncManager,
+      syncManager: SyncManager,
       progress: (progress: SyncProgress) => void
     ) => Promise<unknown>
   ): Promise<{ success: true }> {
@@ -135,12 +135,12 @@ export class SyncOrchestrator {
     messages: Messages,
     progressCallback: BroadcastCallback | null,
     operation: (
-      syncManager: DriveSyncManager,
+      syncManager: SyncManager,
       progress: (progress: SyncProgress) => void
     ) => Promise<unknown>
   ): Promise<{ success: true }> {
     if (!this.syncManager) await this.init()
-    const syncManager = this.syncManager as DriveSyncManager
+    const syncManager = this.syncManager as SyncManager
     const send = (progress: SyncProgress) =>
       progressCallback?.({ ...progress, timestamp: new Date().toISOString() })
 
@@ -177,7 +177,7 @@ export class SyncOrchestrator {
   }
 
   /**
-   * Sync from the storage's feed of changes (see DriveSyncManager.incrementalSync): what the app
+   * Sync from the storage's feed of changes (see SyncManager.incrementalSync): what the app
    * does by itself while it is open. With `skipIfBusy`, nothing is done if a sync is running.
    * @returns whether it ran
    */
@@ -197,7 +197,7 @@ export class SyncOrchestrator {
 
   /**
    * Replace this device's local data with what's in Drive (see
-   * DriveSyncManager.resetLocalFromDrive). Throws UnsyncedChangesError, changing
+   * SyncManager.resetLocalFromDrive). Throws UnsyncedChangesError, changing
    * nothing, if local records have changes that aren't in Drive.
    * @param progressCallback - Optional callback
    */
@@ -211,21 +211,21 @@ export class SyncOrchestrator {
 
   /**
    * Let go of the space's Drive folder, which is gone (DriveFolderGoneError), and sync into a new
-   * one: everything on this device is uploaded again (see DriveSyncManager.startOver). It works
+   * one: everything on this device is uploaded again (see SyncManager.startOver). It works
    * without the old folder, which init() would not.
    * @param progressCallback - Optional callback
    */
   async startOverInDrive(
     progressCallback: BroadcastCallback | null = null
   ): Promise<{ success: true }> {
-    await new DriveSyncManager(this.spaceName, this.spaceId).startOver()
+    await (await SyncManager.open(this.spaceName, this.spaceId)).startOver()
     this.syncManager = null
     return this.sync(progressCallback)
   }
 
   /**
    * Replace this device's data with the copy in the Drive folder of this space's name that can be
-   * seen, and link to it (see DriveSyncManager.resetFromFolderByName). For when the linked folder is
+   * seen, and link to it (see SyncManager.resetFromFolderByName). For when the linked folder is
    * gone, which init() would stop at. Whatever is only on this device is lost.
    * @param progressCallback - Optional callback
    */

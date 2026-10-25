@@ -1,8 +1,8 @@
 import { expect, waitUntil } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
-import type { DriveSyncManager, ProgressCallback } from '../src/js/drive-sync.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import type { ResetSetlist } from '../src/js/sync/session.ts'
+import type { ProgressCallback, SyncManager } from '../src/js/sync-manager.ts'
 import {
   createSyncOrchestrator,
   type SyncBroadcast,
@@ -16,7 +16,7 @@ import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 const { describe, it, beforeEach, afterEach } = window
 
 /**
- * The orchestrator wraps a DriveSyncManager (tested against a fake Drive in the drive-sync files)
+ * The orchestrator wraps a SyncManager (tested against a fake Drive in the drive-sync files)
  * in progress messages and error reporting, so it is run here with a manager that only reports
  * progress or fails.
  */
@@ -65,7 +65,7 @@ describe('SyncOrchestrator', () => {
       },
     }
     const orchestrator = new SyncOrchestrator('Test Church', null)
-    orchestrator.syncManager = manager as unknown as DriveSyncManager
+    orchestrator.syncManager = manager as unknown as SyncManager
     return orchestrator
   }
 
@@ -87,7 +87,7 @@ describe('SyncOrchestrator', () => {
           calls.push(options)
           return report()
         },
-      } as unknown as DriveSyncManager
+      } as unknown as SyncManager
 
       expect(await orchestrator.incrementalSync()).to.equal(true)
       expect(await orchestrator.incrementalSync(null, { push: false })).to.equal(true)
@@ -300,7 +300,7 @@ describe('SyncOrchestrator', () => {
         sync: async () => {
           throw 'plain string'
         },
-      } as unknown as DriveSyncManager
+      } as unknown as SyncManager
       const messages: SyncBroadcast[] = []
 
       let thrown: unknown

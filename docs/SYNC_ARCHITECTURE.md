@@ -43,7 +43,7 @@ UI (main thread)          drive-sync-panel.js (Reset from Google Drive; Sync is 
         │
 Orchestration             sync-orchestrator.ts: wraps the engine, reports progress
         │                 (to a callback)
-Sync engine               drive-sync.ts: DriveSyncManager (folder, inventory, access, reset);
+Sync engine               sync-manager.ts: SyncManager (folder, inventory, access, reset);
                           sync/pull.ts, sync/push.ts, sync/changes.ts: what it pulls and pushes
         │
 File metadata             drive-metadata.ts: names, types and properties of the files
@@ -53,7 +53,7 @@ Storage API               storage/types.ts: roots, and a space's files by `ref`,
 Backend                   storage/drive-storage.ts → drive-api.ts: REST calls via fetch
 ```
 
-The engine does not know it is Drive: it takes a `StorageBackend` (`DriveSyncManager`'s `storage`
+The engine does not know it is Drive: it takes a `StorageBackend` (`SyncManager`'s `storage`
 option, Google Drive unless a test says otherwise). A record keeps the file's `ref` and `rev`
 as `fileRef` and `fileRev`.
 
@@ -66,7 +66,7 @@ get access tokens by messaging it (`GET_BLOB`), refreshing via the worker's
 `/session/refresh` when expired. `drive-api.js` lets the token source be replaced (`drive-client.ts` makes a Drive client for any source: the Worker makes one per team space)
 (`setAccessTokenProvider`), which tests use and a service-worker sync will need.
 
-### A full sync (`DriveSyncManager.sync()`)
+### A full sync (`SyncManager.sync()`)
 
 1. **Refresh members:** list who the space folder is shared with
    (`permissions.list`) and cache it on the space record. Feeds the setlist
@@ -267,7 +267,7 @@ Drive about the linked folder and shows a toast with "Open Drive sync", and the 
 same message with **Start over in Drive**. The space record keeps `driveClientId`, the Google
 app that linked the folder, so the message can say it was an earlier version of the app.
 
-Start over (`DriveSyncManager.startOver`, via `SyncOrchestrator.startOverInDrive`) asks Drive nothing
+Start over (`SyncManager.startOver`, via `SyncOrchestrator.startOverInDrive`) asks Drive nothing
 and changes nothing in it: it clears every setlist's and song's Drive markers and a setlist's share
 link (`ChordlessDB.clearFileLinks`), then the folder link, then the orchestrator syncs. Content stays
 on the device and is uploaded as new files to a folder found or made by name. The markers must go
@@ -281,7 +281,7 @@ When another device has already synced the space with this version of the app, t
 the opposite: to throw away what it has and take that copy. "Reset from Google Drive" cannot,
 because it starts from the stored folder link, which is the old folder, and so stops with the
 folder-gone message. The sync panel's folder-not-found box also offers **Replace with the copy in
-Drive** (`DriveSyncManager.resetFromFolderByName`, via `SyncOrchestrator.resetFromFolderByName`):
+Drive** (`SyncManager.resetFromFolderByName`, via `SyncOrchestrator.resetFromFolderByName`):
 
 - It looks for a folder of the space's name that the signed-in app can see (`findRootByName`,
   which never makes one). If there is none it changes nothing and says so, so a wrong name cannot
@@ -306,7 +306,7 @@ Drive** (`DriveSyncManager.resetFromFolderByName`, via `SyncOrchestrator.resetFr
 - `tests/fake-drive.js`: in-memory Drive (files, folders, `appProperties` vs
   `properties`, field projection, paging, `md5Checksum`, permissions, a skewable
   server clock, injected failures). Errors on anything it doesn't model.
-- `tests/drive-sync.test.ts`: the real `DriveSyncManager` for two simulated devices
+- `tests/drive-sync.test.ts`: the real `SyncManager` for two simulated devices
   sharing one fake Drive: push/pull, conflicts, clock skew, failures part-way,
   paging, spaces and renames, reset, metadata, members.
 - `tests/drive-metadata.test.ts`, `tests/fake-drive.test.ts`.
@@ -515,7 +515,7 @@ is covered.
 Drive's `changes.list`, read from a stored page token, returns every file changed since, charts
 included, and an empty list when nothing changed. An incremental sync asks it what changed and
 applies just that, instead of listing the folders and the members each time. The full sync
-(`DriveSyncManager.sync()`, above) is no longer the usual sync but the fallback.
+(`SyncManager.sync()`, above) is no longer the usual sync but the fallback.
 
 A full sync still runs:
 - **the first time on a device** (and for a space with no stored token): there is nothing to ask the feed about;

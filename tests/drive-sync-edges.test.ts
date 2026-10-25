@@ -6,12 +6,6 @@
 import { expect } from '@open-wc/testing'
 import type { ChordProRecord, SongRecord } from '../src/js/data-types.ts'
 import type { ChordlessDB } from '../src/js/db.ts'
-import {
-  DriveSyncManager,
-  SpaceFolderMismatchError,
-  type SyncProgress,
-  UnsyncedChangesError,
-} from '../src/js/drive-sync.ts'
 import { createSpace, deleteSpace, getCurrentSpace, setCurrentSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
 import {
@@ -23,6 +17,12 @@ import {
 } from '../src/js/sync/changes.ts'
 import { driveSongUuid, pullSetlists, pullSongs, titleFromFilename } from '../src/js/sync/pull.ts'
 import { pushSetlist, pushSetlists, pushSongVariant, songNeedsSync } from '../src/js/sync/push.ts'
+import {
+  SpaceFolderMismatchError,
+  SyncManager,
+  type SyncProgress,
+  UnsyncedChangesError,
+} from '../src/js/sync-manager.ts'
 import { makeSetlist, makeSong } from './builders.ts'
 import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -39,21 +39,27 @@ describe('Drive sync: the less common turns', () => {
   const driveFileOf = async (device: { db: ChordlessDB }, setlistId: string) =>
     must(must(await device.db.getSetlist(setlistId)).fileRef)
 
-  describe('a manager that is not ready', () => {
-    it('says it has not been initialised, whatever it is asked', async () => {
-      const sync = new DriveSyncManager('Church', null)
-      for (const ask of [
-        () => sync.hasSyncedRecords(),
-        () => sync.resolveDriveFolder(),
-        async () => sync.space,
-      ]) {
+  describe('a manager whose folder is not found yet', () => {
+    it('says so, for whatever needs the folder', async () => {
+      const phone = await makeDevice('phone')
+      const sync = await SyncManager.open('Church', null, {
+        db: phone.db,
+        folderLink: phone.folderLink,
+        memberCache: phone.memberCache,
+        changeToken: phone.changeToken,
+        storage: rig.storage,
+      })
+      // (what does not need the folder works: it is opened)
+      expect(await sync.hasSyncedRecords()).to.equal(false)
+      expect(sync.spaceId).to.equal(phone.db.spaceId)
+      for (const ask of [async () => sync.space, async () => sync.newRun()]) {
         let message = ''
         try {
           await ask()
         } catch (error) {
           message = (error as Error).message
         }
-        expect(message).to.match(/not initialised|not known yet/)
+        expect(message).to.match(/not known yet/)
       }
     })
   })
@@ -203,23 +209,23 @@ describe('Drive sync: the less common turns', () => {
       const realUpdate = SpaceDB.prototype.updateSpace
       SpaceDB.prototype.updateSpace = () => Promise.reject(new Error('read only'))
       try {
-        const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
+        const sync = await SyncManager.open(space.name, space.id, { storage: rig.storage })
         await sync.init()
         expect(sync.rootRef).to.be.a('string')
-        sync.spaceDb?.db?.close()
+        sync.db.db?.close()
       } finally {
         SpaceDB.prototype.updateSpace = realUpdate
       }
       // Kept for real, the next manager finds the folder by the link
-      const again = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
+      const again = await SyncManager.open(space.name, space.id, { storage: rig.storage })
       await again.init()
       const linked = again.rootRef
       expect(await again.hasSyncedRecords()).to.equal(false)
-      again.spaceDb?.db?.close()
-      const third = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
+      again.db.db?.close()
+      const third = await SyncManager.open(space.name, space.id, { storage: rig.storage })
       await third.init()
       expect(third.rootRef).to.equal(linked)
-      third.spaceDb?.db?.close()
+      third.db.db?.close()
       await deleteSpace(space.id)
       if (before.id) await setCurrentSpace(before.id, before.name)
     })
@@ -862,11 +868,16 @@ describe('Drive sync: the less common turns', () => {
       expect(rig.driveSetlistFiles()).to.have.length(0)
     })
 
-    it('has a manager with no member cache say so, and go on', async () => {
+    it('has a manager that cannot keep the members say so, and go on', async () => {
       const phone = await makeDevice('phone')
-      const bare = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
+      const bare = await SyncManager.open(TEST_SPACE.name, TEST_SPACE.id, {
         db: phone.db,
         folderLink: phone.folderLink,
+        memberCache: {
+          set: async () => {
+            throw new Error('nowhere to keep them')
+          },
+        },
         storage: rig.storage,
       })
       bare.rootRef = phone.sync.rootRef

@@ -57,7 +57,7 @@ export interface HistoryFile {
 export interface HistoryDevice {
   name: string
   db: import('../src/js/db.ts').ChordlessDB
-  sync: import('../src/js/drive-sync.ts').DriveSyncManager
+  sync: import('../src/js/sync-manager.ts').SyncManager
 }
 
 /** Where the files are kept, and what can happen to them there */

@@ -2,8 +2,8 @@ import { expect } from '@open-wc/testing'
 import type { Setlist } from '../src/js/data-types.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { setlistFileMetadata } from '../src/js/drive-metadata.ts'
-import { DriveSyncManager } from '../src/js/drive-sync.ts'
 import { setlistHasLocalChanges } from '../src/js/sync/changes.ts'
+import { SyncManager } from '../src/js/sync-manager.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
@@ -388,7 +388,7 @@ describe('sync (against the memory backend)', () => {
       expect(migrated.fileRef).to.equal(fileRefBefore)
       expect(setlistHasLocalChanges(migrated)).to.equal(false)
 
-      const sync = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
+      const sync = await SyncManager.open(TEST_SPACE.name, TEST_SPACE.id, {
         db,
         folderLink: phone.folderLink,
         memberCache: phone.memberCache,

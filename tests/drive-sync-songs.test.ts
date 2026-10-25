@@ -1,6 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { songFileMetadata } from '../src/js/drive-metadata.ts'
-import type { DriveSyncManager } from '../src/js/drive-sync.ts'
+import type { SyncManager } from '../src/js/sync-manager.ts'
 import { addSong, editSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE, wait } from './test-helpers.ts'
@@ -139,7 +139,7 @@ describe('Drive sync: songs', () => {
 
     describe('deleting a song', () => {
       /** How many songs the tablet's sync removes as deleted elsewhere */
-      const removedOn = async (device: { sync: DriveSyncManager }) => {
+      const removedOn = async (device: { sync: SyncManager }) => {
         const run = device.sync.newRun()
         await device.sync.buildDriveInventory(run)
         await device.sync.pullFromDrive(null, run)

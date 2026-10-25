@@ -27,7 +27,7 @@ a crawler finding a link and a copyright takedown notice following. Two defences
 ## Status
 
 Built: the bundle and encryption (`share-bundle.ts`, `share-crypto.ts`), making, updating and
-ending a share (`share-manager.ts`, called by a sync step in `DriveSyncManager.sync()`), the
+ending a share (`share-manager.ts`, called by a sync step in `SyncManager.sync()`), the
 share button in the header of the setlist overview (`setlist-share.ts` is the modal it opens: the explanation and Create, or the link, QR code, Update and Stop; the button is lit while shared), the worker's
 download and preview (`worker/src/share.ts`, `share-page.ts`), and opening a link
 (`share-receiver.ts`, `views/share-view.ts`, route `/s/<id>`). Not done:
@@ -162,7 +162,7 @@ in Drive, but it's still encrypted, so it's useless without the full link.
 
 ### Sync
 
-Two new steps in `DriveSyncManager.sync()`, after setlists and songs are pushed:
+Two new steps in `SyncManager.sync()`, after setlists and songs are pushed:
 
 1. **Update shares.** For each setlist with an unexpired `share`:
    - Rebuild the bundle and hash it.

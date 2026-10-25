@@ -8,7 +8,7 @@ interface is shaped so that it would not mean touching the engine.
 
 **Status (2026-10-20):** built. The interface, the Drive adapter (`src/js/storage/drive-storage.ts`)
 and the in-memory backend (`tests/memory-storage.ts`) pass one conformance suite
-(`tests/storage-conformance.ts`). The sync engine (`drive-sync.ts`, `sync/*`) and the share links
+(`tests/storage-conformance.ts`). The sync engine (`sync-manager.ts`, `sync/*`) and the share links
 (`share-manager.ts`) work through the interface, and so do the pad sets (`pad-set-service.ts`); the engine and pad service tests run on the memory backend. Left:
 see "Still on drive-api.ts".
 
@@ -76,7 +76,7 @@ a share link is Drive-specific until that is generalised), and `unpublish` then 
 
 ## Using it
 
-`DriveSyncManager` takes a `storage` option (default `driveStorage`) beside `db`, `folderLink` and
+`SyncManager.open` takes a `storage` option (default `driveStorage`) beside `db`, `folderLink` and
 `memberCache`, and opens the space's files with `manager.space`. The engine tests pass a
 `MemoryStorage` (docs/TESTING.md). A second backend means an adapter that passes the conformance
 suite, and a way to keep `props` (see above).
@@ -177,7 +177,7 @@ primitives are not enough.
   with the sharing key, so a share link works only for Drive-backed spaces (team spaces included,
   as their refs are Drive ids) until that is generalised.
 - **Pad sets** are the account's, not a space's: they move into `SpaceStorage` with the team spaces.
-- **Names**: `drive-sync.ts`, `DriveSyncManager`, `driveStorage` and some messages still say Drive.
+- **Names**: `sync-manager.ts`, `SyncManager`, `driveStorage` and some messages still say Drive.
   They are accurate while Drive is the only backend.
 - **`driveClientId`** on the space record is still Drive's (which Google client linked the folder).
 

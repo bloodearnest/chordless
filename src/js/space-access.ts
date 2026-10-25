@@ -7,13 +7,13 @@
  */
 
 import type { Space } from './data-types.ts'
-import { folderGoneMessage } from './drive-sync.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { goTo } from './navigation.ts'
 import { getCurrentSpaceFull, hasCurrentSpace, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { RootInfo, SpaceStorage } from './storage/types.ts'
+import { folderGoneMessage } from './sync-manager.ts'
 import { toast } from './toast.ts'
 
 /** The space's linked Drive folder is not there to sync with */

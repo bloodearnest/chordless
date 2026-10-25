@@ -66,11 +66,15 @@ export interface MemberCache {
   setReadOnly?(readOnly: boolean): Promise<void>
 }
 
-export interface DriveSyncOptions {
-  /** Database to sync. Defaults to the current space's. Tests pass one per device. */
+/** What a manager is opened with (SyncManager.open), where it is not the defaults: tests give their own */
+export interface SyncManagerOptions {
+  /** Database to sync. Defaults to the database of the space with this id, or of the one in use. */
   db?: ChordlessDB | null
+  /** Where the link to the space's folder is kept. Defaults to its record in the spaces database. */
   folderLink?: FolderLink | null
+  /** Where the folder's members are cached. Defaults to the space's record. */
   memberCache?: MemberCache | null
+  /** Where the place in the feed of changes is kept. Defaults to the space's record. */
   changeToken?: ChangeTokenStore | null
   /** Where the space's files are kept. Defaults to Google Drive. Tests pass a fake. */
   storage?: StorageBackend | null
@@ -223,70 +227,75 @@ function spaceMemberCache(spaceId: string, record: ReturnType<typeof spaceRecord
 /**
  * Sync Manager for a specific space
  */
-export class DriveSyncManager {
-  spaceName: string
-  spaceId: string | null
-  spaceDb: ChordlessDB | null
-  folderLink: FolderLink | null
-  memberCache: MemberCache | null
-  changeToken: ChangeTokenStore | null
-  rootRef: string | null
-  parser: ChordProParser
+export class SyncManager {
+  readonly spaceName: string
+  readonly spaceId: string
+  readonly db: ChordlessDB
+  readonly folderLink: FolderLink
+  readonly memberCache: MemberCache
+  readonly changeToken: ChangeTokenStore
+  /** The space's folder, once init() has found it */
+  rootRef: string | null = null
+  readonly parser = new ChordProParser()
   /** The storage backend (Google Drive unless a test says otherwise) */
-  storage: StorageBackend
+  readonly storage: StorageBackend
   /** The space's files, opened once the folder is known and dropped when a run ends */
   #space: SpaceStorage | null = null
 
   /**
-   * @param options.db - Database to sync. Defaults to the database of the space with this id,
-   *   or of the one in use if there is no id.
-   *   Tests pass one per simulated device.
-   * @param options.folderLink - Where the link to the space's Drive folder is stored.
-   *   Defaults to its record in the spaces database.
-   * @param options.memberCache - Where the folder's members are cached. Defaults to the
-   *   space's record.
+   * Open the manager of a space, without asking the storage anything: its database (the one
+   * given, the space with this id's, or with no id the one in use) and where its folder link,
+   * members and place in the feed are kept. init() then finds its folder.
    */
-  constructor(
+  static async open(
     spaceName: string,
     spaceId: string | null,
-    {
-      db = null,
-      folderLink = null,
-      memberCache = null,
-      changeToken = null,
-      storage = null,
-    }: DriveSyncOptions = {}
+    options: SyncManagerOptions = {}
+  ): Promise<SyncManager> {
+    let { db } = options
+    if (!db) {
+      // The space asked for, or (with no id) the one in use. A given id must be honoured: a
+      // sync of a space that is not in use (the first sync of one just made or joined, or one
+      // managed from the Account and Teams page) would otherwise work on the space in use.
+      // (what this sync saves is what came from storage, not a change to send)
+      if (spaceId) {
+        db = new ChordlessDB(spaceId, 'sync')
+        await db.init()
+      } else {
+        db = await getCurrentDB('sync')
+      }
+      spaceId = db.spaceId
+    }
+    const id = spaceId ?? db.spaceId
+    const record = spaceRecord(id)
+    return new SyncManager(spaceName, {
+      spaceId: id,
+      db,
+      folderLink: options.folderLink ?? spaceFolderLink(record),
+      memberCache: options.memberCache ?? spaceMemberCache(id, record),
+      changeToken: options.changeToken ?? spaceChangeToken(record),
+      storage: options.storage ?? driveStorage,
+    })
+  }
+
+  private constructor(
+    spaceName: string,
+    parts: {
+      spaceId: string
+      db: ChordlessDB
+      folderLink: FolderLink
+      memberCache: MemberCache
+      changeToken: ChangeTokenStore
+      storage: StorageBackend
+    }
   ) {
     this.spaceName = spaceName
-    this.spaceId = spaceId
-    this.spaceDb = db
-    this.folderLink = folderLink
-    this.memberCache = memberCache
-    this.changeToken = changeToken
-    this.storage = storage ?? driveStorage
-    this.rootRef = null
-    this.parser = new ChordProParser()
-  }
-
-  /** The database, once init() has set it */
-  get db(): ChordlessDB {
-    if (!this.spaceDb) throw new Error('DriveSyncManager is not initialised: call init()')
-    return this.spaceDb
-  }
-
-  get #folderLink(): FolderLink {
-    if (!this.folderLink) throw new Error('DriveSyncManager is not initialised: call init()')
-    return this.folderLink
-  }
-
-  get #changeToken(): ChangeTokenStore {
-    if (!this.changeToken) throw new Error('DriveSyncManager is not initialised: call init()')
-    return this.changeToken
-  }
-
-  get #memberCache(): MemberCache {
-    if (!this.memberCache) throw new Error('DriveSyncManager is not initialised: call init()')
-    return this.memberCache
+    this.spaceId = parts.spaceId
+    this.db = parts.db
+    this.folderLink = parts.folderLink
+    this.memberCache = parts.memberCache
+    this.changeToken = parts.changeToken
+    this.storage = parts.storage
   }
 
   /** The space's files, once its folder is known (opened afresh for each sync) */
@@ -301,38 +310,12 @@ export class DriveSyncManager {
     return this.rootRef
   }
 
-  async init(): Promise<boolean> {
-    await this.open()
-    const isNew = await this.resolveDriveFolder()
-    return isNew
-  }
-
-  /** Get the database and the stored link and member cache, without asking Drive anything */
-  async open(): Promise<void> {
-    // Initialize database
-    if (this.spaceDb) {
-      this.spaceId ??= this.spaceDb.spaceId
-    } else {
-      // The space asked for, or (with no id) the one in use. A given id must be honoured: a
-      // sync of a space that is not in use (the first sync of one just made or joined, or one
-      // managed from the Account and Teams page) would otherwise work on the space in use.
-      if (this.spaceId) {
-        // (what this sync saves is what came from storage, not a change to send)
-        this.spaceDb = new ChordlessDB(this.spaceId, 'sync')
-        await this.spaceDb.init()
-      } else {
-        this.spaceDb = await getCurrentDB('sync')
-      }
-      // Ensure we keep the actual space ID from the DB (in case caller passed null)
-      this.spaceId = this.spaceDb.spaceId
-    }
-
-    // (the id is known by now: given, or the database's)
-    const spaceId = this.spaceId as string
-    const record = spaceRecord(spaceId)
-    this.folderLink ??= spaceFolderLink(record)
-    this.memberCache ??= spaceMemberCache(spaceId, record)
-    this.changeToken ??= spaceChangeToken(record)
+  /**
+   * Find the space's folder (see resolveDriveFolder)
+   * @returns whether it was newly made
+   */
+  init(): Promise<boolean> {
+    return this.resolveDriveFolder()
   }
 
   /**
@@ -343,10 +326,9 @@ export class DriveSyncManager {
    * touched: an old folder that can still be seen is left for the user to delete.
    */
   async startOver(): Promise<void> {
-    await this.open()
     await this.db.clearFileLinks()
-    await this.#folderLink.clear()
-    await this.#changeToken.clear()
+    await this.folderLink.clear()
+    await this.changeToken.clear()
     this.rootRef = null
   }
 
@@ -357,7 +339,7 @@ export class DriveSyncManager {
    * @returns whether the folder was newly created
    */
   async resolveDriveFolder(): Promise<boolean> {
-    const linkedId = await this.#folderLink.get()
+    const linkedId = await this.folderLink.get()
 
     if (linkedId) {
       const folder = await this.storage.inspectRoot(linkedId)
@@ -371,10 +353,10 @@ export class DriveSyncManager {
       return false
     }
 
-    const result = await this.storage.ensureRoot(this.spaceName, this.spaceId as string)
+    const result = await this.storage.ensureRoot(this.spaceName, this.spaceId)
     this.rootRef = result.ref
-    await this.#folderLink.set(result.ref)
-    await this.#changeToken.clear()
+    await this.folderLink.set(result.ref)
+    await this.changeToken.clear()
     return result.isNew
   }
 
@@ -390,8 +372,8 @@ export class DriveSyncManager {
     if (existing && existing.ref !== folder.ref) {
       if (!(await this.hasSyncedRecords())) {
         this.rootRef = existing.ref
-        await this.#folderLink.set(existing.ref)
-        await this.#changeToken.clear()
+        await this.folderLink.set(existing.ref)
+        await this.changeToken.clear()
         return
       }
       console.warn(
@@ -548,8 +530,8 @@ export class DriveSyncManager {
 
   /** Keep a position taken before a sync that has now worked, or forget the old one if there is none */
   async #keepFeedPosition(position: string | null): Promise<void> {
-    if (position) await this.#changeToken.set(position)
-    else await this.#changeToken.clear()
+    if (position) await this.changeToken.set(position)
+    else await this.changeToken.clear()
   }
 
   /**
@@ -570,7 +552,7 @@ export class DriveSyncManager {
     { push = true }: { push?: boolean } = {}
   ): Promise<{ success: true; full: boolean } & SyncReport> {
     const feed = this.space.changes
-    const token = feed ? await this.#changeToken.get() : null
+    const token = feed ? await this.changeToken.get() : null
     if (!feed || !token) return { ...(await this.sync(progressCallback)), full: true }
 
     let changes: Awaited<ReturnType<typeof feed.since>>
@@ -578,7 +560,7 @@ export class DriveSyncManager {
       changes = await feed.since(token)
     } catch (error) {
       if (!(error instanceof ChangeTokenLost)) throw error
-      await this.#changeToken.clear()
+      await this.changeToken.clear()
       return { ...(await this.sync(progressCallback)), full: true }
     }
     // (who the folder is shared with changes rarely: read it again now and then, not at every sync)
@@ -587,7 +569,7 @@ export class DriveSyncManager {
     try {
       if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
         // (nothing to pull and nothing to push: the one request was all it took)
-        await this.#changeToken.set(changes.token)
+        await this.changeToken.set(changes.token)
         return { success: true, full: false, ...run.report() }
       }
       const songs = changes.changed.filter(c => c.collection === 'songs').map(c => c.file)
@@ -611,7 +593,7 @@ export class DriveSyncManager {
       // (a user who can only read has nothing to push: it finds that out itself)
       if (push) await this.pushToDrive(progressCallback, run)
 
-      if (!run.downloadsFailed) await this.#changeToken.set(changes.token)
+      if (!run.downloadsFailed) await this.changeToken.set(changes.token)
       progressCallback?.({ stage: 'complete', message: 'Sync complete!' })
       return { success: true, full: false, ...run.report() }
     } catch (error) {
@@ -648,7 +630,7 @@ export class DriveSyncManager {
 
   /** Read the space's members again if they were last read long ago (an incremental sync has no other time to) */
   async #refreshMembersIfOld(): Promise<void> {
-    const refreshedAt = await this.#memberCache.refreshedAt?.()
+    const refreshedAt = await this.memberCache.refreshedAt?.()
     if (refreshedAt === undefined) return
     if (refreshedAt && Date.now() - Date.parse(refreshedAt) < MEMBERS_REFRESH_MS) return
     await this.refreshMembers()
@@ -738,7 +720,7 @@ export class DriveSyncManager {
   async refreshMembers(): Promise<SpaceMember[] | null> {
     try {
       const members = await this.space.members()
-      await this.#memberCache.set(members)
+      await this.memberCache.set(members)
       return members
     } catch (error) {
       console.warn('[DriveSync] Could not refresh space members:', error)
@@ -762,7 +744,7 @@ export class DriveSyncManager {
     run.readOnly = canAdd === false
     if (canAdd !== undefined && canAdd !== null) {
       try {
-        await this.#memberCache.setReadOnly?.(run.readOnly)
+        await this.memberCache.setReadOnly?.(run.readOnly)
       } catch (error) {
         console.warn('[DriveSync] Could not record the access to the space folder:', error)
       }
@@ -862,7 +844,7 @@ export class DriveSyncManager {
       await this.db.clearSyncedData()
       // (from here on the old place in the feed says nothing of what this device has: if the pull
       // below stops short, the next sync must list everything)
-      await this.#changeToken.clear()
+      await this.changeToken.clear()
 
       await this.pullFromDrive(progressCallback, run)
       // (a file the reset could not download is missing here, and the old place would not name it)
@@ -883,21 +865,20 @@ export class DriveSyncManager {
    * is put back.
    */
   async resetFromFolderByName(progressCallback: ProgressCallback | null = null): Promise<void> {
-    await this.open()
     const folder = await this.storage.findRootByName(this.spaceName)
     if (!folder || folder.trashed) {
       throw new Error(
         `There is no Google Drive folder called "${this.spaceName}" that this app can see, so nothing was changed. Sync it from the device that has the data first.`
       )
     }
-    const before = await this.#folderLink.get()
-    await this.#folderLink.set(folder.ref)
+    const before = await this.folderLink.get()
+    await this.folderLink.set(folder.ref)
     this.rootRef = folder.ref
     try {
       await this.resetLocalFromDrive(progressCallback, { discardLocal: true })
     } catch (error) {
-      if (before) await this.#folderLink.set(before)
-      else await this.#folderLink.clear()
+      if (before) await this.folderLink.set(before)
+      else await this.folderLink.clear()
       this.rootRef = null
       throw error
     }
@@ -1021,7 +1002,7 @@ async function currentSpaceStorage(): Promise<StorageBackend> {
 export async function createSyncManager(
   spaceName: string,
   spaceId: string | null
-): Promise<DriveSyncManager> {
+): Promise<SyncManager> {
   const manager = await createUnlinkedSyncManager(spaceName, spaceId)
   await manager.init()
   return manager
@@ -1034,8 +1015,8 @@ export async function createSyncManager(
 export async function createUnlinkedSyncManager(
   spaceName: string,
   spaceId: string | null
-): Promise<DriveSyncManager> {
+): Promise<SyncManager> {
   // (no id means the current space, as the manager itself takes it)
   const space = await getSpaceById(spaceId ?? getCurrentSpace().id)
-  return new DriveSyncManager(spaceName, spaceId, { storage: storageFor(space) })
+  return SyncManager.open(spaceName, spaceId, { storage: storageFor(space) })
 }

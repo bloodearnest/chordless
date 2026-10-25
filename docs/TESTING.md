@@ -105,7 +105,7 @@ app's own modules, imported directly: there's no build step to test around.
   give records unique names or ids (see `unique()` in `song-utils.test.ts`). Migrations
   are tested by building a database at the old version by hand, then opening it with
   `ChordlessDB` (see `db.test.ts`).
-- **Sync** runs the real `drive-sync.ts` and `sync/*` against a **storage backend** (the storage
+- **Sync** runs the real `sync-manager.ts` and `sync/*` against a **storage backend** (the storage
   API, `docs/STORAGE_API.md`). Tests that are about what the engine does use `useSyncRig()` from
   `drive-harness.ts`: a `MemoryStorage` (`memory-storage.ts`) for each test, and simulated
   devices (`makeDevice`, each with its own database, syncing one space), teardown, and

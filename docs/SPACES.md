@@ -643,7 +643,7 @@ carry, and the menu already has "Import Songs" and "Import a Setlist", which are
 
 - **Transport per space** (the `setAccessTokenProvider` seam): personal/owner → googleapis with the
   own token; member → `/api/space/<id>/drive/...` with their Google ID token. One engine
-  (`drive-sync.ts`, `sync/*`).
+  (`sync-manager.ts`, `sync/*`).
 - **Conflicts:** personal spaces are single-writer: keep Drive wins plus a conflict copy of dropped
   local edits. Team spaces add the Worker checksum precondition (409) and a Durable Object per space
   to serialise writes (SYNC_ARCHITECTURE.md).

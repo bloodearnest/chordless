@@ -10,7 +10,7 @@ Where the code is: `account-page.ts` (the list), `account-card.ts` (the account)
 `media-page.ts` (the media player and the pad sets). `/storage` still opens the page (an alias in
 `router.ts`). The panels for sync, export and import and people take the space they are given
 (`drive-sync-panel.ts`, `space-export-panel.ts`, `team-share-panel.ts`), and a sync manager made for
-a space works on that space, not the one in use (`drive-sync.ts`). Differences from the sketch
+a space works on that space, not the one in use (`sync-manager.ts`). Differences from the sketch
 above: "Manage" on the account is an inline disclosure, not a sheet; a card's Sync button is shown
 for any space once syncing can work, and the card runs the sync itself (`space-sync.ts`).
 

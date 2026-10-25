@@ -6,7 +6,6 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { createTeamFolder } from '../src/js/drive-api.ts'
-import { createSyncManager } from '../src/js/drive-sync.ts'
 import {
   createSpace,
   deleteSpace,
@@ -15,6 +14,7 @@ import {
   setCurrentSpace,
   updateSpace,
 } from '../src/js/space.ts'
+import { createSyncManager } from '../src/js/sync-manager.ts'
 import { syncTeamSpace } from '../src/js/team-spaces.ts'
 import { makeSetlist } from './builders.ts'
 import { useFakeDriveRig } from './drive-harness.ts'

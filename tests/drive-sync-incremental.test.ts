@@ -1,16 +1,10 @@
 import { expect } from '@open-wc/testing'
 import { DataChangeEvent } from '../src/js/data-changes.ts'
-import { DriveSyncManager, MEMBERS_REFRESH_MS } from '../src/js/drive-sync.ts'
 import { createSpace, deleteSpace } from '../src/js/space.ts'
 import { SpaceDB } from '../src/js/space-db.ts'
+import { MEMBERS_REFRESH_MS, SyncManager } from '../src/js/sync-manager.ts'
 import { makeSetlist } from './builders.ts'
-import {
-  addSong,
-  editSong,
-  memoryChangeToken,
-  memoryFolderLink,
-  useSyncRig,
-} from './drive-harness.ts'
+import { addSong, editSong, memoryChangeToken, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'
 
@@ -367,9 +361,9 @@ describe('Drive sync: from the feed of changes', () => {
       const { tablet } = await twoDevices()
       const setlist = await addSetlist(tablet, { name: 'From the tablet' })
       await syncDevice(tablet)
-      const sync = new DriveSyncManager(TEST_SPACE.name, space.id, { storage: rig.storage })
+      const sync = await SyncManager.open(TEST_SPACE.name, space.id, { storage: rig.storage })
       await sync.init()
-      expect(sync.spaceDb?.origin).to.equal('sync')
+      expect(sync.db.origin).to.equal('sync')
 
       await sync.incrementalSync()
       expect(seen).to.include(`${setlist.id}:sync`)
@@ -379,11 +373,11 @@ describe('Drive sync: from the feed of changes', () => {
       await sync.incrementalSync()
       expect(seen).to.deep.equal([`${setlist.id}:sync`])
 
-      const own = await must(sync.spaceDb).saveSetlist(makeSetlist({ id: 'own-new' }))
+      const own = await sync.db.saveSetlist(makeSetlist({ id: 'own-new' }))
       seen.length = 0
       await sync.incrementalSync()
       expect(seen).to.deep.equal([`${own.id}:sync`])
-      sync.spaceDb?.db?.close()
+      sync.db.db?.close()
     } finally {
       window.removeEventListener(DataChangeEvent.type, listener)
       await deleteSpace(space.id)
@@ -559,47 +553,31 @@ describe('Drive sync: from the feed of changes', () => {
   it('keeps its place in the space’s own record, where a failure to keep it is only a warning', async () => {
     const space = await createSpace(`Feed ${crypto.randomUUID().slice(0, 8)}`)
     try {
-      const sync = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
+      const sync = await SyncManager.open(space.name, space.id, { storage: rig.storage })
       await sync.init()
       // (what a sync saves is not a change to send)
-      expect(sync.spaceDb?.origin).to.equal('sync')
+      expect(sync.db.origin).to.equal('sync')
       expect((await sync.incrementalSync()).full).to.equal(true)
       const place = (await sync.changeToken?.get()) ?? null
       expect(place).to.be.a('string')
       // (the members are cached with the time they were read)
       expect(await sync.memberCache?.refreshedAt?.()).to.be.a('string')
       expect((await sync.incrementalSync()).full).to.equal(false)
-      sync.spaceDb?.db?.close()
+      sync.db.db?.close()
 
       const realUpdate = SpaceDB.prototype.updateSpace
       SpaceDB.prototype.updateSpace = () => Promise.reject(new Error('read only'))
       try {
-        const next = new DriveSyncManager(space.name, space.id, { storage: rig.storage })
+        const next = await SyncManager.open(space.name, space.id, { storage: rig.storage })
         await next.init()
         await next.sync()
-        next.spaceDb?.db?.close()
+        next.db.db?.close()
       } finally {
         SpaceDB.prototype.updateSpace = realUpdate
       }
     } finally {
       await deleteSpace(space.id)
     }
-  })
-
-  it('cannot forget a place before it has been set up', async () => {
-    const sync = new DriveSyncManager(TEST_SPACE.name, TEST_SPACE.id, {
-      folderLink: memoryFolderLink(),
-      storage: rig.storage,
-    })
-
-    let thrown: Error | null = null
-    try {
-      await sync.resolveDriveFolder()
-    } catch (error) {
-      thrown = error as Error
-    }
-
-    expect(thrown?.message).to.contain('not initialised')
   })
 
   it('has a store of its own that remembers a place', async () => {

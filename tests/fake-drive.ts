@@ -3,7 +3,7 @@
  *
  * installFakeDrive() replaces globalThis.fetch for googleapis.com requests (others
  * pass through) and sets drive-api.js's access token provider, so the real
- * drive-api.js / drive-sync.js code runs unchanged against it.
+ * drive-api.ts / sync-manager.ts code runs unchanged against it.
  *
  * Fidelity notes. It models the Drive behaviours sync relies on:
  * - appProperties (app-private) and properties (public) are separate; queries

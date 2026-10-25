@@ -6,7 +6,6 @@
  */
 import { expect } from '@open-wc/testing'
 import type { Space } from '../src/js/data-types.ts'
-import { createSyncManager, isSyncAvailable } from '../src/js/drive-sync.ts'
 import {
   createSpace,
   deleteSpace,
@@ -19,6 +18,7 @@ import {
 import { driveStorage } from '../src/js/storage/browser-drive.ts'
 import { isTeamMember, storageFor } from '../src/js/storage/space-storage.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
+import { createSyncManager, isSyncAvailable } from '../src/js/sync-manager.ts'
 import { teamApi } from '../src/js/team-client.ts'
 import { outranks } from '../src/js/team-roles.ts'
 import {
@@ -207,12 +207,12 @@ describe('team spaces on this device', () => {
       const manager = await createSyncManager(mine.name, mine.id)
       expect(manager.storage).to.be.instanceOf(TeamStorage)
       expect(manager.rootRef).to.equal('team-1')
-      manager.spaceDb?.db?.close()
+      manager.db.db?.close()
 
       // (with no space named, it is the current one's)
       const current = await createSyncManager(mine.name, null)
       expect(current.storage).to.be.instanceOf(TeamStorage)
-      current.spaceDb?.db?.close()
+      current.db.db?.close()
     })
   })
 

@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import { DriveFolderGoneError } from '../src/js/drive-sync.ts'
+import { DriveFolderGoneError } from '../src/js/sync-manager.ts'
 import { addSong, useSyncRig } from './drive-harness.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, TEST_SPACE } from './test-helpers.ts'

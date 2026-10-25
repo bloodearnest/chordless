@@ -1,8 +1,8 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
-import { type ChangeTokenStore, DriveSyncManager, type FolderLink } from '../src/js/drive-sync.ts'
 import { hashText } from '../src/js/song-utils.ts'
 import type { StorageBackend } from '../src/js/storage/types.ts'
+import { type ChangeTokenStore, type FolderLink, SyncManager } from '../src/js/sync-manager.ts'
 import { makeSong } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { MemoryStorage } from './memory-storage.ts'
@@ -105,7 +105,7 @@ export function makeRig(storage: () => StorageBackend | undefined) {
       },
     }
     const changeToken = memoryChangeToken()
-    const sync = new DriveSyncManager(spaceName, TEST_SPACE.id, {
+    const sync = await SyncManager.open(spaceName, TEST_SPACE.id, {
       db,
       folderLink,
       memberCache,
@@ -120,7 +120,7 @@ export function makeRig(storage: () => StorageBackend | undefined) {
 
   /** Rename the device's space: sync from then on uses the new name */
   async function renameSpace(device, newName) {
-    device.sync = new DriveSyncManager(newName, TEST_SPACE.id, {
+    device.sync = await SyncManager.open(newName, TEST_SPACE.id, {
       db: device.db,
       folderLink: device.folderLink,
       memberCache: device.memberCache,

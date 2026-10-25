@@ -153,11 +153,11 @@ export function leadersOf(setlists: Setlist[], own?: string | null): Leader[] {
  * database is given to the sync: left to itself the sync works on the space in use.
  */
 export async function syncTeamSpace(space: Space): Promise<void> {
-  const { DriveSyncManager } = await import('./drive-sync.ts')
+  const { SyncManager } = await import('./sync-manager.ts')
   const db = new ChordlessDB(space.id)
   await db.init()
   try {
-    const manager = new DriveSyncManager(space.name, space.id, { db, storage: storageFor(space) })
+    const manager = await SyncManager.open(space.name, space.id, { db, storage: storageFor(space) })
     await manager.init()
     await manager.sync()
   } finally {
