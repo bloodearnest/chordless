@@ -257,14 +257,17 @@ storage/sync
   app feature that finds duplicate or empty setlists and stray space folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
-ci/cd
-- set up CI/CD (GitHub Actions or similar): on each push and pull request run `just format lint test`
-  (Playwright needs its Chromium: `just setup`), keep the Playwright HTML report and traces of
-  failures as artifacts, and publish the coverage summary. Then deploy to Cloudflare Workers from
-  main once the tests pass (wrangler, with the token as a secret: see push-secrets.sh). `just
-  test` ends with `just stats`, which edits docs/stats.jsonl: in CI that is only a local change,
-  so decide whether CI commits it, uploads it, or skips the step. Consider a coverage floor, or a
-  check that coverage does not fall, once there is a baseline in docs/stats.jsonl.
+ci/cd (docs/CI.md)
+- the macOS/WebKit and Windows/Chrome end-to-end jobs: make them pass, then required (`e2e` in
+  ci-ok's needs, no continue-on-error), and fold e2e-linux into the same matrix (it is apart only
+  because a matrix has one result for ci-ok, and Linux's is required now)
+- Terraform state of every stack in R2 (each stack's `backend "s3"`, `init -migrate-state`), then the
+  Cloudflare deploy token made by Terraform and written to the production environment's secret
+- deploy from main (deploy.yml: ci.yml again, deploy, smoke test, rollback), and a nightly drift check
+  of the Terraform stacks (drift.yml); branch claude/ci-and-pr-workflow has a draft of both
+- the weekly review routine (docs/agents/weekly-review.md, on the same branch): Sunday 20:00 UTC
+- agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
+  required_approvals)
 
 live mode
  - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
@@ -279,9 +282,12 @@ tests
  - tests/songs.playwright.ts "choosing a song opens it at its own URL, and back returns to the
    list" failed twice in full runs (not alone, 8 of 8 passed): undiagnosed, so not in
    docs/test-catches.jsonl. Run it with --repeat-each under load to find the cause
- - coverage: just coverage covers the browser unit tests only, and counts only the files
-   they load. Playwright coverage (page.coverage, Chromium) would show what the
-   end-to-end tests reach
+ - coverage of the end-to-end tests: `just coverage` merges the node and browser unit suites only,
+   and neither the floor nor docs/stats.jsonl has any for e2e. Playwright can collect V8 coverage
+   from Chromium pages (page.coverage; not WebKit, nor CI's Windows Chrome job), to be turned into
+   lcov (v8-to-istanbul, a new dependency, or a script of our own) and merged by scripts/coverage.ts
+   like the other two, from CI's Linux e2e job as an artifact. Mind that e2e coverage varies with
+   timing more than the unit suites' (the floor would need a run or two that agree to lower it)
 
 ccli import
  - adding the same song twice to set lists
