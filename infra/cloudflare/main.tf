@@ -174,13 +174,9 @@ import {
   id       = "${var.zone_id}/${each.key}"
 }
 
-# Where every stack's Terraform state is kept (each stack's `backend "s3"`): R2 speaks S3. Made with
-# wrangler (npx wrangler r2 bucket create chordless-tfstate --location weur) and imported, as this
-# stack's own state is kept in it. Never song content (CLAUDE.md): state only.
-import {
-  to = cloudflare_r2_bucket.tfstate
-  id = "${var.account_id}/chordless-tfstate/default"
-}
+# Where every stack's Terraform state is kept (each stack's `backend "s3"`): R2 speaks S3. This stack
+# made it while its own state was still local, then moved its state into it (infra/README.md, "State").
+# Never song content (CLAUDE.md): state only.
 
 resource "cloudflare_r2_bucket" "tfstate" {
   account_id = var.account_id

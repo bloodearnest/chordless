@@ -63,9 +63,12 @@ the `import` blocks rebuild it with one `terraform apply` (which changes nothing
 Secret values still stay out of Terraform. The `.tf` files and `.terraform.lock.hcl` (the provider
 versions) are in git; `*.tfstate` and `.terraform/` are ignored.
 
-The bucket is in `cloudflare/`, whose own state it holds: it was made with wrangler
-(`npx wrangler r2 bucket create chordless-tfstate --location weur`) and imported. Moving a stack's
-state from the machine to R2 was, in each stack, `terraform init -migrate-state`.
+The bucket is in `cloudflare/`, whose own state it holds, so that stack made it while its state was
+still local (its `backend` block set aside, `terraform apply`), then moved its state in with
+`terraform init -migrate-state`, as each of the others did. On a fresh account, do the same.
+
+The `cloudflare/` stack's token (`CLOUDFLARE_API_TOKEN`) also needs Workers R2 Storage: Edit, for the
+bucket. Locally it is kept, bare, in the git-ignored `.cloudflare-infra-token`.
 
 ## The GitHub stack
 
