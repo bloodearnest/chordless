@@ -1,8 +1,8 @@
 # Infrastructure (Terraform)
 
 The slow-changing setup around the app, captured as code on 2026-10-20 from what was already
-there: nothing was created, each resource is imported (`import` blocks). Three stacks, each with its
-own state, so a mistake in one cannot touch the other. `google-chordless/` created what it holds;
+there: nothing was created, each resource is imported (`import` blocks). Four stacks, each with its
+own state, so a mistake in one cannot touch another (`github/` was added on 2026-10-25). `google-chordless/` created what it holds;
 `cloudflare/` only imported.
 
 | Stack | Holds |
@@ -10,6 +10,7 @@ own state, so a mistake in one cannot touch the other. `google-chordless/` creat
 | `cloudflare/` | the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
+| `github/` | the GitHub repository's settings (imported): merge by rebase only, the `main` ruleset (a pull request, `ci-ok` passing, linear history), what Actions may run (GitHub's own actions, pinned by SHA), the workflow token's permissions, the `production` and `infra` environments. See [docs/CI.md](../docs/CI.md) |
 
 ## Who owns what
 
@@ -52,3 +53,10 @@ Local, gitignored (`*.tfstate`, `.terraform/`), kept on the developer's machine.
 the `import` blocks rebuild it with one `terraform apply` (which changes nothing when the code matches).
 The `.tf` files and `.terraform.lock.hcl` (the provider versions) are in git. If a secret ever has to go
 through Terraform, move the state to a remote backend first.
+
+## The GitHub stack
+
+`GITHUB_TOKEN=$(gh auth token) mise exec -- terraform plan` in `github/` (its token needs admin on the
+repository: the gh login has it). Not managed, as the provider cannot: secret values
+(`gh secret set NAME --env production`), installing the Claude GitHub app, and the approval GitHub asks
+for before a fork's first pull request runs workflows (its default, "first-time contributors").

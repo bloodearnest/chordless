@@ -4,7 +4,7 @@
 #   drift  the plan of each stack must say "No changes": needs credentials (`just deploy` runs it)
 # Usage: scripts/infra-check.sh lint|drift
 set -uo pipefail
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 tf() { mise exec -- terraform "$@"; }
 failed=0
@@ -37,6 +37,13 @@ case "${1:-}" in
             echo "$name: no gcloud sign-in (gcloud auth login), or INFRA_DRIFT_SKIP=$name"; failed=1; continue
           }
           export GOOGLE_OAUTH_ACCESS_TOKEN;;
+        github)
+          if [ -z "${GITHUB_TOKEN:-}" ]; then
+            GITHUB_TOKEN=$(gh auth token 2>/dev/null) || {
+              echo "$name: set GITHUB_TOKEN, or gh auth login, or INFRA_DRIFT_SKIP=$name"; failed=1; continue
+            }
+            export GITHUB_TOKEN
+          fi;;
       esac
       tf -chdir="$dir" init -backend=false -input=false >/dev/null || { failed=1; continue; }
       tf -chdir="$dir" plan -input=false -detailed-exitcode -no-color >/tmp/infra-plan-"$name".txt 2>&1

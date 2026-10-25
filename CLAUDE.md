@@ -90,13 +90,25 @@ survives only in names already stored on devices and in Drive.)
 
 ## Development Standards
 
-- Use `just format lint test` to verify all changes. This runs formatting, linting (Biome, `tsc -b` over the tsconfig.*.json projects, knip for unused files, exports and dependencies, and a dry-run deploy of `wrangler.toml` that fails on warnings: `scripts/lint-wrangler.sh`), and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
+- Use `just format lint test` to verify all changes (and `just ci` before a pull request: `docs/CI.md`). This runs formatting, linting (Biome, `tsc -b` over the tsconfig.*.json projects, knip for unused files, exports and dependencies, and a dry-run deploy of `wrangler.toml` that fails on warnings: `scripts/lint-wrangler.sh`), and all three test suites: node tests, browser unit tests (Web Test Runner) and Playwright tests.
 - How the tests are organised, and how to write them: `docs/TESTING.md`. The interface between the sync engine and wherever files are kept (Drive now, the Worker's team service next): `docs/STORAGE_API.md`. How navigation works (the app is a single page): `docs/ROUTING.md`. Other design and architecture docs are in `docs/` too (`docs/SPACES.md` for spaces, `docs/SHARING.md` for share links, `docs/SYNC_ARCHITECTURE.md` for sync, `docs/ENVIRONMENTS.md` for dev and prod (two Google Cloud projects), `docs/CLOUD_MIGRATION.md` for the planned move to a new Google Cloud project, to be done before going live).
 - TypeScript (erasable syntax only: no enums or parameter properties, so Node and esbuild can strip the types) and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
 - Infrastructure that rarely changes is Terraform in `infra/` (`infra/README.md`): the Cloudflare zone side (Email Routing, the Worker's custom domain, DNS, TLS settings) and the Google Cloud project (APIs, API keys, service account). Deploys, and everything in `wrangler.toml`, stay wrangler's: do not move the Worker, its assets, bindings or secrets into Terraform. `gcloud` and `terraform` come from `mise.toml`
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`
 - Use modern HTML/CSS/JS, within `.browserslistrc` (iOS/Safari 17, Chrome/Edge 120: devices up to about five years old, which can all update to that). Vite doesn't read it: keep `TARGET` in `vite.config.ts` the same.
 - Always try to use browser native features as much as possible
+
+## Branches and pull requests
+
+Changes reach `main` only through pull requests (`docs/CI.md`): never commit to or push `main`.
+
+- Work on a branch, `<agent>/<topic>` (e.g. `claude/pad-fades`), in a git worktree of your own when
+  another agent may be working in the same checkout.
+- Commit as you go, one logical step per commit; keep other people's uncommitted work out of them.
+- Before asking for review: rebase on `origin/main`, run `just ci` (the checks CI runs, on Linux), and
+  `git push --force-with-lease`. Open the pull request as a draft with `gh pr create`, and mark it
+  ready when `just ci` passes.
+- Never merge your own pull request. They are merged with "Rebase and merge": no merge commits.
 
 ## Log of what the tests catch
 
