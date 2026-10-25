@@ -66,8 +66,9 @@ authors published (a fork's commit can be reached through the parent repository'
   and cache poisoning.
 - Dependabot proposes new versions (new SHAs) weekly, a week after their release.
 
-The npm packages get the same care (`just audit`, `scripts/audit-deps.sh`): each must carry the
-registry's signature (and its provenance, where it publishes one), and no production dependency may
+The npm packages get the same care (`just audit`, `scripts/audit-deps.sh`): each must come from the
+npm registry with a sha512 hash (`scripts/check-lockfile.sh`, so a lockfile change cannot point one at a
+tarball elsewhere), must carry the registry's signature (and its provenance, where it publishes one), and no production dependency may
 have a known high or critical advisory. The dev tools' advisories are listed without failing: they
 never reach users, and one with no fix yet would otherwise block every change.
 
