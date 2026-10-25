@@ -167,7 +167,9 @@ jobs:
     name: End to end (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    # New to CI, so not yet required: `ci-ok` ignores them until they have been green for a while
+    # New to CI, so not yet required: `ci-ok` does not wait for them (add `e2e` to its `needs` once
+    # they have been green for a while), and a failure here does not fail the run, so a deploy
+    # does not wait on them either
     continue-on-error: true
     permissions:
       contents: read
@@ -228,11 +230,12 @@ jobs:
           npm: "false"
       - run: just lint-infra
 
-  # The one required check: every job above passed, or was skipped as not needed
+  # The one required check: every job above passed, or was skipped as not needed (but for the
+  # macOS and Windows end-to-end jobs, while they are not required)
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, infra]
+    needs: [changes, lint, node, unit, coverage, e2e-linux, infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
@@ -241,5 +244,4 @@ jobs:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$RESULTS"
-          # (the e2e matrix is continue-on-error, so it reports success while it is not required)
           jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$RESULTS" >/dev/null
