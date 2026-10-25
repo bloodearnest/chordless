@@ -150,61 +150,61 @@ export class SpaceFolderMismatchError extends Error {
   }
 }
 
+/** "1 song", "3 songs" */
+const counted = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
+
+/** A space's record in the spaces database */
+function spaceRecord(spaceId: string) {
+  // (kept once it has opened: one that failed to is tried again next time)
+  let spaces: SpaceDB | null = null
+  const db = async (): Promise<SpaceDB> => {
+    if (!spaces) {
+      const opening = new SpaceDB()
+      await opening.init()
+      spaces = opening
+    }
+    return spaces
+  }
+  return {
+    get: async () => (await db()).getSpace(spaceId),
+    update: async (changes: Partial<Space>) => (await db()).updateSpace(spaceId, changes),
+  }
+}
+
 /**
  * Where a space's link to its Drive folder is stored: its record in the
  * spaces database. Tests pass their own { get, set }.
  */
-function spaceFolderLink(spaceId: string): FolderLink {
-  let db: SpaceDB | null = null
-  const getDb = async (): Promise<SpaceDB> => {
-    if (!db) {
-      db = new SpaceDB()
-      await db.init()
-    }
-    return db
-  }
+function spaceFolderLink(record: ReturnType<typeof spaceRecord>): FolderLink {
   return {
     async get() {
-      const space = await (await getDb()).getSpace(spaceId)
-      return space?.rootRef ?? null
+      return (await record.get())?.rootRef ?? null
     },
     async set(rootRef: string) {
       try {
-        await (await getDb()).updateSpace(spaceId, {
-          rootRef,
-          driveClientId: GOOGLE_CLIENT_ID,
-        })
+        await record.update({ rootRef, driveClientId: GOOGLE_CLIENT_ID })
       } catch (error) {
         console.warn('[DriveSync] Could not record Drive folder link:', error)
       }
     },
     async clear() {
-      await (await getDb()).updateSpace(spaceId, {
-        rootRef: null,
-        driveClientId: null,
-      })
+      await record.update({ rootRef: null, driveClientId: null })
     },
   }
 }
 
 /** Where a space keeps its place in the feed of changes: its record in the spaces database */
-function spaceChangeToken(spaceId: string): ChangeTokenStore {
+function spaceChangeToken(record: ReturnType<typeof spaceRecord>): ChangeTokenStore {
   // (not essential: without a place kept, the next sync is a full one)
   const update = async (changesToken: string | null) => {
     try {
-      const db = new SpaceDB()
-      await db.init()
-      await db.updateSpace(spaceId, { changesToken })
+      await record.update({ changesToken })
     } catch (error) {
       console.warn('[DriveSync] Could not record the place in the feed of changes:', error)
     }
   }
   return {
-    async get() {
-      const db = new SpaceDB()
-      await db.init()
-      return (await db.getSpace(spaceId))?.changesToken ?? null
-    },
+    get: async () => (await record.get())?.changesToken ?? null,
     set: token => update(token),
     clear: () => update(null),
   }
@@ -215,18 +215,12 @@ function spaceChangeToken(spaceId: string): ChangeTokenStore {
  * cached for offline use: its record in the spaces database, as
  * `members`. Tests pass their own { set }.
  */
-function spaceMemberCache(spaceId: string): MemberCache {
+function spaceMemberCache(spaceId: string, record: ReturnType<typeof spaceRecord>): MemberCache {
   return {
     async set(members: SpaceMember[]) {
-      const db = new SpaceDB()
-      await db.init()
-      await db.updateSpace(spaceId, { members, membersRefreshedAt: new Date().toISOString() })
+      await record.update({ members, membersRefreshedAt: new Date().toISOString() })
     },
-    async refreshedAt() {
-      const db = new SpaceDB()
-      await db.init()
-      return (await db.getSpace(spaceId))?.membersRefreshedAt ?? null
-    },
+    refreshedAt: async () => (await record.get())?.membersRefreshedAt ?? null,
     setReadOnly: readOnly => setSpaceReadOnly(spaceId, readOnly),
   }
 }
@@ -368,9 +362,10 @@ export class DriveSyncManager implements SyncSession {
 
     // (the id is known by now: given, or the database's)
     const spaceId = this.spaceId as string
-    this.folderLink ??= spaceFolderLink(spaceId)
-    this.memberCache ??= spaceMemberCache(spaceId)
-    this.changeToken ??= spaceChangeToken(spaceId)
+    const record = spaceRecord(spaceId)
+    this.folderLink ??= spaceFolderLink(record)
+    this.memberCache ??= spaceMemberCache(spaceId, record)
+    this.changeToken ??= spaceChangeToken(record)
   }
 
   /**
@@ -457,13 +452,11 @@ export class DriveSyncManager implements SyncSession {
     try {
       // Where the feed of changes stands before anything is read: what changes during this sync
       // is seen by the next incremental one
+      this.#beginRun()
       const feedPosition = await this.#feedPosition()
-      this.downloadsFailed = false
       // Who the space's folder is shared with, for choosing leaders
       await this.refreshMembers()
       await this.refreshAccess()
-      this.heldBack = 0
-      this.resetSetlists = []
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
@@ -474,10 +467,10 @@ export class DriveSyncManager implements SyncSession {
 
       // Songs deleted here go in the Drive trash before anything is pulled, or they would come back
       const trashed = await this.trashPendingDeletions()
-      if (trashed > 0 && progressCallback) {
-        progressCallback({
+      if (trashed > 0) {
+        progressCallback?.({
           stage: 'pulling',
-          message: `Moved ${trashed} deleted file${trashed === 1 ? '' : 's'} to the Drive trash`,
+          message: `Moved ${counted(trashed, 'deleted file')} to the Drive trash`,
         })
       }
 
@@ -488,19 +481,19 @@ export class DriveSyncManager implements SyncSession {
       // The pull has adopted the live files it could. A setlist whose file is still gone and
       // that wasn't edited here was removed from Drive: remove it here too
       const removed = await this.removeSetlistsDeletedInDrive()
-      if (removed > 0 && progressCallback) {
-        progressCallback({
+      if (removed > 0) {
+        progressCallback?.({
           stage: 'pulling',
-          message: `Removed ${removed} setlists that were deleted in Drive`,
+          message: `Removed ${counted(removed, 'setlist')} deleted in Drive`,
         })
       }
 
       // A song whose file was deleted elsewhere, and not edited here, is deleted here too
       const goneSongs = await this.removeSongsDeletedInDrive()
-      if (goneSongs > 0 && progressCallback) {
-        progressCallback({
+      if (goneSongs > 0) {
+        progressCallback?.({
           stage: 'pulling',
-          message: `Removed ${goneSongs} song${goneSongs === 1 ? '' : 's'} that ${goneSongs === 1 ? 'was' : 'were'} deleted elsewhere`,
+          message: `Removed ${counted(goneSongs, 'song')} that ${goneSongs === 1 ? 'was' : 'were'} deleted elsewhere`,
         })
       }
 
@@ -535,16 +528,36 @@ export class DriveSyncManager implements SyncSession {
       })
       throw error
     } finally {
-      // Clear caches after sync
-      this.#space = null
-      this._driveFileIds = null
-      this.liveSetlistFiles = null
-      this.pullIncomplete = false
-      this.pendingDeletedRefs = new Set()
-      this.liveSongUuids = null
-      this.readOnly = null
+      this.#endRun()
     }
     return { success: true }
+  }
+
+  /**
+   * Start a sync: what it reports (`heldBack`, `resetSetlists`, `downloadsFailed`) is its own.
+   * `goneRefs` is for a sync from the feed of changes, which has no inventory. Both kinds of sync
+   * begin here and end with `#endRun`, so what one finds out is not carried into the next.
+   */
+  #beginRun(goneRefs: Set<string> | null = null): void {
+    // (in case something did not clear them: only this sync's own pull may say which files are live)
+    this.liveSetlistFiles = null
+    this.liveSongUuids = null
+    this.heldBack = 0
+    this.resetSetlists = []
+    this.downloadsFailed = false
+    this.#goneRefs = goneRefs
+  }
+
+  /** Let go of what a sync found out (what it reports stays, to be read once it has ended) */
+  #endRun(): void {
+    this.#space = null
+    this.#goneRefs = null
+    this._driveFileIds = null
+    this.liveSetlistFiles = null
+    this.pullIncomplete = false
+    this.pendingDeletedRefs = new Set()
+    this.liveSongUuids = null
+    this.readOnly = null
   }
 
   /**
@@ -607,14 +620,7 @@ export class DriveSyncManager implements SyncSession {
 
     progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
     try {
-      this.heldBack = 0
-      this.resetSetlists = []
-      this.downloadsFailed = false
-      // (what a pull of the whole space left, in case something did not clear it: only this
-      // sync's own pull may say which files are live)
-      this.liveSetlistFiles = null
-      this.liveSongUuids = null
-      this.#goneRefs = new Set(changes.gone)
+      this.#beginRun(new Set(changes.gone))
       await this.refreshAccess()
       await this.trashPendingDeletions()
 
@@ -642,13 +648,7 @@ export class DriveSyncManager implements SyncSession {
       })
       throw error
     } finally {
-      this.#space = null
-      this.#goneRefs = null
-      this.liveSetlistFiles = null
-      this.pullIncomplete = false
-      this.pendingDeletedRefs = new Set()
-      this.liveSongUuids = null
-      this.readOnly = null
+      this.#endRun()
     }
     return { success: true, full: false }
   }

@@ -190,9 +190,7 @@ describe('Drive sync: the less common turns', () => {
       await phone.sync.sync(progress => said.push(progress))
       expect(await phone.db.getSetlist(setlist.id)).to.equal(undefined)
       expect(
-        said.some(progress =>
-          /Removed 1 setlists that were deleted in Drive/.test(progress.message)
-        )
+        said.some(progress => /Removed 1 setlist deleted in Drive/.test(progress.message))
       ).to.equal(true)
     })
   })
