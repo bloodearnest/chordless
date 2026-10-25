@@ -269,6 +269,12 @@ ci/cd (docs/CI.md)
   read-only ones. Google by Workload Identity Federation (nothing stored); Cloudflare tokens made by
   hand, each as narrow as it can be (Terraform is not given API Tokens: Edit, which is as much as the
   account); GitHub by a fine-grained token (this repository, Administration)
+- what ZAP's first baseline found (2026-10-25): no Strict-Transport-Security (HSTS: a Cloudflare
+  zone setting, in infra/cloudflare), then make rule 10035 FAIL in .zap/rules.tsv; no
+  Cross-Origin-Opener-Policy / Embedder-Policy (rule 90004), which need trying against Google sign-in
+  and the Picker, whose windows and frames COEP can break; responses with no Content-Type (10019, which
+  ones: the report in the DAST run's artifact); its caching warnings (10015, 10049), mostly meant
+  (the service worker, fresh API answers), to be looked at once and the rules set to match
 - the weekly review routine (docs/agents/weekly-review.md, on the same branch): Sunday 20:00 UTC
 - agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
   required_approvals)

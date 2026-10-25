@@ -1,0 +1,37 @@
+# DAST, weekly: ZAP's passive baseline scan of chordless.app (scripts/zap-baseline.sh; docs/CI.md).
+# It sends no attacks. A FAIL rule in .zap/rules.tsv fails the run, which GitHub emails about; the
+# report is kept as an artifact either way.
+name: DAST
+
+on:
+  schedule:
+    # Mondays at 05:00 UTC, before the week's Dependabot pull request
+    - cron: "0 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      target:
+        description: The site to scan
+        default: https://chordless.app
+
+permissions: {}
+
+jobs:
+  zap:
+    name: ZAP baseline
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: scripts/zap-baseline.sh "$TARGET"
+        env:
+          TARGET: ${{ inputs.target || 'https://chordless.app' }}
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: zap-report
+          path: zap-report/
+          retention-days: 30

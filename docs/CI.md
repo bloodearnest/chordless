@@ -78,6 +78,15 @@ repository to `patterns_allowed` in `infra/github/main.tf`, and `just lint-actio
 Every workflow starts with `permissions: {}` and each job asks for what it needs (`contents: read`);
 checkouts keep no credentials; every job has a timeout. Pull requests run with no secrets.
 
+## DAST (`.github/workflows/zap.yml`)
+
+Weekly, ZAP's baseline scan of chordless.app (`scripts/zap-baseline.sh`, `just zap` locally, with
+Docker): passive only, so it crawls the site, with a browser too, and inspects what it is sent
+(headers, cookies, what pages give away), sending no attacks. Each of its rules is WARN, FAIL or
+IGNORE in `.zap/rules.tsv`: a FAIL fails the run (GitHub emails about a failed scheduled run), and the
+report is kept as an artifact for a month. When the site passes a rule, make it FAIL, so it keeps
+passing. ZAP is pinned by its image's digest; its "ZAP is out of date" warning says when to move it.
+
 ## Tools
 
 mise installs the tools at the versions in `mise.toml` (node, just, actionlint, zizmor, shellcheck,

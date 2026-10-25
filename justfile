@@ -53,6 +53,11 @@ audit:
     @echo "Checking the npm packages (signatures, advisories)..."
     scripts/audit-deps.sh
 
+# DAST: ZAP's passive baseline scan of a site (needs Docker), as CI runs weekly: just zap
+# http://localhost:8788 scans `just preview`. The report is left in zap-report/ (docs/CI.md)
+zap target="https://chordless.app":
+    scripts/zap-baseline.sh {{target}}
+
 # What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
 # a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|msedge`
 ci:
