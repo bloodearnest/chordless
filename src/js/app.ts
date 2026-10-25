@@ -15,10 +15,10 @@ import { setRouter } from './navigation.ts'
 import { SpaceChangeEvent } from './space.ts'
 import { views } from './views/registry.ts'
 
-// The first sign-in renames the space: before anything shows its name. The sign-in
-// lives behind the service worker, so a page it does not control yet (the first visit) has none
-// to find: don't make the first view wait for that.
-if (navigator.serviceWorker?.controller) await checkFirstTimeAuth()
+// The first sign-in renames the space: before anything shows its name. (A page the service worker
+// does not control yet, the first visit or a hard reload, reads the sign-in itself: a quick read
+// of the auth database, empty on a first visit.)
+await checkFirstTimeAuth()
 
 const outlet = document.getElementById('view-outlet')
 if (!outlet) throw new Error('The page has no #view-outlet')

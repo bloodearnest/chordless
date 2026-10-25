@@ -3,7 +3,7 @@
  * (src/service-worker.ts) gives it the worker's globals, so a test can give it fakes. It declares
  * the little it needs of them itself: the DOM and WebWorker type libraries do not mix.
  */
-import * as AuthDB from './auth-db.ts'
+import { type AuthMessageData, answerAuthMessage, isAuthMessage } from './auth-messages.ts'
 import { SHARED_CACHE_NAME, storeShared } from './shared-incoming.ts'
 import { errorMessage } from './utils/errors.ts'
 
@@ -11,15 +11,8 @@ interface WaitEvent {
   waitUntil(promise: Promise<unknown>): void
 }
 
-/** What a page sends with a message (which of these depends on its type) */
-interface MessagePayload {
-  blob: string
-  metadata?: AuthDB.AuthMetadata
-  backup: Partial<AuthDB.BlobBackup>
-}
-
 interface WorkerMessage {
-  data?: { type?: string; data?: MessagePayload; messageId?: string } | null
+  data?: { type?: string; data?: AuthMessageData; messageId?: string } | null
   ports?: readonly MessagePort[]
 }
 
@@ -100,7 +93,7 @@ export function startServiceWorker(
   scope.addEventListener('message', async event => {
     const { type, messageId } = event.data || {}
     // (a message that needs its data and has none fails below, and is answered as an error)
-    const data = event.data?.data as MessagePayload
+    const data: AuthMessageData = event.data?.data ?? {}
 
     try {
       switch (type) {
@@ -117,40 +110,13 @@ export function startServiceWorker(
           scope.skipWaiting()
           break
 
-        case 'STORE_BLOB':
-          // Store encrypted token blob
-          await AuthDB.storeBlob(data.blob, data.metadata)
-          respondToClient(event, messageId, { success: true })
-          break
-
-        case 'GET_BLOB': {
-          // Retrieve blob
-          const blobData = await AuthDB.getBlob()
-          respondToClient(event, messageId, { success: true, data: blobData })
-          break
-        }
-
-        case 'DELETE_BLOB':
-          // Delete blob (logout)
-          await AuthDB.deleteBlob()
-          respondToClient(event, messageId, { success: true })
-          break
-
-        case 'EXPORT_BLOB': {
-          // Export blob as backup
-          const backup = await AuthDB.exportBlobBackup()
-          respondToClient(event, messageId, { success: true, backup })
-          break
-        }
-
-        case 'IMPORT_BLOB':
-          // Import blob from backup
-          await AuthDB.importBlobBackup(data.backup)
-          respondToClient(event, messageId, { success: true })
-          break
-
         default:
-          console.warn('[SW] Unknown message type:', type)
+          // The sign-in's messages (auth-messages.ts): a page it does not control answers them itself
+          if (isAuthMessage(type)) {
+            respondToClient(event, messageId, { ...(await answerAuthMessage(type, data)) })
+          } else {
+            console.warn('[SW] Unknown message type:', type)
+          }
       }
     } catch (error) {
       console.error('[SW] Error handling message:', error)

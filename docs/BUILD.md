@@ -50,8 +50,10 @@ Playwright project) tests the build, served by `vite preview` on its own port, 8
 
 ## First visit
 
-A page that starts loading before the service worker is active is not controlled by it, and
-the auth blob lives behind the worker. Where the worker's `clients.claim()` reaches the page (Chromium)
+A page that starts loading before the service worker is active is not controlled by it. The auth
+blob is the worker's to answer for, but such a page (or one loaded with a hard reload, which bypasses
+the worker) reads and writes it in the same database itself (`src/js/auth-messages.ts`), so it is
+signed in all the same. Where the worker's `clients.claim()` reaches the page (Chromium)
 the page becomes controlled when the worker activates, with no reload. Where it does not (a
 browser that ignores a page still loading), `public/boot.js` waits two seconds for the
 `controllerchange` and then reloads once. `sessionStorage` `sw-first-load` is set from the start

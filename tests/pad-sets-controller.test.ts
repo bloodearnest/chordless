@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { LitElement } from 'lit'
 import { ensurePadSetFolder, uploadPadFile } from '../src/js/drive-api.ts'
 import { PAD_FILE_KEYS } from '../src/js/pad-keys.ts'
@@ -44,7 +44,8 @@ describe('PadSetsController', () => {
   async function setUp() {
     host = document.createElement('pad-sets-host')
     document.body.appendChild(host)
-    await settle()
+    // (listing asks for the sign-in, which is read from the database: however long that takes)
+    await waitUntil(() => !host.padSets.loading, 'the pad sets to load')
     return host.padSets
   }
 

@@ -2,12 +2,12 @@
  * The setlist page when a sync saves its setlist while it is showing it: it follows the new
  * version, on the song being viewed, and says what changed (docs/SYNC_ARCHITECTURE.md).
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { announceDataChange, type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
 import { loadSetlistLocalState } from '../src/js/setlist/local-state.ts'
 import { makeEntry } from './builders.ts'
 import { must, useSetlistPage } from './setlist-page-harness.ts'
-import { clearToasts, shownToast, wait } from './test-helpers.ts'
+import { clearToasts, shownToast } from './test-helpers.ts'
 
 const { describe, it, afterEach } = window
 
@@ -36,6 +36,13 @@ describe('the setlist page: a sync saves its setlist', () => {
       movedTo ??= index
       return navigateTo(index, options)
     }
+    // (the page applies the change, or ignores it: wait for the one it applies, however long)
+    let applying: Promise<void> | undefined
+    const apply = rig.page.applyChangedSetlist.bind(rig.page)
+    rig.page.applyChangedSetlist = () => {
+      applying = apply()
+      return applying
+    }
     window.dispatchEvent(
       new DataChangeEvent({
         spaceId: rig.db.spaceId,
@@ -46,7 +53,8 @@ describe('the setlist page: a sync saves its setlist', () => {
         ...fields,
       })
     )
-    await wait(100)
+    await applying
+    rig.page.applyChangedSetlist = apply
     await rig.flush()
   }
 
@@ -205,7 +213,8 @@ describe('the setlist page: a sync saves its setlist', () => {
       ids: [setlist.id],
       origin: 'sync',
     })
-    await wait(100)
+    // (however long showing it again takes: it asks for the pads, and so for the sign-in)
+    await waitUntil(() => rig.page.songs.length === 3, 'the setlist to be shown again')
     await rig.flush()
 
     expect(rig.page.songs).to.have.length(3)

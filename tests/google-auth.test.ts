@@ -1,5 +1,5 @@
 import { expect } from '@open-wc/testing'
-import type { AuthMetadata, StoredUser } from '../src/js/auth-db.ts'
+import { type AuthMetadata, deleteBlob, type StoredUser, storeBlob } from '../src/js/auth-db.ts'
 import {
   exportBlobBackup,
   getAccessToken,
@@ -13,7 +13,7 @@ import {
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
-import { suppressConsoleLogs } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -103,7 +103,30 @@ describe('google-auth', () => {
 
     it('has no Drive access when the stored sign-in cannot be read', async () => {
       signIn({ scope: 'https://www.googleapis.com/auth/drive.file' })
+      // (with no service worker in control, the page reads it itself: from a database it cannot open)
       setController(null)
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open('auth', 99)
+        request.onsuccess = () => {
+          request.result.close()
+          resolve()
+        }
+        request.onerror = () => reject(request.error)
+      })
+      try {
+        expect(await hasDriveAccess()).to.equal(false)
+      } finally {
+        await deleteDatabase('auth')
+      }
+    })
+
+    it('has no Drive access when the service worker cannot be asked', async () => {
+      signIn({ scope: 'https://www.googleapis.com/auth/drive.file' })
+      setController({
+        postMessage() {
+          throw new Error('gone')
+        },
+      })
       expect(await hasDriveAccess()).to.equal(false)
     })
 
@@ -302,9 +325,19 @@ describe('google-auth', () => {
       expect(await isAuthenticated()).to.equal(true)
     })
 
-    it('is not signed in when the service worker does not control the page yet', async () => {
+    it('reads the sign-in itself when the service worker does not control the page (a first visit, a hard reload)', async () => {
       setController(null)
       expect(await isAuthenticated()).to.equal(false)
+      await storeBlob('stored-here', {
+        access_token: 'a',
+        expires_at: inFromNow(MINUTE),
+        id_token: 'i',
+      })
+      try {
+        expect(await isAuthenticated()).to.equal(true)
+      } finally {
+        await deleteBlob()
+      }
     })
 
     it('logs out by having the worker forget the blob, and Google revoke the access', async () => {

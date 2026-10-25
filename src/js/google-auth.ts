@@ -30,7 +30,14 @@
  */
 
 import type { AuthMetadata, BlobBackup, StoredBlob, StoredUser } from './auth-db.ts'
+import {
+  type AuthMessageData,
+  type AuthMessageType,
+  type AuthReply,
+  answerAuthMessage,
+} from './auth-messages.ts'
 import { jwtClaims } from './base64url.ts'
+import { errorMessage } from './utils/errors.ts'
 
 /** The signed-in user, as the UI shows them */
 export interface UserInfo {
@@ -43,15 +50,7 @@ export interface UserInfo {
 }
 
 /** What the service worker answers to a message from the page */
-interface WorkerReply {
-  messageId?: string
-  success: boolean
-  error?: string
-  data?: StoredBlob
-  backup?: BlobBackup
-}
-
-type WorkerMessageType = 'STORE_BLOB' | 'GET_BLOB' | 'DELETE_BLOB' | 'EXPORT_BLOB' | 'IMPORT_BLOB'
+type WorkerReply = AuthReply & { messageId?: string }
 
 // Configuration
 // (the client of the Google Cloud project this build is for: .env.development / .env.production)
@@ -127,7 +126,7 @@ export async function getCurrentUserInfo(): Promise<UserInfo | null> {
 
     return formatUserInfoForUI(user)
   } catch (error) {
-    logAuthFailure('Failed to get user info', error)
+    console.error('[Auth] Failed to get user info:', error)
     return null
   }
 }
@@ -282,7 +281,7 @@ export async function hasDriveAccess(): Promise<boolean> {
     const { scope } = stored.metadata
     return scope === undefined || scope.includes(DRIVE_SCOPE)
   } catch (error) {
-    logAuthFailure('Error checking for Drive access', error)
+    console.error('[Auth] Error checking for Drive access:', error)
     return false
   }
 }
@@ -322,7 +321,7 @@ export async function isAuthenticated(): Promise<boolean> {
     const response = await sendToServiceWorker('GET_BLOB')
     return response.success && response.data != null
   } catch (error) {
-    logAuthFailure('Error checking auth status', error)
+    console.error('[Auth] Error checking auth status:', error)
     return false
   }
 }
@@ -491,6 +490,12 @@ export async function getStoredBlob(): Promise<StoredBlob | undefined> {
   return response.data
 }
 
+/** Keep this sign-in (the blob and what goes with it) in place of the one stored */
+export async function storeSignIn(blob: string, metadata: AuthMetadata): Promise<void> {
+  const response = await sendToServiceWorker('STORE_BLOB', { blob, metadata })
+  if (!response.success) throw new Error(response.error || 'Failed to store the sign-in')
+}
+
 /**
  * Logout: forget the sign-in on this device (the blob in the service worker), then ask the
  * auth proxy to revoke it at Google. That needs the network: offline, or if Google does not
@@ -553,35 +558,21 @@ export async function downloadBlobBackup(): Promise<void> {
 }
 
 /**
- * The service worker holds the sign-in, and does not control the page until a later load on
- * the very first visit (or after a hard reload): then there is nothing to ask, which is
- * expected and not an error.
- */
-class NoServiceWorkerControllerError extends Error {
-  constructor() {
-    super('No service worker controller')
-    this.name = 'NoServiceWorkerControllerError'
-  }
-}
-
-function logAuthFailure(what: string, error: unknown): void {
-  if (error instanceof NoServiceWorkerControllerError) {
-    console.info(`[Auth] ${what}: the service worker is not controlling this page yet`)
-  } else {
-    console.error(`[Auth] ${what}:`, error)
-  }
-}
-
-/**
- * Send message to Service Worker and wait for response
+ * Send a sign-in message to the service worker, which holds the sign-in, and wait for its answer.
+ * A page it does not control yet (the first visit, before it has taken over, or a hard reload,
+ * which bypasses it) answers it itself from the same database (auth-messages.ts).
  */
 async function sendToServiceWorker(
-  type: WorkerMessageType,
-  data: Record<string, unknown> = {}
+  type: AuthMessageType,
+  data: AuthMessageData = {}
 ): Promise<WorkerReply> {
-  const controller = navigator.serviceWorker.controller
+  const controller = navigator.serviceWorker?.controller
   if (!controller) {
-    throw new NoServiceWorkerControllerError()
+    try {
+      return await answerAuthMessage(type, data)
+    } catch (error) {
+      return { success: false, error: errorMessage(error) }
+    }
   }
 
   return new Promise<WorkerReply>((resolve, reject) => {

@@ -209,37 +209,16 @@ export class AccountCard extends LitElement {
   /** Make the stored token look expired and ask for a new one: the check that sign-in can be renewed */
   async _testTokenRefresh(): Promise<void> {
     try {
-      const { getAccessToken, getStoredBlob } = await import('../js/google-auth.ts')
-      const controller = navigator.serviceWorker.controller
-      if (!controller) {
-        this._message = {
-          text: 'The service worker is not active. Reload the page and try again.',
-          type: 'error',
-        }
-        return
-      }
+      const { getAccessToken, getStoredBlob, storeSignIn } = await import('../js/google-auth.ts')
       const blobData = await getStoredBlob()
       if (!blobData) {
         this._message = { text: 'Not signed in: sign in with Google first.', type: 'error' }
         return
       }
       const { blob, metadata } = blobData
-      const expiredMetadata = {
+      await storeSignIn(blob, {
         ...metadata,
         expires_at: new Date(Date.now() - 60000).toISOString(),
-      }
-      await new Promise<unknown>((resolve, reject) => {
-        const channel = new MessageChannel()
-        const messageId = crypto.randomUUID()
-        const timeout = setTimeout(() => reject(new Error('Timeout')), 5000)
-        channel.port1.onmessage = event => {
-          clearTimeout(timeout)
-          if (event.data.messageId === messageId) resolve(event.data)
-        }
-        controller.postMessage(
-          { type: 'STORE_BLOB', data: { blob, metadata: expiredMetadata }, messageId },
-          [channel.port2]
-        )
       })
       await getAccessToken()
       const updated = (await getStoredBlob()) as StoredBlob

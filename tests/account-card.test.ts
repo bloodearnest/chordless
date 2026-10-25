@@ -414,11 +414,12 @@ describe('account-card', () => {
       expect(text()).to.contain('Token refresh failed')
     })
 
-    it('says when the service worker is not in control', async () => {
+    it('works on a page the service worker does not control, from the sign-in stored here', async () => {
       await open()
       setController(null)
       control('test-refresh').click()
-      await until(() => text().includes('service worker is not active'), 'the message')
+      // (nothing is stored in this page's own database)
+      await until(() => text().includes('Not signed in'), 'the message')
     })
 
     it('says when nothing is signed in any more', async () => {
