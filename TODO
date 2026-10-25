@@ -261,10 +261,16 @@ ci/cd (docs/CI.md)
 - the macOS/WebKit and Windows/Edge end-to-end jobs: make them pass, then required (`e2e` in
   ci-ok's needs, no continue-on-error), and fold e2e-linux into the same matrix (it is apart only
   because a matrix has one result for ci-ok, and Linux's is required now)
-- Terraform state of every stack in R2 (each stack's `backend "s3"`, `init -migrate-state`), then the
-  Cloudflare deploy token made by Terraform and written to the production environment's secret
-- deploy from main (deploy.yml: ci.yml again, deploy, smoke test, rollback), and a nightly drift check
-  of the Terraform stacks (drift.yml); branch claude/ci-and-pr-workflow has a draft of both
+- Terraform state of every stack in R2: the bucket is made (cloudflare stack); move each stack's
+  state in (`init -migrate-state`) with the R2 state token in .r2-tfstate.env
+- deploy from main (deploy.yml, drafted on branch claude/ci-and-pr-workflow): build in a job with no
+  secrets, and deploy that build in a job that runs only wrangler, with a token that can do nothing
+  but deploy Workers (Workers Scripts: Edit); then the smoke test, and rollback
+- Terraform in CI: plan on merges that touch infra/ (read-only credentials, `infra` environment),
+  apply that plan after approval (`infra-apply` environment); a nightly drift check with the
+  read-only ones. Google by Workload Identity Federation (nothing stored); Cloudflare tokens made by
+  hand, each as narrow as it can be (Terraform is not given API Tokens: Edit, which is as much as the
+  account); GitHub by a fine-grained token (this repository, Administration)
 - the weekly review routine (docs/agents/weekly-review.md, on the same branch): Sunday 20:00 UTC
 - agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
   required_approvals)
