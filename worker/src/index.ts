@@ -1,11 +1,11 @@
 /**
- * Chordless Auth Proxy - Cloudflare Worker
+ * Chordless - Cloudflare Worker
  *
- * Stateless OAuth proxy for Google Drive integration.
  * - Exchanges auth codes for tokens, encrypts refresh tokens as JWE blobs
  * - Refreshes access tokens on-demand
  * - Serves share links: the encrypted download from Drive, and the page's preview tags
- * - Performs Drive API operations (invite/revoke) on-demand with decrypted blobs
+ * - Serves the team spaces' API, with their Durable Objects
+ * - Answers the setlist emails forwarded to the import address
  */
 
 /* v8 ignore start -- needs `cloudflare:email` and the Workers cache: only workerd has them (worker.node.test.ts runs it there, unmeasured) */

@@ -29,13 +29,7 @@
  * allowing direct browser-to-Drive API calls for better performance and offline support.
  */
 
-import type {
-  AuthMetadata,
-  BlobBackup,
-  QueuedOperation,
-  StoredBlob,
-  StoredUser,
-} from './auth-db.ts'
+import type { AuthMetadata, BlobBackup, StoredBlob, StoredUser } from './auth-db.ts'
 
 /** The signed-in user, as the UI shows them */
 export interface UserInfo {
@@ -54,20 +48,9 @@ interface WorkerReply {
   error?: string
   data?: StoredBlob
   backup?: BlobBackup
-  operations?: QueuedOperation[]
-  operationId?: number
 }
 
-type WorkerMessageType =
-  | 'STORE_BLOB'
-  | 'GET_BLOB'
-  | 'DELETE_BLOB'
-  | 'EXPORT_BLOB'
-  | 'IMPORT_BLOB'
-  | 'QUEUE_INVITE'
-  | 'QUEUE_REVOKE'
-  | 'GET_PENDING_OPERATIONS'
-  | 'PROCESS_QUEUE'
+type WorkerMessageType = 'STORE_BLOB' | 'GET_BLOB' | 'DELETE_BLOB' | 'EXPORT_BLOB' | 'IMPORT_BLOB'
 
 // Configuration
 // (the client of the Google Cloud project this build is for: .env.development / .env.production)
@@ -324,48 +307,6 @@ export async function hasDriveAccess(): Promise<boolean> {
   }
 }
 
-/**
- * Get current ID token (for API calls to auth proxy)
- *
- * NOTE: Used by Drive collaboration operations (invite/revoke via auth proxy).
- *
- * NOTE: Consider refactoring this function if FedCM browser warnings become an issue.
- * The current implementation uses google.accounts.id.prompt() which triggers
- * FedCM and may cause browser warnings. Alternative approaches:
- * - Store ID token from initial OAuth flow and check expiration
- * - Use silent token refresh via iframe
- * - Trigger new OAuth code flow for fresh ID token (requires user interaction)
- */
-export async function getIdToken(): Promise<string> {
-  await initGoogleAuth()
-
-  return new Promise<string>((resolve, reject) => {
-    google.accounts.id.initialize({
-      client_id: GOOGLE_CLIENT_ID,
-      callback: response => {
-        if (response.credential) {
-          resolve(response.credential)
-        } else {
-          reject(new Error('No ID token received'))
-        }
-      },
-    })
-
-    // Prompt for ID token
-    google.accounts.id.prompt(notification => {
-      // (closing the prompt after it gave a credential is not a refusal; closing it without one is,
-      // and without this the promise would wait for ever)
-      const closed =
-        notification.isDismissedMoment() &&
-        notification.getDismissedReason() !== 'credential_returned'
-      if (notification.isNotDisplayed() || notification.isSkippedMoment() || closed) {
-        console.warn('[Auth] ID token prompt not shown or closed, may need re-auth')
-        reject(new Error('ID token not available'))
-      }
-    })
-  })
-}
-
 /** Google no longer honours the stored sign-in (it expired or was revoked): sign in again */
 export class SignInExpiredError extends Error {
   constructor() {
@@ -435,8 +376,8 @@ export async function getAccessToken(): Promise<string> {
 
 /**
  * Get a valid Google ID token for the team space API, which takes it as proof of who is asking
- * (worker/src/identity.ts). Unlike `getIdToken`, which asks Google in a prompt, this never shows
- * anything: the Worker sends a new one with each refreshed access token.
+ * (worker/src/identity.ts). It never shows anything: the Worker sends a new one with each
+ * refreshed access token.
  * Refreshed if it is about to expire.
  *
  * @throws If not authenticated, refresh fails, or Google sends no ID token
@@ -629,48 +570,6 @@ export async function downloadBlobBackup(): Promise<void> {
   URL.revokeObjectURL(url)
 }
 
-// ==============================================================================
-// FUTURE FEATURE: Drive API Operation Queue
-// ==============================================================================
-// The functions below are infrastructure for future Google Drive collaboration
-// features (invite users, revoke permissions). They queue operations in the
-// Service Worker and process them when online and authenticated.
-//
-// Currently not used by any UI features.
-// ==============================================================================
-
-/**
- * Queue an invite operation to grant a user read access to a Drive file
- */
-export async function queueInvite(fileId: string, email: string): Promise<WorkerReply> {
-  return await sendToServiceWorker('QUEUE_INVITE', { file_id: fileId, email })
-}
-
-/**
- * Queue a revoke operation to remove a user's access to a Drive file
- */
-export async function queueRevoke(fileId: string, permissionId: string): Promise<WorkerReply> {
-  return await sendToServiceWorker('QUEUE_REVOKE', {
-    file_id: fileId,
-    permission_id: permissionId,
-  })
-}
-
-/**
- * Get list of pending operations in the queue
- */
-export async function getPendingOperations(): Promise<QueuedOperation[]> {
-  const response = await sendToServiceWorker('GET_PENDING_OPERATIONS')
-  return response.operations || []
-}
-
-/**
- * Manually trigger processing of queued operations
- */
-export async function processQueue(): Promise<void> {
-  await sendToServiceWorker('PROCESS_QUEUE')
-}
-
 /**
  * The service worker holds the sign-in, and does not control the page until a later load on
  * the very first visit (or after a hard reload): then there is nothing to ask, which is
@@ -718,26 +617,5 @@ async function sendToServiceWorker(
     }
 
     controller.postMessage({ type, data, messageId }, [messageChannel.port2])
-  })
-}
-
-/**
- * Listen for ID token requests from Service Worker
- *
- * NOTE: This is infrastructure for future Drive API operations.
- * The Service Worker requests ID tokens when processing queued invite/revoke operations.
- * Currently called in app initialization but not actively used until Drive features are implemented.
- */
-export function listenForIdTokenRequests(): void {
-  navigator.serviceWorker.addEventListener('message', async event => {
-    if (event.data.type === 'REQUEST_ID_TOKEN') {
-      try {
-        const idToken = await getIdToken()
-        event.ports[0].postMessage({ idToken })
-      } catch (error) {
-        console.error('[Auth] Failed to get ID token:', error)
-        event.ports[0].postMessage({ idToken: null })
-      }
-    }
   })
 }

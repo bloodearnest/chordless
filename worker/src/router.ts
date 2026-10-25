@@ -9,9 +9,7 @@ import { isCrossOrigin, jsonResponse, message } from './http.ts'
 import {
   type GoogleApi,
   handleOAuthCallback,
-  handleSessionInvite,
   handleSessionLogout,
-  handleSessionRevoke,
   handleTokenRefresh,
 } from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
@@ -56,15 +54,6 @@ export async function handleRequest(
     // Signing out: the refresh token is revoked at Google
     if (path === '/session/logout' && request.method === 'POST') {
       return await handleSessionLogout(request, env, google)
-    }
-
-    // Session endpoints (require encrypted blob) - for future Drive collaboration features
-    if (path === '/session/invite' && request.method === 'POST') {
-      return await handleSessionInvite(request, env, google)
-    }
-
-    if (path === '/session/revoke' && request.method === 'POST') {
-      return await handleSessionRevoke(request, env, google)
     }
 
     // What the page needs that is set on the server (not secret: see Env)

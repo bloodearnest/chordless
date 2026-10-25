@@ -15,9 +15,6 @@ interface WaitEvent {
 interface MessagePayload {
   blob: string
   metadata?: AuthDB.AuthMetadata
-  file_id: string
-  email: string
-  permission_id: string
   backup: Partial<AuthDB.BlobBackup>
 }
 
@@ -37,16 +34,11 @@ export interface WorkerScope {
   location: { origin: string }
   clients: {
     claim(): Promise<void>
-    matchAll(options: {
-      type: 'window'
-      includeUncontrolled: boolean
-    }): Promise<readonly { postMessage(message: unknown, transfer: Transferable[]): void }[]>
   }
   skipWaiting(): Promise<void>
   addEventListener(type: 'install' | 'activate', listener: (event: WaitEvent) => void): void
   addEventListener(type: 'message', listener: (event: WorkerMessage) => void): void
   addEventListener(type: 'fetch', listener: (event: WorkerFetch) => void): void
-  addEventListener(type: 'online', listener: () => void): void
 }
 
 /** What the build gives the worker: the files to precache, and the version they make */
@@ -144,39 +136,6 @@ export function startServiceWorker(
           respondToClient(event, messageId, { success: true })
           break
 
-        case 'QUEUE_INVITE': {
-          // Queue an invite operation
-          const inviteId = await AuthDB.queueOperation({
-            type: 'invite',
-            file_id: data.file_id,
-            email: data.email,
-          })
-          respondToClient(event, messageId, { success: true, operationId: inviteId })
-          // Trigger processing
-          processOperationQueue()
-          break
-        }
-
-        case 'QUEUE_REVOKE': {
-          // Queue a revoke operation
-          const revokeId = await AuthDB.queueOperation({
-            type: 'revoke',
-            file_id: data.file_id,
-            permission_id: data.permission_id,
-          })
-          respondToClient(event, messageId, { success: true, operationId: revokeId })
-          // Trigger processing
-          processOperationQueue()
-          break
-        }
-
-        case 'GET_PENDING_OPERATIONS': {
-          // Get all pending operations
-          const pending = await AuthDB.getPendingOperations()
-          respondToClient(event, messageId, { success: true, operations: pending })
-          break
-        }
-
         case 'EXPORT_BLOB': {
           // Export blob as backup
           const backup = await AuthDB.exportBlobBackup()
@@ -187,12 +146,6 @@ export function startServiceWorker(
         case 'IMPORT_BLOB':
           // Import blob from backup
           await AuthDB.importBlobBackup(data.backup)
-          respondToClient(event, messageId, { success: true })
-          break
-
-        case 'PROCESS_QUEUE':
-          // Manually trigger queue processing
-          processOperationQueue()
           respondToClient(event, messageId, { success: true })
           break
 
@@ -215,127 +168,6 @@ export function startServiceWorker(
       event.ports[0].postMessage({ messageId, ...response })
     }
   }
-
-  // ==============================================================================
-  // FUTURE FEATURE: Drive API Operation Queue
-  // ==============================================================================
-  // The functions below handle queued Drive API operations (invite/revoke permissions).
-  // Operations are queued when offline and processed when the user is online and authenticated.
-  // Currently not used - infrastructure for future collaboration features.
-  // ==============================================================================
-
-  // Process operation queue
-  async function processOperationQueue() {
-    try {
-      const pending = await AuthDB.getPendingOperations()
-
-      for (const operation of pending) {
-        // Skip if retried too many times
-        if (operation.retry_count >= 3) {
-          console.warn('[SW] Operation', operation.id, 'exceeded retry limit')
-          await AuthDB.updateOperationStatus(operation.id, 'failed', 'Exceeded retry limit')
-          continue
-        }
-
-        try {
-          await processOperation(operation)
-          await AuthDB.updateOperationStatus(operation.id, 'completed')
-        } catch (error) {
-          console.error('[SW] Operation', operation.id, 'failed:', error)
-          await AuthDB.updateOperationStatus(operation.id, 'failed', errorMessage(error))
-        }
-      }
-
-      // Clean up old completed operations
-      await AuthDB.clearCompletedOperations()
-    } catch (error) {
-      console.error('[SW] Error processing queue:', error)
-    }
-  }
-
-  // Process a single operation
-  async function processOperation(operation: AuthDB.QueuedOperation) {
-    // Get blob
-    const blobData = await AuthDB.getBlob()
-    if (!blobData) {
-      throw new Error('No auth blob found - user needs to re-authenticate')
-    }
-
-    // Get current ID token from a client
-    const idToken = await requestIdTokenFromClient()
-    if (!idToken) {
-      throw new Error('No ID token available - user needs to refresh session')
-    }
-
-    if (operation.type === 'invite') {
-      // Call /session/invite
-      const response = await doFetch(`/session/invite`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          blob: blobData.blob,
-          id_token: idToken,
-          file_id: operation.file_id,
-          email: operation.email,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Invite failed')
-      }
-
-      return await response.json()
-    } else if (operation.type === 'revoke') {
-      // Call /session/revoke
-      const response = await doFetch(`/session/revoke`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          blob: blobData.blob,
-          id_token: idToken,
-          file_id: operation.file_id,
-          permission_id: operation.permission_id,
-        }),
-      })
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Revoke failed')
-      }
-
-      return await response.json()
-    }
-
-    throw new Error(`Unknown operation type: ${(operation as { type: string }).type}`)
-  }
-
-  // Request ID token from an active client
-  async function requestIdTokenFromClient(): Promise<string | null> {
-    const clients = await scope.clients.matchAll({ type: 'window', includeUncontrolled: true })
-
-    if (clients.length === 0) {
-      return null
-    }
-
-    // Ask the first client for an ID token
-    return new Promise<string | null>(resolve => {
-      const messageChannel = new MessageChannel()
-      const timeout = setTimeout(() => resolve(null), 5000)
-
-      messageChannel.port1.onmessage = event => {
-        clearTimeout(timeout)
-        resolve(event.data.idToken || null)
-      }
-
-      clients[0].postMessage({ type: 'REQUEST_ID_TOKEN' }, [messageChannel.port2])
-    })
-  }
-
-  // Process queue periodically when online
-  scope.addEventListener('online', () => {
-    processOperationQueue()
-  })
 
   // Fetch event handler - routes requests
   scope.addEventListener('fetch', event => {

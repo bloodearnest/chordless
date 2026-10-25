@@ -8,15 +8,9 @@ import {
   connectDrive,
   downloadBlobBackup,
   getCurrentUserInfo,
-  getIdToken,
-  getPendingOperations,
   hasDriveAccess,
   importBlobBackup,
   initGoogleAuth,
-  listenForIdTokenRequests,
-  processQueue,
-  queueInvite,
-  queueRevoke,
 } from '../src/js/google-auth.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
@@ -31,19 +25,6 @@ type CodeConfig = {
   include_granted_scopes?: boolean
   callback: (response: { code?: string; error?: string }) => void
 }
-type PromptNotification = {
-  isNotDisplayed(): boolean
-  isSkippedMoment(): boolean
-  isDismissedMoment(): boolean
-  getDismissedReason(): string
-}
-/** What Google tells of a prompt, apart from what a test changes */
-const shown: PromptNotification = {
-  isNotDisplayed: () => false,
-  isSkippedMoment: () => false,
-  isDismissedMoment: () => false,
-  getDismissedReason: () => '',
-}
 
 describe('google-auth: signing in', () => {
   let worker: FakeAuthWorker
@@ -55,10 +36,6 @@ describe('google-auth: signing in', () => {
   let codeResponse: { code?: string; error?: string }
   /** What the page last asked Google for */
   let requested: CodeConfig | undefined
-  let idCredential: string | null
-  let promptNotification: PromptNotification | null
-  /** The credential comes first, then the notification (the prompt closing after it) */
-  let credentialFirst: boolean
 
   const json = (body: object, status = 200) =>
     new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -75,33 +52,12 @@ describe('google-auth: signing in', () => {
       return respondTo(url)
     }) as typeof fetch
     codeResponse = { code: 'the-code' }
-    idCredential = 'id-credential'
-    promptNotification = null
-    credentialFirst = false
     ;(window as { google?: unknown }).google = {
       accounts: {
         oauth2: {
           initCodeClient: (config: CodeConfig) => {
             requested = config
             return { requestCode: () => config.callback(codeResponse) }
-          },
-        },
-        id: {
-          initialize: (config: { callback: (response: { credential?: string }) => void }) => {
-            ;(window as unknown as { __idCallback: typeof config.callback }).__idCallback =
-              config.callback
-          },
-          prompt: (callback: (notification: PromptNotification) => void) => {
-            const callbackInit = (
-              window as unknown as {
-                __idCallback: (response: { credential?: string }) => void
-              }
-            ).__idCallback
-            if (promptNotification && credentialFirst) {
-              callbackInit({ credential: idCredential ?? undefined })
-            }
-            if (promptNotification) callback(promptNotification)
-            else callbackInit({ credential: idCredential ?? undefined })
           },
         },
       },
@@ -316,108 +272,6 @@ describe('google-auth: signing in', () => {
     })
   })
 
-  describe('the ID token', () => {
-    it('is the credential Google gives', async () => {
-      expect(await getIdToken()).to.equal('id-credential')
-    })
-
-    it('is not there when Google gives none', async () => {
-      idCredential = null
-      let message = ''
-      try {
-        await getIdToken()
-      } catch (error) {
-        message = (error as Error).message
-      }
-      expect(message).to.equal('No ID token received')
-    })
-
-    it('is not there when Google does not show its prompt', async () => {
-      promptNotification = { ...shown, isNotDisplayed: () => true }
-      let message = ''
-      try {
-        await getIdToken()
-      } catch (error) {
-        message = (error as Error).message
-      }
-      expect(message).to.equal('ID token not available')
-    })
-
-    it('is not there when Google skips its prompt', async () => {
-      promptNotification = { ...shown, isSkippedMoment: () => true }
-      let message = ''
-      try {
-        await getIdToken()
-      } catch (error) {
-        message = (error as Error).message
-      }
-      expect(message).to.equal('ID token not available')
-    })
-
-    it('is not there when the prompt is closed without a credential', async () => {
-      idCredential = null
-      promptNotification = {
-        ...shown,
-        isDismissedMoment: () => true,
-        getDismissedReason: () => 'cancel_called',
-      }
-      let message = ''
-      try {
-        await getIdToken()
-      } catch (error) {
-        message = (error as Error).message
-      }
-      expect(message).to.equal('ID token not available')
-    })
-
-    it('is the credential even though the prompt closes after giving it', async () => {
-      credentialFirst = true
-      promptNotification = {
-        ...shown,
-        isDismissedMoment: () => true,
-        getDismissedReason: () => 'credential_returned',
-      }
-      expect(await getIdToken()).to.equal('id-credential')
-    })
-
-    describe('asked for by the service worker', () => {
-      let listening = false
-      const ask = () =>
-        new Promise<unknown>(resolve => {
-          const channel = new MessageChannel()
-          channel.port1.onmessage = event => resolve(event.data)
-          navigator.serviceWorker.dispatchEvent(
-            new MessageEvent('message', {
-              data: { type: 'REQUEST_ID_TOKEN' },
-              ports: [channel.port2],
-            })
-          )
-        })
-
-      beforeEach(() => {
-        if (!listening) {
-          listenForIdTokenRequests()
-          listening = true
-        }
-      })
-
-      it('is given', async () => {
-        expect(await ask()).to.deep.equal({ idToken: 'id-credential' })
-      })
-
-      it('is said to be missing when it cannot be had', async () => {
-        idCredential = null
-        expect(await ask()).to.deep.equal({ idToken: null })
-      })
-
-      it('ignores other messages', async () => {
-        navigator.serviceWorker.dispatchEvent(
-          new MessageEvent('message', { data: { type: 'OTHER' } })
-        )
-      })
-    })
-  })
-
   describe('the backup', () => {
     it('is imported through the worker', async () => {
       await importBlobBackup({ version: 1, blob: 'saved', metadata: {} })
@@ -437,21 +291,6 @@ describe('google-auth: signing in', () => {
         HTMLAnchorElement.prototype.click = realClick
       }
       expect(clicked[0]).to.match(/^chordless-auth-backup-\d{4}-\d{2}-\d{2}\.json$/)
-    })
-  })
-
-  describe('the queue of Drive operations', () => {
-    it('takes invites and revokes, lists them, and is told to process them', async () => {
-      expect((await queueInvite('f1', 'a@example.com')).success).to.equal(true)
-      expect((await queueRevoke('f1', 'p1')).success).to.equal(true)
-      const operations = await getPendingOperations()
-      expect(operations).to.have.length(2)
-      await processQueue()
-    })
-
-    it('lists none when the worker has no list', async () => {
-      worker.queued = undefined as never
-      expect(await getPendingOperations()).to.deep.equal([])
     })
   })
 

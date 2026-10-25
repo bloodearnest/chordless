@@ -15,9 +15,6 @@ import { setRouter } from './navigation.ts'
 import { SpaceChangeEvent } from './space.ts'
 import { views } from './views/registry.ts'
 
-// Answer the service worker's requests for a Google ID token
-import('./google-auth.ts').then(({ listenForIdTokenRequests }) => listenForIdTokenRequests())
-
 // The first sign-in renames the space: before anything shows its name. The sign-in
 // lives behind the service worker, so a page it does not control yet (the first visit) has none
 // to find: don't make the first view wait for that.

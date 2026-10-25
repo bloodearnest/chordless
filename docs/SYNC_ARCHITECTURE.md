@@ -614,9 +614,8 @@ backstop.
 ### Later
 
 - **Durable offline queue:** keep individual writes queued locally and replay them
-  when back online. The service worker's existing operation queue
-  (`AuthDB.queueOperation`, `processOperationQueue`, today only for invite/revoke and
-  unused) could be generalised. Trigger on the `online` event (and on app start);
+  when back online (the auth database still has an unused `operation-queue` store, left
+  from an invite/revoke queue that was removed). Trigger on the `online` event (and on app start);
   the Background Sync API would be natural but isn't supported in Safari/iPadOS, so
   it can only be a progressive enhancement.
 - **Full sync in the service worker / periodic sync:** the orchestrator would have to

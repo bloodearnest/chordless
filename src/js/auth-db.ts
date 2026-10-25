@@ -1,10 +1,6 @@
 /**
- * AuthDB - IndexedDB wrapper for Google Drive auth blob storage and operation queuing
- *
- * Used by Service Worker to:
- * - Store encrypted JWE token blobs
- * - Queue invite/revoke operations for offline support
- * - Track operation status and retry logic
+ * AuthDB - IndexedDB wrapper for the Google sign-in's encrypted token blob (JWE), used by the
+ * service worker
  */
 
 import { requestResult } from './utils/idb.ts'
@@ -42,22 +38,6 @@ export interface StoredBlob {
   updated_at: string
 }
 
-/** A queued request for the worker to make once the device is online and signed in */
-export type OperationRequest =
-  | { type: 'invite'; file_id: string; email: string }
-  | { type: 'revoke'; file_id: string; permission_id: string }
-
-export type OperationStatus = 'pending' | 'completed' | 'failed'
-
-export type QueuedOperation = OperationRequest & {
-  id: number
-  status: OperationStatus
-  timestamp: string
-  retry_count: number
-  last_error: string | null
-  updated_at?: string
-}
-
 /** A blob exported for the user to keep */
 export interface BlobBackup {
   version: 1
@@ -68,7 +48,9 @@ export interface BlobBackup {
 
 const STORES = {
   BLOB: 'auth-blob', // Stores the encrypted token blob
-  QUEUE: 'operation-queue', // Stores pending operations
+  // A queue of Drive invite/revoke operations that were never used: the store is still made, so
+  // the schema (and DB_VERSION) stays as it is on devices, but nothing reads or writes it
+  QUEUE: 'operation-queue',
 }
 
 /**
@@ -145,110 +127,6 @@ export async function deleteBlob(): Promise<void> {
   const store = tx.objectStore(STORES.BLOB)
 
   await requestResult(store.delete('current'))
-
-  db.close()
-}
-
-/**
- * Queue an operation (invite or revoke)
- */
-export async function queueOperation(operation: OperationRequest): Promise<number> {
-  const db = await initAuthDB()
-  const tx = db.transaction(STORES.QUEUE, 'readwrite')
-  const store = tx.objectStore(STORES.QUEUE)
-
-  const queueItem = {
-    ...operation,
-    status: 'pending',
-    timestamp: new Date().toISOString(),
-    retry_count: 0,
-    last_error: null,
-  }
-
-  const id = Number(await requestResult(store.add(queueItem)))
-
-  db.close()
-  return id
-}
-
-/**
- * Get all pending operations
- */
-export async function getPendingOperations(): Promise<QueuedOperation[]> {
-  const db = await initAuthDB()
-  const tx = db.transaction(STORES.QUEUE, 'readonly')
-  const store = tx.objectStore(STORES.QUEUE)
-  const index = store.index('status')
-
-  const results = await requestResult(index.getAll('pending'))
-
-  db.close()
-  return results
-}
-
-/**
- * Update operation status
- */
-export async function updateOperationStatus(
-  id: number,
-  status: OperationStatus,
-  error: string | null = null
-): Promise<void> {
-  const db = await initAuthDB()
-  const tx = db.transaction(STORES.QUEUE, 'readwrite')
-  const store = tx.objectStore(STORES.QUEUE)
-
-  // Get current operation
-  const operation = await requestResult(store.get(id))
-
-  if (!operation) {
-    db.close()
-    throw new Error(`Operation ${id} not found`)
-  }
-
-  // Update status
-  operation.status = status
-  operation.last_error = error
-  if (status === 'failed') {
-    operation.retry_count = (operation.retry_count || 0) + 1
-  }
-  operation.updated_at = new Date().toISOString()
-
-  await requestResult(store.put(operation))
-
-  db.close()
-}
-
-/**
- * Delete completed/failed operations
- */
-export async function deleteOperation(id: number): Promise<void> {
-  const db = await initAuthDB()
-  const tx = db.transaction(STORES.QUEUE, 'readwrite')
-  const store = tx.objectStore(STORES.QUEUE)
-
-  await requestResult(store.delete(id))
-
-  db.close()
-}
-
-/**
- * Clear all completed operations (older than 24 hours)
- */
-export async function clearCompletedOperations(): Promise<void> {
-  const db = await initAuthDB()
-  const tx = db.transaction(STORES.QUEUE, 'readwrite')
-  const store = tx.objectStore(STORES.QUEUE)
-
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-  const results = await requestResult(store.getAll())
-
-  for (const op of results) {
-    if (op.status === 'completed' && op.updated_at !== undefined && op.updated_at < cutoff) {
-      await requestResult(store.delete(op.id))
-    }
-  }
 
   db.close()
 }

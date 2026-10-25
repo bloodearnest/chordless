@@ -154,8 +154,8 @@ The Worker keeps no per-user state (until the team service adds its Durable Obje
 - **Who is asking the team service (built 2026-10-21):** Google's own ID token, as
   `Authorization: Bearer`. Google sends a new one (an hour, checked on a real refresh) with every
   refreshed access token, so `/session/refresh` passes it on and the page keeps it beside the access
-  token. `getIdentityToken()` (`google-auth.ts`) renews it silently (`getIdToken` is the old
-  One Tap prompt, which is not used for this). The Worker side is `worker/src/identity.ts`: an
+  token. `getIdentityToken()` (`google-auth.ts`) renews it silently (the old One Tap
+  prompt, `getIdToken`, has been removed). The Worker side is `worker/src/identity.ts`: an
   `IdentityProvider` says which issuers it answers for and verifies a token (signature, issuer,
   audience, expiry, and a *verified* email), and `authenticate(request, providers)` matches the token
   to its provider by issuer. Google is the only provider. It gives an `Identity`

@@ -11,15 +11,11 @@ import {
   type WorkerScope,
 } from '../src/js/service-worker-core.ts'
 import { SHARED_CACHE_NAME, takeShared } from '../src/js/shared-incoming.ts'
-import { deleteDatabase, installFakeTimers, suppressConsoleLogs, wait } from './test-helpers.ts'
+import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
 suppressConsoleLogs()
-
-// Waits in real time, for while the test's fake timers are installed
-const realSetTimeout = window.setTimeout.bind(window)
-const realWait = (ms: number) => new Promise<void>(resolve => realSetTimeout(resolve, ms))
 
 /** The page's CacheStorage with every name given a prefix of the test's own, so nothing else is touched */
 function isolated(
@@ -49,7 +45,6 @@ type Listener = (event: never) => void
 function fakeScope() {
   const listeners: Record<string, Listener> = {}
   const log: string[] = []
-  const clients: Array<{ postMessage(message: unknown, transfer: Transferable[]): void }> = []
   const scope = {
     registration: { active: null as unknown },
     location: { origin: 'https://app.test' },
@@ -57,7 +52,6 @@ function fakeScope() {
       claim: async () => {
         log.push('claim')
       },
-      matchAll: async () => clients,
     },
     skipWaiting: async () => {
       log.push('skipWaiting')
@@ -66,7 +60,7 @@ function fakeScope() {
       listeners[type] = listener
     },
   } satisfies Record<string, unknown> as unknown as WorkerScope
-  return { scope, listeners, log, clients }
+  return { scope, listeners, log }
 }
 
 describe('the service worker', () => {
@@ -231,201 +225,6 @@ describe('the service worker', () => {
       expect(await send({ type: 'GET_VERSION' }, false)).to.equal(null)
       expect(await send({ type: 'NO_SUCH_THING', messageId: 'x' })).to.equal(null)
       expect(await send(null)).to.equal(null)
-    })
-
-    it('lists the pending operations', async () => {
-      await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-      const reply = await send({ type: 'GET_PENDING_OPERATIONS' })
-      expect(reply?.operations).to.have.length(1)
-    })
-
-    describe('the operation queue', () => {
-      let calls: Array<{ path: string; body: Record<string, string> }>
-      let token: string | null
-
-      beforeEach(async () => {
-        calls = []
-        token = 'id-token'
-        await AuthDB.storeBlob('blob')
-        scope.clients.push({
-          postMessage: (message, transfer) => {
-            expect(message).to.deep.equal({ type: 'REQUEST_ID_TOKEN' })
-            ;(transfer[0] as MessagePort).postMessage({ idToken: token })
-          },
-        })
-        fetchImpl = async (path, init) => {
-          calls.push({ path: String(path), body: JSON.parse(String(init?.body)) })
-          return Response.json({ ok: true })
-        }
-      })
-
-      /** Operations as they stand once the worker has processed the queue */
-      async function allOperations() {
-        const db = await AuthDB.initAuthDB()
-        const all = await new Promise<AuthDB.QueuedOperation[]>(resolve => {
-          const request = db.transaction('operation-queue').objectStore('operation-queue').getAll()
-          request.onsuccess = () => resolve(request.result)
-        })
-        db.close()
-        return all
-      }
-      const settled = async () => (await AuthDB.getPendingOperations()).length === 0
-
-      it('sends a queued invite and a queued revoke to the Worker, and marks them done', async () => {
-        const invite = await send({
-          type: 'QUEUE_INVITE',
-          data: { file_id: 'f1', email: 'a@example.com' },
-        })
-        const revoke = await send({
-          type: 'QUEUE_REVOKE',
-          data: { file_id: 'f2', permission_id: 'p' },
-        })
-        expect(invite?.operationId).to.be.a('number')
-        expect(revoke?.operationId).to.be.a('number')
-        // (each queued operation starts a run, and two runs may both take the same one)
-        await until(async () => calls.length >= 2 && (await settled()))
-        expect([...new Set(calls.map(call => call.path))].sort()).to.deep.equal([
-          '/session/invite',
-          '/session/revoke',
-        ])
-        const inviteCall = calls.find(call => call.path === '/session/invite')
-        expect(inviteCall?.body).to.deep.equal({
-          blob: 'blob',
-          id_token: 'id-token',
-          file_id: 'f1',
-          email: 'a@example.com',
-        })
-        await until(async () => (await allOperations()).every(op => op.status === 'completed'))
-      })
-
-      it('processes the queue when asked, and when the device is back online', async () => {
-        await AuthDB.queueOperation({ type: 'revoke', file_id: 'f', permission_id: 'p' })
-        expect((await send({ type: 'PROCESS_QUEUE' }))?.success).to.equal(true)
-        await until(async () => calls.length === 1 && (await settled()))
-        await AuthDB.queueOperation({ type: 'revoke', file_id: 'g', permission_id: 'p' })
-        scope.listeners.online(undefined as never)
-        await until(async () => calls.length === 2 && (await settled()))
-      })
-
-      async function failedWith(message: string) {
-        await until(async () => (await settled()) && (await allOperations()).length > 0)
-        const [op] = await allOperations()
-        expect(op.status).to.equal('failed')
-        expect(op.last_error).to.equal(message)
-        expect(op.retry_count).to.equal(1)
-      }
-
-      it('fails an operation when there is no blob', async () => {
-        await AuthDB.deleteBlob()
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        await send({ type: 'PROCESS_QUEUE' })
-        await failedWith('No auth blob found - user needs to re-authenticate')
-      })
-
-      it('fails an operation when no page is open to give an ID token', async () => {
-        scope.clients.length = 0
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        await send({ type: 'PROCESS_QUEUE' })
-        await failedWith('No ID token available - user needs to refresh session')
-      })
-
-      it('fails an operation when the page gives no ID token', async () => {
-        token = null
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        await send({ type: 'PROCESS_QUEUE' })
-        await failedWith('No ID token available - user needs to refresh session')
-      })
-
-      it('fails an operation when the page does not answer in time', async () => {
-        const clock = installFakeTimers()
-        try {
-          scope.clients.length = 0
-          scope.clients.push({ postMessage: () => {} })
-          await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-          scope.listeners.online(undefined as never)
-          // (the queue reads the database, in real time, before it asks the page)
-          await realWait(100)
-          await clock.tick(5000)
-        } finally {
-          clock.uninstall()
-        }
-        await failedWith('No ID token available - user needs to refresh session')
-      })
-
-      it('fails an operation the Worker refuses, with its reason, or a general one', async () => {
-        fetchImpl = async () => Response.json({ error: 'Not yours' }, { status: 403 })
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        await AuthDB.queueOperation({ type: 'revoke', file_id: 'f', permission_id: 'p' })
-        await send({ type: 'PROCESS_QUEUE' })
-        await until(async () => (await settled()) && (await allOperations()).length === 2)
-        expect((await allOperations()).map(op => op.last_error)).to.deep.equal([
-          'Not yours',
-          'Not yours',
-        ])
-
-        fetchImpl = async () => Response.json({}, { status: 500 })
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        await AuthDB.queueOperation({ type: 'revoke', file_id: 'f', permission_id: 'p' })
-        await send({ type: 'PROCESS_QUEUE' })
-        await until(async () => (await settled()) && (await allOperations()).length === 4)
-        expect((await allOperations()).map(op => op.last_error).slice(2)).to.deep.equal([
-          'Invite failed',
-          'Revoke failed',
-        ])
-      })
-
-      it('gives up on an operation that has failed three times', async () => {
-        await AuthDB.queueOperation({ type: 'invite', file_id: 'f', email: 'a@example.com' })
-        const db = await AuthDB.initAuthDB()
-        await new Promise<void>(resolve => {
-          const tx = db.transaction('operation-queue', 'readwrite')
-          const store = tx.objectStore('operation-queue')
-          store.getAll().onsuccess = event => {
-            for (const op of (event.target as IDBRequest).result)
-              store.put({ ...op, retry_count: 3 })
-          }
-          tx.oncomplete = () => resolve()
-        })
-        db.close()
-        await send({ type: 'PROCESS_QUEUE' })
-        await failedWith('Exceeded retry limit').catch(async () => {
-          const [op] = await allOperations()
-          expect(op.last_error).to.equal('Exceeded retry limit')
-        })
-        expect(calls).to.deep.equal([])
-      })
-
-      it('fails an operation of a kind it does not know', async () => {
-        const db = await AuthDB.initAuthDB()
-        await new Promise<void>(resolve => {
-          const tx = db.transaction('operation-queue', 'readwrite')
-          tx.objectStore('operation-queue').add({
-            type: 'bogus',
-            status: 'pending',
-            retry_count: 0,
-            timestamp: '',
-          })
-          tx.oncomplete = () => resolve()
-        })
-        db.close()
-        await send({ type: 'PROCESS_QUEUE' })
-        await failedWith('Unknown operation type: bogus')
-      })
-
-      it('carries on when the queue cannot be read', async () => {
-        await deleteDatabase('auth')
-        await new Promise<void>((resolve, reject) => {
-          const request = indexedDB.open('auth', 5)
-          request.onsuccess = () => {
-            request.result.close()
-            resolve()
-          }
-          request.onerror = () => reject(request.error)
-        })
-        const reply = await send({ type: 'PROCESS_QUEUE' })
-        expect(reply?.success).to.equal(true)
-        await wait(50)
-      })
     })
   })
 

@@ -5,16 +5,14 @@
  */
 
 import assert from 'node:assert/strict'
-import { afterEach, beforeEach, describe, test } from 'node:test'
+import { beforeEach, describe, test } from 'node:test'
 import * as jose from 'jose'
 import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
 import {
   type GoogleApi,
   handleOAuthCallback,
-  handleSessionInvite,
   handleSessionLogout,
-  handleSessionRevoke,
   handleTokenRefresh,
 } from '../worker/src/session.ts'
 
@@ -462,140 +460,6 @@ describe('POST /session/refresh', () => {
       }
     })
   })
-})
-
-describe('the invite and revoke routes (groundwork for sharing a folder with others)', () => {
-  let realFetch: typeof fetch
-  let requests: { url: string; init: RequestInit }[]
-  let driveAnswer: () => Response
-
-  beforeEach(() => {
-    realFetch = globalThis.fetch
-    requests = []
-    driveAnswer = () => Response.json({ id: 'permission-1' })
-    globalThis.fetch = (async (url: string, init: RequestInit) => {
-      requests.push({ url: String(url), init })
-      return driveAnswer()
-    }) as typeof fetch
-  })
-
-  afterEach(() => {
-    globalThis.fetch = realFetch
-  })
-
-  const invite = async (over: Record<string, unknown> = {}, google = fakeGoogle().google) => {
-    const blob = await encryptBlob(blobData(), env)
-    return handleSessionInvite(
-      post('/session/invite', {
-        blob,
-        id_token: 'token',
-        file_id: 'file-1',
-        email: 'bob@example.com',
-        ...over,
-      }),
-      env,
-      google
-    )
-  }
-
-  const revoke = async (over: Record<string, unknown> = {}, google = fakeGoogle().google) => {
-    const blob = await encryptBlob(blobData(), env)
-    return handleSessionRevoke(
-      post('/session/revoke', {
-        blob,
-        id_token: 'token',
-        file_id: 'file-1',
-        permission_id: 'permission-1',
-        ...over,
-      }),
-      env,
-      google
-    )
-  }
-
-  for (const missing of ['blob', 'id_token', 'file_id', 'email']) {
-    test(`invite refuses a request with no ${missing}`, async () => {
-      const response = await invite({ [missing]: undefined })
-      assert.equal(response.status, 400)
-      assert.equal(requests.length, 0)
-    })
-  }
-
-  for (const missing of ['blob', 'id_token', 'file_id', 'permission_id']) {
-    test(`revoke refuses a request with no ${missing}`, async () => {
-      const response = await revoke({ [missing]: undefined })
-      assert.equal(response.status, 400)
-      assert.equal(requests.length, 0)
-    })
-  }
-
-  test('invite makes the person a reader of the file, as the owner of the blob', async () => {
-    const response = await invite()
-    assert.equal(response.status, 200)
-    assert.deepEqual(await bodyOf(response), { success: true, permission_id: 'permission-1' })
-
-    assert.equal(requests.length, 1)
-    assert.equal(requests[0].url, 'https://www.googleapis.com/drive/v3/files/file-1/permissions')
-    assert.equal(requests[0].init.method, 'POST')
-    assert.equal(
-      (requests[0].init.headers as Record<string, string>).Authorization,
-      'Bearer access-2'
-    )
-    assert.deepEqual(JSON.parse(String(requests[0].init.body)), {
-      role: 'reader',
-      type: 'user',
-      emailAddress: 'bob@example.com',
-    })
-  })
-
-  test('revoke removes the permission', async () => {
-    driveAnswer = () => new Response(null, { status: 204 })
-    const response = await revoke()
-    assert.equal(response.status, 200)
-    assert.deepEqual(await bodyOf(response), { success: true })
-    assert.equal(
-      requests[0].url,
-      'https://www.googleapis.com/drive/v3/files/file-1/permissions/permission-1'
-    )
-    assert.equal(requests[0].init.method, 'DELETE')
-  })
-
-  for (const [name, run] of [
-    ['invite', () => invite],
-    ['revoke', () => revoke],
-  ] as const) {
-    test(`${name} is refused for an ID token that is not the blob's owner, before Drive is asked`, async () => {
-      const other = fakeGoogle({
-        verifyIdToken: (async () => ({
-          email: 'mallory@example.com',
-          sub: 'sub-9',
-        })) as unknown as GoogleApi['verifyIdToken'],
-      })
-      const response = await run()({}, other.google)
-      assert.equal(response.status, 403)
-      assert.equal(requests.length, 0)
-      assert.ok(!other.calls.some(c => c.name === 'refreshAccessToken'))
-    })
-
-    test(`${name} fails for an ID token that does not verify`, async () => {
-      const bad = fakeGoogle({
-        verifyIdToken: (async () => {
-          throw new Error('bad token')
-        }) as unknown as GoogleApi['verifyIdToken'],
-      })
-      await assert.rejects(run()({}, bad.google), /bad token/)
-      assert.equal(requests.length, 0)
-    })
-
-    test(`${name} passes on what Drive says when it refuses`, async () => {
-      driveAnswer = () => new Response('nope', { status: 404 })
-      const response = await run()()
-      assert.equal(response.status, 404)
-      const body = await bodyOf(response)
-      assert.equal(body.error, 'Drive API error')
-      assert.equal(body.details, 'nope')
-    })
-  }
 })
 
 describe('POST /session/logout', () => {

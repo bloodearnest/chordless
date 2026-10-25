@@ -6,8 +6,6 @@ export class FakeAuthWorker {
   messages: { type: string; data: Record<string, unknown> }[] = []
   /** Types to answer with a failure, to see how the page copes */
   failing = new Set<string>()
-  /** The invites and revokes it has been asked to queue */
-  queued: Array<Record<string, unknown>> = []
 
   postMessage(
     { type, data, messageId }: { type: string; data: Record<string, unknown>; messageId: string },
@@ -35,14 +33,6 @@ export class FakeAuthWorker {
           metadata: (data.backup as { metadata: AuthMetadata }).metadata,
           updated_at: new Date().toISOString(),
         }
-        return reply({ success: true })
-      case 'QUEUE_INVITE':
-      case 'QUEUE_REVOKE':
-        this.queued.push({ type, ...data })
-        return reply({ success: true, operationId: this.queued.length })
-      case 'GET_PENDING_OPERATIONS':
-        return reply({ success: true, operations: this.queued })
-      case 'PROCESS_QUEUE':
         return reply({ success: true })
       case 'EXPORT_BLOB':
         return this.stored

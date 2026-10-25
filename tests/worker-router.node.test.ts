@@ -64,7 +64,6 @@ test('the API is refused to a page from another origin, before it is routed', as
     '/oauth/callback',
     '/session/refresh',
     '/session/logout',
-    '/session/invite',
     '/api/share/abc',
     '/api/config',
   ]) {
@@ -97,12 +96,7 @@ test('the API sends no CORS headers', async () => {
 
 test("each session route is the Worker's: an empty request is refused by its own handler", async () => {
   const { send, assetRequests } = setup()
-  for (const path of [
-    '/session/refresh',
-    '/session/logout',
-    '/session/invite',
-    '/session/revoke',
-  ]) {
+  for (const path of ['/session/refresh', '/session/logout']) {
     assert.equal((await send(path, postJson('{}'))).status, 400, path)
   }
   assert.deepEqual(assetRequests, [])
