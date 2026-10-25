@@ -52,7 +52,7 @@ test('a link for a setlist of a dozen songs is short enough to send', async () =
 test('what is not a setlist is refused', async () => {
   await assert.rejects(decodeImport('not-a-link!'))
   await assert.rejects(decodeImport(await hostile({ songs: 'no' })))
-  await assert.rejects(decodeImport(await hostile({ songs: [] })))
+  await assert.rejects(decodeImport(await hostile({ songs: [] })), /That link holds no songs/)
   // Base64 that is not compressed data
   await assert.rejects(decodeImport('AAAAAAAA'), /damaged/)
 })

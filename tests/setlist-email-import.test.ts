@@ -589,17 +589,36 @@ describe('setlist-email-import', () => {
       expect(updated.songs[0].key).to.equal('A')
     })
 
-    it('can be turned down for a new setlist', async () => {
+    it('can be turned down for a new setlist, whose details are then asked for', async () => {
       await withSetlist()
+      const details = () => must($('setlist-details-form')?.parentElement)
+      expect(details().hidden, 'no details to give while updating').to.equal(true)
       await change($$('input[name="target"]').at(-1), el => {
         el.checked = true
       })
       expect(importer._target).to.equal('new')
       expect(importer._updating()).to.equal(undefined)
+      expect(details().hidden).to.equal(false)
+      expect(button(/Create setlist/)).to.not.equal(undefined)
       await change($$('input[name="target"]')[0], el => {
         el.checked = true
       })
       expect(importer._target).to.equal('have')
+    })
+
+    it('points out a setlist of that date that is not the leader’s, and makes a new one until told', async () => {
+      await db.saveSetlist(
+        makeSetlist({
+          id: 'theirs',
+          date: '2099-10-25',
+          owner: 'Someone Else',
+          ownerId: 'else@example.com',
+        })
+      )
+      await review(email())
+      expect(text()).to.contain('You already have a setlist for')
+      expect($('fieldset a')?.getAttribute('href')).to.equal('/setlist/theirs')
+      expect(importer._target).to.equal('new')
     })
 
     it('is not chosen when two setlists of that date are the leader’s', async () => {
