@@ -183,9 +183,10 @@ jobs:
           - name: macOS, WebKit
             os: macos-15
             browser: webkit
-          - name: Windows, Chrome
+          # Edge, as Windows' own browser (Chrome's engine is the Linux job's)
+          - name: Windows, Edge
             os: windows-2025
-            browser: chrome
+            browser: msedge
     defaults:
       run:
         shell: bash

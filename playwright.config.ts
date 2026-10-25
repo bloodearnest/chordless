@@ -19,8 +19,9 @@ const needsBuilt =
   (files.length === 0 && (projects.length === 0 || projects.some(a => /built/.test(a))))
 
 // One browser per run: Chromium, unless CHORDLESS_BROWSER says `webkit` (Safari's engine, which
-// roughly doubles the run, so it is opt-in: `just test-webkit`, or --project=webkit) or `chrome`
-// (Google's own build, as installed: CI's Windows job). Plain runs, and `just test`, stay on Chromium
+// roughly doubles the run, so it is opt-in: `just test-webkit`, or --project=webkit), `chrome`
+// (Google's own build, as installed) or `msedge` (Microsoft's, as installed: Windows' own, CI's
+// Windows job). Plain runs, and `just test`, stay on Chromium
 // (Workers get no command line, so the choice goes to them in the environment.)
 if (args.some(a => /webkit/.test(a))) process.env.CHORDLESS_BROWSER = 'webkit'
 const BROWSERS = {
@@ -28,6 +29,7 @@ const BROWSERS = {
   // iPad and iPhone browsers are all WebKit: where "not big enough" modals show up
   webkit: devices['Desktop Safari'],
   chrome: { ...devices['Desktop Chrome'], channel: 'chrome' },
+  msedge: { ...devices['Desktop Edge'], channel: 'msedge' },
 }
 const browser = (process.env.CHORDLESS_BROWSER || 'chromium') as keyof typeof BROWSERS
 if (!(browser in BROWSERS)) {
