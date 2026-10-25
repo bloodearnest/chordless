@@ -1,6 +1,6 @@
 /**
  * Records how the test suites did, as one line in docs/stats.jsonl: counts, run times and
- * coverage (lines, branches, functions) for each suite, with the commit they ran on.
+ * coverage (lines, branches, functions) for each suite, with the commit (and its tree) they ran on.
  *
  * `just test` runs it afterwards. The suites leave their results in .stats/ (and
  * coverage/coverage-summary.json) when they run in full, so this only reads them: run
@@ -129,12 +129,16 @@ function e2eStats(): SuiteStats & { flaky: number } {
 const git = (...args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim()
 
 const commit = git('rev-parse', '--short', 'HEAD')
+// GitHub's "Rebase and merge" gives a PR's commits new SHAs on main, but the same trees (a branch
+// must be up to date with main to merge): the tree is what still names this code there
+const tree = git('rev-parse', '--short', 'HEAD^{tree}')
 // The history file changes on every run: it does not make the tree dirty
 const dirty = git('status', '--porcelain', '--', '.', `:!${HISTORY}`) !== ''
 
 const entry = {
   date: new Date().toISOString(),
   commit,
+  tree,
   dirty,
   node: nodeStats(),
   unit: unitStats(),
