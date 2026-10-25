@@ -16,6 +16,9 @@ case "${1:-}" in
   lint)
     for dir in infra/*/; do
       name=$(basename "$dir")
+      # A data directory of its own, with no backend: a stack's own .terraform, set up for its state
+      # in R2, would want that state's credentials even for `init -backend=false`
+      export TF_DATA_DIR="${TMPDIR:-/tmp}/chordless-terraform-lint/$name"
       if ! tf -chdir="$dir" fmt -check -diff; then
         echo "terraform fmt: $name is not formatted (terraform -chdir=$dir fmt)"; failed=1
       fi
@@ -26,6 +29,7 @@ case "${1:-}" in
     done
     ;;
   drift)
+    unset TF_DATA_DIR
     if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -f .r2-tfstate.env ]; then
       set -a
       # shellcheck source=/dev/null
