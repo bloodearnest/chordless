@@ -48,8 +48,18 @@ lint-actions:
 
 # What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
 # a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|chrome`
-ci: lint test-node test-unit coverage-check (test-e2e "chromium")
-    git diff --exit-code
+ci:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    state() { git status --porcelain; git diff | git hash-object --stdin; }
+    before=$(state)
+    just lint test-node test-unit coverage-check
+    just test-e2e chromium
+    if [ "$(state)" != "$before" ]; then
+        echo "The checks changed files in the repository, which CI's must not:"
+        git status --short
+        exit 1
+    fi
 
 # Format project files with Biome
 format:

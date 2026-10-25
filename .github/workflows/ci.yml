@@ -1,0 +1,247 @@
+# The checks on every pull request, and on main before a deploy (deploy.yml calls this). Each job is
+# a `just` recipe, so `just ci` runs the Linux jobs' checks locally (docs/CI.md). The one check a
+# pull request needs to pass is `ci-ok`.
+name: CI
+
+on:
+  pull_request:
+  workflow_call:
+  workflow_dispatch:
+  # Weekly on main: keeps the caches from expiring in a quiet week, and checks the pinned tools
+  # and runner images still work
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions: {}
+
+concurrency:
+  # A new push to a pull request cancels its run; runs on main all finish
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Caches are saved on main only, which pull requests read (docs/CI.md)
+  SAVE_CACHE: ${{ github.ref == 'refs/heads/main' }}
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      infra: ${{ steps.changes.outputs.infra }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: scripts/ci/changes.sh "$BASE" | tee -a "$GITHUB_OUTPUT"
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup
+        with:
+          tools: node just actionlint zizmor shellcheck terraform
+      - run: just lint
+        env:
+          # zizmor's online audits (impostor-commit) read the actions' repositories
+          GH_TOKEN: ${{ github.token }}
+      - if: env.SAVE_CACHE == 'true'
+        uses: ./.github/actions/save-cache
+        with:
+          setup: ${{ steps.setup.outputs.save }}
+
+  node:
+    name: Node tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node just
+      - run: just test-node
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: node-coverage
+          path: .stats/node.lcov
+          retention-days: 3
+
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup
+        with:
+          tools: node just
+          browser: chromium
+      - run: just test-unit
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unit-coverage
+          path: coverage/lcov.info
+          retention-days: 3
+      # The one job that saves the Linux packages and Chromium (e2e-linux shares them)
+      - if: env.SAVE_CACHE == 'true'
+        uses: ./.github/actions/save-cache
+        with:
+          setup: ${{ steps.setup.outputs.save }}
+
+  coverage:
+    name: Coverage
+    needs: [node, unit]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node just
+          npm: "false"
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: node-coverage
+          path: .stats
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: unit-coverage
+          path: coverage
+      # Fails if any file has more missing than docs/coverage-floor.json allows; never writes it
+      - run: just coverage-check
+
+  e2e-linux:
+    name: End to end (Linux, Chromium)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node just
+          browser: chromium
+      - run: scripts/ci/fake-dev-vars.sh
+      - run: just test-e2e chromium
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-linux-chromium-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  e2e:
+    name: End to end (${{ matrix.name }})
+    # The slow runners wait for lint, so a change that fails it does not take them up
+    needs: lint
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    # New to CI, so not yet required: `ci-ok` ignores them until they have been green for a while
+    continue-on-error: true
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS, WebKit
+            os: macos-15
+            browser: webkit
+          - name: Windows, Chrome
+            os: windows-2025
+            browser: chrome
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./.github/actions/setup
+        with:
+          tools: node just
+          browser: ${{ matrix.browser }}
+      - run: scripts/ci/fake-dev-vars.sh
+      - run: just test-e2e "$BROWSER"
+        env:
+          BROWSER: ${{ matrix.browser }}
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-${{ matrix.browser }}-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+      - if: env.SAVE_CACHE == 'true'
+        uses: ./.github/actions/save-cache
+        with:
+          setup: ${{ steps.setup.outputs.save }}
+
+  infra:
+    name: Terraform
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: just terraform
+          npm: "false"
+      - run: just lint-infra
+
+  # The one required check: every job above passed, or was skipped as not needed
+  ci-ok:
+    name: ci-ok
+    if: always()
+    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, infra]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$RESULTS"
+          # (the e2e matrix is continue-on-error, so it reports success while it is not required)
+          jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$RESULTS" >/dev/null

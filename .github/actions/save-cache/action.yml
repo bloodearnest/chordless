@@ -1,0 +1,41 @@
+# Save what .github/actions/setup restored, where it missed: called at the end of the one job that
+# saves each cache, and only on main, so pull requests read main's caches and never write any
+# (docs/CI.md). Takes the setup step's outputs.
+name: Save cache
+description: Save the tools, npm packages and browser that the setup step had to fetch
+
+inputs:
+  setup:
+    description: The setup step's `save` output
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Save the tools
+      if: fromJSON(inputs.setup).save_tools
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\mise' || '~/.local/share/mise' }}
+        key: ${{ fromJSON(inputs.setup).tools }}
+
+    - name: Save node_modules
+      if: fromJSON(inputs.setup).save_modules
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: node_modules
+        key: ${{ fromJSON(inputs.setup).modules }}
+
+    - name: Save npm's download cache
+      if: fromJSON(inputs.setup).save_modules
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\npm-cache' || '~/.npm' }}
+        key: ${{ fromJSON(inputs.setup).npm }}
+
+    - name: Save the browser
+      if: fromJSON(inputs.setup).save_browser
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\ms-playwright' || runner.os == 'macOS' && '~/Library/Caches/ms-playwright' || '~/.cache/ms-playwright' }}
+        key: ${{ fromJSON(inputs.setup).browser }}
