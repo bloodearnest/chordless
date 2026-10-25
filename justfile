@@ -4,9 +4,10 @@
 default:
     @just --list
 
-# Run all tests: retake the Help pictures, then node, browser unit (Web Test Runner) and Playwright,
-# then record the results
-test: help-images test-node test-unit test-browser-headless && coverage-check stats
+# Run all tests: node and browser unit (Web Test Runner) in the background, while the Help pictures
+# are retaken and then Playwright runs (scripts/test-all.sh); then record the results
+test: && coverage-check stats
+    scripts/test-all.sh
 
 # Record the last full run's counts, times and coverage in docs/stats.jsonl (`just test` does it)
 stats:

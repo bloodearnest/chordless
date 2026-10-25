@@ -2,12 +2,15 @@
 // tests/help-images.shots.ts. A config of its own, as it writes files rather than tests the app.
 import { defineConfig, devices } from '@playwright/test'
 
-const PORT = 8793
+// The Playwright tests' development server (playwright.config.ts): `just test` starts it before
+// these pictures are taken, and the tests that follow use it too
+const PORT = 8791
 
 export default defineConfig({
   testDir: './tests',
   testMatch: 'help-images.shots.ts',
-  workers: 1,
+  // The light and dark pictures at once: each project writes its own files
+  workers: 2,
   reporter: 'list',
   use: {
     baseURL: `http://localhost:${PORT}`,
@@ -30,7 +33,8 @@ export default defineConfig({
     command: 'npm run dev',
     env: { CHORDLESS_PORT: String(PORT) },
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // (`just test` starts it first, scripts/test-all.sh: see playwright.config.ts)
+    reuseExistingServer: !process.env.CI || process.env.CHORDLESS_SERVERS_STARTED === '1',
     timeout: 120 * 1000,
   },
 })

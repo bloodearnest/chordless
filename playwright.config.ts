@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { defineConfig, devices } from '@playwright/test'
 
 // The tests run their own servers, on ports of their own: 8787 is the development server's
@@ -23,12 +24,20 @@ const needsBuilt =
 if (args.some(a => /webkit/.test(a))) process.env.CHORDLESS_WEBKIT = '1'
 const webkit = process.env.CHORDLESS_WEBKIT === '1'
 
+// A server already on its port is used rather than started: always where `just test` started them
+// (scripts/test-all.sh), and outside CI, where a fresh machine has none to find
+const reuseServers = !process.env.CI || process.env.CHORDLESS_SERVERS_STARTED === '1'
+
 export default defineConfig({
   testDir: './tests',
   testMatch: '*.playwright.{js,ts}',
 
   timeout: 30 * 1000,
   fullyParallel: true,
+  // A worker for every two processors the machine lets this have (one a core, where each core runs
+  // two threads; a CI runner's share, in a container): more make each test slower, not the run
+  // shorter, as the browsers, the servers and the unit tests beside them (`just test`) need the rest
+  workers: Math.max(1, Math.floor(availableParallelism() / 2)),
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
@@ -37,7 +46,13 @@ export default defineConfig({
     baseURL: `http://localhost:${DEV_PORT}`,
     // Dates follow the browser's locale; fix it so expectations are stable
     locale: 'en-GB',
-    trace: 'retain-on-failure',
+    // A failure keeps its trace. The page's DOM at each step is most of what a trace costs (a
+    // fifth of a whole run's time), so a run of named files has it, to look into a failure, and
+    // a whole run keeps the steps, console and network only (with the screenshot below)
+    trace:
+      files.length > 0
+        ? 'retain-on-failure'
+        : { mode: 'retain-on-failure', snapshots: false, screenshots: false },
     screenshot: 'only-on-failure',
   },
 
@@ -80,7 +95,7 @@ export default defineConfig({
       command: 'npm run dev',
       env: { CHORDLESS_PORT: String(DEV_PORT) },
       url: `http://localhost:${DEV_PORT}`,
-      reuseExistingServer: !process.env.CI,
+      reuseExistingServer: reuseServers,
       timeout: 120 * 1000,
     },
     ...(needsBuilt
@@ -88,7 +103,7 @@ export default defineConfig({
           {
             command: `npm run build && npm run preview -- --port ${BUILT_PORT} --strictPort`,
             url: `http://localhost:${BUILT_PORT}`,
-            reuseExistingServer: !process.env.CI,
+            reuseExistingServer: reuseServers,
             timeout: 120 * 1000,
           },
         ]

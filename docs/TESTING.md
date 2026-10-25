@@ -3,6 +3,16 @@
 `just format lint test` checks everything: formatting, linting, then three test suites.
 Run it before committing.
 
+`just test` runs the suites at once (`scripts/test-all.sh`): the node and browser unit tests in
+the background while the Help pictures are taken and then the Playwright tests run, with the
+Playwright servers started at the beginning. Each suite uses a worker (or a page) for every two
+processors the machine allows (`os.availableParallelism()`: a core each on this machine, and a CI
+runner's share), so what runs beside it has room. A background suite's output is printed when it
+is done, all of it if it failed, and kept in `.stats/<suite>.log`. Because the suites share the
+machine, a test that waits a fixed time, or leans on mocha's 2s timeout, will fail now and then:
+wait for the condition instead (`waitUntil`, `expect.poll`), and give a test that does a lot a
+timeout to match.
+
 | Suite | Runs | Files | Recipe |
 | --- | --- | --- | --- |
 | Node | `node --test` | `tests/*.node.test.ts` | `just test-node` |
@@ -119,8 +129,9 @@ app's own modules, imported directly: there's no build step to test around.
   `drive-sync-random.test.ts` runs random histories of several devices (creating and editing
   setlists, syncing, files trashed, restored or re-id'd, resets, failing storage calls) and
   checks that Drive never holds a setlist twice, that devices end up matching Drive, and that
-  no edit is lost. A failure names its seed, which replays the history; raise the constants at
-  the top of the file for a long hunt.
+  no edit is lost. Each mode is a file of its own (`drive-sync-random-<mode>.test.ts`), so they
+  run side by side; the suite is in `random-histories.ts`. A failure names its seed, which
+  replays the history; raise the constants at the top of `random-histories.ts` for a long hunt.
 - **Routing** has pure functions (`router.test.ts`: URL to route and back, and how a move
   changes the history), and the runtime, tested with the real History API, shadow DOM and
   clicks (`app-router.test.ts`). Views are tested like components; `home-view.test.ts`
@@ -137,6 +148,13 @@ app's own modules, imported directly: there's no build step to test around.
   only for tests that fail.
 
 Run one file with `just test-unit tests/db.test.ts`.
+
+A full run starts the slowest files first, by the times of the last full run
+(`.stats/unit-files.json`, written by `scripts/wtr-stats-reporter.js`): one page holds one file,
+so a slow file that started last would hold up the end of the run on its own. A file that takes
+much longer than the rest is better split (as the random histories are, a file to a mode), and a
+component's own pauses (a message shown for two seconds) shortened in its tests, as
+`DriveSyncPanel.doneMs` is.
 
 ## End-to-end tests
 
@@ -164,7 +182,9 @@ parallel, each in its own browser context.
 
 Two projects: `chromium` (everything else, against the dev server) and `built` (only
 `built.playwright.ts`, against `vite build` and `vite preview`). A run that names test files,
-none of them `built`, skips the build. Traces are kept for failures.
+none of them `built`, skips the build. A failure keeps its trace: in a whole run, only the steps,
+console and network (the page's DOM at each step costs a fifth of the run), and with the DOM in a
+run that names files, so run a failing file again to look into it.
 
 Import `test` and `expect` from `tests/fixtures.js`, not `@playwright/test`. Its `test`
 fails any test whose page throws an uncaught error, starts with the first-use modal answered
