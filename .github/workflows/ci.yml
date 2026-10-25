@@ -165,8 +165,6 @@ jobs:
 
   e2e:
     name: End to end (${{ matrix.name }})
-    # The slow runners wait for lint, so a change that fails it does not take them up
-    needs: lint
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     # New to CI, so not yet required: `ci-ok` ignores them until they have been green for a while
