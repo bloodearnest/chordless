@@ -25,7 +25,7 @@ import {
   type TeamRole,
 } from '../../src/js/team-roles.ts'
 import type { BlobData } from './blob.ts'
-import { jsonResponse, message, Refusal, readJson } from './http.ts'
+import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
@@ -64,21 +64,6 @@ function asRole(value: unknown): MemberRole {
   return role
 }
 
-/** Run a handler, turning a refusal into its answer and anything else into a 502 */
-async function answering(run: () => Promise<Response>): Promise<Response> {
-  try {
-    return await run()
-  } catch (error) {
-    if (error instanceof Refusal) return jsonResponse({ error: error.message }, error.status)
-    console.error('Team space admin error:', message(error))
-    const status = (error as { status?: unknown } | null)?.status
-    return jsonResponse(
-      { error: message(error) },
-      typeof status === 'number' && status >= 400 && status < 500 ? status : 502
-    )
-  }
-}
-
 /** Check that a blob is this person's, and that they can write to the folder with it */
 async function checkSharing(ctx: AdminContext, identity: Identity, blob: string, rootRef: string) {
   let data: BlobData
@@ -98,7 +83,7 @@ async function checkSharing(ctx: AdminContext, identity: Identity, blob: string,
 
 /** POST /api/spaces: share a folder you own as a team space; the space's id is issued here */
 export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<Response> {
-  return answering(async () => {
+  return answering('Team space admin', async () => {
     const identity = await ctx.identify(request)
     if (!identity) return jsonResponse({ error: 'Sign in first' }, 401)
     const body = await readJson(request)
@@ -122,7 +107,7 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
 
 /** POST /api/spaces/join: use an invite. A code that is not good is just that, whatever the reason */
 export function handleJoin(request: Request, ctx: AdminContext): Promise<Response> {
-  return answering(async () => {
+  return answering('Team space admin', async () => {
     const identity = await ctx.identify(request)
     if (!identity) return jsonResponse({ error: 'Sign in first' }, 401)
     const { spaceId, code } = await readJson(request)
@@ -153,7 +138,7 @@ export function handleSpaceAdmin(
   ctx: AdminContext,
   who: { identity: Identity; role: TeamRole }
 ): Promise<Response> {
-  return answering(async () => {
+  return answering('Team space admin', async () => {
     const room = ctx.room(spaceId)
     const { identity, role } = who
     const method = request.method

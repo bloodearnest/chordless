@@ -26,24 +26,37 @@ export function isCrossOrigin(request: Request, url: URL) {
   return site !== null && site !== 'same-origin' && site !== 'none'
 }
 
-/**
- * Helper to return JSON responses
- */
+/** A JSON answer */
 export function jsonResponse(data: unknown, status = 200) {
-  return new Response(JSON.stringify(data), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  })
+  return Response.json(data, { status })
 }
 
-/** An answer to send as it is */
+/** An answer to send as it is: thrown by a handler, and answered by `answering` */
 export class Refusal extends Error {
   status: number
   constructor(status: number, text: string) {
     super(text)
     this.status = status
+  }
+}
+
+/** The status to pass on for an error from further on (Drive, the storage): a 4xx it gave, else 502 */
+function statusOf(error: unknown): number {
+  const status = (error as { status?: unknown } | null)?.status
+  return typeof status === 'number' && status >= 400 && status < 500 ? status : 502
+}
+
+/**
+ * Run a handler. A `Refusal` is answered with its status and text; anything else is logged
+ * (under `label`) and answered with the 4xx status it carries, or 502.
+ */
+export async function answering(label: string, run: () => Promise<Response>): Promise<Response> {
+  try {
+    return await run()
+  } catch (error) {
+    if (error instanceof Refusal) return jsonResponse({ error: error.message }, error.status)
+    console.error(`${label} error:`, message(error))
+    return jsonResponse({ error: message(error) }, statusOf(error))
   }
 }
 

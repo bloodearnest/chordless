@@ -12,7 +12,7 @@ import {
   isAdminRoute,
   SPACE_ID,
 } from './team-admin.ts'
-import { handleTeamRequest, teamSpacePath } from './team-api.ts'
+import { handleTeamRequest, refusal, teamSpacePath } from './team-api.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from './team-context.ts'
 
 /** Whether a path is one of these routes */
@@ -49,9 +49,9 @@ export async function handleTeamRoutes(
 
     if (isAdminRoute(request.method, team.rest)) {
       const identity = await admin.identify(request)
-      if (!identity) return jsonResponse({ error: 'Sign in first' }, 401)
+      if (!identity) return refusal('unauthenticated')
       const role = await admin.room(team.spaceId).roleOf(identity)
-      if (!role) return jsonResponse({ error: 'Not a member of this space' }, 403)
+      if (!role) return refusal('not-a-member')
       return handleSpaceAdmin(request, team, admin, { identity, role })
     }
     return handleTeamRequest(request, team, createTeamContext(env, spaces, deps))

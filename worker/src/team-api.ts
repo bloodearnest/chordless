@@ -32,7 +32,7 @@ import {
   type SpaceStorage,
 } from '../../src/js/storage/types.ts'
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
-import { isRecord, jsonResponse, message, Refusal, readJson } from './http.ts'
+import { answering, isRecord, jsonResponse, Refusal, readJson } from './http.ts'
 
 /** What a request may do in a space: its role, or why it may do nothing */
 export type Access = TeamRole | 'unauthenticated' | 'not-a-member'
@@ -98,10 +98,11 @@ function collectionOf(url: URL): Collection {
   return known
 }
 
-/** The status the storage gave an error, if it is one a client may be told */
-function statusOf(error: unknown): number {
-  const status = (error as { status?: unknown } | null)?.status
-  return typeof status === 'number' && status >= 400 && status < 500 ? status : 502
+/** The answer for a request that may do nothing in the space */
+export function refusal(why: Exclude<Access, TeamRole>): Response {
+  return why === 'unauthenticated'
+    ? jsonResponse({ error: 'Sign in first' }, 401)
+    : jsonResponse({ error: 'Not a member of this space' }, 403)
 }
 
 /** Answer a team space request; `path` was matched by `teamSpacePath` */
@@ -110,12 +111,10 @@ export async function handleTeamRequest(
   { spaceId, rest }: { spaceId: string; rest: string },
   context: TeamContext
 ): Promise<Response> {
-  const access = await context.access(request, spaceId)
-  if (access === 'unauthenticated') return jsonResponse({ error: 'Sign in first' }, 401)
-  if (access === 'not-a-member') return jsonResponse({ error: 'Not a member of this space' }, 403)
-  const role: TeamRole = access
+  const role = await context.access(request, spaceId)
+  if (role === 'unauthenticated' || role === 'not-a-member') return refusal(role)
 
-  try {
+  return answering('Team space', async () => {
     const space = await context.space(spaceId)
     if (!space) return jsonResponse({ error: 'No such space' }, 404)
     const url = new URL(request.url)
@@ -230,9 +229,5 @@ export async function handleTeamRequest(
       }
     }
     return jsonResponse({ error: 'Not found' }, 404)
-  } catch (error) {
-    if (error instanceof Refusal) return jsonResponse({ error: error.message }, error.status)
-    console.error('Team space error:', message(error))
-    return jsonResponse({ error: message(error) }, statusOf(error))
-  }
+  })
 }
