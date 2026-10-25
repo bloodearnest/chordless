@@ -67,170 +67,158 @@ export class KeepAwakeLimitEvent extends Event {
     this.minutes = minutes
   }
 }
-const NASHVILLE_PREF_KEY = 'use-nashville'
-const ACCIDENTAL_PREF_KEY = 'use-unicode-accidentals'
-const MUSICIAN_TYPE_KEY = 'musician_type'
-const SECTION_DEFAULTS_KEY = 'section_defaults'
-const ENABLE_CAPO_KEY = 'enable_capo'
-const ENABLED_CAPO_FLAG_KEY = 'enabled_capo'
-const SETUP_DONE_KEY = 'setup-done'
-const KEEP_AWAKE_KEY = 'keep_screen_awake'
-const KEEP_AWAKE_MINUTES_KEY = 'keep_awake_minutes'
-
 /** The longest the screen is kept awake with no touch, in minutes: 0 is no limit */
 export const KEEP_AWAKE_LIMITS = [15, 30, 60, 120, 240, 0] as const
 export const DEFAULT_KEEP_AWAKE_MINUTES = 30
 
-let cachedUseNashville: boolean | null = null
-let cachedUseUnicodeAccidentals: boolean | null = null
-let cachedMusicianType: MusicianType | null = null
-/** The capo preference, when it could not be saved: kept here until the page is left */
-let unsavedCapoPreference: boolean | null = null
-
-function readPreference(): boolean {
-  if (cachedUseNashville !== null) return cachedUseNashville
-  const stored = localStorage.getItem(NASHVILLE_PREF_KEY)
-  cachedUseNashville = stored === '1' || stored === 'true'
-  return cachedUseNashville
+interface PreferenceSpec<T> {
+  /** Where it is kept (the first), and older keys it is also read from and written to */
+  keys: readonly string[]
+  /** The value from what is stored under each key (null where nothing is) */
+  read(stored: (string | null)[]): T
+  /** The value as it is stored */
+  write(value: T): string
+  /** The value when storage cannot be asked */
+  blocked: T
+  /** The event that says it changed (sent on window), if one does */
+  changed?(value: T): Event
+  /** Whether a value that cannot be saved is kept in memory for now (yes, unless said) */
+  remember?: boolean
 }
 
-export function getUseNashvilleNumbers(): boolean {
-  return readPreference()
+/**
+ * A preference kept in localStorage. Read afresh each time (another tab may have changed it); a
+ * value that cannot be saved (storage is blocked or full) is kept in memory until the page is
+ * left, so a change still works for now.
+ */
+function definePreference<T>(spec: PreferenceSpec<T>) {
+  let unsaved: { value: T } | null = null
+  return {
+    get(): T {
+      if (unsaved) return unsaved.value
+      try {
+        return spec.read(spec.keys.map(key => localStorage.getItem(key)))
+      } catch {
+        return spec.blocked
+      }
+    },
+    set(value: T): void {
+      try {
+        for (const key of spec.keys) localStorage.setItem(key, spec.write(value))
+        unsaved = null
+      } catch (error) {
+        console.error(`Failed to save the preference ${spec.keys[0]}`, error)
+        if (spec.remember !== false) unsaved = { value }
+      }
+      if (spec.changed) window.dispatchEvent(spec.changed(value))
+    },
+  }
 }
 
-export function setUseNashvilleNumbers(value: boolean) {
-  const normalized = !!value
-  cachedUseNashville = normalized
-  localStorage.setItem(NASHVILLE_PREF_KEY, normalized ? '1' : '0')
-  window.dispatchEvent(new NashvillePreferenceEvent(normalized))
-}
+/** A switch stored as '1' or '0' (and read as 'true' too) */
+const flag = (key: string, changed: (on: boolean) => Event) =>
+  definePreference<boolean>({
+    keys: [key],
+    read: ([stored]) => stored === '1' || stored === 'true',
+    write: on => (on ? '1' : '0'),
+    blocked: false,
+    changed,
+  })
 
-function readAccidentalPreference(): boolean {
-  if (cachedUseUnicodeAccidentals !== null) return cachedUseUnicodeAccidentals
-  const stored = localStorage.getItem(ACCIDENTAL_PREF_KEY)
-  cachedUseUnicodeAccidentals = stored === '1' || stored === 'true'
-  return cachedUseUnicodeAccidentals
-}
+const nashville = flag('use-nashville', on => new NashvillePreferenceEvent(on))
+const accidentals = flag('use-unicode-accidentals', on => new AccidentalsPreferenceEvent(on))
 
-export function getUseUnicodeAccidentals(): boolean {
-  return readAccidentalPreference()
-}
+const MUSICIAN_TYPE_KEY = 'musician_type'
+const musicianType = definePreference<MusicianType>({
+  keys: [MUSICIAN_TYPE_KEY],
+  read: ([stored]) => (isMusicianType(stored) ? stored : 'general'),
+  write: type => type,
+  blocked: 'general',
+})
 
-export function setUseUnicodeAccidentals(value: boolean) {
-  const normalized = !!value
-  cachedUseUnicodeAccidentals = normalized
-  localStorage.setItem(ACCIDENTAL_PREF_KEY, normalized ? '1' : '0')
-  window.dispatchEvent(new AccidentalsPreferenceEvent(normalized))
-}
+const EVERYTHING: SectionDefaults = { all: 'all' }
+const sectionDefaults = definePreference<SectionDefaults>({
+  keys: ['section_defaults'],
+  read: ([stored]) => {
+    const value: unknown = JSON.parse(stored ?? 'null')
+    return value && typeof value === 'object' ? (value as SectionDefaults) : EVERYTHING
+  },
+  write: defaults => JSON.stringify(defaults),
+  blocked: EVERYTHING,
+})
 
-function readMusicianTypePreference(): MusicianType {
-  if (cachedMusicianType !== null) return cachedMusicianType
-  const stored = localStorage.getItem(MUSICIAN_TYPE_KEY)
-  cachedMusicianType = isMusicianType(stored) ? stored : 'general'
-  return cachedMusicianType
-}
+// (kept under two keys: 'enable_capo' is the older)
+const capo = definePreference<boolean>({
+  keys: ['enable_capo', 'enabled_capo'],
+  read: stored => stored.some(value => value === 'true' || value === '1'),
+  write: on => (on ? 'true' : 'false'),
+  blocked: false,
+  changed: on => new CapoPreferenceEvent(on),
+})
 
-export function getMusicianType(): MusicianType {
-  return readMusicianTypePreference()
-}
+const keepAwake = definePreference<boolean>({
+  keys: ['keep_screen_awake'],
+  read: ([stored]) => stored !== 'false',
+  write: on => (on ? 'true' : 'false'),
+  blocked: true,
+  changed: on => new KeepAwakePreferenceEvent(on),
+})
 
+const isKeepAwakeLimit = (minutes: number) =>
+  (KEEP_AWAKE_LIMITS as readonly number[]).includes(minutes)
+const keepAwakeMinutes = definePreference<number>({
+  keys: ['keep_awake_minutes'],
+  read: ([stored]) =>
+    stored !== null && isKeepAwakeLimit(Number(stored))
+      ? Number(stored)
+      : DEFAULT_KEEP_AWAKE_MINUTES,
+  write: minutes => String(minutes),
+  blocked: DEFAULT_KEEP_AWAKE_MINUTES,
+  changed: minutes => new KeepAwakeLimitEvent(minutes),
+})
+
+const setupDone = definePreference<boolean>({
+  keys: ['setup-done'],
+  read: ([stored]) => stored === '1',
+  write: () => '1',
+  // (it cannot be asked again; and so there is nothing to remember)
+  blocked: true,
+  remember: false,
+})
+
+export const getUseNashvilleNumbers = (): boolean => nashville.get()
+export const setUseNashvilleNumbers = (value: boolean) => nashville.set(!!value)
+
+export const getUseUnicodeAccidentals = (): boolean => accidentals.get()
+export const setUseUnicodeAccidentals = (value: boolean) => accidentals.set(!!value)
+
+export const getMusicianType = (): MusicianType => musicianType.get()
+
+/** Choose a musician type, which sets what each part of a song shows by default */
 export function setMusicianType(value: string) {
-  const normalized = isMusicianType(value) ? value : 'general'
-  cachedMusicianType = normalized
-
-  localStorage.setItem(MUSICIAN_TYPE_KEY, normalized)
-
-  // Update dependent settings based on musician type: the singer and the drummer read the
-  // words, the others have everything
+  const type = isMusicianType(value) ? value : 'general'
+  musicianType.set(type)
+  // The singer and the drummer read the words, the others have everything
   const defaults: SectionDefaults = {
-    all: normalized === 'singer' || normalized === 'drummer' ? 'lyrics' : 'all',
+    all: type === 'singer' || type === 'drummer' ? 'lyrics' : 'all',
   }
-  localStorage.setItem(SECTION_DEFAULTS_KEY, JSON.stringify(defaults))
-  window.dispatchEvent(new SectionDefaultsEvent(normalized, defaults))
-}
-
-function readCapoPreferenceFromStorage(): boolean {
-  try {
-    return [ENABLE_CAPO_KEY, ENABLED_CAPO_FLAG_KEY].some(key => {
-      const value = localStorage.getItem(key)
-      return value === 'true' || value === '1'
-    })
-  } catch {
-    // (storage is blocked)
-    return false
-  }
+  sectionDefaults.set(defaults)
+  window.dispatchEvent(new SectionDefaultsEvent(type, defaults))
 }
 
 /** What each part of a song shows by default: the user's choice, or everything */
-export function getSectionDefaults(): SectionDefaults {
-  try {
-    const stored = JSON.parse(localStorage.getItem(SECTION_DEFAULTS_KEY) ?? 'null')
-    if (stored && typeof stored === 'object') return stored
-  } catch (error) {
-    console.error('Failed to read section defaults:', error)
-  }
-  return { all: 'all' }
-}
+export const getSectionDefaults = (): SectionDefaults => sectionDefaults.get()
 
-export function getCapoPreference(): boolean {
-  return unsavedCapoPreference ?? readCapoPreferenceFromStorage()
-}
-
-export function setCapoPreference(value: boolean) {
-  const enabled = !!value
-  const storageValue = enabled ? 'true' : 'false'
-  try {
-    localStorage.setItem(ENABLE_CAPO_KEY, storageValue)
-    localStorage.setItem(ENABLED_CAPO_FLAG_KEY, storageValue)
-    unsavedCapoPreference = null
-  } catch (error) {
-    console.error('Failed to save capo preference', error)
-    unsavedCapoPreference = enabled
-  }
-  window.dispatchEvent(new CapoPreferenceEvent(enabled))
-}
+export const getCapoPreference = (): boolean => capo.get()
+export const setCapoPreference = (value: boolean) => capo.set(!!value)
 
 /** Whether to keep the screen awake while a setlist is open: on unless the user turned it off */
-export function getKeepAwakePreference(): boolean {
-  try {
-    return localStorage.getItem(KEEP_AWAKE_KEY) !== 'false'
-  } catch {
-    return true
-  }
-}
+export const getKeepAwakePreference = (): boolean => keepAwake.get()
+export const setKeepAwakePreference = (value: boolean) => keepAwake.set(!!value)
 
-export function setKeepAwakePreference(value: boolean) {
-  const enabled = !!value
-  try {
-    localStorage.setItem(KEEP_AWAKE_KEY, enabled ? 'true' : 'false')
-  } catch (error) {
-    console.error('Failed to save keep-awake preference', error)
-  }
-  window.dispatchEvent(new KeepAwakePreferenceEvent(enabled))
-}
-
-export function getKeepAwakeMinutes(): number {
-  try {
-    const stored = Number(localStorage.getItem(KEEP_AWAKE_MINUTES_KEY))
-    return localStorage.getItem(KEEP_AWAKE_MINUTES_KEY) !== null &&
-      (KEEP_AWAKE_LIMITS as readonly number[]).includes(stored)
-      ? stored
-      : DEFAULT_KEEP_AWAKE_MINUTES
-  } catch {
-    return DEFAULT_KEEP_AWAKE_MINUTES
-  }
-}
-
+export const getKeepAwakeMinutes = (): number => keepAwakeMinutes.get()
 export function setKeepAwakeMinutes(minutes: number) {
-  const value = (KEEP_AWAKE_LIMITS as readonly number[]).includes(minutes)
-    ? minutes
-    : DEFAULT_KEEP_AWAKE_MINUTES
-  try {
-    localStorage.setItem(KEEP_AWAKE_MINUTES_KEY, String(value))
-  } catch (error) {
-    console.error('Failed to save keep-awake limit', error)
-  }
-  window.dispatchEvent(new KeepAwakeLimitEvent(value))
+  keepAwakeMinutes.set(isKeepAwakeLimit(minutes) ? minutes : DEFAULT_KEEP_AWAKE_MINUTES)
 }
 
 /** The limit in ms, or Infinity for none */
@@ -250,21 +238,8 @@ declare global {
 }
 
 /** Whether the first-use setup (musician type, capo) has been answered, skipped or made unnecessary */
-export function isSetupDone(): boolean {
-  try {
-    return localStorage.getItem(SETUP_DONE_KEY) === '1'
-  } catch {
-    return true
-  }
-}
-
-export function markSetupDone() {
-  try {
-    localStorage.setItem(SETUP_DONE_KEY, '1')
-  } catch (error) {
-    console.error('Failed to save the setup flag', error)
-  }
-}
+export const isSetupDone = (): boolean => setupDone.get()
+export const markSetupDone = () => setupDone.set(true)
 
 /** Whether a musician type has ever been stored, by the setup or in Preferences */
 export function hasStoredMusicianType(): boolean {
