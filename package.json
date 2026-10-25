@@ -21,7 +21,7 @@
     "jose": "^6.2.12",
     "lit": "^3.3.3",
     "oauth4webapi": "^3.8.8",
-    "postal-mime": "^4.0.5",
+    "postal-mime": "^4.0.8",
     "qrcode-generator": "^2.0.4",
     "unpdf": "^1.8.1"
   },
