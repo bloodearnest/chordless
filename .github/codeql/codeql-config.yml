@@ -1,0 +1,23 @@
+# What CodeQL checks (.github/workflows/codeql.yml; docs/CI.md). Its findings block a merge at the
+# thresholds in the main ruleset (infra/github). When a query proves noisy here, turn it off below
+# (`query-filters`, with the reason) rather than dismissing the same finding over and over; dismiss a
+# single false positive in the repository's Security tab, with a reason.
+name: chordless
+
+# The default suite: CodeQL's high-precision queries (security-extended adds many more, and with
+# them most of the false positives)
+queries:
+  - uses: default
+
+# Code that never runs in a user's browser or the Worker
+paths-ignore:
+  - tests
+  - src/dev
+  - icon-tooling
+  - scripts
+  - vite-plugins
+  - "**/*.config.{js,ts}"
+
+# query-filters:
+#   - exclude:
+#       id: js/some-query   # why it is wrong here

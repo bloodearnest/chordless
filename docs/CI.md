@@ -78,6 +78,18 @@ repository to `patterns_allowed` in `infra/github/main.tf`, and `just lint-actio
 Every workflow starts with `permissions: {}` and each job asks for what it needs (`contents: read`);
 checkouts keep no credentials; every job has a timeout. Pull requests run with no secrets.
 
+## SAST (`.github/workflows/codeql.yml`)
+
+CodeQL analyses the app's and the Worker's code on every pull request, on `main` (which a pull
+request's findings are compared with) and weekly. It is GitHub's own action, pinned like the others.
+What it checks is `.github/codeql/codeql-config.yml`: CodeQL's high-precision `default` suite, and not
+the tests, the dev playgrounds or the build scripts. Its findings block a merge at the thresholds of
+the `main` ruleset's code scanning rule (`infra/github`).
+
+When it is wrong: dismiss a single finding in the repository's Security tab, with the reason (a
+dismissed finding no longer blocks); when one query is wrong again and again, turn it off in the
+config's `query-filters`, with the reason.
+
 ## DAST (`.github/workflows/zap.yml`)
 
 Weekly, ZAP's baseline scan of chordless.app (`scripts/zap-baseline.sh`, `just zap` locally, with
