@@ -44,6 +44,9 @@ them and they are `continue-on-error`. Make them required (add `e2e` to `ci-ok`'
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or
 lower the coverage floor; `just test` still does all three locally.
 
+The end-to-end jobs run three Playwright workers (`CHORDLESS_WORKERS`); with two, the tests took
+3.8 minutes on macOS and 4.2 on Windows (2026-10-25). Locally it is one for every two processors.
+
 On a failure, the end-to-end jobs keep the Playwright report and traces as an artifact for a week, and
 the failing tests are marked on the pull request's diff.
 
