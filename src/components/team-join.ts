@@ -12,9 +12,9 @@ import { withSource } from '../js/other-songs.ts'
 import { listSpaces, setCurrentSpace, switchSpace } from '../js/space.ts'
 import { bringAcross, type TransferReport, whatWouldBeAdded } from '../js/space-transfer.ts'
 import { isTeamMember, storageFor } from '../js/storage/space-storage.ts'
-import { TeamError } from '../js/team-client.ts'
 import { joinSpace, roleWithArticle, syncTeamSpace } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
+import { TeamError } from '../js/worker-call.ts'
 import { buttonStyles } from './shared-styles.ts'
 
 type State =

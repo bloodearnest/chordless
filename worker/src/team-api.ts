@@ -31,19 +31,11 @@ import {
   type FileInput,
   type SpaceStorage,
 } from '../../src/js/storage/types.ts'
+import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import { isRecord, jsonResponse, message, Refusal, readJson } from './http.ts'
 
-export type Role = 'owner' | 'admin' | 'writer' | 'reader'
-
 /** What a request may do in a space: its role, or why it may do nothing */
-export type Access = Role | 'unauthenticated' | 'not-a-member'
-
-const RANK: Record<Role, number> = { reader: 0, writer: 1, admin: 2, owner: 3 }
-
-/** Whether a role is at least another */
-export function atLeast(role: Role, needed: Role): boolean {
-  return RANK[role] >= RANK[needed]
-}
+export type Access = TeamRole | 'unauthenticated' | 'not-a-member'
 
 /** What the team space's Durable Object and its credentials provide (src: the next step) */
 export interface TeamContext {
@@ -121,7 +113,7 @@ export async function handleTeamRequest(
   const access = await context.access(request, spaceId)
   if (access === 'unauthenticated') return jsonResponse({ error: 'Sign in first' }, 401)
   if (access === 'not-a-member') return jsonResponse({ error: 'Not a member of this space' }, 403)
-  const role: Role = access
+  const role: TeamRole = access
 
   try {
     const space = await context.space(spaceId)

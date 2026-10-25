@@ -5,7 +5,8 @@
  */
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { atLeast, teamSpacePath } from '../worker/src/team-api.ts'
+import { atLeast } from '../src/js/team-roles.ts'
+import { teamSpacePath } from '../worker/src/team-api.ts'
 import { makeTeamRig, ORIGIN } from './team-context.ts'
 
 const file = { name: 'a.txt', props: {}, type: 'text/plain' }

@@ -4,13 +4,14 @@
  * (team-client.ts); the space's files are synced as any space's, by whichever backend
  * `storageFor` gives it.
  */
-import type { Setlist, Space, TeamRole } from './data-types.ts'
+import type { Setlist, Space } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { getStoredBlob } from './google-auth.ts'
 import { createSpace, deleteSpace, getSpaceById, listSpaces, updateSpace } from './space.ts'
 import { storageFor } from './storage/space-storage.ts'
 import type { TeamStorage } from './storage/team-storage.ts'
 import { teamApi } from './team-client.ts'
+import type { TeamRole } from './team-roles.ts'
 
 /** What making a team space needs from Drive: a folder inside the one the person picked */
 export interface TeamFolders {
@@ -79,11 +80,6 @@ export async function joinSpace(
   })
 }
 
-const RANK: Record<TeamRole, number> = { reader: 0, writer: 1, admin: 2, owner: 3 }
-
-/** The roles that can be given to someone, which are the ones below the owner */
-export const GRANTABLE_ROLES = ['reader', 'writer', 'admin'] as const
-
 /**
  * What a role is called to people: the roles are the Worker's (a reader may only read, a writer may
  * change files), but a church knows them as team members and worship leaders.
@@ -96,11 +92,6 @@ export function roleLabel(role: TeamRole): string {
 export function roleWithArticle(role: TeamRole): string {
   const label = roleLabel(role)
   return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
-}
-
-/** Whether a role may act on another (change it, remove it, invite to it): only on those below it */
-export function outranks(mine: TeamRole, target: TeamRole): boolean {
-  return RANK[mine] > RANK[target]
 }
 
 /** The link to send someone an invite: the space and the code are in the fragment, which is never sent to a server */

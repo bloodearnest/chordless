@@ -6,7 +6,9 @@
  * A team space's root ref is the space's id (issued, not found by name), and bodies are text:
  * share links and pad audio are not served for team spaces yet.
  */
+import { jwtClaims } from '../base64url.ts'
 import type { SpaceMember } from '../data-types.ts'
+import { callWorker, TeamError, type WorkerCall, type WorkerConnection } from '../worker-call.ts'
 import {
   type ChangeFeed,
   ChangeTokenLost,
@@ -22,38 +24,15 @@ import {
   type WriteResult,
 } from './types.ts'
 
-/** An answer from the Worker that was not a success */
-export class TeamStorageError extends Error {
-  status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.name = 'TeamStorageError'
-    this.status = status
-  }
-}
-
-export interface TeamStorageOptions {
-  /** The Worker's session token for this person (docs/SPACES.md, "Setting up and joining") */
-  token: () => Promise<string>
-  /** Where the Worker is: the page's own origin */
-  origin: string
-  fetch: typeof fetch
-}
-
-/** What a call to the Worker is */
-interface Call {
-  method?: 'GET' | 'POST' | 'PUT'
-  path: string
-  query?: Record<string, string>
-  body?: unknown
-}
+/** What a call to the Worker is: its path is from the space's own (`/api/space/<id>`) */
+type Call = Omit<WorkerCall, 'method'> & { method?: 'GET' | 'POST' | 'PUT' }
 
 class TeamClient {
-  #options: TeamStorageOptions
+  #connection: WorkerConnection
   #refused = 0
 
-  constructor(options: TeamStorageOptions) {
-    this.#options = options
+  constructor(connection: WorkerConnection) {
+    this.#connection = connection
   }
 
   /** How many writes were refused with a 403, since this was made */
@@ -61,31 +40,21 @@ class TeamClient {
     return this.#refused
   }
 
-  async #send(spaceId: string, { method = 'GET', path, query, body }: Call): Promise<Response> {
-    const url = new URL(`/api/space/${encodeURIComponent(spaceId)}${path}`, this.#options.origin)
-    for (const [key, value] of Object.entries(query ?? {})) url.searchParams.set(key, value)
-    const token = await this.#options.token()
-    const headers: Record<string, string> = { Authorization: `Bearer ${token}` }
-    if (body !== undefined) headers['Content-Type'] = 'application/json'
-    const response = await this.#options.fetch(url, {
-      method,
-      headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
-    })
-    if (response.ok) return response
-    if (response.status === 403 && method !== 'GET') this.#refused++
-    let reason = response.statusText
+  async #send(spaceId: string, call: Call): Promise<Response> {
+    const path = `/api/space/${encodeURIComponent(spaceId)}${call.path}`
     try {
-      reason = ((await response.json()) as { error?: string }).error ?? reason
-    } catch {
-      // (an answer that was not ours: the status text will do)
+      return await callWorker({ ...call, path }, this.#connection, (reason, status, token) => {
+        if (status !== 403 || !/not a member/i.test(reason)) return reason
+        // (which account and space were refused: the way to tell a wrong sign-in from a stale space)
+        const who = jwtClaims(token)?.email
+        return `${reason} (${typeof who === 'string' ? `signed in as ${who}, ` : ''}space ${spaceId})`
+      })
+    } catch (error) {
+      if (error instanceof TeamError && error.status === 403 && (call.method ?? 'GET') !== 'GET') {
+        this.#refused++
+      }
+      throw error
     }
-    if (response.status === 403 && /not a member/i.test(reason)) {
-      // (which account and space were refused: the way to tell a wrong sign-in from a stale space)
-      const who = emailIn(token)
-      reason = `${reason} (${who ? `signed in as ${who}, ` : ''}space ${spaceId})`
-    }
-    throw new TeamStorageError(reason || `Error ${response.status}`, response.status)
   }
 
   /** The answer's JSON */
@@ -101,17 +70,6 @@ class TeamClient {
   /** Make the call, and say nothing of the answer */
   async run(spaceId: string, call: Call): Promise<void> {
     await this.#send(spaceId, call)
-  }
-}
-
-/** The address an ID token is for. Only read, to say who was refused: the Worker is what checks it. */
-function emailIn(idToken: string): string | null {
-  try {
-    const payload = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
-    const { email } = JSON.parse(atob(payload)) as { email?: unknown }
-    return typeof email === 'string' ? email : null
-  } catch {
-    return null
   }
 }
 
@@ -139,7 +97,7 @@ class TeamSpace implements SpaceStorage {
           return await client.json(id, { path: '/changes', query: { token } })
         } catch (error) {
           // (the Worker says 410 when the feed has forgotten the position)
-          if (error instanceof TeamStorageError && error.status === 410) throw new ChangeTokenLost()
+          if (error instanceof TeamError && error.status === 410) throw new ChangeTokenLost()
           throw error
         }
       },
@@ -162,7 +120,7 @@ class TeamSpace implements SpaceStorage {
     try {
       return await this.#client.json(this.#id, { path: `/files/${encodeURIComponent(ref)}` })
     } catch (error) {
-      if (error instanceof TeamStorageError && error.status === 404) return null
+      if (error instanceof TeamError && error.status === 404) return null
       throw error
     }
   }
@@ -250,9 +208,9 @@ class TeamSpace implements SpaceStorage {
  */
 export class TeamStorage implements StorageBackend {
   #client: TeamClient
-  #options: TeamStorageOptions
+  #options: WorkerConnection
 
-  constructor(options: TeamStorageOptions) {
+  constructor(options: WorkerConnection) {
     this.#client = new TeamClient(options)
     this.#options = options
   }
@@ -274,7 +232,7 @@ export class TeamStorage implements StorageBackend {
     try {
       return await this.#client.json(ref, { path: '/root' })
     } catch (error) {
-      if (error instanceof TeamStorageError && error.status === 404) return null
+      if (error instanceof TeamError && error.status === 404) return null
       throw error
     }
   }

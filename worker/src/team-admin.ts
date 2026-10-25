@@ -16,11 +16,18 @@
  * A role may only act on those below it: an admin looks after writers and readers, the owner after
  * admins too. The owner is never a member to change or remove.
  */
+
+import {
+  asMemberRole,
+  atLeast,
+  type MemberRole,
+  outranks,
+  type TeamRole,
+} from '../../src/js/team-roles.ts'
 import type { BlobData } from './blob.ts'
 import { jsonResponse, message, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
-import { atLeast, type Role } from './team-api.ts'
-import type { MemberRole, TeamSpaceApi } from './team-state.ts'
+import type { TeamSpaceApi } from './team-state.ts'
 
 /** What these routes need from the Worker */
 export interface AdminContext {
@@ -39,9 +46,6 @@ export interface AdminContext {
   newSpaceId(): string
 }
 
-const MEMBER_ROLES: MemberRole[] = ['reader', 'writer', 'admin']
-const RANK: Record<Role, number> = { reader: 0, writer: 1, admin: 2, owner: 3 }
-
 /** Whether the admin routes serve this request (the rest is the storage API's) */
 export function isAdminRoute(method: string, rest: string): boolean {
   return (
@@ -55,7 +59,7 @@ export function isAdminRoute(method: string, rest: string): boolean {
 }
 
 function asRole(value: unknown): MemberRole {
-  const role = MEMBER_ROLES.find(each => each === value)
+  const role = asMemberRole(value)
   if (!role) throw new Refusal(400, 'Not a role')
   return role
 }
@@ -147,18 +151,18 @@ export function handleSpaceAdmin(
   request: Request,
   { spaceId, rest }: { spaceId: string; rest: string },
   ctx: AdminContext,
-  who: { identity: Identity; role: Role }
+  who: { identity: Identity; role: TeamRole }
 ): Promise<Response> {
   return answering(async () => {
     const room = ctx.room(spaceId)
     const { identity, role } = who
     const method = request.method
-    const needs = (needed: Role) => {
+    const needs = (needed: TeamRole) => {
       if (!atLeast(role, needed)) throw new Refusal(403, `This needs the ${needed} role`)
     }
     /** An admin may act on those below them; the owner on everyone */
-    const outranks = (target: Role) => {
-      if (RANK[role] <= RANK[target]) throw new Refusal(403, 'Only a higher role can do that')
+    const above = (target: TeamRole) => {
+      if (!outranks(role, target)) throw new Refusal(403, 'Only a higher role can do that')
     }
 
     if (rest === '/invites' && method === 'GET') {
@@ -169,7 +173,7 @@ export function handleSpaceAdmin(
       needs('admin')
       const body = await readJson(request)
       const target = asRole(body.role)
-      outranks(target)
+      above(target)
       const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : ''
       if (!EMAIL.test(email) || email.length > 254) {
         throw new Refusal(400, 'An invite is for an email address')
@@ -190,10 +194,10 @@ export function handleSpaceAdmin(
       const email = decodeURIComponent(member[1]).toLowerCase()
       const current = (await room.members()).find(each => each.email === email)
       if (!current) return jsonResponse({ error: 'No such member' }, 404)
-      outranks(current.role as Role)
+      above(current.role)
       if (method === 'PUT') {
         const target = asRole((await readJson(request)).role)
-        outranks(target)
+        above(target)
         await room.setRoleByEmail(email, target)
       } else {
         await room.removeByEmail(email)

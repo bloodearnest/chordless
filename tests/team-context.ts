@@ -3,12 +3,8 @@
  * (worker/src/team-api.ts) and of `TeamStorage`: two spaces on one backend, and a role for each
  * token, so a test chooses who is asking.
  */
-import {
-  handleTeamRequest,
-  type Role,
-  type TeamContext,
-  teamSpacePath,
-} from '../worker/src/team-api.ts'
+import type { TeamRole } from '../src/js/team-roles.ts'
+import { handleTeamRequest, type TeamContext, teamSpacePath } from '../worker/src/team-api.ts'
 import { MemoryStorage } from './memory-storage.ts'
 
 export const ORIGIN = 'https://chordless.test'
@@ -18,7 +14,7 @@ export interface TeamRig {
   /** The ids of the two spaces, and their roots in the storage */
   spaces: { id: string; root: string }[]
   /** The role each token has in every space; a token not here is not signed in */
-  roles: Map<string, Role | 'none'>
+  roles: Map<string, TeamRole | 'none'>
   context: TeamContext
   /** What the Worker answers: the `fetch` of a TeamStorage */
   fetch: typeof fetch
@@ -30,7 +26,7 @@ export async function makeTeamRig(): Promise<TeamRig> {
   for (const id of ['space-1', 'space-2']) {
     spaces.push({ id, root: (await storage.ensureRoot(`Team ${id}`, id)).ref })
   }
-  const roles = new Map<string, Role | 'none'>([['writer-token', 'writer']])
+  const roles = new Map<string, TeamRole | 'none'>([['writer-token', 'writer']])
   const rootOf = (id: string) => spaces.find(space => space.id === id)?.root
 
   const context: TeamContext = {

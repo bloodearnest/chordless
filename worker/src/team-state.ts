@@ -8,9 +8,8 @@
  * Members are keyed by `identityKey` (provider and sub), not by email: an email is for showing and
  * for matching an invite, but it is the account that is a member.
  */
-import type { SpaceMember } from '../../src/js/data-types.ts'
+import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import { type Identity, identityKey } from './identity.ts'
-import type { Role } from './team-api.ts'
 
 /** The part of a Durable Object's storage this uses, so a test can give it a Map */
 export interface Store {
@@ -22,9 +21,6 @@ export interface Store {
   deleteAll(): Promise<void>
   list<T>(options: { prefix: string }): Promise<Map<string, T>>
 }
-
-/** The roles a member can hold: the owner is not a member, they are the space's */
-export type MemberRole = Exclude<Role, 'owner'>
 
 export interface SpaceInfo {
   /** Drive's id of the space's folder (or a shared drive's folder) */
@@ -62,18 +58,6 @@ interface MemberRecord {
   since: string
 }
 
-/** An invitation to join, as an admin sees it (the code itself is never kept or shown again) */
-export interface InviteInfo {
-  /** Names the invite for revoking it: the code's hash, which cannot be turned back into it */
-  id: string
-  /** Who it is for: only an account with this verified email can use it */
-  email: string
-  role: MemberRole
-  createdBy: string
-  createdAt: string
-  expiresAt: string
-}
-
 /** How long an invite can be used */
 export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
@@ -83,9 +67,9 @@ export interface TeamSpaceApi {
   create(space: { rootRef: string; name: string; owner: Identity }): Promise<boolean>
   info(): Promise<SpaceInfo | null>
   /** This account's role in the space, or null if it is not a member */
-  roleOf(identity: Identity): Promise<Role | null>
+  roleOf(identity: Identity): Promise<TeamRole | null>
   /** The owner first, then the members by email */
-  members(): Promise<SpaceMember[]>
+  members(): Promise<TeamMember[]>
   /** Add a member, or change their role */
   setMember(identity: Identity, role: MemberRole): Promise<void>
   removeMember(identity: Identity): Promise<void>
@@ -106,7 +90,7 @@ export interface TeamSpaceApi {
    * expired), or 'other-account' if it is for another email than this account's. It is used up
    * once; someone already in the space keeps their role and uses nothing.
    */
-  redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null>
+  redeemInvite(code: string, identity: Identity): Promise<TeamRole | 'other-account' | null>
   /** Change a member's role by email; false if there is no such member */
   setRoleByEmail(email: string, role: MemberRole): Promise<boolean>
   /** Remove a member by email; false if there is no such member */
@@ -156,7 +140,7 @@ export class TeamSpaceState implements TeamSpaceApi {
     return (await this.#store.get<SpaceInfo>(SPACE)) ?? null
   }
 
-  async roleOf(identity: Identity): Promise<Role | null> {
+  async roleOf(identity: Identity): Promise<TeamRole | null> {
     const info = await this.info()
     if (!info) return null
     if (identityKey(info.owner) === identityKey(identity)) return 'owner'
@@ -164,7 +148,7 @@ export class TeamSpaceState implements TeamSpaceApi {
     return member?.role ?? null
   }
 
-  async members(): Promise<SpaceMember[]> {
+  async members(): Promise<TeamMember[]> {
     const info = await this.info()
     if (!info) return []
     const records = [...(await this.#store.list<MemberRecord>({ prefix: MEMBER })).values()]
@@ -241,7 +225,7 @@ export class TeamSpaceState implements TeamSpaceApi {
     return this.#store.delete(INVITE + id)
   }
 
-  async redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null> {
+  async redeemInvite(code: string, identity: Identity): Promise<TeamRole | 'other-account' | null> {
     const key = INVITE + (await hashOf(code))
     const invite = await this.#store.get<InviteRecord>(key)
     if (!invite || invite.expiresAt <= this.#now().toISOString()) return null

@@ -30,6 +30,7 @@
  */
 
 import type { AuthMetadata, BlobBackup, StoredBlob, StoredUser } from './auth-db.ts'
+import { jwtClaims } from './base64url.ts'
 
 /** The signed-in user, as the UI shows them */
 export interface UserInfo {
@@ -65,28 +66,6 @@ const GOOGLE_SCOPES = `${DRIVE_SCOPE} ${IDENTITY_SCOPES}`
 const AUTH_PROXY_URL = ''
 
 /**
- * Parse JWT and extract payload
- */
-function parseJwt(token: string): Record<string, string> | null {
-  try {
-    const base64Url = token.split('.')[1]
-    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/')
-    const jsonPayload = decodeURIComponent(
-      atob(base64)
-        .split('')
-        .map(c => {
-          return `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`
-        })
-        .join('')
-    )
-    return JSON.parse(jsonPayload)
-  } catch (error) {
-    console.error('[Auth] Failed to parse JWT:', error)
-    return null
-  }
-}
-
-/**
  * Get current user info from stored blob
  * Returns { name, email, picture } or null
  */
@@ -103,15 +82,16 @@ export async function getCurrentUserInfo(): Promise<UserInfo | null> {
     let shouldPersist = false
 
     if (!user && metadata.id_token) {
-      const payload = parseJwt(metadata.id_token)
+      const payload = jwtClaims(metadata.id_token)
       if (payload) {
+        const text = (value: unknown) => (typeof value === 'string' && value ? value : null)
         user = {
-          name: payload.name || null,
-          email: payload.email || null,
-          picture: payload.picture || null,
-          given_name: payload.given_name || null,
-          family_name: payload.family_name || null,
-          sub: payload.sub || null,
+          name: text(payload.name),
+          email: text(payload.email),
+          picture: text(payload.picture),
+          given_name: text(payload.given_name),
+          family_name: text(payload.family_name),
+          sub: text(payload.sub),
         }
         shouldPersist = true
       }
@@ -401,7 +381,7 @@ const TOKEN_EXPIRY_BUFFER_MS = 5 * 60 * 1000
 
 /** When an ID token ends, in ms (its own `exp` claim); 0 for one that cannot be read */
 function idTokenEnd(idToken: string): number {
-  return Number(parseJwt(idToken)?.exp ?? 0) * 1000
+  return Number(jwtClaims(idToken)?.exp ?? 0) * 1000
 }
 
 /**

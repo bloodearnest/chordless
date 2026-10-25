@@ -19,15 +19,16 @@ import {
 import { driveStorage } from '../src/js/storage/browser-drive.ts'
 import { isTeamMember, storageFor } from '../src/js/storage/space-storage.ts'
 import { TeamStorage } from '../src/js/storage/team-storage.ts'
-import { TeamError, teamApi } from '../src/js/team-client.ts'
+import { teamApi } from '../src/js/team-client.ts'
+import { outranks } from '../src/js/team-roles.ts'
 import {
   createTeamSpace,
   inviteLink,
   joinSpace,
   leaveSpace,
-  outranks,
   stopSharing,
 } from '../src/js/team-spaces.ts'
+import { TeamError } from '../src/js/worker-call.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'

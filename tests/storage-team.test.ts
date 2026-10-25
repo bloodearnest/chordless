@@ -1,8 +1,9 @@
 import { expect } from '@open-wc/testing'
 import { ChordlessDB } from '../src/js/db.ts'
 import { DriveSyncManager } from '../src/js/drive-sync.ts'
-import { TeamStorage, TeamStorageError } from '../src/js/storage/team-storage.ts'
+import { TeamStorage } from '../src/js/storage/team-storage.ts'
 import { ChangeTokenLost } from '../src/js/storage/types.ts'
+import { TeamError } from '../src/js/worker-call.ts'
 import { makeSetlist } from './builders.ts'
 import { memoryFolderLink } from './drive-harness.ts'
 import { must } from './must.ts'
@@ -56,7 +57,7 @@ describe('TeamStorage', () => {
       .catch(e => {
         error = e
       })
-    expect((error as TeamStorageError).status).to.equal(403)
+    expect((error as TeamError).status).to.equal(403)
   })
 
   it('says which account and space a refusal was about, to tell a wrong sign-in from a stale space', async () => {
@@ -129,7 +130,7 @@ describe('TeamStorage', () => {
     await feed.since(seen.token).catch(error => {
       failed = error
     })
-    expect(failed).to.be.instanceOf(TeamStorageError)
+    expect(failed).to.be.instanceOf(TeamError)
     expect(failed).to.not.be.instanceOf(ChangeTokenLost)
   })
 
@@ -148,7 +149,7 @@ describe('TeamStorage', () => {
     await space.update(file.ref, text, 'two').catch(e => {
       error = e
     })
-    expect((error as TeamStorageError).status).to.equal(403)
+    expect((error as TeamError).status).to.equal(403)
     expect(reader.writeRefusals()).to.equal(1)
     expect(await space.readText(file.ref)).to.equal('one')
   })
@@ -168,7 +169,7 @@ describe('TeamStorage', () => {
     await space.readText(file.ref).catch(e => {
       error = e
     })
-    expect((error as TeamStorageError).status).to.equal(404)
+    expect((error as TeamError).status).to.equal(404)
   })
 
   it('makes a share readable by anyone, and ends it', async () => {
@@ -226,8 +227,8 @@ describe('TeamStorage', () => {
       .catch(e => {
         error = e
       })
-    expect(error).to.be.instanceOf(TeamStorageError)
-    expect((error as TeamStorageError).status).to.equal(502)
+    expect(error).to.be.instanceOf(TeamError)
+    expect((error as TeamError).status).to.equal(502)
   })
 
   it('uses the status text when the answer is JSON without a reason', async () => {
@@ -243,7 +244,7 @@ describe('TeamStorage', () => {
       .catch(e => {
         error = e
       })
-    expect((error as TeamStorageError).message).to.equal('Server broke')
+    expect((error as TeamError).message).to.equal('Server broke')
   })
 
   it('passes on a refusal to say what a file is, and has nothing to create or update in an empty batch', async () => {
@@ -254,7 +255,7 @@ describe('TeamStorage', () => {
     await space.status('anything').catch(e => {
       error = e
     })
-    expect((error as TeamStorageError).status).to.equal(403)
+    expect((error as TeamError).status).to.equal(403)
 
     const calls = rig.storage.calls.length
     const mine = teamFor(rig).space('space-1')

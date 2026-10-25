@@ -1,7 +1,8 @@
 import { css, html, LitElement, nothing } from 'lit'
 import type { TeamLink } from '../js/data-types.ts'
-import { type Invite, teamApi } from '../js/team-client.ts'
-import { GRANTABLE_ROLES, inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
+import { teamApi } from '../js/team-client.ts'
+import { MEMBER_ROLES, type MemberRole } from '../js/team-roles.ts'
+import { inviteLink, type Leader, roleLabel } from '../js/team-spaces.ts'
 import { errorMessage } from '../js/utils/errors.ts'
 import { buttonStyles } from './shared-styles.ts'
 
@@ -10,7 +11,7 @@ interface Entry {
   email: string
   name: string
   on: boolean
-  role: Invite['role']
+  role: MemberRole
 }
 
 /** What came of an invite: the link to send (shown once), or why not */
@@ -92,7 +93,7 @@ export class TeamInviteStep extends LitElement {
     this._entries = this._entries.map(each => (each.email === email ? { ...each, on } : each))
   }
 
-  _role(email: string, role: Invite['role']): void {
+  _role(email: string, role: MemberRole): void {
     this._entries = this._entries.map(each => (each.email === email ? { ...each, role } : each))
   }
 
@@ -175,12 +176,9 @@ export class TeamInviteStep extends LitElement {
               aria-label="Role of ${entry.email}"
               ?disabled=${this._busy}
               @change=${(event: Event) =>
-                this._role(
-                  entry.email,
-                  (event.target as HTMLSelectElement).value as Invite['role']
-                )}
+                this._role(entry.email, (event.target as HTMLSelectElement).value as MemberRole)}
             >
-              ${GRANTABLE_ROLES.map(
+              ${MEMBER_ROLES.map(
                 role =>
                   html`<option value=${role} ?selected=${role === entry.role}>${roleLabel(role)}</option>`
               )}

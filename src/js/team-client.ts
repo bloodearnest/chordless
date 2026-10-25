@@ -3,45 +3,19 @@
  * space, joining one with an invite, and looking after its people. Each call carries the signed-in
  * person's Google ID token (`getIdentityToken`); the files themselves go through `TeamStorage`.
  */
-import type { SpaceMember, TeamRole } from './data-types.ts'
 import { getIdentityToken } from './google-auth.ts'
+import type { InviteInfo, MemberRole, TeamMember, TeamRole } from './team-roles.ts'
+import { callWorker, type WorkerCall } from './worker-call.ts'
 
-/** An answer from the Worker that was not a success, with its HTTP status */
-export class TeamError extends Error {
-  status: number
-  constructor(message: string, status: number) {
-    super(message)
-    this.name = 'TeamError'
-    this.status = status
-  }
-}
-
-/** A person invited to join, as an admin sees it (the code is shown once, when it is made) */
-export interface Invite {
-  id: string
-  email: string
-  role: Exclude<TeamRole, 'owner'>
-  createdBy: string
-  createdAt: string
-  expiresAt: string
-}
-
-async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const response = await window.fetch(path, {
-    method,
-    headers: {
-      Authorization: `Bearer ${await getIdentityToken()}`,
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  })
-  if (!response.ok) {
-    const reason = await response
-      .json()
-      .then((answer: { error?: string }) => answer.error)
-      .catch(() => undefined)
-    throw new TeamError(reason || `Error ${response.status}`, response.status)
-  }
+async function call<T>(method: WorkerCall['method'], path: string, body?: unknown): Promise<T> {
+  const response = await callWorker(
+    { method, path, body },
+    {
+      token: getIdentityToken,
+      origin: location.origin,
+      fetch: (input, init) => window.fetch(input, init),
+    }
+  )
   return response.status === 204 ? (undefined as T) : response.json()
 }
 
@@ -56,14 +30,14 @@ export const teamApi = {
   join: (spaceId: string, code: string) =>
     call<{ spaceId: string; role: TeamRole }>('POST', '/api/spaces/join', { spaceId, code }),
 
-  members: (id: string) => call<SpaceMember[]>('GET', `${space(id)}/members`),
-  invites: (id: string) => call<Invite[]>('GET', `${space(id)}/invites`),
-  createInvite: (id: string, role: Invite['role'], email: string) =>
+  members: (id: string) => call<TeamMember[]>('GET', `${space(id)}/members`),
+  invites: (id: string) => call<InviteInfo[]>('GET', `${space(id)}/invites`),
+  createInvite: (id: string, role: MemberRole, email: string) =>
     call<{ code: string; expiresAt: string }>('POST', `${space(id)}/invites`, { role, email }),
   revokeInvite: (id: string, inviteId: string) =>
     call<void>('DELETE', `${space(id)}/invites/${encodeURIComponent(inviteId)}`),
 
-  setRole: (id: string, email: string, role: Invite['role']) =>
+  setRole: (id: string, email: string, role: MemberRole) =>
     call<void>('PUT', `${space(id)}/members/${encodeURIComponent(email)}`, { role }),
   removeMember: (id: string, email: string) =>
     call<void>('DELETE', `${space(id)}/members/${encodeURIComponent(email)}`),

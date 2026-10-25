@@ -12,8 +12,9 @@ import {
   TeamShareLeftEvent,
   type TeamSharePanel,
 } from '../src/components/team-share-panel.ts'
-import type { Space, TeamRole } from '../src/js/data-types.ts'
+import type { Space } from '../src/js/data-types.ts'
 import { createSpace, deleteSpace, getSpaceById, updateSpace } from '../src/js/space.ts'
+import type { TeamRole } from '../src/js/team-roles.ts'
 import { type FakeAuthWorker, installFakeAuthWorker } from './fake-auth-worker.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'

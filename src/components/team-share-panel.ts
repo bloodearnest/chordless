@@ -1,12 +1,18 @@
 import { css, html, LitElement, nothing } from 'lit'
 import { createRef, type Ref, ref } from 'lit/directives/ref.js'
-import type { Space, SpaceMember, TeamLink, TeamRole } from '../js/data-types.ts'
-import { type Invite, teamApi } from '../js/team-client.ts'
+import type { Space, TeamLink } from '../js/data-types.ts'
+import { teamApi } from '../js/team-client.ts'
 import {
-  GRANTABLE_ROLES,
+  type InviteInfo,
+  MEMBER_ROLES,
+  type MemberRole,
+  outranks,
+  type TeamMember,
+  type TeamRole,
+} from '../js/team-roles.ts'
+import {
   inviteLink,
   leaveSpace,
-  outranks,
   roleLabel,
   roleWithArticle,
   stopSharing,
@@ -56,8 +62,8 @@ export class TeamSharePanel extends LitElement {
 
   /** The current space */
   declare space: Space | null
-  declare _members: SpaceMember[]
-  declare _invites: Invite[]
+  declare _members: TeamMember[]
+  declare _invites: InviteInfo[]
   declare _error: string
   declare _busy: boolean
   /** The invite just made: its link is shown once, to send */
@@ -186,7 +192,7 @@ export class TeamSharePanel extends LitElement {
     }, false)
   }
 
-  async _setRole(email: string, role: Invite['role']): Promise<void> {
+  async _setRole(email: string, role: MemberRole): Promise<void> {
     const team = this._team
     await this._run(() => teamApi.setRole(team.id, email, role))
   }
@@ -207,11 +213,7 @@ export class TeamSharePanel extends LitElement {
     const email = this._inviteEmail.value as HTMLInputElement
     const role = this._inviteRole.value as HTMLSelectElement
     await this._run(async () => {
-      const { code } = await teamApi.createInvite(
-        team.id,
-        role.value as Invite['role'],
-        email.value
-      )
+      const { code } = await teamApi.createInvite(team.id, role.value as MemberRole, email.value)
       this._link = {
         email: email.value.trim().toLowerCase(),
         url: inviteLink(window.location.origin, team.id, code),
@@ -270,8 +272,8 @@ export class TeamSharePanel extends LitElement {
     `
   }
 
-  _renderMember(member: SpaceMember, mine: TeamRole) {
-    const role = member.role as TeamRole
+  _renderMember(member: TeamMember, mine: TeamRole) {
+    const { role } = member
     // (only admins and the owner look after people, and only those below them)
     const manageable = outranks(mine, 'writer') && outranks(mine, role)
     return html`<li>
@@ -285,7 +287,7 @@ export class TeamSharePanel extends LitElement {
               @change=${(event: Event) =>
                 this._setRole(
                   member.email,
-                  (event.target as HTMLSelectElement).value as Invite['role']
+                  (event.target as HTMLSelectElement).value as MemberRole
                 )}
             >
               ${this._grantable(mine).map(
@@ -304,7 +306,7 @@ export class TeamSharePanel extends LitElement {
 
   /** The roles someone of this role can give: those below their own */
   _grantable(mine: TeamRole) {
-    return GRANTABLE_ROLES.filter(each => outranks(mine, each))
+    return MEMBER_ROLES.filter(each => outranks(mine, each))
   }
 
   _renderInvites(mine: TeamRole) {

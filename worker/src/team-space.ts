@@ -5,17 +5,10 @@
  */
 /* v8 ignore start -- needs `cloudflare:workers`: only workerd has it (worker.node.test.ts runs it there, unmeasured) */
 import { DurableObject } from 'cloudflare:workers'
-import type { SpaceMember } from '../../src/js/data-types.ts'
+import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import type { Env } from './env.ts'
 import type { Identity } from './identity.ts'
-import type { Role } from './team-api.ts'
-import {
-  type InviteInfo,
-  type MemberRole,
-  type SpaceInfo,
-  type TeamSpaceApi,
-  TeamSpaceState,
-} from './team-state.ts'
+import { type SpaceInfo, type TeamSpaceApi, TeamSpaceState } from './team-state.ts'
 
 export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   #state = new TeamSpaceState(this.ctx.storage)
@@ -26,10 +19,10 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   info(): Promise<SpaceInfo | null> {
     return this.#state.info()
   }
-  roleOf(identity: Identity): Promise<Role | null> {
+  roleOf(identity: Identity): Promise<TeamRole | null> {
     return this.#state.roleOf(identity)
   }
-  members(): Promise<SpaceMember[]> {
+  members(): Promise<TeamMember[]> {
     return this.#state.members()
   }
   setMember(identity: Identity, role: MemberRole): Promise<void> {
@@ -51,7 +44,7 @@ export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   revokeInvite(id: string): Promise<boolean> {
     return this.#state.revokeInvite(id)
   }
-  redeemInvite(code: string, identity: Identity): Promise<Role | 'other-account' | null> {
+  redeemInvite(code: string, identity: Identity): Promise<TeamRole | 'other-account' | null> {
     return this.#state.redeemInvite(code, identity)
   }
   setRoleByEmail(email: string, role: MemberRole): Promise<boolean> {

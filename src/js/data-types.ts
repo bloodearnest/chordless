@@ -2,6 +2,7 @@
  * The shapes of the data Chordless parses and stores. docs/DATA_MODEL.md describes them in
  * prose; these are what the code checks against. Types only: nothing here exists at runtime.
  */
+import type { TeamRole } from './team-roles.ts'
 
 // ==================== A parsed chart (ChordProParser) ====================
 
@@ -258,9 +259,6 @@ export interface SpaceMember {
   name?: string
   role?: string
 }
-
-/** A person's role in a team space (docs/SPACES.md, "Roles") */
-export type TeamRole = 'owner' | 'admin' | 'writer' | 'reader'
 
 /**
  * A space that is shared as a team space, as this device knows it. The id is the one the Worker
