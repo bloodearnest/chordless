@@ -3,7 +3,7 @@ import { type BrowserContext, test as base, expect } from '@playwright/test'
 import type { ChordProRecord, SongInput } from '../src/js/data-types.ts'
 import { makeEntry, makeSetlist, makeSong } from './builders.ts'
 
-const CANCELLED_IMPORT = /^TypeError: Importing a module script failed|^Context is stopped$/
+const CANCELLED_IMPORT = /^(TypeError: )?Importing a module script failed|^Context is stopped$/
 
 // What Vite's client (the development server's, not the app's) throws in WebKit when the network
 // goes: its check that the server is back fails
