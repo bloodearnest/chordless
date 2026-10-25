@@ -9,9 +9,8 @@
  */
 import { decryptBlob } from './blob.ts'
 import type { Env } from './env.ts'
+import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
-import type { GoogleApi } from './session.ts'
-import { realGoogle } from './session.ts'
 import type { AdminContext } from './team-admin.ts'
 import type { Access, TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'

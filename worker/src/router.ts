@@ -5,13 +5,9 @@
  */
 
 import type { Env } from './env.ts'
+import type { GoogleApi } from './google-auth.ts'
 import { isCrossOrigin, jsonResponse, message } from './http.ts'
-import {
-  type GoogleApi,
-  handleOAuthCallback,
-  handleSessionLogout,
-  handleTokenRefresh,
-} from './session.ts'
+import { handleOAuthCallback, handleSessionLogout, handleTokenRefresh } from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
 import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'

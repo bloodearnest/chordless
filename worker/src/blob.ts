@@ -32,12 +32,28 @@ export async function encryptBlob(data: BlobData, env: BlobKey) {
 }
 
 /**
+ * A blob this Worker cannot read: made with another key, changed, or not a blob at all. Its
+ * owner has to sign in again. (A key that cannot be used is the server's fault, and not this.)
+ */
+export class UnreadableBlob extends Error {
+  constructor() {
+    super('The sign-in could not be read')
+    this.name = 'UnreadableBlob'
+  }
+}
+
+/**
  * Decrypt JWE blob
  */
 export async function decryptBlob(jwe: string, env: BlobKey): Promise<BlobData> {
   const secret = await importEncryptionKey(env.JWE_ENCRYPTION_KEY)
 
-  const { plaintext } = await jose.compactDecrypt(jwe, secret)
+  let plaintext: Uint8Array
+  try {
+    ;({ plaintext } = await jose.compactDecrypt(jwe, secret))
+  } catch {
+    throw new UnreadableBlob()
+  }
   return JSON.parse(new TextDecoder().decode(plaintext))
 }
 

@@ -140,3 +140,18 @@ export async function revokeToken(
   )
   await oauth.processRevocationResponse(response)
 }
+
+/** The calls to Google that the routes make: the real ones, or a test's */
+export interface GoogleApi {
+  exchangeCode: typeof exchangeCode
+  refreshAccessToken: typeof refreshAccessToken
+  revokeToken: typeof revokeToken
+  verifyIdToken: typeof verifyIdToken
+}
+
+export const realGoogle: GoogleApi = {
+  exchangeCode,
+  refreshAccessToken,
+  revokeToken,
+  verifyIdToken,
+}

@@ -407,7 +407,9 @@ async function refreshTokens(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    if (response.status === 401 && error.error === 'invalid_grant') throw new SignInExpiredError()
+    // (Google no longer honours the sign-in, or the Worker cannot read the blob: sign in again)
+    const refused = error.error === 'invalid_grant' || error.error === 'invalid_blob'
+    if (response.status === 401 && refused) throw new SignInExpiredError()
     throw new Error(error.error || 'Failed to refresh access token')
   }
 

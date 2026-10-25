@@ -46,15 +46,24 @@ function statusOf(error: unknown): number {
   return typeof status === 'number' && status >= 400 && status < 500 ? status : 502
 }
 
+/** Run a handler, answering a `Refusal` it throws with its status and text; anything else is thrown on */
+export async function refusing(run: () => Promise<Response>): Promise<Response> {
+  try {
+    return await run()
+  } catch (error) {
+    if (error instanceof Refusal) return jsonResponse({ error: error.message }, error.status)
+    throw error
+  }
+}
+
 /**
  * Run a handler. A `Refusal` is answered with its status and text; anything else is logged
  * (under `label`) and answered with the 4xx status it carries, or 502.
  */
 export async function answering(label: string, run: () => Promise<Response>): Promise<Response> {
   try {
-    return await run()
+    return await refusing(run)
   } catch (error) {
-    if (error instanceof Refusal) return jsonResponse({ error: error.message }, error.status)
     console.error(`${label} error:`, message(error))
     return jsonResponse({ error: message(error) }, statusOf(error))
   }

@@ -122,7 +122,8 @@ Durable Object, check it against the collection and ref, make the Drive call wit
 stays one Drive implementation: `ownerAccessToken` opens the owner's blob from the space's Durable
 Object, checks it is the owner's (`owner_sub`), refreshes an access token for it (kept in the
 isolate's memory for its hour, made once for a whole batch) and says "sharing is not set up" (no
-blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`) as a 409. A service account
+blob) or "the owner needs to reconnect Google Drive" (`invalid_grant`, or a blob it can no longer
+decrypt) as a 409. A service account
 would be another source. Wired into the route (`worker/src/router.ts`, `team-context.ts`, 2026-10-21): the ID token is checked first, then the role from the Durable Object, then Drive with the owner's token, with the refs each listing shows noted. Spaces are made and joined through `team-admin.ts` (docs/SPACES.md), not through this API.
 
 **On the device (built 2026-10-21):** a space shared with a team has `team: {id, role}` on its

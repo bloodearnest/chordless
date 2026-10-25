@@ -137,9 +137,24 @@ describe('the owner’s access token', () => {
     await assert.rejects(token(), /Google is down/)
   })
 
-  test('is not made from a blob the Worker cannot open', async () => {
+  test('asks the owner to reconnect for a blob the Worker cannot open', async () => {
     const { state, info } = await space('not-a-blob')
-    await assert.rejects(ownerAccessToken({ room: state, info, env, google: google(), now })())
+    await assert.rejects(
+      ownerAccessToken({ room: state, info, env, google: google(), now })(),
+      error => {
+        assert.ok(error instanceof CredentialError)
+        assert.equal(error.status, 409)
+        assert.match(error.message, /reconnect/)
+        return true
+      }
+    )
+  })
+
+  test('says nothing of reconnecting when the fault is the Worker’s own key', async () => {
+    const { state, info } = await space(await blobFor('g-1', 'blob-k'))
+    const broken = { ...env, JWE_ENCRYPTION_KEY: 'not base64!' }
+    const token = ownerAccessToken({ room: state, info, env: broken, google: google(), now })
+    await assert.rejects(token(), error => !(error instanceof CredentialError))
   })
 })
 

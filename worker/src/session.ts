@@ -5,24 +5,31 @@
  * `google` is the calls to Google, which a test replaces.
  */
 
-import { type BlobData, decryptBlob, encryptBlob } from './blob.ts'
+import { type BlobData, decryptBlob, encryptBlob, UnreadableBlob } from './blob.ts'
 import type { Env } from './env.ts'
-import { exchangeCode, refreshAccessToken, revokeToken, verifyIdToken } from './google-auth.ts'
-import { jsonResponse, message } from './http.ts'
+import { type GoogleApi, realGoogle } from './google-auth.ts'
+import { jsonResponse, message, Refusal, readJson, refusing } from './http.ts'
 
-/** The calls to Google that the routes make */
-export interface GoogleApi {
-  exchangeCode: typeof exchangeCode
-  refreshAccessToken: typeof refreshAccessToken
-  revokeToken: typeof revokeToken
-  verifyIdToken: typeof verifyIdToken
+/** A text field of a request's body, or undefined if it is missing, empty or not text */
+function textField(body: Record<string, unknown>, name: string): string | undefined {
+  const value = body[name]
+  return typeof value === 'string' && value ? value : undefined
 }
 
-export const realGoogle: GoogleApi = {
-  exchangeCode,
-  refreshAccessToken,
-  revokeToken,
-  verifyIdToken,
+/**
+ * The blob a request sent, opened. Refused if there is none (400), or if it is not one this
+ * Worker can read (401 `invalid_blob`: the page asks the person to sign in again, as for an
+ * `invalid_grant`). The blob itself is the proof of who is asking.
+ */
+async function openBlob(body: Record<string, unknown>, env: Env): Promise<BlobData> {
+  const blob = textField(body, 'blob')
+  if (!blob) throw new Refusal(400, 'Missing blob')
+  try {
+    return await decryptBlob(blob, env)
+  } catch (error) {
+    if (error instanceof UnreadableBlob) throw new Refusal(401, 'invalid_blob')
+    throw error
+  }
 }
 
 /**
@@ -45,73 +52,78 @@ export const realGoogle: GoogleApi = {
  *   user: {...}             // The profile Google gave
  * }
  */
-export async function handleOAuthCallback(
+export function handleOAuthCallback(
   request: Request,
   env: Env,
   google: GoogleApi = realGoogle
-) {
-  const body = await request.json()
-  const { code, redirect_uri } = body
+): Promise<Response> {
+  return refusing(async () => {
+    const body = await readJson(request)
+    const code = textField(body, 'code')
 
-  if (!code) {
-    return jsonResponse({ error: 'Missing code' }, 400)
-  }
+    if (!code) {
+      return jsonResponse({ error: 'Missing code' }, 400)
+    }
 
-  // Use the redirect_uri supplied by the client (its own origin), falling back to the
-  // env var. The client passes its origin so this works from localhost, Tailscale, etc.
-  const redirectUri = redirect_uri || env.GOOGLE_REDIRECT_URI
-  if (!redirectUri) {
-    return jsonResponse({ error: 'Missing redirect_uri' }, 400)
-  }
+    // Use the redirect_uri supplied by the client (its own origin), falling back to the
+    // env var. The client passes its origin so this works from localhost, Tailscale, etc.
+    const redirectUri = textField(body, 'redirect_uri') ?? env.GOOGLE_REDIRECT_URI
+    if (!redirectUri) {
+      return jsonResponse({ error: 'Missing redirect_uri' }, 400)
+    }
 
-  // Exchange code for tokens; the ID token is verified (signature, issuer, audience, expiry)
-  const tokens = await google.exchangeCode(code, redirectUri, env)
-  const { refresh_token, access_token, expires_in, scope, id_token, claims: payload } = tokens
+    // Exchange code for tokens; the ID token is verified (signature, issuer, audience, expiry)
+    const tokens = await google.exchangeCode(code, redirectUri, env)
+    const { refresh_token, access_token, expires_in, scope, id_token, claims: payload } = tokens
 
-  if (!id_token || !payload) {
-    return jsonResponse({ error: 'No ID token received. Make sure to request openid scope.' }, 400)
-  }
-  const email = payload.email as string | undefined
-  const sub = payload.sub
+    if (!id_token || !payload) {
+      return jsonResponse(
+        { error: 'No ID token received. Make sure to request openid scope.' },
+        400
+      )
+    }
+    const email = payload.email as string | undefined
+    const sub = payload.sub
 
-  // (Drive is not required: a member of a team space signs in for who they are, and the page
-  // asks for Drive separately if they want a space of their own. `scope` says what was granted.)
-  if (!refresh_token) {
-    return jsonResponse(
-      { error: 'No refresh token received. User may need to revoke and re-authorize.' },
-      400
-    )
-  }
+    // (Drive is not required: a member of a team space signs in for who they are, and the page
+    // asks for Drive separately if they want a space of their own. `scope` says what was granted.)
+    if (!refresh_token) {
+      return jsonResponse(
+        { error: 'No refresh token received. User may need to revoke and re-authorize.' },
+        400
+      )
+    }
 
-  // Create JWE blob
-  const blobData: BlobData = {
-    owner_email: email,
-    owner_sub: sub,
-    scopes: scope ?? '',
-    refresh_token: refresh_token,
-    created_at: new Date().toISOString(),
-    blob_id: crypto.randomUUID(),
-    kid: 'default', // Key ID for rotation
-  }
+    // Create JWE blob
+    const blobData: BlobData = {
+      owner_email: email,
+      owner_sub: sub,
+      scopes: scope ?? '',
+      refresh_token: refresh_token,
+      created_at: new Date().toISOString(),
+      blob_id: crypto.randomUUID(),
+      kid: 'default', // Key ID for rotation
+    }
 
-  const blob = await encryptBlob(blobData, env)
+    const blob = await encryptBlob(blobData, env)
 
-  const user = {
-    name: payload.name || null,
-    email: payload.email || null,
-    picture: payload.picture || null,
-    given_name: payload.given_name || null,
-    family_name: payload.family_name || null,
-    sub: payload.sub || null,
-  }
+    const user = {
+      name: payload.name || null,
+      email: payload.email || null,
+      picture: payload.picture || null,
+      given_name: payload.given_name || null,
+      family_name: payload.family_name || null,
+      sub: payload.sub || null,
+    }
 
-  return jsonResponse({
-    blob,
-    access_token,
-    expires_in,
-    id_token,
-    scope,
-    user,
+    return jsonResponse({
+      blob,
+      access_token,
+      expires_in,
+      id_token,
+      scope,
+      user,
+    })
   })
 }
 
@@ -137,61 +149,54 @@ export async function handleOAuthCallback(
  *   id_token?: string       // A new ID token, if Google sent one: what the team space API takes
  * }
  */
-export async function handleTokenRefresh(
+export function handleTokenRefresh(
   request: Request,
   env: Env,
   google: GoogleApi = realGoogle
-) {
-  const { blob, id_token } = await request.json()
+): Promise<Response> {
+  return refusing(async () => {
+    const body = await readJson(request)
+    const blobData = await openBlob(body, env)
 
-  if (!blob) {
-    return jsonResponse({ error: 'Missing blob' }, 400)
-  }
-
-  // Optional: Verify ID token if provided (extra security layer)
-  if (id_token) {
-    try {
-      const payload = await google.verifyIdToken(id_token, env)
-
-      // Decrypt blob
-      const blobData = await decryptBlob(blob, env)
-
-      // Verify ownership matches ID token
-      if (blobData.owner_email !== payload.email || blobData.owner_sub !== payload.sub) {
-        return jsonResponse({ error: 'Token mismatch: blob owner does not match ID token' }, 403)
+    // Optional: Verify ID token if provided (extra security layer)
+    const idToken = textField(body, 'id_token')
+    if (idToken) {
+      try {
+        const payload = await google.verifyIdToken(idToken, env)
+        // Verify ownership matches ID token
+        if (blobData.owner_email !== payload.email || blobData.owner_sub !== payload.sub) {
+          return jsonResponse({ error: 'Token mismatch: blob owner does not match ID token' }, 403)
+        }
+      } catch (error) {
+        // If ID token verification fails, continue without it (blob is still valid proof)
+        console.warn('ID token verification failed, proceeding with blob only:', message(error))
       }
-    } catch (error) {
-      // If ID token verification fails, continue without it (blob is still valid proof)
-      console.warn('ID token verification failed, proceeding with blob only:', message(error))
     }
-  }
 
-  // Decrypt blob and refresh access token
-  const blobData = await decryptBlob(blob, env)
-
-  try {
-    const { access_token, expires_in, id_token } = await google.refreshAccessToken(
-      blobData.refresh_token,
-      env
-    )
-    return jsonResponse({
-      access_token,
-      expires_in,
-      // (Google sends a new ID token with a refresh when it was asked for `openid`)
-      ...(id_token ? { id_token } : {}),
-    })
-  } catch (error) {
-    // Google no longer honours the refresh token (it expired, e.g. the consent screen is still
-    // in "Testing", or the access was revoked): the user has to sign in again, which is
-    // expected and not a server error
-    if ((error as { error?: string }).error === 'invalid_grant') {
-      return jsonResponse(
-        { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
-        401
+    try {
+      const { access_token, expires_in, id_token } = await google.refreshAccessToken(
+        blobData.refresh_token,
+        env
       )
+      return jsonResponse({
+        access_token,
+        expires_in,
+        // (Google sends a new ID token with a refresh when it was asked for `openid`)
+        ...(id_token ? { id_token } : {}),
+      })
+    } catch (error) {
+      // Google no longer honours the refresh token (it expired, e.g. the consent screen is still
+      // in "Testing", or the access was revoked): the user has to sign in again, which is
+      // expected and not a server error
+      if ((error as { error?: string }).error === 'invalid_grant') {
+        return jsonResponse(
+          { error: 'invalid_grant', message: 'Google sign-in expired or was revoked' },
+          401
+        )
+      }
+      throw error
     }
-    throw error
-  }
+  })
 }
 
 /**
@@ -204,33 +209,25 @@ export async function handleTokenRefresh(
  * Request body: { blob: string }
  * Response: { success: true }, or 502 if Google could not be asked or refused
  */
-export async function handleSessionLogout(
+export function handleSessionLogout(
   request: Request,
   env: Env,
   google: GoogleApi = realGoogle
-) {
-  const { blob } = await request.json()
-  if (!blob) {
-    return jsonResponse({ error: 'Missing blob' }, 400)
-  }
+): Promise<Response> {
+  return refusing(async () => {
+    const blobData = await openBlob(await readJson(request), env)
 
-  let blobData: BlobData
-  try {
-    blobData = await decryptBlob(blob, env)
-  } catch {
-    return jsonResponse({ error: 'Invalid blob' }, 400)
-  }
-
-  try {
-    await google.revokeToken(blobData.refresh_token, env)
-  } catch (error) {
-    // (Google says invalid_token for one that is already revoked: that is what was wanted)
-    if ((error as { error?: string }).error !== 'invalid_token') {
-      return jsonResponse(
-        { error: 'Google did not revoke the access', details: message(error) },
-        502
-      )
+    try {
+      await google.revokeToken(blobData.refresh_token, env)
+    } catch (error) {
+      // (Google says invalid_token for one that is already revoked: that is what was wanted)
+      if ((error as { error?: string }).error !== 'invalid_token') {
+        return jsonResponse(
+          { error: 'Google did not revoke the access', details: message(error) },
+          502
+        )
+      }
     }
-  }
-  return jsonResponse({ success: true })
+    return jsonResponse({ success: true })
+  })
 }

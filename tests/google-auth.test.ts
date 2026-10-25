@@ -115,9 +115,11 @@ describe('google-auth', () => {
       expect(await getSignInState()).to.equal('no-drive')
     })
 
-    it('is expired only when Google refuses the sign-in', async () => {
+    it('is expired only when Google refuses the sign-in, or the Worker cannot read it', async () => {
       signIn({ access_token: 'old', expires_at: inFromNow(-MINUTE) })
       respondTo = () => json({ error: 'invalid_grant' }, 401)
+      expect(await getSignInState()).to.equal('expired')
+      respondTo = () => json({ error: 'invalid_blob' }, 401)
       expect(await getSignInState()).to.equal('expired')
       respondTo = () => json({}, 500)
       expect(await getSignInState()).to.equal('signed-in')

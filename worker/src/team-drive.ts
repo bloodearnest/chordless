@@ -10,7 +10,7 @@
 import { createDriveApi } from '../../src/js/drive-client.ts'
 import { createDriveStorage } from '../../src/js/storage/drive-storage.ts'
 import type { StorageBackend } from '../../src/js/storage/types.ts'
-import { type BlobData, type BlobKey, decryptBlob } from './blob.ts'
+import { type BlobData, type BlobKey, decryptBlob, UnreadableBlob } from './blob.ts'
 import type { GoogleEnv, refreshAccessToken } from './google-auth.ts'
 import type { SpaceInfo, TeamSpaceApi } from './team-state.ts'
 
@@ -23,6 +23,8 @@ export class CredentialError extends Error {
     this.status = status
   }
 }
+
+const RECONNECT = 'The space owner needs to reconnect Google Drive'
 
 /** A token this close to its end is made again */
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000
@@ -62,7 +64,11 @@ export function ownerAccessToken({
     opened ??= (async () => {
       const blob = await room.ownerBlob()
       if (!blob) throw new CredentialError('Sharing is not set up for this space', 409)
-      const data = await decryptBlob(blob, env)
+      const data = await decryptBlob(blob, env).catch(error => {
+        // (made with a key the Worker no longer has: only a new sign-in mends it)
+        if (error instanceof UnreadableBlob) throw new CredentialError(RECONNECT, 409)
+        throw error
+      })
       // (a blob that is not the owner's must not stand in for their access)
       if (data.owner_sub !== info.owner.sub) {
         throw new CredentialError('The stored Google sign-in is not the space owner’s', 409)
@@ -92,7 +98,7 @@ export function ownerAccessToken({
         error => {
           made.delete(data.blob_id)
           if ((error as { error?: string }).error === 'invalid_grant') {
-            throw new CredentialError('The space owner needs to reconnect Google Drive', 409)
+            throw new CredentialError(RECONNECT, 409)
           }
           throw error
         }

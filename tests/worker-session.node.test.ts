@@ -9,8 +9,8 @@ import { beforeEach, describe, test } from 'node:test'
 import * as jose from 'jose'
 import { type BlobData, decryptBlob, encryptBlob } from '../worker/src/blob.ts'
 import type { Env } from '../worker/src/env.ts'
+import type { GoogleApi } from '../worker/src/google-auth.ts'
 import {
-  type GoogleApi,
   handleOAuthCallback,
   handleSessionLogout,
   handleTokenRefresh,
@@ -372,14 +372,23 @@ describe('POST /session/refresh', () => {
     })
   })
 
-  test('fails for a blob that is not ours, and asks Google nothing', async () => {
+  test('answers 401 invalid_blob for a blob that is not ours (sign in again), and asks Google nothing', async () => {
     const { google, calls } = fakeGoogle()
     const other = await encryptBlob(blobData(), { JWE_ENCRYPTION_KEY: randomKey() })
-    await assert.rejects(handleTokenRefresh(post('/session/refresh', { blob: other }), env, google))
-    await assert.rejects(
-      handleTokenRefresh(post('/session/refresh', { blob: 'garbage' }), env, google)
-    )
+    for (const blob of [other, 'garbage']) {
+      const response = await handleTokenRefresh(post('/session/refresh', { blob }), env, google)
+      assert.equal(response.status, 401)
+      assert.equal((await bodyOf(response)).error, 'invalid_blob')
+    }
     assert.equal(calls.length, 0)
+  })
+
+  test('refuses a body that is not JSON with a 400', async () => {
+    const request = new Request('https://chordless.test/session/refresh', {
+      method: 'POST',
+      body: 'this is not json',
+    })
+    assert.equal((await handleTokenRefresh(request, env, fakeGoogle().google)).status, 400)
   })
 
   test('passes an error from Google on, for the router to report', async () => {
@@ -482,7 +491,7 @@ describe('POST /session/logout', () => {
   test('wants a blob, and a real one', async () => {
     const { google, calls } = fakeGoogle()
     assert.equal((await logout({}, google)).status, 400)
-    assert.equal((await logout({ blob: 'not-a-blob' }, google)).status, 400)
+    assert.equal((await logout({ blob: 'not-a-blob' }, google)).status, 401)
     assert.equal(calls.length, 0, 'nothing was asked of Google')
   })
 

@@ -113,7 +113,11 @@ test('a route that throws is a JSON 500 with the reason, not a crash', async () 
   const error = console.error
   console.error = () => {}
   try {
-    const response = await setup().send('/session/refresh', postJson('this is not json'))
+    // (a key that cannot be used is the server's fault: not the person's, as a bad blob is)
+    const response = await setup({ JWE_ENCRYPTION_KEY: 'not base64!' }).send(
+      '/session/refresh',
+      postJson('{"blob":"x.y.z.w.v"}')
+    )
     assert.equal(response.status, 500)
     assert.equal(response.headers.get('Content-Type'), 'application/json')
     const body = (await response.json()) as { error: string; message: string }
