@@ -83,6 +83,12 @@ describe('AppUpdate', () => {
     expect(update.ready).to.equal(false)
   })
 
+  it('tells the page once it has found the worker to ask, which a page shown before it cannot know', async () => {
+    await start()
+    expect(update.available).to.equal(true)
+    expect(changes).to.deep.equal([false])
+  })
+
   it('is ready when a new version was already waiting as the app opened', async () => {
     must(container.registration).waiting = new FakeWorker()
     await start()

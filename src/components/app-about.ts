@@ -81,12 +81,16 @@ export class AppAbout extends LitElement {
     super.connectedCallback()
     window.addEventListener(AppUpdateChangeEvent.type, this._refresh)
     window.addEventListener(INSTALL_CHANGE_EVENT, this._refreshInstall)
+    // On the first visit the worker takes control of a page that is already showing, and only
+    // then can it say which version is running
+    navigator.serviceWorker?.addEventListener('controllerchange', this._reload)
     void this._load()
   }
 
   override disconnectedCallback() {
     window.removeEventListener(AppUpdateChangeEvent.type, this._refresh)
     window.removeEventListener(INSTALL_CHANGE_EVENT, this._refreshInstall)
+    navigator.serviceWorker?.removeEventListener('controllerchange', this._reload)
     super.disconnectedCallback()
   }
 
@@ -98,6 +102,10 @@ export class AppAbout extends LitElement {
 
   _refreshInstall = (): void => {
     this._installMode = currentInstallMode()
+  }
+
+  _reload = (): void => {
+    void this._load()
   }
 
   async _load(): Promise<void> {

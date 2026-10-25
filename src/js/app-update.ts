@@ -117,8 +117,10 @@ export class AppUpdate {
     if (!registration) return
     this.#registration = registration
 
-    // One already waiting (found on opening the app), or one that installs while it is open
+    // One already waiting (found on opening the app), or one that installs while it is open.
+    // Either way the page is told: one shown before this had no worker to ask (`available`)
     if (registration.waiting && container.controller) this.#set(true)
+    else this.#changed()
     registration.addEventListener('updatefound', () => {
       const worker = registration.installing
       if (container.controller) this.#setInstalling(true)

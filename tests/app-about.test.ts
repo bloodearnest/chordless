@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppAbout } from '../src/components/app-about.ts'
 import { AppUpdateChangeEvent, appUpdate } from '../src/js/app-update.ts'
 import { INSTALL_CHANGE_EVENT } from '../src/js/install.ts'
@@ -196,6 +196,21 @@ describe('app-about', () => {
       })
       el = await show()
       expect(el._offline).to.equal(null)
+    })
+
+    it('is asked again when a worker takes control of a page it did not load (the first visit)', async () => {
+      let running: { version: string; released: string } | null = null
+      replaceMethod(appUpdate, 'runningVersion', async () => running)
+      const el = await show()
+      expect(el._versionLine()).to.equal('Version unknown')
+      running = { version: 'v-claimed', released: '' }
+      navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))
+      await waitUntil(() => el._running?.version === 'v-claimed', 'the version is asked again')
+      el.remove()
+      running = { version: 'v-later', released: '' }
+      navigator.serviceWorker.dispatchEvent(new Event('controllerchange'))
+      await wait(30)
+      expect(el._running?.version, 'a page that is gone does not ask').to.equal('v-claimed')
     })
 
     it('is not ready when there is no running version', async () => {

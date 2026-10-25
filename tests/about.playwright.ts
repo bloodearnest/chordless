@@ -18,19 +18,24 @@ test.beforeEach(async ({ page }) => {
       worker,
       calls,
       persisted: false,
+      // Whether the browser grants a request to keep the data: not at first, as Chrome for an app
+      // that is not installed (the app asks for itself whenever it opens a database)
+      grants: false,
     }
     ServiceWorkerContainer.prototype.getRegistration = async () =>
       registration as unknown as ServiceWorkerRegistration
 
-    const state = (window as unknown as { fake: { persisted: boolean; calls: typeof calls } }).fake
+    const state = (
+      window as unknown as { fake: { persisted: boolean; grants: boolean; calls: typeof calls } }
+    ).fake
     Object.defineProperty(navigator, 'storage', {
       configurable: true,
       value: {
         persisted: async () => state.persisted,
         persist: async () => {
           state.calls.persist++
-          state.persisted = true
-          return true
+          if (state.grants) state.persisted = true
+          return state.persisted
         },
         estimate: async () => ({ usage: 3_200_000, quota: 24_000_000_000 }),
       },
@@ -125,6 +130,10 @@ test('the storage panel says whether the browser will keep the data, and can ask
   // Not the quota, which a browser reports as it likes
   await expect(status).not.toContainText('24 GB')
 
+  // (the browser would now say yes)
+  await page.evaluate(() => {
+    ;(window as unknown as { fake: { grants: boolean } }).fake.grants = true
+  })
   await about.getByRole('button', { name: 'Ask the browser to keep it' }).click()
   await expect(status).toHaveAttribute('data-state', 'persistent')
   await expect(status).toHaveAttribute('data-look', 'good')
