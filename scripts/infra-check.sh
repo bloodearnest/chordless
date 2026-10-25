@@ -3,7 +3,8 @@
 #   lint   formatting and validity: needs no credentials (`just lint` runs it)
 #   drift  the plan of each stack must say "No changes": needs credentials (`just deploy` runs it,
 #          and CI's drift.yml nightly): the state's, in R2 (AWS_ACCESS_KEY_ID and
-#          AWS_SECRET_ACCESS_KEY, or locally the git-ignored .r2-tfstate.env), and each stack's own
+#          AWS_SECRET_ACCESS_KEY, the git-ignored .r2-tfstate.env, or made from CLOUDFLARE_API_TOKEN),
+#          and each stack's own
 # Usage: scripts/infra-check.sh lint|drift
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -31,8 +32,16 @@ case "${1:-}" in
       . ./.r2-tfstate.env
       set +a
     fi
+    # Or from a Cloudflare API token that can use R2: its S3 key id is the token's id, and its secret
+    # the SHA-256 of the token
+    if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -n "${CLOUDFLARE_API_TOKEN:-}" ]; then
+      AWS_ACCESS_KEY_ID=$(curl -s -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+        https://api.cloudflare.com/client/v4/user/tokens/verify | jq -r '.result.id // empty')
+      AWS_SECRET_ACCESS_KEY=$(printf %s "$CLOUDFLARE_API_TOKEN" | sha256sum | cut -d' ' -f1)
+      export AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY
+    fi
     if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
-      echo "The state is in R2: set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or write them in .r2-tfstate.env (infra/README.md)"
+      echo "The state is in R2: set CLOUDFLARE_API_TOKEN (with R2 access), or AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or write those in .r2-tfstate.env (infra/README.md)"
       exit 1
     fi
     # (INFRA_DRIFT_SKIP="cloudflare google-dev" leaves stacks out, for when you lack their credentials)

@@ -261,8 +261,6 @@ ci/cd (docs/CI.md)
 - the macOS/WebKit and Windows/Edge end-to-end jobs: make them pass, then required (`e2e` in
   ci-ok's needs, no continue-on-error), and fold e2e-linux into the same matrix (it is apart only
   because a matrix has one result for ci-ok, and Linux's is required now)
-- Terraform state of every stack in R2: the bucket is made (cloudflare stack); move each stack's
-  state in (`init -migrate-state`) with the R2 state token in .r2-tfstate.env
 - deploy from main (deploy.yml, drafted on branch claude/ci-and-pr-workflow): build in a job with no
   secrets, and deploy that build in a job that runs only wrangler, with a token that can do nothing
   but deploy Workers (Workers Scripts: Edit); then the smoke test, and rollback
