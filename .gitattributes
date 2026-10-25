@@ -1,3 +1,7 @@
+# Text files are checked out with LF everywhere, as they are stored: Windows (CI's runner sets
+# core.autocrlf) would otherwise add CRs that the scripts, and tests reading .env files, trip on
+* text=auto eol=lf
+
 # Append-only logs: two branches that each added lines keep both when rebased or merged locally
 docs/stats.jsonl merge=union
 docs/test-catches.jsonl merge=union
