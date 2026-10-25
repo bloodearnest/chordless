@@ -1,25 +1,34 @@
-# Dependabot's pull requests go through CI like any other. `cooldown` waits a week after a release
-# before proposing it, by which time a compromised one has usually been found and pulled.
+# Dependabot's pull requests go through CI like any other (docs/CI.md).
+# - One pull request a week, of every npm package and action with a new version (a multi-ecosystem
+#   group), rather than one per package.
+# - `cooldown` waits a week after a release before proposing it, by which time a compromised one
+#   has usually been found and pulled.
+# - Security updates come when an alert does, not weekly: those at once are one pull request too.
 version: 2
-updates:
-  - package-ecosystem: github-actions
-    directory: /
+
+multi-ecosystem-groups:
+  weekly:
     schedule:
       interval: weekly
-    cooldown:
-      default-days: 7
-    groups:
-      actions:
-        patterns: ["*"]
+      day: monday
+      time: "06:00"
+      timezone: Europe/London
 
+updates:
   - package-ecosystem: npm
     directory: /
-    schedule:
-      interval: weekly
+    multi-ecosystem-group: weekly
+    patterns: ["*"]
     cooldown:
       default-days: 7
     groups:
-      dependencies:
-        dependency-type: production
-      dev-dependencies:
-        dependency-type: development
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    multi-ecosystem-group: weekly
+    patterns: ["*"]
+    cooldown:
+      default-days: 7
