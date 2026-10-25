@@ -1,0 +1,7 @@
+# zizmor's settings (`just lint-actions`; docs/CI.md)
+rules:
+  # It asks for GitHub's `$/` self-repository syntax for our own actions, which actionlint 1.7.12
+  # rejects as an action with no ref. The jobs check the repository out first anyway (the scripts
+  # are in it), so `./` names the same commit. Turn this back on when actionlint knows `$/`.
+  self-repository:
+    disable: true

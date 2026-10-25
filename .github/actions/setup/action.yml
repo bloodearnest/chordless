@@ -1,0 +1,110 @@
+# What every CI job needs before its own step: the tools it names (mise.toml's versions), the npm
+# packages, and the browser of an end-to-end job, each from the cache when it can be (docs/CI.md).
+# The job checks out the repository first, as this action lives in it. Caches are only restored
+# here; .github/actions/save-cache saves them, on main.
+name: Setup
+description: Tools, npm packages and a browser, from the cache where possible
+
+inputs:
+  tools:
+    description: The mise tools to install, space separated (e.g. "node just")
+    required: true
+  npm:
+    description: Install the npm packages ("true" or "false")
+    default: "true"
+  browser:
+    description: The Playwright browser (chromium, webkit, chrome), or none
+    default: none
+
+outputs:
+  save:
+    description: What to save at the end of the job (for .github/actions/save-cache), as JSON
+    value: ${{ steps.save.outputs.json }}
+
+runs:
+  using: composite
+  steps:
+    - name: Cache keys
+      id: keys
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+        BROWSER: ${{ inputs.browser }}
+        PLATFORM: ${{ runner.os }}-${{ runner.arch }}
+        MISE_HASH: ${{ hashFiles('mise.toml') }}
+        LOCK_HASH: ${{ hashFiles('package-lock.json') }}
+      run: |
+        {
+          echo "tools=mise-$PLATFORM-${TOOLS// /-}-$MISE_HASH"
+          # node_modules is a function of the lockfile, the platform and Node's version (in
+          # mise.toml): no install scripts run (.npmrc), so nothing else goes into it
+          echo "modules=modules-$PLATFORM-$MISE_HASH-$LOCK_HASH"
+          echo "npm=npm-$PLATFORM-$LOCK_HASH"
+          echo "npm-prefix=npm-$PLATFORM-"
+          echo "browser=browser-$PLATFORM-$BROWSER-$LOCK_HASH"
+        } >>"$GITHUB_OUTPUT"
+
+    - name: Restore the tools
+      id: tools-cache
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\mise' || '~/.local/share/mise' }}
+        key: ${{ steps.keys.outputs.tools }}
+
+    - name: Install the tools
+      shell: bash
+      env:
+        TOOLS: ${{ inputs.tools }}
+      # (word splitting on purpose: one argument per tool)
+      run: scripts/ci/setup-tools.sh $TOOLS
+
+    - name: Restore node_modules
+      id: modules-cache
+      if: inputs.npm == 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: node_modules
+        key: ${{ steps.keys.outputs.modules }}
+
+    - name: Restore npm's download cache
+      if: inputs.npm == 'true' && steps.modules-cache.outputs.cache-hit != 'true'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\npm-cache' || '~/.npm' }}
+        key: ${{ steps.keys.outputs.npm }}
+        restore-keys: ${{ steps.keys.outputs.npm-prefix }}
+
+    - name: Install the npm packages
+      if: inputs.npm == 'true' && steps.modules-cache.outputs.cache-hit != 'true'
+      shell: bash
+      run: npm ci --prefer-offline --no-audit --no-fund
+
+    - name: Restore the browser
+      id: browser-cache
+      if: inputs.browser == 'chromium' || inputs.browser == 'webkit'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.os == 'Windows' && '~\AppData\Local\ms-playwright' || runner.os == 'macOS' && '~/Library/Caches/ms-playwright' || '~/.cache/ms-playwright' }}
+        key: ${{ steps.keys.outputs.browser }}
+
+    - name: Install the browser
+      if: inputs.browser != 'none'
+      shell: bash
+      env:
+        BROWSER: ${{ inputs.browser }}
+        CACHED: ${{ steps.browser-cache.outputs.cache-hit }}
+      run: scripts/ci/install-browser.sh "$BROWSER" "$CACHED"
+
+    - name: What the cache lacked
+      id: save
+      shell: bash
+      env:
+        KEYS: ${{ toJSON(steps.keys.outputs) }}
+        TOOLS_HIT: ${{ steps.tools-cache.outputs.cache-hit }}
+        MODULES: ${{ inputs.npm == 'true' && steps.modules-cache.outputs.cache-hit != 'true' }}
+        BROWSER: ${{ (inputs.browser == 'chromium' || inputs.browser == 'webkit') && steps.browser-cache.outputs.cache-hit != 'true' }}
+      run: |
+        echo "json=$(jq -c \
+          --argjson tools "$([ "$TOOLS_HIT" = true ] && echo false || echo true)" \
+          --argjson modules "$MODULES" --argjson browser "$BROWSER" \
+          '. + {save_tools: $tools, save_modules: $modules, save_browser: $browser}' <<<"$KEYS")" >>"$GITHUB_OUTPUT"
