@@ -30,6 +30,7 @@ lint:
     npx tsc -b
     @just lint-infra
     @just lint-actions
+    @just audit
     @echo "Running knip (unused files, exports and dependencies)..."
     npx knip --no-progress
     @echo "Checking wrangler.toml (a warning fails)..."
@@ -45,6 +46,12 @@ lint-infra:
 lint-actions:
     @echo "Checking the GitHub workflows (actionlint, zizmor)..."
     scripts/lint-actions.sh
+
+# Check the npm packages: the registry's signatures and provenance, and no known high advisory in
+# a production dependency (the dev tools' are listed, not failed: scripts/audit-deps.sh)
+audit:
+    @echo "Checking the npm packages (signatures, advisories)..."
+    scripts/audit-deps.sh
 
 # What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
 # a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|msedge`
