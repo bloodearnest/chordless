@@ -9,12 +9,26 @@
 # owns are not managed: the custom domain's AAAA, and Email Routing's MX and DKIM.
 
 terraform {
-  required_version = ">= 1.5"
+  required_version = ">= 1.10"
   required_providers {
     cloudflare = {
       source  = "cloudflare/cloudflare"
       version = "~> 5.0"
     }
+  }
+  # State: in R2 (infra/README.md), with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from an R2 token
+  backend "s3" {
+    bucket                      = "chordless-tfstate"
+    key                         = "cloudflare/terraform.tfstate"
+    region                      = "auto"
+    endpoints                   = { s3 = "https://589e207ea16d7e9db96c2b3d2ae87833.r2.cloudflarestorage.com" }
+    use_lockfile                = true
+    use_path_style              = true
+    skip_credentials_validation = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    skip_metadata_api_check     = true
+    skip_s3_checksum            = true
   }
 }
 
@@ -158,4 +172,22 @@ import {
   for_each = local.zone_settings
   to       = cloudflare_zone_setting.this[each.key]
   id       = "${var.zone_id}/${each.key}"
+}
+
+# Where every stack's Terraform state is kept (each stack's `backend "s3"`): R2 speaks S3. Made with
+# wrangler (npx wrangler r2 bucket create chordless-tfstate --location weur) and imported, as this
+# stack's own state is kept in it. Never song content (CLAUDE.md): state only.
+import {
+  to = cloudflare_r2_bucket.tfstate
+  id = "${var.account_id}/chordless-tfstate/default"
+}
+
+resource "cloudflare_r2_bucket" "tfstate" {
+  account_id = var.account_id
+  name       = "chordless-tfstate"
+  location   = "WEUR"
+
+  lifecycle {
+    prevent_destroy = true
+  }
 }

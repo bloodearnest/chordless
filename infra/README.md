@@ -2,12 +2,12 @@
 
 The slow-changing setup around the app, captured as code on 2026-10-20 from what was already
 there: nothing was created, each resource is imported (`import` blocks). Four stacks, each with its
-own state, so a mistake in one cannot touch another (`github/` was added on 2026-10-25). `google-chordless/` created what it holds;
-`cloudflare/` only imported.
+own state, so a mistake in one cannot touch another. `google-chordless/` created what it holds;
+`cloudflare/` and `github/` (added 2026-10-25) only imported.
 
 | Stack | Holds |
 |---|---|
-| `cloudflare/` | the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
+| `cloudflare/` | the R2 bucket that holds every stack's state, the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
 | `github/` | the GitHub repository's settings (imported): merge by rebase only, the `main` ruleset (a pull request, `ci-ok` passing, linear history), what Actions may run (GitHub's own actions, pinned by SHA), the workflow token's permissions, the `production` and `infra` environments. See [docs/CI.md](../docs/CI.md) |
@@ -49,14 +49,28 @@ say "No changes") and a check that the production Worker has its secrets (docs/E
 
 ## State
 
-Local, gitignored (`*.tfstate`, `.terraform/`), kept on the developer's machine. It is cheap to lose:
+In Cloudflare R2, the bucket `chordless-tfstate` (one key per stack), through Terraform's `s3`
+backend, with a lock file next to each state (`use_lockfile`), so two runs cannot apply at once and CI
+can check for drift. Access is an R2 API token limited to that bucket (Object Read & Write), whose S3
+credentials go in the git-ignored `.r2-tfstate.env`:
+
+    AWS_ACCESS_KEY_ID=...
+    AWS_SECRET_ACCESS_KEY=...
+
+`scripts/infra-check.sh drift` reads it; by hand, `set -a; . ./.r2-tfstate.env; set +a` first. In CI the
+same two are secrets of the `infra` environment. R2 keeps no old versions, but the state is cheap to lose:
 the `import` blocks rebuild it with one `terraform apply` (which changes nothing when the code matches).
-The `.tf` files and `.terraform.lock.hcl` (the provider versions) are in git. If a secret ever has to go
-through Terraform, move the state to a remote backend first.
+Secret values still stay out of Terraform. The `.tf` files and `.terraform.lock.hcl` (the provider
+versions) are in git; `*.tfstate` and `.terraform/` are ignored.
+
+The bucket is in `cloudflare/`, whose own state it holds: it was made with wrangler
+(`npx wrangler r2 bucket create chordless-tfstate --location weur`) and imported. Moving a stack's
+state from the machine to R2 was, in each stack, `terraform init -migrate-state`.
 
 ## The GitHub stack
 
-`GITHUB_TOKEN=$(gh auth token) mise exec -- terraform plan` in `github/` (its token needs admin on the
-repository: the gh login has it). Not managed, as the provider cannot: secret values
-(`gh secret set NAME --env production`), installing the Claude GitHub app, and the approval GitHub asks
-for before a fork's first pull request runs workflows (its default, "first-time contributors").
+`GITHUB_TOKEN=$(gh auth token) mise exec -- terraform plan` in `github/`. Its token needs admin on the
+repository (the gh login has it); CI's drift check uses a fine-grained token with Administration: read.
+Not managed, as the provider cannot: secret values (`gh secret set NAME --env production`), the Claude
+GitHub app's install, and the approval GitHub asks for before a fork's first pull request runs workflows
+(its default, "first-time contributors").

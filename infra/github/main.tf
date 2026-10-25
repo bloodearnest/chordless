@@ -14,6 +14,20 @@ terraform {
       version = "~> 6.13"
     }
   }
+  # State: in R2 (infra/README.md), with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from an R2 token
+  backend "s3" {
+    bucket                      = "chordless-tfstate"
+    key                         = "github/terraform.tfstate"
+    region                      = "auto"
+    endpoints                   = { s3 = "https://589e207ea16d7e9db96c2b3d2ae87833.r2.cloudflarestorage.com" }
+    use_lockfile                = true
+    use_path_style              = true
+    skip_credentials_validation = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    skip_metadata_api_check     = true
+    skip_s3_checksum            = true
+  }
 }
 
 # Auth: GITHUB_TOKEN in the environment (GITHUB_TOKEN=$(gh auth token) locally)
