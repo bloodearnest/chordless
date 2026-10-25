@@ -49,8 +49,9 @@ export default defineConfig({
   fullyParallel: true,
   // A worker for every two processors the machine lets this have (one a core, where each core runs
   // two threads; a CI runner's share, in a container): more make each test slower, not the run
-  // shorter, as the browsers, the servers and the unit tests beside them (`just test`) need the rest
-  workers: Math.max(1, Math.floor(availableParallelism() / 2)),
+  // shorter, as the browsers, the servers and the unit tests beside them (`just test`) need the rest.
+  // Two at least: CI's macOS runner has three cores with a thread each, which would make one
+  workers: Math.max(2, Math.floor(availableParallelism() / 2)),
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   // In CI, failures also annotate the PR's diff, and the HTML report is kept as an artifact
