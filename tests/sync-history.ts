@@ -1,7 +1,7 @@
 /**
  * Random histories of several devices that share one Drive: the engine, and what must hold of any
  * history. It runs against a `World` (the place the files are kept, and what can happen to them
- * there): `drive-sync-random.test.ts` runs it against an in-memory fake, fast and exact;
+ * there): `random-histories.ts` runs it against an in-memory fake, fast and exact (a test file to a mode, `drive-sync-random*.test.ts`);
  * `tests/drive/` runs the same histories against a real Drive.
  *
  * What must hold, whatever the history:

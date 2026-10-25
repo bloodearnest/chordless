@@ -1,5 +1,5 @@
 import { ContextConsumer } from '@lit/context'
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import { LitElement } from 'lit'
 import { AppRouter, pageTitle, RouteChangeEvent } from '../src/js/app-router.ts'
 import { routeContext } from '../src/js/route-context.ts'
@@ -203,10 +203,14 @@ describe('AppRouter', () => {
       const back = routeChanged()
       window.history.back()
       await Promise.all([first, back])
-      await new Promise(resolve => setTimeout(resolve, 50))
+      // (the swap back is a view transition of its own, a few frames: more under load)
+      await waitUntil(
+        () => outlet.firstElementChild?.dataset.view === 'account',
+        'the view it was on is shown again',
+        { timeout: 3000 }
+      )
       expect(window.location.pathname).to.equal('/account')
       expect(outlet.children).to.have.length(1)
-      expect(outlet.firstElementChild.dataset.view).to.equal('account')
       expect(router.route.name).to.equal('account')
       document.title = title
     })

@@ -23,6 +23,14 @@ import { suppressConsoleLogs, wait } from './test-helpers.ts'
 
 const { describe, it, before, after, beforeEach, afterEach } = window
 
+const frame = () => new Promise(resolve => requestAnimationFrame(resolve))
+
+/** Let what a view defers to the next frame run (page-view.ts), and anything that follows it */
+async function frames(n) {
+  for (let i = 0; i < n; i++) await frame()
+  await wait(0)
+}
+
 /** Wait until a view has loaded what it shows, and run the setup it defers a frame */
 async function loaded(view) {
   await view.updateComplete
@@ -34,7 +42,7 @@ async function loaded(view) {
     'setlist-view': () => view.querySelector('setlist-overview'),
   }[view.localName]
   for (let i = 0; ready && i < 100 && !ready(); i++) await wait(20)
-  await wait(100)
+  await frames(2)
 }
 
 /**
@@ -114,7 +122,7 @@ describe('views leave nothing behind', () => {
       outlet.append(view)
       await loaded(view)
       view.remove()
-      await wait(50)
+      await frames(1)
     }
   }
 
@@ -223,7 +231,7 @@ describe('views leave nothing behind', () => {
     )
     expect(document.body.classList.contains('edit-mode')).to.equal(true)
     view.remove()
-    await wait(50)
+    await frames(1)
     expect(pageState()).to.deep.equal(before)
   })
 
@@ -250,7 +258,7 @@ describe('views leave nothing behind', () => {
     expect(menu.songs.length).to.equal(1)
 
     view.remove()
-    await wait(50)
+    await frames(1)
     expect(menu.songs.length).to.equal(0)
     expect(menu.showOverviewLink).to.equal(false)
   })

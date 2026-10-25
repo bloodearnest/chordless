@@ -30,6 +30,11 @@ interface PanelProgress {
  * UI for triggering and monitoring Google Drive sync
  */
 export class DriveSyncPanel extends LitElement {
+  /** How long a finished reset or start-over is shown, and how long before the reload that
+   * follows one (time to read it; properties for tests to shorten) */
+  static doneMs = 2000
+  static reloadMs = 1000
+
   static override properties = {
     space: { attribute: false },
     syncAvailable: { type: Boolean, attribute: false },
@@ -227,12 +232,12 @@ export class DriveSyncPanel extends LitElement {
         setTimeout(() => {
           this.syncing = false
           this.syncProgress = null
-        }, 2000)
+        }, DriveSyncPanel.doneMs)
         return
       }
       // Local data changed underneath every page, so reload to show it
       this.syncProgress = { stage: 'success', message: '✓ Reset complete, reloading...' }
-      setTimeout(() => this.reload(), 1000)
+      setTimeout(() => this.reload(), DriveSyncPanel.reloadMs)
     } catch (error) {
       console.error('[DriveSyncPanel] Reset from Drive failed:', error)
       this.syncError = errorMessage(error)
@@ -263,7 +268,7 @@ export class DriveSyncPanel extends LitElement {
       setTimeout(() => {
         this.syncing = false
         this.syncProgress = null
-      }, 2000)
+      }, DriveSyncPanel.doneMs)
     } catch (error) {
       console.error('[DriveSyncPanel] Starting over in Drive failed:', error)
       this.syncing = false
@@ -292,7 +297,7 @@ export class DriveSyncPanel extends LitElement {
       this.folderProblem = null
       // Local data changed underneath every page, so reload to show it
       this.syncProgress = { stage: 'success', message: '✓ Replaced from Drive, reloading...' }
-      setTimeout(() => this.reload(), 1000)
+      setTimeout(() => this.reload(), DriveSyncPanel.reloadMs)
     } catch (error) {
       console.error('[DriveSyncPanel] Replacing from a Drive folder failed:', error)
       this.syncing = false

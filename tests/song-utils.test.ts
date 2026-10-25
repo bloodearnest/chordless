@@ -382,7 +382,8 @@ describe('songs that are not as they should be', () => {
     expect(await failure(setDefaultVariant('nobody'))).to.equal('Song not found: nobody')
   })
 
-  it('keeps no more than a hundred parsed charts, letting the oldest go', async () => {
+  it('keeps no more than a hundred parsed charts, letting the oldest go', async function () {
+    this.timeout(10000) // (a hundred and three songs saved and read)
     const songs: Awaited<ReturnType<typeof createSong>>[] = []
     for (let i = 0; i < 103; i++) songs.push(await createSong(chart(unique(`Cached ${i}`))))
     for (const song of songs) await getSongWithContent(song.uuid)

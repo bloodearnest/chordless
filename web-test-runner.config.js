@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { globSync, readFileSync } from 'node:fs'
+import { availableParallelism } from 'node:os'
 import { esbuildPlugin } from '@web/dev-server-esbuild'
 import { defaultReporter } from '@web/test-runner'
 import { playwrightLauncher } from '@web/test-runner-playwright'
@@ -12,9 +13,25 @@ const devEnv = Object.fromEntries(
     .map(line => line.split(/=(.*)/s).slice(0, 2))
 )
 
+// Every test file except the node ones (*.node.test.js, run by just test-node), the slowest first
+// (by the last full run, .stats/unit-files.json): files start in this order, and a slow one that
+// started last would hold up the end of the run on its own
+const lastTimes = (() => {
+  try {
+    return JSON.parse(readFileSync('.stats/unit-files.json', 'utf8'))
+  } catch {
+    return {}
+  }
+})()
+const testFiles = globSync('tests/*.test.{js,ts}')
+  .filter(file => !/\.node\.test\./.test(file))
+  .sort((a, b) => (lastTimes[b] ?? 0) - (lastTimes[a] ?? 0) || a.localeCompare(b))
+
 export default {
-  // Every test file except the node ones (*.node.test.js, run by just test-node)
-  files: ['tests/*.test.{js,ts}', '!tests/*.node.test.{js,ts}'],
+  files: testFiles,
+  // A page at a time for every two processors the machine lets this have (one a core, where each
+  // runs two threads; a CI runner's share), as the Playwright tests beside it (`just test`) have
+  concurrency: Math.max(1, Math.floor(availableParallelism() / 2)),
   nodeResolve: true,
   // Types are erased, nothing else: the browser gets the same code it would from Vite
   plugins: [

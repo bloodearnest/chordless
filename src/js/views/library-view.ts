@@ -57,6 +57,9 @@ import { filterSongs } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
 
 export class LibraryView extends PageView {
+  /** The pause in typing before the search goes in the URL (a property for tests to shorten) */
+  static searchPauseMs = 250
+
   static override properties = {
     ...PageView.properties,
     _search: { state: true },
@@ -175,7 +178,7 @@ export class LibraryView extends PageView {
       if (route.songUuid || (route.search ?? '') === search) return
       this.#searchEcho = search
       goTo(buildUrl({ name: 'songs', search }), { replace: true })
-    }, 250)
+    }, LibraryView.searchPauseMs)
   }
 
   /** A route that names a search other than one this view put there (a link, reload, back) sets the box */

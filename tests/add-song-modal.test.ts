@@ -1,4 +1,4 @@
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
 import '../src/components/app-modal.ts'
 import type { SongWithContent } from '../src/js/data-types.ts'
 import { type ChordlessDB, getCurrentDB } from '../src/js/db.ts'
@@ -185,7 +185,12 @@ describe('AddSongModal', () => {
           song: chosen,
         })
       )
-      await wait(50)
+      // (copying it is a few writes to the database)
+      await waitUntil(
+        () => picked.length > 0 || results().querySelector('status-message')?.state === 'error',
+        'the song is chosen, or it says why not',
+        { timeout: 5000 }
+      )
     }
 
     it('is copied into the library first, and the copy is what is chosen', async () => {

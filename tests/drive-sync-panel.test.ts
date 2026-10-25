@@ -1,6 +1,6 @@
 import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import type { AppModal } from '../src/components/app-modal.ts'
-import type { DriveSyncPanel } from '../src/components/drive-sync-panel.ts'
+import { DriveSyncPanel } from '../src/components/drive-sync-panel.ts'
 import { ChordlessDB } from '../src/js/db.ts'
 import { ROOT_FOLDER_NAME } from '../src/js/drive-client.ts'
 import {
@@ -17,7 +17,6 @@ import { makeSetlist } from './builders.ts'
 import { installFakeDrive } from './fake-drive.ts'
 import { must } from './must.ts'
 import { suppressConsoleLogs, wait } from './test-helpers.ts'
-import '../src/components/drive-sync-panel.ts'
 
 const { describe, it, beforeEach, afterEach } = window
 
@@ -28,7 +27,12 @@ describe('drive-sync-panel', () => {
   let before: { id: string | null; name: string }
   let spaceId: string
 
+  // What it shows when done, and the reload after it, last 50ms rather than seconds
+  const real = { doneMs: DriveSyncPanel.doneMs, reloadMs: DriveSyncPanel.reloadMs }
+
   beforeEach(async () => {
+    DriveSyncPanel.doneMs = 50
+    DriveSyncPanel.reloadMs = 50
     localStorage.removeItem('last-sync-time')
     before = getCurrentSpace()
     const space = await createSpace(`Panel ${crypto.randomUUID().slice(0, 8)}`)
@@ -37,6 +41,7 @@ describe('drive-sync-panel', () => {
   })
 
   afterEach(async () => {
+    Object.assign(DriveSyncPanel, real)
     drive?.uninstall()
     drive = undefined
     localStorage.removeItem('last-sync-time')
@@ -192,9 +197,9 @@ describe('drive-sync-panel', () => {
       await waitUntil(() => text(el).includes('Reset complete'), 'it says it is done', {
         timeout: 4000,
       })
-      await wait(1300)
-      expect(reloads).to.equal(0)
       await waitUntil(() => !el.syncing, 'it is done', { timeout: 4000 })
+      await wait(DriveSyncPanel.reloadMs * 2)
+      expect(reloads).to.equal(0)
     })
   })
 

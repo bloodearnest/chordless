@@ -54,16 +54,11 @@ describe('song-versions', () => {
     const el = await fixture<SongVersions>(
       html`<song-versions .songId=${songId} .db=${db}></song-versions>`
     )
-    await settled(el)
+    // Its own load is not awaited by anything: one more, which reads the same, is (the versions
+    // and the songs to merge are two reads, and waiting for the first is not waiting for both)
+    await el._load()
+    await el.updateComplete
     return el
-  }
-  /** Wait for the component's database reads, and its render */
-  async function settled(el: SongVersions) {
-    for (let n = 0; n < 50; n++) {
-      await new Promise(resolve => setTimeout(resolve, 10))
-      await el.updateComplete
-      if (el._variants.length || n > 10) break
-    }
   }
   const $ = (el: SongVersions, selector: string) =>
     el.shadowRoot?.querySelector(selector) as HTMLElement | null

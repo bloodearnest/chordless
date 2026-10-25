@@ -10,7 +10,9 @@ describe('the views of the app shell', () => {
     expect(Object.keys(views).sort()).to.deep.equal([...ROUTE_NAMES].sort())
   })
 
-  it('makes the element for a route by loading its module', async () => {
+  it('makes the element for a route by loading its module', async function () {
+    // (every view's module, and so most of the app, loaded for the first time: slow under load)
+    this.timeout(10000)
     const tags: Record<string, string> = {}
     for (const name of ROUTE_NAMES) {
       const element = await views[name].load({ name } as Route)

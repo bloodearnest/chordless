@@ -63,7 +63,11 @@ describe('nav-menu', () => {
     await waitUntil(() =>
       menu.shadowRoot.querySelector('app-help')?.shadowRoot?.textContent.includes('Finding a song')
     )
-    expect(menu.shadowRoot.querySelector('app-modal[heading="Song Library"]').open).to.equal(true)
+    // (the menu opens it a frame after closing itself)
+    await waitUntil(
+      () => menu.shadowRoot.querySelector('app-modal[heading="Song Library"]').open,
+      'the help opens'
+    )
     menu.shadowRoot.querySelector('app-modal[heading="Song Library"]').close()
     provideRoute(null)
   })

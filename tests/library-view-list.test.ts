@@ -3,7 +3,8 @@
  * song of another database, and the small controls. (The song itself, once open, is in
  * library-view.test.ts.)
  */
-import { expect } from '@open-wc/testing'
+import { expect, waitUntil } from '@open-wc/testing'
+import type { LitElement } from 'lit'
 import type { AppHeader } from '../src/components/app-header.ts'
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import { SongVersionsChangedEvent } from '../src/components/song-versions.ts'
@@ -19,8 +20,7 @@ import {
   setCurrentSpace,
   setSpaceReadOnly,
 } from '../src/js/space.ts'
-import '../src/js/views/library-view.ts'
-import type { LibraryView } from '../src/js/views/library-view.ts'
+import { LibraryView } from '../src/js/views/library-view.ts'
 import { must } from './must.ts'
 import { deleteDatabase, suppressConsoleLogs, wait } from './test-helpers.ts'
 
@@ -42,8 +42,13 @@ describe('the library view', () => {
   let visited: Array<{ url: string; replace?: boolean }>
   let observers: Array<(entries: Array<Partial<IntersectionObserverEntry>>) => void>
   const RealObserver = window.IntersectionObserver
+  // The pause before a search goes in the URL, shortened: a wait for nothing to happen is a few
+  const realPause = LibraryView.searchPauseMs
+  const PAUSE = 20
+  const pastPause = () => wait(PAUSE * 4)
 
   beforeEach(async () => {
+    LibraryView.searchPauseMs = PAUSE
     visited = []
     observers = []
     setRouter({
@@ -69,6 +74,7 @@ describe('the library view', () => {
   })
 
   afterEach(async () => {
+    LibraryView.searchPauseMs = realPause
     view?.remove()
     outlet.remove()
     window.IntersectionObserver = RealObserver
@@ -90,9 +96,13 @@ describe('the library view', () => {
     view.restoredState = restoredState
     outlet.append(view)
     await view.updateComplete
-    for (let i = 0; i < 100 && view.querySelector('status-message[state="loading"]'); i++)
-      await wait(20)
-    await wait(100)
+    // The list (or why there is none), and the song if one is asked for, or the move away from it
+    const shown = () =>
+      visited.length > 0 ||
+      (view.querySelector('song-list, status-message:not([state="loading"])') &&
+        (!('songUuid' in route && route.songUuid) || view.querySelector('.song-content')))
+    await waitUntil(shown, 'the library shows what it was asked for', { timeout: 5000 })
+    await (view.querySelector('song-list') as LitElement | null)?.updateComplete
   }
   const searchBox = () => must(view.querySelector<HTMLInputElement>('#song-search'))
   const titles = () =>
@@ -116,10 +126,9 @@ describe('the library view', () => {
       searchBox().value = 'beta'
       searchBox().dispatchEvent(new Event('input'))
       await view.updateComplete
-      await wait(50)
-      expect(titles()).to.have.length(1)
+      await waitUntil(() => titles().length === 1, 'the list narrows')
       expect(visited).to.deep.equal([])
-      await wait(300)
+      await waitUntil(() => visited.length > 0, 'the search goes in the URL')
       expect(visited).to.deep.equal([{ url: '/songs?q=beta', replace: true }])
 
       // The route that comes back with it is its own echo: the box is left alone
@@ -143,8 +152,7 @@ describe('the library view', () => {
       searchBox().value = 'capo'
       searchBox().dispatchEvent(new Event('input'))
       await view.updateComplete
-      await wait(50)
-      expect(titles()).to.have.length(1)
+      await waitUntil(() => titles().length === 1, 'the list narrows')
       expect(titles()[0]).to.contain('Capo 2')
     })
 
@@ -155,12 +163,11 @@ describe('the library view', () => {
       await addChart(db, BETA, ADD)
       const dialog = must(view.querySelector('song-info-dialog'))
       dialog.dispatchEvent(new SongVersionsChangedEvent())
-      await wait(300)
-      expect(titles()).to.have.length(2)
+      await waitUntil(() => titles().length === 2, 'it looks again')
       expect(visited).to.deep.equal([])
 
       dialog.dispatchEvent(new SongVersionsChangedEvent(true))
-      await wait(100)
+      await waitUntil(() => visited.length > 0, 'it goes back to the list')
       expect(visited).to.deep.equal([{ url: '/songs', replace: true }])
     })
 
@@ -177,9 +184,8 @@ describe('the library view', () => {
       await sync.init()
       await addChart(sync, BETA, ADD)
       sync.db?.close()
-      await wait(400)
+      await waitUntil(() => titles().length === 2, 'the list shows what the sync saved')
 
-      expect(titles()).to.have.length(2)
       expect(searchBox().value).to.equal('song')
     })
 
@@ -189,7 +195,7 @@ describe('the library view', () => {
       expect(searchBox().value).to.equal('alpha')
       searchBox().value = ' alpha '
       searchBox().dispatchEvent(new Event('input'))
-      await wait(350)
+      await pastPause()
       expect(visited).to.deep.equal([])
     })
 
@@ -253,8 +259,7 @@ describe('the library view', () => {
       expect(view.querySelector('#library-song-meta-header')?.textContent).to.equal('80 BPM • 4/4')
       view.route = { name: 'songs' }
       await view.updateComplete
-      await wait(100)
-      expect(heading()).to.equal('Song Library')
+      await waitUntil(() => heading() === 'Song Library', 'the song is closed')
     })
 
     it('is left alone when the route names the same song again', async () => {
@@ -471,7 +476,7 @@ describe('the library view', () => {
       const song = await addChart(shared, BETA, ADD)
       await open({ name: 'songs', songUuid: song.uuid })
       view.querySelector<HTMLButtonElement>('#add-to-library')?.click()
-      await wait(200)
+      await waitUntil(() => visited.length > 0, 'the copy is opened')
       expect(visited).to.have.length(1)
       expect(visited[0].replace).to.equal(true)
       expect(visited[0].url).to.match(/^\/songs\/.+/)
@@ -507,7 +512,7 @@ describe('the library view', () => {
       searchBox().value = 'alpha'
       searchBox().dispatchEvent(new Event('input'))
       view.remove()
-      await wait(350)
+      await pastPause()
       expect(visited).to.deep.equal([])
     })
   })

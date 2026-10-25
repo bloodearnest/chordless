@@ -38,7 +38,7 @@ exercised). Other settings: `DRIVE_SEEDS` (`1-5`, `7`, `1-3,8`; default `1,2,3`)
 
 A failure names its mode and seed. The same seed makes the same random choices again; a real Drive
 does not repeat itself, so a history may not fail the same way twice. To see whether the in-memory
-fake fails on it too, put the seed in `SEEDS` of `tests/drive-sync-random.test.ts`.
+fake fails on it too, put the seed in `SEEDS` of `tests/random-histories.ts` (`tests/drive-sync-random*.test.ts` run them, a file to a mode).
 
 ## The test account and its credentials
 

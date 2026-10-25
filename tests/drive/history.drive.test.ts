@@ -18,7 +18,7 @@ const { describe, it, before } = window
  * A failure names its mode and seed. DRIVE_MODES=<mode> DRIVE_SEEDS=<seed> just test-drive makes
  * the same random choices again; Drive does not repeat itself, so the same history may not fail
  * the same way twice (the in-memory fake can be asked for the same seed to see whether it fails
- * there too: tests/drive-sync-random.test.ts).
+ * there too: SEEDS in tests/random-histories.ts).
  */
 
 const PREFIX = 'chordless-drive-test'
