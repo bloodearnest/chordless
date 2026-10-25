@@ -25,7 +25,7 @@ of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and
 
 | Job | Runs on | Recipe | Waits for |
 |---|---|---|---|
-| Lint | Linux | `just lint` (Biome, tsc, knip, wrangler, Terraform, actionlint, zizmor) | - |
+| Lint | Linux | `just lint` (Biome, tsc, knip, wrangler, Terraform, actionlint, zizmor, `just audit`) | - |
 | Node tests | Linux | `just test-node` | - |
 | Unit tests | Linux, Chromium | `just test-unit` | - |
 | Coverage | Linux | `just coverage-check`, on the two runs' reports | node, unit |
@@ -65,6 +65,11 @@ authors published (a fork's commit can be reached through the parent repository'
   and whose other audits catch template injection, broad permissions, credentials left in a checkout
   and cache poisoning.
 - Dependabot proposes new versions (new SHAs) weekly, a week after their release.
+
+The npm packages get the same care (`just audit`, `scripts/audit-deps.sh`): each must carry the
+registry's signature (and its provenance, where it publishes one), and no production dependency may
+have a known high or critical advisory. The dev tools' advisories are listed without failing: they
+never reach users, and one with no fix yet would otherwise block every change.
 
 To use a third-party action anyway: ask first, say what it does that a script cannot, pin it, add its
 repository to `patterns_allowed` in `infra/github/main.tf`, and `just lint-actions` must pass.
