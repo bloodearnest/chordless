@@ -42,3 +42,6 @@ tests/fixtures/private/
 
 # .dev.vars when it was production's (just dev-vars moves it here)
 .dev.vars.prod-backup
+
+# Terraform state access: an R2 token for the state bucket (infra/README.md)
+.r2-tfstate.env

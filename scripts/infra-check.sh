@@ -1,7 +1,9 @@
 #!/bin/bash
 # Checks on the Terraform stacks in infra/ (infra/README.md). Terraform is pinned in mise.toml.
 #   lint   formatting and validity: needs no credentials (`just lint` runs it)
-#   drift  the plan of each stack must say "No changes": needs credentials (`just deploy` runs it)
+#   drift  the plan of each stack must say "No changes": needs credentials (`just deploy` runs it,
+#          and CI's drift.yml nightly): the state's, in R2 (AWS_ACCESS_KEY_ID and
+#          AWS_SECRET_ACCESS_KEY, or locally the git-ignored .r2-tfstate.env), and each stack's own
 # Usage: scripts/infra-check.sh lint|drift
 set -uo pipefail
 cd "$(dirname "$0")/.." || exit 1
@@ -23,6 +25,16 @@ case "${1:-}" in
     done
     ;;
   drift)
+    if [ -z "${AWS_ACCESS_KEY_ID:-}" ] && [ -f .r2-tfstate.env ]; then
+      set -a
+      # shellcheck source=/dev/null
+      . ./.r2-tfstate.env
+      set +a
+    fi
+    if [ -z "${AWS_ACCESS_KEY_ID:-}" ] || [ -z "${AWS_SECRET_ACCESS_KEY:-}" ]; then
+      echo "The state is in R2: set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or write them in .r2-tfstate.env (infra/README.md)"
+      exit 1
+    fi
     # (INFRA_DRIFT_SKIP="cloudflare google-dev" leaves stacks out, for when you lack their credentials)
     for dir in infra/*/; do
       name=$(basename "$dir")
@@ -45,7 +57,7 @@ case "${1:-}" in
             export GITHUB_TOKEN
           fi;;
       esac
-      tf -chdir="$dir" init -backend=false -input=false >/dev/null || { failed=1; continue; }
+      tf -chdir="$dir" init -input=false >/dev/null || { failed=1; continue; }
       tf -chdir="$dir" plan -input=false -detailed-exitcode -no-color >/tmp/infra-plan-"$name".txt 2>&1
       case $? in
         0) echo "$name: no changes";;
