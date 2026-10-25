@@ -116,6 +116,15 @@ describe('song-card', () => {
       const none = await show({ song: song(), editMode: true })
       expect(must(none.shadowRoot?.querySelector<KeySelector>('key-selector')).value).to.equal('-')
     })
+
+    it('does not let the key button be pressed outside edit mode, so a tap goes to the card', async () => {
+      const card = await show({ song: song({ currentKey: 'E' }) })
+      const picker = must(card.shadowRoot?.querySelector<KeySelector>('key-selector'))
+      expect(picker.editMode).to.equal(false)
+      await picker.updateComplete
+      const button = must(picker.shadowRoot?.querySelector('.picker-button'))
+      expect(getComputedStyle(button).pointerEvents).to.equal('none')
+    })
   })
 
   describe('when it was last played', () => {

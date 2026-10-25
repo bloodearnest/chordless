@@ -570,7 +570,7 @@ export class SongCard extends LitElement {
           .value=${currentKey ?? '-'}
           .keys=${keys}
           .originalKey=${this.song?.originalKey ?? ''}
-          .editMode=${true}
+          .editMode=${this.editMode}
           @key-selector:change=${this._handleKeyEditChange}
         ></key-selector>
       </div>

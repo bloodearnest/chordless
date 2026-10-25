@@ -85,6 +85,8 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
     .picker-popover {
       margin: 0;
       inset: unset;
+      /* A host may be non-interactive (song-card's controls, outside edit mode); the popup is not */
+      pointer-events: auto;
       max-height: 70dvh;
       overflow-y: auto;
       padding: 0.5rem;
@@ -177,6 +179,11 @@ export abstract class OptionPicker<V extends string | number> extends LitElement
     )
     popover.style.top = `${top}px`
     popover.style.left = `${left}px`
+  }
+
+  override willUpdate(changed: Map<string, unknown>): void {
+    // Edit mode ended with the popup open: its owner may now be hidden, so don't leave it stranded
+    if (changed.has('editMode') && !this.editMode) this._popup.close()
   }
 
   override render() {
