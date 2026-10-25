@@ -13,6 +13,9 @@ import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
 
+/** The Worker's API, which only the app's own pages may call */
+const API_PATHS = /^\/(oauth|session|api)(\/|$)/
+
 export async function handleRequest(
   request: Request,
   env: Env,
@@ -24,15 +27,8 @@ export async function handleRequest(
   const url = new URL(request.url)
   const path = url.pathname
 
-  if (
-    (path.startsWith('/oauth/') ||
-      path.startsWith('/session/') ||
-      path === '/api/config' ||
-      path.startsWith('/api/share/') ||
-      path.startsWith('/api/space/') ||
-      path.startsWith('/api/spaces')) &&
-    isCrossOrigin(request, url)
-  ) {
+  // (the API only: a share link's page, /s/<id>, is opened from other sites)
+  if (API_PATHS.test(path) && isCrossOrigin(request, url)) {
     return jsonResponse({ error: 'Cross-origin requests are not allowed' }, 403)
   }
 

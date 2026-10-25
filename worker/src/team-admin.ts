@@ -27,6 +27,7 @@ import {
 import type { BlobData } from './blob.ts'
 import { answering, jsonResponse, Refusal, readJson } from './http.ts'
 import type { Identity } from './identity.ts'
+import { refusal } from './team-api.ts'
 import type { TeamSpaceApi } from './team-state.ts'
 
 /** What these routes need from the Worker */
@@ -44,18 +45,6 @@ export interface AdminContext {
   openBlob(blob: string): Promise<BlobData>
   /** A new id for a space */
   newSpaceId(): string
-}
-
-/** Whether the admin routes serve this request (the rest is the storage API's) */
-export function isAdminRoute(method: string, rest: string): boolean {
-  return (
-    rest === '/invites' ||
-    rest.startsWith('/invites/') ||
-    rest.startsWith('/members/') ||
-    rest === '/leave' ||
-    rest === '/credential' ||
-    (method === 'DELETE' && rest === '/')
-  )
 }
 
 function asRole(value: unknown): MemberRole {
@@ -85,7 +74,7 @@ async function checkSharing(ctx: AdminContext, identity: Identity, blob: string,
 export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<Response> {
   return answering('Team space admin', async () => {
     const identity = await ctx.identify(request)
-    if (!identity) return jsonResponse({ error: 'Sign in first' }, 401)
+    if (!identity) return refusal('unauthenticated')
     const body = await readJson(request)
     const { blob, rootRef } = body
     const name = typeof body.name === 'string' ? body.name.trim() : ''
@@ -109,7 +98,7 @@ export function handleCreateSpace(request: Request, ctx: AdminContext): Promise<
 export function handleJoin(request: Request, ctx: AdminContext): Promise<Response> {
   return answering('Team space admin', async () => {
     const identity = await ctx.identify(request)
-    if (!identity) return jsonResponse({ error: 'Sign in first' }, 401)
+    if (!identity) return refusal('unauthenticated')
     const { spaceId, code } = await readJson(request)
     if (typeof spaceId !== 'string' || typeof code !== 'string' || !SPACE_ID.test(spaceId)) {
       return jsonResponse({ error: 'This invite is not valid' }, 404)
@@ -131,31 +120,42 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 /** What a space id looks like (they are made here, so anything else is not one) */
 export const SPACE_ID = /^[A-Za-z0-9_-]{8,64}$/
 
-/** The admin routes of one space, for someone whose role in it is `role` (checked by the caller) */
-export function handleSpaceAdmin(
-  request: Request,
-  { spaceId, rest }: { spaceId: string; rest: string },
-  ctx: AdminContext,
-  who: { identity: Identity; role: TeamRole }
-): Promise<Response> {
-  return answering('Team space admin', async () => {
-    const room = ctx.room(spaceId)
-    const { identity, role } = who
-    const method = request.method
-    const needs = (needed: TeamRole) => {
-      if (!atLeast(role, needed)) throw new Refusal(403, `This needs the ${needed} role`)
-    }
-    /** An admin may act on those below them; the owner on everyone */
-    const above = (target: TeamRole) => {
-      if (!outranks(role, target)) throw new Refusal(403, 'Only a higher role can do that')
-    }
+/** What an admin route is given: the request, the space, who is asking, and the path's parts */
+interface AdminCall {
+  request: Request
+  ctx: AdminContext
+  room: TeamSpaceApi
+  identity: Identity
+  role: TeamRole
+  /** What the route's path captured */
+  params: string[]
+  /** Refuse unless the person outranks this role: an admin may act on those below them; the owner on everyone */
+  above(target: TeamRole): void
+}
 
-    if (rest === '/invites' && method === 'GET') {
-      needs('admin')
-      return jsonResponse(await room.invites())
-    }
-    if (rest === '/invites' && method === 'POST') {
-      needs('admin')
+interface AdminRoute {
+  methods: string[]
+  /** The rest of the path, after /api/space/<id> */
+  path: RegExp
+  /** The least role it needs (any member, if none) */
+  needs?: TeamRole
+  run(call: AdminCall): Promise<Response>
+}
+
+const done = () => new Response(null, { status: 204 })
+
+const ADMIN_ROUTES: AdminRoute[] = [
+  {
+    methods: ['GET'],
+    path: /^\/invites$/,
+    needs: 'admin',
+    run: async ({ room }) => jsonResponse(await room.invites()),
+  },
+  {
+    methods: ['POST'],
+    path: /^\/invites$/,
+    needs: 'admin',
+    async run({ request, room, identity, above }) {
       const body = await readJson(request)
       const target = asRole(body.role)
       above(target)
@@ -164,56 +164,98 @@ export function handleSpaceAdmin(
         throw new Refusal(400, 'An invite is for an email address')
       }
       return jsonResponse(await room.createInvite(target, email, identity))
-    }
-    const invite = /^\/invites\/([0-9a-f]+)$/.exec(rest)
-    if (invite && method === 'DELETE') {
-      needs('admin')
-      return (await room.revokeInvite(invite[1]))
-        ? new Response(null, { status: 204 })
-        : jsonResponse({ error: 'No such invite' }, 404)
-    }
-
-    const member = /^\/members\/([^/]+)$/.exec(rest)
-    if (member && (method === 'PUT' || method === 'DELETE')) {
-      needs('admin')
-      const email = decodeURIComponent(member[1]).toLowerCase()
+    },
+  },
+  {
+    methods: ['DELETE'],
+    path: /^\/invites\/([0-9a-f]+)$/,
+    needs: 'admin',
+    run: async ({ room, params: [id] }) =>
+      (await room.revokeInvite(id)) ? done() : jsonResponse({ error: 'No such invite' }, 404),
+  },
+  {
+    methods: ['PUT', 'DELETE'],
+    path: /^\/members\/([^/]+)$/,
+    needs: 'admin',
+    async run({ request, room, params: [who], above }) {
+      const email = decodeURIComponent(who).toLowerCase()
       const current = (await room.members()).find(each => each.email === email)
       if (!current) return jsonResponse({ error: 'No such member' }, 404)
       above(current.role)
-      if (method === 'PUT') {
+      if (request.method === 'PUT') {
         const target = asRole((await readJson(request)).role)
         above(target)
         await room.setRoleByEmail(email, target)
       } else {
         await room.removeByEmail(email)
       }
-      return new Response(null, { status: 204 })
-    }
-
-    if (rest === '/leave' && method === 'POST') {
-      if (role === 'owner') {
-        throw new Refusal(400, 'The owner cannot leave: end sharing instead')
-      }
+      return done()
+    },
+  },
+  {
+    methods: ['POST'],
+    path: /^\/leave$/,
+    async run({ room, identity, role }) {
+      if (role === 'owner') throw new Refusal(400, 'The owner cannot leave: end sharing instead')
       await room.removeMember(identity)
-      return new Response(null, { status: 204 })
-    }
-
-    if (rest === '/credential' && method === 'PUT') {
-      needs('owner')
+      return done()
+    },
+  },
+  {
+    methods: ['PUT'],
+    path: /^\/credential$/,
+    needs: 'owner',
+    async run({ request, ctx, room, identity }) {
       const { blob } = await readJson(request)
       const info = await room.info()
       if (typeof blob !== 'string' || !info) throw new Refusal(400, 'A blob is needed')
       await checkSharing(ctx, identity, blob, info.rootRef)
       await room.setOwnerBlob(blob)
-      return new Response(null, { status: 204 })
-    }
-
-    if (rest === '/' && method === 'DELETE') {
-      needs('owner')
+      return done()
+    },
+  },
+  {
+    methods: ['DELETE'],
+    path: /^\/$/,
+    needs: 'owner',
+    async run({ room }) {
       await room.destroy()
-      return new Response(null, { status: 204 })
-    }
+      return done()
+    },
+  },
+]
 
+/** Whether the admin routes serve this path (the rest is the storage API's) */
+export function isAdminRoute(rest: string): boolean {
+  return ADMIN_ROUTES.some(route => route.path.test(rest))
+}
+
+/** The admin routes of one space, for someone whose role in it is `role` (checked by the caller) */
+export function handleSpaceAdmin(
+  request: Request,
+  { spaceId, rest }: { spaceId: string; rest: string },
+  ctx: AdminContext,
+  { identity, role }: { identity: Identity; role: TeamRole }
+): Promise<Response> {
+  return answering('Team space admin', async () => {
+    for (const route of ADMIN_ROUTES) {
+      const match = route.path.exec(rest)
+      if (!match || !route.methods.includes(request.method)) continue
+      if (route.needs && !atLeast(role, route.needs)) {
+        throw new Refusal(403, `This needs the ${route.needs} role`)
+      }
+      return route.run({
+        request,
+        ctx,
+        room: ctx.room(spaceId),
+        identity,
+        role,
+        params: match.slice(1),
+        above(target) {
+          if (!outranks(role, target)) throw new Refusal(403, 'Only a higher role can do that')
+        },
+      })
+    }
     return jsonResponse({ error: 'Not found' }, 404)
   })
 }
