@@ -1,4 +1,4 @@
-import { expect, fixture, html } from '@open-wc/testing'
+import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import { SetlistShare } from '../src/components/setlist-share.ts'
 import type { Setlist } from '../src/js/data-types.ts'
 import { songListHtml, songListText, ukDate } from '../src/js/setlist/song-list-text.ts'
@@ -109,7 +109,7 @@ describe('the song list to paste', () => {
         rich = await (await items[0].getType('text/html')).text()
       }
       button(el)?.click()
-      await new Promise(resolve => setTimeout(resolve, 20))
+      await waitUntil(() => plain !== '' && rich !== '', 'the copy')
       await el.updateComplete
       expect(plain).to.contain('Worship Leader: Sam')
       expect(plain).to.contain('One (22025)\nTwo')
