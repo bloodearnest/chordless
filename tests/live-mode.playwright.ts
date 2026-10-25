@@ -1,10 +1,10 @@
 // Live mode: Go live from a setlist's header, and what stays on across pages
 import { expect, seedSetlist, test } from './fixtures.ts'
 
-/** A wake lock and a fullscreen that count what is asked of them */
+/** A wake lock that counts what is asked of it */
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
-    const log = { locks: 0, released: 0, fullscreen: 0, exits: 0 }
+    const log = { locks: 0, released: 0 }
     ;(window as unknown as { liveLog: typeof log }).liveLog = log
     Object.defineProperty(navigator, 'wakeLock', {
       configurable: true,
@@ -20,29 +20,12 @@ test.beforeEach(async ({ page }) => {
         },
       },
     })
-    let element: Element | null = null
-    Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true })
-    Object.defineProperty(document, 'fullscreenElement', { configurable: true, get: () => element })
-    Object.defineProperty(document, 'exitFullscreen', {
-      configurable: true,
-      value: async () => {
-        log.exits++
-        element = null
-      },
-    })
-    Object.defineProperty(Element.prototype, 'requestFullscreen', {
-      configurable: true,
-      value: async function (this: Element) {
-        log.fullscreen++
-        element = this
-      },
-    })
   })
 })
 
 const log = page => page.evaluate(() => (window as unknown as { liveLog: object }).liveLog)
 
-test('Go live from the header: live in fullscreen, kept across pages, and left from the overview', async ({
+test('Go live from the header: live, kept across pages, and left from the overview', async ({
   page,
 }) => {
   await seedSetlist(page)
@@ -54,7 +37,6 @@ test('Go live from the header: live in fullscreen, kept across pages, and left f
 
   await button.click()
   await expect(button).toHaveAttribute('aria-pressed', 'true')
-  expect(await log(page)).toMatchObject({ fullscreen: 1 })
   expect(await page.evaluate(() => localStorage.getItem('live_state'))).toContain(
     '/setlist/seeded-setlist'
   )
@@ -71,7 +53,7 @@ test('Go live from the header: live in fullscreen, kept across pages, and left f
   expect(await log(page)).toMatchObject({ released: 0 })
   expect(await page.evaluate(() => localStorage.getItem('live_state'))).not.toBeNull()
 
-  // Back on the overview it is still red, and pressing it leaves: fullscreen goes, but the open
+  // Back on the overview it is still red, and pressing it leaves, but the open
   // setlist still holds the screen awake
   await page.goBack()
   await page.goBack()
@@ -79,31 +61,18 @@ test('Go live from the header: live in fullscreen, kept across pages, and left f
   await expect(button).toHaveAttribute('aria-pressed', 'true')
   await button.click()
   await expect(button).toHaveAttribute('aria-pressed', 'false')
-  await expect.poll(() => log(page)).toMatchObject({ released: 0, exits: 1 })
+  await expect.poll(() => log(page)).toMatchObject({ released: 0 })
   expect(await page.evaluate(() => localStorage.getItem('live_state'))).toBeNull()
 })
 
-test('still live after the page is reloaded: the screen is held and fullscreen asked for again', async ({
-  page,
-}) => {
+test('still live after the page is reloaded: the screen is held again', async ({ page }) => {
   await seedSetlist(page)
   await page.goto('/setlist/seeded-setlist')
   await page.locator('#live-button').click()
   await page.reload()
   await expect(page.locator('#live-button')).toHaveAttribute('aria-pressed', 'true')
   // (a page's log starts again when it loads)
-  await expect.poll(() => log(page)).toMatchObject({ locks: 1, fullscreen: 1 })
-})
-
-test('with fullscreen turned off in Preferences, going live does not ask for it', async ({
-  page,
-}) => {
-  await seedSetlist(page)
-  await page.evaluate(() => localStorage.setItem('fullscreen_while_live', 'false'))
-  await page.goto('/setlist/seeded-setlist')
-  await page.locator('#live-button').click()
-  await expect(page.locator('#live-button')).toHaveAttribute('aria-pressed', 'true')
-  expect(await log(page)).toMatchObject({ fullscreen: 0 })
+  await expect.poll(() => log(page)).toMatchObject({ locks: 1 })
 })
 
 test('taking over from another setlist', async ({ page }) => {

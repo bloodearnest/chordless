@@ -1,11 +1,6 @@
 import { expect, fixture, html } from '@open-wc/testing'
 import type { AppPreferences } from '../src/components/app-preferences.ts'
-import { FullscreenController } from '../src/js/fullscreen.ts'
-import {
-  FullscreenPreferenceEvent,
-  KeepAwakeLimitEvent,
-  KeepAwakePreferenceEvent,
-} from '../src/js/preferences.ts'
+import { KeepAwakeLimitEvent, KeepAwakePreferenceEvent } from '../src/js/preferences.ts'
 import { WakeLockController, WakeLockStateEvent, wakeLock } from '../src/js/wake-lock.ts'
 import { suppressConsoleLogs } from './test-helpers.ts'
 import '../src/components/app-preferences.ts'
@@ -23,7 +18,6 @@ const KEYS = [
   'enabled_capo',
   'keep_screen_awake',
   'keep_awake_minutes',
-  'fullscreen_while_live',
 ]
 
 describe('app-preferences', () => {
@@ -187,26 +181,6 @@ describe('app-preferences', () => {
       expect(el._powerStatus()).to.contain('On battery')
       pretend(wakeLock, 'onMains', null)
       expect(el._powerStatus()).to.contain("can't say")
-    })
-  })
-
-  describe('fullscreen while live', () => {
-    it('is a toggle, on at first, kept when changed, and following changes made elsewhere', async () => {
-      pretend(FullscreenController, 'supported', true)
-      const el = await show()
-      const toggle = control<HTMLInputElement>(el, '#toggle-fullscreen')
-      expect(toggle.checked).to.equal(true)
-      toggle.click()
-      expect(localStorage.getItem('fullscreen_while_live')).to.equal('false')
-      expect(el.fullscreen).to.equal(false)
-      window.dispatchEvent(new FullscreenPreferenceEvent(true))
-      expect(el.fullscreen).to.equal(true)
-    })
-
-    it('is not offered where the browser cannot do it', async () => {
-      pretend(FullscreenController, 'supported', false)
-      const el = await show()
-      expect(control(el, '#toggle-fullscreen')).to.equal(null)
     })
   })
 

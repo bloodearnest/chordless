@@ -8,7 +8,6 @@ import { AppRouter, RouteChangeEvent } from './app-router.ts'
 import { appUpdate } from './app-update.ts'
 import { checkFirstTimeAuth } from './first-time-auth.ts'
 import { maybeShowFirstUseSetup } from './first-use.ts'
-import { startFullscreen } from './fullscreen.ts'
 import './install.ts'
 import { listenForLaunches } from './launch.ts'
 import { startMediaPlayer } from './media-player-loader.ts'
@@ -46,8 +45,6 @@ void maybeShowFirstUseSetup()
 if ('requestIdleCallback' in window)
   requestIdleCallback(() => startMediaPlayer(), { timeout: 3000 })
 else setTimeout(startMediaPlayer, 1000)
-// Fullscreen while live
-startFullscreen()
 // Setlists shared by link are kept only until they end (their songs stay)
 import('./share-receiver.ts').then(({ tidySharedWithMe }) => tidySharedWithMe())
 // Whether the user can write to the space's Drive folder (a sync asks too)

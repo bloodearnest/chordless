@@ -595,7 +595,7 @@ export class SetlistPage {
     button.title = label
   }
 
-  /** Go live from the header's button, or leave, in the tap: that is the gesture fullscreen needs */
+  /** Go live from the header's button, or leave */
   _setupLive() {
     const button = this.root.querySelector<HTMLElement>('#live-button')
     if (!button) return

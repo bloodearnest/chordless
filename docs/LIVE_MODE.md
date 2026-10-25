@@ -1,7 +1,6 @@
 # Live mode
 
-**Status: built.** The state (`js/live.ts`), the wake lock following it, fullscreen
-(`js/fullscreen.ts`), the Go live button in the setlist header and the Preferences toggle. Not yet tried on a real tablet.
+**Status: built.** The state (`js/live.ts`), the wake lock following it, the Go live button in the setlist header and the Preferences toggle. Not yet tried on a real tablet.
 
 Live mode is an explicit "we are performing from this setlist" state. It is the place for
 anything that should last for the length of a service, not for the length of one page view.
@@ -13,13 +12,11 @@ performing: so the wake lock does not need live mode (below), and live mode adds
 
 - **Wake lock** needs no permission. The browser drops it when the page is hidden, so it is
   asked for again when the page is visible.
-- **Fullscreen** (`requestFullscreen()`) needs a user gesture every time, is not remembered
-  between launches, and is usually left when the user switches apps. iPhone Safari only
-  supports it for `<video>`; iPad, Android and desktop support it for any element.
+- **Fullscreen** (`requestFullscreen()`) was tried and dropped: Android shows a popup that has
+  to be swiped away, iOS ignores it, and on desktop it is rarely wanted.
 - **Manifest `display`** applies to the whole installed app and can't vary by view.
   `display_override: ["fullscreen", "standalone"]` would hide the status bar on Android only,
-  for every page. We don't use it: live mode asks for fullscreen from the page instead, which
-  covers Android, iPad and desktop, and only while live.
+  for every page. We don't use it.
 - **Do Not Disturb** can't be switched on from a page. The most we can do is document the
   iOS Shortcuts / Android routines recipe for "when Chordless opens".
 
@@ -27,14 +24,13 @@ performing: so the wake lock does not need live mode (below), and live mode adds
 
 ### What is on when
 
-| | Screen awake | Fullscreen |
-| --- | --- | --- |
-| A setlist (or share) is open | yes, if "Keep the screen awake" is on (the default) | no |
-| Live | yes, **on every page**, if "Keep the screen awake" is on | yes, if "Fullscreen while live" is on (the default) |
+| | Screen awake |
+| --- | --- |
+| A setlist (or share) is open | yes, if "Keep the screen awake" is on (the default) |
+| Live | yes, **on every page**, if "Keep the screen awake" is on |
 
 So the screen is wanted when a setlist is open **or** the device is live. Live does not
-override the preference: someone who turned keeping awake off (to spare the battery) gets
-fullscreen only.
+override the preference: someone who turned keeping awake off (to spare the battery) stays off.
 
 ### State
 
@@ -58,7 +54,7 @@ interface LiveState { url: string; title: string; startedAt: number }
 ### Entering and leaving
 
 - The setlist's header has a round **Go live** button (a broadcast icon, next to share), on the
-  overview, for a setlist or a share. Pressing it is the gesture fullscreen needs. It is quiet
+  overview, for a setlist or a share. It is quiet
   when off and red when this setlist is live, where pressing it leaves live; when another
   setlist is live it offers to take over.
 - The user leaves explicitly (**Leave live**). Nothing ends it for them: not a route change,
@@ -75,11 +71,10 @@ short list, wired by hand.
 | Service | Needs a gesture | Notes |
 | --- | --- | --- |
 | Wake lock, on every page | no | The existing `WakeLockController`: the lock is wanted when a setlist is open or live. Re-acquired when the page is visible (`visibilitychange`). |
-| Fullscreen | yes | Wanted but not active (after switching apps, or Esc) is re-requested on the next tap, key or swipe, once per entry: if the user left it themselves, don't fight them. Hidden where `document.fullscreenEnabled` is false. |
 | Sync (future) | no | A WebSocket session per live team setlist ([LIVE_SYNC.md](LIVE_SYNC.md)): the leader is the setlist's `ownerId`; a preference turns it off. |
 
 Services run while live **and** the page is visible, on every page, not just the live
-setlist: searching the library mid-service shouldn't drop fullscreen or let the screen sleep.
+setlist: searching the library mid-service shouldn't let the screen sleep.
 
 ### Idle expiry
 
@@ -87,8 +82,7 @@ The wake lock's idle limit (`keepAwakeLimitMs`, default an hour; unlimited on ma
 the Battery Status API says so) stays where it is and applies to the lock whether it is wanted
 by an open setlist or by live mode. After the limit with no touch, key press or scroll the lock
 is let go (state `expired`) and the next touch takes it again. The live state is kept: a tablet
-left on a stand overnight goes dark, and is still live when someone picks it up. Fullscreen has
-no timer.
+left on a stand overnight goes dark, and is still live when someone picks it up.
 
 ### Edit mode
 
@@ -103,7 +97,6 @@ on the overview in or out of edit mode): see "be permissive in the moment" in
 In the existing wake lock section, which becomes "Screen and live mode":
 
 - Keep the screen awake (today's toggle; while a setlist is open, and while live).
-- Fullscreen while live (new, **on by default**; shown only where fullscreen is supported).
 - The idle limit (today's "Keep awake limit").
 
 "Keep awake now" goes: **Go live** replaces it.
@@ -114,22 +107,15 @@ In the existing wake lock section, which becomes "Screen and live mode":
 - `WakeLockController`: `setManual()` is gone; `#wanted()` also asks whether the device is live
   (and a page opened while live takes the lock at once). `hold()` and `letGo()` stay, for the
   open setlist.
-- `js/fullscreen.ts`: asked for in the tap that goes live (the header button's handler runs
-  synchronously, so the browser sees the gesture), again on the next gesture after a refusal or
-  coming back to the page, never after the user left it themselves. Started from `app.ts`.
 - The button (`#live-button`) is in `setlistTemplate`, with the share button; `SetlistPage`
   shows it on the overview only, does the going and leaving, and keeps its look and label
   (`aria-pressed`, red when live) current.
-- `app-preferences.ts`: the "Screen and live mode" panel has the Fullscreen while live toggle;
-  "Keep awake now" is gone.
+- `app-preferences.ts`: "Keep awake now" is gone.
 - `SetlistView` and `ShareView` share `SetlistPageHost` (built), so the setlist lifecycle is
   in one place.
 
 ## Open questions
 
-- **Fullscreen on a ChromeOS tablet with two apps side by side** (Chordless and a pedals app):
-  does the request keep the split, or take over the screen? Not known; it is on by default so
-  it can be tried, and can be turned off in Preferences.
 - What happens when a share expires while live (the plan: a toast, and leave live).
 - Whether going live should also be reachable from a song (the header there is crowded).
 - Nothing shows that the device is live on other pages (the library, Preferences), so a stale

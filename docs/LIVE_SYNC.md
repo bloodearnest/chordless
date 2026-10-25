@@ -2,7 +2,7 @@
 
 When a leader changes a live setlist, the people following it see the change at once, not after
 Drive's 3 to 6 seconds and the 60 second tick. **Status: designed, not built (2026-10-24).** Live
-mode itself (the device-local record, wake lock, fullscreen) is in [LIVE_MODE.md](LIVE_MODE.md); the
+mode itself (the device-local record, wake lock) is in [LIVE_MODE.md](LIVE_MODE.md); the
 sync that this speeds up is in [SYNC_ARCHITECTURE.md](SYNC_ARCHITECTURE.md); spaces and roles are in
 [SPACES.md](SPACES.md).
 
