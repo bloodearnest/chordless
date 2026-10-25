@@ -13,7 +13,7 @@ inputs:
     description: Install the npm packages ("true" or "false")
     default: "true"
   browser:
-    description: The Playwright browser (chromium, webkit, chrome), or none
+    description: The Playwright browser (chromium, webkit, chrome, msedge), or none
     default: none
 
 outputs:

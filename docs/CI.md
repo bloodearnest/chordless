@@ -31,7 +31,7 @@ of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and
 | Coverage | Linux | `just coverage-check`, on the two runs' reports | node, unit |
 | End to end | Linux, Chromium | `just test-e2e chromium` | - |
 | End to end | macOS, WebKit | `just test-e2e webkit` | - |
-| End to end | Windows, Chrome | `just test-e2e chrome` | - |
+| End to end | Windows, Edge | `just test-e2e msedge` | - |
 | Terraform | Linux | `just lint-infra` | only when `infra/` changed |
 | `ci-ok` | | every job above passed or was skipped | all |
 

@@ -47,7 +47,7 @@ lint-actions:
     scripts/lint-actions.sh
 
 # What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
-# a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|chrome`
+# a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|msedge`
 ci:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -135,8 +135,8 @@ test-browser-headless *args:
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
     {{ if args == "" { "PLAYWRIGHT_JSON_OUTPUT_NAME=.stats/e2e.json npx playwright test --reporter=list,json" } else { "npx playwright test " + args } }}
 
-# Run the Playwright tests in one browser, chromium, webkit (Safari's engine) or chrome (Google's
-# own, as installed), as CI does: just test-e2e webkit tests/app.playwright.ts
+# Run the Playwright tests in one browser, chromium, webkit (Safari's engine), or chrome or msedge
+# (Google's or Microsoft's own, as installed), as CI does: just test-e2e webkit tests/app.playwright.ts
 test-e2e browser *args:
     CHORDLESS_BROWSER={{browser}} npx playwright test {{args}}
 

@@ -258,7 +258,7 @@ storage/sync
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
 ci/cd (docs/CI.md)
-- the macOS/WebKit and Windows/Chrome end-to-end jobs: make them pass, then required (`e2e` in
+- the macOS/WebKit and Windows/Edge end-to-end jobs: make them pass, then required (`e2e` in
   ci-ok's needs, no continue-on-error), and fold e2e-linux into the same matrix (it is apart only
   because a matrix has one result for ci-ok, and Linux's is required now)
 - Terraform state of every stack in R2 (each stack's `backend "s3"`, `init -migrate-state`), then the
@@ -284,7 +284,7 @@ tests
    docs/test-catches.jsonl. Run it with --repeat-each under load to find the cause
  - coverage of the end-to-end tests: `just coverage` merges the node and browser unit suites only,
    and neither the floor nor docs/stats.jsonl has any for e2e. Playwright can collect V8 coverage
-   from Chromium pages (page.coverage; not WebKit, nor CI's Windows Chrome job), to be turned into
+   from Chromium-based browsers (page.coverage; not WebKit), to be turned into
    lcov (v8-to-istanbul, a new dependency, or a script of our own) and merged by scripts/coverage.ts
    like the other two, from CI's Linux e2e job as an artifact. Mind that e2e coverage varies with
    timing more than the unit suites' (the floor would need a run or two that agree to lower it)
