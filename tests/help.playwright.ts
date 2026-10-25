@@ -30,7 +30,14 @@ test.describe('Help', () => {
       expect(sources.length).toBeGreaterThan(5)
       for (const src of sources)
         expect(src?.endsWith('-dark.png'), src ?? '').toBe(scheme === 'dark')
-      // Each one was found (a missing one is hidden)
+      // Each one was found (a missing one is hidden): once they have all finished loading
+      await expect
+        .poll(() =>
+          pictures.evaluateAll(
+            images => images.filter(image => !(image as HTMLImageElement).complete).length
+          )
+        )
+        .toBe(0)
       expect(
         await pictures.evaluateAll(
           images => images.filter(image => (image as HTMLImageElement).naturalWidth === 0).length

@@ -58,14 +58,23 @@ export { expect }
 
 /**
  * Open the app at path, ready to use: wait for the service worker to take
- * control (it routes the app's URLs), and reload, because the app reloads
- * itself when that first happens, which could otherwise land mid-test.
+ * control (it routes the app's URLs). Where the worker cannot claim the page,
+ * the app reloads itself once (public/boot.js), and this waits for that too,
+ * so it cannot land mid-test.
  */
 export async function openApp(page, path = '/') {
   await page.goto(path)
   await waitForServiceWorker(page)
-  await page.reload()
 }
+
+/** Whether the page is the app, set up by openApp already: so seeding need not open it again */
+const appIsOpen = page =>
+  /^https?:/.test(page.url()) &&
+  page
+    .evaluate(
+      () => navigator.serviceWorker.controller !== null && !sessionStorage.getItem('sw-first-load')
+    )
+    .catch(() => false)
 
 /**
  * Wait for the first visit to settle: the service worker controls the page, and the page
@@ -78,12 +87,11 @@ export async function waitForServiceWorker(page) {
 }
 
 /**
- * Open the app, so it sets up its space and database, then add a test
- * song (Info Test Song, in G: [G]Amazing [C]grace), and optionally a setlist
- * containing it.
+ * Open the app (unless it is open already), so it sets up its space and database, then add a
+ * test song (Info Test Song, in G: [G]Amazing [C]grace), and optionally a setlist containing it.
  */
 export async function seedSong(page, { setlistId = null }: { setlistId?: string | null } = {}) {
-  await openApp(page, '/songs')
+  if (!(await appIsOpen(page))) await openApp(page, '/songs')
   const chordpro = {
     id: 'chordpro-info-test',
     content: '{title: Info Test Song}\n{key: G}\n\n[G]Amazing [C]grace',
@@ -134,11 +142,11 @@ export const SETLIST_SONGS = [
 ]
 
 /**
- * Open the app and add the three SETLIST_SONGS, and a setlist of them in that
- * order, each in its own key. Returns the setlist's URL.
+ * Open the app (unless it is open already) and add the three SETLIST_SONGS, and a setlist of
+ * them in that order, each in its own key. Returns the setlist's URL.
  */
 export async function seedSetlist(page, { setlistId = 'seeded-setlist' } = {}) {
-  await openApp(page, '/songs')
+  if (!(await appIsOpen(page))) await openApp(page, '/songs')
   const chordpros: ChordProRecord[] = []
   const songs: SongInput[] = []
   SETLIST_SONGS.forEach((song, index) => {
