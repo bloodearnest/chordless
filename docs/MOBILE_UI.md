@@ -9,8 +9,7 @@ title and a ▼ toggle. Row 2 holds the controls and stays hidden until the togg
 setlist page row 2 is up to six items: Go live, differs, share, the key/capo/BPM display (which opens
 the song settings popover), edit and info.
 
-The user does not like hiding them behind a toggle. The header is not sticky, so it scrolls away with
-the page, and the space it takes only costs anything at the top.
+The user does not like hiding them behind a toggle. But the header is sticky, so we do need to minimise the space it takes up by reducing whitespace
 
 ## The mobile use case
 
@@ -38,6 +37,10 @@ BPM) matters less there, and live mode can take more of the controls out of the 
   mode is already the guard against accidents, which is the reason to move edit and share while live.
   Not live, the full row shows. See [LIVE_MODE.md](LIVE_MODE.md): the header's Go live button is the
   only live indicator.
+
+### 3. Reduce vertical whitespace in header.
+
+- It's too much atm.
 
 ## Open questions
 
