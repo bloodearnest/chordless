@@ -81,7 +81,7 @@ setlist, not song, content. A shape check is the guard; tests assert that a fram
 - **Auth: a ticket.** A browser cannot set `Authorization` on `new WebSocket`, and the Google ID
   token must not go in a URL (they get logged). The client first `POST`s
   `/api/space/<id>/live/ticket` with its bearer token, passing the normal check
-  (`createTeamContext().access()`, before any object is touched: SECURITY.md), and gets a signed
+  (in `team-routes.ts`, before any object is touched: SECURITY.md), and gets a signed
   ticket for about 30 s, scoped to the space, the setlist, the identity and the role. It connects
   with `?ticket=`. The ticket is an HMAC (a Worker secret), so nothing is stored; it is not
   single-use, because its scope and lifetime are tiny. The role is read at connect and kept in the

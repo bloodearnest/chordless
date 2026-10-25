@@ -4,7 +4,12 @@
  * token, so a test chooses who is asking.
  */
 import type { TeamRole } from '../src/js/team-roles.ts'
-import { handleTeamRequest, type TeamContext, teamSpacePath } from '../worker/src/team-api.ts'
+import {
+  handleTeamRequest,
+  refusal,
+  type TeamContext,
+  teamSpacePath,
+} from '../worker/src/team-api.ts'
 import { MemoryStorage } from './memory-storage.ts'
 
 export const ORIGIN = 'https://chordless.test'
@@ -30,11 +35,6 @@ export async function makeTeamRig(): Promise<TeamRig> {
   const rootOf = (id: string) => spaces.find(space => space.id === id)?.root
 
   const context: TeamContext = {
-    async access(request) {
-      const token = request.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
-      const role = roles.get(token)
-      return role === undefined ? 'unauthenticated' : role === 'none' ? 'not-a-member' : role
-    },
     async space(id) {
       const root = rootOf(id)
       return root ? storage.space(root) : null
@@ -60,7 +60,12 @@ export async function makeTeamRig(): Promise<TeamRig> {
     const request = new Request(input, init)
     const path = teamSpacePath(new URL(request.url).pathname)
     if (!path) return new Response('Not found', { status: 404 })
-    return handleTeamRequest(request, path, context)
+    // (who is asking is settled first, as team-routes.ts does it: here, by the token alone)
+    const token = request.headers.get('Authorization')?.replace('Bearer ', '') ?? ''
+    const role = roles.get(token)
+    if (role === undefined) return refusal('unauthenticated')
+    if (role === 'none') return refusal('not-a-member')
+    return handleTeamRequest(request, path, context, role)
   }) as typeof fetch
 
   return { storage, spaces, roles, context, fetch: fetchTeam }

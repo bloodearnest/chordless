@@ -1,18 +1,16 @@
 /**
- * The team space API's context (team-api.ts) as the Worker has it: who is asking (the identity
- * providers), their role (the space's Durable Object), the space's Drive (the owner's access token,
- * team-drive.ts) with the refs it shows noted (team-refs.ts), and what is in the space's tree.
- *
- * The ID token is checked before any Durable Object is touched, so only signed-in accounts can
- * ask for one; a stranger and a space that is not there get the same answer (docs/SECURITY.md,
- * "Probing for team spaces").
+ * The team space API's context (team-api.ts) as the Worker has it: the space's Drive (the owner's
+ * access token, team-drive.ts) with the refs it shows noted (team-refs.ts), and what is in the
+ * space's tree; and, for making and joining spaces and looking after their people, who is asking
+ * (the identity providers) and the space's Durable Object. Who is asking, and their role, is
+ * settled in team-routes.ts before either is used.
  */
 import { decryptBlob } from './blob.ts'
 import type { Env } from './env.ts'
 import { type GoogleApi, realGoogle } from './google-auth.ts'
 import { authenticate, googleProvider, type IdentityProvider } from './identity.ts'
 import type { AdminContext } from './team-admin.ts'
-import type { Access, TeamContext } from './team-api.ts'
+import type { TeamContext } from './team-api.ts'
 import { ownerAccessToken, teamDrive } from './team-drive.ts'
 import { notingRefs } from './team-refs.ts'
 
@@ -43,7 +41,7 @@ export function createTeamContext(
   teamSpaces: NonNullable<Env['TEAM_SPACE']>,
   deps: TeamDeps = {}
 ): TeamContext {
-  const { providers, google, now } = resolve(env, deps)
+  const { google, now } = resolve(env, deps)
   const room = roomsOf(teamSpaces)
 
   // (a request's space is looked up once; its token source is shared by the calls it makes)
@@ -61,11 +59,6 @@ export function createTeamContext(
   }
 
   return {
-    async access(request, spaceId): Promise<Access> {
-      const identity = await authenticate(request, providers)
-      if (!identity) return 'unauthenticated'
-      return (await room(spaceId).roleOf(identity)) ?? 'not-a-member'
-    },
     async space(spaceId) {
       const found = await drive(spaceId)
       return found && notingRefs(found.backend.space(found.info.rootRef), room(spaceId))

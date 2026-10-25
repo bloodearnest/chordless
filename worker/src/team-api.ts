@@ -34,13 +34,11 @@ import {
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import { answering, isRecord, jsonResponse, Refusal, readJson } from './http.ts'
 
-/** What a request may do in a space: its role, or why it may do nothing */
-export type Access = TeamRole | 'unauthenticated' | 'not-a-member'
+/** Why a request may do nothing in a space */
+export type NoAccess = 'unauthenticated' | 'not-a-member'
 
 /** What the team space's Durable Object and its credentials provide (src: the next step) */
 export interface TeamContext {
-  /** Who is asking, and their role in this space: checked before anything else is looked at */
-  access(request: Request, spaceId: string): Promise<Access>
   /** The space's files; null if there is no such space */
   space(spaceId: string): Promise<SpaceStorage | null>
   /** The space's root, for `GET /root` */
@@ -101,21 +99,22 @@ function collectionOf(url: URL): Collection {
 }
 
 /** The answer for a request that may do nothing in the space */
-export function refusal(why: Exclude<Access, TeamRole>): Response {
+export function refusal(why: NoAccess): Response {
   return why === 'unauthenticated'
     ? jsonResponse({ error: 'Sign in first' }, 401)
     : jsonResponse({ error: 'Not a member of this space' }, 403)
 }
 
-/** Answer a team space request; `path` was matched by `teamSpacePath` */
+/**
+ * Answer a team space request; `path` was matched by `teamSpacePath`, and `role` is the role in
+ * the space of whoever is asking (team-routes.ts settles it first)
+ */
 export async function handleTeamRequest(
   request: Request,
   { spaceId, rest }: { spaceId: string; rest: string },
-  context: TeamContext
+  context: TeamContext,
+  role: TeamRole
 ): Promise<Response> {
-  const role = await context.access(request, spaceId)
-  if (role === 'unauthenticated' || role === 'not-a-member') return refusal(role)
-
   return answering('Team space', async () => {
     const space = await context.space(spaceId)
     if (!space) return jsonResponse({ error: 'No such space' }, 404)

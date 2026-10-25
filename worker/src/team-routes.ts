@@ -47,14 +47,17 @@ export async function handleTeamRoutes(
     // (an id is made by the Worker, so anything else is not one: no object is made for it)
     if (!team || !SPACE_ID.test(team.spaceId)) return jsonResponse({ error: 'No such space' }, 404)
 
-    if (isAdminRoute(team.rest)) {
-      const identity = await admin.identify(request)
-      if (!identity) return refusal('unauthenticated')
-      const role = await admin.room(team.spaceId).roleOf(identity)
-      if (!role) return refusal('not-a-member')
-      return handleSpaceAdmin(request, team, admin, { identity, role })
-    }
-    return handleTeamRequest(request, team, createTeamContext(env, spaces, deps))
+    // Who is asking, and their role in the space: settled before anything else is looked at. The
+    // ID token is checked before any Durable Object is touched, so only signed-in accounts can
+    // ask for one; a stranger and a space that is not there get the same answer
+    // (docs/SECURITY.md, "Probing for team spaces")
+    const identity = await admin.identify(request)
+    if (!identity) return refusal('unauthenticated')
+    const role = await admin.room(team.spaceId).roleOf(identity)
+    if (!role) return refusal('not-a-member')
+
+    if (isAdminRoute(team.rest)) return handleSpaceAdmin(request, team, admin, { identity, role })
+    return handleTeamRequest(request, team, createTeamContext(env, spaces, deps), role)
   })()
 
   // (a member's files, and the codes of invites, are not kept by anything on the way)

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import type { Identity } from '../worker/src/identity.ts'
-import { type Access, handleTeamRequest, type TeamContext } from '../worker/src/team-api.ts'
+import { handleTeamRequest, type TeamContext } from '../worker/src/team-api.ts'
 import { notingRefs } from '../worker/src/team-refs.ts'
 import { TeamSpaceState } from '../worker/src/team-state.ts'
 import { MapStore } from './map-store.ts'
@@ -153,7 +153,6 @@ describe('a member of the team, with the owner syncing straight to Drive', () =>
   async function team() {
     const rig = await made()
     const context: TeamContext = {
-      access: async (): Promise<Access> => 'reader',
       space: async () => rig.space,
       root: async () => ({ ref: rig.root, name: 'Team', trashed: false }),
       owns: (_, ref) => rig.state.owns(ref),
@@ -163,7 +162,8 @@ describe('a member of the team, with the owner syncing straight to Drive', () =>
       handleTeamRequest(
         new Request(`https://chordless.test/api/space/space-1${path}`, init),
         { spaceId: 'space-1', rest: path.split('?')[0] },
-        context
+        context,
+        'reader'
       )
     return { ...rig, call }
   }

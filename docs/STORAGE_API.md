@@ -95,8 +95,8 @@ the Worker running over `fake-drive.ts`.
 
 **Built (2026-10-20):** `TeamStorage` and the API it calls, `worker/src/team-api.ts`
 (`handleTeamRequest`; the routes are listed at the top of that file). The API is a function of
-the request and a `TeamContext`: who is asking and their role (`access`), the space's
-`SpaceStorage` (`space`), its root (`root`) and whether a file is in its tree (`owns`). Tests
+the request, the asker's role (settled first, in `team-routes.ts`) and a `TeamContext`: the space's
+`SpaceStorage` (`space`), its root (`root`) and whether files are in its tree (`owns`, `ownedAmong`). Tests
 give it the in-memory storage; the real context is the Durable Object and the owner's token or
 service account, and the route is not in `router.ts` yet. Roles are enforced in the handler
 (reader reads, writer writes and bins, `canWrite` in the root), a file outside the space is
