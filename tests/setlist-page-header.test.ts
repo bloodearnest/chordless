@@ -59,7 +59,7 @@ describe('the setlist page: header, menu and keys', () => {
   describe('the overview', () => {
     it('opens a song that is chosen, asks before deleting one, and opens the add dialog', async () => {
       await rig.open()
-      const overview = must(rig.page._overviewComponent)
+      const overview = must(rig.page.overview.component)
       overview.dispatchEvent(new OverviewSongClickEvent(1))
       expect(urls().at(-1)).to.match(/\/song\/1$/)
 
@@ -86,24 +86,24 @@ describe('the setlist page: header, menu and keys', () => {
 
     it('changes the key of a song when told to', async () => {
       const setlist = await rig.open()
-      must(rig.page._overviewComponent).dispatchEvent(new OverviewSongKeyChangeEvent(0, 'A'))
+      must(rig.page.overview.component).dispatchEvent(new OverviewSongKeyChangeEvent(0, 'A'))
       await wait(100)
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].key).to.equal('A')
-      must(rig.page._overviewComponent).dispatchEvent(new OverviewSongKeyChangeEvent(0, ''))
+      must(rig.page.overview.component).dispatchEvent(new OverviewSongKeyChangeEvent(0, ''))
     })
 
     it('changes the tempo of a song when told to', async () => {
       const setlist = await rig.open()
-      must(rig.page._overviewComponent).dispatchEvent(new OverviewSongBpmChangeEvent(0, 88))
+      must(rig.page.overview.component).dispatchEvent(new OverviewSongBpmChangeEvent(0, 88))
       await wait(100)
       expect(must(await rig.db.getSetlist(setlist.id)).songs[0].tempo).to.equal(88)
     })
 
     it('removes the listeners from a component it replaces', async () => {
       await rig.open()
-      const first = must(rig.page._overviewComponent)
+      const first = must(rig.page.overview.component)
       await rig.page.renderSetlist(rig.page.currentSetlistId as string)
-      expect(rig.page._overviewComponent).to.not.equal(first)
+      expect(rig.page.overview.component).to.not.equal(first)
       const before = rig.visited.length
       first.dispatchEvent(new OverviewSongClickEvent(0))
       expect(rig.visited.length).to.equal(before)
@@ -315,13 +315,13 @@ describe('the setlist page: header, menu and keys', () => {
     it('is the overview’s on the overview, which lets songs be moved, and is left by going into a song', async () => {
       await rig.open()
       header().dispatchEvent(new EditModeToggleEvent())
-      expect(rig.page.overviewEditMode).to.equal(true)
+      expect(rig.page.overview.editMode).to.equal(true)
       expect(header().editMode).to.equal(true)
-      expect(rig.page._overviewComponent?.editMode).to.equal(true)
+      expect(rig.page.overview.component?.editMode).to.equal(true)
       rig.page.showSong(0, true)
-      expect(rig.page.overviewEditMode).to.equal(false)
+      expect(rig.page.overview.editMode).to.equal(false)
       expect(header().editMode).to.equal(false)
-      rig.page.setOverviewEditMode(false)
+      rig.page.overview.setEditMode(false)
     })
 
     it('is a song’s own, entered and left, saving the setlist when it is left', async () => {
@@ -396,18 +396,18 @@ describe('the setlist page: header, menu and keys', () => {
     it('shows the setlist’s title on the overview, and the song’s on a song', async () => {
       await rig.open(2, { name: 'Harvest' })
       expect(header().heading).to.contain('Harvest')
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(header().heading).to.equal('Alpha')
       rig.page.currentSetlist = undefined
-      await rig.page.updateHeader(null, true)
+      await rig.page.header.show(null, true)
       expect(header().heading).to.equal('Setlist')
     })
 
     it('changes with a fade when it is not told to be quick, and not at all when nothing changes', async () => {
       await rig.open()
-      await rig.page.updateHeader(rig.page.songs[0], false)
+      await rig.page.header.show(rig.page.songs[0], false)
       expect(header().heading).to.equal('Alpha')
-      await rig.page.updateHeader(rig.page.songs[0], false)
+      await rig.page.header.show(rig.page.songs[0], false)
       expect(($('.header-controls-slot') as HTMLElement).style.opacity).to.equal('1')
     })
 
@@ -416,22 +416,22 @@ describe('the setlist page: header, menu and keys', () => {
       await setSpaceReadOnly(must(id), true)
       await rig.open()
       expect(header().showEditToggle).to.equal(true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(header().showEditToggle).to.equal(true)
     })
 
     it('shows the edit toggle on a setlist that was received by link (it hides chords and sections)', async () => {
       await rig.open(3, {}, { readOnly: true })
-      await rig.page.updateHeader(null, true)
+      await rig.page.header.show(null, true)
       expect(header().showEditToggle).to.equal(true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(header().showEditToggle).to.equal(true)
     })
 
     it('shows a song with no key without a key list', async () => {
       await rig.open()
       rig.page.songs[0].currentKey = undefined
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(($('#key-selector') as unknown as { value: string }).value).to.equal('-')
     })
 
@@ -446,8 +446,8 @@ describe('the setlist page: header, menu and keys', () => {
     it('does nothing for a header that is not there', async () => {
       await rig.open()
       rig.root.querySelector('#app-header')?.remove()
-      await rig.page.updateHeader(null, true)
-      rig.page.updateKeySelector('G')
+      await rig.page.header.show(null, true)
+      rig.page.header.showKey('G')
     })
   })
 
@@ -466,9 +466,9 @@ describe('the setlist page: header, menu and keys', () => {
       expect(button.hidden).to.equal(false)
       expect(button.classList.contains('shared')).to.equal(true)
       rig.page.showSong(0, true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(button.hidden).to.equal(true)
-      await rig.page.updateHeader(null, true)
+      await rig.page.header.show(null, true)
       let shown = 0
       const dialog = must($('#setlist-share')) as unknown as HTMLElement & {
         show(): void
@@ -508,7 +508,7 @@ describe('the setlist page: header, menu and keys', () => {
       const button = must($<HTMLElement>('#differs-button'))
       expect(button.hidden).to.equal(false)
       rig.page.showSong(0, true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(button.hidden).to.equal(true)
 
       const dialog = must($('#setlist-differs')) as unknown as HTMLElement & {
@@ -530,7 +530,7 @@ describe('the setlist page: header, menu and keys', () => {
       dialog.dispatchEvent(new SetlistRevertedEvent())
       expect(rendered).to.deep.equal([rig.page.currentSetlistId])
       // (and it is set up once)
-      rig.page._refreshDiffers()
+      rig.page.header.refreshDiffers()
       button.click()
       expect(shown).to.equal(2)
     })
@@ -564,7 +564,7 @@ describe('the setlist page: header, menu and keys', () => {
       await wait(30)
       expect(shownSetlists).to.have.length(1)
       rig.page.showSong(0, true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       header().dispatchEvent(new HeaderInfoClickEvent())
       await wait(30)
       expect(shownSongs).to.have.length(1)

@@ -331,16 +331,16 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       await rig.open()
       rig.page.showSong(0, true)
       document.body.classList.add('edit-mode')
-      rig.page.updateKeySelector('D')
+      rig.page.header.showKey('D')
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
       await setReadOnly()
-      rig.page.updateKeySelector('D')
+      rig.page.header.showKey('D')
       expect(($('#key-selector') as unknown as { editMode: boolean }).editMode).to.equal(true)
     })
 
     it('has the selector set up once', async () => {
       await rig.open()
-      rig.page.setupKeySelector()
+      rig.page.header.showCurrentKey()
       const changed: string[] = []
       rig.page.handleKeyChange = async key => {
         changed.push(key)
@@ -403,8 +403,8 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       setCapoPreference(true)
       window.dispatchEvent(new CapoPreferenceEvent(true))
       expect(($('#capo-selector') as HTMLElement).style.display).to.equal('')
-      rig.page.setupCapoSelector()
-      rig.page.setupCapoSelector()
+      rig.page.header.showCurrentCapo()
+      rig.page.header.showCurrentCapo()
       const changed: unknown[] = []
       const real = rig.page.handleCapoChange
       rig.page.handleCapoChange = async value => {
@@ -432,8 +432,8 @@ describe('the setlist page: sections, key, tempo and capo', () => {
       setCapoPreference(true)
       await rig.open()
       rig.root.querySelector('#capo-selector')?.remove()
-      rig.page.updateCapoSelector(2)
-      rig.page.setupCapoSelector()
+      rig.page.header.showCapo(2)
+      rig.page.header.showCurrentCapo()
       rig.page._applyCapoPreferenceToDisplays()
     })
   })
@@ -460,17 +460,17 @@ describe('the setlist page: sections, key, tempo and capo', () => {
     it('are those of the song being viewed only', async () => {
       await rig.open()
       popover().bpmValue = 7
-      rig.page.updateSongSettingsPopover()
+      rig.page.header.showSongSettings()
       expect(popover().bpmValue).to.equal(7)
       rig.root.querySelector('#song-settings-popover')?.remove()
-      rig.page.updateSongSettingsPopover()
+      rig.page.header.showSongSettings()
     })
 
     it('offer the pad sets where the media player is, and say so when they cannot be listed', async () => {
       await rig.open()
       rig.page.showSong(0, true)
       localStorage.removeItem('media-settings')
-      rig.page.updateSongSettingsPopover()
+      rig.page.header.showSongSettings()
       await wait(50)
       expect(popover().mediaAvailable).to.be.a('boolean')
     })

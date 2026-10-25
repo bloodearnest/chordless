@@ -18,14 +18,6 @@ import {
   type SetlistInfoDialog,
   SetlistInfoSaveEvent,
 } from '../components/setlist-info-dialog.ts'
-import {
-  OverviewAddSongEvent,
-  OverviewSongBpmChangeEvent,
-  OverviewSongClickEvent,
-  OverviewSongDeleteEvent,
-  OverviewSongKeyChangeEvent,
-  type SetlistOverview,
-} from '../components/setlist-overview.ts'
 import { type SetlistShare, SetlistShareChangeEvent } from '../components/setlist-share.ts'
 import type { SongDisplay } from '../components/song-display.ts'
 import type { SongInfoDialog } from '../components/song-info-dialog.ts'
@@ -39,21 +31,15 @@ import { DoubleClickToggleEvent, SongChangeEvent } from './app-events.ts'
 import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
-import { getLive, goLive, isLiveSetlist, LiveChangeEvent, leaveLive } from './live.ts'
-import { wantsMediaPlayer } from './media-player-loader.ts'
+import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
 import { goTo, setPageTitle } from './navigation.ts'
-import { listPadSets, preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
+import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
 import { getSpacePeople } from './people.ts'
 import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './preferences.ts'
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
-import {
-  enterEditMode,
-  isEditMode,
-  leaveEditMode,
-  setBodyEditMode,
-} from './setlist/edit-mode-ui.ts'
+import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   afterMove,
@@ -62,20 +48,18 @@ import {
   renumberSongs,
   saveSetlistLocalState,
 } from './setlist/local-state.ts'
-import { OverviewReorder } from './setlist/overview-reorder.ts'
+import { OverviewController } from './setlist/overview-controller.ts'
 import { buildRuntimeSongs, parseTempoMetadata, type RuntimeSong } from './setlist/runtime-songs.ts'
 import { SectionController } from './setlist/section-controller.ts'
+import { SetlistHeader } from './setlist/setlist-header.ts'
 import { getSongUserPrefs, setSongUserPref } from './song-user-prefs.ts'
-import { syncsBack } from './space.ts'
-import { differsFromOfficial } from './sync/revert.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { setlistContentHash } from './sync/setlist-hash.ts'
 import { toast } from './toast.ts'
-import { getAvailableKeys, transposeSong } from './transpose.ts'
+import { transposeSong } from './transpose.ts'
 import { normalizeCapo } from './utils/capo.ts'
 import { formatSetlistDate, setlistTitle } from './utils/date-utils.ts'
 import { errorMessage } from './utils/errors.ts'
-import { sleep } from './utils/sleep.ts'
 import { showStatusMessage } from './utils/status-message.ts'
 import type { ViewState } from './views/page-view.ts'
 
@@ -139,26 +123,20 @@ export class SetlistPage {
   currentSetlistId: string | null
   currentSetlist: Setlist | undefined
   sections: SectionController
+  /** What the header shows */
+  header: SetlistHeader
   sectionObserver: IntersectionObserver | null
-  overviewEditMode: boolean
-  _overviewComponent: SetlistOverview | null
+  /** The overview, and its edit mode */
+  overview: OverviewController
   _capoEnabled: boolean
   _setlistDetailsSaveHandler?: (event: SetlistInfoSaveEvent) => void
   _setlistDeleteHandler?: (event: SetlistInfoDeleteEvent) => void
-  _currentKeyForCapo: string
-  _currentSongForInfo?: RuntimeSong | null
   _lastVisibleSection?: string | null
   _isProgrammaticScroll?: boolean
   _programmaticScrollTimeout?: ReturnType<typeof setTimeout>
   _onSectionDefaultsChanged: () => void
   _onCapoPreferenceChange: () => void
-  _onOverviewSongClick: (event: OverviewSongClickEvent) => void
-  _onOverviewSongDelete: (event: OverviewSongDeleteEvent) => void
-  _onOverviewAddSong: () => void
   _onLiveChange: () => void
-  _onOverviewSongKeyChange: (event: OverviewSongKeyChangeEvent) => void
-  _onOverviewSongBpmChange: (event: OverviewSongBpmChangeEvent) => void
-  _reorder: OverviewReorder
   _addSongModal: AddSongModal
 
   /**
@@ -207,56 +185,20 @@ export class SetlistPage {
     this.currentSetlist = undefined
     // Track section visibility state: { songIndex: { sectionIndex: { hideMode: 'none'|'section'|'chords'|'lyrics' } } }
     this.sections = new SectionController(this)
+    this.header = new SetlistHeader(this)
     this.sectionObserver = null
-    this.overviewEditMode = false // Track whether overview is in edit mode
-    this._overviewComponent = null
+    this.overview = new OverviewController(this)
     this._capoEnabled = getCapoPreference()
-    this._currentKeyForCapo = ''
     this._onSectionDefaultsChanged = this._handleSectionDefaultsChanged.bind(this)
     this._onCapoPreferenceChange = this._handleCapoPreferenceChange.bind(this)
 
-    // Bind overview component event handlers once
-    this._onOverviewSongClick = (event: OverviewSongClickEvent) => {
-      const index = event.index
-      if (typeof index === 'number') {
-        this.navigateTo(index)
-      }
-    }
-
-    this._onOverviewSongDelete = (event: OverviewSongDeleteEvent) => {
-      const index = event.index
-      if (typeof index === 'number' && this.songs[index]) {
-        this.showDeleteSongConfirmation(index, this.songs[index])
-      }
-    }
-
-    this._onOverviewAddSong = () => {
-      this._addSongModal.open()
-    }
-
-    this._onLiveChange = () => this._refreshLiveButton()
-
-    this._reorder = new OverviewReorder({
-      root: this.root,
-      isEnabled: () => this.overviewEditMode,
-      onMove: (from, to) => this.moveSong(from, to),
-    })
+    this._onLiveChange = () => this.header.refreshLive()
 
     this._addSongModal = new AddSongModal({
       root: this.root,
       getDb: () => this._database(),
       onPick: song => this.addSongToSetlist(song),
     })
-
-    this._onOverviewSongKeyChange = (event: OverviewSongKeyChangeEvent) => {
-      const { index, key } = event
-      if (typeof index === 'number' && key) {
-        this.changeSongKeyInSetlist(index, key)
-      }
-    }
-    this._onOverviewSongBpmChange = (event: OverviewSongBpmChangeEvent) => {
-      this.changeSongBpmInSetlist(event.index, event.bpm)
-    }
   }
 
   /** The space the setlist is in (a section's song may have preferences of the user's) */
@@ -348,7 +290,7 @@ export class SetlistPage {
     clearTimeout(this._programmaticScrollTimeout)
 
     // A drag in progress, and the listeners for the next
-    this._reorder.disable()
+    this.overview.dispose()
 
     // Edit mode is on <body>, which outlives the view; leaving it saves, as exiting does
     this.exitEditMode()
@@ -395,13 +337,13 @@ export class SetlistPage {
         this.songs = []
         this.currentSetlistId = setlistId
         this.currentSetlist = setlist
-        this._refreshShare()
-        this._refreshDiffers()
-        this._refreshLiveButton()
-        this._setOverviewComponent(null)
+        this.header.refreshShare()
+        this.header.refreshDiffers()
+        this.header.refreshLive()
+        this.overview.attach(null)
 
         // Update header to show setlist info
-        this.updateHeader(null, true)
+        this.header.show(null, true)
 
         // Clear container (will show Add Song button via overview)
         const container = this._songContainer()
@@ -429,9 +371,9 @@ export class SetlistPage {
       this.songs = songs
       this.currentSetlistId = setlistId
       this.currentSetlist = setlist
-      this._refreshShare()
-      this._refreshDiffers()
-      this._refreshLiveButton()
+      this.header.refreshShare()
+      this.header.refreshDiffers()
+      this.header.refreshLive()
 
       // Kick off background pad caching for all keys in this setlist
       preloadPadKeysForSongs(this.songs)
@@ -469,7 +411,7 @@ export class SetlistPage {
         // Song is already visible from pre-render setup above
         this._lastVisibleSection = `song-${songIndex}`
         this.currentSongIndex = songIndex
-        this.updateHeader(this.songs[songIndex], true) // true = instant, no animation
+        this.header.show(this.songs[songIndex], true) // true = instant, no animation
         this.applyFontSize(songIndex)
         this.exitEditMode()
         this.dispatchSongChange(this.songs[songIndex])
@@ -477,7 +419,7 @@ export class SetlistPage {
         // Default to overview (already visible)
         this._lastVisibleSection = 'overview'
         this.currentSongIndex = -1
-        this.updateHeader(null, true) // true = instant, no animation
+        this.header.show(null, true) // true = instant, no animation
         this.exitEditMode()
         this.dispatchSongChange(null)
       }
@@ -487,9 +429,7 @@ export class SetlistPage {
       requestAnimationFrame(() => {
         if (this._disposed) return
         // Set up drag-and-drop (only enabled in edit mode)
-        if (this.overviewEditMode) {
-          this._reorder.enable()
-        }
+        this.overview.resume()
 
         // Set up section control buttons
         this.sections.listen()
@@ -498,8 +438,8 @@ export class SetlistPage {
         this.sections.applyAll()
 
         // Set up key selector
-        this.setupKeySelector()
-        this.setupCapoSelector()
+        this.header.showCurrentKey()
+        this.header.showCurrentCapo()
 
         // Set up Intersection Observer to auto-detect current song
         this.setupSectionObserver()
@@ -513,7 +453,7 @@ export class SetlistPage {
         message: 'Error loading songs. Please check the console.',
         state: 'error',
       })
-      this._setOverviewComponent(null)
+      this.overview.attach(null)
     }
   }
 
@@ -521,73 +461,6 @@ export class SetlistPage {
     const container = this.root.querySelector<HTMLElement>('.song-container')
     if (!container) throw new Error('The setlist page has no song container')
     return container
-  }
-
-  _setOverviewComponent(component: SetlistOverview | null) {
-    if (this._overviewComponent) {
-      this._overviewComponent.removeEventListener(
-        OverviewSongClickEvent.type,
-        this._onOverviewSongClick
-      )
-      this._overviewComponent.removeEventListener(
-        OverviewSongDeleteEvent.type,
-        this._onOverviewSongDelete
-      )
-      this._overviewComponent.removeEventListener(
-        OverviewAddSongEvent.type,
-        this._onOverviewAddSong
-      )
-      this._overviewComponent.removeEventListener(
-        OverviewSongKeyChangeEvent.type,
-        this._onOverviewSongKeyChange
-      )
-      this._overviewComponent.removeEventListener(
-        OverviewSongBpmChangeEvent.type,
-        this._onOverviewSongBpmChange
-      )
-    }
-
-    this._overviewComponent = component
-
-    if (component) {
-      component.addEventListener(OverviewSongClickEvent.type, this._onOverviewSongClick)
-      component.addEventListener(OverviewSongDeleteEvent.type, this._onOverviewSongDelete)
-      component.addEventListener(OverviewAddSongEvent.type, this._onOverviewAddSong)
-      component.addEventListener(OverviewSongKeyChangeEvent.type, this._onOverviewSongKeyChange)
-      component.addEventListener(OverviewSongBpmChangeEvent.type, this._onOverviewSongBpmChange)
-    }
-  }
-
-  _refreshOverviewComponentSongs() {
-    if (this._overviewComponent) {
-      this._overviewComponent.songs = [...this.songs]
-    }
-  }
-
-  /** Where this setlist is live: its URL, and for a share its key, which is in the fragment */
-  _liveUrl(): string {
-    const route = this._routeFor(-1)
-    // biome-ignore lint/plugin: the share key is the link's fragment
-    return buildUrl(route) + (route.name === 'share' ? location.hash : '')
-  }
-
-  /** The header's live button: red while this setlist is live, and what pressing it does */
-  _refreshLiveButton() {
-    const button = this.root.querySelector<HTMLElement>('#live-button')
-    if (!button) return
-    const live = getLive()
-    const here = isLiveSetlist(live, buildUrl(this._routeFor(-1)))
-    const label = here ? 'Leave live' : live ? 'Take over live here' : 'Go live'
-    button.classList.toggle('live', here)
-    button.setAttribute('aria-pressed', String(here))
-    button.setAttribute('aria-label', label)
-    button.title = label
-  }
-
-  _refreshOverviewComponentEditMode() {
-    if (this._overviewComponent) {
-      this._overviewComponent.editMode = this.overviewEditMode
-    }
   }
 
   /** The URL follows a swipe to another song or the overview (not a new history entry) */
@@ -610,12 +483,7 @@ export class SetlistPage {
     const songContentWrapper = document.createElement('div')
     songContentWrapper.className = 'song-content'
 
-    const overviewComponent = document.createElement('setlist-overview')
-    overviewComponent.songs = songs
-    overviewComponent.editMode = this.overviewEditMode
-    this._setOverviewComponent(overviewComponent)
-
-    songContentWrapper.appendChild(overviewComponent)
+    songContentWrapper.appendChild(this.overview.create(songs))
     overview.appendChild(songContentWrapper)
     fragment.appendChild(overview)
 
@@ -646,7 +514,7 @@ export class SetlistPage {
 
     this.scrollToSection('overview', -1, instant)
     // Update header with animation for programmatic navigation
-    this.updateHeader(null, false)
+    this.header.show(null, false)
     this.exitEditMode()
 
     // Dispatch song-change event with null to clear media player
@@ -658,11 +526,11 @@ export class SetlistPage {
     this._lastVisibleSection = `song-${index}`
 
     // Leaving overview edit mode when navigating into a song
-    this.setOverviewEditMode(false)
+    this.overview.setEditMode(false)
 
     this.scrollToSection(`song-${index}`, index, instant)
     // Update header with animation for programmatic navigation
-    this.updateHeader(this.songs[index], false)
+    this.header.show(this.songs[index], false)
     this.applyFontSize(index)
     this.exitEditMode()
 
@@ -674,19 +542,7 @@ export class SetlistPage {
 
   async exitEditMode() {
     if (isEditMode()) {
-      const appHeader = this.root.querySelector<AppHeader>('#app-header')
-      const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-      const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-      setBodyEditMode(false)
-      if (appHeader) {
-        appHeader.editMode = false
-      }
-      if (keySelector) {
-        keySelector.editMode = false
-      }
-      if (capoSelector) {
-        capoSelector.editMode = false
-      }
+      this.header.leaveEditMode()
 
       // Update all sections to reflect non-edit mode
       this.sections.applyAll()
@@ -694,143 +550,6 @@ export class SetlistPage {
       // Stamp the setlist as modified (each edit saved itself as it was made)
       await this.editSetlist(() => undefined)
     }
-  }
-
-  async updateHeader(song: RuntimeSong | null, instant = false) {
-    const appHeader = this.root.querySelector<AppHeader>('#app-header')
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-
-    // Determine new title
-    let newTitle: string
-    if (song) {
-      newTitle = song.title
-    } else {
-      if (this.currentSetlist) {
-        newTitle = setlistTitle(this.currentSetlist, 'short')
-      } else {
-        newTitle = 'Setlist'
-      }
-    }
-
-    if (!appHeader) return
-
-    appHeader.showEditToggle = true
-
-    // Check if content is actually changing
-    const titleChanged = appHeader.heading !== newTitle
-    if (!titleChanged && !instant) {
-      return // No change needed
-    }
-
-    if (instant) {
-      // Instant update - no animation
-      appHeader.setTitleInstant(newTitle)
-      this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector)
-    } else {
-      // Animated update - fade out old, swap content, fade in new
-      appHeader.heading = newTitle
-
-      await this._animateSlottedContent(async () => {
-        this._updateHeaderContent(song, musicalMetadata, keySelector, capoSelector)
-      })
-    }
-  }
-
-  _updateHeaderContent(
-    song: RuntimeSong | null,
-    musicalMetadata: MusicalMetadataDisplay | null,
-    keySelector: KeySelector | null,
-    capoSelector: CapoSelector | null
-  ) {
-    if (song) {
-      // Update key selector
-      if (song.currentKey) {
-        this.updateKeySelector(song.currentKey)
-      } else {
-        if (keySelector) {
-          keySelector.value = '-'
-          keySelector.keys = []
-        }
-      }
-
-      if (capoSelector) {
-        if (this._capoEnabled) {
-          this.updateCapoSelector(song.currentCapo, song.currentKey)
-        }
-      }
-
-      // Update song settings popover
-      this.updateSongSettingsPopover()
-
-      // Update musical metadata display
-      if (musicalMetadata) {
-        musicalMetadata.keyValue = song.currentKey || ''
-        musicalMetadata.capoValue = this._capoEnabled ? (song.currentCapo ?? 0) : 0
-        musicalMetadata.bpm = song.currentBPM || null
-        musicalMetadata.timeSignature = song.metadata?.time || song.metadata?.timeSignature || ''
-        musicalMetadata.style.display = ''
-      }
-
-      // Store current song for info button handler
-      this._currentSongForInfo = song
-      this._showHeaderButtons(false)
-    } else {
-      // Overview - hide musical metadata
-      if (musicalMetadata) {
-        musicalMetadata.style.display = 'none'
-      }
-
-      // Clear key selector
-      if (keySelector) {
-        keySelector.value = '-'
-        keySelector.keys = []
-      }
-      if (capoSelector) {
-        capoSelector.referenceKey = ''
-      }
-
-      // Store that we're on overview for info button handler
-      this._currentSongForInfo = null
-      this._showHeaderButtons(true)
-    }
-  }
-
-  /** The header's share and live buttons: on the overview only. Share is lit while the setlist is shared */
-  _showHeaderButtons(show: boolean) {
-    const live = this.root.querySelector<HTMLElement>('#live-button')
-    if (live) live.hidden = !show
-    const differs = this.root.querySelector<HTMLElement>('#differs-button')
-    if (differs) {
-      differs.hidden = !(
-        show &&
-        this.currentSetlist &&
-        differsFromOfficial(this.currentSetlist, syncsBack())
-      )
-    }
-    const button = this.root.querySelector<HTMLElement>('#share-button')
-    if (!button) return
-    button.hidden = !show
-    button.classList.toggle('shared', Boolean(this.currentSetlist?.share))
-  }
-
-  /** Hand the "differs from official" dialog the setlist */
-  _refreshDiffers() {
-    const dialog = this.root.querySelector<SetlistDiffers>('#setlist-differs')
-    if (!dialog || !this.currentSetlist) return
-    dialog.setlist = this.currentSetlist
-    dialog.db = this._database()
-  }
-
-  /** Hand the share dialog the setlist */
-  _refreshShare() {
-    const dialog = this.root.querySelector<SetlistShare>('#setlist-share')
-    if (!dialog || !this.currentSetlist) return
-    dialog.setlist = this.currentSetlist
-    dialog.db = this._database()
-    dialog.songs = this.songs
-    dialog.linkable = syncsBack()
   }
 
   /**
@@ -851,7 +570,7 @@ export class SetlistPage {
           return
         }
         const title = this.currentSetlist ? setlistTitle(this.currentSetlist, 'short') : ''
-        goLive(this._liveUrl(), title)
+        goLive(this.header.liveUrl(), title)
       },
       { signal }
     )
@@ -1012,7 +731,7 @@ export class SetlistPage {
     if (!setlist) return
 
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    this.updateHeader(song, true)
+    this.header.show(song, true)
     // The menu's heading and the window's title say the setlist's date and name
     this.updateNavigationMenu()
     await dialog?.show(setlist)
@@ -1096,15 +815,15 @@ export class SetlistPage {
 
           if (sectionId === 'overview') {
             this.currentSongIndex = -1
-            this.updateHeader(null, false) // animate=true for smooth transition
+            this.header.show(null, false) // animate=true for smooth transition
             this.dispatchSongChange(null)
             this._replaceHistoryForOverview()
           } else if (sectionId.startsWith('song-')) {
             const index = parseInt(sectionId.split('-')[1], 10)
             if (index >= 0 && index < this.songs.length) {
-              this.setOverviewEditMode(false)
+              this.overview.setEditMode(false)
               this.currentSongIndex = index
-              this.updateHeader(this.songs[index], false) // animate=true for smooth transition
+              this.header.show(this.songs[index], false) // animate=true for smooth transition
               this.applyFontSize(index)
               this.dispatchSongChange(this.songs[index])
               this._replaceHistoryForSong(index)
@@ -1214,7 +933,7 @@ export class SetlistPage {
         // Check if we're on overview or song view
         if (this.currentSongIndex < 0) {
           // We're on overview - toggle overview edit mode
-          this.toggleOverviewEditMode()
+          this.overview.toggleEditMode()
           return
         }
 
@@ -1241,8 +960,8 @@ export class SetlistPage {
     appHeader.addEventListener(
       HeaderInfoClickEvent.type,
       () => {
-        if (this._currentSongForInfo) {
-          this.showSongInfo(this._currentSongForInfo)
+        if (this.header.songForInfo) {
+          this.showSongInfo(this.header.songForInfo)
         } else {
           this.showSetlistInfo()
         }
@@ -1311,86 +1030,6 @@ export class SetlistPage {
     }
   }
 
-  updateKeySelector(selectedKey: string) {
-    const keySelector = this.root.querySelector<KeySelector>('#key-selector')
-    if (!keySelector) return
-
-    // Get available keys rotated around the selected key
-    const keys = getAvailableKeys(selectedKey)
-
-    // Get original key from current song
-    let originalKey: string | null = null
-    if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
-      originalKey = this.songs[this.currentSongIndex].originalKey
-    }
-
-    // Update component properties
-    keySelector.value = selectedKey
-    keySelector.keys = keys
-    keySelector.originalKey = originalKey ?? ''
-    keySelector.editMode = isEditMode()
-  }
-
-  updateCapoSelector(value: unknown, currentKey: string | null | undefined = null) {
-    if (!this._capoEnabled) return
-    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-    if (!capoSelector) return
-    capoSelector.value = normalizeCapo(value)
-    capoSelector.referenceKey = currentKey || this._currentKeyForCapo || ''
-    this._currentKeyForCapo = capoSelector.referenceKey
-    capoSelector.editMode = isEditMode()
-  }
-
-  /** Show the current song's key in the key picker */
-  setupKeySelector() {
-    // Initialize with current song's key
-    if (this.currentSongIndex >= 0 && this.songs[this.currentSongIndex]) {
-      const currentKey = this.songs[this.currentSongIndex].currentKey
-      if (currentKey) {
-        this.updateKeySelector(currentKey)
-      }
-    }
-  }
-
-  setupCapoSelector() {
-    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-    if (!capoSelector) return
-
-    capoSelector.style.display = this._capoEnabled ? '' : 'none'
-    if (!this._capoEnabled) {
-      return
-    }
-
-    // (no song is current on the overview: its index is -1)
-    const currentSong = this.songs[this.currentSongIndex] as RuntimeSong | undefined
-    this.updateCapoSelector(currentSong?.currentCapo, currentSong?.currentKey)
-  }
-
-  updateSongSettingsPopover() {
-    const songSettingsPopover =
-      this.root.querySelector<SongSettingsPopover>('#song-settings-popover')
-    if (!songSettingsPopover) return
-
-    const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    if (!song) return
-
-    // Update BPM value
-    songSettingsPopover.bpmValue = song.currentBPM || 120
-
-    // This user's media choices for the song (theirs alone: not in the setlist, so a user who
-    // can only read it can make them too). Shown only where the media player is
-    songSettingsPopover.mediaAvailable = wantsMediaPlayer()
-    if (songSettingsPopover.mediaAvailable) {
-      const prefs = getSongUserPrefs(song.songId, this._database().spaceId)
-      songSettingsPopover.padSetId = prefs?.padSetId
-      listPadSets()
-        .then(sets => {
-          songSettingsPopover.padSets = sets
-        })
-        .catch(error => console.warn('[SongSettings] Could not list the pad sets:', error))
-    }
-  }
-
   /** Remember this user's choice for the current song, and tell the media player */
   saveSongMediaPref(name: 'doubleClick' | 'padSetId', value: boolean | string | undefined) {
     const song = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
@@ -1400,7 +1039,7 @@ export class SetlistPage {
     } else {
       setSongUserPref(song.songId, this._database().spaceId, name, value as string)
     }
-    this.updateSongSettingsPopover()
+    this.header.showSongSettings()
     this.dispatchSongChange(song)
   }
 
@@ -1416,9 +1055,8 @@ export class SetlistPage {
     const model = await this._songModel(song)
     change(model)
     await model.save()
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    if (musicalMetadata) Object.assign(musicalMetadata, shown)
-    this.updateSongSettingsPopover()
+    this.header.showMetadata(shown)
+    this.header.showSongSettings()
   }
 
   /** Tell the media player which song is current now (its tempo, time or key may have changed) */
@@ -1448,7 +1086,7 @@ export class SetlistPage {
     await this._saveSongSetting(song, model => model.setCapo(normalized), {
       capoValue: normalized,
     })
-    this.updateCapoSelector(normalized, song.currentKey)
+    this.header.showCapo(normalized, song.currentKey)
     this._updateSongDisplayCapo(index, normalized)
   }
 
@@ -1462,34 +1100,11 @@ export class SetlistPage {
 
     // Re-render the song with transposition
     await this.reRenderSong(index)
-    this.updateKeySelector(newKey)
+    this.header.showKey(newKey)
     this._tellMediaPlayer()
 
     // Ensure the pad for this key is cached for upcoming playback
     preloadPadKey(newKey)
-  }
-
-  async _animateSlottedContent(updateCallback: () => Promise<void> | void) {
-    const controlsSlot = this.root.querySelector<HTMLElement>('.header-controls-slot')
-
-    // Fade out (use the controls slot to fade everything together)
-    if (controlsSlot) {
-      controlsSlot.style.opacity = '0'
-    }
-
-    // Wait for fade-out (300ms to match app-header)
-    await sleep(300)
-
-    // Update content (this happens while opacity is 0, so changes are invisible)
-    await updateCallback()
-
-    // Small delay to ensure DOM has updated
-    await sleep(10)
-
-    // Fade in
-    if (controlsSlot) {
-      controlsSlot.style.opacity = '1'
-    }
   }
 
   applyFontSize(songIndex: number) {
@@ -1543,17 +1158,15 @@ export class SetlistPage {
       await this.handleKeyChange(originalKey)
     } else if (originalKey) {
       // Key is already correct, just update displays
-      const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-      if (musicalMetadata) musicalMetadata.keyValue = originalKey
+      this.header.showMetadata({ keyValue: originalKey })
     } else {
       console.warn('[resetCurrentSong] No original key found in metadata!')
     }
 
     // The tempo was put back above without going through handleBPMChange, so show it (the key
     // reset does not), in the settings too, and tell the media player so the click follows
-    const musicalMetadata = this.root.querySelector<MusicalMetadataDisplay>('#musical-metadata')
-    if (musicalMetadata) musicalMetadata.bpm = song.currentBPM || null
-    this.updateSongSettingsPopover()
+    this.header.showMetadata({ bpm: song.currentBPM || null })
+    this.header.showSongSettings()
     this.dispatchSongChange(song)
 
     // Save state
@@ -1642,35 +1255,7 @@ export class SetlistPage {
       })
     }
 
-    this._refreshOverviewComponentSongs()
-  }
-
-  toggleOverviewEditMode() {
-    this.setOverviewEditMode(!this.overviewEditMode)
-  }
-
-  setOverviewEditMode(enabled: boolean) {
-    if (this.overviewEditMode === enabled) {
-      return
-    }
-
-    this.overviewEditMode = enabled
-
-    // Update button state (use the header edit toggle button)
-    const appHeader = this.root.querySelector<AppHeader>('#app-header')
-    if (appHeader) {
-      appHeader.editMode = this.overviewEditMode
-    }
-    this._refreshOverviewComponentEditMode()
-
-    // Toggle drag-drop: only enable in edit mode
-    if (this.overviewEditMode) {
-      this._reorder.enable()
-    } else {
-      this._reorder.disable()
-    }
-
-    this.sections.applyAll()
+    this.overview.refreshSongs()
   }
 
   /**
@@ -1723,7 +1308,7 @@ export class SetlistPage {
     }
     song.currentKey = parsed.metadata.key
     song.currentBPM = currentBPM
-    this._refreshOverviewComponentSongs()
+    this.overview.refreshSongs()
 
     // Update DOM
     const songSection = this.root.querySelector<HTMLElement>(`#song-${songIndex}`)
@@ -1757,7 +1342,7 @@ export class SetlistPage {
 
     // Update header
     if (this.currentSongIndex === songIndex) {
-      this.updateHeader(song)
+      this.header.show(song)
     }
   }
 
@@ -1955,6 +1540,11 @@ export class SetlistPage {
     }
   }
 
+  /** Offer songs to add to the setlist */
+  addSong() {
+    this._addSongModal.open()
+  }
+
   async showDeleteSongConfirmation(index: number, song: RuntimeSong) {
     const title = this.root.querySelector<HTMLElement>('#delete-song-title')
     if (title) title.textContent = song.title
@@ -2037,16 +1627,7 @@ export class SetlistPage {
   }
 
   _applyCapoPreferenceToDisplays() {
-    const capoSelector = this.root.querySelector<CapoSelector>('#capo-selector')
-    const currentSong = this.currentSongIndex >= 0 ? this.songs[this.currentSongIndex] : null
-    if (capoSelector) {
-      capoSelector.style.display = this._capoEnabled ? '' : 'none'
-      if (this._capoEnabled && currentSong) {
-        this.updateCapoSelector(currentSong.currentCapo, currentSong.currentKey)
-      } else {
-        capoSelector.referenceKey = ''
-      }
-    }
+    this.header.showCapoPreference()
 
     const songDisplays = this.root.querySelectorAll<SongDisplay>('song-display')
     songDisplays.forEach(display => {

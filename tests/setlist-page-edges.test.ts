@@ -64,7 +64,7 @@ describe('the setlist page: corners', () => {
 
   it('moves a song when its card is dragged in the overview being edited', async () => {
     await rig.open()
-    rig.page.setOverviewEditMode(true)
+    rig.page.overview.setEditMode(true)
     await rig.flush()
     const card = (index: number) =>
       must(rig.root.querySelectorAll<HTMLElement>('.overview-song-card')[index])
@@ -86,7 +86,7 @@ describe('the setlist page: corners', () => {
     document.dispatchEvent(pointer('pointerup', card(2).getBoundingClientRect().bottom + 50))
     await wait(100)
     expect(rig.page.songs.map(song => song.title)).to.deep.equal(['Bravo', 'Charlie', 'Alpha'])
-    rig.page.setOverviewEditMode(false)
+    rig.page.overview.setEditMode(false)
   })
 
   it('adds the song picked in the add-song dialog', async () => {
@@ -119,12 +119,12 @@ describe('the setlist page: corners', () => {
 
   it('keeps the overview’s cards draggable when it is drawn again while being edited', async () => {
     await rig.open(2)
-    rig.page.setOverviewEditMode(true)
+    rig.page.overview.setEditMode(true)
     await rig.page.addSongToSetlist(must(await getSongWithContent(rig.songs[2].uuid, rig.db)))
     await rig.flush()
     await rig.flush()
     expect(rig.page.songs).to.have.length(3)
-    rig.page.setOverviewEditMode(false)
+    rig.page.overview.setEditMode(false)
   })
 
   it('puts a moved song’s section where it now is: first, in the middle or last', async () => {
@@ -217,12 +217,12 @@ describe('the setlist page: corners', () => {
     ]) {
       $(selector)?.remove()
     }
-    rig.page._showHeaderButtons(true)
-    rig.page._refreshShare()
-    rig.page._refreshDiffers()
-    rig.page._refreshLiveButton()
+    rig.page.header.showButtons(true)
+    rig.page.header.refreshShare()
+    rig.page.header.refreshDiffers()
+    rig.page.header.refreshLive()
     rig.page._listenToControls()
-    rig.page.setupKeySelector()
+    rig.page.header.showCurrentKey()
     rig.page.sections.listen()
     rig.page.setupSectionObserver()
     rig.page.setupKeyboardNavigation()
@@ -232,20 +232,20 @@ describe('the setlist page: corners', () => {
   it('shows no capo when it is off, and a capo of none when a song has not one', async () => {
     await rig.open()
     rig.page.showSong(0, true)
-    rig.page.updateCapoSelector(2)
+    rig.page.header.showCapo(2)
     rig.page._updateSongDisplayCapo(0, 3)
     setCapoPreference(true)
     rig.page._capoEnabled = true
     rig.page.songs[0].currentCapo = undefined as never
-    rig.page.setupKeySelector()
-    rig.page.updateHeader(rig.page.songs[0])
+    rig.page.header.showCurrentKey()
+    rig.page.header.show(rig.page.songs[0])
     rig.page._applyCapoPreferenceToDisplays()
     rig.page.currentSongIndex = -1
     rig.page._applyCapoPreferenceToDisplays()
-    rig.page.setupCapoSelector()
-    rig.page.setupKeySelector()
+    rig.page.header.showCurrentCapo()
+    rig.page.header.showCurrentKey()
     rig.page.currentSongIndex = 0
-    rig.page.setupCapoSelector()
+    rig.page.header.showCurrentCapo()
     expect(rig.errors).to.deep.equal([])
   })
 
@@ -289,9 +289,9 @@ describe('the setlist page: corners', () => {
       expect(button().getAttribute('aria-label')).to.equal('Leave live')
 
       rig.page.showSong(0, true)
-      await rig.page.updateHeader(rig.page.songs[0], true)
+      await rig.page.header.show(rig.page.songs[0], true)
       expect(button().hidden).to.equal(true)
-      await rig.page.updateHeader(null, true)
+      await rig.page.header.show(null, true)
       expect(button().hidden).to.equal(false)
 
       button().click()
