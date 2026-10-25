@@ -21,6 +21,7 @@ import {
   parseSongList,
   sentDay,
   songOfChart,
+  titleScore,
 } from '../src/js/email-setlist.ts'
 
 const chart = (title: string, key: string, ccli: string | null): ChartInfo => ({
@@ -303,6 +304,44 @@ test('one chart is not given to two songs, and a short title is not found inside
       ['Holy Spirit', 'Holy Spirit-chords-E.pdf'],
     ]
   )
+})
+
+test('a song is given one chart: its best, and the next best of it is left over', () => {
+  const result = importFromEmail({
+    subject: 'Sunday',
+    from: me,
+    date: 'Tue, 13 Oct 2026',
+    body: body(['1. Holy Spirit in E']),
+    charts: [chart('Holy Spirit Come', 'D', '2002'), chart('Holy Spirit', 'E', '2001')],
+  })
+  assert.deepEqual(
+    result.songs.map(s => s.chartFilename),
+    ['Holy Spirit-chords-E.pdf']
+  )
+  assert.deepEqual(
+    result.unlisted.map(s => s.title),
+    ['Holy Spirit Come']
+  )
+})
+
+test('a title with a comma: either part may be the title its chart has, even one word', () => {
+  const result = importFromEmail({
+    subject: 'Sunday',
+    from: me,
+    date: 'Tue, 13 Oct 2026',
+    body: body(['1. Glory, Here We Stand in D']),
+    charts: [chart('Glory', 'E', '2003')],
+  })
+  assert.deepEqual(
+    result.songs.map(s => [s.listed, s.chartFilename]),
+    [['Glory, Here We Stand', 'Glory-chords-E.pdf']]
+  )
+})
+
+test('titles with the same words in another order match, though less than the same title', () => {
+  assert.equal(titleScore('Great Is The Morning', 'The Morning Is Great'), 0.8)
+  assert.equal(titleScore('Great Is The Morning', 'Great Is The Morning'), 1)
+  assert.equal(titleScore('Great Is The Morning', 'Morning Glory'), 0)
 })
 
 test('an email with no list: the attachments in order, and the sender as the leader', () => {
