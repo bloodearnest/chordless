@@ -57,7 +57,10 @@ credentials go in the git-ignored `.r2-tfstate.env`:
     AWS_ACCESS_KEY_ID=...
     AWS_SECRET_ACCESS_KEY=...
 
-`scripts/infra-check.sh drift` reads it; by hand, `set -a; . ./.r2-tfstate.env; set +a` first. In CI the
+Or, simpler locally, a Cloudflare API token that can use R2 (Workers R2 Storage: Edit) is its own S3
+credential: the key id is the token's id (`GET /user/tokens/verify`), and the secret is the SHA-256 of
+the token. `scripts/infra-check.sh drift` makes them from `CLOUDFLARE_API_TOKEN` when neither is set, so
+the cloudflare stack's token is all it needs. By hand: `set -a; . ./.r2-tfstate.env; set +a` first. In CI the
 same two are secrets of the `infra` environment. R2 keeps no old versions, but the state is cheap to lose:
 the `import` blocks rebuild it with one `terraform apply` (which changes nothing when the code matches).
 Secret values still stay out of Terraform. The `.tf` files and `.terraform.lock.hcl` (the provider
@@ -68,7 +71,7 @@ still local (its `backend` block set aside, `terraform apply`), then moved its s
 `terraform init -migrate-state`, as each of the others did. On a fresh account, do the same.
 
 The `cloudflare/` stack's token (`CLOUDFLARE_API_TOKEN`) also needs Workers R2 Storage: Edit, for the
-bucket. Locally it is kept, bare, in the git-ignored `.cloudflare-infra-token`.
+bucket. Locally it is the one in the git-ignored `.cloudflare-token` (bare, as `just deploy` reads it).
 
 ## The GitHub stack
 

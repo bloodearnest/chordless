@@ -45,5 +45,3 @@ tests/fixtures/private/
 
 # Terraform state access: an R2 token for the state bucket (infra/README.md)
 .r2-tfstate.env
-# The cloudflare stack's token (infra/README.md)
-.cloudflare-infra-token
