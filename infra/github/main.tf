@@ -1,0 +1,168 @@
+# The GitHub repository's settings: how changes reach main, what Actions may run, and the
+# environments that hold the deploy's secrets (docs/CI.md). The repository itself is imported.
+#
+# NOT here: secret values (`gh secret set NAME --env production`: in Terraform they would be in
+# the state; scripts/check-gh-secrets.ts checks the names), installing the Claude GitHub app (the
+# provider cannot, on a personal account), and the approval asked for before a fork's pull request
+# runs workflows (no resource for it; it is GitHub's default, "first-time contributors").
+
+terraform {
+  required_version = ">= 1.10"
+  required_providers {
+    github = {
+      source  = "integrations/github"
+      version = "~> 6.13"
+    }
+  }
+}
+
+# Auth: GITHUB_TOKEN in the environment (GITHUB_TOKEN=$(gh auth token) locally)
+provider "github" {
+  owner = "bloodearnest"
+}
+
+variable "repository" {
+  type    = string
+  default = "chordless"
+}
+
+variable "required_approvals" {
+  description = <<-EOT
+    Approvals a pull request needs. 0 while agents push as the repository's owner, who cannot
+    approve their own pull requests; 1 once agents have an identity of their own (docs/CI.md)
+  EOT
+  type        = number
+  default     = 0
+}
+
+import {
+  to = github_repository.chordless
+  id = "chordless"
+}
+
+resource "github_repository" "chordless" {
+  name        = var.repository
+  description = "App for managing and sharing chord charts and setlists"
+  visibility  = "public"
+
+  has_issues   = true
+  has_projects = true
+  has_wiki     = true
+
+  # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch must be up to
+  # date with main to merge (the ruleset), and can be brought up to date from the pull request
+  allow_merge_commit     = false
+  allow_squash_merge     = false
+  allow_rebase_merge     = true
+  allow_auto_merge       = false
+  allow_update_branch    = true
+  delete_branch_on_merge = true
+
+  security_and_analysis {
+    secret_scanning {
+      status = "enabled"
+    }
+    secret_scanning_push_protection {
+      status = "enabled"
+    }
+  }
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+# Dependabot's alerts, which its security updates need
+resource "github_repository_vulnerability_alerts" "chordless" {
+  repository = github_repository.chordless.name
+  enabled    = true
+}
+
+resource "github_repository_dependabot_security_updates" "chordless" {
+  depends_on = [github_repository_vulnerability_alerts.chordless]
+
+  repository = github_repository.chordless.name
+  enabled    = true
+}
+
+# main: changed only by a pull request whose `ci-ok` passed on a branch up to date with it, merged
+# by rebase; never force-pushed or deleted. No one bypasses it, the owner included.
+resource "github_repository_ruleset" "main" {
+  name        = "main"
+  repository  = github_repository.chordless.name
+  target      = "branch"
+  enforcement = "active"
+
+  conditions {
+    ref_name {
+      include = ["~DEFAULT_BRANCH"]
+      exclude = []
+    }
+  }
+
+  rules {
+    deletion                = true
+    non_fast_forward        = true
+    required_linear_history = true
+
+    pull_request {
+      allowed_merge_methods             = ["rebase"]
+      required_approving_review_count   = var.required_approvals
+      dismiss_stale_reviews_on_push     = true
+      require_last_push_approval        = var.required_approvals > 0
+      required_review_thread_resolution = false
+      require_code_owner_review         = false
+    }
+
+    required_status_checks {
+      strict_required_status_checks_policy = true
+      required_check {
+        context = "ci-ok"
+        # GitHub Actions: a status of that name from anywhere else does not count
+        integration_id = 15368
+      }
+    }
+  }
+}
+
+# What workflows may use: GitHub's own actions and those listed here (none yet: ask first,
+# docs/CI.md), each pinned to a full commit SHA
+resource "github_actions_repository_permissions" "chordless" {
+  repository           = github_repository.chordless.name
+  enabled              = true
+  allowed_actions      = "selected"
+  sha_pinning_required = true
+
+  allowed_actions_config {
+    github_owned_allowed = true
+    verified_allowed     = false
+    patterns_allowed     = []
+  }
+}
+
+# A workflow's token reads by default, and cannot approve pull requests
+resource "github_workflow_repository_permissions" "chordless" {
+  repository                       = github_repository.chordless.name
+  default_workflow_permissions     = "read"
+  can_approve_pull_request_reviews = false
+}
+
+# The deploy's secrets (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID) and the drift check's, each
+# given only to workflows running on main
+resource "github_repository_environment" "env" {
+  for_each    = toset(["production", "infra"])
+  repository  = github_repository.chordless.name
+  environment = each.key
+
+  deployment_branch_policy {
+    protected_branches     = false
+    custom_branch_policies = true
+  }
+}
+
+resource "github_repository_environment_deployment_policy" "main" {
+  for_each       = github_repository_environment.env
+  repository     = github_repository.chordless.name
+  environment    = each.value.environment
+  branch_pattern = "main"
+}
