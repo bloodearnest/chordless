@@ -155,7 +155,7 @@ jobs:
       - run: scripts/ci/fake-dev-vars.sh
       - run: just test-e2e chromium
         env:
-          # Three browsers at once on the runner's four processors (docs/CI.md)
+          # Three browsers at once on the runner's four processors: 2.0 minutes, to 2.4 with two
           CHORDLESS_WORKERS: 3
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -180,13 +180,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # (2 workers: 3.8 minutes; 3 were slower on its three processors, 4.8)
           - name: macOS, WebKit
             os: macos-15
             browser: webkit
+            workers: 2
           # Edge, as Windows' own browser (Chrome's engine is the Linux job's)
           - name: Windows, Edge
             os: windows-2025
             browser: msedge
+            workers: 3
     defaults:
       run:
         shell: bash
@@ -203,8 +206,7 @@ jobs:
       - run: just test-e2e "$BROWSER"
         env:
           BROWSER: ${{ matrix.browser }}
-          # Three browsers at once: macOS has three processors, Windows four (docs/CI.md)
-          CHORDLESS_WORKERS: 3
+          CHORDLESS_WORKERS: ${{ matrix.workers }}
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
