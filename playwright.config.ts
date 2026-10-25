@@ -18,11 +18,24 @@ const needsBuilt =
   projects.some(a => /built$/.test(a)) ||
   (files.length === 0 && (projects.length === 0 || projects.some(a => /built/.test(a))))
 
-// WebKit (Safari's engine) roughly doubles the run, so it is opt-in: `just test-webkit`, or
-// --project=webkit. Plain runs, and `just test`, stay on Chromium
+// One browser per run: Chromium, unless CHORDLESS_BROWSER says `webkit` (Safari's engine, which
+// roughly doubles the run, so it is opt-in: `just test-webkit`, or --project=webkit) or `chrome`
+// (Google's own build, as installed: CI's Windows job). Plain runs, and `just test`, stay on Chromium
 // (Workers get no command line, so the choice goes to them in the environment.)
-if (args.some(a => /webkit/.test(a))) process.env.CHORDLESS_WEBKIT = '1'
-const webkit = process.env.CHORDLESS_WEBKIT === '1'
+if (args.some(a => /webkit/.test(a))) process.env.CHORDLESS_BROWSER = 'webkit'
+const BROWSERS = {
+  chromium: devices['Desktop Chrome'],
+  // iPad and iPhone browsers are all WebKit: where "not big enough" modals show up
+  webkit: devices['Desktop Safari'],
+  chrome: { ...devices['Desktop Chrome'], channel: 'chrome' },
+}
+const browser = (process.env.CHORDLESS_BROWSER || 'chromium') as keyof typeof BROWSERS
+if (!(browser in BROWSERS)) {
+  throw new Error(`CHORDLESS_BROWSER=${browser}: one of ${Object.keys(BROWSERS).join(', ')}`)
+}
+// Chromium's projects keep their first names, `chromium` and `built`
+const name = (project: string) =>
+  browser === 'chromium' ? project : project === 'built' ? `built-${browser}` : browser
 
 // A server already on its port is used rather than started: always where `just test` started them
 // (scripts/test-all.sh), and outside CI, where a fresh machine has none to find
@@ -40,7 +53,8 @@ export default defineConfig({
   workers: Math.max(1, Math.floor(availableParallelism() / 2)),
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  reporter: 'list',
+  // In CI, failures also annotate the PR's diff, and the HTML report is kept as an artifact
+  reporter: process.env.CI ? [['github'], ['list'], ['html', { open: 'never' }]] : 'list',
 
   use: {
     baseURL: `http://localhost:${DEV_PORT}`,
@@ -58,36 +72,17 @@ export default defineConfig({
 
   projects: [
     {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      name: name('chromium'),
+      use: BROWSERS[browser],
       testIgnore: 'built.playwright.{js,ts}',
     },
-    ...(webkit
-      ? [
-          {
-            // iPad and iPhone browsers are all WebKit: where "not big enough" modals show up
-            name: 'webkit',
-            use: { ...devices['Desktop Safari'] },
-            testIgnore: 'built.playwright.{js,ts}',
-          },
-        ]
-      : []),
     {
       // The production build, as `vite preview` serves it: the service worker with its
       // precache, which the dev server does not have
-      name: 'built',
-      use: { ...devices['Desktop Chrome'], baseURL: `http://localhost:${BUILT_PORT}` },
+      name: name('built'),
+      use: { ...BROWSERS[browser], baseURL: `http://localhost:${BUILT_PORT}` },
       testMatch: 'built.playwright.{js,ts}',
     },
-    ...(webkit
-      ? [
-          {
-            name: 'built-webkit',
-            use: { ...devices['Desktop Safari'], baseURL: `http://localhost:${BUILT_PORT}` },
-            testMatch: 'built.playwright.{js,ts}',
-          },
-        ]
-      : []),
   ],
 
   webServer: [

@@ -1,5 +1,8 @@
 # Chordless development commands
 
+# CI's Windows job runs recipes with the runner's Git Bash, as Linux and macOS do with sh
+set windows-shell := ["bash", "-c"]
+
 # Default recipe - show available commands
 default:
     @just --list
@@ -25,12 +28,28 @@ lint:
     npx @biomejs/biome check .
     @echo "Running the TypeScript check..."
     npx tsc -b
-    @echo "Checking the Terraform stacks (format, validity)..."
-    scripts/infra-check.sh lint
+    @just lint-infra
+    @just lint-actions
     @echo "Running knip (unused files, exports and dependencies)..."
     npx knip --no-progress
     @echo "Checking wrangler.toml (a warning fails)..."
     scripts/lint-wrangler.sh
+
+# Check the Terraform stacks: format and validity, no credentials needed (CI runs it when infra/ changes)
+lint-infra:
+    @echo "Checking the Terraform stacks (format, validity)..."
+    scripts/infra-check.sh lint
+
+# Check the GitHub workflows: actionlint (with shellcheck), and zizmor's security audits, which
+# include that every pinned action's SHA is on a branch or tag of its repository (docs/CI.md)
+lint-actions:
+    @echo "Checking the GitHub workflows (actionlint, zizmor)..."
+    scripts/lint-actions.sh
+
+# What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
+# a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|chrome`
+ci: lint test-node test-unit coverage-check (test-e2e "chromium")
+    git diff --exit-code
 
 # Format project files with Biome
 format:
@@ -105,6 +124,11 @@ test-browser-headless *args:
     @echo "Running browser tests with Playwright..."
     @if [ ! -d "node_modules" ]; then echo "Installing dependencies..."; npm install; fi
     {{ if args == "" { "PLAYWRIGHT_JSON_OUTPUT_NAME=.stats/e2e.json npx playwright test --reporter=list,json" } else { "npx playwright test " + args } }}
+
+# Run the Playwright tests in one browser, chromium, webkit (Safari's engine) or chrome (Google's
+# own, as installed), as CI does: just test-e2e webkit tests/app.playwright.ts
+test-e2e browser *args:
+    CHORDLESS_BROWSER={{browser}} npx playwright test {{args}}
 
 # Run the browser tests in WebKit (Safari's engine) instead of Chromium; opt-in, as it is slow: just test-webkit tests/app.playwright.ts
 test-webkit *args:

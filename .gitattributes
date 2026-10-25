@@ -1,0 +1,3 @@
+# Append-only logs: two branches that each added lines keep both when rebased or merged locally
+docs/stats.jsonl merge=union
+docs/test-catches.jsonl merge=union

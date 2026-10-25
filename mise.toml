@@ -1,3 +1,9 @@
+# Tools pinned for local use and CI (CI installs only what each job needs: docs/CI.md)
 [tools]
+actionlint = "1.7.12"
 gcloud = "589.0.0"
+just = "1.59.0"
+node = "22.19.0"
+shellcheck = "0.11.0"
 terraform = "1.16.6"
+zizmor = "1.31.1"

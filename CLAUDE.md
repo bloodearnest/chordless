@@ -104,7 +104,7 @@ When a test fails and the cause turns out to be a real defect in the app code (n
 a flake, or an intended change of behaviour), append one JSON line to `docs/test-catches.jsonl`
 before moving on:
 
-    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "short sha, or uncommitted", "caught_by": "new-test|existing-test"}
+    {"date": "2026-10-14", "suite": "node|unit|e2e", "test": "file › name", "kind": "regression|existing-bug", "summary": "one sentence", "fix": "#PR, or uncommitted", "caught_by": "new-test|existing-test"}
 
 - `regression` is a bug in code being changed at the time; `existing-bug` was already there.
 - A bug caught in work in progress counts: that is a test doing its job.
@@ -115,7 +115,9 @@ before moving on:
   see which tests cost more than they catch.
 - Don't log an expected failure (a test written first), or a failure whose cause is not diagnosed
   yet. Breaking the source on purpose to check a test (a mutation check) is not a catch.
-- When the fix is committed, fill in the sha of an `uncommitted` entry.
+- `fix` is the number of the PR the fix is in (`"#42"`), not a sha: GitHub's "Rebase and merge"
+  gives a PR's commits new shas on `main`. Older entries have shas. Fill in an `uncommitted` entry
+  once the PR is open.
 
 `just test` also records counts, run times and coverage in `docs/stats.jsonl` (one line per commit,
 by `scripts/stats.ts`), so the history of both is in the repo.
