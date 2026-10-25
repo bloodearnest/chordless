@@ -140,9 +140,10 @@ describe('Drive sync: songs', () => {
     describe('deleting a song', () => {
       /** How many songs the tablet's sync removes as deleted elsewhere */
       const removedOn = async (device: { sync: DriveSyncManager }) => {
-        await device.sync.buildDriveInventory()
-        await device.sync.pullFromDrive()
-        return device.sync.removeSongsDeletedInDrive()
+        const run = device.sync.newRun()
+        await device.sync.buildDriveInventory(run)
+        await device.sync.pullFromDrive(null, run)
+        return device.sync.removeSongsDeletedInDrive(run)
       }
       const songFiles = () => rig.storage.list(f => f.props.type === 'chordpro')
 
@@ -256,10 +257,11 @@ describe('Drive sync: songs', () => {
       it('is not carried out before Drive has been listed, or on a song that was never in Drive', async () => {
         const phone = await makeDevice('phone')
         await addSong(phone, { uuid: 'new', title: 'New', content: '{title: New}' })
-        expect(await phone.sync.removeSongsDeletedInDrive()).to.equal(0)
-        await phone.sync.buildDriveInventory()
-        await phone.sync.pullFromDrive()
-        expect(await phone.sync.removeSongsDeletedInDrive()).to.equal(0)
+        const run = phone.sync.newRun()
+        expect(await phone.sync.removeSongsDeletedInDrive(run)).to.equal(0)
+        await phone.sync.buildDriveInventory(run)
+        await phone.sync.pullFromDrive(null, run)
+        expect(await phone.sync.removeSongsDeletedInDrive(run)).to.equal(0)
         expect(await phone.db.getSong('new')).to.not.equal(undefined)
       })
 
@@ -268,10 +270,11 @@ describe('Drive sync: songs', () => {
         await addSong(phone, { uuid: 'song', title: 'Song', content: '{title: Song}' })
         await syncDevice(phone)
         replaceDriveFile(must(must(await phone.db.getSong('song')).fileRef), 'survivor')
-        await phone.sync.buildDriveInventory()
+        const run = phone.sync.newRun()
+        await phone.sync.buildDriveInventory(run)
         // (the pull listed the song's new file, and could not download it)
-        phone.sync.liveSongUuids = new Set(['song'])
-        expect(await phone.sync.removeSongsDeletedInDrive()).to.equal(0)
+        run.liveSongUuids = new Set(['song'])
+        expect(await phone.sync.removeSongsDeletedInDrive(run)).to.equal(0)
         expect(await phone.db.getSong('song')).to.not.equal(undefined)
       })
 

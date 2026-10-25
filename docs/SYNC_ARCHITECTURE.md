@@ -328,7 +328,7 @@ has a file in Drive is noted in a `pending_deletions` store (database version 9,
 At the next sync, before anything is pulled, `trashPendingDeletions()` puts each such file in the
 Drive trash (restorable) and stops noting it; one that cannot be trashed (a user who can only read,
 no network) stays noted, and the pull does not bring its file back meanwhile
-(`SyncSession.pendingDeletedRefs`). On another device, after the pull, `removeSongsDeletedInDrive()`
+(`SyncRun.pendingDeletedRefs`). On another device, after the pull, `removeSongsDeletedInDrive()`
 deletes a song whose file is gone from Drive when it has no other live file there
 (`liveSongUuids`) and has no change that Drive lacks; a song changed there goes back to Drive. This
 also makes deleting a song's file in the Drive web page stick, where a sync used to upload it again.
@@ -419,7 +419,7 @@ pull → push.
    - **Edited since last sync:** the edit wins; re-upload as today, so unsynced work
      is never lost.
    - This also makes deleting a setlist in the Drive UI stick.
-   - Only when the inventory was built (`_driveFileIds` not null). The folder guard
+   - Only when the inventory was built (`run.inventory` not null). The folder guard
      already stops sync if the file exists elsewhere, so "missing" means deleted or
      trashed.
    - **Needs the user's confirmation when resumed.**

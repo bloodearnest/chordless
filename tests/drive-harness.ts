@@ -145,9 +145,11 @@ export function makeRig(storage: () => StorageBackend | undefined) {
     await wait(5)
   }
 
+  /** Sync a device; what the sync reports */
   async function syncDevice(device) {
-    await device.sync.sync()
+    const report = await device.sync.sync()
     await wait(5)
+    return report
   }
 
   async function closeDevices() {

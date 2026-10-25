@@ -19,7 +19,7 @@ import {
   songHasLocalChanges,
   songUuidOf,
 } from './changes.ts'
-import { BATCH_SIZE, type ProgressCallback, type SyncSession } from './session.ts'
+import { BATCH_SIZE, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfSong } from './song-metadata.ts'
 
@@ -29,13 +29,13 @@ function setlistJson(setlist: Setlist): string {
 }
 
 /** Drive file metadata for a setlist (see drive-metadata.ts) */
-function setlistMetadata(session: SyncSession, setlist: Setlist) {
-  return setlistFileMetadata(setlist, { spaceId: session.spaceId })
+function setlistMetadata(run: SyncRun, setlist: Setlist) {
+  return setlistFileMetadata(setlist, { spaceId: run.spaceId })
 }
 
 /** Drive file metadata for a song variant's chart (see drive-metadata.ts) */
-function songMetadata(session: SyncSession, song: SongRecord, chordproFile: ChordProRecord) {
-  return songFileMetadata(song, chordproFile, { spaceId: session.spaceId })
+function songMetadata(run: SyncRun, song: SongRecord, chordproFile: ChordProRecord) {
+  return songFileMetadata(song, chordproFile, { spaceId: run.spaceId })
 }
 
 /** What this device records about a song's synced file */
@@ -84,34 +84,29 @@ function recordSongUpload(
 }
 
 /** Smart skip detection: a setlist needs syncing when it has no Drive file, or has changed */
-export async function setlistNeedsSync(session: SyncSession, setlist: Setlist): Promise<boolean> {
-  if (!setlist.fileRef || !session.fileExistsInDrive(setlist.fileRef)) return true
+export async function setlistNeedsSync(run: SyncRun, setlist: Setlist): Promise<boolean> {
+  if (!setlist.fileRef || !run.fileExistsInDrive(setlist.fileRef)) return true
   return setlistHasLocalChanges(setlist)
 }
 
 /** Smart skip detection: a song needs syncing when it has no Drive file, or has changed */
 export async function songNeedsSync(
-  session: SyncSession,
+  run: SyncRun,
   song: SongRecord,
   chordproFile: ChordProRecord
 ): Promise<boolean> {
-  if (!song.fileRef || !session.fileExistsInDrive(song.fileRef)) return true
+  if (!song.fileRef || !run.fileExistsInDrive(song.fileRef)) return true
   return songHasLocalChanges(song, chordproFile)
 }
 
 /** Another setlist, with a live Drive file, for the same date, time, leader, type and name */
-function syncedTwinOf(
-  session: SyncSession,
-  setlist: Setlist,
-  setlists: Setlist[]
-): Setlist | undefined {
+function syncedTwinOf(run: SyncRun, setlist: Setlist, setlists: Setlist[]): Setlist | undefined {
   const key = setlistKey(setlist)
   return setlists.find(
     other =>
       other.id !== setlist.id &&
       setlistKey(other) === key &&
-      ((other.fileRef && session.fileExistsInDrive(other.fileRef)) ||
-        session.hasLiveFileOfItsOwn(other))
+      ((other.fileRef && run.fileExistsInDrive(other.fileRef)) || run.hasLiveFileOfItsOwn(other))
   )
 }
 
@@ -161,14 +156,10 @@ async function uploadInBatches<T>(
  * The setlists to create files for, out of those that need syncing: not those a Drive file is
  * waiting for, nor those that would store a setlist twice.
  */
-function setlistsToCreate(
-  session: SyncSession,
-  created: Setlist[],
-  localSetlists: Setlist[]
-): Setlist[] {
+function setlistsToCreate(run: SyncRun, created: Setlist[], localSetlists: Setlist[]): Setlist[] {
   // After a pull that could not read every file, this device may not know a twin of a setlist
   // it would create a file for. Create nothing until a pull succeeds; updates go ahead.
-  if (session.pullIncomplete && created.length > 0) {
+  if (run.pullIncomplete && created.length > 0) {
     console.warn(
       `[DriveSync] Not uploading ${created.length} new setlists: the pull could not read every file. They are retried next sync.`
     )
@@ -176,9 +167,9 @@ function setlistsToCreate(
   }
 
   // A record with no file of its own that is still there, while Drive has a live file for its
-  // id, waits for a pull to adopt that file (see SyncSession.hasLiveFileOfItsOwn)
+  // id, waits for a pull to adopt that file (see SyncRun.hasLiveFileOfItsOwn)
   const unclaimed = created.filter(setlist => {
-    if (!session.hasLiveFileOfItsOwn(setlist)) return true
+    if (!run.hasLiveFileOfItsOwn(setlist)) return true
     console.warn(
       `[DriveSync] Not uploading setlist ${setlist.id}: Drive has a file for it that this sync could not read. It is retried next sync.`
     )
@@ -195,7 +186,7 @@ function setlistsToCreate(
     unclaimed.filter(setlist => setlist.lastSyncedAt).map(setlist => setlistKey(setlist))
   )
   return unclaimed.filter(setlist => {
-    const twin = syncedTwinOf(session, setlist, localSetlists)
+    const twin = syncedTwinOf(run, setlist, localSetlists)
     if (!twin && (setlist.lastSyncedAt || !reuploading.has(setlistKey(setlist)))) return true
     console.warn(
       `[DriveSync] Not uploading setlist ${setlist.id}: it is the same setlist as ` +
@@ -208,15 +199,15 @@ function setlistsToCreate(
 
 /** Push setlists to Drive (new ones in batches) */
 export async function pushSetlists(
-  session: SyncSession,
+  run: SyncRun,
   progressCallback: ProgressCallback | null = null
 ): Promise<void> {
-  const localSetlists = await session.db.getAllSetlists()
+  const localSetlists = await run.db.getAllSetlists()
 
   // Only the setlists that need syncing
   const toSync: Setlist[] = []
   for (const setlist of localSetlists) {
-    if (await setlistNeedsSync(session, setlist)) toSync.push(setlist)
+    if (await setlistNeedsSync(run, setlist)) toSync.push(setlist)
   }
   const report = (uploaded: number) =>
     progressCallback?.({
@@ -235,7 +226,7 @@ export async function pushSetlists(
 
   // Those whose file is in Drive are updated; the others are new, or their file is gone
   const updated = toSync.filter(
-    setlist => setlist.fileRef && session.fileExistsInDrive(setlist.fileRef)
+    setlist => setlist.fileRef && run.fileExistsInDrive(setlist.fileRef)
   )
   const created = toSync.filter(setlist => !updated.includes(setlist))
   for (const setlist of created) {
@@ -245,7 +236,7 @@ export async function pushSetlists(
       setlist.fileRev = null
     }
   }
-  const newSetlists = setlistsToCreate(session, created, localSetlists)
+  const newSetlists = setlistsToCreate(run, created, localSetlists)
 
   const recordBatch = async (
     batch: Setlist[],
@@ -258,20 +249,20 @@ export async function pushSetlists(
       recordSetlistUpload(setlist, result)
       saved.push(setlist)
     })
-    if (saved.length > 0) await session.db.saveSetlistsSent(saved)
+    if (saved.length > 0) await run.db.saveSetlistsSent(saved)
     return saved.length
   }
-  const uploadOne = (setlist: Setlist) => pushSetlist(session, setlist)
+  const uploadOne = (setlist: Setlist) => pushSetlist(run, setlist)
   const describe = (setlist: Setlist) => `setlist ${setlist.id}`
 
   const uploaded = await uploadInBatches(newSetlists, BATCH_SIZE, {
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await session.space.createMany(
+        await run.space.createMany(
           'setlists',
           batch.map(setlist => ({
-            input: fileInput(setlistMetadata(session, setlist)),
+            input: fileInput(setlistMetadata(run, setlist)),
             body: setlistJson(setlist),
           }))
         )
@@ -285,10 +276,10 @@ export async function pushSetlists(
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await session.space.updateMany(
+        await run.space.updateMany(
           batch.map(setlist => ({
             ref: setlist.fileRef as string,
-            input: updateInput(setlistMetadata(session, setlist), 'setlist'),
+            input: updateInput(setlistMetadata(run, setlist), 'setlist'),
             body: setlistJson(setlist),
           }))
         )
@@ -300,16 +291,16 @@ export async function pushSetlists(
 }
 
 /** Push a single setlist to Drive: a new file, or an update of its file */
-export async function pushSetlist(session: SyncSession, setlist: Setlist): Promise<void> {
+export async function pushSetlist(run: SyncRun, setlist: Setlist): Promise<void> {
   try {
     const content = setlistJson(setlist)
-    const metadata = setlistMetadata(session, setlist)
+    const metadata = setlistMetadata(run, setlist)
     const result = setlist.fileRef
       ? // (metadata too, so the file name follows e.g. a changed date or leader)
-        await session.space.update(setlist.fileRef, updateInput(metadata, 'setlist'), content)
-      : await session.space.create('setlists', fileInput(metadata), content)
+        await run.space.update(setlist.fileRef, updateInput(metadata, 'setlist'), content)
+      : await run.space.create('setlists', fileInput(metadata), content)
     recordSetlistUpload(setlist, result)
-    await session.db.saveSetlistsSent([setlist])
+    await run.db.saveSetlistsSent([setlist])
   } catch (error) {
     console.error(`[DriveSync] Failed to push setlist ${setlist.id}:`, error)
     throw error // Re-throw for Promise.allSettled
@@ -324,22 +315,22 @@ interface SongUpload {
 
 /** Push songs (flattened variants) to Drive */
 export async function pushSongs(
-  session: SyncSession,
+  run: SyncRun,
   progressCallback: ProgressCallback | null = null
 ): Promise<void> {
   const created: SongUpload[] = []
   const updated: SongUpload[] = []
-  for (const song of await session.db.getAllSongs()) {
+  for (const song of await run.db.getAllSongs()) {
     if (!song.chordproFileId) continue
 
-    const chordproFile = await session.db.getChordPro(song.chordproFileId)
+    const chordproFile = await run.db.getChordPro(song.chordproFileId)
     if (!chordproFile) {
       console.warn(`[DriveSync] ChordPro file not found: ${song.chordproFileId}`)
       continue
     }
-    if (!(await songNeedsSync(session, song, chordproFile))) continue
+    if (!(await songNeedsSync(run, song, chordproFile))) continue
 
-    if (song.fileRef && session.fileExistsInDrive(song.fileRef)) {
+    if (song.fileRef && run.fileExistsInDrive(song.fileRef)) {
       updated.push({ song, chordproFile })
     } else {
       if (song.fileRef) {
@@ -374,21 +365,20 @@ export async function pushSongs(
       recordSongUpload(song, chordproFile, result)
       saved.push(song)
     })
-    if (saved.length > 0) await session.db.saveSongsSent(saved)
+    if (saved.length > 0) await run.db.saveSongsSent(saved)
     return saved.length
   }
-  const uploadOne = ({ song, chordproFile }: SongUpload) =>
-    pushSongVariant(session, song, chordproFile)
+  const uploadOne = ({ song, chordproFile }: SongUpload) => pushSongVariant(run, song, chordproFile)
   const describe = ({ song }: SongUpload) => `song ${song.id}/${songUuidOf(song)}`
 
   const uploaded = await uploadInBatches(created, BATCH_SIZE, {
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await session.space.createMany(
+        await run.space.createMany(
           'songs',
           batch.map(({ song, chordproFile }) => ({
-            input: fileInput(songMetadata(session, song, chordproFile)),
+            input: fileInput(songMetadata(run, song, chordproFile)),
             body: chordproFile.content,
           }))
         )
@@ -401,10 +391,10 @@ export async function pushSongs(
     uploadBatch: async batch =>
       recordBatch(
         batch,
-        await session.space.updateMany(
+        await run.space.updateMany(
           batch.map(({ song, chordproFile }) => ({
             ref: song.fileRef as string,
-            input: updateInput(songMetadata(session, song, chordproFile), 'song'),
+            input: updateInput(songMetadata(run, song, chordproFile), 'song'),
             body: chordproFile.content,
           }))
         )
@@ -417,21 +407,17 @@ export async function pushSongs(
 
 /** Push a specific song variant to Drive: a new file, or an update of its file */
 export async function pushSongVariant(
-  session: SyncSession,
+  run: SyncRun,
   song: SongRecord,
   chordproFile: ChordProRecord
 ): Promise<void> {
   try {
-    const metadata = songMetadata(session, song, chordproFile)
+    const metadata = songMetadata(run, song, chordproFile)
     const result = song.fileRef
-      ? await session.space.update(
-          song.fileRef,
-          updateInput(metadata, 'song'),
-          chordproFile.content
-        )
-      : await session.space.create('songs', fileInput(metadata), chordproFile.content)
+      ? await run.space.update(song.fileRef, updateInput(metadata, 'song'), chordproFile.content)
+      : await run.space.create('songs', fileInput(metadata), chordproFile.content)
     recordSongUpload(song, chordproFile, result)
-    await session.db.saveSongsSent([song])
+    await run.db.saveSongsSent([song])
   } catch (error) {
     console.error(`[DriveSync] Failed to push song ${song.id}/${songUuidOf(song)}:`, error)
     throw error

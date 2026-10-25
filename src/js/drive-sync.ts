@@ -12,7 +12,7 @@
  * - Whether a record has changes that aren't in Drive: sync/changes.ts
  */
 
-import type { Setlist, Space, SpaceMember } from './data-types.ts'
+import type { Space, SpaceMember } from './data-types.ts'
 import { ChordlessDB, getCurrentDB } from './db.ts'
 import { GOOGLE_CLIENT_ID } from './google-auth.ts'
 import { ChordProParser } from './parser.ts'
@@ -21,20 +21,15 @@ import { getCurrentSpace, getSpaceById, setSpaceReadOnly } from './space.ts'
 import { SpaceDB } from './space-db.ts'
 import { driveStorage } from './storage/browser-drive.ts'
 import { storageFor } from './storage/space-storage.ts'
-import type { RootInfo, SpaceStorage, StorageBackend, StoredFile } from './storage/types.ts'
-import {
-  setlistHasLocalChanges,
-  setlistIdOf,
-  songHasLocalChanges,
-  songUuidOf,
-} from './sync/changes.ts'
+import type { RootInfo, SpaceStorage, StorageBackend } from './storage/types.ts'
+import { setlistHasLocalChanges, songHasLocalChanges, songUuidOf } from './sync/changes.ts'
 import { pullSetlists, pullSongs } from './sync/pull.ts'
 import { pushSetlists, pushSongs } from './sync/push.ts'
 
 export type { ProgressCallback, SyncProgress } from './sync/session.ts'
 
 import { ChangeTokenLost } from './storage/types.ts'
-import type { ProgressCallback, ResetSetlist, SyncSession } from './sync/session.ts'
+import { type ProgressCallback, type SyncReport, SyncRun } from './sync/session.ts'
 import { errorMessage } from './utils/errors.ts'
 
 /** A local setlist or song with changes that are not in Drive */
@@ -228,7 +223,7 @@ function spaceMemberCache(spaceId: string, record: ReturnType<typeof spaceRecord
 /**
  * Sync Manager for a specific space
  */
-export class DriveSyncManager implements SyncSession {
+export class DriveSyncManager {
   spaceName: string
   spaceId: string | null
   spaceDb: ChordlessDB | null
@@ -239,28 +234,8 @@ export class DriveSyncManager implements SyncSession {
   parser: ChordProParser
   /** The storage backend (Google Drive unless a test says otherwise) */
   storage: StorageBackend
-  /** The space's files, opened once the folder is known and dropped when a sync ends */
+  /** The space's files, opened once the folder is known and dropped when a run ends */
   #space: SpaceStorage | null = null
-  /** The ids of the files in the space's Drive folder, once listed */
-  _driveFileIds: Set<string> | null
-  /** The setlist files in Drive, as listed by the last pull */
-  liveSetlistFiles: StoredFile[] | null
-  /** Whether the last pull of setlists failed to read some file, so it may not know them all */
-  pullIncomplete: boolean
-  /** Whether a file the last pull meant to download could not be */
-  downloadsFailed = false
-  /** During an incremental sync: the refs the feed said are gone (there is no inventory to ask) */
-  #goneRefs: Set<string> | null = null
-  /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
-  pendingDeletedRefs: Set<string>
-  /** The ids of the songs that have a live file in Drive, as listed by the last pull (null: not listed) */
-  liveSongUuids: Set<string> | null
-  /** Whether the user can only read the folder, as the last check found (null: not asked) */
-  readOnly: boolean | null
-  /** How many records the last pull left alone, for a user who can only read (sync/pull.ts) */
-  heldBack = 0
-  /** The setlists the last pull replaced with Drive's, for a user who can only read */
-  resetSetlists: ResetSetlist[] = []
 
   /**
    * @param options.db - Database to sync. Defaults to the database of the space with this id,
@@ -291,14 +266,6 @@ export class DriveSyncManager implements SyncSession {
     this.storage = storage ?? driveStorage
     this.rootRef = null
     this.parser = new ChordProParser()
-
-    // Drive file inventory (for existence checks)
-    this._driveFileIds = null // Set of file IDs that exist in Drive
-    this.liveSetlistFiles = null
-    this.pullIncomplete = false
-    this.pendingDeletedRefs = new Set()
-    this.liveSongUuids = null
-    this.readOnly = null
   }
 
   /** The database, once init() has set it */
@@ -444,29 +411,61 @@ export class DriveSyncManager implements SyncSession {
   }
 
   /**
+   * A run for one operation (a sync, a pull, a push, a reset), which holds what it finds out:
+   * `goneRefs` for a sync from the feed of changes. A test may make one to give a step.
+   */
+  newRun(goneRefs: Set<string> | null = null): SyncRun {
+    return new SyncRun({
+      db: this.db,
+      parser: this.parser,
+      spaceId: this.spaceId,
+      space: this.space,
+      goneRefs,
+    })
+  }
+
+  /** A run has ended: the space's files are opened afresh for the next (its folders may move) */
+  #endRun(): void {
+    this.#space = null
+  }
+
+  /** Do `work` in `run` (an operation's that this is part of), or in a run of its own */
+  async #within<T>(run: SyncRun | undefined, work: (run: SyncRun) => Promise<T>): Promise<T> {
+    if (run) return work(run)
+    try {
+      return await work(this.newRun())
+    } finally {
+      this.#endRun()
+    }
+  }
+
+  /**
    * Full sync: pull from Drive, then push local changes
    */
-  async sync(progressCallback: ProgressCallback | null = null): Promise<{ success: true }> {
+  async sync(
+    progressCallback: ProgressCallback | null = null
+  ): Promise<{ success: true } & SyncReport> {
     progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
 
+    let report: SyncReport
     try {
+      const run = this.newRun()
       // Where the feed of changes stands before anything is read: what changes during this sync
       // is seen by the next incremental one
-      this.#beginRun()
       const feedPosition = await this.#feedPosition()
       // Who the space's folder is shared with, for choosing leaders
       await this.refreshMembers()
-      await this.refreshAccess()
+      await this.refreshAccess(run)
 
       // Before changing anything, check local records belong to this folder
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
-      await this.buildDriveInventory()
+      await this.buildDriveInventory(run)
       // (without the listing the removals below are skipped, and the feed would not name them again)
-      const listed = this._driveFileIds !== null
-      await this.assertRecordsInThisFolder()
+      const listed = run.inventory !== null
+      await this.assertRecordsInThisFolder(run)
 
       // Songs deleted here go in the Drive trash before anything is pulled, or they would come back
-      const trashed = await this.trashPendingDeletions()
+      const trashed = await this.trashPendingDeletions(run)
       if (trashed > 0) {
         progressCallback?.({
           stage: 'pulling',
@@ -476,11 +475,11 @@ export class DriveSyncManager implements SyncSession {
 
       // First, pull changes from Drive
       progressCallback?.({ stage: 'pulling', message: 'Downloading from Drive...' })
-      await this.pullFromDrive(progressCallback)
+      await this.pullFromDrive(progressCallback, run)
 
       // The pull has adopted the live files it could. A setlist whose file is still gone and
       // that wasn't edited here was removed from Drive: remove it here too
-      const removed = await this.removeSetlistsDeletedInDrive()
+      const removed = await this.removeSetlistsDeletedInDrive(run)
       if (removed > 0) {
         progressCallback?.({
           stage: 'pulling',
@@ -489,7 +488,7 @@ export class DriveSyncManager implements SyncSession {
       }
 
       // A song whose file was deleted elsewhere, and not edited here, is deleted here too
-      const goneSongs = await this.removeSongsDeletedInDrive()
+      const goneSongs = await this.removeSongsDeletedInDrive(run)
       if (goneSongs > 0) {
         progressCallback?.({
           stage: 'pulling',
@@ -502,24 +501,25 @@ export class DriveSyncManager implements SyncSession {
       // Then, push local changes (a user who can only read has none to push). If the access
       // check could not be made, a refusal to upload is how a reader is found out
       try {
-        if (!this.readOnly) await this.syncShares()
-        if (!this.readOnly) {
+        if (!run.readOnly) await this.syncShares(run)
+        if (!run.readOnly) {
           progressCallback?.({ stage: 'pushing', message: 'Checking for changes to upload...' })
-          await this.pushToDrive(progressCallback)
+          await this.pushToDrive(progressCallback, run)
         }
       } catch (error) {
-        if (!(await this.foundToBeReadOnly())) throw error
+        if (!(await this.foundToBeReadOnly(run))) throw error
       }
 
       // A file that could not be downloaded, or one not seen to be gone, is not named by the feed
       // again: the place stays where it was, so that it is (the old place names it)
-      if (!this.downloadsFailed && listed) await this.#keepFeedPosition(feedPosition)
+      if (!run.downloadsFailed && listed) await this.#keepFeedPosition(feedPosition)
       progressCallback?.({
         stage: 'complete',
-        message: this.readOnly
-          ? `Sync complete (view-only: your changes stay on this device${this.heldBack ? `, ${this.heldBack} differ from Drive` : ''})`
+        message: run.readOnly
+          ? `Sync complete (view-only: your changes stay on this device${run.heldBack ? `, ${run.heldBack} differ from Drive` : ''})`
           : 'Sync complete!',
       })
+      report = run.report()
     } catch (error) {
       console.error('[DriveSync] Sync failed:', error)
       progressCallback?.({
@@ -530,34 +530,7 @@ export class DriveSyncManager implements SyncSession {
     } finally {
       this.#endRun()
     }
-    return { success: true }
-  }
-
-  /**
-   * Start a sync: what it reports (`heldBack`, `resetSetlists`, `downloadsFailed`) is its own.
-   * `goneRefs` is for a sync from the feed of changes, which has no inventory. Both kinds of sync
-   * begin here and end with `#endRun`, so what one finds out is not carried into the next.
-   */
-  #beginRun(goneRefs: Set<string> | null = null): void {
-    // (in case something did not clear them: only this sync's own pull may say which files are live)
-    this.liveSetlistFiles = null
-    this.liveSongUuids = null
-    this.heldBack = 0
-    this.resetSetlists = []
-    this.downloadsFailed = false
-    this.#goneRefs = goneRefs
-  }
-
-  /** Let go of what a sync found out (what it reports stays, to be read once it has ended) */
-  #endRun(): void {
-    this.#space = null
-    this.#goneRefs = null
-    this._driveFileIds = null
-    this.liveSetlistFiles = null
-    this.pullIncomplete = false
-    this.pendingDeletedRefs = new Set()
-    this.liveSongUuids = null
-    this.readOnly = null
+    return { success: true, ...report }
   }
 
   /**
@@ -590,12 +563,12 @@ export class DriveSyncManager implements SyncSession {
    * The place moves on only when every file it named was dealt with: one that could not be
    * downloaded is named again by the next call, which tries it again.
    * @param options.push - whether to upload local changes too (default yes)
-   * @returns whether a full sync had to be done instead
+   * @returns what it found, and whether a full sync had to be done instead
    */
   async incrementalSync(
     progressCallback: ProgressCallback | null = null,
     { push = true }: { push?: boolean } = {}
-  ): Promise<{ success: true; full: boolean }> {
+  ): Promise<{ success: true; full: boolean } & SyncReport> {
     const feed = this.space.changes
     const token = feed ? await this.#changeToken.get() : null
     if (!feed || !token) return { ...(await this.sync(progressCallback)), full: true }
@@ -610,36 +583,37 @@ export class DriveSyncManager implements SyncSession {
     }
     // (who the folder is shared with changes rarely: read it again now and then, not at every sync)
     await this.#refreshMembersIfOld()
-    if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
-      // (nothing to pull and nothing to push: the one request was all it took)
-      await this.#changeToken.set(changes.token)
-      return { success: true, full: false }
-    }
-    const songs = changes.changed.filter(c => c.collection === 'songs').map(c => c.file)
-    const setlists = changes.changed.filter(c => c.collection === 'setlists').map(c => c.file)
-
-    progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
+    const run = this.newRun(new Set(changes.gone))
     try {
-      this.#beginRun(new Set(changes.gone))
-      await this.refreshAccess()
-      await this.trashPendingDeletions()
+      if (!push && changes.changed.length === 0 && changes.gone.length === 0) {
+        // (nothing to pull and nothing to push: the one request was all it took)
+        await this.#changeToken.set(changes.token)
+        return { success: true, full: false, ...run.report() }
+      }
+      const songs = changes.changed.filter(c => c.collection === 'songs').map(c => c.file)
+      const setlists = changes.changed.filter(c => c.collection === 'setlists').map(c => c.file)
 
-      if (setlists.length > 0) await pullSetlists(this, progressCallback, setlists)
-      if (songs.length > 0) await pullSongs(this, progressCallback, songs)
-      else this.liveSongUuids = new Set()
+      progressCallback?.({ stage: 'starting', message: 'Starting sync...' })
+      await this.refreshAccess(run)
+      await this.trashPendingDeletions(run)
+
+      if (setlists.length > 0) await pullSetlists(run, progressCallback, setlists)
+      if (songs.length > 0) await pullSongs(run, progressCallback, songs)
+      else run.liveSongUuids = new Set()
       if (changes.gone.length > 0) {
-        await this.removeSetlistsDeletedInDrive()
-        await this.removeSongsDeletedInDrive()
+        await this.removeSetlistsDeletedInDrive(run)
+        await this.removeSongsDeletedInDrive(run)
         // What is left of them was edited here. The feed says a file is gone once, so the record
         // lets go of it now, or a later sync would update a file in the bin
-        await this.#unlinkEditedGone()
+        await this.#unlinkEditedGone(new Set(changes.gone))
       }
 
       // (a user who can only read has nothing to push: it finds that out itself)
-      if (push) await this.pushToDrive(progressCallback)
+      if (push) await this.pushToDrive(progressCallback, run)
 
-      if (!this.downloadsFailed) await this.#changeToken.set(changes.token)
+      if (!run.downloadsFailed) await this.#changeToken.set(changes.token)
       progressCallback?.({ stage: 'complete', message: 'Sync complete!' })
+      return { success: true, full: false, ...run.report() }
     } catch (error) {
       console.error('[DriveSync] Incremental sync failed:', error)
       progressCallback?.({
@@ -650,7 +624,6 @@ export class DriveSyncManager implements SyncSession {
     } finally {
       this.#endRun()
     }
-    return { success: true, full: false }
   }
 
   /**
@@ -658,8 +631,7 @@ export class DriveSyncManager implements SyncSession {
    * then as one never uploaded, and the push makes a new file. A record not edited here keeps its
    * link and what it knows of the file, so that the pull can still bring Drive's version over it.
    */
-  async #unlinkEditedGone(): Promise<void> {
-    const gone = this.#goneRefs as Set<string>
+  async #unlinkEditedGone(gone: Set<string>): Promise<void> {
     const edited = new Set<string>()
     for (const setlist of await this.db.getAllSetlists()) {
       if (setlist.fileRef && gone.has(setlist.fileRef) && setlistHasLocalChanges(setlist)) {
@@ -688,15 +660,15 @@ export class DriveSyncManager implements SyncSession {
    * is not pulled again meanwhile.
    * @returns how many were put in the trash
    */
-  async trashPendingDeletions(): Promise<number> {
+  async trashPendingDeletions(run: SyncRun): Promise<number> {
     const pending = await this.db.getPendingDeletions()
-    this.pendingDeletedRefs = new Set(pending.map(entry => entry.ref))
+    run.pendingDeletedRefs = new Set(pending.map(entry => entry.ref))
     let trashed = 0
     for (const entry of pending) {
       try {
-        await this.space.trash(entry.ref)
+        await run.space.trash(entry.ref)
         await this.db.clearPendingDeletion(entry.ref)
-        this.pendingDeletedRefs.delete(entry.ref)
+        run.pendingDeletedRefs.delete(entry.ref)
         trashed++
       } catch (error) {
         console.warn(`[DriveSync] Could not put ${entry.ref} in the Drive trash yet:`, error)
@@ -711,12 +683,13 @@ export class DriveSyncManager implements SyncSession {
    * goes back to Drive with the push.
    * @returns how many were removed
    */
-  async removeSongsDeletedInDrive(): Promise<number> {
-    if ((!this._driveFileIds && !this.#goneRefs) || !this.liveSongUuids) return 0
+  async removeSongsDeletedInDrive(run: SyncRun): Promise<number> {
+    const live = run.liveSongUuids
+    if (!run.knowsWhatIsGone || !live) return 0
     let removed = 0
     for (const song of await this.db.getAllSongs()) {
-      if (!song.fileRef || this.fileExistsInDrive(song.fileRef)) continue
-      if (this.liveSongUuids.has(songUuidOf(song))) continue
+      if (!song.fileRef || run.fileExistsInDrive(song.fileRef)) continue
+      if (live.has(songUuidOf(song))) continue
       const chordproFile = await this.db.getChordPro(song.chordproFileId)
       if (!chordproFile || songHasLocalChanges(song, chordproFile)) continue
       await this.db.deleteSong(song.uuid, { remember: false })
@@ -726,12 +699,12 @@ export class DriveSyncManager implements SyncSession {
   }
 
   /** Update and clean up this space's share links (see share-manager.ts) */
-  async syncShares(): Promise<number> {
+  async syncShares(run: SyncRun): Promise<number> {
     try {
       return await syncShares({
         db: this.db,
         spaceId: this.spaceId,
-        space: this.space,
+        space: run.space,
       })
     } catch (error) {
       // Shares must never stop setlists and songs syncing
@@ -744,17 +717,17 @@ export class DriveSyncManager implements SyncSession {
    * Build inventory of all file IDs that exist in Drive
    * This is called at the start of sync to detect missing files
    */
-  async buildDriveInventory(): Promise<void> {
+  async buildDriveInventory(run: SyncRun): Promise<void> {
     // (an incremental sync does not list the folders: the feed said what is gone)
-    if (this.#goneRefs) return
+    if (run.goneRefs) return
     try {
-      this._driveFileIds = await this.space.inventory()
+      run.inventory = await run.space.inventory()
     } catch (error) {
       // Without a complete inventory we can't tell which files are missing, so
       // skip the check (fileExistsInDrive assumes they exist). An incomplete set
       // would make every unlisted file look deleted and get re-uploaded.
       console.error('[DriveSync] Failed to build Drive inventory, skipping check:', error)
-      this._driveFileIds = null
+      run.inventory = null
     }
   }
 
@@ -779,22 +752,22 @@ export class DriveSyncManager implements SyncSession {
    * can't be asked, the user is taken to have write access, as before: nothing changes.
    * @returns whether the user can only read the folder
    */
-  async refreshAccess(): Promise<boolean> {
+  async refreshAccess(run: SyncRun): Promise<boolean> {
     let canAdd: boolean | null | undefined
     try {
       canAdd = (await this.storage.inspectRoot(this.folderId))?.canWrite
     } catch (error) {
       console.warn('[DriveSync] Could not check access to the space folder:', error)
     }
-    this.readOnly = canAdd === false
+    run.readOnly = canAdd === false
     if (canAdd !== undefined && canAdd !== null) {
       try {
-        await this.#memberCache.setReadOnly?.(this.readOnly)
+        await this.#memberCache.setReadOnly?.(run.readOnly)
       } catch (error) {
         console.warn('[DriveSync] Could not record the access to the space folder:', error)
       }
     }
-    return this.readOnly
+    return run.readOnly
   }
 
   /**
@@ -802,8 +775,8 @@ export class DriveSyncManager implements SyncSession {
    * A reader whose first check couldn't be made is found out by their refused upload. (Any
    * failure asks, but only an answer from Drive that says read-only counts.)
    */
-  async foundToBeReadOnly(): Promise<boolean> {
-    return this.refreshAccess()
+  async foundToBeReadOnly(run: SyncRun): Promise<boolean> {
+    return this.refreshAccess(run)
   }
 
   /**
@@ -813,16 +786,16 @@ export class DriveSyncManager implements SyncSession {
    * in another folder that would duplicate them, so stop instead. Needs the
    * inventory; skipped if it couldn't be built.
    */
-  async assertRecordsInThisFolder(): Promise<void> {
-    if (!this._driveFileIds) return
+  async assertRecordsInThisFolder(run: SyncRun): Promise<void> {
+    if (!run.inventory) return
 
     const missing = [...(await this.db.getAllSetlists()), ...(await this.db.getAllSongs())].filter(
-      record => record.fileRef && !this.fileExistsInDrive(record.fileRef)
+      record => record.fileRef && !run.fileExistsInDrive(record.fileRef)
     )
 
     let elsewhere = 0
     for (const record of missing) {
-      const file = await this.space.status(record.fileRef as string)
+      const file = await run.space.status(record.fileRef as string)
       if (file && !file.trashed) elsewhere++
     }
     if (elsewhere > 0) {
@@ -838,49 +811,18 @@ export class DriveSyncManager implements SyncSession {
    * as it was. Needs the inventory; skipped if it couldn't be built.
    * @returns how many setlists were removed
    */
-  async removeSetlistsDeletedInDrive(): Promise<number> {
-    if (!this._driveFileIds && !this.#goneRefs) return 0
+  async removeSetlistsDeletedInDrive(run: SyncRun): Promise<number> {
+    if (!run.knowsWhatIsGone) return 0
 
     let removed = 0
     for (const setlist of await this.db.getAllSetlists()) {
-      if (!setlist.fileRef || this.fileExistsInDrive(setlist.fileRef)) continue
-      if (this.hasLiveFileOfItsOwn(setlist)) continue
+      if (!setlist.fileRef || run.fileExistsInDrive(setlist.fileRef)) continue
+      if (run.hasLiveFileOfItsOwn(setlist)) continue
       if (setlistHasLocalChanges(setlist)) continue
       await this.db.deleteSetlist(setlist.id)
       removed++
     }
     return removed
-  }
-
-  /**
-   * Check if a Drive file ID actually exists in Drive
-   */
-  fileExistsInDrive(fileRef: string): boolean {
-    // (an incremental sync has no inventory, only the files the feed said are gone)
-    if (this.#goneRefs) return !this.#goneRefs.has(fileRef)
-    if (!this._driveFileIds) {
-      // Inventory not built, assume file exists (conservative)
-      return true
-    }
-    return this._driveFileIds.has(fileRef)
-  }
-
-  /**
-   * Whether a local record has no Drive file to be found: it never had one, or the one it
-   * had is no longer in the folder. (With no inventory, any file is assumed to be there.)
-   */
-  isOrphaned(record: { fileRef?: string | null }): boolean {
-    return !record.fileRef || !this.fileExistsInDrive(record.fileRef)
-  }
-
-  /**
-   * Whether the last pull saw a live Drive file for this setlist id. When this device's record
-   * has no file of its own that is still there, that file is the setlist's: the pull should have
-   * adopted it, and did not if its download failed. Uploading the record then would store the
-   * setlist twice, so the push and the removal leave it until a pull succeeds.
-   */
-  hasLiveFileOfItsOwn(setlist: Setlist): boolean {
-    return (this.liveSetlistFiles ?? []).some(file => setlistIdOf(file) === setlist.id)
   }
 
   /**
@@ -900,11 +842,11 @@ export class DriveSyncManager implements SyncSession {
     { discardLocal = false }: { discardLocal?: boolean } = {}
   ): Promise<void> {
     try {
+      const run = this.newRun()
       const feedPosition = await this.#feedPosition()
-      this.downloadsFailed = false
       progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
-      await this.buildDriveInventory()
-      if (!this._driveFileIds) {
+      await this.buildDriveInventory(run)
+      if (!run.inventory) {
         throw new Error("Couldn't list your Drive files, so nothing was changed. Try again.")
       }
 
@@ -922,15 +864,12 @@ export class DriveSyncManager implements SyncSession {
       // below stops short, the next sync must list everything)
       await this.#changeToken.clear()
 
-      await this.pullFromDrive(progressCallback)
+      await this.pullFromDrive(progressCallback, run)
       // (a file the reset could not download is missing here, and the old place would not name it)
-      await this.#keepFeedPosition(this.downloadsFailed ? null : feedPosition)
+      await this.#keepFeedPosition(run.downloadsFailed ? null : feedPosition)
       progressCallback?.({ stage: 'complete', message: 'Reset complete' })
     } finally {
-      this.#space = null
-      this._driveFileIds = null
-      this.liveSetlistFiles = null
-      this.liveSongUuids = null
+      this.#endRun()
     }
   }
 
@@ -989,40 +928,55 @@ export class DriveSyncManager implements SyncSession {
   }
 
   /**
-   * Pull changes from Drive to local
+   * Pull changes from Drive, as part of `run` (a sync's), or on its own
    */
-  async pullFromDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
-    // Pull setlists
-    progressCallback?.({ stage: 'pulling', message: 'Checking setlists...', current: 0, total: 1 })
-    await pullSetlists(this, progressCallback)
+  pullFromDrive(
+    progressCallback: ProgressCallback | null = null,
+    run?: SyncRun
+  ): Promise<SyncReport> {
+    return this.#within(run, async run => {
+      // Pull setlists
+      progressCallback?.({
+        stage: 'pulling',
+        message: 'Checking setlists...',
+        current: 0,
+        total: 1,
+      })
+      await pullSetlists(run, progressCallback)
 
-    // Pull songs (chordpro files)
-    progressCallback?.({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 })
-    await pullSongs(this, progressCallback)
+      // Pull songs (chordpro files)
+      progressCallback?.({ stage: 'pulling', message: 'Checking songs...', current: 0, total: 1 })
+      await pullSongs(run, progressCallback)
+      return run.report()
+    })
   }
 
   /**
-   * Push local changes to Drive
+   * Push local changes to Drive, as part of `run` (a sync's), or on its own
    */
-  async pushToDrive(progressCallback: ProgressCallback | null = null): Promise<void> {
-    if (this.readOnly ?? (await this.refreshAccess())) {
-      return
-    }
-    const refusals = this.storage.writeRefusals()
-    try {
-      await this.#pushAll(progressCallback)
-    } catch (error) {
-      if (!(await this.foundToBeReadOnly())) throw error
-      return
-    }
-    // Writes that failed were tried again and left for the next sync: were they refused?
-    if (this.storage.writeRefusals() > refusals) await this.foundToBeReadOnly()
+  pushToDrive(
+    progressCallback: ProgressCallback | null = null,
+    run?: SyncRun
+  ): Promise<SyncReport> {
+    return this.#within(run, async run => {
+      if (run.readOnly ?? (await this.refreshAccess(run))) return run.report()
+      const refusals = this.storage.writeRefusals()
+      try {
+        await this.#pushAll(progressCallback, run)
+      } catch (error) {
+        if (!(await this.foundToBeReadOnly(run))) throw error
+        return run.report()
+      }
+      // Writes that failed were tried again and left for the next sync: were they refused?
+      if (this.storage.writeRefusals() > refusals) await this.foundToBeReadOnly(run)
+      return run.report()
+    })
   }
 
-  async #pushAll(progressCallback: ProgressCallback | null): Promise<void> {
+  async #pushAll(progressCallback: ProgressCallback | null, run: SyncRun): Promise<void> {
     // Build inventory of existing Drive files
     progressCallback?.({ stage: 'scanning', message: 'Checking Drive files...' })
-    await this.buildDriveInventory()
+    await this.buildDriveInventory(run)
 
     // Push setlists
     progressCallback?.({
@@ -1031,7 +985,7 @@ export class DriveSyncManager implements SyncSession {
       current: 0,
       total: 1,
     })
-    await pushSetlists(this, progressCallback)
+    await pushSetlists(run, progressCallback)
 
     // Push songs (chordpro files)
     progressCallback?.({
@@ -1040,7 +994,7 @@ export class DriveSyncManager implements SyncSession {
       current: 0,
       total: 1,
     })
-    await pushSongs(this, progressCallback)
+    await pushSongs(run, progressCallback)
   }
 }
 

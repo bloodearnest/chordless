@@ -58,7 +58,7 @@ describe('Drive sync: from the feed of changes', () => {
 
     const result = await phone.sync.incrementalSync(null, { push: false })
 
-    expect(result).to.deep.equal({ success: true, full: false })
+    expect(result).to.include({ success: true, full: false })
     expect(rig.storage.calls).to.deep.equal([])
     expect(rig.storage.feedReads).to.equal(reads + 1)
   })

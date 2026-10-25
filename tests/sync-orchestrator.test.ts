@@ -40,6 +40,14 @@ describe('SyncOrchestrator', () => {
     | 'pullFromDrive'
     | 'resetLocalFromDrive'
 
+  /** What a manager's operation resolves to: nothing found that a person must be told of */
+  const report = (resetSetlists: ResetSetlist[] = []) => ({
+    heldBack: 0,
+    resetSetlists,
+    readOnly: null,
+    downloadsFailed: false,
+  })
+
   /** A manager whose one operation reports `reports`, then fails with `failure` if given */
   function orchestratorWith(
     operation: Operation,
@@ -50,10 +58,10 @@ describe('SyncOrchestrator', () => {
   ) {
     const manager = {
       db,
-      resetSetlists,
       [operation]: async (progress: ProgressCallback) => {
-        for (const report of reports) progress(report as Parameters<ProgressCallback>[0])
+        for (const each of reports) progress(each as Parameters<ProgressCallback>[0])
         if (failure) throw failure
+        return report(resetSetlists)
       },
     }
     const orchestrator = new SyncOrchestrator('Test Church', null)
@@ -75,9 +83,9 @@ describe('SyncOrchestrator', () => {
       const calls: unknown[] = []
       const orchestrator = new SyncOrchestrator('Test Church', null)
       orchestrator.syncManager = {
-        resetSetlists: [],
         incrementalSync: async (_progress: unknown, options: unknown) => {
           calls.push(options)
+          return report()
         },
       } as unknown as DriveSyncManager
 
@@ -92,8 +100,11 @@ describe('SyncOrchestrator', () => {
         release = resolve
       })
       const running = orchestratorWith('sync')
-      const manager = running.syncManager as unknown as { sync: () => Promise<void> }
-      manager.sync = () => held
+      const manager = running.syncManager as unknown as { sync: () => Promise<unknown> }
+      manager.sync = async () => {
+        await held
+        return report()
+      }
       const first = running.sync()
       await new Promise(resolve => setTimeout(resolve, 20))
 
@@ -179,10 +190,6 @@ describe('SyncOrchestrator', () => {
         expect(text()).to.contain(`Your changes to ${setlistTitle(mine)} were replaced`)
         expect(text()).to.contain('+ Beta')
         expect(text()).to.contain('Alpha: key G → A')
-        // said once: the list is emptied
-        expect(
-          (one.syncManager as unknown as { resetSetlists: unknown[] }).resetSetlists
-        ).to.deep.equal([])
 
         // Undo puts back what this device had
         await db.saveSetlist(theirs)

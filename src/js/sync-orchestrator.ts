@@ -13,7 +13,7 @@ import {
   DriveSyncManager,
   isSyncAvailable,
 } from './drive-sync.ts'
-import type { ResetSetlist } from './sync/session.ts'
+import type { ResetSetlist, SyncReport } from './sync/session.ts'
 import { describeSetlistChange } from './sync/setlist-diff.ts'
 import { withSyncLock } from './sync-lock.ts'
 import { toast } from './toast.ts'
@@ -36,9 +36,10 @@ const SUMMARY_LIMIT = 4
  * had changed on this device: tell them what the leader's version has that theirs did not, and
  * offer to put theirs back (docs/SPACES.md, "Read-only: local edits are never blocked")
  */
-async function tellOfReset(manager: DriveSyncManager): Promise<void> {
-  const reset = manager.resetSetlists
-  manager.resetSetlists = []
+async function tellOfReset(
+  manager: DriveSyncManager,
+  { resetSetlists: reset }: SyncReport
+): Promise<void> {
   if (reset.length === 0) return
   const { db } = manager
   const titles = new Map<string, string>()
@@ -170,8 +171,7 @@ export class SyncOrchestrator {
       { starting: 'Starting sync...', complete: 'Sync complete!' },
       progressCallback,
       async (manager, progress) => {
-        await manager.sync(progress)
-        await tellOfReset(manager)
+        await tellOfReset(manager, await manager.sync(progress))
       }
     )
   }
@@ -188,8 +188,7 @@ export class SyncOrchestrator {
     const result = await withSyncLock(
       () =>
         this.#execute('Incremental sync', {}, progressCallback, async (manager, progress) => {
-          await manager.incrementalSync(progress, { push })
-          await tellOfReset(manager)
+          await tellOfReset(manager, await manager.incrementalSync(progress, { push }))
         }),
       { skipIfBusy }
     )
@@ -270,8 +269,7 @@ export class SyncOrchestrator {
       { starting: 'Pulling from Drive...', complete: 'Pull complete!' },
       progressCallback,
       async (manager, progress) => {
-        await manager.pullFromDrive(progress)
-        await tellOfReset(manager)
+        await tellOfReset(manager, await manager.pullFromDrive(progress))
       }
     )
   }

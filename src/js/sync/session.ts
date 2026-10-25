@@ -1,11 +1,12 @@
 /**
- * What the pull and the push of a Drive sync (pull.ts, push.ts) share. The DriveSyncManager
- * keeps this state for the length of a sync and passes itself to them.
+ * What the pull and the push of a sync (pull.ts, push.ts) share: the run they are part of
+ * (`SyncRun`), its progress, and reading files in batches.
  */
 import type { Setlist } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import type { ChordProParser } from '../parser.ts'
 import type { SpaceStorage, StoredFile } from '../storage/types.ts'
+import { setlistIdOf } from './changes.ts'
 
 /** What a sync reports while it runs */
 export interface SyncProgress {
@@ -60,39 +61,103 @@ export interface ResetSetlist {
   after: Setlist
 }
 
-export interface SyncSession {
+/** What a sync reports once it has ended */
+export interface SyncReport {
+  /** How many charts the pull left alone because they have local changes that can't go back */
+  heldBack: number
+  /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
+  resetSetlists: ResetSetlist[]
+  /** Whether the user can only read the folder (null: it was not asked) */
+  readOnly: boolean | null
+  /** Whether a file the pull meant to download could not be */
+  downloadsFailed: boolean
+}
+
+/**
+ * One sync (or pull, push or reset), and what it finds out as it goes: what is in the space, which
+ * files are live, whether the user can only read. Made afresh for each by the DriveSyncManager and
+ * passed to the pull and the push (pull.ts, push.ts), so nothing one finds out is carried into the
+ * next; what it reports is its `report()`.
+ */
+export class SyncRun {
   readonly db: ChordlessDB
   readonly parser: ChordProParser
   readonly spaceId: string | null
   /** The space's files */
   readonly space: SpaceStorage
+  /**
+   * A sync from the feed of changes: the refs the feed said are gone. It lists nothing, so this is
+   * all it knows of what is no longer there (null: a sync that lists the space)
+   */
+  readonly goneRefs: Set<string> | null
 
-  /** The setlist files in Drive, as listed by the last pull */
-  liveSetlistFiles: StoredFile[] | null
+  /** The refs of the files in the space, once listed (null: not listed, or the listing failed) */
+  inventory: Set<string> | null = null
+  /** The setlist files in Drive, as listed by the pull */
+  liveSetlistFiles: StoredFile[] | null = null
   /** Whether the user can only read the folder (null: not asked yet) */
-  readOnly: boolean | null
+  readOnly: boolean | null = null
   /** How many charts the pull left alone because they have local changes that can't go back */
-  heldBack: number
+  heldBack = 0
   /** The setlists a pull replaced with Drive's although they had local changes (read-only) */
-  resetSetlists: ResetSetlist[]
-  /** Whether the last pull of setlists failed to read some file, so it may not know them all */
-  pullIncomplete: boolean
+  resetSetlists: ResetSetlist[] = []
+  /** Whether the pull of setlists failed to read some file, so it may not know them all */
+  pullIncomplete = false
   /** Whether a file the pull meant to download could not be (a setlist or a song) */
-  downloadsFailed: boolean
+  downloadsFailed = false
   /** Files this device has deleted the records of and has not yet put in the trash: not to be pulled again */
-  pendingDeletedRefs: Set<string>
-  /** The ids of the songs that have a live file in Drive, as listed by the last pull (null: not listed) */
-  liveSongUuids: Set<string> | null
+  pendingDeletedRefs = new Set<string>()
+  /** The ids of the songs that have a live file in Drive, as listed by the pull (null: not listed) */
+  liveSongUuids: Set<string> | null = null
+
+  constructor(options: {
+    db: ChordlessDB
+    parser: ChordProParser
+    spaceId: string | null
+    space: SpaceStorage
+    goneRefs?: Set<string> | null
+  }) {
+    this.db = options.db
+    this.parser = options.parser
+    this.spaceId = options.spaceId
+    this.space = options.space
+    this.goneRefs = options.goneRefs ?? null
+  }
+
+  /** Whether it knows which files are gone: from a listing, or from the feed */
+  get knowsWhatIsGone(): boolean {
+    return this.inventory !== null || this.goneRefs !== null
+  }
 
   /** Whether a Drive file is in the folder (with no inventory, any file is assumed to be) */
-  fileExistsInDrive(fileRef: string): boolean
+  fileExistsInDrive(fileRef: string): boolean {
+    // (a sync from the feed has no inventory, only the files the feed said are gone)
+    if (this.goneRefs) return !this.goneRefs.has(fileRef)
+    // (not listed: assume it is there, which is the safe way round)
+    return this.inventory?.has(fileRef) ?? true
+  }
+
   /** Whether a local record has no Drive file to be found: it never had one, or it is gone */
-  isOrphaned(record: { fileRef?: string | null }): boolean
+  isOrphaned(record: { fileRef?: string | null }): boolean {
+    return !record.fileRef || !this.fileExistsInDrive(record.fileRef)
+  }
+
   /**
-   * Whether the last pull saw a live Drive file for this setlist id. When this device's record
-   * has no file of its own that is still there, that file is the setlist's: the pull should have
-   * adopted it, and did not if its download failed. Uploading the record then would store the
-   * setlist twice, so the push and the removal leave it until a pull succeeds.
+   * Whether the pull saw a live Drive file for this setlist id. When this device's record has no
+   * file of its own that is still there, that file is the setlist's: the pull should have adopted
+   * it, and did not if its download failed. Uploading the record then would store the setlist
+   * twice, so the push and the removal leave it until a pull succeeds.
    */
-  hasLiveFileOfItsOwn(setlist: Setlist): boolean
+  hasLiveFileOfItsOwn(setlist: Setlist): boolean {
+    return (this.liveSetlistFiles ?? []).some(file => setlistIdOf(file) === setlist.id)
+  }
+
+  report(): SyncReport {
+    return {
+      heldBack: this.heldBack,
+      resetSetlists: this.resetSetlists,
+      readOnly: this.readOnly,
+      downloadsFailed: this.downloadsFailed,
+    }
+  }
 }

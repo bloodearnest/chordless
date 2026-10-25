@@ -219,11 +219,11 @@ describe('Drive sync: spaces', () => {
       await syncDevice(leader)
       rig.storage.readOnly = true
       const said: string[] = []
-      await member.sync.sync(progress => said.push(progress.message))
+      const report = await member.sync.sync(progress => said.push(progress.message))
 
       expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
-      expect(member.sync.resetSetlists).to.have.length(1)
-      expect(member.sync.heldBack).to.equal(0)
+      expect(report.resetSetlists).to.have.length(1)
+      expect(report.heldBack).to.equal(0)
       expect(said.at(-1)).to.equal('Sync complete (view-only: your changes stay on this device)')
     })
 
@@ -236,9 +236,9 @@ describe('Drive sync: spaces', () => {
       await editSetlist(leader, setlist.id, { name: 'Leader change' })
       await syncDevice(leader)
       rig.storage.readOnly = true
-      await syncDevice(member)
+      const report = await syncDevice(member)
       expect(must(await member.db.getSetlist(setlist.id)).name).to.equal('Leader change')
-      expect(member.sync.heldBack).to.equal(0)
+      expect(report.heldBack).to.equal(0)
     })
 
     it('keeps a chart it changed when the leader changed it too', async () => {
@@ -255,11 +255,11 @@ describe('Drive sync: spaces', () => {
       await syncDevice(leader)
       rig.storage.readOnly = true
       const said: string[] = []
-      await member.sync.sync(progress => said.push(progress.message))
+      const report = await member.sync.sync(progress => said.push(progress.message))
 
       const song = must(await member.db.getSong('song-1'))
       expect(must(await member.db.getChordPro(song.chordproFileId)).content).to.contain('mine')
-      expect(member.sync.heldBack).to.equal(1)
+      expect(report.heldBack).to.equal(1)
       expect(said.at(-1)).to.contain('1 differ from Drive')
     })
 

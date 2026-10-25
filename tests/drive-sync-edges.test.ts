@@ -229,7 +229,7 @@ describe('Drive sync: the less common turns', () => {
     it('says what it reports when there are no charts in Drive at all', async () => {
       const phone = await makeDevice('phone')
       const said: string[] = []
-      await pullSongs(phone.sync, progress => said.push(progress.message))
+      await pullSongs(phone.sync.newRun(), progress => said.push(progress.message))
       expect(said).to.deep.equal(['No songs found in Drive'])
     })
 
@@ -301,7 +301,7 @@ describe('Drive sync: the less common turns', () => {
       await phone.db.saveChordPro({ ...chart, content: '{title: Amazing}\n[G]Edited here' })
       const [file] = rig.storage.list(each => each.props.type === 'chordpro')
       rig.storage.edit(file.ref, '{title: Amazing}\n[G]Edited in Drive')
-      await pullSongs(phone.sync)
+      await pullSongs(phone.sync.newRun())
       const after = must(await phone.db.getChordPro(song.chordproFileId))
       expect(after.content).to.contain('Edited in Drive')
     })
@@ -538,7 +538,7 @@ describe('Drive sync: the less common turns', () => {
       phone.db.getAllSetlists = async () => {
         throw new Error('unreadable')
       }
-      expect(await phone.sync.syncShares()).to.equal(0)
+      expect(await phone.sync.syncShares(phone.sync.newRun())).to.equal(0)
     })
   })
 
@@ -563,12 +563,13 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const song = must(await phone.db.getSong('song-1'))
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
-      expect(await songNeedsSync(phone.sync, song, chart)).to.equal(false)
-      await phone.sync.buildDriveInventory()
+      const run = phone.sync.newRun()
+      expect(await songNeedsSync(run, song, chart)).to.equal(false)
+      await phone.sync.buildDriveInventory(run)
       rig.storage.remove(must(song.fileRef))
-      await phone.sync.buildDriveInventory()
-      expect(await songNeedsSync(phone.sync, song, chart)).to.equal(true)
-      expect(await songNeedsSync(phone.sync, { ...song, fileRef: null }, chart)).to.equal(true)
+      await phone.sync.buildDriveInventory(run)
+      expect(await songNeedsSync(run, song, chart)).to.equal(true)
+      expect(await songNeedsSync(run, { ...song, fileRef: null }, chart)).to.equal(true)
     })
   })
 
@@ -579,7 +580,7 @@ describe('Drive sync: the less common turns', () => {
         throw new Error('cannot record')
       }
       rig.storage.readOnly = true
-      expect(await phone.sync.refreshAccess()).to.equal(true)
+      expect(await phone.sync.refreshAccess(phone.sync.newRun())).to.equal(true)
     })
 
     it('is found out by a refused upload when the first check could not be made', async () => {
@@ -589,8 +590,7 @@ describe('Drive sync: the less common turns', () => {
       await editSetlist(phone, (await phone.db.getAllSetlists())[0].id, { name: 'Edited' })
       rig.storage.fail('inspectRoot')
       rig.storage.readOnly = true
-      await phone.sync.pushToDrive()
-      expect(phone.sync.readOnly).to.equal(true)
+      expect((await phone.sync.pushToDrive()).readOnly).to.equal(true)
     })
   })
 
@@ -604,8 +604,9 @@ describe('Drive sync: the less common turns', () => {
       tablet.db.getSetlist = async () => {
         throw new Error('unreadable')
       }
-      await pullSetlists(tablet.sync)
-      expect(tablet.sync.pullIncomplete).to.equal(true)
+      const run = tablet.sync.newRun()
+      await pullSetlists(run)
+      expect(run.pullIncomplete).to.equal(true)
       tablet.db.getSetlist = real
     })
 
@@ -615,7 +616,7 @@ describe('Drive sync: the less common turns', () => {
       await syncDevice(phone)
       const record = must(await phone.db.getSetlist(setlist.id))
       await phone.db.saveSetlist({ ...record, fileRev: 'out of date' })
-      await pullSetlists(phone.sync)
+      await pullSetlists(phone.sync.newRun())
       expect(must(await phone.db.getSetlist(setlist.id)).fileRev).to.not.equal('out of date')
     })
 
@@ -625,8 +626,9 @@ describe('Drive sync: the less common turns', () => {
       await addSetlist(phone, { name: 'There' })
       await syncDevice(phone)
       rig.storage.fail('readText', { times: 5 })
-      await pullSetlists(tablet.sync)
-      expect(tablet.sync.pullIncomplete).to.equal(true)
+      const run = tablet.sync.newRun()
+      await pullSetlists(run)
+      expect(run.pullIncomplete).to.equal(true)
     })
   })
 
@@ -662,7 +664,7 @@ describe('Drive sync: the less common turns', () => {
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       await syncDevice(phone)
       rig.storage.fail('readText', { times: 5 })
-      await pullSongs(tablet.sync)
+      await pullSongs(tablet.sync.newRun())
       expect(await tablet.db.getSong('song-1')).to.equal(undefined)
     })
   })
@@ -674,8 +676,8 @@ describe('Drive sync: the less common turns', () => {
       await addSong(phone, { uuid: 'song-1', title: 'One', content: '{title: One}\n[G]One' })
       const song = must(await phone.db.getSong('song-1'))
       const chart = must(await phone.db.getChordPro(song.chordproFileId))
-      await pushSetlist(phone.sync, setlist)
-      await pushSongVariant(phone.sync, song, chart)
+      await pushSetlist(phone.sync.newRun(), setlist)
+      await pushSongVariant(phone.sync.newRun(), song, chart)
       expect(rig.driveSetlistFiles()).to.have.length(1)
       expect(rig.storage.list(each => each.props.type === 'chordpro')).to.have.length(1)
     })
@@ -686,7 +688,7 @@ describe('Drive sync: the less common turns', () => {
       rig.storage.fail('create', { times: 5 })
       let failed = false
       try {
-        await pushSetlist(phone.sync, setlist)
+        await pushSetlist(phone.sync.newRun(), setlist)
       } catch {
         failed = true
       }
@@ -791,10 +793,12 @@ describe('Drive sync: the less common turns', () => {
       const setlist = await addSetlist(phone, { name: 'Mine' })
       await syncDevice(phone)
       await editSetlist(phone, setlist.id, { name: 'Edited' })
-      phone.sync.readOnly = false
+      // (the check said they could write)
+      const run = phone.sync.newRun()
+      run.readOnly = false
       rig.storage.readOnly = true
-      await phone.sync.pushToDrive()
-      expect(phone.sync.readOnly).to.equal(true)
+      await phone.sync.pushToDrive(null, run)
+      expect(run.readOnly).to.equal(true)
     })
 
     it('stops quietly when a refused write throws and the user turns out to be a reader', async () => {
@@ -803,10 +807,26 @@ describe('Drive sync: the less common turns', () => {
       phone.db.getAllSetlists = async () => {
         throw Object.assign(new Error('The user does not have write access'), { status: 403 })
       }
-      phone.sync.readOnly = false
+      // (the check said they could write)
+      const run = phone.sync.newRun()
+      run.readOnly = false
       rig.storage.readOnly = true
-      await phone.sync.pushToDrive()
-      expect(phone.sync.readOnly).to.equal(true)
+      await phone.sync.pushToDrive(null, run)
+      expect(run.readOnly).to.equal(true)
+    })
+
+    it('asks afresh at each push whether the user can only read: a push on its own keeps nothing for the next', async () => {
+      const phone = await makeDevice('phone')
+      const setlist = await addSetlist(phone, { name: 'Mine' })
+      await syncDevice(phone)
+      rig.storage.readOnly = true
+      await editSetlist(phone, setlist.id, { name: 'While a reader' })
+      expect((await phone.sync.pushToDrive()).readOnly).to.equal(true)
+
+      // (made a writer since)
+      rig.storage.readOnly = false
+      expect((await phone.sync.pushToDrive()).readOnly).to.equal(false)
+      expect(rig.driveSetlist(setlist.id).name).to.equal('While a reader')
     })
 
     it('fails the sync when the push fails, and the user is not found to be a reader', async () => {
@@ -835,9 +855,10 @@ describe('Drive sync: the less common turns', () => {
     it('leaves a new setlist alone while Drive has a file for it that the pull did not claim', async () => {
       const phone = await makeDevice('phone')
       await addSetlist(phone, { name: 'Waiting' })
-      phone.sync.hasLiveFileOfItsOwn = () => true
-      phone.sync.pullIncomplete = false
-      await pushSetlists(phone.sync)
+      const run = phone.sync.newRun()
+      run.hasLiveFileOfItsOwn = () => true
+      run.pullIncomplete = false
+      await pushSetlists(run)
       expect(rig.driveSetlistFiles()).to.have.length(0)
     })
 

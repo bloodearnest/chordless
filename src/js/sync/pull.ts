@@ -18,7 +18,7 @@ import {
   setlistIdOf,
   songHasLocalChanges,
 } from './changes.ts'
-import { inBatches, type ProgressCallback, type SyncSession } from './session.ts'
+import { inBatches, type ProgressCallback, type SyncRun } from './session.ts'
 import { setlistContent, setlistContentHash } from './setlist-hash.ts'
 import { metadataOfProps, remoteMetadataChanges } from './song-metadata.ts'
 
@@ -107,14 +107,14 @@ async function downloadSetlist(
  * Pull setlists from Drive (with batch database operations)
  */
 export async function pullSetlists(
-  session: SyncSession,
+  run: SyncRun,
   progressCallback: ProgressCallback | null = null,
   files?: StoredFile[]
 ): Promise<void> {
   // Get all setlists from Drive (or only those given: the ones the feed of changes named)
-  const driveSetlists = files ?? (await session.space.list('setlists'))
-  session.liveSetlistFiles = driveSetlists
-  session.pullIncomplete = false
+  const driveSetlists = files ?? (await run.space.list('setlists'))
+  run.liveSetlistFiles = driveSetlists
+  run.pullIncomplete = false
 
   const downloadQueue: SetlistDownload[] = []
   const adopted = new Set<string>()
@@ -125,7 +125,7 @@ export async function pullSetlists(
       const setlistId = setlistIdOf(driveFile)
 
       // Check if we have this setlist locally
-      const localSetlist = await session.db.getSetlist(setlistId)
+      const localSetlist = await run.db.getSetlist(setlistId)
 
       if (!localSetlist) {
         // New setlist, download it
@@ -134,12 +134,12 @@ export async function pullSetlists(
         // Drive's content changed since our last sync if its md5Checksum (computed
         // by Drive) differs from the one we recorded. No clocks involved.
         if (driveFile.rev !== localSetlist.fileRev) {
-          if (session.readOnly && setlistHasLocalChanges(localSetlist)) {
+          if (run.readOnly && setlistHasLocalChanges(localSetlist)) {
             resetting.set(setlistId, localSetlist)
           }
           downloadQueue.push({ driveFile, setlistId, localSetlist })
         }
-      } else if (!adopted.has(setlistId) && session.isOrphaned(localSetlist)) {
+      } else if (!adopted.has(setlistId) && run.isOrphaned(localSetlist)) {
         // The Drive file this device knew is gone (e.g. duplicates were cleaned up), yet
         // another live file holds this setlist: take that one over rather than uploading
         // a copy of it
@@ -147,8 +147,8 @@ export async function pullSetlists(
         downloadQueue.push({ driveFile, setlistId, localSetlist, adopt: true })
       }
     } catch (error) {
-      session.pullIncomplete = true
-      session.downloadsFailed = true
+      run.pullIncomplete = true
+      run.downloadsFailed = true
       console.error(`[DriveSync] Failed to pull setlist ${driveFile.name}:`, error)
     }
   }
@@ -173,7 +173,7 @@ export async function pullSetlists(
   const setlistsToSave: Setlist[] = []
   let completed = 0
   await inBatches(
-    session.space,
+    run.space,
     downloadQueue,
     item => item.driveFile.ref,
     (item, text) => downloadSetlist(item, text),
@@ -189,8 +189,8 @@ export async function pullSetlists(
             total: downloadQueue.length,
           })
         } else {
-          session.pullIncomplete = true
-          session.downloadsFailed = true
+          run.pullIncomplete = true
+          run.downloadsFailed = true
           console.error('[DriveSync] Failed to download setlist:', result.reason)
         }
       }
@@ -198,10 +198,10 @@ export async function pullSetlists(
   )
 
   if (setlistsToSave.length > 0) {
-    await session.db.saveSetlistsBatch(setlistsToSave)
+    await run.db.saveSetlistsBatch(setlistsToSave)
     for (const after of setlistsToSave) {
       const before = resetting.get(after.id)
-      if (before) session.resetSetlists.push({ before, after })
+      if (before) run.resetSetlists.push({ before, after })
     }
   }
 }
@@ -224,11 +224,11 @@ export async function pullSetlists(
  * 5. Parse chordpro content and create/update song records
  */
 export async function pullSongs(
-  session: SyncSession,
+  run: SyncRun,
   progressCallback: ProgressCallback | null = null,
   files?: StoredFile[]
 ): Promise<void> {
-  const driveFiles = files ?? (await session.space.list('songs'))
+  const driveFiles = files ?? (await run.space.list('songs'))
 
   const latestByUuid = new Map<
     string,
@@ -238,7 +238,7 @@ export async function pullSongs(
     const props = file.props
     if (props.type && props.type !== 'chordpro') continue
     // A song deleted here, whose file could not be put in the trash yet, is not to come back
-    if (session.pendingDeletedRefs.has(file.ref)) continue
+    if (run.pendingDeletedRefs.has(file.ref)) continue
     const songUuid = driveSongUuid(props, file.ref)
     const driveModified = new Date(file.modified || file.created || 0)
     const existing = latestByUuid.get(songUuid)
@@ -254,7 +254,7 @@ export async function pullSongs(
     latestByUuid.set(songUuid, { file, props, songUuid, driveModified })
   }
 
-  session.liveSongUuids = new Set(latestByUuid.keys())
+  run.liveSongUuids = new Set(latestByUuid.keys())
 
   if (latestByUuid.size === 0) {
     progressCallback?.({
@@ -273,9 +273,9 @@ export async function pullSongs(
     []
   for (const entry of latestByUuid.values()) {
     const { songUuid, file, props } = entry
-    const localSong = await session.db.getSong(songUuid)
+    const localSong = await run.db.getSong(songUuid)
     const chordproRecord = localSong?.chordproFileId
-      ? await session.db.getChordPro(localSong.chordproFileId)
+      ? await run.db.getChordPro(localSong.chordproFileId)
       : null
 
     let needsDownload = false
@@ -286,8 +286,8 @@ export async function pullSongs(
     } else if (file.rev !== localSong.fileRev) {
       // Drive's content changed since our last sync: its md5Checksum (computed
       // by Drive) differs from the one we recorded
-      if (session.readOnly && chordproRecord && songHasLocalChanges(localSong, chordproRecord)) {
-        session.heldBack++
+      if (run.readOnly && chordproRecord && songHasLocalChanges(localSong, chordproRecord)) {
+        run.heldBack++
       } else {
         needsDownload = true
       }
@@ -304,7 +304,7 @@ export async function pullSongs(
   }
 
   for (const { localSong, file, changes } of metadataOnly) {
-    await session.db.saveSong({ ...localSong, ...changes, ...driveMarkers(file) })
+    await run.db.saveSong({ ...localSong, ...changes, ...driveMarkers(file) })
   }
 
   if (downloads.length === 0) {
@@ -327,10 +327,10 @@ export async function pullSongs(
   })
 
   await inBatches(
-    session.space,
+    run.space,
     downloads,
     item => item.file.ref,
-    (item, text) => downloadSong(session, item, text),
+    (item, text) => downloadSong(run, item, text),
     results => {
       const succeeded = results.filter(result => result.status === 'fulfilled').length
       downloaded += succeeded
@@ -344,7 +344,7 @@ export async function pullSongs(
       }
       for (const result of results) {
         if (result.status === 'rejected') {
-          session.downloadsFailed = true
+          run.downloadsFailed = true
           console.error('[DriveSync] Failed to download song:', result.reason)
         }
       }
@@ -362,20 +362,20 @@ export function titleFromFilename(filename: string | undefined): string {
 }
 
 async function downloadSong(
-  session: SyncSession,
+  run: SyncRun,
   { songUuid, file, props, localSong }: SongDownload,
   chordproContent: string
 ): Promise<void> {
   const remoteHash = hashText(chordproContent)
   const localChart = localSong?.chordproFileId
-    ? await session.db.getChordPro(localSong.chordproFileId)
+    ? await run.db.getChordPro(localSong.chordproFileId)
     : undefined
 
   // (with the chart gone from this device, it is restored from Drive's, whatever the hash)
   if (localChart && localSong?.fileRef === file.ref && localSong.syncedContentHash === remoteHash) {
     // Same chart as we last synced, e.g. a record from before checksums were
     // recorded. Not a remote change: keep local edits, record the checksum.
-    await session.db.saveSong({
+    await run.db.saveSong({
       ...localSong,
       ...driveMarkers(file),
     })
@@ -388,7 +388,7 @@ async function downloadSong(
 
   const chordproFileId = localSong?.chordproFileId || `chordpro-${crypto.randomUUID()}`
 
-  const parsed = session.parser.parse(chordproContent)
+  const parsed = run.parser.parse(chordproContent)
   const { metadata } = parsed
   // What Drive's file properties and this device's copy know of the song fill in what the
   // chart lacks
@@ -401,7 +401,7 @@ async function downloadSong(
   const contentHash = remoteHash
 
   const now = new Date().toISOString()
-  await session.db.saveChordPro({
+  await run.db.saveChordPro({
     id: chordproFileId,
     content: chordproContent,
     contentHash,
@@ -454,5 +454,5 @@ async function downloadSong(
     contentHash,
   }
 
-  await session.db.saveSong(songRecord)
+  await run.db.saveSong(songRecord)
 }
