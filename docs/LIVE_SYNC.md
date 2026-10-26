@@ -79,12 +79,15 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   with the file id, and only for 48 h, and a ping carries nothing: the cost of a squat is that the
   recipients wait for the tick.
 - A share room takes 500 sockets, then answers 503.
-- **The sharer** says `changed` after the sync that uploaded the update (`syncShares` runs inside
-  it) is done. A personal space can do this too: the room needs no account.
+- **The sharer** says `changed` when the share's file has been uploaded (see "The client"). A
+  personal space can do this too: the room needs no account.
 - **A recipient** live on the link fetches the share again, as it is now: `GET
   /api/share/<id>?fresh=1`. The edge cache keeps Drive quiet for a congregation (one request a
-  minute per file); `fresh` takes a cached answer only if it is under 3 s old, so Drive is asked at
-  most that often per file in a data centre, however many ask or what they send. The result is
+  minute per file); `fresh` skips it and asks Drive, but with **collapsed forwarding**: while Drive is
+  being asked about a file, every request for it (fresh or not) waits for that answer and does not ask
+  again, and a failure is shared and not kept. So a congregation fetching at once is one question to
+  Drive, and one person looping on `?fresh=1` is at most one at a time per file (per Worker instance:
+  best effort, not a global limit). The result is
   saved as a sync would (`reloadShare`, origin `sync`), so the page showing the share follows it and
   says what changed. Nothing happens for a share the device has no copy of.
 
@@ -163,8 +166,8 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   test-live-share` also measures how long Drive takes to make an updated share readable, over many
   updates read straight from Drive: 40 updates, **0.5 to 0.73 s** after the upload finished (median
   0.64 s, 95th percentile 0.71 s; the upload itself 1.2 to 2.9 s, median 1.5 s). (An earlier reading of
-  2.7 s was the Worker's own edge cache serving the old copy to a fetch within 3 s of the last: that is
-  now 1 s.) Keep the number small: 40 updates polled every 150 ms made about 200 requests with one API
+  2.7 s was the Worker's own edge cache serving the old copy to a fetch within 3 s of the last; `?fresh=1`
+  now skips the cache, with the fetches collapsed.) Keep the number small: 40 updates polled every 150 ms made about 200 requests with one API
   key from one address in minutes, and Google answered everything from that address with its "Sorry..."
   page for a while, which is the per-address limit that is the reason downloads go through the Worker.
   The team space's feed is not measured (it needs two accounts).

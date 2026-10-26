@@ -24,16 +24,6 @@ const MAX_BYTES = 1024 * 1024
 /** How long an answer is reused before asking Drive again */
 const FOUND_SECONDS = 60
 const GONE_SECONDS = 30
-/**
- * ...and for a request that says `?fresh=1` (a recipient told by the live channel that the share was
- * updated). Anyone can ask, so what it changes is bounded: Drive is asked at most this often per
- * file in a data centre, however many ask, and not once more for asking more. (Drive makes a new
- * version readable within a second of its upload, so a recipient asks again soon and often.)
- */
-const FRESH_SECONDS = 1
-/** When the answer was fetched from Drive (ms), kept with it in the cache */
-const CACHED_AT = 'X-Cached-At'
-
 /** The part of the Workers Cache API used here */
 export interface ShareCache {
   match(request: Request): Promise<Response | undefined>
@@ -50,8 +40,6 @@ interface ShareDeps {
   fetchDrive?: typeof fetch
   cache?: ShareCache
   waitUntil?: (promise: Promise<unknown>) => void
-  /** For tests: the time in ms */
-  now?: () => number
 }
 
 const text = (body: string, status: number, headers: Record<string, string> = {}) =>
@@ -68,6 +56,48 @@ export function shareFileId(pathname: string) {
   return match ? decodeURIComponent(match[1]) : null
 }
 
+/** What asking Drive came to: an answer to give and to keep, or a reply to give as it is */
+type Asked = { answer: Response } | { failure: Response }
+
+/** The questions to Drive in flight, by file id (see handleShareDownload) */
+const asking = new Map<string, Promise<Asked>>()
+
+async function askDrive(fileId: string, apiKey: string, fetchDrive: typeof fetch): Promise<Asked> {
+  let drive: Response
+  try {
+    drive = await fetchDrive(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&key=${encodeURIComponent(apiKey)}`
+    )
+  } catch {
+    return { failure: text('Could not reach Drive', 502) }
+  }
+
+  if (drive.status === 404) {
+    return {
+      answer: text('This share has ended', 404, {
+        'Cache-Control': `public, max-age=${GONE_SECONDS}`,
+      }),
+    }
+  }
+  if (!drive.ok) {
+    // Rate-limited, a Google error page, anything else: nothing to say about the share
+    return { failure: text('Drive could not be read', 502) }
+  }
+  const declared = Number(drive.headers.get('Content-Length'))
+  if (declared > MAX_BYTES) return { failure: text('Too large to be a share', 502) }
+  const bytes = await drive.arrayBuffer()
+  if (bytes.byteLength > MAX_BYTES) return { failure: text('Too large to be a share', 502) }
+  return {
+    answer: new Response(bytes, {
+      headers: {
+        'Content-Type': 'application/octet-stream',
+        ETag: await etagOf(bytes),
+        'Cache-Control': `public, max-age=${FOUND_SECONDS}`,
+      },
+    }),
+  }
+}
+
 /**
  * 200 with the ciphertext and an ETag (honours If-None-Match with a 304); 404 when the share
  * is gone (Drive says 404 once its public permission is revoked, or the file deleted); 502
@@ -77,59 +107,44 @@ export async function handleShareDownload(
   request: Request,
   fileId: string,
   env: ShareEnv,
-  { fetchDrive = fetch, cache, waitUntil, now = Date.now }: ShareDeps = {}
+  { fetchDrive = fetch, cache, waitUntil }: ShareDeps = {}
 ) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return text('Method not allowed', 405, { Allow: 'GET, HEAD' })
   }
   if (!FILE_ID.test(fileId)) return text('Not found', 404)
-  if (!env.GOOGLE_API_KEY) return text('Sharing is not set up on this server', 503)
+  const apiKey = env.GOOGLE_API_KEY
+  if (!apiKey) return text('Sharing is not set up on this server', 503)
 
-  // Cached by id alone: the same answer for everyone, whatever else is on the URL
+  // Cached by id alone: the same answer for everyone, whatever else is on the URL. A request that
+  // says `?fresh=1` (a recipient told by the live channel that the share was updated) does not take
+  // the cache's answer, and asks Drive
   const cacheKey = new Request(new URL(`/api/share/${fileId}`, request.url).href)
-  let answer = await cache?.match(cacheKey)
-  if (answer && new URL(request.url).searchParams.get('fresh') === '1') {
-    // (an answer with no time on it is as old as can be)
-    const age = now() - Number(answer.headers.get(CACHED_AT) ?? 0)
-    if (!(age < FRESH_SECONDS * 1000)) answer = undefined
-  }
+  const fresh = new URL(request.url).searchParams.get('fresh') === '1'
+  let answer = fresh ? undefined : await cache?.match(cacheKey)
 
   if (!answer) {
-    let drive: Response
-    try {
-      drive = await fetchDrive(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&key=${encodeURIComponent(env.GOOGLE_API_KEY)}`
-      )
-    } catch {
-      return text('Could not reach Drive', 502)
+    // Collapsed forwarding: while Drive is being asked about this file, a request for it waits for that
+    // answer and does not ask again, however many there are. So asking afresh for every request is
+    // affordable, and one person looping on ?fresh=1 is at most one question at a time to Drive
+    let asked = asking.get(fileId)
+    if (!asked) {
+      asked = askDrive(fileId, apiKey, fetchDrive)
+        .then(async result => {
+          if ('answer' in result && cache) {
+            const put = cache.put(cacheKey, result.answer.clone())
+            if (waitUntil) waitUntil(put)
+            else await put
+          }
+          return result
+        })
+        .finally(() => asking.delete(fileId))
+      asking.set(fileId, asked)
     }
-
-    if (drive.status === 404) {
-      answer = text('This share has ended', 404, {
-        'Cache-Control': `public, max-age=${GONE_SECONDS}`,
-      })
-    } else if (drive.ok) {
-      const declared = Number(drive.headers.get('Content-Length'))
-      if (declared > MAX_BYTES) return text('Too large to be a share', 502)
-      const bytes = await drive.arrayBuffer()
-      if (bytes.byteLength > MAX_BYTES) return text('Too large to be a share', 502)
-      answer = new Response(bytes, {
-        headers: {
-          'Content-Type': 'application/octet-stream',
-          ETag: await etagOf(bytes),
-          'Cache-Control': `public, max-age=${FOUND_SECONDS}`,
-        },
-      })
-    } else {
-      // Rate-limited, a Google error page, anything else: nothing to say about the share
-      return text('Drive could not be read', 502)
-    }
-    if (cache) {
-      answer.headers.set(CACHED_AT, String(now()))
-      const put = cache.put(cacheKey, answer.clone())
-      if (waitUntil) waitUntil(put)
-      else await put
-    }
+    const result = await asked
+    // (each who waited gets a copy: a body is read once)
+    if ('failure' in result) return result.failure.clone()
+    answer = result.answer.clone()
   }
 
   const etag = answer.headers.get('ETag')
