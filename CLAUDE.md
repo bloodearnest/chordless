@@ -103,7 +103,8 @@ survives only in names already stored on devices and in Drive.)
 Changes reach `main` only through pull requests (`docs/CI.md`): never commit to or push `main`.
 
 - Work on a branch, `<agent>/<topic>` (e.g. `claude/pad-fades`), in a git worktree of your own when
-  another agent may be working in the same checkout.
+  another agent may be working in the same checkout: inside the repository, in
+  `.claude/worktrees/<topic>` (git-ignored; what `claude --worktree` makes), not next to it.
 - Commit as you go, one logical step per commit; keep other people's uncommitted work out of them.
 - Before asking for review: rebase on `origin/main`, run `just ci` (the checks CI runs, on Linux), and
   `git push --force-with-lease`. Open the pull request as a draft with `gh pr create`, and mark it
