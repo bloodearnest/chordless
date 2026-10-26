@@ -1,5 +1,5 @@
 import type { ParsedChart } from '../data-types.ts'
-import { SongIndex } from './song-search.ts'
+import { SongIndex, type WordRange, wordRanges } from './song-search.ts'
 
 interface SearchableSong {
   title?: string | null
@@ -45,9 +45,22 @@ export function matchedFields(song: SearchableSong, searchTerm: string) {
   }
 }
 
+/** A line split around the match at `at`, cut to about `width` characters either side */
+function around(line: string, at: number, length: number, width: number) {
+  const start = Math.max(0, at - width)
+  const end = Math.min(line.length, at + length + width)
+  return {
+    before: (start > 0 ? '…' : '') + line.slice(start, at),
+    match: line.slice(at, at + length),
+    after: line.slice(at + length, end) + (end < line.length ? '…' : ''),
+  }
+}
+
 /**
  * The first lyric line containing the search term, split around the match and cut to about
- * `width` characters either side. Undefined if no single line has it.
+ * `width` characters either side. If no line has the letters typed, the line with the most of
+ * the words searched for (in another form, or with a letter wrong), the first of them marked.
+ * Undefined if no single line has it.
  */
 export function lyricSnippet(
   parsed: ParsedChart,
@@ -56,20 +69,21 @@ export function lyricSnippet(
 ): { before: string; match: string; after: string } | undefined {
   const term = normalizeTerm(searchTerm)
   if (!term) return undefined
-  for (const line of lyricsOf(parsed).lines) {
+  const { lines } = lyricsOf(parsed)
+  for (const line of lines) {
     const lower = line.toLowerCase()
     // Lowercasing can change a string's length; then the positions can't be trusted
     const at = lower.length === line.length ? lower.indexOf(term) : -1
-    if (at < 0) continue
-    const start = Math.max(0, at - width)
-    const end = Math.min(line.length, at + term.length + width)
-    return {
-      before: (start > 0 ? '…' : '') + line.slice(start, at),
-      match: line.slice(at, at + term.length),
-      after: line.slice(at + term.length, end) + (end < line.length ? '…' : ''),
-    }
+    if (at >= 0) return around(line, at, term.length, width)
   }
-  return undefined
+  let best: { line: string; ranges: WordRange[] } | undefined
+  for (const line of lines) {
+    const ranges = wordRanges(line, term)
+    if (ranges.length > (best?.ranges.length ?? 0)) best = { line, ranges }
+  }
+  if (!best) return undefined
+  const [first] = best.ranges
+  return around(best.line, first.start, first.end - first.start, width)
 }
 
 /**
@@ -94,6 +108,22 @@ function matchRank(song: SearchableSong, term: string): number | undefined {
 
 /** The rank of a song the letters typed are not in, but the words are (another form of one, a slip) */
 const WORDS_ONLY = 6
+
+/**
+ * The rank of a song the words searched for are found in (in another form, or with a letter wrong):
+ * as a title that has the term in it if in the title, as artist and variant name if in either of
+ * them, else words in the lyrics only
+ */
+function wordRank(song: SearchableSong, term: string): number {
+  if (wordRanges(song.title || '', term).length > 0) return 3
+  if (
+    wordRanges(song.artist || '', term).length + wordRanges(song.variantLabel || '', term).length >
+    0
+  ) {
+    return 4
+  }
+  return WORDS_ONLY
+}
 
 /** The lowest rank whose songs are put in order of how well their words match, not by the library's order */
 const SCORED_FROM = 5
@@ -145,7 +175,8 @@ export function filterSongs<T extends SearchableSong>(songs: T[], searchTerm: st
   const scores = indexOf(songs).search(term)
   const ranked: { song: T; rank: number; score: number }[] = []
   songs.forEach((song, i) => {
-    const rank = matchRank(song, term) ?? (scores.has(i) ? WORDS_ONLY : undefined)
+    const letters = matchRank(song, term)
+    const rank = scores.has(i) ? Math.min(letters ?? WORDS_ONLY, wordRank(song, term)) : letters
     if (rank !== undefined) ranked.push({ song, rank, score: scores.get(i) ?? 0 })
   })
   // Array.prototype.sort is stable, so ties stay in the library's order

@@ -121,7 +121,7 @@ describe('filterSongs', () => {
     const library = [
       {
         title: 'Passing',
-        parsed: chart('We praise you\nthe rest is about something else\nmore words'),
+        parsed: chart('We praise you\nthe rest is about a mountain else\nmore words'),
       },
       { title: 'Repeating', parsed: chart('Praise him\npraise him\npraise him\nPraise') },
       { title: 'Other forms', parsed: chart('He is praising\nand singing') },
@@ -141,8 +141,27 @@ describe('filterSongs', () => {
       expect(titles('praises')).to.have.members(['Repeating', 'Passing', 'Other forms'])
     })
 
+    it('ranks a song whose title, artist or variant has the word like one with the letters', () => {
+      const parsed = chart('Praise him\npraise him\npraise him')
+      const songs = [
+        { title: 'Lyrics only', parsed },
+        { title: 'Variant', variantLabel: 'Praising set' },
+        { title: 'Artist', artist: 'The Praising Band' },
+        { title: 'Praise' },
+        { artist: 'No title: Praised Be' },
+        { title: 'Elsewhere', artist: 'Someone', variantLabel: 'Else' },
+      ]
+      expect(filterSongs(songs, 'praises').map(song => song.title)).to.deep.equal([
+        'Praise',
+        'Variant',
+        'Artist',
+        undefined,
+        'Lyrics only',
+      ])
+    })
+
     it('finds a slip of the fingers, and words in another order', () => {
-      expect(titles('somthing')).to.deep.equal(['Passing'])
+      expect(titles('mountan')).to.deep.equal(['Passing'])
       expect(titles('else about')).to.deep.equal(['Passing'])
     })
 
@@ -264,8 +283,32 @@ describe('matching in songs with missing fields, and quoting long lines', () => 
     expect(snippet).to.deep.equal({ before: '', match: 'grace', after: '' })
   })
 
-  it('finds no place in a line that changes length when lower-cased', () => {
-    // "İ" is two characters in lower case, so a position in one is not a position in the other
-    expect(lyricSnippet(chart('İstanbul grace'), 'grace')).to.equal(undefined)
+  it('finds the place in a line that changes length when lower-cased by its words', () => {
+    // "İ" is two characters in lower case, so a position in one is not a position in the other:
+    // the letters are not searched for there, the words are, in the line as it is
+    expect(lyricSnippet(chart('İstanbul grace'), 'grace')).to.deep.equal({
+      before: 'İstanbul ',
+      match: 'grace',
+      after: '',
+    })
+  })
+
+  it('quotes the line with the words searched for when the letters are not in it', () => {
+    const parsed = chart('We are praising him, praising')
+    expect(lyricSnippet(parsed, 'praises')).to.deep.equal({
+      before: 'We are ',
+      match: 'praising',
+      after: ' him, praising',
+    })
+    expect(lyricSnippet(parsed, 'worshippin')).to.equal(undefined)
+  })
+
+  it('quotes the line with the most of the words, when the letters are in none', () => {
+    const lines = ['We sing of mercies', 'Mercy, mercies and mercy', 'Mercy again'].map(words => ({
+      segments: [{ chord: 'G', lyrics: words }],
+    }))
+    const parsed = { metadata: {}, sections: [{ type: 'section' as const, label: 'V', lines }] }
+    expect(lyricSnippet(parsed, 'merciful')?.match).to.equal('Mercy')
+    expect(lyricSnippet(parsed, 'merciful')?.after).to.equal(', mercies and mercy')
   })
 })

@@ -431,26 +431,27 @@ library
  - ccli report nag
  - lyrics full-text search. Built (src/js/utils/song-search.ts, used by `filterSongs`): MiniSearch over
    the songs the library page and the add-song modal already have, with their charts parsed (title,
-   artist, variant name, lyrics; processTerm lowercases, strips accents and apostrophes, drops stop
-   words and stems with `stemmer`). It finds other forms of a word ("praises" finds "praise"), a
-   slip of the fingers (fuzzy, words of four letters or more), words in any order (all must be there),
-   and a word begun (the last one). Those songs come after every song the typed letters are in; among
-   lyrics-only matches the better score goes first. Made in memory, not stored: it is rebuilt when the
+   artist, variant name, lyrics; each word is indexed as written and stemmed with `stemmer`, in lower
+   case without accents or apostrophes, and the very common words are left out). It finds other forms
+   of a word ("praises" finds "praise"), a slip of the fingers (fuzzy, on stems of six letters or more:
+   on shorter ones "praises" would find "raise"), words in any order (all must be there), and a word
+   begun (the last one: as written, or as the stem of the forms it may become, `ENDINGS`, so
+   "worshippin" finds "worship"). The words found are marked in the title, artist and variant name,
+   and the best line is quoted (`wordRanges`, `lyricSnippet`). Songs found by the words alone come
+   after every song the typed letters are in, except that a title that has the word is ranked as a
+   title that has the letters (`wordRank`); among lyrics-only matches the better score goes first.
+   Made in memory, not stored: it is rebuilt when the
    list of songs changes (the library page and the modal make it a moment after the list is shown,
    `warmSearch`), which costs about 0.2 s for 600 songs on a laptop. The list includes songs of the
    device's other databases, so one index covers "From …" songs too, and there is nothing to keep
    up to date after a save, a sync, or leaving a space. Not built:
    - matchLibrary's "line of the song's words" step (src/js/import-plan.ts) still scans; it could use
      the same index (rejoining SongSelect's split syllables is `SPLIT_WORD` in song-filter.ts)
-   - a song found only by the words shows no lyric line under it (`lyricSnippet` looks for the
-     letters typed): show the line with the best word match
    - if libraries grow so that making the index is felt (thousands of songs, an old iPad), store the
      serialised index (MiniSearch toJSON/loadJSON) in its own IndexedDB store as a derived cache that
      is safe to drop, one per database, updated per chart on save (db.saveChordPro/deleteChordPro)
      and by contentHash after a sync pull, with a version to bump when the tokeniser or stemmer changes
-   - the typed letters of an unfinished word are not stemmed forward ("praisin" does not find the
-     index word "prais"): the plain letters search covers it, so only a longer form of a word
-     typed in full needs the stem
+   - rank a title that is the word ("Praise" for "praises") above a title with the word in it
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.
