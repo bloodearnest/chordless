@@ -65,10 +65,12 @@ resource "github_repository" "chordless" {
 
   # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch must be up to
   # date with main to merge (the ruleset), and can be brought up to date from the pull request
-  allow_merge_commit     = false
-  allow_squash_merge     = false
-  allow_rebase_merge     = true
-  allow_auto_merge       = false
+  allow_merge_commit = false
+  allow_squash_merge = false
+  allow_rebase_merge = true
+  # "Enable auto-merge" on a pull request: it merges itself once its required checks pass (Dependabot's
+  # weekly pull request is set to, .github/workflows/dependabot-auto-merge.yml)
+  allow_auto_merge       = true
   allow_update_branch    = true
   delete_branch_on_merge = true
 
@@ -99,8 +101,9 @@ resource "github_repository_dependabot_security_updates" "chordless" {
   enabled    = true
 }
 
-# main: changed only by a pull request whose `ci-ok` passed on a branch up to date with it, merged
-# by rebase; never force-pushed or deleted. No one bypasses it, the owner included.
+# main: changed only by a pull request whose `ci-ok` passed on a branch up to date with it, and whose
+# CodeQL findings are below the thresholds, merged by rebase; never force-pushed or deleted. No one
+# bypasses it, the owner included.
 resource "github_repository_ruleset" "main" {
   name        = "main"
   repository  = github_repository.chordless.name
@@ -134,6 +137,18 @@ resource "github_repository_ruleset" "main" {
         context = "ci-ok"
         # GitHub Actions: a status of that name from anywhere else does not count
         integration_id = 15368
+      }
+    }
+
+    # CodeQL's findings block a merge (.github/workflows/codeql.yml; what it checks is
+    # .github/codeql/codeql-config.yml): a security finding of high severity or more, or any other
+    # finding at error level. Below those they are shown, not blocking. A false positive is dismissed
+    # in the Security tab, with the reason, and then no longer blocks.
+    required_code_scanning {
+      required_code_scanning_tool {
+        tool                      = "CodeQL"
+        security_alerts_threshold = "high_or_higher"
+        alerts_threshold          = "errors"
       }
     }
   }
