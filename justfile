@@ -16,6 +16,11 @@ test: && coverage-check stats
 stats:
     node scripts/stats.ts
 
+# End of a session: fast-forward the primary checkout's main to origin, and list the worktrees
+# and branches whose PR has merged (`just wrap-up --prune` removes them). Run it in your own shell
+wrap-up *args:
+    scripts/wrap-up.sh {{args}}
+
 # Run browser unit tests, optionally just some files: just test-unit tests/db.test.ts
 # (a full run also measures coverage and leaves its results for `just stats`)
 test-unit *args:
