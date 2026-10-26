@@ -82,9 +82,13 @@ function searchWords(searchTerm: string) {
   })
 }
 
-/** How many letters of a word of this length may be wrong: none for a short one */
-function slips(length: number): number {
-  return length >= 6 ? Math.round(length * 0.2) : 0
+/**
+ * How many letters of a word of this length may be wrong: none for a short one. The word being
+ * typed needs a letter more before it is allowed any: an unfinished word ("worshi") is a letter
+ * from other words ("worthy"), and is not a slip of the fingers.
+ */
+function slips(length: number, beingTyped: boolean): number {
+  return length >= (beingTyped ? 7 : 6) ? Math.round(length * 0.2) : 0
 }
 
 /** The number of single-letter changes (add, remove, change) that make one word the other */
@@ -118,7 +122,7 @@ export function wordRanges(text: string, searchTerm: string): WordRange[] {
     const matches = words.some(
       (word, i) =>
         stem === word.stem ||
-        distance(stem, word.stem) <= slips(word.stem.length) ||
+        distance(stem, word.stem) <= slips(word.stem.length, i === words.length - 1) ||
         (i === words.length - 1 &&
           (plain.startsWith(word.plain) || word.completions.includes(stem)))
     )
@@ -149,8 +153,8 @@ export class SongIndex {
 
   /**
    * The songs with every word of the search (or a form of it), each with a score (higher is
-   * better). The last word may be unfinished, as it is while typing, and a word of six letters or
-   * more may have a letter wrong.
+   * better). The last word may be unfinished, as it is while typing. A word of six letters or more
+   * may have a letter wrong, and the last of seven.
    */
   search(searchTerm: string): Map<number, number> {
     const words = searchWords(searchTerm)
@@ -159,7 +163,7 @@ export class SongIndex {
       const form: Query = {
         combineWith: 'OR',
         queries: [word.stem],
-        fuzzy: slips(word.stem.length) ? 0.2 : false,
+        fuzzy: slips(word.stem.length, i === words.length - 1) ? 0.2 : false,
       }
       if (i < words.length - 1) return form
       // The word being typed may be begun: not a stem yet
