@@ -769,6 +769,15 @@ describe('the live route', () => {
     assert.deepEqual(w.live, [])
   })
 
+  test('says so where the object cannot take a socket', async () => {
+    const w = await world()
+    const state = w.states.get(SPACE)
+    assert.ok(state)
+    delete (state as { fetch?: unknown }).fetch
+    w.teamSpaces.get = id => w.states.get(String(id)) as never
+    assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(bob))).status, 503)
+  })
+
   test('does not make an object for an id that is not a space’s', async () => {
     const w = await world()
     assert.equal((await w.call('x/live', null, await upgrade(bob))).status, 404)

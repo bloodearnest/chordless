@@ -236,6 +236,28 @@ describe('The live channel', () => {
     expect(r.world.changed).to.equal(0)
   })
 
+  it('says nothing when stopped without having started, and does not trust a late word from a socket it let go', async () => {
+    const r = rig()
+    r.channel.stop()
+    expect(r.world.statuses).to.deep.equal([])
+
+    const up = await connected()
+    const old = up.sockets[0].socket
+    up.channel.stop()
+    old.emit('open')
+    expect(up.world.connected, 'only the first open counted').to.equal(1)
+    expect(up.world.statuses.at(-1)).to.equal('offline')
+  })
+
+  it('does nothing when a timer it had called off goes off anyway', async () => {
+    const r = await connected()
+    const ping = r.pending().find(timer => timer.ms === PING_EVERY_MS)
+    r.channel.stop()
+    ping?.fn()
+    expect(r.sockets[0].socket.sent).to.deep.equal([])
+    expect(r.pending()).to.have.length(0)
+  })
+
   it('does not connect if stopped while it was getting the token', async () => {
     const r = rig()
     r.channel.start()
