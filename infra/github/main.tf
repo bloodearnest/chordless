@@ -161,16 +161,32 @@ resource "github_workflow_repository_permissions" "chordless" {
   can_approve_pull_request_reviews = false
 }
 
-# The deploy's secrets (CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID) and the drift check's, each
-# given only to workflows running on main
+# Who reviews: an infra-apply job waits for their approval (the repository's owner)
+variable "reviewer_id" {
+  description = "GitHub user id of the one who approves applies (gh api user -q .id)"
+  type        = number
+  default     = 1042
+}
+
+# Each given only to workflows running on main (docs/CI.md):
+# - production: the deploy's secrets
+# - infra: read-only credentials, for Terraform plans and the drift check
+# - infra-apply: the credentials that can change things, only after the reviewer approves the plan
 resource "github_repository_environment" "env" {
-  for_each    = toset(["production", "infra"])
+  for_each    = toset(["production", "infra", "infra-apply"])
   repository  = github_repository.chordless.name
   environment = each.key
 
   deployment_branch_policy {
     protected_branches     = false
     custom_branch_policies = true
+  }
+
+  dynamic "reviewers" {
+    for_each = each.key == "infra-apply" ? [var.reviewer_id] : []
+    content {
+      users = [reviewers.value]
+    }
   }
 }
 
