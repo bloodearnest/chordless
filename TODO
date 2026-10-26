@@ -79,19 +79,6 @@ bugs
   made "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport the nine such charts in the Gateway
   Church space: Adonai, All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver,
   Our God He Reigns, See His Love, Washed, What A Friend.
-- search ranking, second half: the substring tiers are built (`filterSongs`, src/js/utils/song-filter.ts:
-  exact title, title starts with, a title word starts with, title contains, artist/label, lyrics only;
-  ties keep the library's order). MiniSearch (the plan under "library") combines with them, it does not
-  replace them: boosts alone do not put an exact title first, and it matches whole words, not substrings
-  ("rais" would stop finding "Praise"). Its jobs:
-  1. MiniSearch orders within the lyrics-only tier, by score instead of library order (a chorus that
-     repeats the word beats one passing mention). Sort key: substring tier, then MiniSearch score.
-  2. MiniSearch adds songs the substring pass missed (stemming: "praises" finds "praise"; typos;
-     words out of order: "lord praise"), appended below every substring match so fuzzy hits never
-     push out a real one.
-  If the index is not built (first search, evicted, rebuilding after a sync), the tiered substring
-  results alone are shown, so offline-first still holds.
-
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc
   and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
@@ -442,32 +429,28 @@ UI
 
 library
  - ccli report nag
- - lyrics full-text search (IndexedDB has no native full-text search: only key/range and exact-match
-   multiEntry indexes; the library has to be an in-memory index we store ourselves). Use MiniSearch
-   (about 7 kB, ESM, toJSON/loadJSON, fuzzy + prefix; custom processTerm: lowercase, strip accents,
-   stem, drop stop words). One document per song: id, title, author, lyrics (author weighted above
-   lyrics, title above both; author is already on every song, from {artist}/{author}), where lyrics come from
-   lyricsOf (src/js/import-plan.ts), which strips chords, directives and CCLI lines and rejoins
-   SongSelect's split syllables ("e - [D]nough"); no library does that for ChordPro. Store the
-   serialised index in its own IndexedDB store, as a derived cache that is safe to drop.
-   Use it in: the library search box (find a song by its chorus; SongSelect's own search is bad),
-   and matchLibrary's "line of the song's words" step in place of the scan.
-   When the index must be updated or rebuilt:
-   - a chart is saved or deleted (db.saveChordPro/deleteChordPro: the writers are song-utils.ts
-     createSong/edit/delete and drive-sync.ts), so a song added by the SongSelect bookmarklet, an
-     edit, or a delete is reflected at once: re-add that one document (MiniSearch discard + add)
-   - after a Drive sync pulls charts changed on another device: re-index by comparing each
-     chart's contentHash (the same key import-setlist.ts uses for its lyrics cache), not everything
-   - switching space/database: one index per database (a received "Shared with me" song
-     is in its own database). Searching across them means querying each in-memory index and
-     merging by score, tagged "From …" like the library search does now: cheap (a search is
-     milliseconds), only the loading of each index costs, so load them lazily. Scores from
-     different indexes are not strictly comparable (they depend on each index's word counts); fine
-     for this, or one index with a database field if it ever matters. Per-database keeps dropping
-     a space's index trivial.
-   - a missing store, a different index version (bump when the tokeniser/stemmer changes) or
-     storage eviction: rebuild lazily on first search, in batches, off the main thread if slow
-   - Reset from Drive / space delete: drop that database's index with it
+ - lyrics full-text search. Built (src/js/utils/song-search.ts, used by `filterSongs`): MiniSearch over
+   the songs the library page and the add-song modal already have, with their charts parsed (title,
+   artist, variant name, lyrics; processTerm lowercases, strips accents and apostrophes, drops stop
+   words and stems with `stemmer`). It finds other forms of a word ("praises" finds "praise"), a
+   slip of the fingers (fuzzy, words of four letters or more), words in any order (all must be there),
+   and a word begun (the last one). Those songs come after every song the typed letters are in; among
+   lyrics-only matches the better score goes first. Made in memory, not stored: it is rebuilt when the
+   list of songs changes (the library page and the modal make it a moment after the list is shown,
+   `warmSearch`), which costs about 0.2 s for 600 songs on a laptop. The list includes songs of the
+   device's other databases, so one index covers "From …" songs too, and there is nothing to keep
+   up to date after a save, a sync, or leaving a space. Not built:
+   - matchLibrary's "line of the song's words" step (src/js/import-plan.ts) still scans; it could use
+     the same index (rejoining SongSelect's split syllables is `SPLIT_WORD` in song-filter.ts)
+   - a song found only by the words shows no lyric line under it (`lyricSnippet` looks for the
+     letters typed): show the line with the best word match
+   - if libraries grow so that making the index is felt (thousands of songs, an old iPad), store the
+     serialised index (MiniSearch toJSON/loadJSON) in its own IndexedDB store as a derived cache that
+     is safe to drop, one per database, updated per chart on save (db.saveChordPro/deleteChordPro)
+     and by contentHash after a sync pull, with a version to bump when the tokeniser or stemmer changes
+   - the typed letters of an unfinished word are not stemmed forward ("praisin" does not find the
+     index word "prais"): the plain letters search covers it, so only a longer form of a word
+     typed in full needs the stem
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.

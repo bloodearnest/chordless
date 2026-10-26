@@ -20,9 +20,11 @@
     "@lit/task": "^1.0.3",
     "jose": "^6.2.12",
     "lit": "^3.3.3",
+    "minisearch": "^7.2.0",
     "oauth4webapi": "^3.8.8",
     "postal-mime": "^4.0.11",
     "qrcode-generator": "^2.0.4",
+    "stemmer": "^2.0.1",
     "unpdf": "^1.9.1"
   },
   "devDependencies": {

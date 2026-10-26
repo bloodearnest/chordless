@@ -4,7 +4,7 @@ import type { SongWithContent } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import { addToLibrary, getSongsElsewhere, withSongsFromElsewhere } from '../other-songs.ts'
 import { getLibrarySongs } from '../song-utils.ts'
-import { filterSongs } from '../utils/song-filter.ts'
+import { filterSongs, warmSearch } from '../utils/song-filter.ts'
 import { showStatusMessage } from '../utils/status-message.ts'
 
 /**
@@ -82,6 +82,7 @@ export class AddSongModal {
 
       input.value = ''
       this.#renderResults(songs)
+      warmSearch(songs)
       modal.show()
 
       // Focus search input and wire events when modal opens successfully

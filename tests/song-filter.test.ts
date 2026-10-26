@@ -1,5 +1,10 @@
 import { expect } from '@open-wc/testing'
-import { filterSongs, lyricSnippet, matchedFields } from '../src/js/utils/song-filter.ts'
+import {
+  filterSongs,
+  lyricSnippet,
+  matchedFields,
+  warmSearch,
+} from '../src/js/utils/song-filter.ts'
 
 const { describe, it } = window
 
@@ -102,7 +107,68 @@ describe('filterSongs', () => {
     })
   })
 
+  describe('by the words', () => {
+    const chart = (words: string) => ({
+      metadata: {},
+      sections: [
+        {
+          type: 'section' as const,
+          label: 'Verse',
+          lines: words.split('\n').map(line => ({ segments: [{ chord: 'G', lyrics: line }] })),
+        },
+      ],
+    })
+    const library = [
+      {
+        title: 'Passing',
+        parsed: chart('We praise you\nthe rest is about something else\nmore words'),
+      },
+      { title: 'Repeating', parsed: chart('Praise him\npraise him\npraise him\nPraise') },
+      { title: 'Other forms', parsed: chart('He is praising\nand singing') },
+      { title: 'No words' },
+    ]
+    const titles = (term: string) => filterSongs(library, term).map(song => song.title)
+
+    it('orders songs matching only in the lyrics by how well, not by the library order', () => {
+      expect(titles('praise').slice(0, 2)).to.deep.equal(['Repeating', 'Passing'])
+    })
+
+    it('puts songs with another form of the word after every song with the letters', () => {
+      expect(titles('praise')).to.deep.equal(['Repeating', 'Passing', 'Other forms'])
+    })
+
+    it('finds a longer form of the word typed', () => {
+      expect(titles('praises')).to.have.members(['Repeating', 'Passing', 'Other forms'])
+    })
+
+    it('finds a slip of the fingers, and words in another order', () => {
+      expect(titles('somthing')).to.deep.equal(['Passing'])
+      expect(titles('else about')).to.deep.equal(['Passing'])
+    })
+
+    it('puts back a word SongSelect split across chords', () => {
+      const split = [{ title: 'Split', parsed: chart('Hallelu - jah to the King') }]
+      expect(filterSongs(split, 'hallelujah')).to.have.length(1)
+    })
+
+    it('can make the index ahead of the first search', async () => {
+      const songs = [{ title: 'Ahead', parsed: chart('mercies new') }]
+      warmSearch(songs)
+      await new Promise(resolve => setTimeout(resolve, 400))
+      expect(filterSongs(songs, 'mercy').map(song => song.title)).to.deep.equal(['Ahead'])
+    })
+
+    it('searches again when the songs change, and not when they have not', () => {
+      const first = [{ title: 'A', parsed: chart('mercies new') }]
+      expect(filterSongs(first, 'mercy')).to.have.length(1)
+      expect(filterSongs([...first], 'mercy')).to.have.length(1)
+      const second = [{ title: 'B', parsed: chart('something else') }]
+      expect(filterSongs(second, 'mercy')).to.have.length(0)
+    })
+  })
+
   it('copes with songs missing a title or artist', () => {
+    expect(filterSongs([{ artist: 'Carl Boberg' }, { title: null }], 'boberg')).to.have.length(1)
     expect(filterSongs(songs, 'untitled')).to.have.length(1)
     expect(filterSongs(songs, 'zzz')).to.deep.equal([])
   })
