@@ -72,13 +72,39 @@ export function lyricSnippet(
 }
 
 /**
- * The songs whose title, artist, variant name or lyrics contain the search term, ignoring case.
- * An empty search matches every song (and gives back the same array).
+ * How well a song matches the search term, lowest first: 0 the title is the term, 1 the title
+ * starts with it, 2 a word of the title starts with it, 3 the title contains it, 4 the artist or
+ * variant name does, 5 only the lyrics do. Undefined if nothing matches.
+ */
+function matchRank(song: SearchableSong, term: string): number | undefined {
+  const found = matchedFields(song, term)
+  if (found.title) {
+    // A title matched, so there is one
+    const title = (song.title as string).toLowerCase()
+    if (title.trim() === term) return 0
+    if (title.startsWith(term)) return 1
+    if (title.split(/[^\p{L}\p{N}]+/u).some(word => word.startsWith(term))) return 2
+    return 3
+  }
+  if (found.artist || found.label) return 4
+  if (found.lyrics) return 5
+  return undefined
+}
+
+/**
+ * The songs whose title, artist, variant name or lyrics contain the search term, ignoring case,
+ * best match first: a title that is the term, then titles starting with it, then the rest of the
+ * title matches, then artist and variant name, then lyrics only. Songs that match equally well
+ * keep their order. An empty search matches every song (and gives back the same array).
  */
 export function filterSongs<T extends SearchableSong>(songs: T[], searchTerm: string): T[] {
-  if (!normalizeTerm(searchTerm)) return songs
-  return songs.filter(song => {
-    const found = matchedFields(song, searchTerm)
-    return found.title || found.artist || found.label || found.lyrics
-  })
+  const term = normalizeTerm(searchTerm)
+  if (!term) return songs
+  const ranked: { song: T; rank: number }[] = []
+  for (const song of songs) {
+    const rank = matchRank(song, term)
+    if (rank !== undefined) ranked.push({ song, rank })
+  }
+  // Array.prototype.sort is stable, so ties stay in the library's order
+  return ranked.sort((a, b) => a.rank - b.rank).map(({ song }) => song)
 }
