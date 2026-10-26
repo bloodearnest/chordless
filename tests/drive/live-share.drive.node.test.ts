@@ -13,7 +13,7 @@ import { after, before, describe, test } from 'node:test'
 import { createTestHarness } from 'wrangler'
 import { createDriveApi } from '../../src/js/drive-client.ts'
 import { fileInput, shareFileMetadata, updateInput } from '../../src/js/drive-metadata.ts'
-import { CHANGED } from '../../src/js/live-protocol.ts'
+import { CHANGED, FOLLOW_UPS_MS } from '../../src/js/live-protocol.ts'
 import { buildShareBundle } from '../../src/js/share-bundle.ts'
 import {
   decryptBundle,
@@ -46,9 +46,6 @@ const worker = createTestHarness({ workers: [{ configPath: 'wrangler.toml', secr
 type Socket = WebSocket & { accept(): void }
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
-/** What the app waits after a "changed" before it fetches once more (live-sync.ts) */
-const FEED_LAG_MS = 5000
 
 describe('live sync of a share, against a real Drive and the real Worker', { skip }, () => {
   let space: SpaceStorage
@@ -163,31 +160,25 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
     assert.equal(sharer.heard.length, 0, 'the sharer was not told its own word')
     const told = recipient.heard[0] - uploaded
 
-    // ...and does what the app does: fetch at once, and again after the feed's lag
-    const atOnce = await fetchShare(true)
-    const sawAtOnce = atOnce.name === 'version 2'
-    let seenAfter = sawAtOnce ? performance.now() - uploaded : null
-    let polls = 0
-    while (seenAfter === null && performance.now() - uploaded < 60_000) {
-      await sleep(1000)
-      polls++
-      const again = await fetchShare(true)
-      if (again.name === 'version 2') seenAfter = performance.now() - uploaded
+    // ...and does what the app does (live-sync.ts): fetch at once, and again after each of the follow-ups
+    let seenAfter: number | null = null
+    let seenBy = ''
+    for (const after of [0, ...FOLLOW_UPS_MS]) {
+      await sleep(Math.max(0, recipient.heard[0] + after - performance.now()))
+      if ((await fetchShare(true)).name === 'version 2') {
+        seenAfter = performance.now() - uploaded
+        seenBy = after === 0 ? 'the fetch at once' : `the fetch ${after} ms after being told`
+        break
+      }
     }
-    const appSees = sawAtOnce
-      ? 'at once'
-      : seenAfter !== null && seenAfter <= FEED_LAG_MS + 2000
-        ? 'on its second fetch'
-        : 'later than the app asks again'
-
     t.diagnostic(
-      `told ${Math.round(told)} ms after the sharer said it; the update was ${
+      `told ${Math.round(told)} ms after the sharer said it; the update ${
         seenAfter === null
-          ? 'never seen in 60 s'
-          : `seen ${Math.round(seenAfter)} ms after the upload finished`
-      } (${sawAtOnce ? 'by the first fetch' : `after ${polls} more fetches, one a second`}); the app would have it ${appSees}`
+          ? `was not there by the last fetch, ${FOLLOW_UPS_MS.at(-1)} ms after being told`
+          : `was found by ${seenBy}, ${Math.round(seenAfter)} ms after the upload finished`
+      }`
     )
-    assert.notEqual(seenAfter, null, 'the recipient finds the new version within a minute')
+    assert.notEqual(seenAfter, null, 'the app finds the new version by its last fetch')
 
     // Nobody who listens may send
     recipient.socket.send(CHANGED)

@@ -15,14 +15,12 @@ import { getCurrentDB } from './db.ts'
 import { getIdentityToken } from './google-auth.ts'
 import { getLive, LiveChangeEvent, type LiveState } from './live.ts'
 import { LiveChannel, type LiveChannelEvents, type LiveStatus } from './live-channel.ts'
+import { FOLLOW_UPS_MS } from './live-protocol.ts'
 import { announceLiveSyncStatus } from './live-sync-status.ts'
 import { generateLiveSecret } from './share-crypto.ts'
 import { reloadShare } from './share-receiver.ts'
 import { getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
 import { atLeast } from './team-roles.ts'
-
-/** How long after a "changed" the update is fetched once more: Drive's feed shows a change a few seconds late */
-export const FEED_LAG_MS = 5000
 
 /** A channel this device joins while it is live, and what it is for */
 export type LiveTarget =
@@ -131,7 +129,7 @@ export interface LiveSyncDeps {
 interface Joined {
   target: LiveTarget
   channel: LiveChannelLike
-  cancelFollowUp: (() => void) | null
+  cancelFollowUps: (() => void)[]
 }
 
 export class LiveSync {
@@ -210,14 +208,14 @@ export class LiveSync {
         // (what happened while it was down is found the same way: by fetching)
         connected: () => this.#fetch(joined.target),
       }),
-      cancelFollowUp: null,
+      cancelFollowUps: [],
     }
     this.#joined.set(target.key, joined)
     joined.channel.start()
   }
 
   #leave(joined: Joined): void {
-    joined.cancelFollowUp?.()
+    for (const cancel of joined.cancelFollowUps) cancel()
     joined.channel.stop()
     this.#joined.delete(joined.target.key)
   }
@@ -242,14 +240,13 @@ export class LiveSync {
     else if (target.kind === 'share-recipient') void this.#deps.reloadShare(target.fileId)
   }
 
-  /** Another device says it changed something: read it now, and once more when Drive has caught up */
+  /** Another device says it changed something: read it now, and again as Drive catches up (a new word starts the times again) */
   #onChanged(joined: Joined): void {
     this.#fetch(joined.target)
-    joined.cancelFollowUp?.()
-    joined.cancelFollowUp = this.#deps.later(FEED_LAG_MS, () => {
-      joined.cancelFollowUp = null
-      this.#fetch(joined.target)
-    })
+    for (const cancel of joined.cancelFollowUps) cancel()
+    joined.cancelFollowUps = FOLLOW_UPS_MS.map(ms =>
+      this.#deps.later(ms, () => this.#fetch(joined.target))
+    )
   }
 
   /** This device's changes are in the space (and its shares): tell the others, if this person may (a reader's edits stay on the device) */

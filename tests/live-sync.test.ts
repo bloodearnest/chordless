@@ -3,8 +3,8 @@ import { SyncPushedEvent } from '../src/js/auto-sync.ts'
 import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { LiveChangeEvent, type LiveState } from '../src/js/live.ts'
 import type { LiveChannelEvents, LiveStatus } from '../src/js/live-channel.ts'
+import { FOLLOW_UPS_MS } from '../src/js/live-protocol.ts'
 import {
-  FEED_LAG_MS,
   type LiveChannelLike,
   type LiveSpace,
   LiveSync,
@@ -269,20 +269,22 @@ describe('Live sync', () => {
   })
 
   describe('in a team space', () => {
-    it('syncs at once when another device says it changed something, and once more after Drive’s feed has caught up', async () => {
+    it('syncs at once when another device says it changed something, and again as Drive’s feed catches up', async () => {
       const { sync, state, settle, channel } = rig()
       sync.start()
       await settle()
 
       channel().events.changed()
       expect(state.syncs).to.equal(1)
-      expect(state.timers.at(-1)?.ms).to.equal(FEED_LAG_MS)
-      state.timers.at(-1)?.fn()
+      expect(state.timers.map(timer => timer.ms)).to.deep.equal(FOLLOW_UPS_MS)
+      state.timers[0].fn()
       expect(state.syncs).to.equal(2)
+      state.timers[1].fn()
+      expect(state.syncs).to.equal(3)
       sync.stop()
     })
 
-    it('asks for one follow-up, not one for each of a burst', async () => {
+    it('asks for one set of follow-ups, not one for each of a burst', async () => {
       const { sync, state, settle, channel } = rig()
       sync.start()
       await settle()
@@ -290,7 +292,7 @@ describe('Live sync', () => {
       channel().events.changed()
       channel().events.changed()
       expect(state.syncs).to.equal(3)
-      expect(state.timers.filter(timer => !timer.cancelled)).to.have.length(1)
+      expect(state.timers.filter(timer => !timer.cancelled)).to.have.length(FOLLOW_UPS_MS.length)
       sync.stop()
     })
 
@@ -350,8 +352,8 @@ describe('Live sync', () => {
       expect(state.reloads).to.deep.equal(['f2'])
       channel().events.changed()
       expect(state.reloads).to.deep.equal(['f2', 'f2'])
-      state.timers.at(-1)?.fn()
-      expect(state.reloads).to.deep.equal(['f2', 'f2', 'f2'])
+      for (const timer of state.timers) timer.fn()
+      expect(state.reloads).to.have.length(2 + FOLLOW_UPS_MS.length)
       expect(state.syncs, 'a share is not the space').to.equal(0)
       sync.stop()
     })
