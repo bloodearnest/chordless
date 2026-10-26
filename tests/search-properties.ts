@@ -58,9 +58,48 @@ function wordsOf(song: TestSong): string[] {
   return [...words]
 }
 
+/**
+ * Words written with an apostrophe for a letter left out, as they are in real charts, and the word
+ * each is. (Known by hand, so as not to use the search's own rule to say what is right.)
+ */
+const POETIC: Record<string, string> = {
+  "ev'ry": 'every',
+  "ev'rything": 'everything',
+  "ev'ryday": 'everyday',
+  "ev'ryone": 'everyone',
+  "pow'r": 'power',
+  "pow'rs": 'powers',
+  "heav'n": 'heaven',
+  "ne'er": 'never',
+  "o'er": 'over',
+  "e'er": 'ever',
+  "sov'reign": 'sovereign',
+  "marv'lous": 'marvelous',
+  "stamm'ring": 'stammering',
+  "desp'rate": 'desperate',
+  "off'ring": 'offering',
+  "giv'n": 'given',
+}
+
+/** The words of a song with an apostrophe inside, in lower case, with the plain apostrophe */
+function apostropheWordsOf(song: TestSong): string[] {
+  const words = new Set<string>()
+  for (const text of textsOf(song)) {
+    for (const [word] of text.matchAll(/\p{L}+['’]\p{L}+/gu)) {
+      const written = word.toLowerCase().replace('’', "'")
+      // (not an everyday contraction: Lord's, don't)
+      if (!/'(s|t|re|ve|ll|d|m)$/.test(written)) words.add(written)
+    }
+  }
+  return [...words]
+}
+
 const tokenCache = new Map<TestSong, string[]>()
 
-/** Every word of a song (any length), in lower case without apostrophes or accents */
+/**
+ * Every word of a song (any length), in lower case without apostrophes or accents; and the word
+ * that a poetic one stands for ("every" for "ev'ry")
+ */
 function tokensOf(song: TestSong): string[] {
   let tokens = tokenCache.get(song)
   if (!tokens) {
@@ -74,6 +113,10 @@ function tokensOf(song: TestSong): string[] {
             .replace(/\p{M}|['’]/gu, '')
         )
       }
+    }
+    for (const written of apostropheWordsOf(song)) {
+      const word = POETIC[written]
+      if (word !== undefined) tokens.push(word)
     }
     tokenCache.set(song, tokens)
   }
@@ -194,6 +237,16 @@ export function checkSearch(songs: TestSong[], options: Options = {}): string[] 
       }
     }
     if (word.length >= 8) for (const slip of slipsOf(word)) queries.add(slip)
+  }
+
+  // A word written with an apostrophe for a letter left out is found as the word it is, and as
+  // written. (Every such word in the songs, not drawn: there are few.)
+  for (const song of songs) {
+    for (const written of apostropheWordsOf(song)) {
+      recall('apostrophe as written', written, song)
+      const word = POETIC[written]
+      if (word !== undefined) recall('apostrophe word', word, song)
+    }
   }
 
   // A title typed whole, whole or without its last letters, finds its song first
