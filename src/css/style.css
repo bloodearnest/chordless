@@ -1274,10 +1274,10 @@ body.edit-mode .key-selector:focus {
   background: none;
   border: 2px solid var(--header-text, white);
   color: var(--header-text, white);
-  width: 2.5rem;
-  height: 2.5rem;
-  min-width: 2.5rem;
-  min-height: 2.5rem;
+  width: var(--header-button, 2.5rem);
+  height: var(--header-button, 2.5rem);
+  min-width: var(--header-button, 2.5rem);
+  min-height: var(--header-button, 2.5rem);
   border-radius: 50%;
   display: flex;
   align-items: center;

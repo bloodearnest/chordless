@@ -42,7 +42,7 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} showInfoButton - Whether to show the info button
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  * @property {Boolean} titleBelow - On phones, the title is a row of its own under the menu and icons
- * @property {Boolean} tucked - On phones, the header is slid out of the way (the page sets --tuck, its height)
+ * @property {Boolean} tucked - On phones, the header is slid out of the way (by a negative top margin the page sets)
  *
  * Slots:
  * @slot controls - Page-specific controls (the song's key, capo and tempo). On phones they are a
@@ -239,6 +239,18 @@ export class AppHeader extends LitElement {
         width: 100%;
       }
 
+      /* The round buttons follow the text size too, not a fixed 2.5rem (the page's own share and
+         live buttons read this as well) */
+      :host {
+        --header-button: calc(var(--font-ui) * 2);
+      }
+
+      .nav-menu-button {
+        padding: 0.25rem;
+        min-width: var(--header-button);
+        min-height: var(--header-button);
+      }
+
       /* Slid up out of the way: the page under it moves up as it goes, so the text stays put */
       :host {
         transition:
@@ -246,8 +258,8 @@ export class AppHeader extends LitElement {
           visibility 0.25s;
       }
 
+      /* (its margin is set by the page that tucks it: see header-autohide.ts) */
       :host([tucked]) {
-        margin-top: calc(-1 * var(--tuck, 0px));
         visibility: hidden;
       }
 
@@ -271,6 +283,7 @@ export class AppHeader extends LitElement {
         width: 100%;
         justify-content: flex-start;
         flex-wrap: wrap;
+        line-height: 1.2;
         padding-left: var(--gap);
       }
     }
@@ -315,10 +328,10 @@ export class AppHeader extends LitElement {
       background: none;
       border: 2px solid var(--header-text, white);
       color: var(--header-text, white);
-      width: 2.5rem;
-      height: 2.5rem;
-      min-width: 2.5rem;
-      min-height: 2.5rem;
+      width: var(--header-button, 2.5rem);
+      height: var(--header-button, 2.5rem);
+      min-width: var(--header-button, 2.5rem);
+      min-height: var(--header-button, 2.5rem);
       border-radius: 50%;
       display: flex;
       align-items: center;

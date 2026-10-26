@@ -73,10 +73,11 @@ describe('autohideHeader', () => {
     scrollTo(100)
     scrollTo(200)
     expect(header.tucked).to.equal(true)
-    expect(header.style.getPropertyValue('--tuck')).to.equal('50px')
+    expect(header.style.marginTop).to.equal('-50px')
     now += 400
     scrollTo(150)
     expect(header.tucked).to.equal(false)
+    expect(header.style.marginTop).to.equal('')
   })
 
   it('ignores a small movement', () => {

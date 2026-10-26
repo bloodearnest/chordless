@@ -32,8 +32,9 @@ export function autohideHeader({ header, root, songShown, signal }: HeaderAutohi
 
   const tuck = (tucked: boolean) => {
     if (header.tucked === tucked) return
-    // (the header's margin is what takes it out of the way, so it needs to know its height)
-    if (tucked) header.style.setProperty('--tuck', `${header.offsetHeight}px`)
+    // (the header's top margin is what takes it out of the way, and slides it, as the header
+    // transitions it. Set here, as the page's own styles beat the header's for its margin)
+    header.style.marginTop = tucked ? `${-header.offsetHeight}px` : ''
     header.tucked = tucked
     settlesAt = performance.now() + SETTLE
     run = 0
