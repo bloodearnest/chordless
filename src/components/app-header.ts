@@ -277,6 +277,7 @@ export class AppHeader extends LitElement {
         flex: 0 0 100%;
         padding-left: var(--gap);
         box-sizing: border-box;
+        line-height: 1.2;
       }
 
       .header-row-2 {
