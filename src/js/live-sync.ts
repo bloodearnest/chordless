@@ -202,21 +202,23 @@ export class LiveSync {
         target.kind === 'share-sender' &&
         (!change.ids || change.ids.includes(target.setlistId))
       ) {
-        this.#publishSoon(joined)
+        this.#publishSoon(joined, target)
       }
     }
   }
 
-  #publishSoon(joined: Joined): void {
+  #publishSoon(joined: Joined, target: Extract<LiveTarget, { kind: 'share-sender' }>): void {
     joined.cancelPublish?.()
     joined.cancelPublish = this.#deps.later(PUBLISH_DEBOUNCE_MS, () => {
       joined.cancelPublish = null
-      void this.#publish(joined)
+      void this.#publish(joined.channel, target)
     })
   }
 
-  async #publish({ target, channel }: Joined): Promise<void> {
-    if (target.kind !== 'share-sender') return
+  async #publish(
+    channel: LiveChannelLike,
+    target: Extract<LiveTarget, { kind: 'share-sender' }>
+  ): Promise<void> {
     try {
       // (what the upload saves on the setlist is a change of its own, which comes back here and finds
       // the share up to date: nothing is uploaded, so nothing is said)
