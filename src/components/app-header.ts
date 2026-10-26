@@ -253,18 +253,10 @@ export class AppHeader extends LitElement {
         flex: 1 1 100%;
       }
 
-      /* The round buttons follow the text size too, not a fixed 2.5rem (the page's own share and
-         live buttons read this as well) */
       :host {
-        --header-button: calc(var(--font-ui) * 2);
-        /* How far in from the header's padding the menu icon's edge is */
-        --edge: 0.25rem;
-      }
-
-      .nav-menu-button {
-        padding: 0.25rem;
-        min-width: var(--header-button);
-        min-height: var(--header-button);
+        /* How far in from the header's padding the menu icon's drawing starts: the button's
+           padding (0.5rem) and the space the icon leaves round its lines (6px) */
+        --edge: calc(0.5rem + 6px);
       }
 
       /* Slid up out of the way: the page under it moves up as it goes, so the text stays put */
@@ -291,13 +283,12 @@ export class AppHeader extends LitElement {
       .subtitle {
         display: block;
         width: 100%;
-        /* (the 5px is the space the menu icon's drawing leaves at its own edge) */
-        padding-left: calc(var(--edge) + 5px);
+          padding-left: var(--edge);
         box-sizing: border-box;
         /* The same height as the key's row, which the overview and a song swap (the key's box has
            a 2px border): the header must not change height between them */
-        font-size: var(--font-ui-small);
-        padding-block: 2px;
+        font-size: var(--font-ui);
+        padding-block: calc(0.2rem + 2px);
         line-height: 1.2;
         opacity: 0.85;
         white-space: nowrap;
@@ -319,7 +310,8 @@ export class AppHeader extends LitElement {
 
       /* The key and the rest line up with the menu icon's edge, not indented from it: the
          controls' own padding and border (musical-metadata-display's) are taken off */
-      ::slotted(.header-controls-slot) {
+      slot[name='controls'] {
+        display: flex;
         margin-left: calc(var(--edge) - 2px - 0.45rem);
       }
     }

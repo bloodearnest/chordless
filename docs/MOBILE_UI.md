@@ -32,6 +32,9 @@ BPM) matters less there, and live mode can take more of the controls out of the 
 - The header's padding and gaps are `calc(var(--font-base) * 0.4)`, not `rem`: the text follows
   `--font-base` (the screen's width), so the space does too.
 - Phone padding is half a gap above and below; no gap between the rows.
+- The icons, the menu button and the text are full size (2.5rem round buttons, 44px menu button).
+  They were squeezed smaller first, and were too small to use: with the header tucking away
+  while a song scrolls, the room is there. The header is about 83px on a phone.
 
 ### 3. The header gets out of the way of a song (built)
 
