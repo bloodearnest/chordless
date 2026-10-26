@@ -108,9 +108,11 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 
   A **sharer** also publishes the share itself, apart from the sync: 300 ms after an edit to the
   setlist (a burst is one upload; under the sync lock, so not alongside a sync) it brings the share up
-  to date as a sync would and tells the room that moment, and the sync's wait after an edit is 400 ms
-  while live (`LIVE_NUDGE_MS`; 2 s otherwise). It tells the others after a `SyncPushedEvent` (a team
-  reader does not: only writers send); on a
+  to date as a sync would, and the sync's wait after an edit is 400 ms while live (`LIVE_NUDGE_MS`; 2 s
+  otherwise). The room is told by the upload itself (`ShareUpdatedEvent`, sent by `refreshShare`
+  whoever calls it: this, the sync's share step or the share dialog), so a sync that gets there first
+  does not leave the recipients waiting for its push. A team space's room is told after a
+  `SyncPushedEvent` (a reader does not: only writers send); on a
   `changed` it syncs, or fetches the share, at once and again after each of `FOLLOW_UPS_MS`; and on every
   (re)connect it does so once, to catch up on what it missed. A **recipient of a share** also fetches it
   every `SHARE_POLL_MS` (30 s) while live and on screen, whatever the channel says: a team space has the
