@@ -110,6 +110,10 @@ Changes reach `main` only through pull requests (`docs/CI.md`): never commit to 
   `git push --force-with-lease`. Open the pull request as a draft with `gh pr create`, and mark it
   ready when `just ci` passes.
 - Never merge your own pull request. They are merged with "Rebase and merge": no merge commits.
+- At the end of a session, `just wrap-up`: it fast-forwards the primary checkout's `main` to
+  `origin/main` and lists the worktrees and branches whose pull request has merged (`--prune`
+  removes the clean ones). A session confined to its own worktree cannot touch the primary checkout:
+  say so and ask the user to run it (`! just wrap-up`).
 
 ## Log of what the tests catch
 
