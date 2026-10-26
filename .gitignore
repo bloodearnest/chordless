@@ -51,3 +51,6 @@ tests/fixtures/private/
 
 # A throwaway Cloudflare token that can make tokens, for scripts/ci-tokens.sh (infra/README.md)
 .cloudflare-bootstrap-token
+
+# Terraform plans CI makes (scripts/terraform-ci.sh)
+/plans/

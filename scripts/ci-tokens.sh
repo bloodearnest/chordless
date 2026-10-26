@@ -70,6 +70,9 @@ for environment in infra infra-apply; do
         }')
       answer=$(cf POST /tokens "$body")
       jq -r .result.value <<<"$answer" | set_secrets "$environment" "$(jq -r .result.id <<<"$answer")"
+      # (not a secret: when it runs out, which the Terraform jobs warn of: scripts/ci/check-expiry.sh)
+      gh variable set R2_TOKEN_EXPIRES --repo "$REPOSITORY" --env "$environment" \
+        --body "$(jq -r .result.expires_on <<<"$answer")"
       echo "  \"$name\" made, expiring $(jq -r .result.expires_on <<<"$answer")"
       ;;
     rotate)
