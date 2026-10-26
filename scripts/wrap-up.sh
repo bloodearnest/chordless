@@ -6,7 +6,8 @@
 #   scripts/wrap-up.sh --prune    also remove the merged ones that have nothing uncommitted
 #
 # Run it from anywhere in the repository, in the user's own shell: a session confined to its
-# worktree cannot touch the primary checkout. "Rebase and merge" gives a PR's commits new shas, so
+# worktree cannot touch the primary checkout. It also installs the packages (npm ci) if the lock file is
+# newer than what is installed, which a pull that adds a dependency leaves behind. "Rebase and merge" gives a PR's commits new shas, so
 # a merged branch is found by its PR (gh), not by git's ancestry, and is only removed when its tip
 # is the commit the PR merged (nothing added since). Nothing is ever force-removed.
 set -euo pipefail
@@ -26,6 +27,12 @@ elif [[ -n "$(git -C "$primary" status --porcelain)" ]]; then
   echo "  has uncommitted changes: left alone"
 elif git -C "$primary" merge --ff-only --quiet origin/main; then
   echo "  up to date with origin/main ($(git -C "$primary" rev-parse --short HEAD))"
+  # A pull that changes package-lock.json leaves node_modules behind, and a build then fails to resolve
+  # the new package. npm writes node_modules/.package-lock.json when it installs: older than the lock is stale.
+  if [[ ! -e "$primary/node_modules/.package-lock.json" || "$primary/package-lock.json" -nt "$primary/node_modules/.package-lock.json" ]]; then
+    echo "  node_modules is older than package-lock.json: npm ci"
+    (cd "$primary" && npm ci --silent)
+  fi
 else
   echo "  has commits origin/main lacks: left alone"
 fi
