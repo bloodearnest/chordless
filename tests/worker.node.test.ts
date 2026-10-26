@@ -278,13 +278,6 @@ describe('a team space Durable Object', () => {
     })
   })
 
-  test('has a place for the share rooms, which answers nothing yet', async () => {
-    const env = await worker.getWorker<Env>().getEnv()
-    assert.ok(env.SHARE_ROOM, 'wrangler.toml binds SHARE_ROOM')
-    const room = env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName('a-share-file-id'))
-    assert.equal((await room.fetch(new Request('https://chordless.test/'))).status, 501)
-  })
-
   // The live channel (worker/src/live-relay.ts): a device going live is a socket on the space's object
   describe('the live channel', () => {
     const cat = { provider: 'google', sub: 'g-3', email: 'cat@example.com' }
