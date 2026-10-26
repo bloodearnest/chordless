@@ -86,6 +86,11 @@ You know, the basics.
 
 - **Add songs** from your library, or import from SongSelect or other ChordPro.
   Have variant versions of songs with alternate chords or lyrics.
+- **Find songs fast.** Search by title, artist or any line of the lyrics. It
+  finds other forms of a word ("praises" finds "praise"), poetic spellings
+  ("ev'ry" is "every"), words in any order, and copes with a slip of the
+  fingers. It keeps up as you type, puts the best match first and marks the
+  words it found.
 - **Transpose** to your preferred key.
 - **Order songs** as you like.
 - **Add notes** to share with your team. *Coming soon.*
