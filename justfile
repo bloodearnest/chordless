@@ -58,6 +58,10 @@ audit:
 zap target="https://chordless.app":
     scripts/zap-baseline.sh {{target}}
 
+# The GitHub environments have the secrets the workflows use, by name (docs/CI.md)
+check-gh-secrets:
+    node scripts/check-gh-secrets.ts
+
 # What CI's Linux jobs run, in order, writing no file in the repository: `just ci` before pushing
 # a branch reproduces a PR's checks (docs/CI.md). The macOS and Windows jobs are `just test-e2e webkit|msedge`
 ci:
