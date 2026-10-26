@@ -13,6 +13,11 @@ terraform {
       source  = "integrations/github"
       version = "~> 6.13"
     }
+    # (for the check of the merge settings)
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
   }
   # State: in R2 (infra/README.md), with AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY from an R2 token
   backend "s3" {
@@ -49,6 +54,21 @@ variable "required_approvals" {
   default     = 0
 }
 
+locals {
+  merge_settings = {
+    # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch must be up to
+    # date with main to merge (the ruleset), and can be brought up to date from the pull request
+    allow_merge_commit  = false
+    allow_squash_merge  = false
+    allow_rebase_merge  = true
+    allow_update_branch = true
+    # "Enable auto-merge" on a pull request: it merges itself once its required checks pass
+    # (Dependabot's weekly pull request is set to, .github/workflows/dependabot-auto-merge.yml)
+    allow_auto_merge       = true
+    delete_branch_on_merge = true
+  }
+}
+
 import {
   to = github_repository.chordless
   id = "chordless"
@@ -63,16 +83,12 @@ resource "github_repository" "chordless" {
   has_projects = true
   has_wiki     = true
 
-  # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch must be up to
-  # date with main to merge (the ruleset), and can be brought up to date from the pull request
-  allow_merge_commit = false
-  allow_squash_merge = false
-  allow_rebase_merge = true
-  # "Enable auto-merge" on a pull request: it merges itself once its required checks pass (Dependabot's
-  # weekly pull request is set to, .github/workflows/dependabot-auto-merge.yml)
-  allow_auto_merge       = true
-  allow_update_branch    = true
-  delete_branch_on_merge = true
+  allow_merge_commit     = local.merge_settings.allow_merge_commit
+  allow_squash_merge     = local.merge_settings.allow_squash_merge
+  allow_rebase_merge     = local.merge_settings.allow_rebase_merge
+  allow_auto_merge       = local.merge_settings.allow_auto_merge
+  allow_update_branch    = local.merge_settings.allow_update_branch
+  delete_branch_on_merge = local.merge_settings.delete_branch_on_merge
 
   security_and_analysis {
     secret_scanning {
@@ -85,6 +101,40 @@ resource "github_repository" "chordless" {
 
   lifecycle {
     prevent_destroy = true
+    # GitHub's REST API, which the provider reads, leaves the merge settings out for a token that
+    # cannot push to the repository. CI's plan token is read-only, so to the provider they would
+    # always read as unset, and every plan would "change" them. So they are set when the repository
+    # is created, not after: the check below compares them with GitHub's GraphQL API, which a
+    # read-only token can see, and a difference is drift. To change one: in GitHub, then here
+    ignore_changes = [
+      allow_merge_commit, allow_squash_merge, allow_rebase_merge, allow_auto_merge,
+      allow_update_branch, delete_branch_on_merge, merge_commit_title, merge_commit_message,
+      squash_merge_commit_title, squash_merge_commit_message,
+    ]
+  }
+}
+
+# (a data source of its own, not one in the check: Terraform reads those only at apply, so every plan
+# would have something to do)
+data "external" "merge_settings" {
+  program = ["bash", "${path.module}/merge-settings.sh"]
+  query = {
+    owner      = "bloodearnest"
+    repository = var.repository
+  }
+}
+
+check "merge_settings" {
+  assert {
+    condition = data.external.merge_settings.result == tomap({
+      mergeCommitAllowed  = tostring(local.merge_settings.allow_merge_commit)
+      squashMergeAllowed  = tostring(local.merge_settings.allow_squash_merge)
+      rebaseMergeAllowed  = tostring(local.merge_settings.allow_rebase_merge)
+      autoMergeAllowed    = tostring(local.merge_settings.allow_auto_merge)
+      allowUpdateBranch   = tostring(local.merge_settings.allow_update_branch)
+      deleteBranchOnMerge = tostring(local.merge_settings.delete_branch_on_merge)
+    })
+    error_message = "GitHub's merge settings are not main.tf's: ${jsonencode(data.external.merge_settings.result)}"
   }
 }
 

@@ -24,6 +24,7 @@ case "$mode" in
     [ "$mode" = drift ] && base=
     mkdir -p plans
     changed=false
+    drifted=false
     for stack in "${CI_STACKS[@]}"; do
       if [ -n "$base" ] && git diff --quiet "$base" HEAD -- "infra/$stack"; then
         echo "$stack: not changed since ${base:0:7}" >&2
@@ -35,6 +36,14 @@ case "$mode" in
         -out="$PWD/plans/$stack.tfplan" >"plans/$stack.txt" 2>&1
       status=$?
       set -e
+      # A `check` that fails (infra/github's merge settings) is only a warning to Terraform: drift here
+      if [ $status != 1 ] && grep -q "Check block assertion failed" "plans/$stack.txt"; then
+        drifted=true
+        echo "$stack: a check failed:" >&2
+        failure=$(grep -A30 "Check block assertion failed" "plans/$stack.txt" | grep -Ev '^ *([0-9]+:.*)?$')
+        echo "$failure" >&2
+        { echo "### $stack: a check failed"; echo '```'; echo "$failure"; echo '```'; } | summary
+      fi
       case $status in
         0)
           echo "$stack: no changes" >&2
@@ -53,7 +62,7 @@ case "$mode" in
           ;;
       esac
     done
-    if [ "$mode" = drift ] && [ "$changed" = true ]; then
+    if [ "$mode" = drift ] && { [ "$changed" = true ] || [ "$drifted" = true ]; }; then
       echo "Drift: what is real differs from infra/ (see above): put the change in the code, or undo it" >&2
       exit 1
     fi
