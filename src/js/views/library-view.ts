@@ -54,7 +54,7 @@ import { getLibrarySongs } from '../song-utils.ts'
 import * as SongViewManager from '../song-view-manager.ts'
 import { getCurrentSpace, listSpaces } from '../space.ts'
 import { getAvailableKeys, transposeSong } from '../transpose.ts'
-import { filterSongs } from '../utils/song-filter.ts'
+import { filterSongs, warmSearch } from '../utils/song-filter.ts'
 import { PageView, type ViewState } from './page-view.ts'
 
 export class LibraryView extends PageView {
@@ -112,10 +112,12 @@ export class LibraryView extends PageView {
     task: async () => {
       const db = await getCurrentDB()
       const own = await getLibrarySongs(db, { withLastUsage: true, allVariants: true })
-      return withSongsFromElsewhere(
+      const songs = withSongsFromElsewhere(
         withSpaceName(own, (await listSpaces()).length, getCurrentSpace().name),
         await getSongsElsewhere(db.dbName)
       )
+      warmSearch(songs)
+      return songs
     },
     args: () => [],
   })
