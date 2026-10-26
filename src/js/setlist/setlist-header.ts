@@ -84,8 +84,6 @@ export class SetlistHeader {
     if (!appHeader) return
 
     appHeader.showEditToggle = true
-    // (on a phone the overview's title has a row to itself, with the icons above it)
-    appHeader.titleBelow = !song
     // (nothing to change)
     if (appHeader.heading === title && !instant) return
 
@@ -99,6 +97,10 @@ export class SetlistHeader {
   }
 
   #showContent(song: RuntimeSong | null) {
+    // (on a phone the overview's title has a row to itself, with the icons above it. This moves
+    // it, so it is done with the rest, while the title and controls are faded out)
+    const appHeader = this.#find<AppHeader>('#app-header')
+    if (appHeader) appHeader.titleBelow = !song
     const musicalMetadata = this.#find<MusicalMetadataDisplay>('#musical-metadata')
     const keySelector = this.#find<KeySelector>('#key-selector')
     const capoSelector = this.#find<CapoSelector>('#capo-selector')
