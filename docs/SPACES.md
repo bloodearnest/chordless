@@ -19,8 +19,8 @@ audio live in the user's own browser and in a Drive the user (or their team spac
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song or pad
 content. They hold only membership, roles, the owner's encrypted token blob, checksums, and, for
-live sync, the latest *structure* of a live setlist (titles, order, keys, tempo, notes: a setlist
-is not copyrighted, a chart is), never chart text (LIVE_SYNC.md). (Share
+the live channel, the hash of the secret a share's sender proved (LIVE_SYNC.md): its sockets carry one
+word, "changed", and never a setlist, chart or key. (Share
 links are the one exception: the Worker caches ciphertext it cannot read.)
 
 Churches using Chordless are expected to hold a CCLI licence, which covers sharing charts with the
@@ -584,8 +584,8 @@ only what needs Drive: sharing by link (the song list to paste stays).
 - **No guard for a setlist that is open or live, on purpose.** A leader's last-minute song must reach
   a live follower: blocking it would go against "permissive in the moment". Today it cannot happen
   mid-service anyway, because a sync only runs when the user presses it on the Account and Teams page. When
-  updates can arrive while a setlist is open (immediate sync, or the leader pushing over a WebSocket,
-  opt-in, LIVE_SYNC.md), apply them in place: keep the current song by its song id, say what changed with the same
+  updates can arrive while a setlist is open (an immediate sync, which the live channel's "changed"
+  asks for, LIVE_SYNC.md), apply them in place: keep the current song by its song id, say what changed with the same
   summary, and keep Undo. The diff is pure so both sources can share it.
 - The marker does not yet list *what* differs (their value, the official one, whether the official
   one changed since). That, and a per-field merge, are the device layer in SYNC_ARCHITECTURE.md,
@@ -728,7 +728,7 @@ member), a throwaway dev Worker and a service account. Detail of each run is bel
   sharing policy than the test one, and whether shared drives exist on the nonprofit tier.
 - A permanent delete by a Content manager answered 404, not 403: unresolved, and it does not matter.
 - Clock-time costs: Drive calls took 1 s or more each through the Worker, and `changes.list` runs
-  3 to 6 s behind a change. Pulls by a timer are fine; anything wanting instant needs the live channel (a WebSocket relay in the space's Durable Object: LIVE_SYNC.md).
+  3 to 6 s behind a change. Pulls by a timer are fine; anything wanting faster has the live channel (a WebSocket in the space's Durable Object that makes the others sync now; it still waits for the feed: LIVE_SYNC.md).
 
 The throwaway code (`worker/src/spike-broker.ts`, `spike-service-account.ts`, `src/dev/broker-spike.*`,
 `src/dev/shared-drive-probe.*`, `src/dev/picker.js`, and their tests) was deleted on 2026-10-20 when the
@@ -872,7 +872,7 @@ so the one place the app deleted permanently (replacing a pad set's files) now t
    from official" button with revert (setlists). Left: what-differs list, charts' marker, role from the Worker.
 6. [ ] Per-space pads and the "Save to" upload choice.
 7. [ ] Worker team service (serves the storage API to members; the API handler `worker/src/team-api.ts` and the client `TeamStorage` are built and tested on the in-memory storage, 2026-10-20; the identity check is built too (`worker/src/identity.ts`, below), and so is the Durable Object's state (`team-state.ts`, `team-space.ts`, 2026-10-21: owner, members and roles, the refs in the tree, the owner's blob) the owner-token source for Drive (`team-drive.ts`), the route (`router.ts`, `team-routes.ts`, `team-context.ts`), making a space, invites, joining and looking after the people (`team-admin.ts`); the join page (`/join#<space id>.<code>`, `team-join.ts`) is built, including for a link opened in the installed app (`launch.ts` hands the page the fragment of any link it is launched with, tagged with the path it came for: `incoming-link.ts`), and the Account and Teams page works for a member and has a Team Space panel (`team-share-panel.ts`): share the current space, invite by email (the link is shown once, to send), change roles, remove people, withdraw invites, stop sharing, or leave; the space list (`select-space.ts`, on the Account and Teams page) says which spaces are a team's and the role in each, and how one is joined; not yet the service account, the pads, or a switcher in the header): Durable Object, enable-sharing consent, invite/join/revoke, roles incl. admin,
-   pad rules, no song or pad content persisted (a test asserts no storage writes of bodies; a live setlist's structure is the one allowed thing, LIVE_SYNC.md).
+   pad rules, no song or pad content persisted (a test asserts no storage writes of bodies; the live channel holds only the hash of a share's sender secret, LIVE_SYNC.md).
 8. [ ] UI: the team space wizard ("Creating a team space": name, where the files live, what to
    bring, invite, progress). **Built so far (2026-10-22): `/account/new` (`team-space-wizard.ts`) asks
    for the name and the parent folder, makes `<name>/` in it, registers it and offers to open it;

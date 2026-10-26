@@ -41,6 +41,7 @@ run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/share/*", "/a
 
 # One Durable Object per team space (worker/src/team-space.ts): its members and roles, the files in
 # its tree, and the owner's encrypted token blob. Never song, setlist or pad content.
+# It also holds the space's live channel (docs/LIVE_SYNC.md): WebSockets that carry one word, "changed".
 [[durable_objects.bindings]]
 name = "TEAM_SPACE"
 class_name = "TeamSpace"

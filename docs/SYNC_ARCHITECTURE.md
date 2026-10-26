@@ -494,7 +494,7 @@ It can be an optional extra for a closed, installed app.
 | App open | an incremental sync about every 60 s |
 | A setlist is **live** | the same tick, every 60 s. There is no faster poll for the live setlist: a late song within a minute is enough, and the fast way is the live channel (below) |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
-| A live session is up (later) | the leader's changes are pushed to followers over a WebSocket (LIVE_SYNC.md); the poll stays as the fallback, back at 60 s |
+| A live channel is up (built) | a device that has sent its changes says so over a WebSocket and the others sync at once (LIVE_SYNC.md); the poll stays as the fallback |
 
 The intervals and the offline threshold are named constants, not preferences.
 
@@ -578,12 +578,11 @@ moved between folders each have a test of their own.
 
 - **Same lock and guards as the push:** the Web Lock `chordless-sync`, skipped when offline or
   signed out; never alongside a full sync.
-- **The fast way is the live channel, later.** A leader's changes to a live setlist (an added song,
-  a key, the order) go straight to followers over a session (a WebSocket relay in the space's Durable Object, which
-  keeps only the latest structure of the setlist, never a chart; designed in LIVE_SYNC.md, which
-  chose it over WebRTC). It is opt-in, and it adds to what a lone user can do. The 60 s tick stays
-  as the fallback for anyone not on it or whose connection drops. A change arrives as the setlist
-  (without chart text) and lands as below; charts still come through the storage.
+- **The fast way is the live channel (built).** A device that has sent its changes says "changed" over a
+  WebSocket in the space's Durable Object (LIVE_SYNC.md), and the other live devices run a sync at once
+  (`AutoSync.syncSoon`), and again 5 s later for the feed's lag. It carries no setlist, so the sync's rules
+  (conflicts, the diff, Undo) apply unchanged and nothing is stored by the Worker. The 60 s tick stays
+  as the fallback for anyone not on it or whose connection drops. A change lands as below.
 - **A pull that changes the open setlist applies in place (built):** a sync that saves setlists tells
   the app: every write is a `DataChangeEvent` on the window, and over a BroadcastChannel to the
   app's other tabs (`data-changes.ts`), carrying only ids. The setlist page (`applyChangedSetlist`,
