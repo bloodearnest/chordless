@@ -33,7 +33,20 @@ BPM) matters less there, and live mode can take more of the controls out of the 
   `--font-base` (the screen's width), so the space does too.
 - Phone padding is half a gap above and below; no gap between the rows.
 
-### 3. Less in the header on mobile (not built)
+### 3. The header gets out of the way of a song (built)
+
+- On the overview the icons stay in the top row and the title (the date or name) is a row of its
+  own under them (`title-below` on `<app-header>`).
+- Scrolling a song down tucks the header away, and scrolling up brings it back, as a browser's
+  address bar does: a common pattern on phones. Phones only. It's
+  `src/js/setlist/header-autohide.ts`: CSS alone can't (scroll-driven animations don't know the
+  direction, and aren't in the Safari 17 floor). The header slides up by a negative `margin-top`,
+  so the lyrics move up with it, not resize. The header is always shown at the top of a song, on
+  the overview, and when moving to another song.
+- A move of the header leaves the scrolling alone for 350 ms: the lyrics grow or shrink with it,
+  which at the end of a song looks like a scroll the other way.
+
+### 4. Less in the header on mobile (not built)
 
 - **Key chip.** With chords hidden, drop the full key/capo/BPM display from the header and leave a
   small key chip, so a singer can still see the key. The chip opens the song settings popover, so a

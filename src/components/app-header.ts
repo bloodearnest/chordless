@@ -41,6 +41,8 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} showEditToggle - Whether to show the edit mode toggle button
  * @property {Boolean} showInfoButton - Whether to show the info button
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
+ * @property {Boolean} titleBelow - On phones, the title is a row of its own under the menu and icons
+ * @property {Boolean} tucked - On phones, the header is slid out of the way (the page sets --tuck, its height)
  *
  * Slots:
  * @slot controls - Page-specific controls (the song's key, capo and tempo). On phones they are a
@@ -68,6 +70,8 @@ export class AppHeader extends LitElement {
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
+    titleBelow: { type: Boolean, reflect: true, attribute: 'title-below' },
+    tucked: { type: Boolean, reflect: true },
     _slottedControls: { state: true }, // whether anything is in the controls slot
     _updateReady: { state: true }, // whether a new version of the app is waiting
   }
@@ -78,6 +82,8 @@ export class AppHeader extends LitElement {
   declare showLogo: boolean
   declare editMode: boolean
   declare disableAnimation: boolean
+  declare titleBelow: boolean
+  declare tucked: boolean
   declare _slottedControls: boolean
   declare _updateReady: boolean
 
@@ -233,6 +239,34 @@ export class AppHeader extends LitElement {
         width: 100%;
       }
 
+      /* Slid up out of the way: the page under it moves up as it goes, so the text stays put */
+      :host {
+        transition:
+          margin-top 0.25s ease-in-out,
+          visibility 0.25s;
+      }
+
+      :host([tucked]) {
+        margin-top: calc(-1 * var(--tuck, 0px));
+        visibility: hidden;
+      }
+
+      /* The menu and the icons, and under them the title, as a row of its own */
+      :host([title-below]) .header-icons {
+        margin-left: auto;
+      }
+
+      :host([title-below]) .header-row-1 {
+        flex-wrap: wrap;
+      }
+
+      :host([title-below]) .header-row-1 .title {
+        order: 1;
+        flex: 0 0 100%;
+        padding-left: var(--gap);
+        box-sizing: border-box;
+      }
+
       .header-row-2 {
         width: 100%;
         justify-content: flex-start;
@@ -329,6 +363,8 @@ export class AppHeader extends LitElement {
     this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
+    this.titleBelow = false
+    this.tucked = false
     this._slottedControls = false
     this._updateReady = appUpdate.ready
     this._previousTitle = ''

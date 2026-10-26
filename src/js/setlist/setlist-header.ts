@@ -84,6 +84,8 @@ export class SetlistHeader {
     if (!appHeader) return
 
     appHeader.showEditToggle = true
+    // (on a phone the overview's title has a row to itself, with the icons above it)
+    appHeader.titleBelow = !song
     // (nothing to change)
     if (appHeader.heading === title && !instant) return
 

@@ -40,6 +40,7 @@ import { CapoPreferenceEvent, getCapoPreference, SectionDefaultsEvent } from './
 import { buildUrl, type Route } from './router.ts'
 import { AddSongModal } from './setlist/add-song-modal.ts'
 import { enterEditMode, isEditMode, leaveEditMode } from './setlist/edit-mode-ui.ts'
+import { autohideHeader } from './setlist/header-autohide.ts'
 import { listenForNavigationKeys } from './setlist/keyboard-navigation.ts'
 import {
   afterMove,
@@ -223,6 +224,15 @@ export class SetlistPage {
     if (this._disposed) return
 
     this.setupKeyboardNavigation()
+    const header = this.root.querySelector<AppHeader>('#app-header')
+    if (header) {
+      autohideHeader({
+        header,
+        root: this.root,
+        songShown: () => this.currentSongIndex >= 0,
+        signal: this._abort.signal,
+      })
+    }
     this.setupDoubleClickToggle()
     this.setupChangedSetlists()
     this.setupNavigationMenu()

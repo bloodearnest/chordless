@@ -431,6 +431,22 @@ describe('the setlist page: header, menu and keys', () => {
       expect(($('#key-selector') as unknown as { value: string }).value).to.equal('-')
     })
 
+    it('gives the overview title a row of its own, and the songs not', async () => {
+      await rig.open()
+      await rig.page.header.show(null, true)
+      expect(header().titleBelow).to.equal(true)
+      await rig.page.header.show(rig.page.songs[0], true)
+      expect(header().titleBelow).to.equal(false)
+    })
+
+    it('keeps the header out of a scroll on the overview', async () => {
+      await rig.open()
+      await rig.page.header.show(null, true)
+      const section = must($<HTMLElement>('#overview'))
+      section.dispatchEvent(new Event('scroll'))
+      expect(header().tucked).to.equal(false)
+    })
+
     it('does nothing for a header that is not there', async () => {
       await rig.open()
       rig.root.querySelector('#app-header')?.remove()
