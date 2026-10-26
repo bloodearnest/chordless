@@ -83,7 +83,7 @@ checkouts keep no credentials; every job has a timeout. Pull requests run with n
 
 CodeQL analyses the app's and the Worker's code on every pull request, on `main` (which a pull
 request's findings are compared with) and weekly. It is GitHub's own action, pinned like the others.
-What it checks is `.github/codeql/codeql-config.yml`: CodeQL's high-precision `default` suite, and not
+What it checks is `.github/codeql/codeql-config.yml`: CodeQL's default (high-precision) suite, and not
 the tests, the dev playgrounds or the build scripts. Its findings block a merge at the thresholds of
 the `main` ruleset's code scanning rule (`infra/github`): a security finding of high severity or more,
 or any other at error level. Below those they are shown, and do not block.
