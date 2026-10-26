@@ -10,16 +10,17 @@ so what CI runs can be run, and fixed, locally.
 2. Before asking for review: `git fetch && git rebase origin/main`, then `just ci`, then
    `git push --force-with-lease`. Open the pull request with `gh pr create` (a draft until `just ci`
    passes), using the template.
-3. The pull request needs `ci-ok` to pass, on a branch up to date with `main` (GitHub's "Update branch"
-   rebases it), and the approvals the ruleset asks for. It is merged with **Rebase and merge**: no
-   merge commits, no squash.
+3. The pull request needs `ci-ok` to pass, CodeQL's findings below the ruleset's thresholds, a
+   branch up to date with `main` (GitHub's "Update branch" rebases it), and the approvals the ruleset
+   asks for. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
+   on a pull request merges it when all that is so.
 4. Deploys are still `just deploy`, by hand.
 
 The rules are in Terraform (`infra/github/`), and no one bypasses them, the owner included. To get out
 of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and apply.
 
-"Rebase and merge" gives the commits new SHAs on `main`, so `docs/test-catches.jsonl` names a fix by its pull request (`"#42"`), and
-`docs/stats.jsonl` records each run's tree as well as its commit (the trees are the same on `main`).
+"Rebase and merge" gives the commits new SHAs on `main`, so `docs/test-catches.jsonl` names a fix by
+its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as well as its commit (the trees are the same on `main`).
 
 ## The checks (`.github/workflows/ci.yml`)
 
@@ -84,7 +85,8 @@ CodeQL analyses the app's and the Worker's code on every pull request, on `main`
 request's findings are compared with) and weekly. It is GitHub's own action, pinned like the others.
 What it checks is `.github/codeql/codeql-config.yml`: CodeQL's high-precision `default` suite, and not
 the tests, the dev playgrounds or the build scripts. Its findings block a merge at the thresholds of
-the `main` ruleset's code scanning rule (`infra/github`).
+the `main` ruleset's code scanning rule (`infra/github`): a security finding of high severity or more,
+or any other at error level. Below those they are shown, and do not block.
 
 When it is wrong: dismiss a single finding in the repository's Security tab, with the reason (a
 dismissed finding no longer blocks); when one query is wrong again and again, turn it off in the
@@ -126,8 +128,34 @@ job per key: unit tests (Linux packages, Chromium), lint (its tools), and the ma
 (their own). A weekly run of CI on `main` keeps them from expiring (GitHub drops a cache unused for a
 week). The deploy job uses no cache at all.
 
+## Dependabot (`.github/dependabot.yml`)
+
+One pull request a week (Mondays) of every npm package and action with a new version, each at least a
+week old (`cooldown`); security updates when an alert comes, those at once in one pull request. Each
+is set to merge itself once its checks pass (`.github/workflows/dependabot-auto-merge.yml`): the same
+checks as any pull request, with `just audit` among them.
+
+## Terraform (`.github/workflows/terraform.yml`)
+
+A change to `infra/` that reaches `main` is planned and, once you approve, applied
+(`scripts/terraform-ci.sh`):
+
+1. **Plan**, in the `infra` environment, with credentials that can only read (an R2 key that reads
+   the state, so the plan takes no lock; a GitHub token that reads the repository's settings). The plan
+   is in the run's summary.
+2. **Apply**, in the `infra-apply` environment, which waits for your approval: read the plan, then
+   approve, and exactly that plan is applied, with credentials that can write.
+
+Nightly, every stack is planned, and the run fails if any would change: something was changed outside
+the code (a console, a dashboard). Put it in the code, or undo it.
+
+Pull requests run none of it: they have no secrets. Only the `github` stack is in CI so far; the
+others are planned and applied by hand (`infra/README.md`) until their credentials are made. Each run
+also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30 days before, a failure
+7 days before, so the nightly run says so in time. The credentials, and rotating them:
+`infra/README.md`.
+
 ## Next
 
-Still to come, each in a pull request of its own: every Terraform stack's state moved to R2; deploys
-from `main`, smoke tested and rolled back on failure; and a nightly check of the Terraform stacks for
-drift.
+Still to come: deploys from `main` (the build in a job with no secrets, deployed only when it changed,
+then smoke tested and rolled back on failure); the `cloudflare` and Google stacks in CI.
