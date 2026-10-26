@@ -48,3 +48,6 @@ tests/fixtures/private/
 
 # ZAP baseline reports (just zap)
 /zap-report/
+
+# A throwaway Cloudflare token that can make tokens, for scripts/ci-tokens.sh (infra/README.md)
+.cloudflare-bootstrap-token
