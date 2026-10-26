@@ -12,6 +12,7 @@
 import { DataChangeEvent } from './data-changes.ts'
 import { getSignInState } from './google-auth.ts'
 import { lastSyncOf, recordSync } from './last-sync.ts'
+import { getLive } from './live.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator } from './sync-orchestrator.ts'
@@ -24,6 +25,8 @@ export const STALE_AFTER_MS = 15 * 60_000
 export const OFFLINE_LONG_MS = 5 * 60_000
 /** A change made here is sent after this much quiet, so that a burst of edits is one sync */
 export const NUDGE_MS = 2000
+/** ...and while the device is live, when a change is wanted elsewhere at once: a burst is still one sync, but a short one (docs/LIVE_SYNC.md) */
+export const LIVE_NUDGE_MS = 400
 
 /**
  * A sync that sent changes made here has finished (sent on window): what the live channel waits
@@ -60,6 +63,8 @@ export interface AutoSyncDeps {
   online(): boolean
   /** When the space last synced on this device (ISO time), or null if it never has */
   lastSync(): string | null
+  /** Whether this device is live (live.ts) */
+  live(): boolean
   state(): Promise<SyncState>
   /** The sync itself, for the space in use; false if it was skipped because another is running, and throws if it fails */
   run(): Promise<boolean>
@@ -142,7 +147,7 @@ export class AutoSync {
   #nudge(): void {
     if (this.#running) this.#changedWhileRunning = true
     this.#cancelNudge?.()
-    this.#cancelNudge = this.#deps.later(NUDGE_MS, () => {
+    this.#cancelNudge = this.#deps.later(this.#deps.live() ? LIVE_NUDGE_MS : NUDGE_MS, () => {
       this.#cancelNudge = null
       void this.#sync(false)
     })
@@ -247,6 +252,7 @@ export function startAutoSync(): AutoSync {
       const { id } = getCurrentSpace()
       return id ? lastSyncOf(id) : null
     },
+    live: () => getLive() !== null,
     state: currentState,
     run: runSync,
     every: (ms, fn) => {

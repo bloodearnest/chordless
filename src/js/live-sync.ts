@@ -18,8 +18,11 @@ import { LiveChannel, type LiveChannelEvents, type LiveStatus } from './live-cha
 import { FOLLOW_UPS_MS } from './live-protocol.ts'
 import { announceLiveSyncStatus } from './live-sync-status.ts'
 import { generateLiveSecret } from './share-crypto.ts'
+import { refreshShare } from './share-manager.ts'
 import { reloadShare } from './share-receiver.ts'
-import { getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
+import { getCurrentSpace, getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
+import { withSyncLock } from './sync-lock.ts'
+import { createSyncManager } from './sync-manager.ts'
 import { atLeast } from './team-roles.ts'
 
 /**
@@ -29,12 +32,15 @@ import { atLeast } from './team-roles.ts'
  */
 export const SHARE_POLL_MS = 30_000
 
+/** A live share is brought up to date this long after the last edit to its setlist: a burst is one upload */
+export const PUBLISH_DEBOUNCE_MS = 300
+
 /** A channel this device joins while it is live, and what it is for */
 export type LiveTarget =
   /** The team space's: the devices of its members tell each other of changes, to sync at once */
   | { kind: 'team'; key: string; teamId: string; canWrite: boolean }
   /** A share's room, as its sharer: tell the recipients that the share was uploaded */
-  | { kind: 'share-sender'; key: string; fileId: string; secret: string }
+  | { kind: 'share-sender'; key: string; fileId: string; secret: string; setlistId: string }
   /** A share's room, as a recipient: fetch the share again when it is said to have been updated */
   | { kind: 'share-recipient'; key: string; fileId: string }
 
@@ -104,6 +110,7 @@ export async function liveTargets(world: LiveWorld): Promise<LiveTarget[]> {
         key: `send:${share.fileId}`,
         fileId: share.fileId,
         secret,
+        setlistId,
       })
     }
   }
@@ -129,6 +136,8 @@ export interface LiveSyncDeps {
   syncSoon(): Promise<void>
   /** Fetch a received share again, as it is now */
   reloadShare(fileId: string): Promise<void>
+  /** Bring a setlist's share up to date with it now, apart from the sync; whether it uploaded a new one */
+  publishShare(setlistId: string): Promise<boolean>
   visible(): boolean
   later(ms: number, fn: () => void): () => void
   /** Call `fn` every `ms` until the returned function is called */
@@ -141,6 +150,8 @@ interface Joined {
   cancelFollowUps: (() => void)[]
   /** A recipient's slow poll */
   stopPoll: (() => void) | null
+  /** A sharer's upload, waiting out the edits */
+  cancelPublish: (() => void) | null
 }
 
 export class LiveSync {
@@ -179,7 +190,41 @@ export class LiveSync {
 
   /** A setlist was saved: it may have been shared, or no longer, since the channels were worked out */
   #onData = (event: Event): void => {
-    if ((event as DataChangeEvent).change.kind === 'setlist') void this.#refresh()
+    const { change } = event as DataChangeEvent
+    if (change.kind !== 'setlist') return
+    void this.#refresh()
+    // An edit made here to a setlist that is shared: the share is brought up to date at once and the
+    // room told, without waiting for the sync (which reads the feed and pushes the setlist first)
+    if (change.origin !== 'local' || change.remote) return
+    for (const joined of this.#joined.values()) {
+      const { target } = joined
+      if (
+        target.kind === 'share-sender' &&
+        (!change.ids || change.ids.includes(target.setlistId))
+      ) {
+        this.#publishSoon(joined)
+      }
+    }
+  }
+
+  #publishSoon(joined: Joined): void {
+    joined.cancelPublish?.()
+    joined.cancelPublish = this.#deps.later(PUBLISH_DEBOUNCE_MS, () => {
+      joined.cancelPublish = null
+      void this.#publish(joined)
+    })
+  }
+
+  async #publish({ target, channel }: Joined): Promise<void> {
+    if (target.kind !== 'share-sender') return
+    try {
+      // (what the upload saves on the setlist is a change of its own, which comes back here and finds
+      // the share up to date: nothing is uploaded, so nothing is said)
+      if (await this.#deps.publishShare(target.setlistId)) channel.notify()
+    } catch (error) {
+      // (the sync's share step will try again)
+      console.warn('[LiveSync] Could not update the share:', error)
+    }
   }
 
   /** Be in the channels of what is live, and in no others */
@@ -221,6 +266,7 @@ export class LiveSync {
       }),
       cancelFollowUps: [],
       stopPoll: null,
+      cancelPublish: null,
     }
     this.#joined.set(target.key, joined)
     if (target.kind === 'share-recipient') {
@@ -235,6 +281,7 @@ export class LiveSync {
   #leave(joined: Joined): void {
     for (const cancel of joined.cancelFollowUps) cancel()
     joined.stopPoll?.()
+    joined.cancelPublish?.()
     joined.channel.stop()
     this.#joined.delete(joined.target.key)
   }
@@ -313,6 +360,28 @@ const ownWorld: LiveWorld = {
   newSecret: generateLiveSecret,
 }
 
+/** Bring the setlist's share up to date, as a sync would, but now: one at a time with the syncs (sync-lock.ts) */
+async function publishShare(setlistId: string): Promise<boolean> {
+  const result = await withSyncLock(async () => {
+    const db = await getCurrentDB()
+    const setlist = await db.getSetlist(setlistId)
+    if (!setlist?.share || setlist.deletedAt) return false
+    const { id, name } = getCurrentSpace()
+    const manager = await createSyncManager(name, id)
+    const share = await refreshShare(
+      { ...setlist, share: setlist.share },
+      { db, spaceId: id, space: manager.space }
+    )
+    if (share === setlist.share) return false
+    // (on the setlist as it is stored now: the upload took a while)
+    await db.updateSetlist(setlistId, stored => {
+      stored.share = share
+    })
+    return true
+  })
+  return result.ran && result.value
+}
+
 function realChannel(target: LiveTarget, events: LiveChannelEvents): LiveChannel {
   const path =
     target.kind === 'team'
@@ -350,6 +419,7 @@ export function startLiveSync(): LiveSync {
     channel: realChannel,
     syncSoon,
     reloadShare,
+    publishShare,
     visible: () => document.visibilityState === 'visible',
     later: (ms, fn) => {
       const id = setTimeout(fn, ms)

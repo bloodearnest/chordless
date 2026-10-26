@@ -2,6 +2,7 @@ import { expect } from '@open-wc/testing'
 import {
   AutoSync,
   type AutoSyncDeps,
+  LIVE_NUDGE_MS,
   NUDGE_MS,
   OFFLINE_LONG_MS,
   STALE_AFTER_MS,
@@ -39,6 +40,7 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     now: 1_000_000_000_000,
     visible: true,
     online: initial.online ?? true,
+    live: false,
     state: (initial.state ?? 'feed') as SyncState,
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
@@ -61,6 +63,7 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     online: () => world.online,
     lastSync: () =>
       world.lastSyncAgo === null ? null : new Date(world.now - world.lastSyncAgo).toISOString(),
+    live: () => world.live,
     state: async () => world.state,
     run: async () => {
       world.runs++
@@ -256,6 +259,20 @@ describe('Syncing by itself while the app is open', () => {
       fire(world.nudges)
       await settle()
       expect(world.runs).to.equal(2)
+    })
+
+    it('waits less while the device is live, where others want the change at once', async () => {
+      const { auto, world, win } = rig({ state: 'feed' })
+      auto.start()
+      await settle()
+
+      win.dispatchEvent(savedHere())
+      expect(world.nudges.at(-1)?.ms).to.equal(NUDGE_MS)
+
+      world.live = true
+      win.dispatchEvent(savedHere())
+      expect(world.nudges.at(-1)?.ms).to.equal(LIVE_NUDGE_MS)
+      expect(LIVE_NUDGE_MS).to.be.lessThan(NUDGE_MS)
     })
 
     it('does not sync for what a sync saved, or for what another tab saved: that tab sends its own', async () => {
