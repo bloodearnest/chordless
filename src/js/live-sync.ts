@@ -10,6 +10,7 @@
  * ones. The page shows the channels' state on the live button (live-sync-status.ts).
  */
 import { SyncPushedEvent, syncSoon } from './auto-sync.ts'
+import { DataChangeEvent } from './data-changes.ts'
 import { getCurrentDB } from './db.ts'
 import { getIdentityToken } from './google-auth.ts'
 import { getLive, LiveChangeEvent, type LiveState } from './live.ts'
@@ -147,6 +148,7 @@ export class LiveSync {
     const { win, doc } = this.#deps
     win.addEventListener(LiveChangeEvent.type, this.#refresh)
     win.addEventListener(SpaceChangeEvent.type, this.#refresh)
+    win.addEventListener(DataChangeEvent.type, this.#onData)
     win.addEventListener(SyncPushedEvent.type, this.#onPushed)
     win.addEventListener('online', this.#retry)
     doc.addEventListener('visibilitychange', this.#retry)
@@ -157,12 +159,18 @@ export class LiveSync {
     const { win, doc } = this.#deps
     win.removeEventListener(LiveChangeEvent.type, this.#refresh)
     win.removeEventListener(SpaceChangeEvent.type, this.#refresh)
+    win.removeEventListener(DataChangeEvent.type, this.#onData)
     win.removeEventListener(SyncPushedEvent.type, this.#onPushed)
     win.removeEventListener('online', this.#retry)
     doc.removeEventListener('visibilitychange', this.#retry)
     this.#refreshes++
-    for (const key of [...this.#joined.keys()]) this.#leave(key)
+    for (const joined of [...this.#joined.values()]) this.#leave(joined)
     this.#tell()
+  }
+
+  /** A setlist was saved: it may have been shared, or no longer, since the channels were worked out */
+  #onData = (event: Event): void => {
+    if ((event as DataChangeEvent).change.kind === 'setlist') void this.#refresh()
   }
 
   /** Be in the channels of what is live, and in no others */
@@ -180,7 +188,7 @@ export class LiveSync {
     if (refresh !== this.#refreshes) return
 
     const wanted = new Set(targets.map(target => target.key))
-    for (const key of [...this.#joined.keys()]) if (!wanted.has(key)) this.#leave(key)
+    for (const [key, joined] of [...this.#joined]) if (!wanted.has(key)) this.#leave(joined)
     for (const target of targets) {
       const kept = this.#joined.get(target.key)
       if (kept) {
@@ -208,12 +216,10 @@ export class LiveSync {
     joined.channel.start()
   }
 
-  #leave(key: string): void {
-    const joined = this.#joined.get(key)
-    if (!joined) return
+  #leave(joined: Joined): void {
     joined.cancelFollowUp?.()
     joined.channel.stop()
-    this.#joined.delete(key)
+    this.#joined.delete(joined.target.key)
   }
 
   /** The channels' state together: up only when all are, and none when there are none */

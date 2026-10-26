@@ -15,6 +15,7 @@ import {
 import {
   decryptBundle,
   encryptBundle,
+  generateLiveSecret,
   generateShareKey,
   matchesSetlistCode,
   parseShareUrl,
@@ -138,6 +139,13 @@ test('keys are 22 base64url characters, and different every time', () => {
   const a = generateShareKey()
   assert.match(a, /^[\w-]{22}$/)
   assert.notEqual(generateShareKey(), a)
+})
+
+test('a sharer’s live secret is a long random string a room accepts, different every time', () => {
+  const a = generateLiveSecret()
+  assert.match(a, /^[\w-]{20,100}$/)
+  assert.notEqual(generateLiveSecret(), a)
+  assert.notEqual(a, generateShareKey())
 })
 
 test('base64url round trips every byte value, with no padding or + or /', () => {

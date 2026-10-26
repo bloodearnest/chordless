@@ -171,7 +171,6 @@ export class LiveChannel {
 
   /** The socket is gone or never came: try again, a little later each time */
   #lost(): void {
-    if (this.#stopped) return
     this.#attempt++
     this.#drop()
     this.#set('offline')

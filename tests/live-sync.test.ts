@@ -1,5 +1,6 @@
 import { expect } from '@open-wc/testing'
 import { SyncPushedEvent } from '../src/js/auto-sync.ts'
+import { DataChangeEvent } from '../src/js/data-changes.ts'
 import { LiveChangeEvent, type LiveState } from '../src/js/live.ts'
 import type { LiveChannelEvents, LiveStatus } from '../src/js/live-channel.ts'
 import {
@@ -372,6 +373,54 @@ describe('Live sync', () => {
       expect(state.channels.map(channel => channel.notified)).to.deep.equal([1, 1])
       sync.stop()
     })
+  })
+
+  it('joins a share’s room when the setlist is shared while live, and leaves it when it is not', async () => {
+    const { sync, state, win, settle } = rig([teamTarget()])
+    sync.start()
+    await settle()
+    const saved = () =>
+      new DataChangeEvent({
+        spaceId: 's',
+        kind: 'setlist',
+        ids: ['abc'],
+        origin: 'local',
+        remote: false,
+      })
+
+    state.targets = [teamTarget(), sender]
+    win.dispatchEvent(saved())
+    await settle()
+    expect(state.channels.map(channel => channel.target.key)).to.deep.equal([
+      'team:team-1',
+      'send:f1',
+    ])
+    expect(state.channels[0].stopped, 'the team’s stays').to.equal(false)
+
+    state.targets = [teamTarget()]
+    win.dispatchEvent(saved())
+    await settle()
+    expect(state.channels[1].stopped).to.equal(true)
+    sync.stop()
+  })
+
+  it('does not work out the channels again for a change that is not a setlist’s', async () => {
+    const { sync, state, win, settle } = rig([])
+    sync.start()
+    await settle()
+    state.targets = [teamTarget()]
+    win.dispatchEvent(
+      new DataChangeEvent({
+        spaceId: 's',
+        kind: 'song',
+        ids: ['x'],
+        origin: 'local',
+        remote: false,
+      })
+    )
+    await settle()
+    expect(state.channels).to.have.length(0)
+    sync.stop()
   })
 
   it('tries the channels again when the device is back online or the app is shown', async () => {
