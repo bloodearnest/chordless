@@ -71,6 +71,18 @@ minutes left; a long run mints another when it is nearly out. A refresh token gi
 Google's "testing" mode expires after seven days: publish the consent screen (or re-run the login)
 if `invalid_grant` appears.
 
+## The live-share test
+
+`just test-live-share` (`tests/drive/live-share.drive.node.test.ts`) uses the same account and token
+for live sync of a share (LIVE_SYNC.md): it uploads a share file to the test account's Drive, runs the
+real Worker in workerd (the wrangler test harness, with `GOOGLE_API_KEY` from `.dev.vars`, the dev
+project's Drive key), and joins the share's room with real WebSockets as a sharer and as recipients
+who have no account. The sharer uploads a new version and says `changed`; the test checks who is told,
+fetches the share as the app does (`?fresh=1`, at once and again) and prints how long the new
+version took to be there. It is a Node test and not one of the browser tests above because the Worker
+refuses a page of another origin, which the test runner's page is. Its folder goes to Drive's bin
+(the share's public link is ended first), whatever happens.
+
 ## Cleaning up
 
 A history that passes puts its folder in Drive's bin (recoverable for thirty days). One that fails
