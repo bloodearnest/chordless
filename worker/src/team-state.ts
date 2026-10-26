@@ -102,6 +102,11 @@ export interface TeamSpaceApi {
   ownerBlob(): Promise<string | null>
   setOwnerBlob(blob: string): Promise<void>
   clearOwnerBlob(): Promise<void>
+  /**
+   * A device going live (a WebSocket upgrade, which the Worker has authorised; live-relay.ts). Only
+   * the Durable Object has it: the state in tests has none
+   */
+  fetch?(request: Request): Response | Promise<Response>
 }
 
 const SPACE = 'space'

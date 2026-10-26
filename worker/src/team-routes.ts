@@ -14,6 +14,7 @@ import {
 } from './team-admin.ts'
 import { handleTeamRequest, refusal, teamSpacePath } from './team-api.ts'
 import { createAdminContext, createTeamContext, type TeamDeps } from './team-context.ts'
+import { handleLive, livePathSpace } from './team-live.ts'
 
 /** Whether a path is one of these routes */
 export function isTeamPath(path: string): boolean {
@@ -30,6 +31,10 @@ export async function handleTeamRoutes(
   const spaces = env.TEAM_SPACE
   const path = new URL(request.url).pathname
   const admin = createAdminContext(env, spaces, deps)
+
+  // A device going live: the answer carries a socket, which the wrapper below would drop
+  const liveSpace = livePathSpace(path)
+  if (liveSpace !== null) return handleLive(request, liveSpace, admin)
 
   const answer = await (async () => {
     if (path === '/api/spaces') {
