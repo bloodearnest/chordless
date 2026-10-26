@@ -48,6 +48,60 @@ describe('filterSongs', () => {
     expect(filterSongs(withLyrics, 'gsus')).to.deep.equal([])
   })
 
+  describe('ranking', () => {
+    const chart = (words: string) => ({
+      metadata: {},
+      sections: [
+        {
+          type: 'section' as const,
+          label: 'Verse',
+          lines: [{ segments: [{ chord: 'G', lyrics: words }] }],
+        },
+      ],
+    })
+    const library = [
+      { title: 'Alleluia', parsed: chart('We praise you') },
+      { title: 'Sing Praise Now' },
+      { title: 'Songs of Praises' },
+      { title: 'Praise the Lord' },
+      { title: 'Hymn', artist: 'Praise Band' },
+      { title: 'Praise' },
+      { title: 'Unpraised' },
+    ]
+    const titles = (term: string) => filterSongs(library, term).map(song => song.title)
+
+    it('puts an exact title first, then titles starting with the term, then the rest', () => {
+      expect(titles('praise')).to.deep.equal([
+        'Praise',
+        'Praise the Lord',
+        'Sing Praise Now',
+        'Songs of Praises',
+        'Unpraised',
+        'Hymn',
+        'Alleluia',
+      ])
+    })
+
+    it('never puts a lyrics-only song above a title match', () => {
+      const result = titles('praise')
+      expect(result.indexOf('Alleluia')).to.equal(result.length - 1)
+    })
+
+    it('keeps the input order within a rank', () => {
+      const same = [{ title: 'B Praise' }, { title: 'A Praise' }]
+      expect(filterSongs(same, 'praise').map(song => song.title)).to.deep.equal([
+        'B Praise',
+        'A Praise',
+      ])
+    })
+
+    it('does not change the songs it is given', () => {
+      const copy = [...library]
+      filterSongs(library, 'praise')
+      expect(library).to.deep.equal(copy)
+    })
+  })
+
   it('copes with songs missing a title or artist', () => {
     expect(filterSongs(songs, 'untitled')).to.have.length(1)
     expect(filterSongs(songs, 'zzz')).to.deep.equal([])

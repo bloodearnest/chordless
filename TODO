@@ -79,37 +79,18 @@ bugs
   made "See His Love" show Em D C for Gm (Sunday 18 Oct). Reimport the nine such charts in the Gateway
   Church space: Adonai, All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver,
   Our God He Reigns, See His Love, Washed, What A Friend.
-- search results are not ranked: searching "Praise" buries the song called Praise under every song
-  whose lyrics say "praise". Wanted order: exact title match, then title starts with / has the term,
-  then artist and variant label, then lyrics only.
-  Cause: `filterSongs` (src/js/utils/song-filter.ts) is a plain `songs.filter(...)` that ORs
-  `matchedFields` (title, artist, label, lyrics are each a case-insensitive `includes`). It keeps the
-  input order and never scores, so a lyric hit ranks the same as a title hit. Both callers
-  (`library-view.ts` ~558, `add-song-modal.ts` ~96) render the result as given, and the add-song
-  modal's list also mixes in "From …" songs of other databases (`withSongsFromElsewhere`), appended
-  with no ordering by relevance either. For a common worship word, nearly every song matches on lyrics,
-  so the title match can be pages down.
-  Fix: make `filterSongs` return the matches sorted by a rank, stable within a rank (keep the
-  library's order, so ties stay alphabetical). Rank from `matchedFields` plus two more tests on the
-  title: 0 exact (title === term, after `normalizeTerm`), 1 title starts with the term, 2 a title word
-  starts with it ("Praise" in "Praise the Lord"), 3 title contains it, 4 artist/label, 5 lyrics only.
-  Sort songs from other databases in with the rest by the same rank, not after them. Keep the
-  "empty search returns the same array" contract. Extend tests/song-filter.test.ts: exact beats
-  prefix beats lyrics-only, ties keep input order, and a lyrics-only song is never above a title hit.
-  MiniSearch (the plan under "library") does not replace this; it combines with it. Boosts alone do
-  not put an exact title first (a one-word title scores low on term frequency, and a long song
-  repeating the word can outscore it), and it matches whole words, not substrings ("rais" would stop
-  finding "Praise"). So the two do different jobs:
-  1. The substring tiers above decide the top of the list: deterministic, plain `includes` (no regex,
-     so no escaping of what the user types).
-  2. MiniSearch orders within the lyrics-only tier, by score instead of library order (a chorus that
+- search ranking, second half: the substring tiers are built (`filterSongs`, src/js/utils/song-filter.ts:
+  exact title, title starts with, a title word starts with, title contains, artist/label, lyrics only;
+  ties keep the library's order). MiniSearch (the plan under "library") combines with them, it does not
+  replace them: boosts alone do not put an exact title first, and it matches whole words, not substrings
+  ("rais" would stop finding "Praise"). Its jobs:
+  1. MiniSearch orders within the lyrics-only tier, by score instead of library order (a chorus that
      repeats the word beats one passing mention). Sort key: substring tier, then MiniSearch score.
-  3. MiniSearch adds songs the substring pass missed (stemming: "praises" finds "praise"; typos;
+  2. MiniSearch adds songs the substring pass missed (stemming: "praises" finds "praise"; typos;
      words out of order: "lord praise"), appended below every substring match so fuzzy hits never
      push out a real one.
   If the index is not built (first search, evicted, rebuilding after a sync), the tiered substring
-  results alone are shown, so offline-first still holds. Build order: the tiers first (fixes this bug
-  alone); MiniSearch later only supplies the tiebreaker and the extra hits, with no rework.
+  results alone are shown, so offline-first still holds.
 
 browser support
 - Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc
