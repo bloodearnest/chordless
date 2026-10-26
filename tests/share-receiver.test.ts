@@ -1,4 +1,5 @@
 import { expect } from '@open-wc/testing'
+import { type DataChange, DataChangeEvent } from '../src/js/data-changes.ts'
 import { ChordlessDB, createSetlist } from '../src/js/db.ts'
 import { buildShareBundle } from '../src/js/share-bundle.ts'
 import { encryptBundle, generateShareKey, setlistCode } from '../src/js/share-crypto.ts'
@@ -9,6 +10,7 @@ import {
   listSharedWithMe,
   openShare,
   ownSetlistFor,
+  reloadShare,
   SHARED_DB_ID,
   shareSetlistId,
   tidySharedWithMe,
@@ -144,6 +146,75 @@ describe('Receiving a share link', () => {
     expect(songs).to.have.length(2)
     expect(songs.filter(each => each.isDefault)).to.have.length(1)
     second.db.db?.close()
+  })
+
+  describe('when the live channel says the share was updated', () => {
+    /** The setlist changes the page showing the share would hear of */
+    const heard = () => {
+      const changes: DataChange[] = []
+      const listener = (event: DataChangeEvent) => changes.push(event.change)
+      window.addEventListener(DataChangeEvent.type, listener)
+      return { changes, stop: () => window.removeEventListener(DataChangeEvent.type, listener) }
+    }
+
+    it('fetches it as it is now, not as the worker’s cache has it, and keeps it as a sync would', async () => {
+      await open(key, (await worker()).fetchFile)
+      const updated = await worker(
+        bundle({ chart: '{title: Alpha}\n{key: G}\n[G]Alpha, fixed' }),
+        '"e2"'
+      )
+      const urls: string[] = []
+      const fetchFile = ((url: string, init?: RequestInit) => {
+        urls.push(url)
+        return updated.fetchFile(url, init)
+      }) as unknown as typeof fetch
+
+      const listening = heard()
+      await reloadShare(FILE, { fetchFile, today: '2026-10-12' })
+      listening.stop()
+
+      expect(urls).to.deep.equal([`/api/share/${FILE}?fresh=1`])
+      const setlist = must((await inside()).setlists[0])
+      expect(setlist.received?.etag).to.equal('"e2"')
+      const changed = listening.changes.filter(change => change.kind === 'setlist')
+      expect(changed).to.have.length(1)
+      expect(changed[0]).to.include({ origin: 'sync', spaceId: SHARED_DB_ID })
+      expect(changed[0].ids).to.deep.equal([shareSetlistId(FILE)])
+    })
+
+    it('does nothing to the setlist when it has not changed (the worker says 304)', async () => {
+      await open(key, (await worker()).fetchFile)
+      const before = must((await inside()).setlists[0])
+      const listening = heard()
+      await reloadShare(FILE, { fetchFile: (await worker()).fetchFile, today: '2026-10-12' })
+      listening.stop()
+      expect(listening.changes).to.deep.equal([])
+      expect(must((await inside()).setlists[0])).to.deep.equal(before)
+    })
+
+    it('keeps the day the setlist was first received, so that a page sees only what changed', async () => {
+      await open(key, (await worker()).fetchFile)
+      const first = must((await inside()).setlists[0])
+      const updated = await worker(bundle({ key: 'B' }), '"e2"')
+      await new Promise(resolve => setTimeout(resolve, 5))
+      await reloadShare(FILE, { fetchFile: updated.fetchFile, today: '2026-10-12' })
+      const second = must((await inside()).setlists[0])
+      expect(second.createdDate).to.equal(first.createdDate)
+      expect(second.songs[0].key).to.equal('B')
+    })
+
+    it('has nothing to do for a share this device has no copy or key for', async () => {
+      const { fetchFile, calls } = await worker()
+      await reloadShare(FILE, { fetchFile, today: '2026-10-12' })
+      expect(calls).to.have.length(0)
+      expect((await inside()).setlists).to.have.length(0)
+    })
+
+    it('lets the share go when the worker says it has ended', async () => {
+      await open(key, (await worker()).fetchFile)
+      await reloadShare(FILE, { fetchFile: status(404), today: '2026-10-12' })
+      expect((await inside()).setlists).to.have.length(0)
+    })
   })
 
   it('reuses a song it already has the chart of, in another share', async () => {

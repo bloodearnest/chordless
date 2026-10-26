@@ -108,6 +108,26 @@ describe('The live channel', () => {
     expect(r.world.connected).to.equal(1)
   })
 
+  it('asks for the subprotocol alone where it has nothing to prove (a recipient of a share)', async () => {
+    const sockets: string[][] = []
+    const channel = new LiveChannel(
+      {
+        open: protocols => {
+          sockets.push(protocols)
+          return new FakeSocket()
+        },
+        token: async () => null,
+        later: () => () => {},
+        random: () => 0,
+      },
+      { status: () => {}, changed: () => {}, connected: () => {} }
+    )
+    channel.start()
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(sockets).to.deep.equal([[LIVE_PROTOCOL]])
+    channel.stop()
+  })
+
   it('tells of "changed" from the others, and ignores anything else', async () => {
     const { sockets, world } = await connected()
     sockets[0].socket.emit('message', CHANGED)

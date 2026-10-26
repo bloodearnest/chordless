@@ -191,6 +191,12 @@ export interface SetlistShare {
   expires: string
   /** Hash of the bundle last uploaded: a different one means the share needs updating */
   bundleHash: string
+  /**
+   * What this device proves itself to the share's live room with, to be the one that says it was
+   * updated (docs/LIVE_SYNC.md). Made when the setlist is first live while shared; the room keeps
+   * only its hash. Private to the space, like the key
+   */
+  liveSecret?: string
 }
 
 /** What a device keeps about a share link it opened, with the setlist it received */
