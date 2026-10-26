@@ -1,0 +1,26 @@
+# Dependabot's pull requests merge themselves once their checks pass (docs/CI.md): this turns on
+# GitHub's auto-merge for them, by rebase, as for any pull request. What protects main is the same
+# as for any other: ci-ok, CodeQL, a branch up to date with main; and Dependabot's week of cooldown.
+name: Dependabot
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions: {}
+
+jobs:
+  auto-merge:
+    name: Auto-merge
+    # The pull request's author, not whoever triggered the run (which anyone can be, on a push to it)
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - run: gh pr merge --auto --rebase "$PR"
+        env:
+          PR: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ github.token }}
