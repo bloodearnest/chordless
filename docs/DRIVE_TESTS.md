@@ -98,7 +98,8 @@ and the share requests, with the time.
 
 - `live-share.live.playwright.ts`: a sharer with a real Drive folder shares a setlist from the UI, a
   recipient with no account opens the link, both go live, the sharer adds a song, and the recipient's
-  page shows it (about 7 s from the edit, the app's 2 s wait after an edit included).
+  page shows it (2.8 to 3.3 s from the edit in five runs: the app's short wait after an edit while live,
+  the share's upload, the ping, the fetch).
 
 ## Cleaning up
 

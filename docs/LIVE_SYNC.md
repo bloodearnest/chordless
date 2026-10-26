@@ -174,8 +174,10 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 - `just test-live` (`tests/live/live-share.live.playwright.ts`, not in CI): two real browsers. A sharer
   signed in as the test account (a real Drive folder, the share made from the UI) and a recipient with no
   account, both live on `just serve-live`'s server. The sharer adds a song; the recipient's page shows it
-  about 7 s later (the app's 2 s wait after an edit, the sync, the share's upload, the ping, the fetch).
-  It found that the sync that runs by itself did not update shares (below).
+  2.8 to 3.3 s later (five runs; the test's polling makes it steps of half a second): the app's short
+  wait after an edit, the share's upload (1.2 to 2.9 s on its own), the ping, the fetch. It had been 7 s
+  before the share was published at once and the room told at the upload, and it found that the sync that
+  runs by itself did not update shares at all (the sync's share step, in `incrementalSync`).
 - **Not covered: a team space in two browsers.** A member has to be a different Google account from
   the owner, and there is one test account. Until there are two: two real devices on different
   networks, then wifi dropped mid-service, are the test.
