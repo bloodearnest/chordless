@@ -69,7 +69,10 @@ ci:
     set -euo pipefail
     state() { git status --porcelain; git diff | git hash-object --stdin; }
     before=$(state)
-    just lint test-node test-unit coverage-check
+    # test-unit takes its own arguments, so on one command line it would swallow what follows it
+    just lint test-node
+    just test-unit
+    just coverage-check
     just test-e2e chromium
     if [ "$(state)" != "$before" ]; then
         echo "The checks changed files in the repository, which CI's must not:"
