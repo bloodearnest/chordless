@@ -16,6 +16,7 @@ import type { Env } from './env.ts'
 import { handleRequest } from './router.ts'
 import type { ShareCache } from './share.ts'
 
+export { ShareRoom } from './share-room.ts'
 export { TeamSpace } from './team-space.ts'
 
 /**

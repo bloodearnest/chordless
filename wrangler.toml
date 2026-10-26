@@ -45,9 +45,19 @@ run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/share/*", "/a
 name = "TEAM_SPACE"
 class_name = "TeamSpace"
 
+# One per share file (worker/src/share-room.ts): the live room of a share, which holds only the hash
+# of the secret its sharer proved. Never a setlist or a chart.
+[[durable_objects.bindings]]
+name = "SHARE_ROOM"
+class_name = "ShareRoom"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["TeamSpace"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["ShareRoom"]
 
 # Secrets (set via `wrangler secret put`):
 # - JWE_ENCRYPTION_KEY: Symmetric key for encrypting/decrypting token blobs (base64 encoded)
@@ -76,9 +86,17 @@ simple = { limit = 30, period = 60 }
 name = "TEAM_SPACE"
 class_name = "TeamSpace"
 
+[[env.dev.durable_objects.bindings]]
+name = "SHARE_ROOM"
+class_name = "ShareRoom"
+
 [[env.dev.migrations]]
 tag = "v1"
 new_sqlite_classes = ["TeamSpace"]
+
+[[env.dev.migrations]]
+tag = "v2"
+new_sqlite_classes = ["ShareRoom"]
 
 [env.dev.vars]
 # Serve the component playgrounds in src/dev/ (404 in production)

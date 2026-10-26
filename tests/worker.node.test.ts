@@ -277,6 +277,13 @@ describe('a team space Durable Object', () => {
     })
   })
 
+  test('has a place for the share rooms, which answers nothing yet', async () => {
+    const env = await worker.getWorker<Env>().getEnv()
+    assert.ok(env.SHARE_ROOM, 'wrangler.toml binds SHARE_ROOM')
+    const room = env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName('a-share-file-id'))
+    assert.equal((await room.fetch(new Request('https://chordless.test/'))).status, 501)
+  })
+
   test('persists a space that was made', async () => {
     const handle = worker.getWorker<Env>()
     const env = await handle.getEnv()
