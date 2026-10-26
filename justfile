@@ -155,6 +155,12 @@ test-drive *args:
 test-live-share:
     node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars --test tests/drive/live-share.drive.node.test.ts
 
+# Live sync in two real browsers (docs/LIVE_SYNC.md): one signed in as the test Google account, one
+# with no account, on `just serve-live`'s server, with a real Drive. Needs .drive-test.env and .dev.vars.
+# LIVE_DEBUG=1 prints what the pages log and say on their sockets. Not part of `just test` or CI
+test-live *args:
+    node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars node_modules/.bin/playwright test --config playwright.live.config.ts {{args}}
+
 # Get the refresh token for the real-Drive suite, signing in as the test account (docs/DRIVE_TESTS.md)
 drive-test-login:
     node --env-file-if-exists=.drive-test.env scripts/drive-test-login.ts

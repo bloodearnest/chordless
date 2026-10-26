@@ -83,6 +83,23 @@ version took to be there. It is a Node test and not one of the browser tests abo
 refuses a page of another origin, which the test runner's page is. Its folder goes to Drive's bin
 (the share's public link is ended first), whatever happens.
 
+## The live tests, in browsers
+
+`just test-live` (`playwright.live.config.ts`, `tests/live/`) uses the same account to run **browsers
+signed in as the test account**, against `just serve-live`'s server (on ports of its own), the real
+Worker and a real Drive. The sign-in is made without Google's consent screen: the app keeps it as an
+encrypted blob that holds the refresh token, which the Worker opens with its key, so the test makes one
+from `DRIVE_TEST_REFRESH_TOKEN` and `JWE_ENCRYPTION_KEY` (`.dev.vars`) and puts it where the app keeps
+it (`tests/live/signed-in.ts`); the app then asks the Worker for access tokens, and the Worker asks
+Google. Use `signIn(page)` for any test that needs the app signed in. Each test makes its space under a
+name of its own and puts it away from Node afterwards (`drive-cleanup.ts`: shares ended, folder in the
+bin), whatever happens to the browser. `LIVE_DEBUG=1` prints each page's console, its sockets' frames
+and the share requests, with the time.
+
+- `live-share.live.playwright.ts`: a sharer with a real Drive folder shares a setlist from the UI, a
+  recipient with no account opens the link, both go live, the sharer adds a song, and the recipient's
+  page shows it (about 7 s from the edit, the app's 2 s wait after an edit included).
+
 ## Cleaning up
 
 A history that passes puts its folder in Drive's bin (recoverable for thirty days). One that fails
