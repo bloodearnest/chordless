@@ -206,13 +206,33 @@ describe('song-card', () => {
       expect(card.shadowRoot?.querySelector('.lyric-match mark')?.textContent).to.equal('blind but')
     })
 
-    it('quotes nothing when the lyrics matched but no line can be quoted', async () => {
-      // (“İ” is two characters in lower case, so a place in a line cannot be found)
+    it('quotes a line in which lower case changes the length, by its words', async () => {
+      // (“İ” is two characters in lower case, so the place of the letters in the line is not
+      // the place in the lower case line: the words are found in the line as it is)
       const odd = new ChordProParser().parse('{title: X}\n\n[G]İstanbul grace')
       const card = await show({
         song: song({ parsed: odd, title: 'Y', artist: 'Z' }),
         search: 'grace',
       })
+      expect(card.shadowRoot?.querySelector('.lyric-match mark')?.textContent).to.equal('grace')
+    })
+
+    it('marks other forms of the words searched for, in the title and the lyric line', async () => {
+      const sung = new ChordProParser().parse('{title: X}\n\n[G]We are praising Him')
+      const card = await show({
+        song: song({ parsed: sung, title: 'Praise', artist: 'Z' }),
+        search: 'praises',
+      })
+      expect(card.shadowRoot?.querySelector('.title mark')?.textContent).to.equal('Praise')
+      const found = await show({
+        song: song({ parsed: sung, title: 'Y', artist: 'Z' }),
+        search: 'praises',
+      })
+      expect(found.shadowRoot?.querySelector('.lyric-match mark')?.textContent).to.equal('praising')
+    })
+
+    it('quotes nothing when the chart has none of the words', async () => {
+      const card = await show({ song: song({ parsed }), search: 'zzz' })
       expect(part(card, 'lyric-match')).to.equal(null)
     })
 

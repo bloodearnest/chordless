@@ -1,25 +1,27 @@
 import { expect } from '@open-wc/testing'
-import { processTerm, SongIndex } from '../src/js/utils/song-search.ts'
+import { plainWord, SongIndex, stemOf, wordRanges } from '../src/js/utils/song-search.ts'
 
 const { describe, it } = window
 
-describe('processTerm', () => {
-  it('makes the forms of a word one word', () => {
-    const stems = ['praise', 'Praises', 'praised', 'praising'].map(processTerm)
+describe('plainWord and stemOf', () => {
+  it('makes the forms of a word one stem', () => {
+    const stems = ['praise', 'Praises', 'praised', 'praising'].map(word =>
+      stemOf(plainWord(word) as string)
+    )
     expect(new Set(stems).size).to.equal(1)
   })
 
   it('ignores case, accents and apostrophes', () => {
-    expect(processTerm('Lord’s')).to.equal(processTerm('lords'))
-    expect(processTerm("Lord's")).to.equal(processTerm('lords'))
-    expect(processTerm('Café')).to.equal(processTerm('cafe'))
+    expect(plainWord('Lord’s')).to.equal('lords')
+    expect(plainWord("Lord's")).to.equal('lords')
+    expect(plainWord('Café')).to.equal('cafe')
   })
 
   it('leaves out the words every song has, and nothing', () => {
-    expect(processTerm('you')).to.equal(null)
-    expect(processTerm('The')).to.equal(null)
-    expect(processTerm('')).to.equal(null)
-    expect(processTerm("'")).to.equal(null)
+    expect(plainWord('you')).to.equal(null)
+    expect(plainWord('The')).to.equal(null)
+    expect(plainWord('')).to.equal(null)
+    expect(plainWord("'")).to.equal(null)
   })
 })
 
@@ -36,8 +38,14 @@ describe('SongIndex', () => {
       'Great Is Thy Faithfulness',
       'Great is thy faithfulness, morning by morning new mercies I see'
     ),
-    song('Ten Thousand Reasons', 'Bless the Lord O my soul\nWorship his holy name', 'Matt Redman'),
+    song(
+      'Ten Thousand Reasons',
+      "Bless the Lord O my soul\nWorship his holy name\nLord's love",
+      'Matt Redman'
+    ),
     song('Blessed Be Your Name', 'Blessed be your name', '', 'Acoustic'),
+    song('Raise A Hallelujah', 'I raise a hallelujah'),
+    song('Praise', 'We are praising and he praised us'),
   ])
   const found = (term: string) => [...index.search(term).keys()].sort()
 
@@ -46,19 +54,29 @@ describe('SongIndex', () => {
     expect(found('faithfulness')).to.deep.equal([1])
   })
 
-  it('finds another form of a word', () => {
+  it('finds another form of a word, longer or shorter than the song has it', () => {
     expect(found('worshipping')).to.deep.equal([2])
     expect(found('blessing')).to.deep.equal([2, 3])
     expect(found('reason')).to.deep.equal([2])
+    expect(found('praises')).to.deep.equal([5])
+    expect(found('praise')).to.deep.equal([5])
   })
 
-  it('finds a word with a letter wrong, from four letters', () => {
+  it('does not let a short word have a letter wrong ("praises" is not "raise")', () => {
+    expect(found('praises')).to.not.include(4)
+    expect(found('raises')).to.deep.equal([4])
+  })
+
+  it('finds a word with a letter wrong, from six letters', () => {
     expect(found('wretck')).to.deep.equal([0])
-    expect(found('sweat')).to.deep.equal([0])
+    expect(found('hallelujha')).to.deep.equal([4])
   })
 
-  it('does not guess at a short word', () => {
-    expect(found('sea')).to.deep.equal([])
+  it('finds a word begun, whatever form it will be: the last word', () => {
+    expect(found('worshippin')).to.deep.equal([2])
+    expect(found('amaz')).to.deep.equal([0])
+    expect(found('bless the lo')).to.deep.equal([2])
+    expect(found('am grace')).to.deep.equal([])
   })
 
   it('finds words in any order, and needs them all', () => {
@@ -66,10 +84,9 @@ describe('SongIndex', () => {
     expect(found('lord grace')).to.deep.equal([])
   })
 
-  it('finds a word begun, as while typing, at the last word', () => {
-    expect(found('amaz')).to.deep.equal([0])
-    expect(found('bless the lo')).to.deep.equal([2])
-    expect(found('am grace')).to.deep.equal([])
+  it('finds a word with an apostrophe as the word without', () => {
+    expect(found("lord's")).to.deep.equal([2])
+    expect(found('lords')).to.deep.equal([2])
   })
 
   it('finds the artist and the name of the variant', () => {
@@ -87,5 +104,39 @@ describe('SongIndex', () => {
 
   it('finds nothing for a search of only common words', () => {
     expect(found('the you')).to.deep.equal([])
+    expect(found('')).to.deep.equal([])
+  })
+})
+
+describe('wordRanges', () => {
+  const marked = (text: string, term: string) =>
+    wordRanges(text, term).map(({ start, end }) => text.slice(start, end))
+
+  it('finds the other forms of the words searched for', () => {
+    expect(marked('We are praising, and Praised be', 'praises')).to.deep.equal([
+      'praising',
+      'Praised',
+    ])
+  })
+
+  it('finds a word with a letter wrong, from six letters', () => {
+    expect(marked('saved a wretch like me', 'wretck')).to.deep.equal(['wretch'])
+    expect(marked('I raise it', 'praises')).to.deep.equal([])
+  })
+
+  it('finds a word that begins as the last word typed', () => {
+    expect(marked('Worshipping at your feet, worship', 'worshippin')).to.deep.equal([
+      'Worshipping',
+      'worship',
+    ])
+    expect(marked('Worshipping at your feet', 'feet wor')).to.deep.equal(['Worshipping', 'feet'])
+  })
+
+  it('ignores the words too common to search for', () => {
+    expect(marked('you are the one', 'you the')).to.deep.equal([])
+  })
+
+  it('gives the place in the text', () => {
+    expect(wordRanges('Lord’s praise', 'praises')).to.deep.equal([{ start: 7, end: 13 }])
   })
 })

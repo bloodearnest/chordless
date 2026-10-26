@@ -3,6 +3,7 @@ import type { ParsedChart } from '../js/data-types.ts'
 import { formatArtistNames } from '../js/song-utils.ts'
 import { getWeeksAgo } from '../js/utils/date-utils.ts'
 import { lyricSnippet, matchedFields, normalizeTerm } from '../js/utils/song-filter.ts'
+import { type WordRange, wordRanges } from '../js/utils/song-search.ts'
 import './icon.ts'
 import type { KeyChangeEvent } from './key-selector.ts'
 import './key-selector.ts'
@@ -455,16 +456,28 @@ export class SongCard extends LitElement {
     `
   }
 
-  /** The text with the search term marked wherever it occurs */
+  /**
+   * The text with the search term marked wherever it occurs; where it does not, the words that
+   * match it (another form of a word searched for, or one with a letter wrong)
+   */
   _mark(text: string) {
     const term = normalizeTerm(this.search)
+    if (!term) return text
     const lower = text.toLowerCase()
-    if (!term || lower.length !== text.length || !lower.includes(term)) return text
+    const ranges: WordRange[] = []
+    if (lower.length === text.length && lower.includes(term)) {
+      for (let at = lower.indexOf(term); at >= 0; at = lower.indexOf(term, at + term.length)) {
+        ranges.push({ start: at, end: at + term.length })
+      }
+    } else {
+      ranges.push(...wordRanges(text, term))
+    }
+    if (ranges.length === 0) return text
     const parts: unknown[] = []
     let from = 0
-    for (let at = lower.indexOf(term); at >= 0; at = lower.indexOf(term, from)) {
-      parts.push(text.slice(from, at), html`<mark>${text.slice(at, at + term.length)}</mark>`)
-      from = at + term.length
+    for (const { start, end } of ranges) {
+      parts.push(text.slice(from, start), html`<mark>${text.slice(start, end)}</mark>`)
+      from = end
     }
     parts.push(text.slice(from))
     return parts
@@ -475,7 +488,7 @@ export class SongCard extends LitElement {
     const { song, search } = this
     if (!song?.parsed || !search) return ''
     const found = matchedFields(song, search)
-    if (found.title || found.artist || !found.lyrics) return ''
+    if (found.title || found.artist) return ''
     const snippet = lyricSnippet(song.parsed, search)
     if (!snippet) return ''
     return html`<div class="lyric-match" part="lyric-match">
