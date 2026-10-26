@@ -45,9 +45,16 @@ export function plainWord(word: string): string | null {
   return !plain || STOP_WORDS.has(plain) ? null : plain
 }
 
-/** The stem of a plain word, which "praising", "praises" and "praised" share */
+const stems = new Map<string, string>()
+
+/** The stem of a plain word, which "praising", "praises" and "praised" share (kept: words come again and again) */
 export function stemOf(plain: string): string {
-  return stemmer(plain)
+  let stem = stems.get(plain)
+  if (stem === undefined) {
+    stem = stemmer(plain)
+    stems.set(plain, stem)
+  }
+  return stem
 }
 
 /**
@@ -61,15 +68,38 @@ function indexTerms(word: string): string | string[] | null {
   return stem === plain ? plain : [plain, stem]
 }
 
-/** How a word may go on, as the end of a form of it: while typing "worshippin" it is "worshipping" */
-const ENDINGS = ['g', 'ng', 'ing', 'd', 'ed', 'es', 's', 'ly', 'er', 'ers']
+/** How a word goes on from its stem: "worship" goes on "ping" (doubling its last letter) and "ped" */
+const ENDINGS = ['ing', 'ings', 'ed', 'es', 's', 'er', 'ers', 'ly', 'ness', 'ful', 'ies', 'ied']
+
+/** The shortest stem a word being typed is taken to be going on from ("son" is not "sonn") */
+const MIN_STEM = 4
 
 /**
- * The stems of the words an unfinished word may become: "worshippin" will be "worshipping", of
- * the stem "worship", which the letters so far are not a beginning of
+ * The stems a word being typed may be going on from: "worshippin" is "worship" and "pin", the
+ * start of "ping" ("worshipping", the last letter doubled), so the songs that have "worship" are
+ * the songs for it, as well as those that have "worshipping" (which the plain beginning finds).
+ * A word that loses its "e" is found too: "lovi" is "lov" and "i", the start of "ing", so "love";
+ * and one that changes its "y": "mercie" is "merc" and "ie", the start of "ies", so "mercy".
+ * Only the beginnings of the typed letters, never another word they are near.
  */
 function completionStems(plain: string): string[] {
-  return [...new Set(ENDINGS.map(ending => stemOf(plain + ending)))]
+  const stems: string[] = []
+  for (let length = MIN_STEM - 1; length < plain.length; length++) {
+    const stem = plain.slice(0, length)
+    const tail = plain.slice(length)
+    const goesOn = ENDINGS.some(
+      ending => ending.startsWith(tail) || `${stem.at(-1)}${ending}`.startsWith(tail)
+    )
+    if (!goesOn) continue
+    if (length >= MIN_STEM) stems.push(stem)
+    if (/^[ie]/.test(tail)) stems.push(`${stem}e`)
+    if (tail.startsWith('i')) stems.push(`${stem}y`)
+  }
+  // (the index has the stem of a word, which is not the word: "stai" for "stay"; but not a stem
+  // so short that it is nearly every word: "alle" is not "all")
+  return [
+    ...new Set(stems.flatMap(stem => [stem, stemOf(stem)]).filter(stem => stem.length >= MIN_STEM)),
+  ]
 }
 
 /** The words of a search: as written, stemmed, and (for the one being typed) as it may be completed */
@@ -109,26 +139,65 @@ function distance(a: string, b: string): number {
 }
 
 /**
- * The words of a text the search found it by, as `search` finds: a form of a word searched for, a
- * word with a letter wrong, or (the last word of the search) a word that begins as typed
+ * Go through the words of a text for those the search finds it by, as `search` finds: a form of a
+ * word searched for, a word with a letter wrong (unless `slip` is false), or (the last word of the
+ * search) a word that begins as typed. Gives where they are, and which words of the search (by
+ * place) were found.
  */
-export function wordRanges(text: string, searchTerm: string): WordRange[] {
+function scan(text: string, searchTerm: string, slip: boolean) {
   const words = searchWords(searchTerm)
   const ranges: WordRange[] = []
-  for (const found of text.matchAll(/[\p{L}\p{N}'’]+/gu)) {
-    const plain = plainWord(found[0])
+  const found = new Set<number>()
+  for (const token of text.matchAll(/[\p{L}\p{N}'’]+/gu)) {
+    const plain = plainWord(token[0])
     if (plain === null) continue
     const stem = stemOf(plain)
-    const matches = words.some(
-      (word, i) =>
+    let matched = false
+    words.forEach((word, i) => {
+      const last = i === words.length - 1
+      const allowed = slip ? slips(word.stem.length, last) : 0
+      // (the index has the word as written and its stem, and the stem of the search is looked up in both)
+      if (
         stem === word.stem ||
-        distance(stem, word.stem) <= slips(word.stem.length, i === words.length - 1) ||
-        (i === words.length - 1 &&
-          (plain.startsWith(word.plain) || word.completions.includes(stem)))
-    )
-    if (matches) ranges.push({ start: found.index, end: found.index + found[0].length })
+        plain === word.stem ||
+        (allowed > 0 &&
+          (distance(stem, word.stem) <= allowed || distance(plain, word.stem) <= allowed)) ||
+        (last &&
+          (plain.startsWith(word.plain) ||
+            word.completions.includes(plain) ||
+            word.completions.includes(stem)))
+      ) {
+        matched = true
+        found.add(i)
+      }
+    })
+    if (matched) ranges.push({ start: token.index, end: token.index + token[0].length })
   }
-  return ranges
+  return { ranges, found, count: words.length }
+}
+
+/**
+ * The words of a text the search found it by (see `scan`): where they are, to mark them. With
+ * `slip` false, not those with a letter wrong.
+ */
+export function wordRanges(text: string, searchTerm: string, slip = true): WordRange[] {
+  return scan(text, searchTerm, slip).ranges
+}
+
+/**
+ * Whether every word of the search is in these texts together (each in any of them): a form of
+ * it, or with a letter wrong (unless `slip` is false), or begun as typed for the last. False for
+ * a search of no words.
+ */
+export function wordsFound(texts: string[], searchTerm: string, slip = true): boolean {
+  const found = new Set<number>()
+  let count = 0
+  for (const text of texts) {
+    const result = scan(text, searchTerm, slip)
+    count = result.count
+    for (const i of result.found) found.add(i)
+  }
+  return count > 0 && found.size === count
 }
 
 /** Boosts: a word in the title counts for more than the same word in the lyrics */

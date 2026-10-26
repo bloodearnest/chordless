@@ -435,12 +435,14 @@ library
    case without accents or apostrophes, and the very common words are left out). It finds other forms
    of a word ("praises" finds "praise"), a slip of the fingers (fuzzy, on stems of six letters or more:
    on shorter ones "praises" would find "raise"), words in any order (all must be there), and a word
-   begun (the last one: as written, or as the stem of the forms it may become, `ENDINGS`, so
-   "worshippin" finds "worship"). The words found are marked in the title, artist and variant name,
-   and the best line is quoted (`wordRanges`, `lyricSnippet`). Songs found by the words alone come
-   after every song the typed letters are in, except that a title that has the word is ranked as a
-   title that has the letters (`wordRank`); among lyrics-only matches the better score goes first.
-   Made in memory, not stored: it is rebuilt when the
+   begun (the last one: as written, or going on from a stem of four letters or more with the start of
+   an ending, `ENDINGS`, and a lost "e": "worshippin" finds "worship", "lovi" finds "love"). The words
+   found are marked in the title, artist and variant name, and the best line is quoted (`wordRanges`,
+   `lyricSnippet`). Songs found by the words alone come after every song the typed letters are in,
+   except that a title that has the word is ranked as a title that has the letters (`wordRank`); a
+   song found only because a word in it has a letter wrong comes last of all; among lyrics-only
+   matches the better score goes first. Checked over many words drawn from the songs, made-up and
+   real (docs/TESTING.md, "The search, over many words"). Made in memory, not stored: it is rebuilt when the
    list of songs changes (the library page and the modal make it a moment after the list is shown,
    `warmSearch`), which costs about 0.2 s for 600 songs on a laptop. The list includes songs of the
    device's other databases, so one index covers "From …" songs too, and there is nothing to keep
@@ -452,6 +454,11 @@ library
      is safe to drop, one per database, updated per chart on save (db.saveChordPro/deleteChordPro)
      and by contentHash after a sync pull, with a version to bump when the tokeniser or stemmer changes
    - rank a title that is the word ("Praise" for "praises") above a title with the word in it
+   - a word with an apostrophe inside is only found as written: "ev'rything" and "sov'reign" are
+     "evrything" and "sovreign" to the search, so "everything" does not find them (real charts have
+     many: ne'er, o'er, ev'ry). Index the word with the apostrophe taken out and, as well, split at it
+   - a word begun that is only a stem and a short ending ("moti" is "mot" and "i", so "mote") finds
+     the odd unrelated word; fine so far, look again if it is noticed
 
 - Make the settings controls and panels (About: version, install, offline, storage status) more compact; they are all a little large.
 - The info icon is an i-in-a-circle inside a second circle. Want one circle only: either just an `i` inside our current border circle, or the icon without the border.

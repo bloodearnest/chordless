@@ -1,5 +1,11 @@
 import { expect } from '@open-wc/testing'
-import { plainWord, SongIndex, stemOf, wordRanges } from '../src/js/utils/song-search.ts'
+import {
+  plainWord,
+  SongIndex,
+  stemOf,
+  wordRanges,
+  wordsFound,
+} from '../src/js/utils/song-search.ts'
 
 const { describe, it } = window
 
@@ -88,6 +94,28 @@ describe('SongIndex', () => {
     expect(found('am grace')).to.deep.equal([])
   })
 
+  it('goes on from a stem as the longer form of it is typed, letter by letter', () => {
+    // "worship" is in a song: "worshipp", "worshippi", ... are the start of "worshipping"
+    for (const typed of ['worshipp', 'worshippi', 'worshippin', 'worshipping']) {
+      expect(found(typed), typed).to.deep.equal([2])
+    }
+    // "love" loses its "e": "lovi" is "lov" and the start of "ing"
+    for (const typed of ['lovi', 'lovin', 'loving']) expect(found(typed), typed).to.deep.equal([2])
+    // "praise", "praised": "praisi" is "prais" and "i"
+    expect(found('praisi')).to.deep.equal([5])
+    // only as the start of an ending, and from a stem of four letters: "holyx" is not "holy"
+    expect(found('holyx')).to.deep.equal([])
+    expect(found('reasq')).to.deep.equal([])
+    // ("son" is three letters: "sonn" is not going on from it, nor "endi" from "end", "allel" "all")
+    const short = new SongIndex([song('Son', 'my son at the end of all')])
+    for (const typed of ['sonn', 'endi', 'allel'])
+      expect(short.search(typed).size, typed).to.equal(0)
+    // a word that ends in "y" is "stai" in the index: "stayi" goes on to "stayed"
+    const stay = new SongIndex([song('Stay', 'he stayed and mercies new')])
+    for (const typed of ['stayi', 'stayin', 'mercie'])
+      expect(stay.search(typed).size, typed).to.equal(1)
+  })
+
   it('finds words in any order, and needs them all', () => {
     expect(found('lord bless')).to.deep.equal([2])
     expect(found('lord grace')).to.deep.equal([])
@@ -149,5 +177,27 @@ describe('wordRanges', () => {
 
   it('gives the place in the text', () => {
     expect(wordRanges('Lord’s praise', 'praises')).to.deep.equal([{ start: 7, end: 13 }])
+  })
+})
+
+describe('wordsFound', () => {
+  const texts = ['Amazing Grace', 'a wretch like me', 'John Newton']
+
+  it('is true when every word of the search is in some text, in any order', () => {
+    expect(wordsFound(texts, 'grace newton')).to.equal(true)
+    expect(wordsFound(texts, 'wretches amaz')).to.equal(true)
+  })
+
+  it('is false when a word is in none, or the search has no words', () => {
+    expect(wordsFound(texts, 'grace zebra')).to.equal(false)
+    expect(wordsFound(texts, 'the you')).to.equal(false)
+    expect(wordsFound(texts, '')).to.equal(false)
+    expect(wordsFound([], 'grace')).to.equal(false)
+  })
+
+  it('counts a word with a letter wrong, unless told not to', () => {
+    expect(wordsFound(texts, 'wretck like')).to.equal(true)
+    expect(wordsFound(texts, 'wretck like', false)).to.equal(false)
+    expect(wordsFound(texts, 'wretches like', false)).to.equal(true)
   })
 })
