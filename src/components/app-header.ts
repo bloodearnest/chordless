@@ -31,16 +31,6 @@ export class HeaderInfoClickEvent extends Event {
   }
 }
 
-/** The second row was shown or hidden (on phones) */
-export class HeaderExpandToggleEvent extends Event {
-  static readonly type = 'app-header:expand-toggle'
-  readonly expanded: boolean
-  constructor(expanded: boolean) {
-    super(HeaderExpandToggleEvent.type, { bubbles: true, composed: true })
-    this.expanded = expanded
-  }
-}
-
 /**
  * AppHeader Component
  *
@@ -53,16 +43,15 @@ export class HeaderExpandToggleEvent extends Event {
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
  *
  * Slots:
- * @slot controls - Center section for page-specific controls (key selector, font controls, etc.)
- * @slot tools - Icon buttons in the second row, before the edit and info buttons (e.g. share)
- * @slot actions - Buttons that stay in the top row at its end, even on phones (e.g. the
- *   home page's create-setlist button)
+ * @slot controls - Page-specific controls (the song's key, capo and tempo). On phones they are a
+ *   second row under the title; on wider screens they share the one row, before the icons
+ * @slot tools - Icon buttons at the end of the top row, before the edit and info buttons (e.g. share)
+ * @slot actions - Buttons in the top row, after the title (e.g. the home page's create-setlist button)
  *
  * Events:
  * @fires EditModeToggleEvent - When the edit mode button is pressed
  * @fires HeaderInfoClickEvent - When the info button is pressed
  * @fires HeaderMenuClickEvent - When the menu button is pressed (trigger: the button)
- * @fires HeaderExpandToggleEvent - When the second row is shown or hidden (expanded)
  *
  * CSS Parts:
  * @csspart header - The main header element
@@ -79,7 +68,6 @@ export class AppHeader extends LitElement {
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
-    expanded: { type: Boolean, reflect: true },
     _slottedControls: { state: true }, // whether anything is in the controls slot
     _updateReady: { state: true }, // whether a new version of the app is waiting
   }
@@ -90,7 +78,6 @@ export class AppHeader extends LitElement {
   declare showLogo: boolean
   declare editMode: boolean
   declare disableAnimation: boolean
-  declare expanded: boolean
   declare _slottedControls: boolean
   declare _updateReady: boolean
 
@@ -104,18 +91,20 @@ export class AppHeader extends LitElement {
   static override styles = css`
     :host {
       display: block;
+      /* The space between things follows the text size (--font-base), not the browser's rem */
+      --gap: calc(var(--font-base) * 0.4);
     }
 
     header {
       background-color: var(--header-bg, #3498db);
       color: var(--header-text, white);
-      padding: 0.5rem 0.5rem;
+      padding: calc(var(--gap) / 2) var(--gap);
       display: flex;
       flex-wrap: wrap;
       justify-content: space-between;
       align-items: center;
       flex-shrink: 0;
-      gap: 0.5rem;
+      gap: var(--gap);
       width: 100%;
       max-width: 100%;
       box-sizing: border-box;
@@ -133,18 +122,26 @@ export class AppHeader extends LitElement {
       }
     }
 
+    /* Top row: menu, title, then the icons. Under it, on phones, the controls */
     .header-row-1 {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: var(--gap);
       flex: 1;
       min-width: 0;
+    }
+
+    .header-icons {
+      display: flex;
+      align-items: center;
+      gap: var(--gap);
+      flex-shrink: 0;
     }
 
     .header-row-2 {
       display: flex;
       align-items: center;
-      gap: 0.75rem;
+      gap: var(--gap);
     }
 
     .nav-menu-button {
@@ -153,7 +150,6 @@ export class AppHeader extends LitElement {
       color: var(--header-text, white);
       cursor: pointer;
       padding: 0.5rem;
-      margin-right: 0.5rem;
       position: relative;
       display: flex;
       align-items: center;
@@ -197,7 +193,7 @@ export class AppHeader extends LitElement {
       transition: opacity 0.3s ease-in-out;
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--gap);
     }
 
     .title.fade-out {
@@ -213,7 +209,7 @@ export class AppHeader extends LitElement {
     ::slotted(.header-controls-slot) {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--gap);
       transition: opacity 0.3s ease-in-out;
       flex-wrap: nowrap;
       flex-shrink: 1;
@@ -221,88 +217,50 @@ export class AppHeader extends LitElement {
       overflow: hidden;
     }
 
-    /* Force visibility of slotted controls when expanded on mobile */
-    @media (max-width: 47.99rem) {
-      :host([expanded]) ::slotted(.header-controls-slot) {
-        display: flex !important;
-        visibility: visible !important;
-        gap: 0.2rem !important;
-        flex-wrap: nowrap !important;
-      }
-
-      :host([expanded]) ::slotted(.header-controls-slot > *) {
-        display: flex !important;
-        visibility: visible !important;
-        flex-shrink: 0 !important;
-      }
+    .header-row-1 .title {
+      flex: 1;
+      min-width: 0;
     }
 
-    .header-right {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-
-    /* Mobile: two-row layout when expanded */
+    /* Phones: the controls take a row of their own, as little of it as they need */
     @media (max-width: 47.99rem) {
-      /* Row 1: always visible */
+      header {
+        padding: calc(var(--gap) / 2) var(--gap);
+        gap: 0;
+      }
+
       .header-row-1 {
         width: 100%;
+      }
+
+      .header-row-2 {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        padding-left: var(--gap);
+      }
+    }
+
+    /* Tablet/desktop: one row, the controls before the icons */
+    @media (min-width: 48rem) {
+      .header-row-1 {
+        display: contents;
       }
 
       .header-row-1 .title {
-        flex: 1;
-        min-width: 0;
-      }
-
-      /* Row 2: hidden by default */
-      .header-row-2 {
-        display: none;
-      }
-
-      /* Always show expand toggle on mobile */
-      .header-row-1 .expand-toggle {
-        display: flex !important;
-      }
-
-      /* When expanded: show row 2 */
-      :host([expanded]) .header-row-2 {
-        display: flex;
-        width: 100%;
-        justify-content: flex-end;
-        align-items: center;
-        gap: 0.2rem;
-        flex-wrap: nowrap;
-        overflow-x: visible;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      /* Make buttons smaller on mobile */
-      :host([expanded]) .icon-button {
-        width: 1.8rem;
-        height: 1.8rem;
-        font-size: var(--font-ui);
-        flex-shrink: 0;
-        border-width: 1px;
-      }
-    }
-
-    /* Tablet/desktop: single row, hide expand button */
-    @media (min-width: 48rem) {
-      .header-row-1 {
-        flex: 0 0 auto;
-      }
-
-      .header-row-1 .expand-toggle {
-        display: none !important;
+        flex: 0 1 auto;
       }
 
       .header-row-2 {
-        display: flex;
+        order: 1;
         justify-content: flex-end;
         flex: 1;
         flex-wrap: nowrap;
         white-space: nowrap;
+      }
+
+      .header-icons {
+        order: 2;
       }
     }
 
@@ -310,23 +268,13 @@ export class AppHeader extends LitElement {
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: var(--gap);
       margin-left: auto;
     }
 
-    /* Nothing to show in a second row: no toggle for it, and the top row (with
-       any actions) takes the whole width */
+    /* Nothing to show in a second row */
     .header-row-2[hidden] {
       display: none !important;
-    }
-
-    header:not(.has-controls) .header-row-1 {
-      flex: 1;
-    }
-
-    header:not(.has-controls) .header-row-1 .title {
-      flex: 1;
-      min-width: 0;
     }
 
     .icon-button {
@@ -346,10 +294,6 @@ export class AppHeader extends LitElement {
       font-weight: bold;
       transition: all 0.2s;
       flex-shrink: 0;
-    }
-
-    .expand-toggle {
-      display: flex;
     }
 
     /* The i alone, bolder, to match the weight of the circle round it */
@@ -385,7 +329,6 @@ export class AppHeader extends LitElement {
     this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
-    this.expanded = false
     this._slottedControls = false
     this._updateReady = appUpdate.ready
     this._previousTitle = ''
@@ -478,20 +421,14 @@ export class AppHeader extends LitElement {
     })
   }
 
-  /** Whether there's anything for the second row (controls, edit, info) */
-  _hasControls(): boolean {
-    return this.showEditToggle || this.showInfoButton || this._slottedControls
-  }
-
   _onControlsSlotChange(event: Event): void {
     this._slottedControls = (event.target as HTMLSlotElement).assignedElements().length > 0
   }
 
   override render() {
-    const hasControls = this._hasControls()
     return html`
-      <header part="header" class=${hasControls ? 'has-controls' : ''}>
-        <!-- Row 1: Always visible on mobile -->
+      <header part="header">
+        <!-- Row 1: menu, title and icons -->
         <div class="header-row-1">
           <button
             class="nav-menu-button"
@@ -507,54 +444,42 @@ export class AppHeader extends LitElement {
             ${this._displayTitle}
           </div>
           <div class="header-actions"><slot name="actions"></slot></div>
-          ${
-            hasControls
-              ? html`
-                <button
-                  class="icon-button expand-toggle ${this.expanded ? 'active' : ''}"
-                  @click=${this._handleExpandToggle}
-                  aria-label="Toggle header controls"
-                >
-                  ${this.expanded ? '▲' : '▼'}
-                </button>
-              `
-              : ''
-          }
+          <div class="header-icons">
+            <slot name="tools"></slot>
+            ${
+              this.showEditToggle
+                ? html`
+                  <button
+                    class="icon-button edit-toggle ${this.editMode ? 'active' : ''}"
+                    part="edit-toggle"
+                    @click=${this._handleEditToggle}
+                    aria-label="Toggle edit mode"
+                  >
+                    <app-icon name="edit"></app-icon>
+                  </button>
+                `
+                : ''
+            }
+            ${
+              this.showInfoButton
+                ? html`
+                  <button
+                    class="icon-button info-button"
+                    part="info-button"
+                    @click=${this._handleInfoClick}
+                    aria-label="Information"
+                  >
+                    <app-icon name="info-mark"></app-icon>
+                  </button>
+                `
+                : ''
+            }
+          </div>
         </div>
 
-        <!-- Row 2: Controls (hidden on mobile unless expanded) -->
-        <div class="header-row-2" ?hidden=${!hasControls}>
+        <!-- Row 2: the page's controls (on phones, under the top row) -->
+        <div class="header-row-2" ?hidden=${!this._slottedControls}>
           <slot name="controls" @slotchange=${this._onControlsSlotChange}></slot>
-          <slot name="tools"></slot>
-
-          ${
-            this.showEditToggle
-              ? html`
-                <button
-                  class="icon-button edit-toggle ${this.editMode ? 'active' : ''}"
-                  part="edit-toggle"
-                  @click=${this._handleEditToggle}
-                  aria-label="Toggle edit mode"
-                >
-                  <app-icon name="edit"></app-icon>
-                </button>
-              `
-              : ''
-          }
-          ${
-            this.showInfoButton
-              ? html`
-                <button
-                  class="icon-button info-button"
-                  part="info-button"
-                  @click=${this._handleInfoClick}
-                  aria-label="Information"
-                >
-                  <app-icon name="info-mark"></app-icon>
-                </button>
-              `
-              : ''
-          }
         </div>
       </header>
     `
@@ -570,13 +495,6 @@ export class AppHeader extends LitElement {
 
   _handleInfoClick() {
     this.dispatchEvent(new HeaderInfoClickEvent())
-  }
-
-  _handleExpandToggle() {
-    this.expanded = !this.expanded
-
-    // Emit custom event instead of direct DOM manipulation
-    this.dispatchEvent(new HeaderExpandToggleEvent(this.expanded))
   }
 }
 
@@ -594,6 +512,5 @@ declare global {
     [HeaderMenuClickEvent.type]: HeaderMenuClickEvent
     [EditModeToggleEvent.type]: EditModeToggleEvent
     [HeaderInfoClickEvent.type]: HeaderInfoClickEvent
-    [HeaderExpandToggleEvent.type]: HeaderExpandToggleEvent
   }
 }
