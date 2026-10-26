@@ -1,8 +1,8 @@
 # Chordless
 
 Chordless is a web app for running a worship band's setlist: the lyrics and chords
-for each song, laid out to be read from a music stand, a phone or an iPad, and controlled
-with one touch while you're playing.
+for each song, laid out to be read from a device like a phone or tablet, prepared
+and shared in advance, and controlled with one touch while you're playing.
 
 It is built for live use. Everything you'd want to do mid-song (change song, scroll,
 hide the chords on a verse you know) is a swipe or a tap. Everything that could go
@@ -12,43 +12,110 @@ possible.
 
 ## Who made it
 
-Chordless is designed and built by an experienced software engineer who is also a church
-worship leader, so it's shaped by what actually goes wrong on a Sunday morning. It is built
-with the help of AI coding assistants (Claude Code, mostly): they write a great deal of the
-code, under human direction and review, and the design, the priorities and the decisions are
-the author's. The tests, the docs and the checks in CI are what keep that honest.
+Chordless is designed and built by an experienced software engineer who is also
+an experienced church worship leader, so it is shaped by what is actually needed
+week to week. It is built with the help of AI coding assistants (Claude Code,
+mostly): they write a great deal of the code, but under human direction and
+review, and the design, the priorities and the decisions are the author's.
 
-## Making the most of your screen
+The tests, the docs and the checks in CI are what keep that honest. There are
+3500+ automated tests, and they run on Linux, macOS and Windows on every
+change.
+
+## Why Chordless?
+
+Existing apps didn't meet the needs of the author and his worship team: patchy
+cross platform support, awkward patterns for live use, poor use of screen space,
+lack of shared song libraries, and little help with prep, planning and keeping
+track of what was played.
+
+Chordless has a few high level design goals that drive its features, listed
+below. Most are already implemented. Some are planned, and marked as such.
+
+### Making the most of your digital screen
+
+We're still copying printed paper layouts onto screens, which wastes space.
+Chordless embraces the fact that it's a digital screen, and tries UI patterns
+that make use of it.
 
 - **Smart layout:** the text is sized to be as large as the screen allows, in as many
   columns as fit, so you can read it from further back, on any size of device.
-- **Show and hide, per section:** hide the chords on a verse everyone knows, or hide a whole
-  verse or chorus you're skipping this week. Each section is separate, so the page shows
-  only what the band needs, and nothing is lost: bring it back with a tap.
-- **Light and dark themes**, with the text size and colours kept in step.
+- **Show and hide, per section:** hide the chords on the chorus, because you
+  know them. Or hide the whole chorus, because you know the lyrics too. But you
+  really need that 3rd verse! Each section is separate, so the page shows
+  only what you need. That saves space and means less poking at your device
+  mid song. For most songs on a tablet, it removes any need to scroll during
+  a song.
+- **Light and dark themes**. Table stakes, but also important so your device
+  does not cause glare on stage.
+
+### Built for live use
+
+Apps used at live events need to be reliable and avoid disasters.
+
 - **Stays awake** while you're live, so the screen doesn't dim mid-song.
-
-## Playing, not fiddling
-
 - **One-touch control:** left/right changes song, up/down scrolls. Keyboard, touch and
   foot pedals that send arrow keys all work.
-- **Transpose** into any key, and set a capo, per song, for the singer or the instrument.
-- **Pads and click:** a media player for pad sounds (your own pad set, kept in your Drive;
-  the app ships none) and a metronome.
-- **Notes** on a song, for the things that aren't in the chart.
-- **Live and edit modes:** live mode is minimal and hard to break. Edit mode is where you
-  reorder, delete and correct.
+- **Edit mode for changes** cuts the chance of an accidental change while live.
+  But changes are still possible when you need them.
+- **Live mode** syncs with other people on the same setlist, so everyone keeps up
+  with live changes, in a service or in rehearsal.
+- **Modal UI patterns** for most things, so you don't have to navigate away from
+  the current song.
+- **Fully offline capable.** All data is stored on your device, and synced when
+  you have internet.
 
-## Your setlist, your way
+### Customisable to the musician
 
-- **Setlists** of songs, in order, for a date. Songs are plain
-  [ChordPro](https://www.chordpro.org/) files, so they're yours to take anywhere.
-- **Bring songs in** from SongSelect, from files, or by forwarding the leader's setlist email.
-- **Share a setlist** as a link with anyone, no account needed. Links expire.
-- **Teams:** share a space with the band, with a worship leader and team members, each with
-  their own role.
+We're all special in our own way.
 
-## Works everywhere, including older devices
+- **Singer?** Only show lyrics by default.
+- **Guitarist?** Enable capo controls, separately from transpose.
+- **Not a concert pitch instrument?** Set a standard transpose applied to every
+  song. *Coming soon, use capo for now!*
+- **I know this song backwards!** Even the 3rd verse? Hide the sections you
+  don't need to spend screen space on.
+- **Make notes** to remind you of key information. These can be personal, or
+  shared with the team. *Sharing coming soon.*
+- **Personal sync.** Use multiple devices, and your data and preferences sync
+  between them. *Preferences sync coming soon.*
+
+### Setlist creation
+
+You know, the basics.
+
+- **Add songs** from your library, or import from SongSelect or other ChordPro.
+  Have variant versions of songs with alternate chords or lyrics.
+- **Transpose** to your preferred key.
+- **Order songs** as you like.
+- **Add notes** to share with your team. *Coming soon.*
+- **Define song structure.** How many times are we doing the bridge? Or: we're
+  only doing the chorus of this song. *Coming soon.*
+- **Setlist metadata.** Date, time, leader, service type.
+- **See song history.** When did we last do this song?
+- **Track prepared vs played.** We often prepare more songs than we play. Tools
+  to track what you *actually* played, rather than what you prepared, to help
+  with planning. *Coming soon.*
+
+### Built for teams
+
+- **Create a Worship Team.** Invite people to join, as worship leader or team
+  member. Backed by your Google Drive. *Other storage is possible in future.*
+- **Shared songs.** A synchronised song database for the team, so everyone is
+  singing from the same literal hymn sheet.
+- **Shared setlists.** All current and past setlists, available to everyone.
+- **Share with guests.** Anonymously and temporarily share a setlist with
+  anyone, even outside your team.
+
+### Built in media player
+
+Use it for home practice, team rehearsal, or live.
+
+- **Metronome.** Plays at the song's BPM and time signature.
+- **Tonic pads.** Upload your pad sounds and play the tonic. Fades and
+  transitions between songs.
+
+### Accessibility
 
 - **Any device with a browser:** phones, tablets and laptops, iOS, Android, Windows, macOS,
   Linux and ChromeOS. There's nothing to install from an app store (though you can add it to
@@ -56,11 +123,10 @@ the author's. The tests, the docs and the checks in CI are what keep that honest
 - **Older hardware is a goal, not an afterthought.** Churches don't replace their iPads every
   two years. Chordless runs on devices up to about five years old (iOS and iPadOS 17,
   Chrome and Edge 120), which can all update to that for free.
-- **Works offline.** Once loaded, Chordless doesn't need the internet, so a flaky church
-  wifi can't stop the service. Changes made offline sync when you're back online.
-- **Sync between devices** through your own Google Drive.
+- **Colour highlights.** Highlight chord background/text colours to help with
+  visual impairment or dyslexia. *Coming soon.*
 
-## Your songs stay yours
+### Your songs stay yours
 
 Song lyrics and chords are copyrighted, so Chordless never hosts them. They live on
 your devices and in your own Google Drive folder, which you can share with your
@@ -71,7 +137,7 @@ Churches are expected to hold a CCLI licence. See [docs/SHARING.md](docs/SHARING
 ## How it's built
 
 Chordless is deliberately plain: TypeScript modules and [Lit](https://lit.dev/) web
-components, with no framework on top, using native browser features wherever it can.
+components, no framework on top, and native browser features wherever possible.
 
 - **Offline-first PWA:** a service worker precaches the whole app, and data is kept in
   IndexedDB. Pages have real URLs and survive a reload.
