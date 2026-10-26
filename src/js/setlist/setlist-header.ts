@@ -15,6 +15,7 @@ import type { SongSettingsPopover } from '../../components/song-settings-popover
 import type { Setlist } from '../data-types.ts'
 import type { ChordlessDB } from '../db.ts'
 import { getLive, isLiveSetlist } from '../live.ts'
+import { getLiveSyncStatus } from '../live-sync-status.ts'
 import { wantsMediaPlayer } from '../media-player-loader.ts'
 import { listPadSets } from '../pad-set-service.ts'
 import { buildUrl, type Route } from '../router.ts'
@@ -182,6 +183,10 @@ export class SetlistHeader {
     button.setAttribute('aria-pressed', String(here))
     button.setAttribute('aria-label', label)
     button.title = label
+    // (the dot: whether the other devices are reached at once, while this one is live on a team space)
+    const sync = here ? getLiveSyncStatus() : null
+    if (sync) button.dataset.sync = sync
+    else delete button.dataset.sync
   }
 
   /** Hand the "differs from official" dialog the setlist */

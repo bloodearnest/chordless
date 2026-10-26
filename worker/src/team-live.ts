@@ -5,8 +5,10 @@
  * not there get the same answer (docs/SECURITY.md). The token comes in the subprotocol, since a
  * browser cannot set `Authorization` on a WebSocket and a URL gets logged.
  */
+
+import { LIVE_PROTOCOL } from '../../src/js/live-protocol.ts'
 import { jsonResponse } from './http.ts'
-import { LIVE_PROTOCOL, tokenFromProtocol } from './live-relay.ts'
+import { tokenFromProtocol } from './live-relay.ts'
 import { type AdminContext, SPACE_ID } from './team-admin.ts'
 import { refusal, teamSpacePath } from './team-api.ts'
 

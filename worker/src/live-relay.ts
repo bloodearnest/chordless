@@ -5,14 +5,9 @@
  * travels by the sync, as always. The rules are here, apart from the Durable Object
  * (team-space.ts), which only holds the sockets.
  */
+import { CHANGED, LIVE_PROTOCOL } from '../../src/js/live-protocol.ts'
 import { atLeast, type TeamRole } from '../../src/js/team-roles.ts'
 import type { Identity } from './identity.ts'
-
-/** The one frame there is: sent by a writer, relayed as it is to every other socket of the space */
-export const CHANGED = '{"type":"changed"}'
-
-/** The subprotocol the page asks for; the ID token rides as a second one (see `tokenFromProtocol`) */
-export const LIVE_PROTOCOL = 'chordless'
 
 /** What the Durable Object keeps with each socket (its attachment): who it is, and nothing else */
 export type LiveAttachment = Identity

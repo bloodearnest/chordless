@@ -5,15 +5,23 @@
  * (live-relay.ts): the sockets of the devices that are live, which carry only "something changed".
  */
 /* v8 ignore start -- needs `cloudflare:workers`: only workerd has it (worker.node.test.ts runs it there, unmeasured) */
-import { DurableObject } from 'cloudflare:workers'
+import { DurableObject, type DurableObjectState } from 'cloudflare:workers'
+import { CHANGED, LIVE_PROTOCOL, PING, PONG } from '../../src/js/live-protocol.ts'
 import type { InviteInfo, MemberRole, TeamMember, TeamRole } from '../../src/js/team-roles.ts'
 import type { Env } from './env.ts'
 import type { Identity } from './identity.ts'
-import { CHANGED, judge, LIVE_PROTOCOL, type LiveAttachment } from './live-relay.ts'
+import { judge, type LiveAttachment } from './live-relay.ts'
 import { type SpaceInfo, type TeamSpaceApi, TeamSpaceState } from './team-state.ts'
 
 export class TeamSpace extends DurableObject<Env> implements TeamSpaceApi {
   #state = new TeamSpaceState(this.ctx.storage)
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    super(ctx, env)
+    // The pages' pings are answered by the runtime without waking the object: a socket that is quiet
+    // costs nothing, and a page can tell a dead one (no answer) from a quiet one
+    ctx.setWebSocketAutoResponse(new WebSocketRequestResponsePair(PING, PONG))
+  }
 
   /**
    * A device going live: the Worker has settled who it is (team-live.ts) and passes that in a

@@ -7,11 +7,13 @@ declare module 'cloudflare:workers' {
     deleteAll(): Promise<void>
     list<T>(options: { prefix: string }): Promise<Map<string, T>>
   }
-  interface DurableObjectState {
+  export interface DurableObjectState {
     storage: DurableObjectStorage
     /** Accept a socket for hibernation: the object may leave memory between its messages */
     acceptWebSocket(socket: WebSocket, tags?: string[]): void
     getWebSockets(tag?: string): WebSocket[]
+    /** Answer this message with that one, without waking the object */
+    setWebSocketAutoResponse(pair: WebSocketRequestResponsePair): void
   }
   export class DurableObject<E = unknown> {
     ctx: DurableObjectState
@@ -32,4 +34,7 @@ interface ResponseInit {
 declare class WebSocketPair {
   0: WebSocket
   1: WebSocket
+}
+declare class WebSocketRequestResponsePair {
+  constructor(request: string, response: string)
 }

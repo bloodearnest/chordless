@@ -344,6 +344,19 @@ describe('a team space Durable Object', () => {
       assert.deepEqual(writer.heard, [])
     })
 
+    test('answers a ping, from a reader too, and relays nothing of it', async () => {
+      const name = await space('live-ping')
+      const reader = await goLive(name, bob)
+      const other = await goLive(name, cat)
+
+      reader.socket.send('ping')
+      await settle()
+
+      assert.deepEqual(reader.heard, ['pong'])
+      assert.deepEqual(reader.closed, [])
+      assert.deepEqual(other.heard, [])
+    })
+
     test('keeps spaces apart', async () => {
       const here = await goLive(await space('live-b'), cat)
       const there = await goLive(await space('live-c'), ann)
