@@ -60,6 +60,13 @@ export class MusicalMetadataDisplay extends LitElement {
       cursor: default;
     }
 
+    /* A phone has no room to spare: no space above and below, in the header's second row */
+    @media (max-width: 47.99rem) {
+      .metadata-container {
+        padding-block: 0;
+      }
+    }
+
     /* In edit mode, make it look like a button */
     :host([edit-mode]) .metadata-container {
       background-color: color-mix(in srgb, currentColor 20%, transparent);

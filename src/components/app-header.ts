@@ -294,6 +294,10 @@ export class AppHeader extends LitElement {
         /* (the 5px is the space the menu icon's drawing leaves at its own edge) */
         padding-left: calc(var(--edge) + 5px);
         box-sizing: border-box;
+        /* The same height as the key's row, which the overview and a song swap (the key's box has
+           a 2px border): the header must not change height between them */
+        font-size: var(--font-ui-small);
+        padding-block: 2px;
         line-height: 1.2;
         opacity: 0.85;
         white-space: nowrap;
