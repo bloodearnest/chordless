@@ -9,6 +9,7 @@ import type { GoogleApi } from './google-auth.ts'
 import { isCrossOrigin, jsonResponse, message } from './http.ts'
 import { handleOAuthCallback, handleSessionLogout, handleTokenRefresh } from './session.ts'
 import { handleShareDownload, type ShareCache, shareFileId } from './share.ts'
+import { handleShareLive, shareLiveId } from './share-live.ts'
 import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
@@ -55,6 +56,10 @@ export async function handleRequest(
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)
+
+    // A device joining a share's live room (docs/LIVE_SYNC.md)
+    const liveShareId = shareLiveId(path)
+    if (liveShareId !== null) return await handleShareLive(request, liveShareId, env)
 
     // A share link's download (public, encrypted; see docs/SHARING.md)
     const shareId = shareFileId(path)

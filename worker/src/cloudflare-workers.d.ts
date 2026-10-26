@@ -4,6 +4,8 @@ declare module 'cloudflare:workers' {
     get<T>(key: string): Promise<T | undefined>
     put(entries: Record<string, unknown>): Promise<void>
     delete(key: string): Promise<boolean>
+    /** Call the object's `alarm()` at this time (ms) */
+    setAlarm(time: number): Promise<void>
     deleteAll(): Promise<void>
     list<T>(options: { prefix: string }): Promise<Map<string, T>>
   }
@@ -19,6 +21,7 @@ declare module 'cloudflare:workers' {
     ctx: DurableObjectState
     env: E
     constructor(ctx: DurableObjectState, env: E)
+    alarm?(): void | Promise<void>
   }
 }
 
