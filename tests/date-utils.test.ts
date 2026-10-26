@@ -52,6 +52,13 @@ describe('formatSetlistDate', () => {
     )
   })
 
+  it('formats compact dates, without the weekday', () => {
+    expect(formatSetlistDate('2026-10-18', 'compact', { locale: 'en-GB', now })).to.equal('18 Oct')
+    expect(formatSetlistDate('2025-10-12', 'compact', { locale: 'en-GB', now })).to.equal(
+      '12 Oct 2025'
+    )
+  })
+
   it('reads YYYY-MM-DD as a local date', () => {
     // As UTC this would be Saturday evening in timezones behind UTC
     expect(formatSetlistDate('2026-10-18', 'short', { locale: 'en-GB', now })).to.match(/^Sun/)
