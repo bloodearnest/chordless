@@ -149,6 +149,12 @@ help-images:
 test-drive *args:
     node --env-file-if-exists=.drive-test.env node_modules/.bin/web-test-runner --config web-test-runner.drive.config.js {{args}}
 
+# Live sync of a share against the test account's real Drive and the real Worker (docs/LIVE_SYNC.md,
+# docs/DRIVE_TESTS.md): a recipient is told of an update and fetches it, and how long that took. Needs
+# .drive-test.env and, for the Drive key, .dev.vars. Not part of `just test` or CI
+test-live-share:
+    node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars --test tests/drive/live-share.drive.node.test.ts
+
 # Get the refresh token for the real-Drive suite, signing in as the test account (docs/DRIVE_TESTS.md)
 drive-test-login:
     node --env-file-if-exists=.drive-test.env scripts/drive-test-login.ts
