@@ -104,7 +104,11 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 
   It tells the others after a `SyncPushedEvent` (a team reader does not: only writers send); on a
   `changed` it syncs, or fetches the share, at once and again after each of `FOLLOW_UPS_MS`; and on every
-  (re)connect it does so once, to catch up on what it missed.
+  (re)connect it does so once, to catch up on what it missed. A **recipient of a share** also fetches it
+  every `SHARE_POLL_MS` (30 s) while live and on screen, whatever the channel says: a team space has the
+  sync's minute tick for a "changed" that was missed, and a share has nothing else. (Found by the
+  two-browser test, where Drive was slower than the follow-ups once; the cost is one conditional request,
+  a 304, every 30 s.)
 - **The dot** on the live button (`data-sync`, `live-sync-status.ts`): green when every channel is up,
   amber while connecting, hollow when not. Hollow loses nothing. It is shown on the live setlist only.
 

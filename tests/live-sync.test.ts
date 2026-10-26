@@ -11,6 +11,7 @@ import {
   type LiveTarget,
   type LiveWorld,
   liveTargets,
+  SHARE_POLL_MS,
 } from '../src/js/live-sync.ts'
 import { getLiveSyncStatus, LiveSyncStatusEvent } from '../src/js/live-sync-status.ts'
 import { SpaceChangeEvent } from '../src/js/space.ts'
@@ -165,6 +166,7 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
     reloads: [] as string[],
     channels: [] as FakeChannel[],
     timers: [] as { ms: number; fn: () => void; cancelled: boolean }[],
+    polls: [] as { ms: number; fn: () => void; stopped: boolean }[],
     statuses: [] as (LiveStatus | null)[],
   }
   win.addEventListener(LiveSyncStatusEvent.type, event =>
@@ -191,6 +193,13 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
       state.timers.push(timer)
       return () => {
         timer.cancelled = true
+      }
+    },
+    every: (ms, fn) => {
+      const poll = { ms, fn, stopped: false }
+      state.polls.push(poll)
+      return () => {
+        poll.stopped = true
       }
     },
   })
@@ -358,6 +367,45 @@ describe('Live sync', () => {
       sync.stop()
     })
 
+    it('fetches the share every 30 s while live, as the tick does for a space, whatever the channel says', async () => {
+      const { sync, state, settle } = rig([recipient])
+      sync.start()
+      await settle()
+      expect(state.polls.map(poll => poll.ms)).to.deep.equal([SHARE_POLL_MS])
+      expect(SHARE_POLL_MS).to.equal(30_000)
+
+      state.polls[0].fn()
+      state.polls[0].fn()
+      expect(state.reloads).to.deep.equal(['f2', 'f2'])
+      expect(state.channels[0].status, 'the channel was never up').to.equal('offline')
+      sync.stop()
+    })
+
+    it('does not fetch on the poll while the app is not on screen, and stops when live ends', async () => {
+      const { sync, state, win, settle } = rig([recipient])
+      sync.start()
+      await settle()
+
+      state.visible = false
+      state.polls[0].fn()
+      expect(state.reloads).to.deep.equal([])
+
+      state.visible = true
+      state.targets = []
+      win.dispatchEvent(new LiveChangeEvent(null))
+      await settle()
+      expect(state.polls[0].stopped).to.equal(true)
+      sync.stop()
+    })
+
+    it('has no poll for a team space (the sync’s tick is its fallback) or for the sharer', async () => {
+      const { sync, state, settle } = rig([teamTarget(), sender])
+      sync.start()
+      await settle()
+      expect(state.polls).to.have.length(0)
+      sync.stop()
+    })
+
     it('does not tell the others from a recipient’s device: they only listen', async () => {
       const { sync, win, settle, state } = rig([recipient])
       sync.start()
@@ -497,6 +545,7 @@ describe('Live sync', () => {
       reloadShare: async () => {},
       visible: () => true,
       later: () => () => {},
+      every: () => () => {},
     })
     const warn = console.warn
     console.warn = () => {}
