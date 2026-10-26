@@ -16,7 +16,7 @@ test.skip('missing' in found, `needs ${'missing' in found ? found.missing.join('
 
 /** LIVE_DEBUG=1 prints what each page logs, says on its sockets and asks of the share route, with the time */
 function watch(page: Page, who: string) {
-  if (!process.env.LIVE_DEBUG) return
+  if (!process.env.LIVE_DEBUG) return () => {}
   const t0 = Date.now()
   const say = (what: string) =>
     console.log(`[${((Date.now() - t0) / 1000).toFixed(1)}s ${who}] ${what}`)
@@ -41,6 +41,7 @@ function watch(page: Page, who: string) {
       )
     }
   })
+  return say
 }
 
 /** The space the running test made in Drive, to be put away whatever happens to it */
@@ -58,7 +59,7 @@ test('a song added by the sharer reaches a recipient who has no account', async 
   const spaceName = `chordless-drive-test live ${stamp}`
   madeSpace = spaceName
   await page.context().addInitScript(() => localStorage.setItem('setup-done', '1'))
-  watch(page, 'sharer')
+  const sharerSays = watch(page, 'sharer')
   await signIn(page)
 
   {
@@ -113,7 +114,7 @@ test('a song added by the sharer reaches a recipient who has no account', async 
     const recipientContext = await browser.newContext({ locale: 'en-GB' })
     await recipientContext.addInitScript(() => localStorage.setItem('setup-done', '1'))
     const recipient = await recipientContext.newPage()
-    watch(recipient, 'recipient')
+    const recipientSays = watch(recipient, 'recipient')
     await recipient.goto(link)
     await expect(recipient.locator('setlist-overview')).toContainText('Live Alpha', {
       timeout: 60_000,
@@ -132,6 +133,7 @@ test('a song added by the sharer reaches a recipient who has no account', async 
 
     // The sharer adds the song, as a late song is added: the app syncs it, updates the share and tells
     const started = Date.now()
+    sharerSays('EDIT: the song is added')
     await page.evaluate(
       async ({ id, entry }) => {
         const { getCurrentDB } = await import('/js/db.ts')
@@ -147,6 +149,7 @@ test('a song added by the sharer reaches a recipient who has no account', async 
       timeout: 60_000,
     })
     const took = Date.now() - started
+    recipientSays('the page shows the song')
     testInfo.annotations.push({
       type: 'took',
       description: `${took} ms from the edit to the recipient's page`,
