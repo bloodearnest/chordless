@@ -62,7 +62,7 @@ test('an email with a list of songs is answered with a link that holds them', as
   assert.ok(!body.includes('%PDF'), 'no chart in the reply')
   // The details and the songs are in both versions
   for (const version of [body, html]) {
-    assert.match(version, /Sunday 25th October/)
+    assert.match(version, /\(no name\)/, 'a subject that was only the date leaves no name')
     assert.match(version, /2026-10-25/)
     assert.match(version, /Leader One/)
     assert.match(version, /Alpha Song \(G\)/)
