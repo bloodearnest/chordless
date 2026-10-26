@@ -74,7 +74,7 @@ test('a song the library lacks must be imported from SongSelect first, then the 
   const result = await page.evaluate(async () => {
     const { getCurrentDB } = await import('/js/db.ts')
     const db = await getCurrentDB()
-    const setlist = (await db.getAllSetlists()).find(have => have.name === 'Sunday 25th October')
+    const setlist = (await db.getAllSetlists()).find(have => have.date === '2026-10-25')
     if (!setlist) return null
     const entries: { title?: string; key: string | null; tempo: number | null }[] = []
     for (const entry of setlist.songs) {
@@ -83,6 +83,7 @@ test('a song the library lacks must be imported from SongSelect first, then the 
     }
     return {
       date: setlist.date,
+      name: setlist.name,
       owner: setlist.owner,
       ownerId: setlist.ownerId,
       type: setlist.type,
@@ -92,9 +93,11 @@ test('a song the library lacks must be imported from SongSelect first, then the 
   })
   expect(result).toEqual({
     date: '2026-10-25',
+    // (a subject that is only the date is no name, so the setlist is that Sunday's service)
+    name: '',
     owner: 'Leader One',
     ownerId: 'one@example.com',
-    type: 'Event',
+    type: 'Church Service',
     entries: [
       { title: 'Alpha Song', key: 'G', tempo: null },
       { title: 'Brand New Song', key: 'D', tempo: 90 },

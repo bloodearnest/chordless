@@ -705,6 +705,22 @@ function oneChartPerSong(charts: ChartInfo[]): {
   return { charts: [...first.values()], otherKeys }
 }
 
+/**
+ * A subject as the setlist's name: without the date, which the setlist has of its own ("Sunday
+ * 18th October" is no name, and "Sunday 18th October - Harvest" is "Harvest"), and without the
+ * words that led to it ("Songs for"). Nothing is left of a subject that is only a date
+ */
+function nameWithoutDate(subject: string, sent: Date | null): string {
+  const mention = scanDates(subject, sent, true) ?? scanDates(subject, sent, false)
+  if (!mention) return subject
+  return subject
+    .replace(mention.stated, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/^[\s\-–—:,|·]+|[\s\-–—:,|·]+$/g, '')
+    .replace(/(?:^|\s)(?:for|on|the|of|at)$/i, '')
+    .trim()
+}
+
 /** Subject lines that are the sender's app's, not a name for the set */
 function setName(subject: string): string {
   return cleanSubject(subject).replace(/^here['’]?s your set\s*[:\-–]?\s*/i, '')
@@ -742,19 +758,20 @@ export function importFromEmail(email: EmailText): ImportedSetlist {
   const forward = innermostForward(email.body)
   const text = forward ? forward.text : email.body
   const leader = forward?.from ? parsePerson(forward.from) : email.from
-  const name = setName(forward?.subject || email.subject)
+  const subject = setName(forward?.subject || email.subject)
   const sent = sentDay(forward?.date || email.date) ?? sentDay(email.date)
-  let date = findDate(name, sent) || findDate(text, sent)
+  const name = nameWithoutDate(subject, sent)
+  let date = findDate(subject, sent) || findDate(text, sent)
   let dateWarning: string | null = null
   if (!date) {
-    const wrong = findDateWithWrongNumber(name, sent) ?? findDateWithWrongNumber(text, sent)
+    const wrong = findDateWithWrongNumber(subject, sent) ?? findDateWithWrongNumber(text, sent)
     if (wrong) {
       date = wrong.date
       dateWarning = wrong.warning
     }
   }
   if (!date) {
-    const bare = findBareSunday(name, sent)
+    const bare = findBareSunday(subject, sent)
     if (bare) {
       date = bare.date
       dateWarning = bare.warning

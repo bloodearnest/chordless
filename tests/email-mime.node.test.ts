@@ -116,7 +116,7 @@ test('a message forwarded as an attachment is read as the message that was forwa
 
   const setlist = importFromEmail(await readEmail(raw, readText))
   assert.equal(setlist.leader.email, 'one@example.com')
-  assert.equal(setlist.name, 'Sunday 25th October')
+  assert.equal(setlist.name, '')
   assert.equal(setlist.date, '2026-10-25')
   assert.deepEqual(
     setlist.songs.map(s => s.ccli),

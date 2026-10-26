@@ -269,7 +269,7 @@ test('an email with a numbered list: its order and keys, the charts matched by t
     ]),
     charts,
   })
-  assert.equal(result.name, 'Sunday 18th October')
+  assert.equal(result.name, '', 'a subject that is only the date is no name')
   assert.equal(result.date, '2026-10-18')
   assert.deepEqual(result.leader, jenny)
   assert.deepEqual(
@@ -338,6 +338,22 @@ test('a title with a comma: either part may be the title its chart has, even one
   )
 })
 
+test('the rest of the subject is the name, with the date taken out', () => {
+  const nameOf = (subject: string) =>
+    importFromEmail({
+      subject,
+      from: jenny,
+      date: 'Tue, 13 Oct 2026',
+      body: 'Here are the songs.',
+      charts: [chart('A Song', 'G', '3001')],
+    }).name
+  assert.equal(nameOf('Fwd: Sunday 18th October - Harvest'), 'Harvest')
+  assert.equal(nameOf('Harvest service: Sunday 18th October'), 'Harvest service')
+  assert.equal(nameOf('Harvest, 18 Oct 2026'), 'Harvest')
+  assert.equal(nameOf('Set for Sunday 18th October'), 'Set')
+  assert.equal(nameOf('Harvest songs'), 'Harvest songs', 'a subject with no date stays whole')
+})
+
 test('titles with the same words in another order match, though less than the same title', () => {
   assert.equal(titleScore('Great Is The Morning', 'The Morning Is Great'), 0.8)
   assert.equal(titleScore('Great Is The Morning', 'Great Is The Morning'), 1)
@@ -353,7 +369,7 @@ test('an email with no list: the attachments in order, and the sender as the lea
     charts: [chart('B Song', 'D', null), chart('A Song', 'G', '3001')],
   })
   assert.deepEqual(result.leader, jenny)
-  assert.equal(result.name, 'Songs for Sunday 25th')
+  assert.equal(result.name, 'Songs', 'the date is taken out of the name')
   assert.equal(result.date, '2026-10-25')
   assert.deepEqual(
     result.songs.map(s => s.title),
@@ -449,7 +465,7 @@ test('the same chart attached twice is one song; another key of it is a note, no
       chart('Other Song', 'G', '7002'),
     ],
   })
-  assert.equal(result.name, 'Sunday 25th October', 'the app’s subject wording is taken off')
+  assert.equal(result.name, '', 'the app’s subject wording is taken off, and the date')
   assert.deepEqual(
     result.songs.map(s => [s.title, s.key, s.notes]),
     [
