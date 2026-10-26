@@ -186,9 +186,10 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
     assert.deepEqual(recipient.closed, [1008])
   })
 
-  // LIVE_SHARE_UPDATES=30 just test-live-share: how long Drive takes to make an updated share readable,
+  // LIVE_SHARE_UPDATES=15 just test-live-share: how long Drive takes to make an updated share readable,
   // by many updates one after another, read straight from Drive (not through the Worker, whose cache
-  // would hide it). The live channel can only be as quick as this is on its slow days
+  // would hide it). The live channel can only be as quick as this is on its slow days. Keep the count
+  // small: Google answers an address that asks for too much, with one key, with a block page for a while
   test('measures how long Drive takes to make an update readable', {
     skip: !Number(process.env.LIVE_SHARE_UPDATES),
     timeout: 20 * 60_000,
@@ -214,7 +215,7 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
         )
         if (response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()), body) === 0) {
           seen = performance.now() - uploaded
-        } else await sleep(150)
+        } else await sleep(400)
       }
       readable.push(seen ?? 60_000)
       slowest = Math.max(slowest, seen ?? 60_000)
