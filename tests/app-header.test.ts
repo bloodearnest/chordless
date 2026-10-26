@@ -2,7 +2,6 @@ import { expect, fixture, html, waitUntil } from '@open-wc/testing'
 import {
   type AppHeader,
   EditModeToggleEvent,
-  HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
   HeaderMenuClickEvent,
 } from '../src/components/app-header.ts'
@@ -59,7 +58,7 @@ describe('app-header', () => {
       const header = await fixture<AppHeader>(html`<app-header heading="Plain"></app-header>`)
       expect(button(header, '.edit-toggle')).to.equal(null)
       expect(button(header, '.info-button')).to.equal(null)
-      expect(button(header, '.expand-toggle')).to.equal(null)
+      expect(header.shadowRoot?.querySelector<HTMLElement>('.header-row-2')?.hidden).to.equal(true)
       expect(header.shadowRoot?.querySelector('.logo')).to.equal(null)
       let menu: HeaderMenuClickEvent | null = null
       header.addEventListener(
@@ -109,29 +108,12 @@ describe('app-header', () => {
       expect(button(header, '.edit-toggle')?.classList.contains('active')).to.equal(true)
     })
 
-    it('shows and hides the second row with its toggle, and says so', async () => {
-      const header = await fixture<AppHeader>(
-        html`<app-header heading="Page" show-edit-toggle></app-header>`
-      )
-      const seen: boolean[] = []
-      header.addEventListener(HeaderExpandToggleEvent.type, event =>
-        seen.push((event as HeaderExpandToggleEvent).expanded)
-      )
-      button(header, '.expand-toggle')?.click()
-      await header.updateComplete
-      expect(button(header, '.expand-toggle')?.textContent?.trim()).to.equal('▲')
-      button(header, '.expand-toggle')?.click()
-      await header.updateComplete
-      expect(button(header, '.expand-toggle')?.textContent?.trim()).to.equal('▼')
-      expect(seen).to.deep.equal([true, false])
-    })
-
-    it('has controls when something is in the controls slot', async () => {
+    it('shows the second row when something is in the controls slot', async () => {
       const header = await fixture<AppHeader>(
         html`<app-header heading="Page"><button slot="controls">Go</button></app-header>`
       )
       await header.updateComplete
-      expect(button(header, '.expand-toggle')).to.not.equal(null)
+      expect(header.shadowRoot?.querySelector<HTMLElement>('.header-row-2')?.hidden).to.equal(false)
     })
 
     it('shows a dot on the menu button while an update is waiting', async () => {

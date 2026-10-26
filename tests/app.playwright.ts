@@ -170,20 +170,20 @@ test.describe('Navigation menu', () => {
     await seedSong(page, { setlistId: 'menu-test-setlist' })
     await page.setViewportSize({ width: 390, height: 700 })
     const pages = [
-      { path: '/', controls: false },
-      { path: '/songs', controls: true },
-      { path: '/setlist/menu-test-setlist', controls: true },
-      { path: '/preferences', controls: false },
-      { path: '/storage', controls: false },
-      { path: '/bookmarklet', controls: false },
-      { path: '/import-song', controls: false },
+      '/',
+      '/songs',
+      '/setlist/menu-test-setlist',
+      '/preferences',
+      '/storage',
+      '/bookmarklet',
+      '/import-song',
     ]
-    for (const { path, controls } of pages) {
+    for (const path of pages) {
       await page.goto(path)
       const header = page.locator('app-header')
       await expect(header, path).toHaveCount(1)
-      // On a phone, the toggle for the second row only shows when there are controls
-      await expect(header.locator('.expand-toggle'), path).toHaveCount(controls ? 1 : 0)
+      // There is no toggle for a second row on a phone
+      await expect(header.locator('.expand-toggle'), path).toHaveCount(0)
 
       const button = header.getByRole('button', { name: 'Navigation menu' })
       const menu = page.locator('nav-menu .nav-menu-popover')

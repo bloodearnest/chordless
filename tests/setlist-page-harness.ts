@@ -148,7 +148,7 @@ export function useSetlistPage() {
     setCapoPreference(false)
     localStorage.removeItem('section_defaults')
     localStorage.removeItem(`song-prefs-${rig.db.spaceId}`)
-    document.body.classList.remove('edit-mode', 'header-expanded')
+    document.body.classList.remove('edit-mode')
     document.body.removeAttribute('data-edit-mode')
     delete document.body.dataset.view
   })

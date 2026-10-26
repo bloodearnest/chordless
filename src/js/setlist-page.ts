@@ -1,7 +1,6 @@
 import {
   type AppHeader,
   EditModeToggleEvent,
-  HeaderExpandToggleEvent,
   HeaderInfoClickEvent,
 } from '../components/app-header.ts'
 import type { AppModal } from '../components/app-modal.ts'
@@ -296,8 +295,6 @@ export class SetlistPage {
 
     // Edit mode is on <body>, which outlives the view; leaving it saves, as exiting does
     this.exitEditMode()
-    document.body.classList.remove('header-expanded')
-    document.documentElement.style.setProperty('--header-expanded', '0')
 
     // The menu is the shell's: take the setlist's songs out of it
     const navMenu = document.getElementById('nav-menu') as NavMenu | null
@@ -966,22 +963,6 @@ export class SetlistPage {
           this.showSongInfo(this.header.songForInfo)
         } else {
           this.showSetlistInfo()
-        }
-      },
-      { signal }
-    )
-
-    // Listen for header-expand-toggle event
-    appHeader.addEventListener(
-      HeaderExpandToggleEvent.type,
-      e => {
-        const { expanded } = e
-        if (expanded) {
-          document.body.classList.add('header-expanded')
-          document.documentElement.style.setProperty('--header-expanded', '1')
-        } else {
-          document.body.classList.remove('header-expanded')
-          document.documentElement.style.setProperty('--header-expanded', '0')
         }
       },
       { signal }

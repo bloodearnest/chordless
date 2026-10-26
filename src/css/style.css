@@ -651,42 +651,6 @@ body.edit-mode .edit-mode-control.fade-in {
   transition: opacity 0.3s ease-in-out;
 }
 
-/* Expand toggle button styling */
-.expand-toggle {
-  background: none;
-  border: 2px solid var(--header-text);
-  color: var(--header-text);
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 50%;
-  display: none; /* Hidden by default, shown on mobile */
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: var(--font-ui-small);
-  font-weight: bold;
-  transition: all 0.2s;
-}
-
-.expand-toggle:hover {
-  background-color: rgba(255, 255, 255, 0.2);
-  transform: scale(1.05);
-}
-
-/* Mobile: show expand toggle, hide controls by default */
-@media (max-width: 47.99rem) {
-  .expand-toggle {
-    display: flex;
-  }
-}
-
-/* Tablet/desktop: hide expand toggle, always show controls */
-@media (min-width: 48rem) {
-  .expand-toggle {
-    display: none !important;
-  }
-}
-
 /* Key selector - appears as plain text in normal mode, interactive button in edit mode */
 .key-selector {
   background: transparent;

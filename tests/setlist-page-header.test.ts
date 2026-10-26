@@ -5,11 +5,7 @@
  */
 import { expect } from '@open-wc/testing'
 import type { AppHeader } from '../src/components/app-header.ts'
-import {
-  EditModeToggleEvent,
-  HeaderExpandToggleEvent,
-  HeaderInfoClickEvent,
-} from '../src/components/app-header.ts'
+import { EditModeToggleEvent, HeaderInfoClickEvent } from '../src/components/app-header.ts'
 import type { AppModal } from '../src/components/app-modal.ts'
 import {
   MenuOverviewClickEvent,
@@ -433,14 +429,6 @@ describe('the setlist page: header, menu and keys', () => {
       rig.page.songs[0].currentKey = undefined
       await rig.page.header.show(rig.page.songs[0], true)
       expect(($('#key-selector') as unknown as { value: string }).value).to.equal('-')
-    })
-
-    it('widens and narrows with its toggle', async () => {
-      await rig.open()
-      header().dispatchEvent(new HeaderExpandToggleEvent(true))
-      expect(document.body.classList.contains('header-expanded')).to.equal(true)
-      header().dispatchEvent(new HeaderExpandToggleEvent(false))
-      expect(document.body.classList.contains('header-expanded')).to.equal(false)
     })
 
     it('does nothing for a header that is not there', async () => {

@@ -107,7 +107,6 @@ describe('views leave nothing behind', () => {
     bodyClass: document.body.className,
     bodyEditMode: document.body.getAttribute('data-edit-mode'),
     bodyUserSelect: document.body.style.userSelect,
-    headerExpanded: document.documentElement.style.getPropertyValue('--header-expanded'),
     menuSongs: menu.songs?.length ?? 0,
     menuOverviewLink: menu.showOverviewLink,
     menuTitle: menu.setlistTitle,
