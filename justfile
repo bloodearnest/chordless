@@ -104,6 +104,11 @@ test-node:
 serve:
     npm run dev
 
+# The same, for trying live sync (docs/LIVE_SYNC.md): the Worker is its own process (wrangler dev), as the
+# Vite plugin cannot pass WebSockets to it. Slower to start and heavier; `just serve` is for everything else
+serve-live:
+    scripts/serve-live.sh
+
 # Build the app and the Worker into dist/
 build:
     npm run build
