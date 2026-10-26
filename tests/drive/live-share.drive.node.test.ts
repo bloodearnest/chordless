@@ -186,6 +186,54 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
     assert.deepEqual(recipient.closed, [1008])
   })
 
+  // LIVE_SHARE_UPDATES=30 just test-live-share: how long Drive takes to make an updated share readable,
+  // by many updates one after another, read straight from Drive (not through the Worker, whose cache
+  // would hide it). The live channel can only be as quick as this is on its slow days
+  test('measures how long Drive takes to make an update readable', {
+    skip: !Number(process.env.LIVE_SHARE_UPDATES),
+    timeout: 20 * 60_000,
+  }, async t => {
+    const count = Number(process.env.LIVE_SHARE_UPDATES)
+    const metadata = shareFileMetadata(
+      { id: 'live-share-test' },
+      { spaceId: null, expires: '2099-01-02' }
+    )
+    const readable: number[] = []
+    const uploads: number[] = []
+    let slowest = 0
+    for (let i = 0; i < count; i++) {
+      const body = await encryptBundle(key, bundleNamed(`measure ${i}`))
+      const began = performance.now()
+      await space.update(fileId, updateInput(metadata, 'share'), body)
+      const uploaded = performance.now()
+      uploads.push(uploaded - began)
+      let seen: number | null = null
+      while (seen === null && performance.now() - uploaded < 60_000) {
+        const response = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true&key=${encodeURIComponent(apiKey as string)}`
+        )
+        if (response.ok && Buffer.compare(Buffer.from(await response.arrayBuffer()), body) === 0) {
+          seen = performance.now() - uploaded
+        } else await sleep(150)
+      }
+      readable.push(seen ?? 60_000)
+      slowest = Math.max(slowest, seen ?? 60_000)
+    }
+    const percentile = (values: number[], p: number) => {
+      const sorted = [...values].sort((a, b) => a - b)
+      return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)]
+    }
+    const row = (name: string, values: number[]) =>
+      `${name}: min ${Math.round(Math.min(...values))}, median ${Math.round(percentile(values, 50))}, p95 ${Math.round(percentile(values, 95))}, max ${Math.round(Math.max(...values))} ms`
+    t.diagnostic(
+      `${count} updates. ${row('readable after the upload finished', readable)}. ${row('the upload itself', uploads)}`
+    )
+    console.log(
+      `${count} updates. ${row('readable after the upload finished', readable)}. ${row('the upload itself', uploads)}`
+    )
+    assert.ok(slowest < 60_000, 'every update became readable within a minute')
+  })
+
   test('another secret cannot send for the sharer', async () => {
     const squatter = await worker.fetch(`/api/share/${fileId}/live`, {
       headers: {

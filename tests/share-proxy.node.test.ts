@@ -125,15 +125,19 @@ test('?fresh=1 skips an answer older than a few seconds, and Drive is asked once
     handleShareDownload(new Request(`https://chordless.app/api/share/${ID}?fresh=1`), ID, env, deps)
 
   await handleShareDownload(get(), ID, env, deps)
-  clock += 2000
+  clock += 500
   await fresh()
-  assert.equal(drive.urls.length, 1, 'two seconds old: it will do')
+  assert.equal(drive.urls.length, 1, 'half a second old: it will do')
 
-  clock += 2000
+  clock += 1500
   await fresh()
   await fresh()
   await fresh()
-  assert.equal(drive.urls.length, 2, 'four: Drive is asked, once, and the answer kept for the rest')
+  assert.equal(
+    drive.urls.length,
+    2,
+    'two seconds: Drive is asked, once, and the answer kept for the rest'
+  )
 
   clock += 10_000
   await handleShareDownload(get(), ID, env, deps)
