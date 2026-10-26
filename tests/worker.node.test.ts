@@ -417,6 +417,100 @@ describe('a team space Durable Object', () => {
     })
   })
 
+  // A share's live room (worker/src/share-room.ts): no accounts, so who may send is a secret's hash
+  describe('a share’s live room', () => {
+    const changed = '{"type":"changed"}'
+
+    /** A device joining a share's room, as the Worker passes it on (share-live.ts); `publisher` is the hash of the sharer's secret */
+    const join = async (fileId: string, publisher?: string) => {
+      const env = await worker.getWorker<Env>().getEnv()
+      assert.ok(env.SHARE_ROOM)
+      const answer = (await env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName(fileId)).fetch(
+        new Request(`https://chordless.test/api/share/${fileId}/live`, {
+          headers: {
+            Upgrade: 'websocket',
+            'Sec-WebSocket-Protocol': 'chordless',
+            ...(publisher ? { 'X-Share-Publisher': publisher } : {}),
+          },
+        })
+      )) as Response & { webSocket: (WebSocket & { accept(): void }) | null }
+      if (answer.status !== 101) return answer.status
+      const socket = answer.webSocket
+      assert.ok(socket)
+      socket.accept()
+      const heard: string[] = []
+      const closed: number[] = []
+      socket.addEventListener('message', event => heard.push(String(event.data)))
+      socket.addEventListener('close', event => closed.push(event.code))
+      return { socket, heard, closed }
+    }
+    /** Let the messages in flight arrive */
+    const settle = () => new Promise(resolve => setTimeout(resolve, 200))
+    const open = async (fileId: string, publisher?: string) => {
+      const joined = await join(fileId, publisher)
+      if (typeof joined === 'number') throw new Error(`refused ${joined}`)
+      return joined
+    }
+
+    test('relays the sharer’s "changed" to those listening, and not back', async () => {
+      const sharer = await open('share-aaaaaaaaaa', 'hash-1')
+      const one = await open('share-aaaaaaaaaa')
+      const two = await open('share-aaaaaaaaaa')
+
+      sharer.socket.send(changed)
+      await settle()
+
+      assert.deepEqual(one.heard, [changed])
+      assert.deepEqual(two.heard, [changed])
+      assert.deepEqual(sharer.heard, [])
+    })
+
+    test('closes a listener that sends, and a sharer’s message that is not the frame', async () => {
+      const sharer = await open('share-bbbbbbbbbb', 'hash-1')
+      const listener = await open('share-bbbbbbbbbb')
+      const other = await open('share-bbbbbbbbbb')
+
+      listener.socket.send(changed)
+      sharer.socket.send('{"type":"changed","setlist":{}}')
+      await settle()
+
+      assert.deepEqual(listener.closed, [1008])
+      assert.deepEqual(sharer.closed, [1003])
+      assert.deepEqual(other.heard, [])
+    })
+
+    test('takes the first secret as the sharer’s, and refuses another’s', async () => {
+      await open('share-cccccccccc', 'hash-1')
+      const squatter = await join('share-cccccccccc', 'hash-2')
+      assert.equal(squatter, 403)
+
+      // (the sharer’s other device, with the same secret, is let in)
+      const again = await open('share-cccccccccc', 'hash-1')
+      const listener = await open('share-cccccccccc')
+      again.socket.send(changed)
+      await settle()
+      assert.deepEqual(listener.heard, [changed])
+    })
+
+    test('keeps rooms apart, one for each share', async () => {
+      const here = await open('share-dddddddddd', 'hash-1')
+      const there = await open('share-eeeeeeeeee')
+      here.socket.send(changed)
+      await settle()
+      assert.deepEqual(there.heard, [])
+      // (and a secret claimed in one room is nothing in another)
+      assert.notEqual(typeof (await join('share-eeeeeeeeee', 'hash-9')), 'number')
+    })
+
+    test('answers a ping, from a listener too', async () => {
+      const listener = await open('share-ffffffffff')
+      listener.socket.send('ping')
+      await settle()
+      assert.deepEqual(listener.heard, ['pong'])
+      assert.deepEqual(listener.closed, [])
+    })
+  })
+
   test('persists a space that was made', async () => {
     const handle = worker.getWorker<Env>()
     const env = await handle.getEnv()

@@ -116,6 +116,46 @@ test('the cache is short-lived, so updates and revocations reach people', async 
   assert.equal(cached?.headers.get('Cache-Control'), 'public, max-age=60')
 })
 
+test('?fresh=1 skips an answer older than a few seconds, and Drive is asked once for all who ask', async () => {
+  const cache = memoryCache()
+  let clock = 1_000_000
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const deps = { fetchDrive: drive.fetchDrive, cache, now: () => clock }
+  const fresh = () =>
+    handleShareDownload(new Request(`https://chordless.app/api/share/${ID}?fresh=1`), ID, env, deps)
+
+  await handleShareDownload(get(), ID, env, deps)
+  clock += 2000
+  await fresh()
+  assert.equal(drive.urls.length, 1, 'two seconds old: it will do')
+
+  clock += 2000
+  await fresh()
+  await fresh()
+  await fresh()
+  assert.equal(drive.urls.length, 2, 'four: Drive is asked, once, and the answer kept for the rest')
+
+  clock += 10_000
+  await handleShareDownload(get(), ID, env, deps)
+  assert.equal(drive.urls.length, 2, 'an ordinary request still takes what is there')
+})
+
+test('?fresh=1 is the same answer: only how old it may be is different', async () => {
+  const cache = memoryCache()
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const deps = { fetchDrive: drive.fetchDrive, cache, now: () => 1 }
+  const plain = await handleShareDownload(get(), ID, env, deps)
+  const fresh = await handleShareDownload(
+    new Request(`https://chordless.app/api/share/${ID}?fresh=1`),
+    ID,
+    env,
+    deps
+  )
+  assert.equal(fresh.headers.get('ETag'), plain.headers.get('ETag'))
+  assert.equal(fresh.headers.get('X-Cached-At'), null, 'the cache’s note is not given out')
+  assert.equal(drive.urls.length, 1)
+})
+
 test('"ended" is cached briefly too; errors are not cached', async () => {
   const cache = memoryCache()
   const gone = fakeDrive(() => new Response('{}', { status: 404 }))

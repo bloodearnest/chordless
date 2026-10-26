@@ -15,12 +15,23 @@ import { toHex } from '../../src/js/utils/bytes.ts'
 /** A file id as Drive makes them, and nothing that could change the URL we fetch */
 const FILE_ID = /^[\w-]{10,100}$/
 
+/** Whether this is a file id Drive could have made (the live channel's rooms are named by them too) */
+export const isShareFileId = (id: string) => FILE_ID.test(id)
+
 /** Shares are a few KB. Anything much bigger isn't one: don't relay it */
 const MAX_BYTES = 1024 * 1024
 
 /** How long an answer is reused before asking Drive again */
 const FOUND_SECONDS = 60
 const GONE_SECONDS = 30
+/**
+ * ...and for a request that says `?fresh=1` (a recipient told by the live channel that the share was
+ * updated). Anyone can ask, so what it changes is bounded: Drive is asked at most this often per
+ * file in a data centre, however many ask, and not once more for asking more.
+ */
+const FRESH_SECONDS = 3
+/** When the answer was fetched from Drive (ms), kept with it in the cache */
+const CACHED_AT = 'X-Cached-At'
 
 /** The part of the Workers Cache API used here */
 export interface ShareCache {
@@ -38,6 +49,8 @@ interface ShareDeps {
   fetchDrive?: typeof fetch
   cache?: ShareCache
   waitUntil?: (promise: Promise<unknown>) => void
+  /** For tests: the time in ms */
+  now?: () => number
 }
 
 const text = (body: string, status: number, headers: Record<string, string> = {}) =>
@@ -63,7 +76,7 @@ export async function handleShareDownload(
   request: Request,
   fileId: string,
   env: ShareEnv,
-  { fetchDrive = fetch, cache, waitUntil }: ShareDeps = {}
+  { fetchDrive = fetch, cache, waitUntil, now = Date.now }: ShareDeps = {}
 ) {
   if (request.method !== 'GET' && request.method !== 'HEAD') {
     return text('Method not allowed', 405, { Allow: 'GET, HEAD' })
@@ -74,6 +87,11 @@ export async function handleShareDownload(
   // Cached by id alone: the same answer for everyone, whatever else is on the URL
   const cacheKey = new Request(new URL(`/api/share/${fileId}`, request.url).href)
   let answer = await cache?.match(cacheKey)
+  if (answer && new URL(request.url).searchParams.get('fresh') === '1') {
+    // (an answer with no time on it is as old as can be)
+    const age = now() - Number(answer.headers.get(CACHED_AT) ?? 0)
+    if (!(age < FRESH_SECONDS * 1000)) answer = undefined
+  }
 
   if (!answer) {
     let drive: Response
@@ -106,6 +124,7 @@ export async function handleShareDownload(
       return text('Drive could not be read', 502)
     }
     if (cache) {
+      answer.headers.set(CACHED_AT, String(now()))
       const put = cache.put(cacheKey, answer.clone())
       if (waitUntil) waitUntil(put)
       else await put

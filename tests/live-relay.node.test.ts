@@ -33,7 +33,7 @@ describe('judge', () => {
   })
 
   test('closes a reader that sends anything', () => {
-    assert.deepEqual(judge('reader', CHANGED), { close: 1008, reason: 'Readers only listen' })
+    assert.deepEqual(judge('reader', CHANGED), { close: 1008, reason: 'Only the sender sends' })
     assert.equal((judge('reader', 'anything') as { close: number }).close, 1008)
   })
 

@@ -22,12 +22,27 @@ export function tokenFromProtocol(header: string | null): string | null {
   return protocol === LIVE_PROTOCOL && token && extra.length === 0 ? token : null
 }
 
+/**
+ * What a page asked for on a share's live channel: nothing but ours (a recipient), or ours and the
+ * sharer's secret. Null if it is neither. Anyone with the link may listen; only the sharer sends.
+ */
+export function shareSecretFromProtocol(header: string | null): { secret: string | null } | null {
+  const [protocol, secret, ...extra] = (header ?? '').split(',').map(part => part.trim())
+  if (protocol !== LIVE_PROTOCOL || extra.length > 0) return null
+  return { secret: secret || null }
+}
+
 /** What to do with a message from a socket */
 export type Verdict = 'relay' | { close: number; reason: string }
 
 /** 1008: a message the socket may not send; 1003: one that is not the frame */
-export function judge(role: TeamRole, message: string | ArrayBuffer): Verdict {
-  if (!atLeast(role, 'writer')) return { close: 1008, reason: 'Readers only listen' }
+export function judgeSender(canSend: boolean, message: string | ArrayBuffer): Verdict {
+  if (!canSend) return { close: 1008, reason: 'Only the sender sends' }
   if (message !== CHANGED) return { close: 1003, reason: 'Not a frame' }
   return 'relay'
+}
+
+/** A team space's socket: writers send, readers only listen */
+export function judge(role: TeamRole, message: string | ArrayBuffer): Verdict {
+  return judgeSender(atLeast(role, 'writer'), message)
 }
