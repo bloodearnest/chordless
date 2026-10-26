@@ -149,9 +149,10 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 
 ## Running it locally
 
-`npm run dev` (Vite with the Cloudflare plugin, 1.64) does not pass WebSocket upgrades to the Worker:
-the page's attempt hangs up, the dot stays hollow, and the tick carries on. `npx wrangler dev --env dev`
-does pass them (checked: a bad token gets the Worker's 401), and so does a deploy.
+`just serve` (Vite with the Cloudflare plugin, 1.64) does not pass WebSocket upgrades to the Worker:
+the page's attempt hangs up, the dot stays hollow, and the tick carries on. **`just serve-live`** does:
+the Worker is `wrangler dev` in its own process and Vite proxies to it (BUILD.md). Checked: an upgrade
+through Vite's port reaches the Worker's route (a bad token gets its 401). A deploy passes them too.
 
 ## Not done
 
