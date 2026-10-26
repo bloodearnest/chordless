@@ -591,7 +591,12 @@ export class SyncManager {
       }
 
       // (a user who can only read has nothing to push: it finds that out itself)
-      if (push) await this.pushToDrive(progressCallback, run)
+      if (push) {
+        // A share whose setlist changed here is updated with the push, so a live one is at once
+        // (a full sync also ends and cleans up shares; this one lists nothing)
+        if (!run.readOnly) await this.syncShares(run, { light: true })
+        await this.pushToDrive(progressCallback, run)
+      }
 
       if (!run.downloadsFailed) await this.changeToken.set(changes.token)
       progressCallback?.({ stage: 'complete', message: 'Sync complete!' })
@@ -680,14 +685,17 @@ export class SyncManager {
     return removed
   }
 
-  /** Update and clean up this space's share links (see share-manager.ts) */
-  async syncShares(run: SyncRun): Promise<number> {
+  /** Update and clean up this space's share links (see share-manager.ts); `light`: only update what changed here */
+  async syncShares(run: SyncRun, { light = false }: { light?: boolean } = {}): Promise<number> {
     try {
-      return await syncShares({
-        db: this.db,
-        spaceId: this.spaceId,
-        space: run.space,
-      })
+      return await syncShares(
+        {
+          db: this.db,
+          spaceId: this.spaceId,
+          space: run.space,
+        },
+        { light }
+      )
     } catch (error) {
       // Shares must never stop setlists and songs syncing
       console.error('[DriveSync] Share sync failed:', error)
