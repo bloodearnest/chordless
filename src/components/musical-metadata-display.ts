@@ -60,13 +60,6 @@ export class MusicalMetadataDisplay extends LitElement {
       cursor: default;
     }
 
-    /* A phone has no room to spare: no space above and below, in the header's second row */
-    @media (max-width: 47.99rem) {
-      .metadata-container {
-        padding-block: 0;
-      }
-    }
-
     /* In edit mode, make it look like a button */
     :host([edit-mode]) .metadata-container {
       background-color: color-mix(in srgb, currentColor 20%, transparent);
@@ -100,6 +93,15 @@ export class MusicalMetadataDisplay extends LitElement {
     .meta-value {
       color: var(--header-text, #fff);
       font-size: var(--font-ui-small);
+    }
+
+    /* On a phone it is the header's second row, whose name row (under the title) it must match in height */
+    @media (max-width: 47.99rem) {
+      .metadata-container,
+      .meta-label,
+      .meta-value {
+        font-size: var(--font-ui);
+      }
     }
   `
 
