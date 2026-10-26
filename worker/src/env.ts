@@ -10,6 +10,11 @@ export interface Env extends GoogleEnv, ShareEnv {
     idFromName(name: string): unknown
     get(id: unknown): TeamSpaceApi
   }
+  /** The live rooms of shares, one per share file, named by its id (share-room.ts): unset in tests that do not touch them */
+  SHARE_ROOM?: {
+    idFromName(name: string): unknown
+    get(id: unknown): { fetch(request: Request): Response | Promise<Response> }
+  }
   ASSETS: { fetch(request: Request): Promise<Response> }
   /** Set only in [env.dev]: serve the component playgrounds */
   DEV_PAGES?: string
