@@ -71,9 +71,9 @@ audio live in the user's own browser and in a Drive the user (or their team spac
 The Worker passes team-space traffic through (streamed, never buffered to storage) without
 persisting or caching it: no KV, R2, Durable Object or Cache API entry may hold song or pad
 content. They hold only membership, roles, the owner's encrypted token blob, checksums, and, for
-live sync, the latest *structure* of a live setlist (its songs' titles, order, keys, tempo and
-notes: a setlist is not copyrighted, a chart is; `docs/LIVE_SYNC.md`), never chart text. (Share
-links are the one exception: the Worker caches ciphertext it cannot read.) The space model (personal
+the live channel (`docs/LIVE_SYNC.md`), the hash of the secret a share's sender proved. The channel's
+sockets carry one word, "changed", never a setlist, chart or key: the content moves by the sync, as ever.
+(Share links are the one exception: the Worker caches ciphertext it cannot read.) The space model (personal
 and team spaces, roles, the Worker's team service) is in `docs/SPACES.md`. The word is **space** in the code and the docs;
 in the UI people see **Personal** and **Team** (the list's heading is "Personal and Team Spaces"; "Create a new Team", "Account and Teams": the page that lists them is
 designed in `docs/ACCOUNT.md`), and roles are called worship leader and team member. ("organisation" is the old name; it
