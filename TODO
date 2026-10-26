@@ -263,12 +263,14 @@ ci/cd (docs/CI.md)
   because a matrix has one result for ci-ok, and Linux's is required now)
 - deploy from main (deploy.yml, drafted on branch claude/ci-and-pr-workflow): build in a job with no
   secrets, and deploy that build in a job that runs only wrangler, with a token that can do nothing
-  but deploy Workers (Workers Scripts: Edit); then the smoke test, and rollback
-- Terraform in CI: plan on merges that touch infra/ (read-only credentials, `infra` environment),
-  apply that plan after approval (`infra-apply` environment); a nightly drift check with the
-  read-only ones. Google by Workload Identity Federation (nothing stored); Cloudflare tokens made by
-  hand, each as narrow as it can be (Terraform is not given API Tokens: Edit, which is as much as the
-  account); GitHub by a fine-grained token (this repository, Administration)
+  but deploy Workers (Workers Scripts: Edit); deploy only when the build differs from what is live
+  (the page's hashed script names, and the Worker bundle's hash in the deploy's message), plus a
+  scheduled run, as merges by a workflow's token (Dependabot's auto-merge) start no other workflow;
+  then the smoke test, and rollback
+- Terraform in CI for the cloudflare and Google stacks (only github is in it so far): Google by
+  Workload Identity Federation (nothing stored), Cloudflare by tokens made by hand, each as narrow as it
+  can be (read-only for `infra`; Terraform is never given API Tokens: Edit, which is as much as the
+  account)
 - what ZAP's first baseline found (2026-10-25): no Strict-Transport-Security (HSTS: a Cloudflare
   zone setting, in infra/cloudflare), then make rule 10035 FAIL in .zap/rules.tsv; no
   Cross-Origin-Opener-Policy / Embedder-Policy (rule 90004), which need trying against Google sign-in
