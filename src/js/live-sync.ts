@@ -1,34 +1,110 @@
 /**
- * Live sync (docs/LIVE_SYNC.md): while this device is live on a team space, its live channel is
- * up. When this device has sent its changes to the space it tells the others, and when another
- * device says it did, this one syncs at once instead of at the next tick. The channel carries no
- * content; the sync is what moves it, so all of the sync's rules (conflicts, undo, the diff toast)
- * apply as ever.
+ * Live sync (docs/LIVE_SYNC.md): while this device is live, the channels it needs are up. On a team
+ * space's setlist that is the space's channel: when this device has sent its changes it tells the
+ * others, and when another does, this one syncs at once instead of at the next tick. A setlist that
+ * is shared by link has a room too: its sharer says it uploaded the update, and the recipients who
+ * are live on the link fetch it again. The channels carry no content; the sync, or the share's
+ * download, is what moves it, so all of their rules (conflicts, undo, the diff toast) apply as ever.
  *
  * The rules are here with everything injected (`LiveSyncDeps`); `startLiveSync` gives them the real
- * ones. The page shows the channel's state on the live button (live-sync-status.ts).
+ * ones. The page shows the channels' state on the live button (live-sync-status.ts).
  */
 import { SyncPushedEvent, syncSoon } from './auto-sync.ts'
-import type { Space } from './data-types.ts'
+import { getCurrentDB } from './db.ts'
 import { getIdentityToken } from './google-auth.ts'
-import { getLive, LiveChangeEvent } from './live.ts'
+import { getLive, LiveChangeEvent, type LiveState } from './live.ts'
 import { LiveChannel, type LiveChannelEvents, type LiveStatus } from './live-channel.ts'
 import { announceLiveSyncStatus } from './live-sync-status.ts'
+import { generateLiveSecret } from './share-crypto.ts'
+import { reloadShare } from './share-receiver.ts'
 import { getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
 import { atLeast } from './team-roles.ts'
 
-/** How long after a "changed" the space is read once more: Drive's feed shows a change a few seconds late */
+/** How long after a "changed" the update is fetched once more: Drive's feed shows a change a few seconds late */
 export const FEED_LAG_MS = 5000
 
-/** The team space whose channel this device would join, if it is live */
+/** A channel this device joins while it is live, and what it is for */
+export type LiveTarget =
+  /** The team space's: the devices of its members tell each other of changes, to sync at once */
+  | { kind: 'team'; key: string; teamId: string; canWrite: boolean }
+  /** A share's room, as its sharer: tell the recipients that the share was uploaded */
+  | { kind: 'share-sender'; key: string; fileId: string; secret: string }
+  /** A share's room, as a recipient: fetch the share again when it is said to have been updated */
+  | { kind: 'share-recipient'; key: string; fileId: string }
+
+/** The team space in use, if it is one this person may join the channel of */
 export interface LiveSpace {
   /** The space's id at the Worker */
   teamId: string
   /** Whether this person may tell the others (a reader only listens) */
   canWrite: boolean
+  /** The user can only read the space's Drive folder, so nothing they edit is sent: nor is a share updated */
+  readOnly: boolean
 }
 
-/** What the live channel of a space is made of: one object per connection of this device */
+/** What finds the channels the live setlist needs; injected so that the rules are tested apart from the database */
+export interface LiveWorld {
+  live(): LiveState | null
+  /** The team space in use, or null if it is not a team's */
+  space(): Promise<LiveSpace | null>
+  /** Whether the space in use is read-only, team's or not (a share is not updated from it) */
+  readOnly(): Promise<boolean>
+  /** The setlist's share, if it has one */
+  share(setlistId: string): Promise<{ fileId: string; liveSecret?: string } | null>
+  /** Keep the secret on the setlist's share (the setlist is saved as changed, so that the other devices have it) */
+  keepLiveSecret(setlistId: string, secret: string): Promise<void>
+  newSecret(): string
+}
+
+/** `/setlist/<id>` is one of the space's; `/s/<fileId>` is one received by link. Anything after is a song in it, or a link's fragment */
+const OWN = /^\/setlist\/([^/#]+)/
+const RECEIVED = /^\/s\/([^/#]+)/
+
+/** The channels this device needs for what is live now: none if nothing is, or the setlist is not one that has any */
+export async function liveTargets(world: LiveWorld): Promise<LiveTarget[]> {
+  const live = world.live()
+  if (!live) return []
+
+  const received = RECEIVED.exec(live.url)
+  if (received) {
+    const fileId = decodeURIComponent(received[1])
+    return [{ kind: 'share-recipient', key: `receive:${fileId}`, fileId }]
+  }
+
+  const own = OWN.exec(live.url)
+  if (!own) return []
+  const setlistId = decodeURIComponent(own[1])
+  const targets: LiveTarget[] = []
+  const space = await world.space()
+  if (space) {
+    targets.push({
+      kind: 'team',
+      key: `team:${space.teamId}`,
+      teamId: space.teamId,
+      canWrite: space.canWrite,
+    })
+  }
+  // (a space that is not a team's has no channel, but its setlist can still be shared by link)
+  if (!(await world.readOnly())) {
+    const share = await world.share(setlistId)
+    if (share) {
+      let secret = share.liveSecret
+      if (!secret) {
+        secret = world.newSecret()
+        await world.keepLiveSecret(setlistId, secret)
+      }
+      targets.push({
+        kind: 'share-sender',
+        key: `send:${share.fileId}`,
+        fileId: share.fileId,
+        secret,
+      })
+    }
+  }
+  return targets
+}
+
+/** What a channel is made of: one object per connection of this device */
 export interface LiveChannelLike {
   readonly status: LiveStatus
   start(): void
@@ -40,24 +116,27 @@ export interface LiveChannelLike {
 export interface LiveSyncDeps {
   win: EventTarget
   doc: EventTarget
-  /** Whether this device is live */
-  isLive(): boolean
-  /** The team space in use, or null if it is not one (or this person cannot join its channel) */
-  space(): Promise<LiveSpace | null>
-  channel(teamId: string, events: LiveChannelEvents): LiveChannelLike
+  /** The channels needed now */
+  targets(): Promise<LiveTarget[]>
+  channel(target: LiveTarget, events: LiveChannelEvents): LiveChannelLike
   /** Sync the space in use now */
   syncSoon(): Promise<void>
+  /** Fetch a received share again, as it is now */
+  reloadShare(fileId: string): Promise<void>
   visible(): boolean
   later(ms: number, fn: () => void): () => void
 }
 
+interface Joined {
+  target: LiveTarget
+  channel: LiveChannelLike
+  cancelFollowUp: (() => void) | null
+}
+
 export class LiveSync {
   #deps: LiveSyncDeps
-  #channel: LiveChannelLike | null = null
-  #teamId: string | null = null
-  #canWrite = false
-  #cancelFollowUp: (() => void) | null = null
-  /** Counts the refreshes, so that a slow answer about the space does not undo a later one */
+  #joined = new Map<string, Joined>()
+  /** Counts the refreshes, so that a slow answer about the targets does not undo a later one */
   #refreshes = 0
 
   constructor(deps: LiveSyncDeps) {
@@ -82,97 +161,173 @@ export class LiveSync {
     win.removeEventListener('online', this.#retry)
     doc.removeEventListener('visibilitychange', this.#retry)
     this.#refreshes++
-    this.#close()
+    for (const key of [...this.#joined.keys()]) this.#leave(key)
+    this.#tell()
   }
 
-  /** Be connected to the space in use if this device is live on a team space, and to nothing if it is not */
+  /** Be in the channels of what is live, and in no others */
   #refresh = async (): Promise<void> => {
     const refresh = ++this.#refreshes
-    const space = this.#deps.isLive() ? await this.#deps.space() : null
-    // (a later change of mind while the space was being read)
+    let targets: LiveTarget[]
+    try {
+      targets = await this.#deps.targets()
+    } catch (error) {
+      // (the database or the setlist could not be read: no channels, and the tick carries on)
+      console.warn('[LiveSync] Could not tell what is live:', error)
+      targets = []
+    }
+    // (a later change of mind while it was being worked out)
     if (refresh !== this.#refreshes) return
-    this.#canWrite = space?.canWrite ?? false
-    if (space?.teamId === this.#teamId) return
-    this.#close()
-    if (!space) return
-    this.#teamId = space.teamId
-    this.#channel = this.#deps.channel(space.teamId, {
-      status: status => this.#tell(status),
-      changed: () => this.#onChanged(),
-      // (what happened while it was down is found the same way: by a sync)
-      connected: () => void this.#deps.syncSoon(),
-    })
-    this.#channel.start()
+
+    const wanted = new Set(targets.map(target => target.key))
+    for (const key of [...this.#joined.keys()]) if (!wanted.has(key)) this.#leave(key)
+    for (const target of targets) {
+      const kept = this.#joined.get(target.key)
+      if (kept) {
+        // (the same channel, with what changed about it: a reader made a writer, say)
+        kept.target = target
+        continue
+      }
+      this.#join(target)
+    }
+    this.#tell()
   }
 
-  #close(): void {
-    this.#cancelFollowUp?.()
-    this.#cancelFollowUp = null
-    this.#channel?.stop()
-    this.#channel = null
-    this.#teamId = null
-    this.#tell(null)
+  #join(target: LiveTarget): void {
+    const joined: Joined = {
+      target,
+      channel: this.#deps.channel(target, {
+        status: () => this.#tell(),
+        changed: () => this.#onChanged(joined),
+        // (what happened while it was down is found the same way: by fetching)
+        connected: () => this.#fetch(joined.target),
+      }),
+      cancelFollowUp: null,
+    }
+    this.#joined.set(target.key, joined)
+    joined.channel.start()
   }
 
-  #tell(status: LiveStatus | null): void {
+  #leave(key: string): void {
+    const joined = this.#joined.get(key)
+    if (!joined) return
+    joined.cancelFollowUp?.()
+    joined.channel.stop()
+    this.#joined.delete(key)
+  }
+
+  /** The channels' state together: up only when all are, and none when there are none */
+  #tell(): void {
+    const states = [...this.#joined.values()].map(({ channel }) => channel.status)
+    const status: LiveStatus | null =
+      states.length === 0
+        ? null
+        : states.every(state => state === 'connected')
+          ? 'connected'
+          : states.includes('connecting')
+            ? 'connecting'
+            : 'offline'
     announceLiveSyncStatus(this.#deps.win, status)
   }
 
-  /** Another device sent changes to the space: read them now, and once more when Drive's feed has caught up */
-  #onChanged(): void {
-    void this.#deps.syncSoon()
-    this.#cancelFollowUp?.()
-    this.#cancelFollowUp = this.#deps.later(FEED_LAG_MS, () => {
-      this.#cancelFollowUp = null
-      void this.#deps.syncSoon()
+  /** Read what the channel is about: the space, or the share */
+  #fetch(target: LiveTarget): void {
+    if (target.kind === 'team') void this.#deps.syncSoon()
+    else if (target.kind === 'share-recipient') void this.#deps.reloadShare(target.fileId)
+  }
+
+  /** Another device says it changed something: read it now, and once more when Drive has caught up */
+  #onChanged(joined: Joined): void {
+    this.#fetch(joined.target)
+    joined.cancelFollowUp?.()
+    joined.cancelFollowUp = this.#deps.later(FEED_LAG_MS, () => {
+      joined.cancelFollowUp = null
+      this.#fetch(joined.target)
     })
   }
 
-  /** This device's changes are in the space: tell the others, if this person may (a reader's edits stay on the device) */
+  /** This device's changes are in the space (and its shares): tell the others, if this person may (a reader's edits stay on the device) */
   #onPushed = (): void => {
-    if (this.#canWrite) this.#channel?.notify()
+    for (const { target, channel } of this.#joined.values()) {
+      if (target.kind === 'share-sender' || (target.kind === 'team' && target.canWrite)) {
+        channel.notify()
+      }
+    }
   }
 
   #retry = (): void => {
-    if (this.#deps.visible()) this.#channel?.retryNow()
+    if (!this.#deps.visible()) return
+    for (const { channel } of this.#joined.values()) channel.retryNow()
   }
 }
 
-/* v8 ignore start -- wiring to the real socket, clock and sign-in: the Playwright tests run the app */
-async function currentTeamSpace(): Promise<LiveSpace | null> {
-  const space: Space = await getCurrentSpaceFull()
-  if (!space.team) return null
-  return {
-    teamId: space.team.id,
-    canWrite: atLeast(space.team.role, 'writer') && !space.readOnly,
-  }
+/* v8 ignore start -- wiring to the real socket, clock, database and sign-in: the Playwright tests run the app */
+const ownWorld: LiveWorld = {
+  live: getLive,
+  async space() {
+    const space = await getCurrentSpaceFull()
+    if (!space.team) return null
+    return {
+      teamId: space.team.id,
+      canWrite: atLeast(space.team.role, 'writer') && !space.readOnly,
+      readOnly: Boolean(space.readOnly),
+    }
+  },
+  async readOnly() {
+    return Boolean((await getCurrentSpaceFull()).readOnly)
+  },
+  async share(setlistId) {
+    const share = (await (await getCurrentDB()).getSetlist(setlistId))?.share
+    return share ? { fileId: share.fileId, liveSecret: share.liveSecret } : null
+  },
+  async keepLiveSecret(setlistId, secret) {
+    await (await getCurrentDB()).updateSetlist(setlistId, stored => {
+      // (as it is stored now: another device may have made one meanwhile, and the first stays)
+      if (!stored.share || stored.share.liveSecret) return
+      stored.share = { ...stored.share, liveSecret: secret }
+      stored.modifiedDate = new Date().toISOString()
+    })
+  },
+  newSecret: generateLiveSecret,
 }
 
-/** Start the live channel for as long as this device is live on a team space */
+function realChannel(target: LiveTarget, events: LiveChannelEvents): LiveChannel {
+  const path =
+    target.kind === 'team'
+      ? `/api/space/${encodeURIComponent(target.teamId)}/live`
+      : `/api/share/${encodeURIComponent(target.fileId)}/live`
+  return new LiveChannel(
+    {
+      open: protocols => {
+        const url = new URL(path, location.href)
+        url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
+        return new WebSocket(url, protocols)
+      },
+      token: async () =>
+        target.kind === 'team'
+          ? getIdentityToken()
+          : target.kind === 'share-sender'
+            ? target.secret
+            : null,
+      later: (ms, fn) => {
+        const id = setTimeout(fn, ms)
+        return () => clearTimeout(id)
+      },
+      random: Math.random,
+    },
+    events
+  )
+}
+
+/** Start the live channels for as long as this device is live */
 export function startLiveSync(): LiveSync {
   const sync = new LiveSync({
     win: window,
     doc: document,
-    isLive: () => getLive() !== null,
-    space: currentTeamSpace,
-    channel: (teamId, events) =>
-      new LiveChannel(
-        {
-          open: protocols => {
-            const url = new URL(`/api/space/${encodeURIComponent(teamId)}/live`, location.href)
-            url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:'
-            return new WebSocket(url, protocols)
-          },
-          token: getIdentityToken,
-          later: (ms, fn) => {
-            const id = setTimeout(fn, ms)
-            return () => clearTimeout(id)
-          },
-          random: Math.random,
-        },
-        events
-      ),
+    targets: () => liveTargets(ownWorld),
+    channel: realChannel,
     syncSoon,
+    reloadShare,
     visible: () => document.visibilityState === 'visible',
     later: (ms, fn) => {
       const id = setTimeout(fn, ms)

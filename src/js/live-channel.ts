@@ -23,8 +23,12 @@ export interface LiveSocket {
 export interface LiveChannelDeps {
   /** A socket to the space's live address, asking for these subprotocols */
   open(protocols: string[]): LiveSocket
-  /** The person's ID token (a new one for each connection: it expires after an hour) */
-  token(): Promise<string>
+  /**
+   * What this device proves itself with, asked for at each connection: a team member's ID token
+   * (a new one each time: it expires after an hour), a sharer's secret, or null for someone who
+   * only listens to a share
+   */
+  token(): Promise<string | null>
   /** Call `fn` once after `ms`, unless the returned function is called first */
   later(ms: number, fn: () => void): () => void
   /** 0 up to 1, to spread the reconnects of many devices */
@@ -121,7 +125,7 @@ export class LiveChannel {
       const token = await this.#deps.token()
       // (stopped, or started again, while the token was being got)
       if (attempt !== this.#attempt) return
-      socket = this.#deps.open([LIVE_PROTOCOL, token])
+      socket = this.#deps.open(token === null ? [LIVE_PROTOCOL] : [LIVE_PROTOCOL, token])
     } catch {
       // (signed out, offline: nothing to hold on to)
       if (attempt === this.#attempt) this.#lost()
