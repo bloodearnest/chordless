@@ -72,8 +72,13 @@ case "${1:-}" in
       esac
       tf -chdir="$dir" init -input=false >/dev/null || { failed=1; continue; }
       tf -chdir="$dir" plan -input=false -detailed-exitcode -no-color >/tmp/infra-plan-"$name".txt 2>&1
-      case $? in
+      status=$?
+      # (a `check` that fails is only a warning to Terraform; here it is drift: infra/github's merge settings)
+      if [ $status = 0 ] && grep -q "Check block assertion failed" /tmp/infra-plan-"$name".txt; then status=3; fi
+      case $status in
         0) echo "$name: no changes";;
+        3) echo "$name: DRIFT (a check failed):"
+           grep -A30 "Check block assertion failed" /tmp/infra-plan-"$name".txt | grep -Ev '^ *([0-9]+:.*)?$'; failed=1;;
         2) echo "$name: DRIFT (the plan has changes; see terraform -chdir=$dir plan):"
            grep -E "^\s*[#~+-] " /tmp/infra-plan-"$name".txt | head -20; failed=1;;
         *) echo "$name: the plan failed:"; tail -15 /tmp/infra-plan-"$name".txt; failed=1;;

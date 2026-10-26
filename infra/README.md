@@ -63,6 +63,12 @@ value in the state could be read with the plan job's read-only key, which would 
 | `infra-apply` (applies, after approval) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | an R2 token, Object Read & Write, this bucket only |
 | | `GH_TERRAFORM_TOKEN` | the same, with read and write |
 
+Neither GitHub token needs Contents: write, though GitHub's REST API shows the repository's merge
+settings (which merge buttons, auto-merge, deleting a merged branch) only to a token that can push.
+`infra/github` sets them when the repository is created and otherwise leaves them to a `check`, which
+reads them over GraphQL (`infra/github/merge-settings.sh`, which a read-only token can) and fails the
+drift check when they are not the code's. Changing one is done in GitHub, then in `main.tf`.
+
 Each environment also has a variable, `R2_TOKEN_EXPIRES`. `just check-gh-secrets` checks all are there.
 
 **The R2 tokens** are the account's (Account API Tokens), made by `scripts/ci-tokens.sh create`, which
