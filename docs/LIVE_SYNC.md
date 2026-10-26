@@ -23,8 +23,9 @@ The content moves the way it always does (Drive, or the team service, through th
 
 **What it costs.** It is as fast as the sync, not faster: the sender's push, then Drive's feed of
 changes (about 5 s behind a change, measured 2026-10-19), then the follower's pull. Expect 5 to
-10 s from an edit to a follower's screen (a minute before). A follower therefore syncs again 5 s
-after a `changed` (`FEED_LAG_MS`), for a change that the feed had not shown yet. If that turns out
+10 s from an edit to a follower's screen (a minute before). A follower therefore fetches at once
+after a `changed`, and again 3 s and 6 s after it (`FOLLOW_UPS_MS`), for a change that Drive had not
+shown yet. If that turns out
 too slow, the way to faster is relaying the setlist itself, which needs a design for merging it
 (the first design of this document did; see "Decisions"). It also needs the sender to reach Drive:
 a leader who is offline tells no one, where a relay would still have worked.
@@ -102,7 +103,7 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   - anything else, or nothing live: none.
 
   It tells the others after a `SyncPushedEvent` (a team reader does not: only writers send); on a
-  `changed` it syncs, or fetches the share, at once and again after `FEED_LAG_MS`; and on every
+  `changed` it syncs, or fetches the share, at once and again after each of `FOLLOW_UPS_MS`; and on every
   (re)connect it does so once, to catch up on what it missed.
 - **The dot** on the live button (`data-sync`, `live-sync-status.ts`): green when every channel is up,
   amber while connecting, hollow when not. Hollow loses nothing. It is shown on the live setlist only.
@@ -145,8 +146,10 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
 - `just test-live-share` (`tests/drive/live-share.drive.node.test.ts`, not in CI): a share file in the
   test account's real Drive, the real Worker, real WebSockets. A recipient is told of an update (a few
   ms locally) and finds it in the share **about 2.7 s after the sharer's upload finished** (five runs,
-  2.6 to 2.8 s): the fetch right after the upload misses it, which is why the app fetches again after
-  `FEED_LAG_MS`. So for a share, an edit reaches a recipient in about the sharer's sync plus 3 to 5 s.
+  2.6 to 2.8 s, by polling): the fetch right after the upload misses it, which is why the app fetches
+  again. With the schedule of `FOLLOW_UPS_MS` the 3 s fetch has it (three runs), 3.6 to 3.8 s after the
+  upload, the fetch's own time with it. So for a share, an edit reaches a recipient in about the sharer's
+  sync plus 4 s. The team space's feed is not measured (it needs two accounts).
 - **Not covered: two real browsers.** A Playwright test of a leader and a follower needs a team space,
   which needs Drive and a Google token a test cannot make, so it would need a test identity provider
   and a fake Drive in the Worker (a design of its own). Until then: two real devices on different
