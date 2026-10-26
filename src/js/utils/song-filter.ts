@@ -1,5 +1,5 @@
 import type { ParsedChart } from '../data-types.ts'
-import { SongIndex, type WordRange, wordRanges } from './song-search.ts'
+import { SongIndex, type WordRange, wordRanges, wordsFound } from './song-search.ts'
 
 interface SearchableSong {
   title?: string | null
@@ -11,8 +11,14 @@ interface SearchableSong {
 
 const lyricsCache = new WeakMap<ParsedChart, { lines: string[]; lower: string }>()
 
-/** The words of a chart, without its chords or section labels: each line, and all of it lowercased */
-function lyricsOf(parsed: ParsedChart) {
+/** SongSelect splits a word across chords ("e - [D]nough"): put it back together */
+const SPLIT_WORD = /(?<=\p{L})\s+-\s+(?=\p{L})/gu
+
+/**
+ * The words of a chart, without its chords or section labels: each line, and all of it lowercased.
+ * A word split across chords is whole again.
+ */
+export function lyricsOf(parsed: ParsedChart) {
   let lyrics = lyricsCache.get(parsed)
   if (!lyrics) {
     const lines = parsed.sections.flatMap(section =>
@@ -20,6 +26,7 @@ function lyricsOf(parsed: ParsedChart) {
         line.segments
           .map(s => s.lyrics)
           .join('')
+          .replace(SPLIT_WORD, '')
           .trim()
       )
     )
@@ -106,22 +113,26 @@ function matchRank(song: SearchableSong, term: string): number | undefined {
   return undefined
 }
 
-/** The rank of a song the letters typed are not in, but the words are (another form of one, a slip) */
+/** The rank of a song the letters typed are not in, but the words are (another form of one) */
 const WORDS_ONLY = 6
 
+/** The rank of a song found only because a word in it has a letter wrong: after all the rest */
+const SLIPS_ONLY = 7
+
 /**
- * The rank of a song the words searched for are found in (in another form, or with a letter wrong):
- * as a title that has the term in it if in the title, as artist and variant name if in either of
- * them, else words in the lyrics only
+ * The rank of a song the words searched for are found in, other than by the letters typed.
+ * If a letter wrong is needed for any word it is last, however well the rest match; else (another
+ * form of a word) as a title that has the term in it if in the title, as artist and variant
+ * name if in either of them, else words in the lyrics only.
  */
 function wordRank(song: SearchableSong, term: string): number {
-  if (wordRanges(song.title || '', term).length > 0) return 3
-  if (
-    wordRanges(song.artist || '', term).length + wordRanges(song.variantLabel || '', term).length >
-    0
-  ) {
-    return 4
-  }
+  const title = song.title || ''
+  const artist = song.artist || ''
+  const label = song.variantLabel || ''
+  const lyrics = song.parsed ? lyricsOf(song.parsed).lines.join('\n') : ''
+  if (!wordsFound([title, artist, label, lyrics], term, false)) return SLIPS_ONLY
+  if (wordRanges(title, term, false).length > 0) return 3
+  if (wordRanges(artist, term, false).length + wordRanges(label, term, false).length > 0) return 4
   return WORDS_ONLY
 }
 
@@ -130,9 +141,6 @@ const SCORED_FROM = 5
 
 /** The index of the list of songs last searched: typing goes on searching the same list */
 let lastIndex: { songs: readonly SearchableSong[]; index: SongIndex } | undefined
-
-/** SongSelect splits a word across chords ("e - [D]nough"): put it back together */
-const SPLIT_WORD = /(?<=\p{L})\s+-\s+(?=\p{L})/gu
 
 /** The index of these songs, made now or the one made for the same songs before */
 function indexOf(songs: readonly SearchableSong[]): SongIndex {
@@ -144,7 +152,7 @@ function indexOf(songs: readonly SearchableSong[]): SongIndex {
       title: song.title || '',
       artist: song.artist || '',
       label: song.variantLabel || '',
-      lyrics: song.parsed ? lyricsOf(song.parsed).lines.join('\n').replace(SPLIT_WORD, '') : '',
+      lyrics: song.parsed ? lyricsOf(song.parsed).lines.join('\n') : '',
     }))
   )
   lastIndex = { songs: [...songs], index }
@@ -166,8 +174,9 @@ export function warmSearch(songs: readonly SearchableSong[]): void {
  * lyrics only. Songs that match equally well keep their order, except lyrics-only ones, which go
  * by how well their words match (a chorus that repeats the word before a passing mention).
  * After them come the songs with the words but not the letters: other forms of a word ("praises"
- * finds "praise"), a slip of the fingers, words in another order. An empty search matches every
- * song (and gives back the same array).
+ * finds "praise"), words in another order; and last of all, those found only because a word in
+ * them has a letter wrong, which never outrank a match of the letters typed. An empty search
+ * matches every song (and gives back the same array).
  */
 export function filterSongs<T extends SearchableSong>(songs: T[], searchTerm: string): T[] {
   const term = normalizeTerm(searchTerm)
@@ -176,7 +185,7 @@ export function filterSongs<T extends SearchableSong>(songs: T[], searchTerm: st
   const ranked: { song: T; rank: number; score: number }[] = []
   songs.forEach((song, i) => {
     const letters = matchRank(song, term)
-    const rank = scores.has(i) ? Math.min(letters ?? WORDS_ONLY, wordRank(song, term)) : letters
+    const rank = scores.has(i) ? Math.min(letters ?? SLIPS_ONLY, wordRank(song, term)) : letters
     if (rank !== undefined) ranked.push({ song, rank, score: scores.get(i) ?? 0 })
   })
   // Array.prototype.sort is stable, so ties stay in the library's order

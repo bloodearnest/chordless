@@ -225,6 +225,26 @@ what every iPhone and iPad browser uses. It is opt-in, not part of `just test`: 
 the run. Use it for layout and modal problems reported on Apple devices. `just install-webkit` fetches
 it once (on Linux it also needs system libraries: `sudo npx playwright install-deps webkit`).
 
+## The search, over many words
+
+A search is tried with a word picked by hand, then another, and the next bug is in a word nobody
+tried. So `search.node.test.ts` draws the words from the songs themselves (seeded: the same every
+run) and checks what must be true of any search, which `search-properties.ts` lists: every word
+of a song finds it, and so does each prefix of it as it is typed (a word begun, or the longer form
+of a word the song has in a shorter one), a song is only given with something to mark or quote, the
+songs given are exactly those a plain scan of the text finds (none missed, none unexplained), a
+song found only by a letter wrong comes after every other, and a word begun is not taken for
+another word. A failure names the search and the song. Changing the search rules: run it, and
+break the rule on purpose to see that a property fails (a check that cannot fail is no check).
+
+It runs on made-up hymns (public domain, `fixtures/search-hymns.ts`) everywhere, and on real
+charts if you have some, as the emails do (above): unpack the `songs/` of a Chordless export into
+`tests/fixtures/private/charts/` (copyrighted, so git ignores them) and run
+`CHORDLESS_REAL_CHARTS=1 node --test tests/search.node.test.ts`. That takes ~12 s;
+`CHORDLESS_SEARCH_WORDS=600` draws more words (~30 s), as you should when the search changes. It is
+opt-in because real charts take other paths through the parser than the made-up ones, which moves
+the coverage `just ci` checks (the coverage of what CI has).
+
 ## Real emails
 
 The email importer (`src/js/email-setlist.ts`) is tuned on real emails from other leaders. They
