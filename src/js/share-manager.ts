@@ -22,6 +22,26 @@ import { toLocalDateString } from './utils/date-utils.ts'
 /** An orphaned share file (no setlist points at it) is left alone this long, so a share another device is still recording is not ended under it */
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
 
+/**
+ * A share's file was uploaded with a new version (sent on window, by whoever did it: the sync's share
+ * step, the share dialog, or the live channel's own publish). The live channel tells the room on it, so
+ * that the recipients are told the moment the upload is done, whichever did it (docs/LIVE_SYNC.md)
+ */
+export class ShareUpdatedEvent extends Event {
+  static readonly type = 'share:updated'
+  readonly fileId: string
+  constructor(fileId: string) {
+    super(ShareUpdatedEvent.type)
+    this.fileId = fileId
+  }
+}
+
+declare global {
+  interface WindowEventMap {
+    [ShareUpdatedEvent.type]: ShareUpdatedEvent
+  }
+}
+
 export interface ShareContext {
   db: ChordlessDB
   spaceId: string | null
@@ -105,6 +125,8 @@ export async function refreshShare(
 
   const metadata = shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires })
   await ctx.space.update(share.fileId, updateInput(metadata, 'share'), await file())
+  // (the page's window: there is none where a test runs this in Node)
+  globalThis.dispatchEvent?.(new ShareUpdatedEvent(share.fileId))
   return { ...share, expires, bundleHash: hash }
 }
 

@@ -3,7 +3,7 @@ import type { Setlist } from '../src/js/data-types.ts'
 import { createSetlist } from '../src/js/db.ts'
 import { addDays, SHARE_DAYS_AFTER } from '../src/js/share-bundle.ts'
 import { decryptBundle } from '../src/js/share-crypto.ts'
-import { createShare, stopShare, syncShares } from '../src/js/share-manager.ts'
+import { createShare, ShareUpdatedEvent, stopShare, syncShares } from '../src/js/share-manager.ts'
 import { toLocalDateString } from '../src/js/utils/date-utils.ts'
 import { makeEntry } from './builders.ts'
 import { addSong, editSong, memoryFolderLink, useSyncRig } from './drive-harness.ts'
@@ -125,6 +125,26 @@ describe('Share links: sync', () => {
     expect(recorded.share?.bundleHash).to.not.equal(share.bundleHash)
     expect(recorded.share?.key).to.equal(share.key)
     expect(recorded.share?.fileId).to.equal(share.fileId)
+  })
+
+  it('says on window that a share was uploaded, and not when it was already up to date', async () => {
+    const { phone, setlist, share } = await sharedSetlist()
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as ShareUpdatedEvent).fileId)
+    window.addEventListener(ShareUpdatedEvent.type, listener)
+    try {
+      await phone.sync.sync()
+      expect(heard, 'nothing changed').to.deep.equal([])
+
+      await phone.db.saveSetlist({
+        ...(await phone.db.getSetlist(setlist.id)),
+        songs: [makeEntry({ order: 1, songId: 'title-beta', songUuid: 'b', key: 'A', notes: '' })],
+      } as Setlist)
+      await phone.sync.sync()
+      expect(heard).to.deep.equal([share.fileId])
+    } finally {
+      window.removeEventListener(ShareUpdatedEvent.type, listener)
+    }
   })
 
   it('updates the share when a key, note or the song list changes', async () => {

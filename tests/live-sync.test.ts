@@ -15,6 +15,7 @@ import {
   SHARE_POLL_MS,
 } from '../src/js/live-sync.ts'
 import { getLiveSyncStatus, LiveSyncStatusEvent } from '../src/js/live-sync-status.ts'
+import { ShareUpdatedEvent } from '../src/js/share-manager.ts'
 import { SpaceChangeEvent } from '../src/js/space.ts'
 
 const { describe, it } = window
@@ -202,7 +203,8 @@ function rig(initial: LiveTarget[] = [teamTarget()]) {
     publishShare: async setlistId => {
       state.published.push(setlistId)
       if (state.publishFails) throw new Error('Drive said no')
-      return state.publishes
+      // (an upload is announced, as share-manager.ts does, by whoever makes it)
+      if (state.publishes) win.dispatchEvent(new ShareUpdatedEvent('f1'))
     },
     visible: () => state.visible,
     later: (ms, fn) => {
@@ -349,12 +351,22 @@ describe('Live sync', () => {
   })
 
   describe('with a share', () => {
-    it('tells the recipients when the sync that updated the share is done', async () => {
+    it('tells the recipients the moment the share is uploaded, whoever uploaded it', async () => {
       const { sync, win, settle, state } = rig([sender])
       sync.start()
       await settle()
-      win.dispatchEvent(new SyncPushedEvent())
+      win.dispatchEvent(new ShareUpdatedEvent('f1'))
       expect(state.channels[0].notified).to.equal(1)
+      sync.stop()
+    })
+
+    it('does not tell them of another share, or wait for the sync that follows', async () => {
+      const { sync, win, settle, state } = rig([sender])
+      sync.start()
+      await settle()
+      win.dispatchEvent(new ShareUpdatedEvent('another'))
+      win.dispatchEvent(new SyncPushedEvent())
+      expect(state.channels[0].notified).to.equal(0)
       sync.stop()
     })
 
@@ -560,7 +572,15 @@ describe('Live sync', () => {
       sync.start()
       await settle()
       win.dispatchEvent(new SyncPushedEvent())
-      expect(state.channels.map(channel => channel.notified)).to.deep.equal([1, 1])
+      expect(
+        state.channels.map(channel => channel.notified),
+        'the push is the team’s'
+      ).to.deep.equal([1, 0])
+      win.dispatchEvent(new ShareUpdatedEvent('f1'))
+      expect(
+        state.channels.map(channel => channel.notified),
+        'the upload is the share’s'
+      ).to.deep.equal([1, 1])
       sync.stop()
     })
   })
@@ -683,7 +703,7 @@ describe('Live sync', () => {
       },
       syncSoon: async () => {},
       reloadShare: async () => {},
-      publishShare: async () => false,
+      publishShare: async () => {},
       visible: () => true,
       later: () => () => {},
       every: () => () => {},

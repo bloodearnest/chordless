@@ -18,7 +18,7 @@ import { LiveChannel, type LiveChannelEvents, type LiveStatus } from './live-cha
 import { FOLLOW_UPS_MS } from './live-protocol.ts'
 import { announceLiveSyncStatus } from './live-sync-status.ts'
 import { generateLiveSecret } from './share-crypto.ts'
-import { refreshShare } from './share-manager.ts'
+import { refreshShare, ShareUpdatedEvent } from './share-manager.ts'
 import { reloadShare } from './share-receiver.ts'
 import { getCurrentSpace, getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
 import { withSyncLock } from './sync-lock.ts'
@@ -136,8 +136,8 @@ export interface LiveSyncDeps {
   syncSoon(): Promise<void>
   /** Fetch a received share again, as it is now */
   reloadShare(fileId: string): Promise<void>
-  /** Bring a setlist's share up to date with it now, apart from the sync; whether it uploaded a new one */
-  publishShare(setlistId: string): Promise<boolean>
+  /** Bring a setlist's share up to date with it now, apart from the sync (an upload is announced by ShareUpdatedEvent) */
+  publishShare(setlistId: string): Promise<void>
   visible(): boolean
   later(ms: number, fn: () => void): () => void
   /** Call `fn` every `ms` until the returned function is called */
@@ -170,6 +170,7 @@ export class LiveSync {
     win.addEventListener(SpaceChangeEvent.type, this.#refresh)
     win.addEventListener(DataChangeEvent.type, this.#onData)
     win.addEventListener(SyncPushedEvent.type, this.#onPushed)
+    win.addEventListener(ShareUpdatedEvent.type, this.#onShareUpdated)
     win.addEventListener('online', this.#retry)
     doc.addEventListener('visibilitychange', this.#retry)
     void this.#refresh()
@@ -181,6 +182,7 @@ export class LiveSync {
     win.removeEventListener(SpaceChangeEvent.type, this.#refresh)
     win.removeEventListener(DataChangeEvent.type, this.#onData)
     win.removeEventListener(SyncPushedEvent.type, this.#onPushed)
+    win.removeEventListener(ShareUpdatedEvent.type, this.#onShareUpdated)
     win.removeEventListener('online', this.#retry)
     doc.removeEventListener('visibilitychange', this.#retry)
     this.#refreshes++
@@ -211,18 +213,15 @@ export class LiveSync {
     joined.cancelPublish?.()
     joined.cancelPublish = this.#deps.later(PUBLISH_DEBOUNCE_MS, () => {
       joined.cancelPublish = null
-      void this.#publish(joined.channel, target)
+      void this.#publish(target)
     })
   }
 
-  async #publish(
-    channel: LiveChannelLike,
-    target: Extract<LiveTarget, { kind: 'share-sender' }>
-  ): Promise<void> {
+  async #publish(target: Extract<LiveTarget, { kind: 'share-sender' }>): Promise<void> {
     try {
-      // (what the upload saves on the setlist is a change of its own, which comes back here and finds
-      // the share up to date: nothing is uploaded, so nothing is said)
-      if (await this.#deps.publishShare(target.setlistId)) channel.notify()
+      // (it is the upload that tells the room, whoever made it: see #onShareUpdated. What the upload
+      // saves on the setlist is a change of its own, which comes back here and finds the share up to date)
+      await this.#deps.publishShare(target.setlistId)
     } catch (error) {
       // (the sync's share step will try again)
       console.warn('[LiveSync] Could not update the share:', error)
@@ -317,13 +316,17 @@ export class LiveSync {
     )
   }
 
-  /** This device's changes are in the space (and its shares): tell the others, if this person may (a reader's edits stay on the device) */
+  /** This device's changes are in the space: tell the others, if this person may (a reader's edits stay on the device) */
   #onPushed = (): void => {
     for (const { target, channel } of this.#joined.values()) {
-      if (target.kind === 'share-sender' || (target.kind === 'team' && target.canWrite)) {
-        channel.notify()
-      }
+      if (target.kind === 'team' && target.canWrite) channel.notify()
     }
+  }
+
+  /** A share's new version is uploaded: tell its room now, not when the sync has pushed the setlist too */
+  #onShareUpdated = (event: Event): void => {
+    const { fileId } = event as ShareUpdatedEvent
+    this.#joined.get(`send:${fileId}`)?.channel.notify()
   }
 
   #retry = (): void => {
@@ -363,25 +366,23 @@ const ownWorld: LiveWorld = {
 }
 
 /** Bring the setlist's share up to date, as a sync would, but now: one at a time with the syncs (sync-lock.ts) */
-async function publishShare(setlistId: string): Promise<boolean> {
-  const result = await withSyncLock(async () => {
+async function publishShare(setlistId: string): Promise<void> {
+  await withSyncLock(async () => {
     const db = await getCurrentDB()
     const setlist = await db.getSetlist(setlistId)
-    if (!setlist?.share || setlist.deletedAt) return false
+    if (!setlist?.share || setlist.deletedAt) return
     const { id, name } = getCurrentSpace()
     const manager = await createSyncManager(name, id)
     const share = await refreshShare(
       { ...setlist, share: setlist.share },
       { db, spaceId: id, space: manager.space }
     )
-    if (share === setlist.share) return false
+    if (share === setlist.share) return
     // (on the setlist as it is stored now: the upload took a while)
     await db.updateSetlist(setlistId, stored => {
       stored.share = share
     })
-    return true
   })
-  return result.ran && result.value
 }
 
 function realChannel(target: LiveTarget, events: LiveChannelEvents): LiveChannel {
