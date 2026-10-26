@@ -57,15 +57,46 @@ export function stemOf(plain: string): string {
   return stem
 }
 
+/** What follows the apostrophe in an everyday contraction (Lord's, don't, you're, I've, we'll, I'd, I'm) */
+const CONTRACTION = /^(s|t|re|ve|ll|d|m)$/i
+
+/**
+ * The letters left out for an apostrophe: a vowel ("ev'ry", "pow'r", "heav'n") or a "v" ("ne'er",
+ * "o'er"). Not every letter, which would make "eter" of "e'er" and find "eternal" by it.
+ */
+const LEFT_OUT = [...'aeiouv']
+
+/**
+ * The words a word may be with a letter put back where its apostrophe is: songs are written
+ * "ev'ry", "pow'r", "heav'n", "ne'er", "o'er", for every, power, heaven, never, over. We can't
+ * know which letter, so each is tried: "every" is among them, and the rest are not words anyone
+ * searches for. None for an everyday contraction, or a word with no apostrophe inside it.
+ */
+function lettersPutBack(word: string): string[] {
+  const at = word.search(/['’]/)
+  if (at < 1 || at === word.length - 1 || CONTRACTION.test(word.slice(at + 1))) return []
+  const forms: string[] = []
+  for (const letter of LEFT_OUT) {
+    const plain = plainWord(`${word.slice(0, at)}${letter}${word.slice(at + 1)}`)
+    if (plain !== null) forms.push(plain)
+  }
+  return forms
+}
+
 /**
  * What a word is indexed as: itself, so that a word begun is found ("worshippin" finds
- * "worshipping"), and its stem, so that another form of it is ("worshipped")
+ * "worshipping"), and its stem, so that another form of it is ("worshipped"); and the same of the
+ * words it may be with a letter put back, for a word with an apostrophe in it ("ev'ry")
  */
 function indexTerms(word: string): string | string[] | null {
   const plain = plainWord(word)
   if (plain === null) return null
-  const stem = stemOf(plain)
-  return stem === plain ? plain : [plain, stem]
+  const terms = new Set<string>()
+  for (const form of [plain, ...lettersPutBack(word)]) {
+    terms.add(form)
+    terms.add(stemOf(form))
+  }
+  return terms.size === 1 ? plain : [...terms]
 }
 
 /** How a word goes on from its stem: "worship" goes on "ping" (doubling its last letter) and "ped" */
@@ -149,24 +180,29 @@ function scan(text: string, searchTerm: string, slip: boolean) {
   const ranges: WordRange[] = []
   const found = new Set<number>()
   for (const token of text.matchAll(/[\p{L}\p{N}'’]+/gu)) {
-    const plain = plainWord(token[0])
-    if (plain === null) continue
-    const stem = stemOf(plain)
+    const written = plainWord(token[0])
+    if (written === null) continue
+    // (the word as written, and the words it may be with a letter put back, for "ev'ry")
+    const forms = [written, ...lettersPutBack(token[0])]
     let matched = false
     words.forEach((word, i) => {
       const last = i === words.length - 1
       const allowed = slip ? slips(word.stem.length, last) : 0
       // (the index has the word as written and its stem, and the stem of the search is looked up in both)
-      if (
-        stem === word.stem ||
-        plain === word.stem ||
-        (allowed > 0 &&
-          (distance(stem, word.stem) <= allowed || distance(plain, word.stem) <= allowed)) ||
-        (last &&
-          (plain.startsWith(word.plain) ||
-            word.completions.includes(plain) ||
-            word.completions.includes(stem)))
-      ) {
+      const matches = forms.some(plain => {
+        const stem = stemOf(plain)
+        return (
+          stem === word.stem ||
+          plain === word.stem ||
+          (allowed > 0 &&
+            (distance(stem, word.stem) <= allowed || distance(plain, word.stem) <= allowed)) ||
+          (last &&
+            (plain.startsWith(word.plain) ||
+              word.completions.includes(plain) ||
+              word.completions.includes(stem)))
+        )
+      })
+      if (matches) {
         matched = true
         found.add(i)
       }

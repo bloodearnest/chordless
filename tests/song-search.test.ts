@@ -201,3 +201,63 @@ describe('wordsFound', () => {
     expect(wordsFound(texts, 'wretches like', false)).to.equal(true)
   })
 })
+
+describe('a word with an apostrophe in it', () => {
+  // As written in real charts, and the word it is
+  const POETIC = [
+    ["ev'ry", 'every'],
+    ["ev'rything", 'everything'],
+    ["ev'ryday", 'everyday'],
+    ["pow'r", 'power'],
+    ["heav'n", 'heaven'],
+    ["ne'er", 'never'],
+    ["o'er", 'over'],
+    ["e'er", 'ever'],
+    ["sov'reign", 'sovereign'],
+    ["marv'lous", 'marvelous'],
+    ["stamm'ring", 'stammering'],
+    ["desp'rate", 'desperate'],
+    ["off'ring", 'offering'],
+    ['giv’n', 'given'],
+  ]
+
+  it('is found as the word it is, with a letter put back where the apostrophe is', () => {
+    for (const [written, word] of POETIC) {
+      const index = new SongIndex([
+        { title: 'T', artist: '', label: '', lyrics: `and ${written} still` },
+      ])
+      expect(index.search(word).size, `${word} for ${written}`).to.equal(1)
+    }
+  })
+
+  it('is found as written, with or without the apostrophe, and begun', () => {
+    const index = new SongIndex([{ title: 'T', artist: '', label: '', lyrics: "ev'rything" }])
+    for (const typed of ["ev'rything", 'evrything', 'evryth', 'everyth', 'everythi']) {
+      expect(index.search(typed).size, typed).to.equal(1)
+    }
+  })
+
+  it('is marked as the word it is', () => {
+    for (const [written, word] of POETIC) {
+      const text = `and ${written} still`
+      const [range] = wordRanges(text, word)
+      expect(text.slice(range?.start, range?.end), word).to.equal(written)
+    }
+  })
+
+  it('is not made into other words when it is an everyday contraction', () => {
+    const index = new SongIndex([
+      { title: 'T', artist: '', label: '', lyrics: "the Lord's love, don't, you're, I'll, we've" },
+    ])
+    expect(index.search('lordas').size).to.equal(0)
+    expect(index.search('donut').size).to.equal(0)
+    expect(index.search('lords').size).to.equal(1)
+    expect(wordRanges("don't", 'donut')).to.deep.equal([])
+  })
+
+  it('is left as it is when the apostrophe is at an end of it', () => {
+    const index = new SongIndex([{ title: 'T', artist: '', label: '', lyrics: "singin' 'cause" }])
+    expect(index.search('singing').size).to.equal(0)
+    expect(index.search('singin').size).to.equal(1)
+  })
+})

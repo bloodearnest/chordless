@@ -454,9 +454,11 @@ library
      is safe to drop, one per database, updated per chart on save (db.saveChordPro/deleteChordPro)
      and by contentHash after a sync pull, with a version to bump when the tokeniser or stemmer changes
    - rank a title that is the word ("Praise" for "praises") above a title with the word in it
-   - a word with an apostrophe inside is only found as written: "ev'rything" and "sov'reign" are
-     "evrything" and "sovreign" to the search, so "everything" does not find them (real charts have
-     many: ne'er, o'er, ev'ry). Index the word with the apostrophe taken out and, as well, split at it
+   - a word with an apostrophe for a letter left out ("ev'ry", "pow'r", "heav'n", "ne'er") is found as
+     the word it is: indexed with each of a, e, i, o, u, v put back (`lettersPutBack`), and marked the
+     same way. Not done: an everyday contraction (Lord's, don't) is left alone, as is an apostrophe at an
+     end of a word ("singin'", "'cause", "'neath"), and a letter left out that is not one of those
+     six or more than one letter ("fount'n" for "fountain"). Add what a real chart needs
    - a word begun that is only a stem and a short ending ("moti" is "mot" and "i", so "mote") finds
      the odd unrelated word; fine so far, look again if it is noticed
 

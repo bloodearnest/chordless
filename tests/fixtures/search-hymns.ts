@@ -166,6 +166,21 @@ Giver of immortal gladness
 Fill us with the light of day
 {end_of_verse}
 `,
+  `{title: Made-Up Contractions}
+{artist: A Made-Up Band}
+{key: G}
+
+{start_of_verse}
+[G]Ev'ry heart shall sing, ev'rything that breathes
+Ne'er shall the pow'r of heav'n fail us
+O'er the sov'reign throne, a marv'lous song of the off'ring
+{end_of_verse}
+
+{start_of_verse}
+Don't you fear, the Lord's love is given
+You're loved, we'll sing, I'm here, they've come
+{end_of_verse}
+`,
   `{title: Worship}
 {artist: A Made-Up Band}
 {key: E}
