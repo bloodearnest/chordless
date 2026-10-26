@@ -1,7 +1,8 @@
 /** The live channel's rules (worker/src/live-relay.ts), apart from the sockets that carry it */
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { CHANGED, judge, tokenFromProtocol } from '../worker/src/live-relay.ts'
+import { CHANGED } from '../src/js/live-protocol.ts'
+import { judge, tokenFromProtocol } from '../worker/src/live-relay.ts'
 
 describe('tokenFromProtocol', () => {
   test('is the second of the subprotocols a page asked for, after ours', () => {

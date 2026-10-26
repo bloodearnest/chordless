@@ -146,7 +146,7 @@
     {
       "includes": ["worker/src/**/*.ts"],
       "javascript": {
-        "globals": ["WebSocketPair"]
+        "globals": ["WebSocketPair", "WebSocketRequestResponsePair"]
       }
     },
     {
