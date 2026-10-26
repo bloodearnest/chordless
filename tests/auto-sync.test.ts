@@ -5,6 +5,7 @@ import {
   NUDGE_MS,
   OFFLINE_LONG_MS,
   STALE_AFTER_MS,
+  SyncPushedEvent,
   type SyncState,
   TICK_MS,
 } from '../src/js/auto-sync.ts'
@@ -42,6 +43,8 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
     failNext: false,
+    /** The next sync is skipped, as one is when another is running */
+    skipNext: false,
     tick: null as null | (() => void),
     stopped: false,
     /** What `later` was asked to do, and whether it was called off */
@@ -66,6 +69,9 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
         world.failNext = false
         throw new Error('offline')
       }
+      const skipped = world.skipNext
+      world.skipNext = false
+      return !skipped
     },
     later: (ms, fn) => {
       const nudge = { ms, fn, cancelled: false }
@@ -304,6 +310,102 @@ describe('Syncing by itself while the app is open', () => {
       expect(world.runs).to.equal(2)
     })
 
+    describe('telling the others (the live channel waits for it)', () => {
+      /** The times the rig's window was told a sync had sent this device's changes */
+      const pushes = (win: EventTarget) => {
+        const heard: number[] = []
+        win.addEventListener(SyncPushedEvent.type, () => heard.push(heard.length))
+        return heard
+      }
+
+      it('says so when a sync that carried this device’s changes finishes, and not before', async () => {
+        const { auto, world, win } = rig({ state: 'feed' })
+        const heard = pushes(win)
+        auto.start()
+        await settle()
+        expect(heard, 'the opening sync carried nothing').to.have.length(0)
+
+        win.dispatchEvent(savedHere())
+        world.hold = true
+        fire(world.nudges)
+        await settle()
+        expect(heard, 'it is still running').to.have.length(0)
+
+        world.hold = false
+        world.release?.()
+        await settle()
+        expect(heard).to.have.length(1)
+      })
+
+      it('does not say so for a sync that carried nothing, or for what a sync or another tab saved', async () => {
+        const { auto, world, win } = rig({ state: 'feed' })
+        const heard = pushes(win)
+        auto.start()
+        await settle()
+
+        win.dispatchEvent(savedHere({ origin: 'sync' }))
+        win.dispatchEvent(savedHere({ remote: true }))
+        world.tick?.()
+        await settle()
+        expect(heard).to.have.length(0)
+      })
+
+      it('says so once, by the sync that carried the change, and the next one carries nothing', async () => {
+        const { auto, world, win } = rig({ state: 'feed' })
+        const heard = pushes(win)
+        auto.start()
+        await settle()
+
+        win.dispatchEvent(savedHere())
+        fire(world.nudges)
+        await settle()
+        world.tick?.()
+        await settle()
+        expect(heard).to.have.length(1)
+      })
+
+      it('waits for a sync that works: a failed or skipped one tells of it at the next', async () => {
+        const { auto, world, win } = rig({ state: 'feed' })
+        const heard = pushes(win)
+        auto.start()
+        await settle()
+        win.dispatchEvent(savedHere())
+
+        world.failNext = true
+        world.tick?.()
+        await settle()
+        world.skipNext = true
+        world.tick?.()
+        await settle()
+        expect(heard).to.have.length(0)
+
+        world.tick?.()
+        await settle()
+        expect(heard).to.have.length(1)
+      })
+
+      it('leaves a change made while a sync was running to the next one', async () => {
+        const { auto, world, win } = rig({ state: 'feed' })
+        const heard = pushes(win)
+        auto.start()
+        await settle()
+        win.dispatchEvent(savedHere())
+        world.hold = true
+        world.tick?.()
+        await settle()
+
+        win.dispatchEvent(savedHere({ ids: ['b'] }))
+        world.hold = false
+        world.release?.()
+        await settle()
+        expect(heard, 'the first carried the first change').to.have.length(1)
+
+        fire(world.nudges)
+        await settle()
+        expect(heard, 'the nudge carried the second').to.have.length(2)
+      })
+    })
+
     it('is called off when stopped', async () => {
       const { auto, world, win } = rig({ state: 'feed' })
       auto.start()
@@ -313,6 +415,50 @@ describe('Syncing by itself while the app is open', () => {
       expect(world.nudges.at(-1)?.cancelled).to.equal(true)
       win.dispatchEvent(savedHere())
       expect(world.nudges).to.have.length(1)
+    })
+  })
+
+  describe('when another device says it changed something', () => {
+    it('syncs at once, not at the next tick, even for a storage with no feed', async () => {
+      for (const state of ['feed', 'no-feed'] as SyncState[]) {
+        const { auto, world } = rig({ state, lastSync: 0 })
+        auto.start()
+        await settle()
+        const before = world.runs
+        await auto.syncSoon()
+        expect(world.runs, state).to.equal(before + 1)
+        auto.stop()
+      }
+    })
+
+    it('does nothing when it cannot sync, or the app is not on screen', async () => {
+      const unavailable = rig({ state: 'unavailable', lastSync: null })
+      unavailable.auto.start()
+      await unavailable.auto.syncSoon()
+      expect(unavailable.world.runs).to.equal(0)
+
+      const hidden = rig({ state: 'feed' })
+      hidden.auto.start()
+      await settle()
+      hidden.world.visible = false
+      await hidden.auto.syncSoon()
+      expect(hidden.world.runs).to.equal(1)
+    })
+
+    it('syncs again after the one running, which may have read before the change', async () => {
+      const { auto, world } = rig({ state: 'feed' })
+      world.hold = true
+      auto.start()
+      await settle()
+      expect(world.runs).to.equal(1)
+
+      await auto.syncSoon()
+      await auto.syncSoon()
+      expect(world.runs, 'not run alongside it').to.equal(1)
+      world.hold = false
+      world.release?.()
+      await settle()
+      expect(world.runs, 'one more, however many were told').to.equal(2)
     })
   })
 
