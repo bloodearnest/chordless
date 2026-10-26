@@ -116,48 +116,99 @@ test('the cache is short-lived, so updates and revocations reach people', async 
   assert.equal(cached?.headers.get('Cache-Control'), 'public, max-age=60')
 })
 
-test('?fresh=1 skips an answer older than a few seconds, and Drive is asked once for all who ask', async () => {
+const getFresh = (id = ID) =>
+  new Request(`https://chordless.app/api/share/${id}?fresh=1`, { method: 'GET' })
+
+test('?fresh=1 asks Drive, not the cache, for the share as it is now', async () => {
   const cache = memoryCache()
-  let clock = 1_000_000
-  const drive = fakeDrive(() => new Response(ciphertext))
-  const deps = { fetchDrive: drive.fetchDrive, cache, now: () => clock }
-  const fresh = () =>
-    handleShareDownload(new Request(`https://chordless.app/api/share/${ID}?fresh=1`), ID, env, deps)
+  let version = 1
+  const drive = fakeDrive(() => new Response(new Uint8Array([version])))
+  const deps = { fetchDrive: drive.fetchDrive, cache }
 
-  await handleShareDownload(get(), ID, env, deps)
-  clock += 500
-  await fresh()
-  assert.equal(drive.urls.length, 1, 'half a second old: it will do')
+  const first = await handleShareDownload(get(), ID, env, deps)
+  version = 2
+  const ordinary = await handleShareDownload(get(), ID, env, deps)
+  assert.equal(ordinary.headers.get('ETag'), first.headers.get('ETag'), 'the cache has version 1')
+  assert.equal(drive.urls.length, 1)
 
-  clock += 1500
-  await fresh()
-  await fresh()
-  await fresh()
-  assert.equal(
-    drive.urls.length,
-    2,
-    'two seconds: Drive is asked, once, and the answer kept for the rest'
-  )
+  const fresh = await handleShareDownload(getFresh(), ID, env, deps)
+  assert.notEqual(fresh.headers.get('ETag'), first.headers.get('ETag'), 'Drive has version 2')
+  assert.equal(drive.urls.length, 2)
 
-  clock += 10_000
-  await handleShareDownload(get(), ID, env, deps)
-  assert.equal(drive.urls.length, 2, 'an ordinary request still takes what is there')
+  const after = await handleShareDownload(get(), ID, env, deps)
+  assert.equal(after.headers.get('ETag'), fresh.headers.get('ETag'), 'and the cache keeps it')
+  assert.equal(drive.urls.length, 2)
 })
 
-test('?fresh=1 is the same answer: only how old it may be is different', async () => {
+test('requests for one file at once share one question to Drive, whether they ask afresh or not', async () => {
   const cache = memoryCache()
-  const drive = fakeDrive(() => new Response(ciphertext))
-  const deps = { fetchDrive: drive.fetchDrive, cache, now: () => 1 }
-  const plain = await handleShareDownload(get(), ID, env, deps)
-  const fresh = await handleShareDownload(
-    new Request(`https://chordless.app/api/share/${ID}?fresh=1`),
-    ID,
-    env,
-    deps
+  let answer: (response: Response) => void = () => {}
+  const waiting = new Promise<Response>(resolve => {
+    answer = resolve
+  })
+  // (the first question waits to be answered; a later one gets a response of its own)
+  let questions = 0
+  const drive = fakeDrive(() => (++questions === 1 ? waiting : new Response(ciphertext)))
+  const deps = { fetchDrive: drive.fetchDrive, cache }
+
+  const asks = [
+    handleShareDownload(getFresh(), ID, env, deps),
+    handleShareDownload(getFresh(), ID, env, deps),
+    handleShareDownload(get(), ID, env, deps),
+    handleShareDownload(get({ 'If-None-Match': '"nothing"' }), ID, env, deps),
+  ]
+  await new Promise(resolve => setTimeout(resolve, 10))
+  assert.equal(drive.urls.length, 1, 'one question, though four are waiting')
+
+  answer(new Response(ciphertext))
+  const answers = await Promise.all(asks)
+  assert.deepEqual(
+    answers.map(each => each.status),
+    [200, 200, 200, 200]
   )
-  assert.equal(fresh.headers.get('ETag'), plain.headers.get('ETag'))
-  assert.equal(fresh.headers.get('X-Cached-At'), null, 'the cache’s note is not given out')
+  for (const each of answers) {
+    assert.deepEqual(
+      new Uint8Array(await each.arrayBuffer()),
+      ciphertext,
+      'each has the whole body'
+    )
+  }
   assert.equal(drive.urls.length, 1)
+
+  // ...and once it is answered, the next to ask afresh asks again
+  await handleShareDownload(getFresh(), ID, env, deps)
+  assert.equal(drive.urls.length, 2)
+})
+
+test('files are asked about separately', async () => {
+  const other = 'AnotherFileIdOfTheRightKind01'
+  const drive = fakeDrive(() => new Response(ciphertext))
+  const deps = { fetchDrive: drive.fetchDrive }
+  await Promise.all([
+    handleShareDownload(getFresh(), ID, env, deps),
+    handleShareDownload(getFresh(other), other, env, deps),
+  ])
+  assert.equal(drive.urls.length, 2)
+})
+
+test('a failure is shared by those who waited, and does not stay: the next asks again', async () => {
+  let respond: () => Response = () => new Response('Sorry...', { status: 429 })
+  const drive = fakeDrive(() => respond())
+  const deps = { fetchDrive: drive.fetchDrive }
+
+  const answers = await Promise.all([
+    handleShareDownload(getFresh(), ID, env, deps),
+    handleShareDownload(getFresh(), ID, env, deps),
+  ])
+  assert.deepEqual(
+    answers.map(each => each.status),
+    [502, 502]
+  )
+  assert.equal(drive.urls.length, 1)
+
+  respond = () => new Response(ciphertext)
+  assert.equal((await handleShareDownload(getFresh(), ID, env, deps)).status, 200)
+  assert.equal(drive.urls.length, 2)
 })
 
 test('"ended" is cached briefly too; errors are not cached', async () => {

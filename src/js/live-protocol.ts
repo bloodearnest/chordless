@@ -13,7 +13,7 @@ export const LIVE_PROTOCOL = 'chordless'
  * against the real Drive, `just test-live-share`; the 95th percentile 0.71 s), and the recipient is told
  * when the upload is done, so the first fetch usually has it: the rest are for a slow day, and for the
  * team space, whose feed lagged about 5 s when measured once. A fetch that finds nothing new costs
- * little: a share's is a 304 and Drive is asked at most once a second, a sync is a few requests.
+ * little: a share's is a 304 and Drive is asked once at a time per file, a sync is a few requests.
  */
 export const FOLLOW_UPS_MS = [1500, 3000, 4500, 6000]
 
