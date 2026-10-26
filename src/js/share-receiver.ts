@@ -10,6 +10,7 @@
  * seen is theirs to keep.
  */
 
+import type { DataOrigin } from './data-changes.ts'
 import type { ReceivedShare, Setlist, SetlistEntry } from './data-types.ts'
 import { ChordlessDB } from './db.ts'
 import { isExpired, type ShareBundle } from './share-bundle.ts'
@@ -43,6 +44,10 @@ export interface OpenShareOptions {
   /** For tests */
   fetchFile?: typeof fetch
   today?: string
+  /** What a write to the database is: a sync's (so the page showing the share follows it) or the user's */
+  origin?: DataOrigin
+  /** Ask the worker for the file as it is now, not as its edge cache has it (the live channel says it changed) */
+  fresh?: boolean
 }
 
 function deleteDatabase(name: string): Promise<void> {
@@ -86,7 +91,12 @@ export async function forgetShare(fileId: string, db?: ChordlessDB): Promise<voi
  * share's, and its songs. A song this device already has the chart of is reused; one that is
  * new is added, as the default of its song if the song is already here in another form.
  */
-async function store(db: ChordlessDB, bundle: ShareBundle, received: ReceivedShare) {
+async function store(
+  db: ChordlessDB,
+  bundle: ShareBundle,
+  received: ReceivedShare,
+  createdDate = new Date().toISOString()
+) {
   const now = new Date().toISOString()
   const entries: SetlistEntry[] = []
 
@@ -116,7 +126,7 @@ async function store(db: ChordlessDB, bundle: ShareBundle, received: ReceivedSha
     name: bundle.setlist.name,
     owner: bundle.setlist.owner,
     songs: entries,
-    createdDate: now,
+    createdDate,
     modifiedDate: now,
     received,
   }
@@ -133,9 +143,14 @@ async function store(db: ChordlessDB, bundle: ShareBundle, received: ReceivedSha
 export async function openShare(
   fileId: string,
   keyFromLink: string,
-  { fetchFile = fetch, today = toLocalDateString(new Date()) }: OpenShareOptions = {}
+  {
+    fetchFile = fetch,
+    today = toLocalDateString(new Date()),
+    origin,
+    fresh = false,
+  }: OpenShareOptions = {}
 ): Promise<ShareOpening> {
-  const db = new ChordlessDB(SHARED_DB_ID)
+  const db = new ChordlessDB(SHARED_DB_ID, origin)
   await db.init()
   const kept = await db.getSetlist(shareSetlistId(fileId))
   const known = kept?.received
@@ -161,9 +176,12 @@ export async function openShare(
   const etag = known && known.key === key ? known.etag : ''
   let response: Response
   try {
-    response = await fetchFile(`/api/share/${encodeURIComponent(fileId)}`, {
-      headers: etag ? { 'If-None-Match': etag } : {},
-    })
+    response = await fetchFile(
+      `/api/share/${encodeURIComponent(fileId)}${fresh ? '?fresh=1' : ''}`,
+      {
+        headers: etag ? { 'If-None-Match': etag } : {},
+      }
+    )
   } catch {
     // No connection: the copy on this device is what there is
     if (kept) return { state: 'ready', db, setlist: kept, fresh: false }
@@ -192,14 +210,30 @@ export async function openShare(
   }
   if (isExpired(bundle.expires, today)) return ended()
 
-  const setlist = await store(db, bundle, {
-    fileId,
-    key,
-    etag: response.headers.get('ETag') ?? '',
-    expires: bundle.expires,
-    ...(bundle.setlistId && { setlistId: bundle.setlistId }),
-  })
+  // (the day it was first received stays: the page compares setlists, and a new one is a change)
+  const setlist = await store(
+    db,
+    bundle,
+    {
+      fileId,
+      key,
+      etag: response.headers.get('ETag') ?? '',
+      expires: bundle.expires,
+      ...(bundle.setlistId && { setlistId: bundle.setlistId }),
+    },
+    kept?.createdDate
+  )
   return { state: 'ready', db, setlist, fresh: true }
+}
+
+/**
+ * The share was updated (the live channel says so): fetch it again as it is now, if it has changed,
+ * and keep it as a sync would, so the page showing it follows. Nothing if this device has no copy
+ * or no key for it.
+ */
+export async function reloadShare(fileId: string, options: OpenShareOptions = {}): Promise<void> {
+  const opening = await openShare(fileId, '', { origin: 'sync', fresh: true, ...options })
+  if (opening.state === 'ready') opening.db.db?.close()
 }
 
 /**

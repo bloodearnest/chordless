@@ -71,6 +71,36 @@ minutes left; a long run mints another when it is nearly out. A refresh token gi
 Google's "testing" mode expires after seven days: publish the consent screen (or re-run the login)
 if `invalid_grant` appears.
 
+## The live-share test
+
+`just test-live-share` (`tests/drive/live-share.drive.node.test.ts`) uses the same account and token
+for live sync of a share (LIVE_SYNC.md): it uploads a share file to the test account's Drive, runs the
+real Worker in workerd (the wrangler test harness, with `GOOGLE_API_KEY` from `.dev.vars`, the dev
+project's Drive key), and joins the share's room with real WebSockets as a sharer and as recipients
+who have no account. The sharer uploads a new version and says `changed`; the test checks who is told,
+fetches the share as the app does (`?fresh=1`, at once and again) and prints how long the new
+version took to be there. It is a Node test and not one of the browser tests above because the Worker
+refuses a page of another origin, which the test runner's page is. Its folder goes to Drive's bin
+(the share's public link is ended first), whatever happens.
+
+## The live tests, in browsers
+
+`just test-live` (`playwright.live.config.ts`, `tests/live/`) uses the same account to run **browsers
+signed in as the test account**, against `just serve-live`'s server (on ports of its own), the real
+Worker and a real Drive. The sign-in is made without Google's consent screen: the app keeps it as an
+encrypted blob that holds the refresh token, which the Worker opens with its key, so the test makes one
+from `DRIVE_TEST_REFRESH_TOKEN` and `JWE_ENCRYPTION_KEY` (`.dev.vars`) and puts it where the app keeps
+it (`tests/live/signed-in.ts`); the app then asks the Worker for access tokens, and the Worker asks
+Google. Use `signIn(page)` for any test that needs the app signed in. Each test makes its space under a
+name of its own and puts it away from Node afterwards (`drive-cleanup.ts`: shares ended, folder in the
+bin), whatever happens to the browser. `LIVE_DEBUG=1` prints each page's console, its sockets' frames
+and the share requests, with the time.
+
+- `live-share.live.playwright.ts`: a sharer with a real Drive folder shares a setlist from the UI, a
+  recipient with no account opens the link, both go live, the sharer adds a song, and the recipient's
+  page shows it (2.8 to 3.3 s from the edit in five runs: the app's short wait after an edit while live,
+  the share's upload, the ping, the fetch).
+
 ## Cleaning up
 
 A history that passes puts its folder in Drive's bin (recoverable for thirty days). One that fails

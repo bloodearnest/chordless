@@ -109,6 +109,11 @@ test-node:
 serve:
     npm run dev
 
+# The same, for trying live sync (docs/LIVE_SYNC.md): the Worker is its own process (wrangler dev), as the
+# Vite plugin cannot pass WebSockets to it. Slower to start and heavier; `just serve` is for everything else
+serve-live:
+    scripts/serve-live.sh
+
 # Build the app and the Worker into dist/
 build:
     npm run build
@@ -148,6 +153,18 @@ help-images:
 # DRIVE_DEVICES=3 DRIVE_MODES=owner,concurrent just test-drive
 test-drive *args:
     node --env-file-if-exists=.drive-test.env node_modules/.bin/web-test-runner --config web-test-runner.drive.config.js {{args}}
+
+# Live sync of a share against the test account's real Drive and the real Worker (docs/LIVE_SYNC.md,
+# docs/DRIVE_TESTS.md): a recipient is told of an update and fetches it, and how long that took. Needs
+# .drive-test.env and, for the Drive key, .dev.vars. Not part of `just test` or CI
+test-live-share:
+    node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars --test tests/drive/live-share.drive.node.test.ts
+
+# Live sync in two real browsers (docs/LIVE_SYNC.md): one signed in as the test Google account, one
+# with no account, on `just serve-live`'s server, with a real Drive. Needs .drive-test.env and .dev.vars.
+# LIVE_DEBUG=1 prints what the pages log and say on their sockets. Not part of `just test` or CI
+test-live *args:
+    node --env-file-if-exists=.drive-test.env --env-file-if-exists=.dev.vars node_modules/.bin/playwright test --config playwright.live.config.ts {{args}}
 
 # Get the refresh token for the real-Drive suite, signing in as the test account (docs/DRIVE_TESTS.md)
 drive-test-login:

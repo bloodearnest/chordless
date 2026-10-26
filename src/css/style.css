@@ -1340,6 +1340,33 @@ body.edit-mode .key-selector:focus {
   color: white;
 }
 
+/* While live on a team space: a dot for whether the other devices are reached at once (green), being
+   reached (amber), or only by the minute's sync (hollow). Nothing is lost when it is hollow. */
+.live-button[data-sync] {
+  position: relative;
+}
+
+.live-button[data-sync]::after {
+  content: "";
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  border: 2px solid var(--header-bg, #2c3e50);
+  background: var(--color-success);
+}
+
+.live-button[data-sync="connecting"]::after {
+  background: var(--color-warning);
+}
+
+.live-button[data-sync="offline"]::after {
+  background: transparent;
+  border-color: var(--header-text, white);
+}
+
 .share-button.shared {
   background-color: var(--button-bg, #3498db);
   color: var(--header-text, white);

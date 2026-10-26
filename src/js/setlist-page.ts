@@ -32,6 +32,7 @@ import { DataChangeEvent, touches } from './data-changes.ts'
 import type { Setlist, SetlistEntry, SongWithContent } from './data-types.ts'
 import { type ChordlessDB, getCurrentDB, NO_CHANGE } from './db.ts'
 import { goLive, LiveChangeEvent, leaveLive } from './live.ts'
+import { LiveSyncStatusEvent } from './live-sync-status.ts'
 import { goTo, setPageTitle } from './navigation.ts'
 import { preloadPadKey, preloadPadKeysForSongs } from './pad-set-service.ts'
 import { ChordProParser } from './parser.ts'
@@ -233,6 +234,7 @@ export class SetlistPage {
     window.addEventListener('storage', this._onCapoPreferenceChange, { signal })
     window.addEventListener(CapoPreferenceEvent.type, this._onCapoPreferenceChange, { signal })
     window.addEventListener(LiveChangeEvent.type, this._onLiveChange, { signal })
+    window.addEventListener(LiveSyncStatusEvent.type, this._onLiveChange, { signal })
   }
 
   /** How far each song (and the overview) is scrolled, to put back if the user returns */

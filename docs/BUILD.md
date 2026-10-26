@@ -12,6 +12,16 @@ Development and production are one codebase with two shapes.
 `vite.config.ts` has the settings, with the reasons beside them. Port 8787 is fixed because the
 browser's data (IndexedDB, sign-in) belongs to the origin and the Tailscale funnel points at it.
 
+**`just serve-live`** is the same dev server for trying live sync (LIVE_SYNC.md), and only that. The
+Cloudflare plugin (1.64) cannot pass a WebSocket upgrade to the Worker, so here the Worker is
+`wrangler dev --env dev` in its own process (port 8789, `CHORDLESS_WORKER_PORT`), and Vite, still on
+8787, proxies `/oauth`, `/session` and `/api` to it with `ws: true` (`CHORDLESS_WORKER_URL` in
+`vite.config.ts` turns that on and the plugin off; `scripts/serve-live.sh` starts both and stops
+the Worker with Vite). It keeps the Host, so the Worker's cross-origin check sees the page's origin.
+`/s/` and `/dev` stay with Vite, which transforms the files; a received share's link preview (the
+Worker's `/s/` page) is therefore not seen here. It is slower to start and takes two processes, so
+use `just serve` for everything else. Playwright and the other tests use the plugin, as before.
+
 ## Layout
 
 - `src/` is Vite's root: `index.html` (the only page that is built), `js/`, `components/`,

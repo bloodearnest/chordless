@@ -23,6 +23,11 @@ export function generateShareKey(): string {
   return toBase64Url(crypto.getRandomValues(new Uint8Array(KEY_BYTES)))
 }
 
+/** A new random secret for the sharer's device to prove itself to the share's live room with (the same size as a key) */
+export function generateLiveSecret(): string {
+  return generateShareKey()
+}
+
 const importKey = (key: string) => {
   const raw = fromBase64Url(key)
   if (raw.length !== KEY_BYTES) throw new Error('The share key is the wrong length')

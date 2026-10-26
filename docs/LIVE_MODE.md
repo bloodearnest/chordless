@@ -71,7 +71,7 @@ short list, wired by hand.
 | Service | Needs a gesture | Notes |
 | --- | --- | --- |
 | Wake lock, on every page | no | The existing `WakeLockController`: the lock is wanted when a setlist is open or live. Re-acquired when the page is visible (`visibilitychange`). |
-| Sync (future) | no | A WebSocket session per live team setlist ([LIVE_SYNC.md](LIVE_SYNC.md)): the leader is the setlist's `ownerId`; a preference turns it off. |
+| Live sync (built) | no | The live channels of what is live ([LIVE_SYNC.md](LIVE_SYNC.md)): the team space's, and the share's if the setlist is shared by link (or it is one received by link). A dot on the live button shows them. |
 
 Services run while live **and** the page is visible, on every page, not just the live
 setlist: searching the library mid-service shouldn't let the screen sleep.
@@ -121,6 +121,6 @@ In the existing wake lock section, which becomes "Screen and live mode":
 - Nothing shows that the device is live on other pages (the library, Preferences), so a stale
   live state could go unnoticed there until the setlist's overview is opened. If that matters,
   something small is needed there.
-- What Sync needs from the live record: settled in [LIVE_SYNC.md](LIVE_SYNC.md). The session is the
-  setlist's id within its space and the role comes from the setlist's `ownerId`, so the live record
+- What live sync needs from the live record: settled in [LIVE_SYNC.md](LIVE_SYNC.md). The channels
+  come from its URL (`/setlist/<id>` or `/s/<file id>`) and the space in use, so the live record
   gains nothing.

@@ -12,6 +12,7 @@
 import { DataChangeEvent } from './data-changes.ts'
 import { getSignInState } from './google-auth.ts'
 import { lastSyncOf, recordSync } from './last-sync.ts'
+import { getLive } from './live.ts'
 import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator } from './sync-orchestrator.ts'
@@ -24,6 +25,25 @@ export const STALE_AFTER_MS = 15 * 60_000
 export const OFFLINE_LONG_MS = 5 * 60_000
 /** A change made here is sent after this much quiet, so that a burst of edits is one sync */
 export const NUDGE_MS = 2000
+/** ...and while the device is live, when a change is wanted elsewhere at once: a burst is still one sync, but a short one (docs/LIVE_SYNC.md) */
+export const LIVE_NUDGE_MS = 400
+
+/**
+ * A sync that sent changes made here has finished (sent on window): what the live channel waits
+ * for before it tells the other devices (docs/LIVE_SYNC.md), so that they find the changes there
+ */
+export class SyncPushedEvent extends Event {
+  static readonly type = 'sync:pushed'
+  constructor() {
+    super(SyncPushedEvent.type)
+  }
+}
+
+declare global {
+  interface WindowEventMap {
+    [SyncPushedEvent.type]: SyncPushedEvent
+  }
+}
 
 /** What a sync can be done with now */
 export type SyncState =
@@ -43,9 +63,11 @@ export interface AutoSyncDeps {
   online(): boolean
   /** When the space last synced on this device (ISO time), or null if it never has */
   lastSync(): string | null
+  /** Whether this device is live (live.ts) */
+  live(): boolean
   state(): Promise<SyncState>
-  /** The sync itself, for the space in use (skipped if another is running); throws if it fails */
-  run(): Promise<void>
+  /** The sync itself, for the space in use; false if it was skipped because another is running, and throws if it fails */
+  run(): Promise<boolean>
   /** Call `fn` every `ms` until the returned function is called */
   every(ms: number, fn: () => void): () => void
   /** Call `fn` once after `ms`, unless the returned function is called first */
@@ -61,6 +83,10 @@ export class AutoSync {
   #running = false
   /** A change was made here while a sync was running: that sync may not have sent it */
   #changedWhileRunning = false
+  /** Changes made here that no finished sync has sent yet */
+  #unsent = false
+  /** Another device said it changed something while a sync was running: that one may not have seen it */
+  #pullAgain = false
 
   constructor(deps: AutoSyncDeps) {
     this.#deps = deps
@@ -114,13 +140,14 @@ export class AutoSync {
   #onDataChange = (event: Event): void => {
     const { change } = event as DataChangeEvent
     if (change.origin !== 'local' || change.remote) return
+    this.#unsent = true
     this.#nudge()
   }
 
   #nudge(): void {
     if (this.#running) this.#changedWhileRunning = true
     this.#cancelNudge?.()
-    this.#cancelNudge = this.#deps.later(NUDGE_MS, () => {
+    this.#cancelNudge = this.#deps.later(this.#deps.live() ? LIVE_NUDGE_MS : NUDGE_MS, () => {
       this.#cancelNudge = null
       void this.#sync(false)
     })
@@ -143,24 +170,48 @@ export class AutoSync {
    */
   async #sync(everything: boolean): Promise<void> {
     if (!this.#deps.visible() || !this.#deps.online()) return
+    // (what this sync carries: put back if it does not finish, so the next one tells of it)
+    const carrying = this.#unsent
+    let sent = false
     try {
       const state = await this.#deps.state()
       if (state === 'unavailable' || (state === 'no-feed' && !everything)) return
       this.#lastAttempt = this.#deps.now()
       this.#running = true
       this.#changedWhileRunning = false
-      await this.#deps.run()
+      this.#unsent = false
+      const ran = await this.#deps.run()
+      sent = ran && carrying
+      if (!ran) this.#unsent ||= carrying
     } catch (error) {
       // (offline, signed out, a failed request: the next tick tries again)
+      this.#unsent ||= carrying
       console.warn('[AutoSync] Sync did not work:', error)
     } finally {
       this.#running = false
     }
+    if (sent) this.#deps.win.dispatchEvent(new SyncPushedEvent())
     // A change made while it ran may have missed it: send that too
     if (this.#changedWhileRunning) {
       this.#changedWhileRunning = false
       this.#nudge()
     }
+    if (this.#pullAgain) {
+      this.#pullAgain = false
+      await this.#sync(true)
+    }
+  }
+
+  /**
+   * Sync now, because another device says it changed something (the live channel): not at the next
+   * tick. One that is running may have read before that change, so it is followed by another.
+   */
+  async syncSoon(): Promise<void> {
+    if (this.#running) {
+      this.#pullAgain = true
+      return
+    }
+    await this.#sync(true)
   }
 }
 
@@ -174,10 +225,19 @@ async function currentState(): Promise<SyncState> {
   return storageFor(space).space(space.rootRef).changes ? 'feed' : 'no-feed'
 }
 
-async function runSync(): Promise<void> {
+async function runSync(): Promise<boolean> {
   const space = await getCurrentSpaceFull()
   const orchestrator = await createSyncOrchestrator(space.name, space.id)
-  if (await orchestrator.incrementalSync(null, { skipIfBusy: true })) recordSync(space.id)
+  const ran = await orchestrator.incrementalSync(null, { skipIfBusy: true })
+  if (ran) recordSync(space.id)
+  return ran
+}
+
+let running: AutoSync | null = null
+
+/** Sync the space in use now, if the app is syncing by itself (see AutoSync.syncSoon) */
+export async function syncSoon(): Promise<void> {
+  await running?.syncSoon()
 }
 
 /** Start syncing the space in use while the app is open */
@@ -192,6 +252,7 @@ export function startAutoSync(): AutoSync {
       const { id } = getCurrentSpace()
       return id ? lastSyncOf(id) : null
     },
+    live: () => getLive() !== null,
     state: currentState,
     run: runSync,
     every: (ms, fn) => {
@@ -204,6 +265,7 @@ export function startAutoSync(): AutoSync {
     },
   })
   auto.start()
+  running = auto
   return auto
 }
 /* v8 ignore stop */

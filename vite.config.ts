@@ -11,10 +11,16 @@ const TARGET = ['safari17', 'chrome120', 'edge120']
 // The app is in src/, the static files it links to (icons, manifest) in public/.
 // The Cloudflare plugin runs the Worker (worker/src) next to it, in workerd, so dev
 // is the same shape as production: one server, one origin.
+//
+// Except for `just serve-live`, which sets CHORDLESS_WORKER_URL: the plugin cannot pass a WebSocket
+// upgrade to the Worker (live sync, docs/LIVE_SYNC.md), so there the Worker is `wrangler dev` in its
+// own process and this server hands the Worker's paths to it, upgrades included. Still one origin.
+const WORKER_URL = process.env.CHORDLESS_WORKER_URL
+
 export default defineConfig(({ command, isPreview }) => {
   // `npm run dev` uses wrangler.toml's [env.dev] (the dev pages); a build, and previewing
   // one, use the top level
-  if (command === 'serve' && !isPreview) process.env.CLOUDFLARE_ENV ??= 'dev'
+  if (command === 'serve' && !isPreview && !WORKER_URL) process.env.CLOUDFLARE_ENV ??= 'dev'
 
   return {
     root: 'src',
@@ -46,6 +52,14 @@ export default defineConfig(({ command, isPreview }) => {
       port: Number(process.env.CHORDLESS_PORT) || 8787,
       strictPort: true,
       allowedHosts: ['casey.tail030f3.ts.net'],
+      // The paths the Worker answers before the static files (wrangler.toml's run_worker_first).
+      // The Host is kept, so that the Worker sees the origin the page has and its cross-origin check agrees.
+      // (/s/ and /dev stay here: the Worker would serve the unbuilt files, where this server transforms them.)
+      ...(WORKER_URL && {
+        proxy: Object.fromEntries(
+          ['/oauth', '/session', '/api'].map(path => [path, { target: WORKER_URL, ws: true }])
+        ),
+      }),
     },
     // Pre-bundle every dependency at start-up: finding one later reloads the page mid-test
     optimizeDeps: {
@@ -55,7 +69,7 @@ export default defineConfig(({ command, isPreview }) => {
       devManifest(),
       preloadHome(),
       serviceWorker({ target: TARGET }),
-      cloudflare({ configPath: '../wrangler.toml' }),
+      ...(WORKER_URL ? [] : [cloudflare({ configPath: '../wrangler.toml' })]),
     ],
   }
 })

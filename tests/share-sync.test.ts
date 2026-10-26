@@ -3,7 +3,7 @@ import type { Setlist } from '../src/js/data-types.ts'
 import { createSetlist } from '../src/js/db.ts'
 import { addDays, SHARE_DAYS_AFTER } from '../src/js/share-bundle.ts'
 import { decryptBundle } from '../src/js/share-crypto.ts'
-import { createShare, stopShare, syncShares } from '../src/js/share-manager.ts'
+import { createShare, ShareUpdatedEvent, stopShare, syncShares } from '../src/js/share-manager.ts'
 import { toLocalDateString } from '../src/js/utils/date-utils.ts'
 import { makeEntry } from './builders.ts'
 import { addSong, editSong, memoryFolderLink, useSyncRig } from './drive-harness.ts'
@@ -127,6 +127,26 @@ describe('Share links: sync', () => {
     expect(recorded.share?.fileId).to.equal(share.fileId)
   })
 
+  it('says on window that a share was uploaded, and not when it was already up to date', async () => {
+    const { phone, setlist, share } = await sharedSetlist()
+    const heard: string[] = []
+    const listener = (event: Event) => heard.push((event as ShareUpdatedEvent).fileId)
+    window.addEventListener(ShareUpdatedEvent.type, listener)
+    try {
+      await phone.sync.sync()
+      expect(heard, 'nothing changed').to.deep.equal([])
+
+      await phone.db.saveSetlist({
+        ...(await phone.db.getSetlist(setlist.id)),
+        songs: [makeEntry({ order: 1, songId: 'title-beta', songUuid: 'b', key: 'A', notes: '' })],
+      } as Setlist)
+      await phone.sync.sync()
+      expect(heard).to.deep.equal([share.fileId])
+    } finally {
+      window.removeEventListener(ShareUpdatedEvent.type, listener)
+    }
+  })
+
   it('updates the share when a key, note or the song list changes', async () => {
     const { phone, setlist, share } = await sharedSetlist()
     await phone.sync.sync()
@@ -141,6 +161,71 @@ describe('Share links: sync', () => {
     const bundle = await openShare(share.fileId, share.key)
     expect(bundle.setlist.songs).to.have.length(1)
     expect(bundle.setlist.songs[0]).to.include({ title: 'Beta', key: 'A', notes: 'repeat 4x' })
+  })
+
+  describe('by the sync that runs by itself (the feed’s)', () => {
+    const editKey = async (phone: Device, setlistId: string, key: string) => {
+      await phone.db.saveSetlist({
+        ...(await phone.db.getSetlist(setlistId)),
+        songs: [makeEntry({ order: 1, songId: 'title-beta', songUuid: 'b', key, notes: '' })],
+      } as Setlist)
+    }
+
+    it('updates the share of a setlist changed here, so a live share is at once', async () => {
+      const { phone, setlist, share } = await sharedSetlist()
+      await phone.sync.sync()
+      await editKey(phone, setlist.id, 'A')
+
+      await phone.sync.incrementalSync()
+
+      const bundle = await openShare(share.fileId, share.key)
+      expect(bundle.setlist.songs).to.have.length(1)
+      expect(bundle.setlist.songs[0]).to.include({ key: 'A' })
+      const recorded = must(await phone.db.getSetlist(setlist.id))
+      expect(recorded.share?.bundleHash).to.not.equal(share.bundleHash)
+    })
+
+    it('does nothing to a share whose setlist did not change here, and lists no folder', async () => {
+      const { phone, setlist, share } = await sharedSetlist()
+      await phone.sync.sync()
+      const sharesBefore = updates().filter(c => c.on === share.fileId).length
+      const listsBefore = rig.storage.calls.filter(c => c.op === 'list').length
+
+      await phone.sync.incrementalSync()
+      await editKey(phone, setlist.id, 'A')
+      await phone.sync.incrementalSync()
+      await phone.sync.incrementalSync()
+
+      expect(updates().filter(c => c.on === share.fileId)).to.have.length(sharesBefore + 1)
+      expect(rig.storage.calls.filter(c => c.op === 'list')).to.have.length(listsBefore)
+    })
+
+    it('leaves ending an expired share, and a change to a song alone, to a full sync', async () => {
+      const { phone, setlist, share } = await sharedSetlist()
+      await phone.sync.sync()
+      await editSong(phone, 'a', '{title: Alpha}\n{key: G}\n[G]Alpha line, fixed')
+      await phone.db.saveSetlist({
+        ...(await phone.db.getSetlist(setlist.id)),
+        share: { ...share, expires: addDays(today, -1) },
+      } as Setlist)
+
+      await phone.sync.incrementalSync()
+      expect(rig.storage.publicDownload(share.fileId).status, 'not ended').to.equal(200)
+
+      await phone.sync.sync()
+      expect(rig.storage.publicDownload(share.fileId).status).to.equal(404)
+    })
+
+    it('does not update a share for a user who can only read', async () => {
+      const { phone, setlist, share } = await sharedSetlist()
+      await phone.sync.sync()
+      await editKey(phone, setlist.id, 'A')
+      const before = updates().filter(c => c.on === share.fileId).length
+
+      await phone.sync.incrementalSync(null, { push: false })
+
+      expect(updates().filter(c => c.on === share.fileId)).to.have.length(before)
+    })
   })
 
   it("a second leader's sync updates the share too", async () => {

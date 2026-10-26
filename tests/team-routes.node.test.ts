@@ -77,6 +77,8 @@ async function world() {
   /** The Durable Objects: one state per name, and a note of which names were asked for */
   const states = new Map<string, TeamSpaceState>()
   const asked: string[] = []
+  /** The sockets asked of the objects (the Durable Object's own side of a live socket is tested in workerd) */
+  const live: { space: string; request: Request }[] = []
   const teamSpaces = {
     idFromName(name: string) {
       asked.push(name)
@@ -86,7 +88,12 @@ async function world() {
       const name = String(id)
       const state = states.get(name) ?? new TeamSpaceState(new MapStore())
       states.set(name, state)
-      return state
+      return Object.assign(state, {
+        fetch: async (request: Request) => {
+          live.push({ space: name, request })
+          return new Response('socket', { status: 200 })
+        },
+      })
     },
   }
   const room = teamSpaces.get(SPACE) as TeamSpaceState
@@ -136,7 +143,7 @@ async function world() {
   /** What the owner's own sync makes, straight in Drive */
   const direct = async (name: string, body = `${name} text`) =>
     (await backend.space(root).create('songs', input(name), body)).file.ref
-  return { drive, backend, root, room, env, deps, asked, call, direct, teamSpaces, states }
+  return { drive, backend, root, room, env, deps, asked, call, direct, teamSpaces, states, live }
 }
 
 const json = async (response: Response) => (await response.json()) as Record<string, unknown>
@@ -683,5 +690,97 @@ describe('the owner’s own routes', () => {
       assert.equal((await w.call(`${SPACE}/root`, who)).status, 403)
     }
     assert.equal(await w.room.ownerBlob(), null)
+  })
+})
+
+describe('the live route', () => {
+  /** What a page sends: `new WebSocket(url, ['chordless', token])` */
+  const upgrade = async (who: Identity, extra: Record<string, string> = {}) => ({
+    headers: {
+      Upgrade: 'websocket',
+      'Sec-WebSocket-Protocol': `chordless, ${await idToken(who)}`,
+      ...extra,
+    },
+  })
+
+  test('hands a member’s socket to the space’s object, and says who they are', async () => {
+    const w = await world()
+    const answer = await w.call(`${SPACE}/live`, null, await upgrade(bob))
+    assert.equal(answer.status, 200, 'the object’s answer, as it is')
+    assert.equal(await answer.text(), 'socket')
+    const [{ space, request }] = w.live
+    assert.equal(space, SPACE)
+    assert.deepEqual(JSON.parse(request.headers.get('X-Live-Identity') ?? ''), bob)
+    assert.equal(request.headers.get('Upgrade'), 'websocket')
+    assert.equal(request.headers.get('Authorization'), null, 'the token goes no further')
+  })
+
+  test('lets a reader listen', async () => {
+    const w = await world()
+    assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(cat))).status, 200)
+  })
+
+  test('does not let a page say who it is: the object has only what the Worker settled', async () => {
+    const w = await world()
+    await w.call(
+      `${SPACE}/live`,
+      null,
+      await upgrade(cat, { 'X-Live-Identity': JSON.stringify(ann) })
+    )
+    assert.deepEqual(JSON.parse(w.live[0].request.headers.get('X-Live-Identity') ?? ''), cat)
+  })
+
+  test('asks who it is before any object is touched: no token, a bad one, or one in the wrong place', async () => {
+    const w = await world()
+    const attempts: Record<string, string>[] = [
+      { Upgrade: 'websocket' },
+      { Upgrade: 'websocket', 'Sec-WebSocket-Protocol': 'chordless' },
+      { Upgrade: 'websocket', 'Sec-WebSocket-Protocol': 'chordless, not-a-token' },
+      { Upgrade: 'websocket', 'Sec-WebSocket-Protocol': `other, ${await idToken(bob)}` },
+      { Upgrade: 'websocket', Authorization: `Bearer ${await idToken(bob)}` },
+    ]
+    for (const headers of attempts) {
+      const answer = await w.call(`${SPACE}/live`, null, { headers })
+      assert.equal(answer.status, 401, JSON.stringify(Object.keys(headers)))
+    }
+    assert.deepEqual(w.asked, [])
+    assert.deepEqual(w.live, [])
+  })
+
+  test('refuses a stranger', async () => {
+    const w = await world()
+    assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(stranger))).status, 403)
+    assert.deepEqual(w.live, [])
+  })
+
+  test('is not a page: a plain request is told it is a socket', async () => {
+    const w = await world()
+    assert.equal((await w.call(`${SPACE}/live`, bob)).status, 426)
+  })
+
+  test('refuses a page of another origin', async () => {
+    const w = await world()
+    const answer = await w.call(
+      `${SPACE}/live`,
+      null,
+      await upgrade(bob, { Origin: 'https://evil.example' })
+    )
+    assert.equal(answer.status, 403)
+    assert.deepEqual(w.live, [])
+  })
+
+  test('says so where the object cannot take a socket', async () => {
+    const w = await world()
+    const state = w.states.get(SPACE)
+    assert.ok(state)
+    delete (state as { fetch?: unknown }).fetch
+    w.teamSpaces.get = id => w.states.get(String(id)) as never
+    assert.equal((await w.call(`${SPACE}/live`, null, await upgrade(bob))).status, 503)
+  })
+
+  test('does not make an object for an id that is not a space’s', async () => {
+    const w = await world()
+    assert.equal((await w.call('x/live', null, await upgrade(bob))).status, 404)
+    assert.deepEqual(w.asked, [])
   })
 })

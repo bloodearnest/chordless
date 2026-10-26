@@ -53,6 +53,8 @@ import('./space-access.ts').then(({ refreshSpaceAccess }) => {
 void appUpdate.start()
 // Sync the space in use by itself while the app is open (sync-lock.ts keeps it to one at a time)
 import('./auto-sync.ts').then(({ startAutoSync }) => startAutoSync())
+// While live on a team space, its devices tell each other of changes, to sync at once (live-sync.ts)
+import('./live-sync.ts').then(({ startLiveSync }) => startLiveSync())
 // ...and the pages hear of what other tabs of the app write
 import('./data-changes.ts').then(({ listenForOtherTabs }) => listenForOtherTabs())
 // Files the system opens with the installed app, and links for its open window

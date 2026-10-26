@@ -8,6 +8,7 @@ import { SongSettingsClickEvent } from '../src/components/musical-metadata-displ
 import { SongSelectEvent } from '../src/components/song-list.ts'
 import type { SongSettingsPopover } from '../src/components/song-settings-popover.ts'
 import { getLive, goLive, leaveLive } from '../src/js/live.ts'
+import { announceLiveSyncStatus } from '../src/js/live-sync-status.ts'
 import { setCapoPreference } from '../src/js/preferences.ts'
 import { SetlistPage } from '../src/js/setlist-page.ts'
 import { getSongWithContent } from '../src/js/song-utils.ts'
@@ -274,7 +275,10 @@ describe('the setlist page: corners', () => {
   })
 
   describe('going live from the header', () => {
-    afterEach(() => localStorage.removeItem('live_state'))
+    afterEach(() => {
+      localStorage.removeItem('live_state')
+      announceLiveSyncStatus(window, null)
+    })
     const button = () => must($<HTMLButtonElement>('#live-button'))
 
     it('is on the overview, not on a song, and goes live on this setlist and leaves again', async () => {
@@ -298,6 +302,19 @@ describe('the setlist page: corners', () => {
       expect(getLive()).to.equal(null)
       expect(button().classList.contains('live')).to.equal(false)
       expect(button().getAttribute('aria-label')).to.equal('Go live')
+    })
+
+    it('shows whether the live channel is up, only while this setlist is live', async () => {
+      const setlist = await rig.open()
+      announceLiveSyncStatus(window, 'connected')
+      expect(button().dataset.sync, 'not live').to.equal(undefined)
+
+      goLive(`/setlist/${setlist.id}`, 'Sunday')
+      expect(button().dataset.sync).to.equal('connected')
+      announceLiveSyncStatus(window, 'offline')
+      expect(button().dataset.sync).to.equal('offline')
+      announceLiveSyncStatus(window, null)
+      expect(button().dataset.sync, 'no channel (not a team space)').to.equal(undefined)
     })
 
     it('offers to take over when another setlist is live, and keeps up with other windows', async () => {

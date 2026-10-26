@@ -17,10 +17,31 @@ import {
 import { encryptBundle, generateShareKey } from './share-crypto.ts'
 import { getSongById } from './song-utils.ts'
 import type { SpaceStorage } from './storage/types.ts'
+import { setlistHasLocalChanges } from './sync/changes.ts'
 import { toLocalDateString } from './utils/date-utils.ts'
 
 /** An orphaned share file (no setlist points at it) is left alone this long, so a share another device is still recording is not ended under it */
 const ORPHAN_GRACE_MS = 24 * 60 * 60 * 1000
+
+/**
+ * A share's file was uploaded with a new version (sent on window, by whoever did it: the sync's share
+ * step, the share dialog, or the live channel's own publish). The live channel tells the room on it, so
+ * that the recipients are told the moment the upload is done, whichever did it (docs/LIVE_SYNC.md)
+ */
+export class ShareUpdatedEvent extends Event {
+  static readonly type = 'share:updated'
+  readonly fileId: string
+  constructor(fileId: string) {
+    super(ShareUpdatedEvent.type)
+    this.fileId = fileId
+  }
+}
+
+declare global {
+  interface WindowEventMap {
+    [ShareUpdatedEvent.type]: ShareUpdatedEvent
+  }
+}
 
 export interface ShareContext {
   db: ChordlessDB
@@ -105,6 +126,8 @@ export async function refreshShare(
 
   const metadata = shareFileMetadata(setlist, { spaceId: ctx.spaceId, expires })
   await ctx.space.update(share.fileId, updateInput(metadata, 'share'), await file())
+  // (the page's window: there is none where a test runs this in Node)
+  globalThis.dispatchEvent?.(new ShareUpdatedEvent(share.fileId))
   return { ...share, expires, bundleHash: hash }
 }
 
@@ -126,8 +149,16 @@ export async function stopShare(
  * 3. End share files nothing points at any more (a stopped or deleted setlist), once old enough.
  * A share that fails is left for the next sync: the others carry on. Returns how many setlists
  * it changed.
+ *
+ * `light` is for the sync that runs by itself every minute and after an edit (the feed's, which
+ * does not list folders): only step 1, and only for a setlist with changes not yet sent, so that a
+ * live share is updated at once. Ending and cleaning up (steps 2 and 3, which list the shares) wait
+ * for a full sync, and so does a share whose songs changed but not its setlist.
  */
-export async function syncShares(ctx: ShareContext): Promise<number> {
+export async function syncShares(
+  ctx: ShareContext,
+  { light = false }: { light?: boolean } = {}
+): Promise<number> {
   const today = todayOf(ctx)
   const now = ctx.now ?? new Date()
   const setlists = await ctx.db.getAllSetlists()
@@ -136,6 +167,7 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
   for (const setlist of setlists) {
     const { share } = setlist
     if (!share || setlist.deletedAt) continue
+    if (light && (isExpired(share.expires, today) || !setlistHasLocalChanges(setlist))) continue
     try {
       if (isExpired(share.expires, today)) {
         await stopShare(share, ctx.space)
@@ -157,6 +189,8 @@ export async function syncShares(ctx: ShareContext): Promise<number> {
       console.error(`[Share] Could not sync the share of setlist ${setlist.id}:`, error)
     }
   }
+
+  if (light) return changed
 
   try {
     const live = new Map(
