@@ -1,4 +1,4 @@
-/** The part of `cloudflare:workers` the Worker uses: a Durable Object base class */
+/** The part of `cloudflare:workers` the Worker uses: a Durable Object base class, and its sockets */
 declare module 'cloudflare:workers' {
   interface DurableObjectStorage {
     get<T>(key: string): Promise<T | undefined>
@@ -9,10 +9,27 @@ declare module 'cloudflare:workers' {
   }
   interface DurableObjectState {
     storage: DurableObjectStorage
+    /** Accept a socket for hibernation: the object may leave memory between its messages */
+    acceptWebSocket(socket: WebSocket, tags?: string[]): void
+    getWebSockets(tag?: string): WebSocket[]
   }
   export class DurableObject<E = unknown> {
     ctx: DurableObjectState
     env: E
     constructor(ctx: DurableObjectState, env: E)
   }
+}
+
+// (what workerd adds to the standard WebSocket and Response)
+interface WebSocket {
+  /** What is kept with the socket while the object is out of memory (a small structured value) */
+  serializeAttachment(value: unknown): void
+  deserializeAttachment(): unknown
+}
+interface ResponseInit {
+  webSocket?: WebSocket
+}
+declare class WebSocketPair {
+  0: WebSocket
+  1: WebSocket
 }

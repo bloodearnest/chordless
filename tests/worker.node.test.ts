@@ -11,6 +11,7 @@ import assert from 'node:assert/strict'
 import { after, before, describe, test } from 'node:test'
 import { createTestHarness } from 'wrangler'
 import type { Env } from '../worker/src/env.ts'
+import type { Identity } from '../worker/src/identity.ts'
 import type { TeamSpaceApi } from '../worker/src/team-state.ts'
 import { email } from './make-email.ts'
 
@@ -282,6 +283,125 @@ describe('a team space Durable Object', () => {
     assert.ok(env.SHARE_ROOM, 'wrangler.toml binds SHARE_ROOM')
     const room = env.SHARE_ROOM.get(env.SHARE_ROOM.idFromName('a-share-file-id'))
     assert.equal((await room.fetch(new Request('https://chordless.test/'))).status, 501)
+  })
+
+  // The live channel (worker/src/live-relay.ts): a device going live is a socket on the space's object
+  describe('the live channel', () => {
+    const cat = { provider: 'google', sub: 'g-3', email: 'cat@example.com' }
+    const changed = '{"type":"changed"}'
+
+    /** A space with ann as owner, cat as writer and bob as reader */
+    const space = async (name: string) => {
+      await inSpace(name, async team => {
+        await team.create({ rootRef: `root-${name}`, name, owner: ann })
+        await team.setMember(cat, 'writer')
+        await team.setMember(bob, 'reader')
+      })
+      return name
+    }
+
+    /** A device going live in a space, as the Worker passes it on after settling who it is (team-live.ts) */
+    const goLive = async (name: string, who: Identity) => {
+      const env = await worker.getWorker<Env>().getEnv()
+      assert.ok(env.TEAM_SPACE)
+      const stub = env.TEAM_SPACE.get(env.TEAM_SPACE.idFromName(name))
+      assert.ok(stub.fetch)
+      const answer = (await stub.fetch(
+        new Request('https://chordless.test/api/space/x/live', {
+          headers: {
+            Upgrade: 'websocket',
+            'Sec-WebSocket-Protocol': 'chordless',
+            'X-Live-Identity': JSON.stringify(who),
+          },
+        })
+      )) as Response & { webSocket: (WebSocket & { accept(): void }) | null }
+      assert.equal(answer.status, 101)
+      assert.equal(answer.headers.get('Sec-WebSocket-Protocol'), 'chordless')
+      const socket = answer.webSocket
+      assert.ok(socket)
+      socket.accept()
+      const heard: string[] = []
+      const closed: number[] = []
+      socket.addEventListener('message', event => heard.push(String(event.data)))
+      socket.addEventListener('close', event => closed.push(event.code))
+      return { socket, heard, closed }
+    }
+
+    /** Let the messages in flight arrive */
+    const settle = () => new Promise(resolve => setTimeout(resolve, 200))
+
+    test('relays a writer’s "changed" to the other live devices, and not back', async () => {
+      const name = await space('live-a')
+      const writer = await goLive(name, cat)
+      const reader = await goLive(name, bob)
+      const owner = await goLive(name, ann)
+
+      writer.socket.send(changed)
+      await settle()
+
+      assert.deepEqual(reader.heard, [changed])
+      assert.deepEqual(owner.heard, [changed])
+      assert.deepEqual(writer.heard, [])
+    })
+
+    test('keeps spaces apart', async () => {
+      const here = await goLive(await space('live-b'), cat)
+      const there = await goLive(await space('live-c'), ann)
+
+      here.socket.send(changed)
+      await settle()
+
+      assert.deepEqual(there.heard, [])
+    })
+
+    test('closes a reader that sends, and a message that is not the frame', async () => {
+      const name = await space('live-d')
+      const reader = await goLive(name, bob)
+      const writer = await goLive(name, cat)
+      const listener = await goLive(name, ann)
+
+      reader.socket.send(changed)
+      writer.socket.send('{"type":"changed","setlist":{"songs":[]}}')
+      await settle()
+
+      assert.deepEqual(reader.closed, [1008])
+      assert.deepEqual(writer.closed, [1003])
+      assert.deepEqual(listener.heard, [], 'nothing of either reached the others')
+    })
+
+    // (Two things stop them: their sockets are closed when their membership changes, and a frame is
+    // checked against the role they have at that moment. This cannot tell which did: the test
+    // harness does not tell the client of a close made outside a message, so it cannot be seen.)
+    test('relays nothing from a member who was removed or demoted since they connected', async () => {
+      const name = await space('live-e')
+      const dan = { provider: 'google', sub: 'g-4', email: 'dan@example.com' }
+      await inSpace(name, team => team.setMember(dan, 'writer'))
+      const removed = await goLive(name, cat)
+      const demoted = await goLive(name, dan)
+      const listener = await goLive(name, ann)
+
+      await inSpace(name, async team => {
+        await team.removeMember(cat)
+        await team.setMember(dan, 'reader')
+      })
+      removed.socket.send(changed)
+      demoted.socket.send(changed)
+      await settle()
+
+      assert.deepEqual(listener.heard, [])
+    })
+
+    test('relays nothing once the space is destroyed', async () => {
+      const name = await space('live-f')
+      const writer = await goLive(name, cat)
+      const listener = await goLive(name, ann)
+      await inSpace(name, team => team.destroy())
+
+      writer.socket.send(changed)
+      await settle()
+
+      assert.deepEqual(listener.heard, [])
+    })
   })
 
   test('persists a space that was made', async () => {
