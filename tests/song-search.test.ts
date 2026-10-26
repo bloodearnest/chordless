@@ -46,6 +46,7 @@ describe('SongIndex', () => {
     song('Blessed Be Your Name', 'Blessed be your name', '', 'Acoustic'),
     song('Raise A Hallelujah', 'I raise a hallelujah'),
     song('Praise', 'We are praising and he praised us'),
+    song('Worthy Is The Lamb', 'Worthy is the Lamb'),
   ])
   const found = (term: string) => [...index.search(term).keys()].sort()
 
@@ -67,9 +68,17 @@ describe('SongIndex', () => {
     expect(found('raises')).to.deep.equal([4])
   })
 
-  it('finds a word with a letter wrong, from six letters', () => {
-    expect(found('wretck')).to.deep.equal([0])
+  it('finds a word with a letter wrong, from six letters, or from seven for the last word', () => {
+    expect(found('wretck like')).to.deep.equal([0])
+    expect(found('wretchd')).to.deep.equal([0])
     expect(found('hallelujha')).to.deep.equal([4])
+  })
+
+  it('does not take a word being typed for a slip of the fingers ("worshi" is not "worthy")', () => {
+    expect(found('wretck')).to.deep.equal([])
+    expect(found('worshi')).to.deep.equal([2])
+    expect(found('worshi')).to.not.include(6)
+    expect(found('worthi')).to.deep.equal([6])
   })
 
   it('finds a word begun, whatever form it will be: the last word', () => {
@@ -120,7 +129,9 @@ describe('wordRanges', () => {
   })
 
   it('finds a word with a letter wrong, from six letters', () => {
-    expect(marked('saved a wretch like me', 'wretck')).to.deep.equal(['wretch'])
+    expect(marked('saved a wretch like me', 'wretck like')).to.deep.equal(['wretch', 'like'])
+    expect(marked('saved a wretch like me', 'wretchd')).to.deep.equal(['wretch'])
+    expect(marked('Worthy is the Lamb, worship', 'worshi')).to.deep.equal(['worship'])
     expect(marked('I raise it', 'praises')).to.deep.equal([])
   })
 
