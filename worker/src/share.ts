@@ -28,7 +28,7 @@ const GONE_SECONDS = 30
  * ...and for a request that says `?fresh=1` (a recipient told by the live channel that the share was
  * updated). Anyone can ask, so what it changes is bounded: Drive is asked at most this often per
  * file in a data centre, however many ask, and not once more for asking more. (Drive makes a new
- * version readable about 2.7 s after the upload, so a recipient asks again soon and often.)
+ * version readable within a second of its upload, so a recipient asks again soon and often.)
  */
 const FRESH_SECONDS = 1
 /** When the answer was fetched from Drive (ms), kept with it in the cache */
