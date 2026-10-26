@@ -22,6 +22,13 @@ import { reloadShare } from './share-receiver.ts'
 import { getCurrentSpaceFull, SpaceChangeEvent } from './space.ts'
 import { atLeast } from './team-roles.ts'
 
+/**
+ * A recipient of a share fetches it this often while live, whatever the channel says: a team space has
+ * the sync's minute tick as its fallback and a share has nothing else, so a "changed" that was missed
+ * (the channel was down, or Drive had not shown the update by the last follow-up) is found by this
+ */
+export const SHARE_POLL_MS = 30_000
+
 /** A channel this device joins while it is live, and what it is for */
 export type LiveTarget =
   /** The team space's: the devices of its members tell each other of changes, to sync at once */
@@ -124,12 +131,16 @@ export interface LiveSyncDeps {
   reloadShare(fileId: string): Promise<void>
   visible(): boolean
   later(ms: number, fn: () => void): () => void
+  /** Call `fn` every `ms` until the returned function is called */
+  every(ms: number, fn: () => void): () => void
 }
 
 interface Joined {
   target: LiveTarget
   channel: LiveChannelLike
   cancelFollowUps: (() => void)[]
+  /** A recipient's slow poll */
+  stopPoll: (() => void) | null
 }
 
 export class LiveSync {
@@ -209,13 +220,21 @@ export class LiveSync {
         connected: () => this.#fetch(joined.target),
       }),
       cancelFollowUps: [],
+      stopPoll: null,
     }
     this.#joined.set(target.key, joined)
+    if (target.kind === 'share-recipient') {
+      // (as the tick is: not while the app is not on screen)
+      joined.stopPoll = this.#deps.every(SHARE_POLL_MS, () => {
+        if (this.#deps.visible()) this.#fetch(target)
+      })
+    }
     joined.channel.start()
   }
 
   #leave(joined: Joined): void {
     for (const cancel of joined.cancelFollowUps) cancel()
+    joined.stopPoll?.()
     joined.channel.stop()
     this.#joined.delete(joined.target.key)
   }
@@ -335,6 +354,10 @@ export function startLiveSync(): LiveSync {
     later: (ms, fn) => {
       const id = setTimeout(fn, ms)
       return () => clearTimeout(id)
+    },
+    every: (ms, fn) => {
+      const id = setInterval(fn, ms)
+      return () => clearInterval(id)
     },
   })
   sync.start()
