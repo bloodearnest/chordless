@@ -10,8 +10,12 @@ set -euo pipefail
 worker_port=${CHORDLESS_WORKER_PORT:-8789}
 worker="http://localhost:${worker_port}"
 
+# CHORDLESS_DEV_VARS: where the dev secrets are, if not the .dev.vars here (a second checkout has none)
+env_file=()
+[[ -n "${CHORDLESS_DEV_VARS:-}" ]] && env_file=(--env-file "$CHORDLESS_DEV_VARS")
+
 # wrangler's own process, not npx's, so that stopping it stops the Worker's runtime with it
-node_modules/.bin/wrangler dev --env dev --port "$worker_port" &
+node_modules/.bin/wrangler dev --env dev --port "$worker_port" "${env_file[@]}" &
 wrangler=$!
 trap 'kill "$wrangler" 2>/dev/null || true' EXIT
 

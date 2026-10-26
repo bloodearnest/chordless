@@ -171,9 +171,13 @@ Durable Object named by the share file's id (`SHARE_ROOM`, migration v2).
   key from one address in minutes, and Google answered everything from that address with its "Sorry..."
   page for a while, which is the per-address limit that is the reason downloads go through the Worker.
   The team space's feed is not measured (it needs two accounts).
-- **Not covered: two real browsers.** A Playwright test of a leader and a follower needs a team space,
-  which needs Drive and a Google token a test cannot make, so it would need a test identity provider
-  and a fake Drive in the Worker (a design of its own). Until then: two real devices on different
+- `just test-live` (`tests/live/live-share.live.playwright.ts`, not in CI): two real browsers. A sharer
+  signed in as the test account (a real Drive folder, the share made from the UI) and a recipient with no
+  account, both live on `just serve-live`'s server. The sharer adds a song; the recipient's page shows it
+  about 7 s later (the app's 2 s wait after an edit, the sync, the share's upload, the ping, the fetch).
+  It found that the sync that runs by itself did not update shares (below).
+- **Not covered: a team space in two browsers.** A member has to be a different Google account from
+  the owner, and there is one test account. Until there are two: two real devices on different
   networks, then wifi dropped mid-service, are the test.
 
 ## Running it locally

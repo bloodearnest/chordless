@@ -140,6 +140,9 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
     const recipient = await join()
     const another = await join()
 
+    // (LIVE_SHARE_GAP_MS: how long the share has been read, and not changed, before the update)
+    await sleep(Number(process.env.LIVE_SHARE_GAP_MS) || 0)
+
     // The sharer updates the share, and when that is done says so: the order the app keeps
     const metadata = shareFileMetadata(
       { id: 'live-share-test' },
@@ -171,10 +174,20 @@ describe('live sync of a share, against a real Drive and the real Worker', { ski
         break
       }
     }
+    // (if the app's fetches missed it: when does it come? the app would only learn at its next sync)
+    let lateAfter: number | null = null
+    while (seenAfter === null && lateAfter === null && performance.now() - uploaded < 90_000) {
+      await sleep(1000)
+      if ((await fetchShare(true)).name === 'version 2') lateAfter = performance.now() - uploaded
+    }
     t.diagnostic(
       `told ${Math.round(told)} ms after the sharer said it; the update ${
         seenAfter === null
-          ? `was not there by the last fetch, ${FOLLOW_UPS_MS.at(-1)} ms after being told`
+          ? `was not there by the last fetch, ${FOLLOW_UPS_MS.at(-1)} ms after being told${
+              lateAfter === null
+                ? ', nor in 90 s'
+                : `; it came ${Math.round(lateAfter)} ms after the upload finished`
+            }`
           : `was found by ${seenBy}, ${Math.round(seenAfter)} ms after the upload finished`
       }`
     )
