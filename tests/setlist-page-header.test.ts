@@ -431,12 +431,25 @@ describe('the setlist page: header, menu and keys', () => {
       expect(($('#key-selector') as unknown as { value: string }).value).to.equal('-')
     })
 
-    it('gives the overview title a row of its own, and the songs not', async () => {
+    it('gives the overview a short date and a row under it for the name, or else the type', async () => {
       await rig.open()
+      Object.assign(rig.page.currentSetlist ?? {}, {
+        date: '2026-10-18',
+        name: 'Harvest',
+        type: 'Sunday',
+      })
       await rig.page.header.show(null, true)
-      expect(header().titleBelow).to.equal(true)
+      expect(header().phoneHeading).to.match(/^(18 Oct|Oct 18)/)
+      expect(header().subheading).to.equal('Harvest')
+      Object.assign(rig.page.currentSetlist ?? {}, { name: '' })
+      await rig.page.header.show(null, true)
+      expect(header().subheading).to.equal('Sunday')
+      Object.assign(rig.page.currentSetlist ?? {}, { type: '' })
+      await rig.page.header.show(null, true)
+      expect(header().subheading).to.equal('')
       await rig.page.header.show(rig.page.songs[0], true)
-      expect(header().titleBelow).to.equal(false)
+      expect(header().phoneHeading).to.equal('')
+      expect(header().subheading).to.equal('')
     })
 
     it('keeps the header out of a scroll on the overview', async () => {

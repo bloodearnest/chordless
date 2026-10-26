@@ -14,7 +14,25 @@ import { must } from './must.ts'
 const { describe, it } = window
 
 describe('app-header', () => {
-  const shownTitle = header => header.shadowRoot.querySelector('.title').textContent.trim()
+  const shownTitle = header => header.shadowRoot.querySelector('.title .wide').textContent.trim()
+
+  it('has a shorter heading for a phone, and a row under it, which change with the heading', async () => {
+    const header = await fixture<AppHeader>(
+      html`<app-header heading="Sun 18 Oct - Harvest"></app-header>`
+    )
+    const narrow = () => header.shadowRoot?.querySelector('.title .narrow')?.textContent?.trim()
+    const sub = () => header.shadowRoot?.querySelector('.subtitle')?.textContent?.trim()
+    // Without a phone heading the one heading serves
+    expect(narrow()).to.equal('Sun 18 Oct - Harvest')
+    expect(sub()).to.equal(undefined)
+    header.phoneHeading = '18 Oct'
+    header.subheading = 'Harvest'
+    await waitUntil(() => narrow() === '18 Oct' && sub() === 'Harvest', 'the texts change')
+    // (nothing but the row under changes)
+    header.subheading = 'Sunday'
+    await waitUntil(() => sub() === 'Sunday', 'the row under changes')
+    expect(narrow()).to.equal('18 Oct')
+  })
 
   it('shows a new heading after fading the old one out', async () => {
     const header = await fixture<AppHeader>(html`<app-header heading="First"></app-header>`)

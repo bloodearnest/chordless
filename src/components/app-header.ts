@@ -41,7 +41,8 @@ export class HeaderInfoClickEvent extends Event {
  * @property {Boolean} showEditToggle - Whether to show the edit mode toggle button
  * @property {Boolean} showInfoButton - Whether to show the info button
  * @property {Boolean} editMode - Current edit mode state (for styling the toggle button)
- * @property {Boolean} titleBelow - On phones, the title is a row of its own under the menu and icons
+ * @property {String} phoneHeading - The title on a phone, if shorter than `heading` (the top row has little room)
+ * @property {String} subheading - On a phone, a row of its own under the top row (not shown wider)
  * @property {Boolean} tucked - On phones, the header is slid out of the way (by a negative top margin the page sets)
  *
  * Slots:
@@ -70,7 +71,8 @@ export class AppHeader extends LitElement {
     showLogo: { type: Boolean, attribute: 'show-logo' },
     editMode: { type: Boolean, reflect: true, attribute: 'edit-mode' },
     disableAnimation: { type: Boolean, attribute: 'disable-animation' },
-    titleBelow: { type: Boolean, reflect: true, attribute: 'title-below' },
+    phoneHeading: { type: String, attribute: 'phone-heading' },
+    subheading: { type: String },
     tucked: { type: Boolean, reflect: true },
     _slottedControls: { state: true }, // whether anything is in the controls slot
     _updateReady: { state: true }, // whether a new version of the app is waiting
@@ -82,7 +84,8 @@ export class AppHeader extends LitElement {
   declare showLogo: boolean
   declare editMode: boolean
   declare disableAnimation: boolean
-  declare titleBelow: boolean
+  declare phoneHeading: string
+  declare subheading: string
   declare tucked: boolean
   declare _slottedControls: boolean
   declare _updateReady: boolean
@@ -93,6 +96,8 @@ export class AppHeader extends LitElement {
   /** Set by setTitleInstant for the one update it causes; not reactive, so it causes no other */
   _instant: boolean
   _displayTitle: string
+  _displayPhone: string
+  _displaySub: string
 
   static override styles = css`
     :host {
@@ -228,6 +233,14 @@ export class AppHeader extends LitElement {
       min-width: 0;
     }
 
+    .narrow {
+      display: none;
+    }
+
+    .subtitle {
+      display: none;
+    }
+
     /* Phones: the controls take a row of their own, as little of it as they need */
     @media (max-width: 47.99rem) {
       header {
@@ -235,14 +248,17 @@ export class AppHeader extends LitElement {
         gap: 0;
       }
 
+      /* (a basis of its own width, so that what comes after wraps to a row of its own) */
       .header-row-1 {
-        width: 100%;
+        flex: 1 1 100%;
       }
 
       /* The round buttons follow the text size too, not a fixed 2.5rem (the page's own share and
          live buttons read this as well) */
       :host {
         --header-button: calc(var(--font-ui) * 2);
+        /* How far in from the header's padding the menu icon's edge is */
+        --edge: 0.25rem;
       }
 
       .nav-menu-button {
@@ -263,21 +279,31 @@ export class AppHeader extends LitElement {
         visibility: hidden;
       }
 
-      /* The menu and the icons, and under them the title, as a row of its own */
-      :host([title-below]) .header-icons {
-        margin-left: auto;
+      .wide {
+        display: none;
       }
 
-      :host([title-below]) .header-row-1 {
-        flex-wrap: wrap;
+      .narrow {
+        display: inline;
       }
 
-      :host([title-below]) .header-row-1 .title {
-        order: 1;
-        flex: 0 0 100%;
-        padding-left: var(--gap);
+      /* A row of its own, under the top row, for the rest of the title (a setlist's name) */
+      .subtitle {
+        display: block;
+        width: 100%;
+        /* (the 5px is the space the menu icon's drawing leaves at its own edge) */
+        padding-left: calc(var(--edge) + 5px);
         box-sizing: border-box;
         line-height: 1.2;
+        opacity: 0.85;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        transition: opacity 0.3s ease-in-out;
+      }
+
+      .subtitle.fade-out {
+        opacity: 0;
       }
 
       .header-row-2 {
@@ -285,7 +311,12 @@ export class AppHeader extends LitElement {
         justify-content: flex-start;
         flex-wrap: wrap;
         line-height: 1.2;
-        padding-left: var(--gap);
+      }
+
+      /* The key and the rest line up with the menu icon's edge, not indented from it: the
+         controls' own padding and border (musical-metadata-display's) are taken off */
+      ::slotted(.header-controls-slot) {
+        margin-left: calc(var(--edge) - 2px - 0.45rem);
       }
     }
 
@@ -377,7 +408,8 @@ export class AppHeader extends LitElement {
     this.showLogo = false
     this.editMode = false
     this.disableAnimation = false
-    this.titleBelow = false
+    this.phoneHeading = ''
+    this.subheading = ''
     this.tucked = false
     this._slottedControls = false
     this._updateReady = appUpdate.ready
@@ -385,6 +417,8 @@ export class AppHeader extends LitElement {
     this._animating = false
     this._instant = false
     this._displayTitle = '' // The title actually shown in the UI
+    this._displayPhone = ''
+    this._displaySub = ''
   }
 
   override connectedCallback() {
@@ -392,8 +426,7 @@ export class AppHeader extends LitElement {
     window.addEventListener(AppUpdateChangeEvent.type, this._onUpdateChange)
     this._updateReady = appUpdate.ready
     // Initialize display title
-    this._displayTitle = this.heading
-    this._previousTitle = this.heading
+    this._commitTitle()
   }
 
   override disconnectedCallback() {
@@ -407,13 +440,8 @@ export class AppHeader extends LitElement {
 
   override willUpdate(changedProperties: PropertyValues<this>): void {
     // Without animation the new heading is shown by this very update
-    if (
-      changedProperties.has('heading') &&
-      this.heading !== this._previousTitle &&
-      (this.disableAnimation || this._instant)
-    ) {
-      this._displayTitle = this.heading
-      this._previousTitle = this.heading
+    if (this._titleChanged(changedProperties) && (this.disableAnimation || this._instant)) {
+      this._commitTitle()
     }
   }
 
@@ -421,35 +449,51 @@ export class AppHeader extends LitElement {
     super.updated(changedProperties)
 
     // Animate a title change (one already running shows the latest heading when done)
-    if (
-      changedProperties.has('heading') &&
-      this.heading !== this._previousTitle &&
-      !this._animating
-    ) {
+    if (this._titleChanged(changedProperties) && !this._animating) {
       this._animateTransition()
     }
+  }
+
+  /** All the title's texts as one, to see whether any changed */
+  _titleKey(): string {
+    return [this.heading, this.phoneHeading, this.subheading].join('\0')
+  }
+
+  _titleChanged(changed: PropertyValues<this>): boolean {
+    const touched =
+      changed.has('heading') || changed.has('phoneHeading') || changed.has('subheading')
+    return touched && this._titleKey() !== this._previousTitle
+  }
+
+  /** Show the title's texts as they now are */
+  _commitTitle(): void {
+    this._displayTitle = this.heading
+    this._displayPhone = this.phoneHeading
+    this._displaySub = this.subheading
+    this._previousTitle = this._titleKey()
   }
 
   async _animateTransition(): Promise<void> {
     this._animating = true
 
     // Fade out the old title (Lit keeps the same element across renders)
-    const titleEl = this._title.value
-    titleEl?.classList.add('fade-out')
+    const titleEls = this.renderRoot.querySelectorAll('.title, .subtitle')
+    for (const el of titleEls) el.classList.add('fade-out')
 
     // Wait for fade-out to complete
     await sleep(300)
 
     // Update the displayed title
-    this._displayTitle = this.heading
-    this._previousTitle = this.heading
+    this._commitTitle()
     this.requestUpdate()
 
     // Wait for re-render
     await this.updateComplete
 
     // Fade in the new one
-    requestAnimationFrame(() => titleEl?.classList.remove('fade-out'))
+    requestAnimationFrame(() => {
+      for (const el of titleEls) el.classList.remove('fade-out')
+    })
 
     // Wait for fade-in to complete
     await sleep(300)
@@ -457,7 +501,7 @@ export class AppHeader extends LitElement {
     this._animating = false
 
     // The heading may have changed again while fading: show the latest
-    if (this._displayTitle !== this.heading) {
+    if (this._titleKey() !== this._previousTitle) {
       this._animateTransition()
     }
   }
@@ -491,7 +535,8 @@ export class AppHeader extends LitElement {
           </button>
           <div class="title" part="title" ${ref(this._title)}>
             ${this.showLogo ? html`<img src="/icons/favicon-light.svg" alt="" class="logo" />` : ''}
-            ${this._displayTitle}
+            <span class="wide">${this._displayTitle}</span>
+            <span class="narrow">${this._displayPhone || this._displayTitle}</span>
           </div>
           <div class="header-actions"><slot name="actions"></slot></div>
           <div class="header-icons">
@@ -526,6 +571,12 @@ export class AppHeader extends LitElement {
             }
           </div>
         </div>
+
+        ${
+          this._displaySub
+            ? html`<div class="subtitle" part="subtitle">${this._displaySub}</div>`
+            : ''
+        }
 
         <!-- Row 2: the page's controls (on phones, under the top row) -->
         <div class="header-row-2" ?hidden=${!this._slottedControls}>

@@ -2,7 +2,7 @@
  * Utility functions for date formatting and calculations
  */
 
-export type DateStyle = 'short' | 'long'
+export type DateStyle = 'short' | 'long' | 'compact'
 export interface DateFormatOptions {
   locale?: string
   now?: Date
@@ -86,15 +86,18 @@ export function formatSetlistDate(
   const date = parseLocalDate(dateString)
   if (Number.isNaN(date.getTime())) return dateString ?? ''
 
+  const thisYear = date.getFullYear() === now.getFullYear()
   const options: Intl.DateTimeFormatOptions =
-    style === 'short'
-      ? {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          ...(date.getFullYear() !== now.getFullYear() && { year: 'numeric' }),
-        }
-      : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
+    style === 'compact'
+      ? { day: 'numeric', month: 'short', ...(!thisYear && { year: 'numeric' }) }
+      : style === 'short'
+        ? {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            ...(!thisYear && { year: 'numeric' }),
+          }
+        : { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }
   return date.toLocaleDateString(locale, options)
 }
 

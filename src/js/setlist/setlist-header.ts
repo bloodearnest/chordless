@@ -24,7 +24,7 @@ import { syncsBack } from '../space.ts'
 import { differsFromOfficial } from '../sync/revert.ts'
 import { getAvailableKeys } from '../transpose.ts'
 import { normalizeCapo } from '../utils/capo.ts'
-import { setlistTitle } from '../utils/date-utils.ts'
+import { formatSetlistDate, setlistTitle } from '../utils/date-utils.ts'
 import { sleep } from '../utils/sleep.ts'
 import { isEditMode, setBodyEditMode } from './edit-mode-ui.ts'
 import type { RuntimeSong } from './runtime-songs.ts'
@@ -83,24 +83,37 @@ export class SetlistHeader {
         : 'Setlist'
     if (!appHeader) return
 
+    // On a phone the overview's title is the date alone, and the name (or, with none, the type of
+    // service) a row under it: the top row has little room
+    const onOverview = !song && currentSetlist
+    const phoneHeading = onOverview ? formatSetlistDate(currentSetlist.date, 'compact') : ''
+    const subheading = onOverview ? currentSetlist.name || currentSetlist.type || '' : ''
+
     appHeader.showEditToggle = true
     // (nothing to change)
-    if (appHeader.heading === title && !instant) return
+    if (
+      appHeader.heading === title &&
+      appHeader.phoneHeading === phoneHeading &&
+      appHeader.subheading === subheading &&
+      !instant
+    ) {
+      return
+    }
 
     if (instant) {
+      appHeader.phoneHeading = phoneHeading
+      appHeader.subheading = subheading
       appHeader.setTitleInstant(title)
       this.#showContent(song)
     } else {
+      appHeader.phoneHeading = phoneHeading
+      appHeader.subheading = subheading
       appHeader.heading = title
       await this.#fadeControls(() => this.#showContent(song))
     }
   }
 
   #showContent(song: RuntimeSong | null) {
-    // (on a phone the overview's title has a row to itself, with the icons above it. This moves
-    // it, so it is done with the rest, while the title and controls are faded out)
-    const appHeader = this.#find<AppHeader>('#app-header')
-    if (appHeader) appHeader.titleBelow = !song
     const musicalMetadata = this.#find<MusicalMetadataDisplay>('#musical-metadata')
     const keySelector = this.#find<KeySelector>('#key-selector')
     const capoSelector = this.#find<CapoSelector>('#capo-selector')
