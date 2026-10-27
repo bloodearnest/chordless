@@ -150,22 +150,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # A freeze: the repository's variable DEPLOY_FREEZE is true (gh variable set DEPLOY_FREEZE --body
-      # true; gh variable delete DEPLOY_FREEZE). Pushes and the schedule then deploy nothing, and the
-      # next unfrozen run deploys what is on main; a manual run always goes ahead (docs/CI.md)
-      - id: freeze
-        env:
-          FROZEN: ${{ vars.DEPLOY_FREEZE }}
-          EVENT: ${{ github.event_name }}
-        run: |
-          if [ "$FROZEN" = true ] && [ "$EVENT" != workflow_dispatch ]; then
-            echo "frozen=true" >>"$GITHUB_OUTPUT"
-            echo "Deploys are frozen (DEPLOY_FREEZE): nothing deployed." | tee -a "$GITHUB_STEP_SUMMARY"
-          fi
       # Not the newest commit on main: a newer run will deploy it, and this one must not put an older
       # build over it
       - id: newest
-        if: steps.freeze.outputs.frozen != 'true'
         env:
           REPOSITORY: ${{ github.repository }}
           SHA: ${{ github.sha }}
