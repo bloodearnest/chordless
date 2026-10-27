@@ -4,15 +4,19 @@ deploys (.github/workflows/deploy.yml)
 - the rollback (`wrangler rollback` after a failed smoke test) has never run: try it once on purpose.
   Plan: add a manual-run input `break_smoke` to deploy.yml that makes the smoke test fail on purpose
   after a real deploy (`scripts/ci/smoke.sh` is given a hash it cannot match). Run it when nothing is
-  being used (not Saturday night or Sunday; set DEPLOY_FREEZE first), from a state where the previous
+  being used (not Saturday night or Sunday, and merge nothing meanwhile), from a state where the previous
   version differs from the current one (deploy any real change first, or note the two version ids with
   `wrangler deployments list`). Then check: the run ends red at the smoke step, the rollback step ran
   and passed, `wrangler deployments list` shows the previous version active again, chordless.app's
-  /version.json has the previous hash, and the site loads and signs in. Remove DEPLOY_FREEZE and let
-  the next push deploy the current build again. Then drop the input, or keep it, documented
+  /version.json has the previous hash, and the site loads and signs in. The next push deploys the
+  current build again. Then drop the input, or keep it, documented
 - the production deploy token (`CLOUDFLARE_API_TOKEN` in `production`) has no expiry check yet
   (`scripts/ci/check-expiry.sh` knows the Terraform ones); give it a CLOUDFLARE_TOKEN_EXPIRES variable
   and check it in the deploy job
+- (idea, not wanted yet) a deploy freeze, for a time the app is in use: a repository variable
+  `DEPLOY_FREEZE` that makes a push or the nightly run deploy nothing (a manual run ignoring it, so a
+  fix is always possible), or a window built in (Saturday 18:00 to Sunday 14:00 London) so there is
+  nothing to remember. The nightly deploy already avoids Saturday night and Sunday
 - the Worker bundle's hash in the deploy's message (`wrangler deploy --message`), so the dashboard's
   versions say which build they are
 

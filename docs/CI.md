@@ -189,12 +189,6 @@ deploy what a push did not (a merge made with a workflow's token, as Dependabot'
 workflow; not Saturday night or Sunday, when the app is used most); and by hand. The scheduled run does not plan the
 infrastructure: the nightly drift check (`terraform.yml`) does.
 
-**Freezing deploys** (before a service, say): `gh variable set DEPLOY_FREEZE --body true` (or Settings,
-Secrets and variables, Actions, Variables). While it is `true`, a push or the schedule runs its checks
-and deploys nothing, and says so in the summary; the first run after `gh variable delete DEPLOY_FREEZE`
-deploys what is on `main` (the live build is compared, so nothing is lost). A manual run (Actions, Deploy,
-Run workflow) ignores the freeze: a fix must always be possible.
-
 Each deploy is listed against the `production` environment, with the live address, in the repository's
 Deployments.
 
