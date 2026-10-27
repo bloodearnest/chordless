@@ -109,9 +109,11 @@ jobs:
   deploy:
     name: Deploy
     needs: [ci, plan, apply, build]
-    # (apply is skipped when there was nothing to apply; rejected or failed, it stops the deploy)
+    # !cancelled() so the skipped apply (nothing to apply) does not skip this too. CI by ci-ok, the
+    # one required check: the job's own result is failure when the macOS or Windows job (not yet
+    # required) fails
     if: >-
-      needs.ci.result == 'success' && needs.plan.result == 'success'
+      !cancelled() && needs.ci.outputs.ok == 'true' && needs.plan.result == 'success'
       && (needs.apply.result == 'success' || needs.apply.result == 'skipped')
       && needs.build.result == 'success'
     runs-on: ubuntu-24.04

@@ -159,7 +159,7 @@ also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30
 
 One run, in order, so a deploy never runs before what it depends on:
 
-1. **CI** (`ci.yml`) on the commit.
+1. **CI** (`ci.yml`) on the commit: passes when `ci-ok` does (a job allowed to fail, such as macOS, fails the called workflow's own result but not this).
 2. **Infrastructure** (the plan and apply jobs of `terraform.yml`, repeated in `deploy.yml` with the same
    steps, in `.github/actions/terraform-plan` and `-apply`): every stack CI looks after is planned, and applied after
    the owner approves if anything differs. A rejected or failed apply stops the deploy; nothing
