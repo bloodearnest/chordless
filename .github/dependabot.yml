@@ -26,6 +26,16 @@ updates:
         applies-to: security-updates
         patterns: ["*"]
 
+  # The Terraform providers of each stack in infra/ (their versions and .terraform.lock.hcl). Not the
+  # Terraform CLI: that is pinned in mise.toml, which Renovate updates (.github/renovate.json5). A
+  # merged bump runs the Terraform workflow, which plans and waits for the owner before any apply.
+  - package-ecosystem: terraform
+    directories: ["/infra/*"]
+    multi-ecosystem-group: weekly
+    patterns: ["*"]
+    cooldown:
+      default-days: 7
+
   - package-ecosystem: github-actions
     directory: /
     multi-ecosystem-group: weekly
