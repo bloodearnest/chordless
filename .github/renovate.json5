@@ -1,0 +1,37 @@
+// Renovate keeps the tools pinned in mise.toml up to date (docs/CI.md); Dependabot cannot, as it has
+// no mise support. Only that: npm packages and actions stay Dependabot's (.github/dependabot.yml),
+// so no manager but mise is on.
+// - One pull request a week (Mondays, London time) of every tool with a new version, each at least a
+//   week old, as Dependabot's are. Merged by itself once its checks pass, as Dependabot's are.
+// - A major version is its own pull request and is not merged by itself: Node 22 to 24 is a decision.
+//   gcloud numbers every release as a major (589.0.0, 590.0.0), so it is not held back by that.
+{
+  $schema: "https://docs.renovatebot.com/renovate-schema.json",
+  enabledManagers: ["mise"],
+  timezone: "Europe/London",
+  schedule: ["before 7am on Monday"],
+  minimumReleaseAge: "7 days",
+  dependencyDashboard: false,
+  commitMessagePrefix: "tools:",
+  automerge: true,
+  platformAutomerge: true,
+  automergeStrategy: "rebase",
+  packageRules: [
+    {
+      matchManagers: ["mise"],
+      groupName: "mise tools",
+    },
+    {
+      matchManagers: ["mise"],
+      matchUpdateTypes: ["major"],
+      groupName: "mise tools (major versions)",
+      automerge: false,
+    },
+    {
+      matchManagers: ["mise"],
+      matchPackageNames: ["gcloud"],
+      groupName: "mise tools",
+      automerge: true,
+    },
+  ],
+}

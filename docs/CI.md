@@ -136,6 +136,23 @@ week old (`cooldown`); security updates when an alert comes, those at once in on
 is set to merge itself once its checks pass (`.github/workflows/dependabot-auto-merge.yml`): the same
 checks as any pull request, with `just audit` among them.
 
+## Renovate (`.github/renovate.json5`)
+
+Dependabot has no support for mise, so [Renovate](https://docs.renovatebot.com/modules/manager/mise/)
+keeps the tools pinned in `mise.toml` up to date, and only those (`enabledManagers: ["mise"]`: npm and
+actions stay Dependabot's, so the two never propose the same change). It is the hosted Mend Renovate
+app, installed on this repository by hand (github.com/apps/renovate): the config is the only thing in the
+repository, and the app has no secret of ours. It is a third party that can push branches, but a
+pull request from it goes through the same checks as any other, and `main` is protected by the ruleset.
+
+The rules are Dependabot's: one pull request a week (Mondays, before 7, London time) of every tool with
+a new version at least a week old, merged by itself once its checks pass (GitHub's auto-merge, by
+rebase). A major version is its own pull request and is not merged by itself: Node 22 to 24 is a
+decision. (gcloud numbers every release a major, so it is exempt.)
+
+Not covered: mise itself, which CI installs from `scripts/ci/install-mise.sh`, pinned with a SHA-256 for
+each platform; a new version needs new hashes.
+
 ## Terraform (`.github/workflows/terraform.yml`)
 
 Every push to `main` plans every stack and, if anything differs, applies it once you approve, as the
