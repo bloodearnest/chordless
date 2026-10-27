@@ -100,7 +100,7 @@ Docker): passive only, so it crawls the site, with a browser too, and inspects w
 (headers, cookies, what pages give away), sending no attacks. Each of its rules is WARN, FAIL or
 IGNORE in `.zap/rules.tsv`: a FAIL fails the run (GitHub emails about a failed scheduled run), and the
 report is kept as an artifact for a month. When the site passes a rule, make it FAIL, so it keeps
-passing. ZAP is pinned by its image's digest; its "ZAP is out of date" warning says when to move it.
+passing. ZAP is pinned by its image's digest; Renovate proposes a new one (below), and its "ZAP is out of date" warning also says when to move.
 
 ## Tools
 
@@ -131,16 +131,21 @@ week). The deploy job uses no cache at all.
 
 ## Dependabot (`.github/dependabot.yml`)
 
-One pull request a week (Mondays) of every npm package and action with a new version, each at least a
-week old (`cooldown`); security updates when an alert comes, those at once in one pull request. Each
+One pull request a week (Mondays) of every npm package, action and Terraform provider (each stack in
+`infra/`: its versions and `.terraform.lock.hcl`) with a new version, each at least a week old
+(`cooldown`); security updates when an alert comes, those at once in one pull request. A merged
+provider bump changes `infra/`, so the Terraform workflow plans it and waits for you before any apply. Each
 is set to merge itself once its checks pass (`.github/workflows/dependabot-auto-merge.yml`): the same
 checks as any pull request, with `just audit` among them.
 
 ## Renovate (`.github/renovate.json5`)
 
-Dependabot has no support for mise, so [Renovate](https://docs.renovatebot.com/modules/manager/mise/)
-keeps the tools pinned in `mise.toml` up to date, and only those (`enabledManagers: ["mise"]`: npm and
-actions stay Dependabot's, so the two never propose the same change). It is the hosted Mend Renovate
+Dependabot has no support for mise, or for an image pinned by digest in a script, so
+[Renovate](https://docs.renovatebot.com/modules/manager/mise/) keeps those up to date: the tools pinned
+in `mise.toml`, and ZAP's image in `scripts/zap-baseline.sh` (a regex manager reads the digest and the tag
+in its comment). Only those (`enabledManagers`): npm, actions and Terraform providers stay Dependabot's,
+so the two never propose the same change. We are trying Renovate on these two before deciding whether
+it should do it all. It is the hosted Mend Renovate
 app, installed on this repository by hand (github.com/apps/renovate): the config is the only thing in the
 repository, and the app has no secret of ours. It is a third party that can push branches, but a
 pull request from it goes through the same checks as any other, and `main` is protected by the ruleset.
@@ -148,7 +153,8 @@ pull request from it goes through the same checks as any other, and `main` is pr
 The rules are Dependabot's: one pull request a week (Mondays, before 7, London time) of every tool with
 a new version at least a week old, merged by itself once its checks pass (GitHub's auto-merge, by
 rebase). A major version is its own pull request and is not merged by itself: Node 22 to 24 is a
-decision. (gcloud numbers every release a major, so it is exempt.)
+decision. (gcloud numbers every release a major, so it is exempt.) ZAP's is its own pull request, never
+merged by itself: a new ZAP can make the weekly scan fail, which no pull request's checks show.
 
 Not covered: mise itself, which CI installs from `scripts/ci/install-mise.sh`, pinned with a SHA-256 for
 each platform; a new version needs new hashes.
