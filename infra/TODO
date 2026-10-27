@@ -1,0 +1,37 @@
+Infrastructure and deploy tasks (infra/README.md, docs/CI.md). The app's own TODO is ../TODO.
+
+deploys (.github/workflows/deploy.yml)
+- deploy on every merge to main: add `push: branches: [main]` to deploy.yml and remove `push` from
+  terraform.yml (its plan and apply jobs are in deploy.yml too). Google stacks are the last thing a
+  deploy can depend on that is still applied by hand
+- a scheduled deploy run: merges made with a workflow's token (Dependabot's auto-merge) start no other
+  workflow, so a merge it makes would never be deployed
+- the rollback (`wrangler rollback` after a failed smoke test) has never run: try it once on purpose
+- the production deploy token (`CLOUDFLARE_API_TOKEN` in `production`) has no expiry check yet
+  (`scripts/ci/check-expiry.sh` knows the Terraform ones); give it a CLOUDFLARE_TOKEN_EXPIRES variable
+  and check it in the deploy job
+- the Worker bundle's hash in the deploy's message (`wrangler deploy --message`), so the dashboard's
+  versions say which build they are
+
+tokens
+- a script for the bootstrap token: `scripts/ci-tokens.sh bootstrap` opens the dashboard's token page
+  with the permissions and a one-hour life filled in (Cloudflare's token template URL: check it
+  works), takes the pasted value without echoing it into .cloudflare-bootstrap-token (mode 600), and
+  runs create or rotate; then reminds you to delete the token. Cloudflare has no OAuth route to make
+  tokens (wrangler login has no scope for it, 2026-10-27), and the Global API Key is worse
+
+Terraform in CI
+- the Google stacks (google-chordless, google-dev), by Workload Identity Federation: nothing stored.
+  Never give Terraform API Tokens: Edit, which is as much as the account
+
+cloudflare
+- HSTS (Strict-Transport-Security): a zone setting in infra/cloudflare; ZAP's rule 10035 then
+  becomes FAIL in .zap/rules.tsv
+
+google
+- the Team storage service account should move to a Google Cloud project of its own:
+  docs/CLOUD_MIGRATION.md, step 6
+
+github
+- agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
+  required_approvals)

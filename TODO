@@ -163,7 +163,6 @@ offline
 storage/sync
 - `hashText` (utils/hash.ts), which sync compares to tell an edit, is a 32-bit hash: a collision is a
   missed change. A stronger one (SHA-256) means a migration of the hashes kept on records
-- the Team storage service account should move to a Google Cloud project of its own: docs/CLOUD_MIGRATION.md, step 6
 - read-only spaces: local edits work until the leader changes the setlist (then theirs replaces the reader's, with a
   toast saying what changed, with Undo); a changed chart is held back (Reset from Drive is its revert). The sync that
   brings the leader's changes while the app is open is built (docs/SYNC_ARCHITECTURE.md, "Pulling while the app is
@@ -217,36 +216,24 @@ storage/sync
   ai-catalog audits are ignored
 - the Content-Security-Policy is enforced (public/_headers). Not yet checked: the service worker's
   own fetches (its violations are not in the page console: chrome://serviceworker-internals or the
-  worker's DevTools), and Safari. Also consider HSTS (a Cloudflare zone setting)
+  worker's DevTools), and Safari
 - test song import on real devices, on the live site: file import and paste on Android and iPad,
   the bookmarklet on Android Chrome, and whether the phone/tablet tip shows on the bookmarklet page
 - user-facing Drive health check / cleanup (idea): turn src/dev/drive-audit.html into an
   app feature that finds duplicate or empty setlists and stray space folders, and
   moves them to the Drive trash after confirmation. Would need songs covered too.
 
-ci/cd (docs/CI.md)
+ci/cd (docs/CI.md; the infrastructure and deploy tasks are in infra/TODO)
 - the macOS/WebKit and Windows/Edge end-to-end jobs: make them pass, then required (`e2e` in
   ci-ok's needs, no continue-on-error), and fold e2e-linux into the same matrix (it is apart only
   because a matrix has one result for ci-ok, and Linux's is required now)
-- deploy from main (deploy.yml, drafted on branch claude/ci-and-pr-workflow): build in a job with no
-  secrets, and deploy that build in a job that runs only wrangler, with a token that can do nothing
-  but deploy Workers (Workers Scripts: Edit); deploy only when the build differs from what is live
-  (the page's hashed script names, and the Worker bundle's hash in the deploy's message), plus a
-  scheduled run, as merges by a workflow's token (Dependabot's auto-merge) start no other workflow;
-  then the smoke test, and rollback
-- Terraform in CI for the cloudflare and Google stacks (only github is in it so far): Google by
-  Workload Identity Federation (nothing stored), Cloudflare by tokens made by hand, each as narrow as it
-  can be (read-only for `infra`; Terraform is never given API Tokens: Edit, which is as much as the
-  account)
-- what ZAP's first baseline found (2026-10-25): no Strict-Transport-Security (HSTS: a Cloudflare
-  zone setting, in infra/cloudflare), then make rule 10035 FAIL in .zap/rules.tsv; no
+- what ZAP's first baseline found (2026-10-25): no Strict-Transport-Security (HSTS, in infra/TODO),
+  then make rule 10035 FAIL in .zap/rules.tsv; no
   Cross-Origin-Opener-Policy / Embedder-Policy (rule 90004), which need trying against Google sign-in
   and the Picker, whose windows and frames COEP can break; responses with no Content-Type (10019, which
   ones: the report in the DAST run's artifact); its caching warnings (10015, 10049), mostly meant
   (the service worker, fresh API answers), to be looked at once and the rules set to match
 - the weekly review routine (docs/agents/weekly-review.md, on the same branch): Sunday 20:00 UTC
-- agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
-  required_approvals)
 
 live mode
  - loading a setlist at a song (reload, or a link to #song-N) reports the song, then the
