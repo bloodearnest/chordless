@@ -8,13 +8,15 @@
 #              already runs this build; otherwise deployed, smoke tested, and rolled back on failure
 # Only wrangler deploys (infra/README.md): Terraform never touches the Worker, its assets or secrets.
 #
-# By hand for now (Actions, Deploy, Run workflow). To deploy on every merge to main: add
-# `push: branches: [main]` here, and remove the `push` trigger from terraform.yml, whose jobs this has too.
-# Do that once the cloudflare stack is in CI (infra/README.md), so a Cloudflare change a deploy
-# depends on is applied first, not by hand.
+# On every push to main (a merge), and by hand (Actions, Deploy, Run workflow). This is also where
+# main's own checks run after a merge (ci.yml has no push trigger), which is what a pull request not
+# having to be up to date relies on (docs/CI.md). A merge that changes nothing shipped (docs, TODO)
+# runs the checks and the plan, and deploys nothing.
 name: Deploy
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       force:

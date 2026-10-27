@@ -1,18 +1,13 @@
 # Terraform in CI (scripts/terraform-ci.sh; docs/CI.md), for the stacks it has credentials for.
-# - A change to infra/ on main: plan it with read-only credentials (`infra`), and apply exactly that
-#   plan once the owner approves it (`infra-apply`, whose reviewer the run waits for). The plan is in
+# - Nightly: plan everything, and fail on drift (something changed outside the code); and by hand.
+# - A change that reaches main is planned with read-only credentials (`infra`), and applied exactly
+#   once the owner approves it (`infra-apply`, whose reviewer the run waits for), by deploy.yml, before
+#   its deploy: it has the same two jobs (the steps are in .github/actions/terraform-*). The plan is in
 #   the run's summary, to read before approving.
-# - Nightly: plan everything, and fail on drift (something changed outside the code).
-# deploy.yml has the same two jobs before its deploy (the steps are in .github/actions/terraform-*).
 # Pull requests run none of this: they have no secrets (`just lint-infra` checks infra/ there).
 name: Terraform
 
 on:
-  # (until deploy.yml runs on every push to main, which then plans and applies the same: remove this
-  # trigger then)
-  push:
-    branches: [main]
-    paths: ["infra/**"]
   schedule:
     - cron: "30 3 * * *"
   workflow_dispatch:
