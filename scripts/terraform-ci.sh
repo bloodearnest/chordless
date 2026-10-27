@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Terraform in CI (.github/workflows/terraform.yml; docs/CI.md). The state is in R2 (infra/README.md);
 # the credentials come from the job's environment.
-#   plan [<base sha>]  plan each stack CI looks after that changed since <base> (all, with no base),
-#                      without taking the state's lock (the `infra` environment's R2 key only reads);
-#                      a plan that changes something is saved in plans/<stack>.tfplan for `apply`, and
-#                      shown in the job's summary. Prints changed=true|false (for $GITHUB_OUTPUT)
+#   plan               plan every stack CI looks after, without taking the state's lock (the `infra`
+#                      environment's R2 key only reads); a plan that changes something is saved in
+#                      plans/<stack>.tfplan for `apply`, and shown in the job's summary. Prints
+#                      changed=true|false (for $GITHUB_OUTPUT). Always every stack, not those a push
+#                      changed: a run that a newer one superseded would lose its change otherwise
 #   apply              apply the saved plans, exactly (the `infra-apply` environment, after approval)
 #   drift              plan every stack CI looks after; fail if any would change (nightly)
 set -euo pipefail
@@ -20,16 +21,10 @@ summary() { if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat >>"$GITHUB_STEP_SUMMA
 mode=${1:-}
 case "$mode" in
   plan | drift)
-    base=${2:-}
-    [ "$mode" = drift ] && base=
     mkdir -p plans
     changed=false
     drifted=false
     for stack in "${CI_STACKS[@]}"; do
-      if [ -n "$base" ] && git diff --quiet "$base" HEAD -- "infra/$stack"; then
-        echo "$stack: not changed since ${base:0:7}" >&2
-        continue
-      fi
       tf -chdir="infra/$stack" init -input=false -no-color >/dev/null
       set +e
       tf -chdir="infra/$stack" plan -input=false -no-color -lock=false -detailed-exitcode \
@@ -77,7 +72,7 @@ case "$mode" in
     done
     ;;
   *)
-    echo "Usage: $0 plan [<base sha>] | apply | drift"
+    echo "Usage: $0 plan | apply | drift"
     exit 2
     ;;
 esac
