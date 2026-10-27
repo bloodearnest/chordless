@@ -23,6 +23,12 @@ export interface Env extends GoogleEnv, ShareEnv {
   /** Limits on the emails answered (wrangler.toml [[ratelimits]]): unset in tests and dev */
   EMAIL_PER_SENDER?: RateLimit
   EMAIL_OVERALL?: RateLimit
+  /** Limit on the page's telemetry, by sender address (wrangler.toml [[ratelimits]]): unset in tests and dev */
+  TELEMETRY?: RateLimit
+  /** Where the page's traces go: an OTLP/HTTP traces endpoint (docs/OBSERVABILITY.md); a variable, not a secret */
+  OTLP_ENDPOINT?: string
+  /** The headers to send with them, `name=value,name=value` (Honeycomb: `x-honeycomb-team=<ingest key>`). Without it, the page's traces are taken and dropped */
+  OTLP_HEADERS?: string
   /** The address links in email replies point to; chordless.app when unset */
   APP_ORIGIN?: string
   /**

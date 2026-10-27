@@ -61,6 +61,16 @@ export const SECRETS: SecretSpec[] = [
       'Browser key restricted to the Picker API and our addresses, for the team space folder picker',
     problem: value => (/^AIza[\w-]{30,}$/.test(value) ? null : 'is not a Google API key'),
   },
+  {
+    name: 'OTLP_HEADERS',
+    required: false,
+    about:
+      "Headers for the page's traces sent to Honeycomb, `x-honeycomb-team=<ingest key>` (docs/OBSERVABILITY.md); without it they are dropped",
+    problem: value =>
+      value.split(',').every(pair => /^[\w-]+=\S+$/.test(pair.trim()))
+        ? null
+        : 'is not name=value pairs, separated by commas',
+  },
 ]
 
 /** What is wrong with the Worker's configuration, by secret name (none when all is well) */

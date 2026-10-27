@@ -19,6 +19,15 @@ test('a complete configuration has no problems, and the Picker key may be left o
   assert.deepEqual(configProblems({ ...good, PICKER_API_KEY: undefined }), [])
 })
 
+test('the telemetry headers may be left out, and are name=value pairs when set', () => {
+  assert.deepEqual(configProblems({ ...good, OTLP_HEADERS: undefined }), [])
+  assert.deepEqual(configProblems({ ...good, OTLP_HEADERS: 'x-honeycomb-team=hcaik_abc123' }), [])
+  assert.deepEqual(configProblems({ ...good, OTLP_HEADERS: 'a=1, b=2==' }), [])
+  const problems = configProblems({ ...good, OTLP_HEADERS: 'hcaik_the-key-on-its-own' })
+  assert.deepEqual(problems, ['OTLP_HEADERS is not name=value pairs, separated by commas'])
+  assert.doesNotMatch(problems[0], /hcaik/)
+})
+
 test('a missing required secret is named, with what it is for', () => {
   const problems = configProblems({ ...good, GOOGLE_CLIENT_SECRET: undefined, GOOGLE_API_KEY: '' })
   assert.equal(problems.length, 2)

@@ -38,6 +38,18 @@ name = "EMAIL_OVERALL"
 namespace_id = "7302"
 simple = { limit = 30, period = 60 }
 
+# The page's traces (worker/src/telemetry.ts), by sender address. A page sends a batch every few
+# seconds, and a band on one wifi shares an address, so this is generous: it stops floods, not use.
+[[ratelimits]]
+name = "TELEMETRY"
+namespace_id = "7303"
+simple = { limit = 600, period = 60 }
+
+# Where the page's traces go (docs/OBSERVABILITY.md): Honeycomb, EU instance. The key is the secret
+# OTLP_HEADERS below. Environments do not inherit variables, so [env.dev.vars] has it too.
+[vars]
+OTLP_ENDPOINT = "https://api.eu1.honeycomb.io/v1/traces"
+
 [assets]
 directory = "src"
 not_found_handling = "single-page-application"
@@ -47,7 +59,7 @@ binding = "ASSETS"
 # Paths the worker handles before static assets. API routes must be listed:
 # otherwise the SPA fallback answers them (POST -> 405) and the worker never runs.
 # /dev is listed so the worker can hide the dev-only pages in production.
-run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/share/*", "/api/space/*", "/api/spaces", "/api/spaces/*", "/s/*", "/dev", "/dev/*"]
+run_worker_first = ["/oauth/*", "/session/*", "/api/config", "/api/otlp/*", "/api/share/*", "/api/space/*", "/api/spaces", "/api/spaces/*", "/s/*", "/dev", "/dev/*"]
 
 # One Durable Object per team space (worker/src/team-space.ts): its members and roles, the files in
 # its tree, and the owner's encrypted token blob. Never song, setlist or pad content.
@@ -77,6 +89,8 @@ new_sqlite_classes = ["ShareRoom"]
 # - GOOGLE_API_KEY: Google API key restricted to the Drive API, for share link downloads
 # - PICKER_API_KEY: the Team Key (browser key restricted to the Picker API and our addresses), which the
 #   page fetches from /api/config for the team space folder picker
+# - OTLP_HEADERS: `x-honeycomb-team=<ingest key>` (infra/honeycomb output prod_ingest_key), for the
+#   page's traces sent to Honeycomb (worker/src/telemetry.ts); optional: without it they are dropped
 
 # Local development settings: `npm run dev` runs `wrangler dev --env dev`.
 # Secrets still come from .dev.vars.
@@ -95,6 +109,11 @@ simple = { limit = 5, period = 60 }
 name = "EMAIL_OVERALL"
 namespace_id = "7302"
 simple = { limit = 30, period = 60 }
+
+[[env.dev.ratelimits]]
+name = "TELEMETRY"
+namespace_id = "7303"
+simple = { limit = 600, period = 60 }
 
 # (so do Durable Objects and their migrations)
 [[env.dev.durable_objects.bindings]]
@@ -116,3 +135,4 @@ new_sqlite_classes = ["ShareRoom"]
 [env.dev.vars]
 # Serve the component playgrounds in src/dev/ (404 in production)
 DEV_PAGES = "true"
+OTLP_ENDPOINT = "https://api.eu1.honeycomb.io/v1/traces"
