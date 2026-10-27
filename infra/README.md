@@ -29,15 +29,18 @@ own state, so a mistake in one cannot touch another. (Five now: `google-ci/` is 
 
 ## Running it
 
-`terraform` and `gcloud` are pinned in `mise.toml` (`mise install`). Inside a stack directory:
+`terraform` and `gcloud` are pinned in `mise.toml` (`mise install`), and run through mise (`mise exec -- gcloud ...`),
+not from your PATH. `just tf <stack> <terraform arguments>` (`scripts/tf.sh`) runs Terraform on a stack with the
+state's credentials (made from `.cloudflare-token`) and the stack's own (a gcloud sign-in for `google-*`, the
+gh login for `github`), so most of what follows is `just tf cloudflare plan`. The long way, inside a stack directory:
 
     # cloudflare/  (a custom API token, not the wrangler login: Workers Scripts, Workers Routes,
     #               DNS, Zone Settings, Zone, Email Routing Rules; limited to chordless.app)
     CLOUDFLARE_API_TOKEN=... mise exec -- terraform plan
 
     # google-chordless/ (the same)
-    gcloud auth login
-    GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform plan
+    mise exec -- gcloud auth login
+    GOOGLE_OAUTH_ACCESS_TOKEN=$(mise exec -- gcloud auth print-access-token) mise exec -- terraform plan
 
 `plan` should say "No changes" (in `google-chordless/` too: `terraform output project_number` is the Picker app id). If it does not, someone changed something in a console: either put
 the change in the code or revert it. Prefer a short-lived token, limited to this machine's IP, and delete it after.
@@ -136,10 +139,10 @@ those two environments, one account each.
 
 **Bootstrap, once** (and when `google-ci/` changes), by hand, as someone who owns both projects:
 
-    gcloud auth login
-    cd infra/google-ci
-    GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform init
-    GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform apply
+    mise exec -- gcloud auth login
+    just tf google-ci init
+    just tf google-ci plan -out /tmp/google-ci.plan      # read it
+    just tf google-ci apply /tmp/google-ci.plan
 
 `terraform output` then names the provider and the two service accounts, which `scripts/ci/google-auth.sh`
 has (they are not secret). The apply account cannot change the project itself, IAM or the federation:
