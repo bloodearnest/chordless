@@ -17,6 +17,13 @@ name: Deploy
 on:
   push:
     branches: [main]
+  # Every morning but Sunday, to deploy what a push did not: a merge made with a workflow's token
+  # (Dependabot's auto-merge) starts no workflow, so its change, and the checks on it, wait for the
+  # next run. Monday to Saturday at 07:30 UTC, after Dependabot's morning (06:00 London); not Saturday
+  # night or Sunday, which is when the app is used most. The infrastructure is not planned here: the
+  # nightly drift check (terraform.yml) does that
+  schedule:
+    - cron: "30 7 * * 1-6"
   workflow_dispatch:
     inputs:
       force:
@@ -41,6 +48,7 @@ jobs:
 
   plan:
     name: Infrastructure plan
+    if: github.event_name != 'schedule'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: infra
@@ -118,16 +126,18 @@ jobs:
   deploy:
     name: Deploy
     needs: [ci, plan, apply, build]
-    # !cancelled() so the skipped apply (nothing to apply) does not skip this too. CI by ci-ok, the
-    # one required check: the job's own result is failure when the macOS or Windows job (not yet
-    # required) fails
+    # !cancelled() so the skipped apply (nothing to apply) does not skip this too
     if: >-
-      !cancelled() && needs.ci.outputs.ok == 'true' && needs.plan.result == 'success'
+      !cancelled() && needs.ci.result == 'success'
+      && (needs.plan.result == 'success' || needs.plan.result == 'skipped')
       && (needs.apply.result == 'success' || needs.apply.result == 'skipped')
       && needs.build.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    environment: production
+    environment:
+      name: production
+      # (GitHub lists each deploy against this address, in the repository's Deployments)
+      url: https://chordless.app
     permissions:
       contents: read
     env:
@@ -136,9 +146,22 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # A freeze: the repository's variable DEPLOY_FREEZE is true (gh variable set DEPLOY_FREEZE --body
+      # true; gh variable delete DEPLOY_FREEZE). Pushes and the schedule then deploy nothing, and the
+      # next unfrozen run deploys what is on main; a manual run always goes ahead (docs/CI.md)
+      - id: freeze
+        env:
+          FROZEN: ${{ vars.DEPLOY_FREEZE }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$FROZEN" = true ] && [ "$EVENT" != workflow_dispatch ]; then
+            echo "frozen=true" >>"$GITHUB_OUTPUT"
+            echo "Deploys are frozen (DEPLOY_FREEZE): nothing deployed." | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
       # Not the newest commit on main: a newer run will deploy it, and this one must not put an older
       # build over it
       - id: newest
+        if: steps.freeze.outputs.frozen != 'true'
         env:
           REPOSITORY: ${{ github.repository }}
           SHA: ${{ github.sha }}

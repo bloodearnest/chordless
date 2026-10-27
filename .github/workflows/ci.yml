@@ -6,10 +6,6 @@ name: CI
 on:
   pull_request:
   workflow_call:
-    outputs:
-      ok:
-        description: '"true" when ci-ok passed (the called workflow''s own result is failure when a job allowed to fail did)'
-        value: ${{ jobs.ci-ok.outputs.ok }}
   workflow_dispatch:
   # Weekly on main: keeps the caches from expiring in a quiet week, and checks the pinned tools
   # and runner images still work
@@ -161,6 +157,9 @@ jobs:
         env:
           # Three browsers at once on the runner's four processors: 2.0 minutes, to 2.4 with two
           CHORDLESS_WORKERS: 3
+      # Which tests only passed on a retry (retries: 2 would hide them)
+      - if: always()
+        run: node scripts/flaky-summary.ts
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -174,10 +173,6 @@ jobs:
     name: End to end (${{ matrix.name }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
-    # New to CI, so not yet required: `ci-ok` does not wait for them (add `e2e` to its `needs` once
-    # they have been green for a while), and a failure here does not fail the run, so a deploy
-    # does not wait on them either
-    continue-on-error: true
     permissions:
       contents: read
     strategy:
@@ -211,6 +206,8 @@ jobs:
         env:
           BROWSER: ${{ matrix.browser }}
           CHORDLESS_WORKERS: ${{ matrix.workers }}
+      - if: always()
+        run: node scripts/flaky-summary.ts
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -242,22 +239,17 @@ jobs:
           npm: "false"
       - run: just lint-infra
 
-  # The one required check: every job above passed, or was skipped as not needed (but for the
-  # macOS and Windows end-to-end jobs, while they are not required)
+  # The one required check: every job above passed, or was skipped as not needed
   ci-ok:
     name: ci-ok
     if: always()
-    needs: [changes, lint, node, unit, coverage, e2e-linux, infra]
+    needs: [changes, lint, node, unit, coverage, e2e-linux, e2e, infra]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions: {}
-    outputs:
-      ok: ${{ steps.ok.outputs.ok }}
     steps:
       - env:
           RESULTS: ${{ toJSON(needs) }}
         run: |
           jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$RESULTS"
           jq -e 'all(.[]; .result == "success" or .result == "skipped")' <<<"$RESULTS" >/dev/null
-      - id: ok
-        run: echo ok=true >>"$GITHUB_OUTPUT"

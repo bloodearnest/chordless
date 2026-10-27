@@ -37,9 +37,8 @@ its pull request (`"#42"`), and `docs/stats.jsonl` records each run's tree as we
 | `ci-ok` | | every job above passed or was skipped | all |
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
-ruleset. The macOS and Windows jobs are new to CI: they show their result, but `ci-ok` does not wait for
-them and they are `continue-on-error`. Make them required (add `e2e` to `ci-ok`'s `needs`, drop
-`continue-on-error`) once they have been green for a while.
+ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are
+slow (4 to 6 minutes against Linux's 2), and what they run is to be trimmed (`TODO`).
 
 `just ci` runs the Linux jobs' checks in order, and fails if they changed any file. CI never writes to
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or
@@ -51,7 +50,9 @@ how long the tests took (2026-10-25): Linux 2.0 minutes with three, 2.4 with two
 every two processors.
 
 On a failure, the end-to-end jobs keep the Playwright report and traces as an artifact for a week, and
-the failing tests are marked on the pull request's diff.
+the failing tests are marked on the pull request's diff. Each also lists, in its summary, the tests that
+only passed on a retry (`scripts/flaky-summary.ts`, from the JSON report): `retries: 2` keeps one flaky
+test from failing a run, and would hide it. Log each in `docs/test-catches.jsonl` (kind `flaky`).
 
 ## Actions, and why so few
 
@@ -161,7 +162,7 @@ also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30
 
 One run, in order, so a deploy never runs before what it depends on:
 
-1. **CI** (`ci.yml`) on the commit: passes when `ci-ok` does (a job allowed to fail, such as macOS, fails the called workflow's own result but not this).
+1. **CI** (`ci.yml`) on the commit.
 2. **Infrastructure** (the plan and apply jobs of `terraform.yml`, repeated in `deploy.yml` with the same
    steps, in `.github/actions/terraform-plan` and `-apply`): every stack CI looks after is planned, and applied after
    the owner approves if anything differs. A rejected or failed apply stops the deploy; nothing
@@ -183,8 +184,22 @@ environment its caller's job would need (the first run showed `GH_TERRAFORM_TOKE
 workflow): the environment is on the job, and the secrets go into the shared steps as inputs. The
 apply jobs share the `terraform` concurrency group, so two never run at once.
 
+**When it runs.** On every push to `main`; every morning but Sunday (Monday to Saturday, 07:30 UTC), to
+deploy what a push did not (a merge made with a workflow's token, as Dependabot's auto-merge is, starts no
+workflow; not Saturday night or Sunday, when the app is used most); and by hand. The scheduled run does not plan the
+infrastructure: the nightly drift check (`terraform.yml`) does.
+
+**Freezing deploys** (before a service, say): `gh variable set DEPLOY_FREEZE --body true` (or Settings,
+Secrets and variables, Actions, Variables). While it is `true`, a push or the schedule runs its checks
+and deploys nothing, and says so in the summary; the first run after `gh variable delete DEPLOY_FREEZE`
+deploys what is on `main` (the live build is compared, so nothing is lost). A manual run (Actions, Deploy,
+Run workflow) ignores the freeze: a fix must always be possible.
+
+Each deploy is listed against the `production` environment, with the live address, in the repository's
+Deployments.
+
 Deploys run in a `deploy` concurrency group, none cancelled; a run waiting is replaced by a newer one.
-It runs on every push to `main`, and by hand. It is also the only place `main`'s own checks run after a
+It is also the only place `main`'s own checks run after a
 merge (`ci.yml` has no push trigger): a pull request need not be up to date with `main`, and this is what
 catches two that were each fine and are not together. A merge that changes nothing shipped (docs, TODO) runs
 the checks and the plan, and deploys nothing. `terraform.yml` has the nightly drift check and a manual run;
