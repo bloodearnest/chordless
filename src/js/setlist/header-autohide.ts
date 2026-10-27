@@ -1,7 +1,7 @@
 /**
  * On a phone the header tucks away while a song is scrolled down, and comes back as soon as it is
- * scrolled up (as a browser's address bar does), to leave more of the screen to the lyrics. See
- * docs/MOBILE_UI.md. On a tablet or desktop it never moves.
+ * scrolled up (as a browser's address bar does), to leave more of the screen to the lyrics. On a
+ * tablet or desktop it never moves.
  */
 import type { AppHeader } from '../../components/app-header.ts'
 
