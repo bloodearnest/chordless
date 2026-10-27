@@ -211,7 +211,10 @@ apply jobs share the `terraform` concurrency group, so two never run at once.
 **When it runs.** On every push to `main`; every morning but Sunday (Monday to Saturday, 07:30 UTC), to
 deploy what a push did not (a merge made with a workflow's token, as Dependabot's auto-merge is, starts no
 workflow; not Saturday night or Sunday, when the app is used most); and by hand. The scheduled run does not plan the
-infrastructure: the nightly drift check (`terraform.yml`) does.
+infrastructure: the nightly drift check (`terraform.yml`) does. A manual run can also skip it
+(`skip_infra`): to ship a fix while a plan is failing (a provider bump that no longer plans holds up
+every other deploy, which plans first). Whatever the infrastructure needs is then not applied, so
+the change it was held for waits for the next run.
 
 Each deploy is listed against the `production` environment, with the live address, in the repository's
 Deployments.
