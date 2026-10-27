@@ -3,8 +3,8 @@
 // Set window name so bookmarklet can find and reuse this tab
 window.name = 'chordless'
 
-// Register service worker
-if ('serviceWorker' in navigator) {
+// Register service worker (not below the floor: floor.js has shown its message)
+if ('serviceWorker' in navigator && !window.chordlessBelowFloor) {
   // The page should be controlled by the service worker (the auth blob lives behind it). On
   // the first visit the worker takes control of the open page itself (clients.claim()), which
   // is quick where it works. Where it does not reach a page that began loading before the
