@@ -30,6 +30,10 @@ on:
         description: Deploy even if the live site already runs this build
         type: boolean
         default: false
+      skip_infra:
+        description: Do not plan or apply the infrastructure first (a fix while a plan is failing)
+        type: boolean
+        default: false
 
 permissions: {}
 
@@ -48,7 +52,8 @@ jobs:
 
   plan:
     name: Infrastructure plan
-    if: github.event_name != 'schedule'
+    # Not on the schedule (the nightly drift check does that), nor when a manual run skips it
+    if: github.event_name != 'schedule' && !inputs.skip_infra
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: infra
@@ -150,6 +155,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - if: inputs.skip_infra
+        run: echo "The infrastructure was not planned or applied (skip_infra)." | tee -a "$GITHUB_STEP_SUMMARY"
       # Not the newest commit on main: a newer run will deploy it, and this one must not put an older
       # build over it
       - id: newest
