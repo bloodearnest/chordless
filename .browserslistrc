@@ -3,8 +3,8 @@
 # It is what the code needs with room to spare: the first thing below 16.2 that the CSS
 # uses is color-mix(). Chrome and Edge update themselves.
 # vite.config.js TARGET must say the same (Vite does not read this file).
-Safari >= 17
-iOS >= 17
+Safari >= 17.4
+iOS >= 17.4
 Chrome >= 120
 ChromeAndroid >= 120
 Edge >= 120

@@ -40,8 +40,6 @@ describe('the library view', () => {
   let outlet: HTMLElement
   let view: LibraryView
   let visited: Array<{ url: string; replace?: boolean }>
-  let observers: Array<(entries: Array<Partial<IntersectionObserverEntry>>) => void>
-  const RealObserver = window.IntersectionObserver
   // The pause before a search goes in the URL, shortened: a wait for nothing to happen is a few
   const realPause = LibraryView.searchPauseMs
   const PAUSE = 20
@@ -50,20 +48,12 @@ describe('the library view', () => {
   beforeEach(async () => {
     LibraryView.searchPauseMs = PAUSE
     visited = []
-    observers = []
     setRouter({
       navigate: async (url: string, options?: { replace?: boolean }) => {
         visited.push({ url, replace: options?.replace })
         return true
       },
     })
-    window.IntersectionObserver = class {
-      constructor(callback: (entries: Array<Partial<IntersectionObserverEntry>>) => void) {
-        observers.push(callback)
-      }
-      observe() {}
-      disconnect() {}
-    } as unknown as typeof IntersectionObserver
     before = getCurrentSpace()
     const space = await createSpace(`Library ${crypto.randomUUID().slice(0, 8)}`)
     spaceId = space.id
@@ -77,7 +67,6 @@ describe('the library view', () => {
     LibraryView.searchPauseMs = realPause
     view?.remove()
     outlet.remove()
-    window.IntersectionObserver = RealObserver
     setRouter(null)
     document.body.classList.remove('edit-mode')
     await setSpaceReadOnly(spaceId, false)
@@ -275,23 +264,27 @@ describe('the library view', () => {
       expect(visited).to.deep.equal([{ url: '/songs', replace: true }])
     })
 
+    /** The scroll container, at rest `left` pixels along (the song is one 400px page to the right) */
+    const comeToRest = (left: number) => {
+      const container = must(view.querySelector('#songs-content-container'))
+      Object.defineProperty(container, 'scrollLeft', { value: left, configurable: true })
+      Object.defineProperty(container, 'clientWidth', { value: 400, configurable: true })
+      container.dispatchEvent(new Event('scrollend'))
+    }
+
     it('goes back to the list when the user swipes back to it', async () => {
       const song = await addChart(db, ALPHA, ADD)
       await open({ name: 'songs', songUuid: song.uuid })
-      const [observe] = observers
-      // (scrolling to the song goes past the list: that is not a swipe)
-      observe([{ isIntersecting: true, intersectionRatio: 1 }])
+      // (scrolling to the song ends on the song: that is not a swipe)
+      comeToRest(400)
       expect(visited).to.deep.equal([])
-      await wait(700)
-      observe([{ isIntersecting: false, intersectionRatio: 0.2 }])
-      expect(visited).to.deep.equal([])
-      observe([{ isIntersecting: true, intersectionRatio: 1 }])
+      comeToRest(0)
       expect(visited).to.deep.equal([{ url: '/songs', replace: undefined }])
     })
 
     it('has no swipe back when no song is open', async () => {
       await open()
-      observers[0]([{ isIntersecting: true, intersectionRatio: 1 }])
+      comeToRest(0)
       expect(visited).to.deep.equal([])
     })
 

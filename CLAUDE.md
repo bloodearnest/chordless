@@ -95,7 +95,7 @@ survives only in names already stored on devices and in Drive.)
 - TypeScript (erasable syntax only: no enums or parameter properties, so Node and esbuild can strip the types) and Lit, built and served with Vite (with `@cloudflare/vite-plugin`, which runs the Worker next to it). There is no build in dev: Vite serves the modules as they are. Production is `vite build`. Keep it that thin: no frameworks, no transpiling beyond what the browser floor needs. Dependencies are npm packages, imported by name and bundled by Vite
 - Infrastructure that rarely changes is Terraform in `infra/` (`infra/README.md`): the Cloudflare zone side (Email Routing, the Worker's custom domain, DNS, TLS settings) and the Google Cloud project (APIs, API keys, service account). Deploys, and everything in `wrangler.toml`, stay wrangler's: do not move the Worker, its assets, bindings or secrets into Terraform. `gcloud` and `terraform` come from `mise.toml`
 - The service worker is built as a classic script with the whole app precached (`vite-plugins/service-worker.ts`); see `docs/BUILD.md`
-- Use modern HTML/CSS/JS, within `.browserslistrc` (iOS/Safari 17, Chrome/Edge 120: devices up to about five years old, which can all update to that). Vite doesn't read it: keep `TARGET` in `vite.config.ts` the same.
+- Use modern HTML/CSS/JS, within `.browserslistrc` (iOS/Safari 17.4, Chrome/Edge 120: devices up to about five years old, which can all update to that). Vite doesn't read it: keep `TARGET` in `vite.config.ts` the same.
 - Always try to use browser native features as much as possible
 
 ## Branches and pull requests
