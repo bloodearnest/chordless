@@ -14,9 +14,11 @@ deploys (.github/workflows/deploy.yml)
   versions say which build they are
 
 tokens
-- check the bootstrap script's token-template URL (its permission key, `account_api_tokens`, is from
-  memory) the next time it is used; if the form is not filled in, the script says to make the token
-  by hand
+- check the bootstrap script the next time it is used: the template URL fills in only the permission
+  and the name (its key, `account_api_tokens`, is from memory; the first try showed the form had no
+  expiry, IP or account limit), and the script now refuses a token with no end date or one past two
+  hours, no IP limit, or other than this account's resources. Those checks read
+  GET /accounts/<id>/tokens/<id>: confirm its fields (`condition.request_ip.in`, `policies[].resources`)
 
 Terraform in CI
 - the Google stacks (google-chordless, google-dev), by Workload Identity Federation: nothing stored.

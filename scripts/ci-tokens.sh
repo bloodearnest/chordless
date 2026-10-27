@@ -40,13 +40,15 @@ declare -A PERMISSIONS=([infra]="Workers R2 Storage Bucket Item Read" [infra-app
 mode=${1:-}
 
 if [ "$mode" = bootstrap ]; then
-  # The dashboard's token form, filled in by its URL (Cloudflare's token templates). If it is not
-  # filled in as said, make the token by hand: Account API Tokens, Create Custom Token, permission
-  # Account API Tokens: Edit, your IP, an hour.
+  # The dashboard's token form, filled in by its URL (Cloudflare's token templates): only the
+  # permission and the name, so the rest is set by hand in the form, and checked below before the token
+  # is kept: this account only, your IP only, an hour. If the permission is not filled in either,
+  # make the token by hand: Account API Tokens, Create Custom Token, Account API Tokens: Edit.
   template='[{"key":"account_api_tokens","type":"edit"}]'
   expires=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
   url="https://dash.cloudflare.com/$ACCOUNT/api-tokens?permissionGroupKeys=$(jq -rn --arg t "$template" '$t|@uri')&name=$(jq -rn --arg n "chordless bootstrap $(date -u +%F)" '$n|@uri')"
-  echo "Make the token in the dashboard: Account API Tokens: Edit, limited to your IP, expiring by $expires."
+  echo "Make the token in the dashboard: Account API Tokens: Edit on this account only; Client IP Address Filtering:"
+  echo "your IP ($(curl -fsS --max-time 10 https://api.ipify.org 2>/dev/null || echo 'ask your IP')); TTL: an end date within the hour (before $expires)."
   echo "$url"
   (xdg-open "$url" || open "$url") >/dev/null 2>&1 || echo "(open that address in a browser)"
   read -rsp "Paste the token (not shown): " value
@@ -55,6 +57,23 @@ if [ "$mode" = bootstrap ]; then
   # It must be a live token before it is kept
   answer=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/tokens/verify" -H "Authorization: Bearer $value")
   [ "$(jq -r .result.status <<<"$answer")" = active ] || { echo "Cloudflare does not accept it: $(jq -c .errors <<<"$answer")"; exit 1; }
+  # It must be the throwaway kind asked for, not a broad or long one: checked from Cloudflare's own
+  # description of it (what the form was given), before it is kept
+  id=$(jq -r .result.id <<<"$answer")
+  ends=$(jq -r '.result.expires_on // empty' <<<"$answer")
+  details=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/tokens/$id" -H "Authorization: Bearer $value")
+  problems=()
+  if [ -z "$ends" ]; then problems+=("it never expires (set an end date within the hour)")
+  elif [ "$(date -u -d "$ends" +%s)" -gt "$(date -u -d '+2 hours' +%s)" ]; then problems+=("it runs until $ends (an hour is enough)"); fi
+  [ "$(jq -r '(.result.condition.request_ip.in // []) | length' <<<"$details")" -gt 0 ] || problems+=("it is not limited to an IP address")
+  jq -e --arg a "com.cloudflare.api.account.$ACCOUNT" \
+    '[.result.policies[]?.resources | keys[]] | length > 0 and all(. == $a)' <<<"$details" >/dev/null ||
+    problems+=("it is not limited to this account")
+  if [ ${#problems[@]} -gt 0 ]; then
+    printf 'Not kept: %s\n' "${problems[@]}"
+    echo "Delete that token in the dashboard, make another with those settings, and run this again."
+    exit 1
+  fi
   (umask 077 && printf %s "$value" >"$BOOTSTRAP_FILE")
   echo "Kept in $BOOTSTRAP_FILE (readable by you only). Delete the token in the dashboard, and that file, after."
   exec "$0" "${2:-create}"
