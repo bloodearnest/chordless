@@ -3,13 +3,13 @@
 #   plan once the owner approves it (`infra-apply`, whose reviewer the run waits for). The plan is in
 #   the run's summary, to read before approving.
 # - Nightly: plan everything, and fail on drift (something changed outside the code).
+# deploy.yml has the same two jobs before its deploy (the steps are in .github/actions/terraform-*).
 # Pull requests run none of this: they have no secrets (`just lint-infra` checks infra/ there).
 name: Terraform
 
 on:
-  # Called by deploy.yml, which waits for it: a deploy must not run before the infrastructure it needs
-  workflow_call:
-  # (until deploy.yml runs on every push to main, which then calls this: remove this trigger then)
+  # (until deploy.yml runs on every push to main, which then plans and applies the same: remove this
+  # trigger then)
   push:
     branches: [main]
     paths: ["infra/**"]
@@ -38,32 +38,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: scripts/ci/setup-tools.sh terraform
-      # (fails within a week of a credential running out: the nightly run tells the owner in time)
-      - run: scripts/ci/check-expiry.sh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_TOKEN }}
-          R2_TOKEN_EXPIRES: ${{ vars.R2_TOKEN_EXPIRES }}
       - id: plan
-        run: |
-          if [ "$EVENT" = schedule ]; then
-            scripts/terraform-ci.sh drift
-          else
-            scripts/terraform-ci.sh plan | tee -a "$GITHUB_OUTPUT"
-          fi
-        env:
-          EVENT: ${{ github.event_name }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_TOKEN }}
-      # The plans hold no secrets (Terraform is given none: infra/README.md), but artifacts of a public
-      # repository can be downloaded by anyone signed in to GitHub: kept for a day
-      - if: steps.plan.outputs.changed == 'true'
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        uses: ./.github/actions/terraform-plan
         with:
-          name: terraform-plans
-          path: plans/*.tfplan
-          retention-days: 1
+          drift: ${{ github.event_name == 'schedule' }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}
+          r2-token-expires: ${{ vars.R2_TOKEN_EXPIRES }}
 
   apply:
     name: Apply
@@ -78,13 +60,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: scripts/ci/setup-tools.sh terraform
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      - uses: ./.github/actions/terraform-apply
         with:
-          name: terraform-plans
-          path: plans
-      - run: scripts/terraform-ci.sh apply
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GH_TERRAFORM_TOKEN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}

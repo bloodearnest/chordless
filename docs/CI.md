@@ -160,7 +160,8 @@ also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30
 One run, in order, so a deploy never runs before what it depends on:
 
 1. **CI** (`ci.yml`) on the commit.
-2. **Infrastructure** (`terraform.yml`, called): every stack CI looks after is planned, and applied after
+2. **Infrastructure** (the plan and apply jobs of `terraform.yml`, repeated in `deploy.yml` with the same
+   steps, in `.github/actions/terraform-plan` and `-apply`): every stack CI looks after is planned, and applied after
    the owner approves if anything differs. A rejected or failed apply stops the deploy; nothing
    differing is a pass. (Every stack, not those a push changed: a run that a newer one superseded
    would lose its change otherwise.) Additive infrastructure goes first, which is the order a deploy
@@ -174,6 +175,11 @@ One run, in order, so a deploy never runs before what it depends on:
    (`check-prod-secrets.ts`), `wrangler deploy` runs from the built artifact, `scripts/ci/smoke.sh` waits
    for the site to run that hash and answer, and on failure `wrangler rollback` puts the previous version
    back (Durable Object migrations only add, so they stay).
+
+The jobs are repeated, not called: a called workflow did not get the secrets of an
+environment its caller's job would need (the first run showed `GH_TERRAFORM_TOKEN` empty in a called
+workflow): the environment is on the job, and the secrets go into the shared steps as inputs. The
+apply jobs share the `terraform` concurrency group, so two never run at once.
 
 Deploys run in a `deploy` concurrency group, none cancelled; a run waiting is replaced by a newer one.
 It is `workflow_dispatch` only until the `cloudflare` stack is in CI: then add `push: branches: [main]`

@@ -1,14 +1,15 @@
 # Deploy chordless.app (docs/CI.md). In order, so a deploy never runs before what it depends on:
 #   ci         the checks (ci.yml), on this commit
-#   infra      Terraform (terraform.yml): every stack planned, and applied once the owner approves, if
-#              anything differs. A rejected or failed apply stops the deploy
+#   plan, apply  Terraform, as terraform.yml (the steps are shared, .github/actions/terraform-*): every
+#              stack planned, and applied once the owner approves, if anything differs. A rejected or
+#              failed apply stops the deploy
 #   build      with no secrets: the build and its hash (scripts/build-hash.ts), kept for the deploy
 #   deploy     in `production`, the only job with the Cloudflare token: skipped when the live site
 #              already runs this build; otherwise deployed, smoke tested, and rolled back on failure
 # Only wrangler deploys (infra/README.md): Terraform never touches the Worker, its assets or secrets.
 #
 # By hand for now (Actions, Deploy, Run workflow). To deploy on every merge to main: add
-# `push: branches: [main]` here, and remove the `push` trigger from terraform.yml, which this calls.
+# `push: branches: [main]` here, and remove the `push` trigger from terraform.yml, whose jobs this has too.
 # Do that once the cloudflare stack is in CI (infra/README.md), so a Cloudflare change a deploy
 # depends on is applied first, not by hand.
 name: Deploy
@@ -36,11 +37,49 @@ jobs:
     permissions:
       contents: read
 
-  infra:
-    name: Infrastructure
-    uses: ./.github/workflows/terraform.yml
+  plan:
+    name: Infrastructure plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: infra
     permissions:
       contents: read
+    outputs:
+      changed: ${{ steps.plan.outputs.changed }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: plan
+        uses: ./.github/actions/terraform-plan
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}
+          r2-token-expires: ${{ vars.R2_TOKEN_EXPIRES }}
+
+  apply:
+    name: Infrastructure apply
+    needs: plan
+    if: needs.plan.outputs.changed == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: infra-apply
+    permissions:
+      contents: read
+    # (the group terraform.yml has, so a push to infra/ and a deploy do not apply at once)
+    concurrency:
+      group: terraform
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/terraform-apply
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}
 
   build:
     name: Build
@@ -69,9 +108,12 @@ jobs:
 
   deploy:
     name: Deploy
-    needs: [ci, infra, build]
-    # (infra succeeds when there was nothing to apply)
-    if: needs.ci.result == 'success' && needs.infra.result == 'success' && needs.build.result == 'success'
+    needs: [ci, plan, apply, build]
+    # (apply is skipped when there was nothing to apply; rejected or failed, it stops the deploy)
+    if: >-
+      needs.ci.result == 'success' && needs.plan.result == 'success'
+      && (needs.apply.result == 'success' || needs.apply.result == 'skipped')
+      && needs.build.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     environment: production

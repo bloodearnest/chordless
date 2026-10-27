@@ -1,0 +1,32 @@
+# Apply exactly the plans the plan job kept (scripts/terraform-ci.sh; docs/CI.md). Shared by
+# terraform.yml and deploy.yml; the job runs it in `infra-apply`, after the owner approves, and
+# passes that environment's secrets in (see terraform-plan).
+name: Terraform apply
+description: Apply the saved plans with the credentials that can write
+
+inputs:
+  aws-access-key-id:
+    description: The R2 token (Object Read and Write) for the state
+    required: true
+  aws-secret-access-key:
+    description: Its secret
+    required: true
+  github-token:
+    description: The fine-grained GitHub token (read and write)
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: scripts/ci/setup-tools.sh terraform
+    - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+      with:
+        name: terraform-plans
+        path: plans
+    - shell: bash
+      run: scripts/terraform-ci.sh apply
+      env:
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
