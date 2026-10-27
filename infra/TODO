@@ -14,8 +14,10 @@ deploys (.github/workflows/deploy.yml)
   versions say which build they are
 
 Terraform in CI
-- the Google stacks (google-chordless, google-dev), by Workload Identity Federation: nothing stored.
-  Never give Terraform API Tokens: Edit, which is as much as the account
+- the Google stacks (google-chordless, google-dev) are in CI by Workload Identity Federation
+  (infra/google-ci, applied by hand; scripts/ci/google-auth.sh): nothing stored. Never give
+  Terraform API Tokens: Edit, which is as much as the account. Not yet tried against Google: the
+  first run may name a role `ci-plan` or `ci-apply` lacks (add it in infra/google-ci)
 
 cloudflare
 - HSTS (Strict-Transport-Security): a zone setting in infra/cloudflare; ZAP's rule 10035 then
