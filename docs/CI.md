@@ -14,7 +14,7 @@ so what CI runs can be run, and fixed, locally.
    branch up to date with `main` (GitHub's "Update branch" rebases it), and the approvals the ruleset
    asks for. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
    on a pull request merges it when all that is so.
-4. Deploys are still `just deploy`, by hand.
+4. Deploys are `.github/workflows/deploy.yml` (run by hand for now; below), or still `just deploy` from a laptop.
 
 The rules are in Terraform (`infra/github/`), and no one bypasses them, the owner included. To get out
 of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and apply.
@@ -155,7 +155,36 @@ also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30
 7 days before, so the nightly run says so in time. The credentials, and rotating them:
 `infra/README.md`.
 
+## Deploys (`.github/workflows/deploy.yml`)
+
+One run, in order, so a deploy never runs before what it depends on:
+
+1. **CI** (`ci.yml`) on the commit.
+2. **Infrastructure** (`terraform.yml`, called): every stack CI looks after is planned, and applied after
+   the owner approves if anything differs. A rejected or failed apply stops the deploy; nothing
+   differing is a pass. (Every stack, not those a push changed: a run that a newer one superseded
+   would lose its change otherwise.) Additive infrastructure goes first, which is the order a deploy
+   needs. To remove something, deploy the code that stops using it, then remove it in a second pull request.
+3. **Build**, in a job with no secrets: `vite build`, and `scripts/build-hash.ts`, a hash of everything
+   shipped (the build is reproducible: the same hash from any checkout), written to `/version.json`.
+4. **Deploy**, in the `production` environment (main only), the one job with the Cloudflare token. It
+   skips itself when the commit is not the newest on `main`, or when the live `/version.json` already
+   has this build's hash (`force` overrides); the live site is asked, not a record kept, so a failed or
+   rolled back deploy is tried again. Otherwise: the Worker's secrets are checked
+   (`check-prod-secrets.ts`), `wrangler deploy` runs from the built artifact, `scripts/ci/smoke.sh` waits
+   for the site to run that hash and answer, and on failure `wrangler rollback` puts the previous version
+   back (Durable Object migrations only add, so they stay).
+
+Deploys run in a `deploy` concurrency group, none cancelled; a run waiting is replaced by a newer one.
+It is `workflow_dispatch` only until the `cloudflare` stack is in CI: then add `push: branches: [main]`
+to it and remove `push` from `terraform.yml`. Until then a change to Cloudflare is applied by hand first
+(`infra/README.md`), and `just deploy` still checks for drift.
+
+The `production` environment's credentials: `CLOUDFLARE_API_TOKEN` (secret; an account API token,
+Workers Scripts: Edit on this account, nothing else) and `CLOUDFLARE_ACCOUNT_ID` (variable). They are not
+the Terraform tokens. The Worker's own secrets stay in Cloudflare (`wrangler secret put`): a deploy
+leaves them alone and the job never sees them.
+
 ## Next
 
-Still to come: deploys from `main` (the build in a job with no secrets, deployed only when it changed,
-then smoke tested and rolled back on failure); the `cloudflare` and Google stacks in CI.
+Still to come: the `cloudflare` and Google stacks in CI; deploys on every merge.

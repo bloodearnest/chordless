@@ -71,6 +71,13 @@ drift check when they are not the code's. Changing one is done in GitHub, then i
 
 Each environment also has a variable, `R2_TOKEN_EXPIRES`. `just check-gh-secrets` checks all are there.
 
+**The deploy token** (`production` environment, not Terraform's): `CLOUDFLARE_API_TOKEN` is an account
+API token with Workers Scripts: Edit on this account and nothing else, and the variable
+`CLOUDFLARE_ACCOUNT_ID` is the account's id. Set with `gh secret set CLOUDFLARE_API_TOKEN --env production`
+and `gh variable set CLOUDFLARE_ACCOUNT_ID --env production`. It has no expiry check yet; give it a
+year and put the date in the account token's name. A deploy (`docs/CI.md`) is how the Worker gets
+updated: Terraform never deploys it.
+
 **The R2 tokens** are the account's (Account API Tokens), made by `scripts/ci-tokens.sh create`, which
 puts each straight into its environment without showing it. It needs a throwaway account token that
 can make tokens: in the dashboard, Account API Tokens, a custom token with Account API Tokens: Edit,
