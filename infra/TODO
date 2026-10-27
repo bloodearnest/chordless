@@ -1,9 +1,6 @@
 Infrastructure and deploy tasks (infra/README.md, docs/CI.md). The app's own TODO is ../TODO.
 
 deploys (.github/workflows/deploy.yml)
-- deploy on every merge to main: add `push: branches: [main]` to deploy.yml and remove `push` from
-  terraform.yml (its plan and apply jobs are in deploy.yml too). Google stacks are the last thing a
-  deploy can depend on that is still applied by hand
 - a scheduled deploy run: merges made with a workflow's token (Dependabot's auto-merge) start no other
   workflow, so a merge it makes would never be deployed
 - the rollback (`wrangler rollback` after a failed smoke test) has never run: try it once on purpose

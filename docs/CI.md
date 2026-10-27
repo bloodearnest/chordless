@@ -14,7 +14,7 @@ so what CI runs can be run, and fixed, locally.
    approvals the ruleset asks for. It need not be up to date with `main` (that would cost another run of
    CI per merge): the checks on `main` after a merge, which the deploy waits for, catch what slips in. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
    on a pull request merges it when all that is so.
-4. Deploys are `.github/workflows/deploy.yml` (run by hand for now; below), or still `just deploy` from a laptop.
+4. Deploys are `.github/workflows/deploy.yml` (on every push to `main`, and by hand; below), or still `just deploy` from a laptop.
 
 The rules are in Terraform (`infra/github/`), and no one bypasses them, the owner included. To get out
 of a CI that cannot pass, set the ruleset's `enforcement = "disabled"` there and apply.
@@ -137,8 +137,9 @@ checks as any pull request, with `just audit` among them.
 
 ## Terraform (`.github/workflows/terraform.yml`)
 
-A change to `infra/` that reaches `main` is planned and, once you approve, applied
-(`scripts/terraform-ci.sh`):
+Every push to `main` plans every stack and, if anything differs, applies it once you approve, as the
+first part of the deploy (`deploy.yml`, below; both workflows use the same steps, `scripts/terraform-ci.sh`).
+`terraform.yml` is the nightly drift check and a manual run. In each:
 
 1. **Plan**, in the `infra` environment, with credentials that can only read (an R2 key that reads
    the state, so the plan takes no lock; a GitHub token that reads the repository's settings). The plan
@@ -183,9 +184,12 @@ workflow): the environment is on the job, and the secrets go into the shared ste
 apply jobs share the `terraform` concurrency group, so two never run at once.
 
 Deploys run in a `deploy` concurrency group, none cancelled; a run waiting is replaced by a newer one.
-It is `workflow_dispatch` only until the `cloudflare` stack is in CI: then add `push: branches: [main]`
-to it and remove `push` from `terraform.yml`. Until then a change to Cloudflare is applied by hand first
-(`infra/README.md`), and `just deploy` still checks for drift.
+It runs on every push to `main`, and by hand. It is also the only place `main`'s own checks run after a
+merge (`ci.yml` has no push trigger): a pull request need not be up to date with `main`, and this is what
+catches two that were each fine and are not together. A merge that changes nothing shipped (docs, TODO) runs
+the checks and the plan, and deploys nothing. `terraform.yml` has the nightly drift check and a manual run;
+a change to `infra/` is planned and applied here, before the deploy. `just deploy` from a laptop still
+checks for drift first.
 
 The `production` environment's credentials: `CLOUDFLARE_API_TOKEN` (secret; an account API token,
 Workers Scripts: Edit on this account, nothing else) and `CLOUDFLARE_ACCOUNT_ID` (variable). They are not
