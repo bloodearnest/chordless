@@ -34,7 +34,10 @@ terraform {
 
 # Auth: a Honeycomb management key (Team settings > API keys), as HONEYCOMB_KEY_ID and
 # HONEYCOMB_KEY_SECRET, with the scopes environments:write and api-keys:write.
-provider "honeycombio" {}
+# Our team is on the EU instance: a different host, and the US one answers "invalid API key".
+provider "honeycombio" {
+  api_url = "https://api.eu1.honeycomb.io"
+}
 
 resource "honeycombio_environment" "prod" {
   name             = "chordless-prod"
