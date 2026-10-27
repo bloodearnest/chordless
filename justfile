@@ -21,23 +21,6 @@ stats:
 wrap-up *args:
     scripts/wrap-up.sh {{args}}
 
-# Agent VMs (docs/AGENT_VMS.md): Claude Code in an Incus virtual machine, away from this computer.
-# `just agent-create` makes one; the others use it, or the one called NAME
-agent-create *args:
-    scripts/agent-vm.sh create {{args}}
-
-agent-list:
-    scripts/agent-vm.sh list
-
-agent-claude *args:
-    scripts/agent-vm.sh claude {{args}}
-
-agent-shell *args:
-    scripts/agent-vm.sh shell {{args}}
-
-agent-destroy name:
-    scripts/agent-vm.sh destroy {{name}}
-
 # Run browser unit tests, optionally just some files: just test-unit tests/db.test.ts
 # (a full run also measures coverage and leaves its results for `just stats`)
 test-unit *args:
