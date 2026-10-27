@@ -2,7 +2,7 @@
 
 The slow-changing setup around the app, captured as code on 2026-10-20 from what was already
 there: nothing was created, each resource is imported (`import` blocks). Four stacks, each with its
-own state, so a mistake in one cannot touch another. `google-chordless/` created what it holds;
+own state, so a mistake in one cannot touch another. (Five now: `google-ci/` is below.) `google-chordless/` created what it holds;
 `cloudflare/` and `github/` (added 2026-10-25) only imported.
 
 | Stack | Holds |
@@ -10,6 +10,7 @@ own state, so a mistake in one cannot touch another. `google-chordless/` created
 | `cloudflare/` | the R2 bucket that holds every stack's state, the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
+| `google-ci/` | how CI signs in to Google: a Workload Identity pool and a GitHub OIDC provider in `chordless-app`, restricted to this repository's jobs on `main`, and two service accounts, `ci-plan` (the `infra` environment: reads both projects) and `ci-apply` (`infra-apply`: enables APIs and manages API keys in both, and the app project's service accounts). **Never in CI**: planned and applied by hand, so a change to what CI runs can never widen what CI may do |
 | `github/` | the GitHub repository's settings (imported): merge by rebase only, the `main` ruleset (a pull request, `ci-ok` passing, linear history), what Actions may run (GitHub's own actions, pinned by SHA), the workflow token's permissions, the `production` and `infra` environments. See [docs/CI.md](../docs/CI.md) |
 
 ## Who owns what
@@ -122,6 +123,25 @@ still local (its `backend` block set aside, `terraform apply`), then moved its s
 
 The `cloudflare/` stack's token (`CLOUDFLARE_API_TOKEN`) also needs Workers R2 Storage: Edit, for the
 bucket. Locally it is the one in the git-ignored `.cloudflare-token` (bare, as `just deploy` reads it).
+
+## The Google stacks in CI
+
+Nothing is stored: `scripts/ci/google-auth.sh` trades the job's GitHub OIDC token (it needs
+`id-token: write`) for the access token of `ci-plan` (in `infra`) or `ci-apply` (in `infra-apply`)
+through the pool in `google-ci/`. The pool admits only this repository's jobs on `main` that run in
+those two environments, one account each.
+
+**Bootstrap, once** (and when `google-ci/` changes), by hand, as someone who owns both projects:
+
+    gcloud auth login
+    cd infra/google-ci
+    GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform init
+    GOOGLE_OAUTH_ACCESS_TOKEN=$(gcloud auth print-access-token) mise exec -- terraform apply
+
+`terraform output` then names the provider and the two service accounts, which `scripts/ci/google-auth.sh`
+has (they are not secret). The apply account cannot change the project itself, IAM or the federation:
+those stay by hand. It can enable APIs, manage API keys and the app project's service accounts, which
+is all `google-chordless/` and `google-dev/` hold.
 
 ## The GitHub stack
 
