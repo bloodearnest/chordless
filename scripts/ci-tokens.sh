@@ -11,15 +11,22 @@
 #
 # The tokens are the account's (Account API Tokens), not a person's, so they outlive anyone's login.
 # It needs a throwaway account token that can make tokens (Account API Tokens: Edit; an hour's life,
-# your IP only), bare in the git-ignored .cloudflare-bootstrap-token: delete it in the dashboard
-# afterwards. And a gh login that can set the repository's secrets.
+# your IP only), bare in the git-ignored .cloudflare-bootstrap-token (the primary checkout's, from a
+# worktree too): delete it in the dashboard afterwards. `bootstrap` helps make it. And a gh login that
+# can set the repository's secrets. About once a year (when the tokens are rotated).
 #
+#   scripts/ci-tokens.sh bootstrap [create|rotate]
+#                                 open the dashboard to make the bootstrap token (the permission and
+#                                 an hour's life filled in), take its pasted value without showing it,
+#                                 keep it in the file, check it, then run create (or rotate)
 #   scripts/ci-tokens.sh create   make the tokens (expiring in a year) and set the secrets; one that
 #                                 exists is left as it is
 #   scripts/ci-tokens.sh rotate   give the tokens new values (Cloudflare "rolls" them: same id and
 #                                 permissions) and set the secrets again
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# (the primary checkout's, so a worktree finds it too)
+BOOTSTRAP_FILE=$(cd "$(git rev-parse --git-common-dir)/.." && pwd)/.cloudflare-bootstrap-token
 
 ACCOUNT=589e207ea16d7e9db96c2b3d2ae87833
 ZONE=03ecba88194d19b6e9998db7e04bd95d
@@ -31,9 +38,31 @@ declare -A NAME=([infra]="chordless CI: Terraform state, read" [infra-apply]="ch
 declare -A PERMISSIONS=([infra]="Workers R2 Storage Bucket Item Read" [infra-apply]="Workers R2 Storage Bucket Item Write")
 
 mode=${1:-}
-[[ $mode == create || $mode == rotate ]] || { echo "Usage: $0 create|rotate"; exit 2; }
-[ -s .cloudflare-bootstrap-token ] || { echo "No .cloudflare-bootstrap-token (infra/README.md)"; exit 1; }
-BOOTSTRAP=$(<.cloudflare-bootstrap-token)
+
+if [ "$mode" = bootstrap ]; then
+  # The dashboard's token form, filled in by its URL (Cloudflare's token templates). If it is not
+  # filled in as said, make the token by hand: Account API Tokens, Create Custom Token, permission
+  # Account API Tokens: Edit, your IP, an hour.
+  template='[{"key":"account_api_tokens","type":"edit"}]'
+  expires=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
+  url="https://dash.cloudflare.com/$ACCOUNT/api-tokens?permissionGroupKeys=$(jq -rn --arg t "$template" '$t|@uri')&name=$(jq -rn --arg n "chordless bootstrap $(date -u +%F)" '$n|@uri')"
+  echo "Make the token in the dashboard: Account API Tokens: Edit, limited to your IP, expiring by $expires."
+  echo "$url"
+  (xdg-open "$url" || open "$url") >/dev/null 2>&1 || echo "(open that address in a browser)"
+  read -rsp "Paste the token (not shown): " value
+  echo
+  [ -n "$value" ] || { echo "Nothing pasted"; exit 1; }
+  # It must be a live token before it is kept
+  answer=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/tokens/verify" -H "Authorization: Bearer $value")
+  [ "$(jq -r .result.status <<<"$answer")" = active ] || { echo "Cloudflare does not accept it: $(jq -c .errors <<<"$answer")"; exit 1; }
+  (umask 077 && printf %s "$value" >"$BOOTSTRAP_FILE")
+  echo "Kept in $BOOTSTRAP_FILE (readable by you only). Delete the token in the dashboard, and that file, after."
+  exec "$0" "${2:-create}"
+fi
+
+[[ $mode == create || $mode == rotate ]] || { echo "Usage: $0 bootstrap [create|rotate] | create | rotate"; exit 2; }
+[ -s "$BOOTSTRAP_FILE" ] || { echo "No $BOOTSTRAP_FILE: scripts/ci-tokens.sh bootstrap makes it (infra/README.md)"; exit 1; }
+BOOTSTRAP=$(<"$BOOTSTRAP_FILE")
 
 cf() {
   local method=$1 path=$2 body=${3:-}
@@ -132,4 +161,4 @@ for environment in infra infra-apply; do
       ;;
   esac
 done
-echo "Done: delete the bootstrap token in the dashboard, and .cloudflare-bootstrap-token"
+echo "Done: delete the bootstrap token in the dashboard, and $BOOTSTRAP_FILE"

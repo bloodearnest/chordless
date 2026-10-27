@@ -14,11 +14,9 @@ deploys (.github/workflows/deploy.yml)
   versions say which build they are
 
 tokens
-- a script for the bootstrap token: `scripts/ci-tokens.sh bootstrap` opens the dashboard's token page
-  with the permissions and a one-hour life filled in (Cloudflare's token template URL: check it
-  works), takes the pasted value without echoing it into .cloudflare-bootstrap-token (mode 600), and
-  runs create or rotate; then reminds you to delete the token. Cloudflare has no OAuth route to make
-  tokens (wrangler login has no scope for it, 2026-10-27), and the Global API Key is worse
+- check the bootstrap script's token-template URL (its permission key, `account_api_tokens`, is from
+  memory) the next time it is used; if the form is not filled in, the script says to make the token
+  by hand
 
 Terraform in CI
 - the Google stacks (google-chordless, google-dev), by Workload Identity Federation: nothing stored.

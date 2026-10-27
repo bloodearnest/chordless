@@ -83,8 +83,11 @@ updated: Terraform never deploys it.
 **The Cloudflare tokens** (the R2 ones and `CLOUDFLARE_API_TOKEN`) are the account's (Account API Tokens),
 made by `scripts/ci-tokens.sh create` (one that exists is left alone), which puts each straight into its
 environment without showing it. It needs a throwaway account token that
-can make tokens: in the dashboard, Account API Tokens, a custom token with Account API Tokens: Edit,
-your IP only, an hour's life; bare in `.cloudflare-bootstrap-token` (git-ignored). Delete it after.
+can make tokens (Account API Tokens: Edit, your IP only, an hour's life), bare in `.cloudflare-bootstrap-token`
+(git-ignored; the primary checkout's, from a worktree too). `scripts/ci-tokens.sh bootstrap` opens the
+dashboard for it, takes the pasted value without showing it, checks it and then runs `create` (or
+`bootstrap rotate`). Delete the token in the dashboard after, and the file. Cloudflare has no browser
+login that can make tokens (`wrangler login` has no scope for it).
 
 **The GitHub tokens** can only be made in GitHub's settings (Fine-grained tokens): resource owner the
 repository's, only this repository, the permissions above (Metadata is always on). Set each from a
