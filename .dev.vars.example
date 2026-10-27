@@ -16,5 +16,9 @@ PICKER_API_KEY=
 # environment are no use in the other.
 JWE_ENCRYPTION_KEY=
 
+# The page's traces to Honeycomb (docs/OBSERVABILITY.md): `x-honeycomb-team=<the dev ingest key>`, from
+# `just tf honeycomb output -raw dev_ingest_key`. Leave empty and they are taken and dropped.
+OTLP_HEADERS=
+
 # Used when the client sends no redirect_uri
 GOOGLE_REDIRECT_URI=

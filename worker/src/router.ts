@@ -13,6 +13,7 @@ import { handleShareLive, shareLiveId } from './share-live.ts'
 import { withSharePreview } from './share-page.ts'
 import type { TeamDeps } from './team-context.ts'
 import { handleTeamRoutes, isTeamPath } from './team-routes.ts'
+import { handleTelemetry, TELEMETRY_PATH, type TelemetryDeps } from './telemetry.ts'
 
 /** The Worker's API, which only the app's own pages may call */
 const API_PATHS = /^\/(oauth|session|api)(\/|$)/
@@ -23,7 +24,8 @@ export async function handleRequest(
   ctx: { waitUntil(promise: Promise<unknown>): void },
   cache: ShareCache,
   google?: GoogleApi,
-  team?: TeamDeps
+  team?: TeamDeps,
+  telemetry?: TelemetryDeps
 ) {
   const url = new URL(request.url)
   const path = url.pathname
@@ -53,6 +55,9 @@ export async function handleRequest(
     if (path === '/api/config' && request.method === 'GET') {
       return jsonResponse({ pickerApiKey: env.PICKER_API_KEY ?? null })
     }
+
+    // The page's traces, on their way to Honeycomb (docs/OBSERVABILITY.md)
+    if (path === TELEMETRY_PATH) return await handleTelemetry(request, env, ctx, telemetry)
 
     // Team spaces (docs/SPACES.md): making one, joining, its people, and its files
     if (isTeamPath(path)) return await handleTeamRoutes(request, env, team)
