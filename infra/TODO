@@ -15,7 +15,7 @@ deploys (.github/workflows/deploy.yml)
 
 tokens
 - check the bootstrap script the next time it is used: the template URL fills in only the permission
-  and the name (its key, `account_api_tokens`, is from memory; the first try showed the form had no
+  and the name (Cloudflare's docs list no expiry, IP or account parameter for account tokens; its key, `account_api_tokens`, is from memory; the first try showed the form had no
   expiry, IP or account limit), and the script now refuses a token with no end date or one past two
   hours, no IP limit, or other than this account's resources. Those checks read
   GET /accounts/<id>/tokens/<id>: confirm its fields (`condition.request_ip.in`, `policies[].resources`)

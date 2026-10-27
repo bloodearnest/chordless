@@ -40,13 +40,15 @@ declare -A PERMISSIONS=([infra]="Workers R2 Storage Bucket Item Read" [infra-app
 mode=${1:-}
 
 if [ "$mode" = bootstrap ]; then
-  # The dashboard's token form, filled in by its URL (Cloudflare's token templates): only the
-  # permission and the name, so the rest is set by hand in the form, and checked below before the token
+  # The dashboard's token form, filled in by its URL (Cloudflare's token templates, documented at
+  # developers.cloudflare.com/fundamentals/api/how-to/account-owned-token-template/): an account
+  # token takes only the permission and the name, so the rest is set by hand in the form (no
+  # parameter for the expiry, the IP or the account), and checked below before the token
   # is kept: this account only, your IP only, an hour. If the permission is not filled in either,
   # make the token by hand: Account API Tokens, Create Custom Token, Account API Tokens: Edit.
   template='[{"key":"account_api_tokens","type":"edit"}]'
   expires=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
-  url="https://dash.cloudflare.com/$ACCOUNT/api-tokens?permissionGroupKeys=$(jq -rn --arg t "$template" '$t|@uri')&name=$(jq -rn --arg n "chordless bootstrap $(date -u +%F)" '$n|@uri')"
+  url="https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=$(jq -rn --arg t "$template" '$t|@uri')&name=$(jq -rn --arg n "chordless bootstrap $(date -u +%F)" '$n|@uri')"
   echo "Make the token in the dashboard: Account API Tokens: Edit on this account only; Client IP Address Filtering:"
   echo "your IP ($(curl -fsS --max-time 10 https://api.ipify.org 2>/dev/null || echo 'ask your IP')); TTL: an end date within the hour (before $expires)."
   echo "$url"
