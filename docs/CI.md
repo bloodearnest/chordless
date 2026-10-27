@@ -134,7 +134,8 @@ week). The deploy job uses no cache at all.
 One pull request a week (Mondays) of every npm package, action and Terraform provider (each stack in
 `infra/`: its versions and `.terraform.lock.hcl`) with a new version, each at least a week old
 (`cooldown`); security updates when an alert comes, those at once in one pull request. A merged
-provider bump changes `infra/`, so the Terraform workflow plans it and waits for you before any apply. Each
+provider bump changes `infra/`, so the Terraform workflow plans it and waits for you before any apply; a
+plan that fails holds up the next deploy (which plans first) until the bump is reverted. Each
 is set to merge itself once its checks pass (`.github/workflows/dependabot-auto-merge.yml`): the same
 checks as any pull request, with `just audit` among them.
 
