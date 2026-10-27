@@ -82,10 +82,6 @@ export class LibraryView extends PageView {
   #infoDialog = createRef<SongInfoDialog>()
   #resetModal = createRef<AppModal>()
 
-  #scrollObserver: IntersectionObserver | null = null
-  #suppressScrollReset = false
-  #scrollResetTimeout: ReturnType<typeof setTimeout> | undefined
-
   // The open song
   #openUuid: string | null = null
   #song: SongWithContent | null = null
@@ -148,8 +144,6 @@ export class LibraryView extends PageView {
 
   override disconnectedCallback(): void {
     super.disconnectedCallback()
-    this.#scrollObserver?.disconnect()
-    clearTimeout(this.#scrollResetTimeout)
     clearTimeout(this.#searchTimeout)
     this.#syncing++
     // Edit mode is on <body>, which outlives this view
@@ -206,9 +200,6 @@ export class LibraryView extends PageView {
       return
     }
     this.#openUuid = uuid
-    // The list is still in view until the song has loaded and been scrolled to: that is not a
-    // swipe back to the list (going forward in history, under load, took it for one)
-    this.#suppressScrollResetTemporarily()
     try {
       const song = await getSongFromAnywhere(uuid, await getCurrentDB())
       if (sync !== this.#syncing) return
@@ -230,30 +221,17 @@ export class LibraryView extends PageView {
     element?.scrollIntoView({ behavior, block: 'nearest', inline: 'start' })
   }
 
-  /** Swiping back to the list closes the song */
+  /**
+   * Swiping back to the list closes the song. `scrollend` fires once a scroll has come to rest,
+   * wherever it came from; a scroll of our own ends on the song, so only a swipe ends on the list.
+   */
   #observeScrollBack(): void {
-    const list = this.#libraryList.value as HTMLElement
-    this.#scrollObserver = new IntersectionObserver(
-      entries => {
-        for (const entry of entries) {
-          if (this.#suppressScrollReset) continue
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5 && this.#route.songUuid) {
-            goTo(buildUrl({ name: 'songs' }))
-          }
-        }
-      },
-      { threshold: [0.5, 1.0] }
-    )
-    this.#scrollObserver.observe(list)
-  }
-
-  /** Scrolling to the song passes through the list: don't take that for a swipe back */
-  #suppressScrollResetTemporarily(duration = 600): void {
-    this.#suppressScrollReset = true
-    clearTimeout(this.#scrollResetTimeout)
-    this.#scrollResetTimeout = setTimeout(() => {
-      this.#suppressScrollReset = false
-    }, duration)
+    const container = this.querySelector<HTMLElement>('#songs-content-container')
+    container?.addEventListener('scrollend', () => {
+      if (this.#route.songUuid && container.scrollLeft < container.clientWidth / 2) {
+        goTo(buildUrl({ name: 'songs' }))
+      }
+    })
   }
 
   // ==================== Header controls ====================
@@ -308,7 +286,6 @@ export class LibraryView extends PageView {
 
     await this.#renderSong(parsed, song)
 
-    this.#suppressScrollResetTemporarily()
     this.#scrollTo(this.#songView.value)
   }
 

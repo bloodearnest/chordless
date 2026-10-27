@@ -6,7 +6,7 @@ import { preloadHome } from './vite-plugins/preload-home.ts'
 import { serviceWorker } from './vite-plugins/service-worker.ts'
 
 // The floor, the same as .browserslistrc (which Vite does not read)
-const TARGET = ['safari17', 'chrome120', 'edge120']
+const TARGET = ['safari17.4', 'chrome120', 'edge120']
 
 // The app is in src/, the static files it links to (icons, manifest) in public/.
 // The Cloudflare plugin runs the Worker (worker/src) next to it, in workerd, so dev

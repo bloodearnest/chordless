@@ -79,7 +79,7 @@ bugs
   Church space: Adonai, All Hail King Jesus, Here Is Love, Holy Holy Holy, More Precious Than Silver,
   Our God He Reigns, See His Love, Washed, What A Friend.
 browser support
-- Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120, set in .browserslistrc
+- Decided (2026-10-10): the floor is iOS/Safari 17 and Chrome/Edge 120 (raised to Safari/iOS 17.4 on 2026-10-27, for `scrollend`), set in .browserslistrc
   and TARGET in vite.config.ts (keep them the same). Reasoning: support devices up to about five
   years old; asking people to update their OS is fine, excluding a device that cannot update is
   not, and every iPhone/iPad from 2021 on can run iOS 17 and later (a survey of the worship team:
@@ -121,14 +121,12 @@ navigation
   the scroll/focus handling. Keep AppRouter the only place that knows. No polyfill for now:
   @virtualstate/navigation is still alpha (last release Oct 2025), doesn't intercept link clicks
   (so we'd keep that code), and passes 139 of 306 web-platform tests
-- Swiping (library <-> song, setlist songs) is the browser's own touch scroll with CSS scroll-snap;
-  we only watch where it ended with an IntersectionObserver (library-view.ts, setlist-page.ts), which
-  can't tell a swipe from our own scrollIntoView, so library-view.ts suppresses it for 600ms around
-  programmatic scrolls (#suppressScrollResetTemporarily). That timer raced going forward in history
-  under load (fixed, see docs/test-catches.jsonl). If it causes more trouble: use `scrollend`
-  (Chrome/Edge 114+, Safari 17.4+; the floor is Safari 17, so Safari 17.0-17.3 needs a fallback) in
-  place of the observer and the timer. Custom touch/pointer code is only for drags that must stop
-  native scrolling: overview reordering (touch-action: none) and the media player
+- Swiping (library <-> song, setlist songs) is the browser's own touch scroll with CSS scroll-snap.
+  The library watches where it ended with `scrollend` (library-view.ts; the floor, Safari 17.4, has
+  it). The setlist page still uses an IntersectionObserver and a timer around its own scrolls
+  (setlist-page.ts, _isProgrammaticScroll): move it to `scrollend` too. Custom touch/pointer code is
+  only for drags that must stop native scrolling: overview reordering (touch-action: none) and the
+  media player
 
 accessibility (found by the axe checks in the unit tests)
 - song-section's heading is a <summary> containing the collapse and Show buttons
