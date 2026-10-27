@@ -102,6 +102,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # The whole history: the build's release date is the last commit that touched the app's
+          # files (vite-plugins/service-worker.ts), which a one-commit clone answers with the newest
+          # commit whatever it touched, so every merge would look like a new build
+          fetch-depth: 0
       - uses: ./.github/actions/setup
         with:
           tools: node
