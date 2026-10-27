@@ -32,6 +32,8 @@ jobs:
     environment: infra
     permissions:
       contents: read
+      # (to sign in to Google with no stored key: scripts/ci/google-auth.sh)
+      id-token: write
     outputs:
       changed: ${{ steps.plan.outputs.changed }}
     steps:
@@ -58,6 +60,8 @@ jobs:
     environment: infra-apply
     permissions:
       contents: read
+      # (to sign in to Google with no stored key: scripts/ci/google-auth.sh)
+      id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

@@ -44,6 +44,8 @@ jobs:
     environment: infra
     permissions:
       contents: read
+      # (to sign in to Google with no stored key: scripts/ci/google-auth.sh)
+      id-token: write
     outputs:
       changed: ${{ steps.plan.outputs.changed }}
     steps:
@@ -69,6 +71,8 @@ jobs:
     environment: infra-apply
     permissions:
       contents: read
+      # (to sign in to Google with no stored key: scripts/ci/google-auth.sh)
+      id-token: write
     # (the group terraform.yml has, so a push to infra/ and a deploy do not apply at once)
     concurrency:
       group: terraform

@@ -23,6 +23,9 @@ runs:
   steps:
     - shell: bash
       run: scripts/ci/setup-tools.sh terraform
+    # Google: the job's OIDC token for ci-apply's (nothing stored). The job needs `id-token: write`
+    - shell: bash
+      run: scripts/ci/google-auth.sh apply
     - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: terraform-plans

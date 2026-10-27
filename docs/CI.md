@@ -149,8 +149,9 @@ A change to `infra/` that reaches `main` is planned and, once you approve, appli
 Nightly, every stack is planned, and the run fails if any would change: something was changed outside
 the code (a console, a dashboard). Put it in the code, or undo it.
 
-Pull requests run none of it: they have no secrets. The `github` and `cloudflare` stacks are in CI; the
-Google ones are planned and applied by hand (`infra/README.md`) until their credentials are made. Each run
+Pull requests run none of it: they have no secrets. The `github`, `cloudflare` and two Google stacks are in CI; `google-ci`, which says what CI may do to
+Google, is planned and applied by hand (`infra/README.md`). Google is signed in to with no stored key: Workload Identity
+Federation, `scripts/ci/google-auth.sh`. Each run
 also checks its credentials' expiry (`scripts/ci/check-expiry.sh`): a warning 30 days before, a failure
 7 days before, so the nightly run says so in time. The credentials, and rotating them:
 `infra/README.md`.
