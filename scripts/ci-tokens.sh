@@ -10,14 +10,14 @@
 # No value is shown or written to a file: each goes from Cloudflare's answer straight to `gh secret set`.
 #
 # The tokens are the account's (Account API Tokens), not a person's, so they outlive anyone's login.
-# It needs a throwaway account token that can make tokens (Account API Tokens: Edit; an hour's life,
+# It needs a throwaway account token that can make tokens (Account API Tokens: Edit; a day's life at most,
 # your IP only), bare in the git-ignored .cloudflare-bootstrap-token (the primary checkout's, from a
 # worktree too): delete it in the dashboard afterwards. `bootstrap` helps make it. And a gh login that
 # can set the repository's secrets. About once a year (when the tokens are rotated).
 #
 #   scripts/ci-tokens.sh bootstrap [create|rotate]
 #                                 open the dashboard to make the bootstrap token (the permission and
-#                                 an hour's life filled in), take its pasted value without showing it,
+#                                 a day's life at most filled in), take its pasted value without showing it,
 #                                 keep it in the file, check it, then run create (or rotate)
 #   scripts/ci-tokens.sh create   make the tokens (expiring in a year) and set the secrets; one that
 #                                 exists is left as it is
@@ -44,13 +44,13 @@ if [ "$mode" = bootstrap ]; then
   # developers.cloudflare.com/fundamentals/api/how-to/account-owned-token-template/): an account
   # token takes only the permission and the name, so the rest is set by hand in the form (no
   # parameter for the expiry, the IP or the account), and checked below before the token
-  # is kept: this account only, your IP only, an hour. If the permission is not filled in either,
+  # is kept: this account only, your IP only, a day at most. If the permission is not filled in either,
   # make the token by hand: Account API Tokens, Create Custom Token, Account API Tokens: Edit.
   template='[{"key":"account_api_tokens","type":"edit"}]'
-  expires=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
+  expires=$(date -u -d '+1 day' +%Y-%m-%dT%H:%M:%SZ)
   url="https://dash.cloudflare.com/?to=/:account/api-tokens&permissionGroupKeys=$(jq -rn --arg t "$template" '$t|@uri')&name=$(jq -rn --arg n "chordless bootstrap $(date -u +%F)" '$n|@uri')"
   echo "Make the token in the dashboard: Account API Tokens: Edit on this account only; Client IP Address Filtering:"
-  echo "your IP ($(curl -fsS --max-time 10 https://api.ipify.org 2>/dev/null || echo 'ask your IP')); TTL: an end date within the hour (before $expires)."
+  echo "your IP ($(curl -fsS --max-time 10 https://api.ipify.org 2>/dev/null || echo 'ask your IP')); TTL: an end date within a day (before $expires)."
   echo "$url"
   (xdg-open "$url" || open "$url") >/dev/null 2>&1 || echo "(open that address in a browser)"
   read -rsp "Paste the token (not shown): " value
@@ -64,15 +64,22 @@ if [ "$mode" = bootstrap ]; then
   id=$(jq -r .result.id <<<"$answer")
   ends=$(jq -r '.result.expires_on // empty' <<<"$answer")
   details=$(curl -sS "https://api.cloudflare.com/client/v4/accounts/$ACCOUNT/tokens/$id" -H "Authorization: Bearer $value")
+  # (a refusal to describe the token would look like a token with no limits: say so instead)
+  if [ "$(jq -r .success <<<"$details" 2>/dev/null)" != true ]; then
+    echo "Cloudflare would not describe the token, so its limits cannot be checked: $(jq -c .errors <<<"$details" 2>/dev/null || echo "$details" | head -c 300)"
+    exit 1
+  fi
   problems=()
-  if [ -z "$ends" ]; then problems+=("it never expires (set an end date within the hour)")
-  elif [ "$(date -u -d "$ends" +%s)" -gt "$(date -u -d '+2 hours' +%s)" ]; then problems+=("it runs until $ends (an hour is enough)"); fi
+  if [ -z "$ends" ]; then problems+=("it never expires (set an end date within a day)")
+  elif [ "$(date -u -d "$ends" +%s)" -gt "$(date -u -d '+26 hours' +%s)" ]; then problems+=("it runs until $ends (a day is enough)"); fi
   [ "$(jq -r '(.result.condition.request_ip.in // []) | length' <<<"$details")" -gt 0 ] || problems+=("it is not limited to an IP address")
   jq -e --arg a "com.cloudflare.api.account.$ACCOUNT" \
     '[.result.policies[]?.resources | keys[]] | length > 0 and all(. == $a)' <<<"$details" >/dev/null ||
     problems+=("it is not limited to this account")
   if [ ${#problems[@]} -gt 0 ]; then
     printf 'Not kept: %s\n' "${problems[@]}"
+    # What Cloudflare says the token is limited to (no secret in it), to see what the checks read
+    echo "Cloudflare describes it as: $(jq -c '{ip: .result.condition, resources: [.result.policies[]? | .resources]}' <<<"$details")"
     echo "Delete that token in the dashboard, make another with those settings, and run this again."
     exit 1
   fi
