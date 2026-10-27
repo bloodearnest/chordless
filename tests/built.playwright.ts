@@ -74,7 +74,7 @@ test('the files it caches are the files the build made', async ({ page }) => {
 test('the security headers are on the page, its deep links and the service worker', async ({
   request,
 }) => {
-  for (const path of ['/', '/songs', '/service-worker.js', '/boot.js']) {
+  for (const path of ['/', '/songs', '/service-worker.js', '/boot.js', '/floor.js']) {
     const headers = (await request.get(path)).headers()
     expect(headers['content-security-policy'], path).toContain("default-src 'self'")
     expect(headers['x-content-type-options'], path).toBe('nosniff')
@@ -195,4 +195,31 @@ test('the build is for the production Google project, and carries nothing of the
   // (the production build keeps its folder in `Chordless`, never the dev app's)
   expect(built).not.toContain(dev.VITE_DRIVE_ROOT_FOLDER)
   expect(prod.VITE_DRIVE_ROOT_FOLDER).toBe('Chordless')
+})
+
+test.describe('below the browser floor', () => {
+  // A browser without scrollend (Safari before 17.4) is what the check looks for. The page stops
+  // loading (window.stop()), so it never reaches `load`
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => {
+      Object.defineProperty(window, 'onscrollend', { value: undefined, configurable: true })
+      delete (window as unknown as Record<string, unknown>).onscrollend
+    })
+  })
+
+  test('says to update the device, and does not load the app', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'commit' })
+    await expect(page.getByRole('alert')).toContainText('update your device')
+    await expect(page.locator('app-header, nav-menu:not(:empty)')).toHaveCount(0)
+    expect(await page.evaluate(() => navigator.serviceWorker.controller)).toBeNull()
+  })
+
+  test('"Try it anyway" opens the app, and is remembered', async ({ page }) => {
+    await page.goto('/', { waitUntil: 'commit' })
+    await page.getByRole('button', { name: 'Try it anyway' }).click()
+    await expect(page.locator('#view-outlet .boot-shell')).toHaveCount(0)
+    await expect(page.getByRole('alert')).toHaveCount(0)
+    await page.reload()
+    await expect(page.getByRole('alert')).toHaveCount(0)
+  })
 })

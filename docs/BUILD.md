@@ -96,7 +96,9 @@ fails on a violation. What the policy allows, and why, is in the comment at the 
 When the app starts using a new host, add it there; the service worker script gets the same
 header, so its `connect-src` must cover what it fetches.
 
-The page has no inline script (`public/boot.js` is the one classic script), so scripts need no
+Below the floor (`.browserslistrc`), `public/floor.js` replaces the page with a plain "Please update your device" message and stops it loading the app. It is a classic script in syntax any browser parses, and tests `scrollend` (the check that sets the floor), `:has()` and `structuredClone`. "Try it anyway" is remembered in localStorage, so a wrong guess never locks anyone out.
+
+The page has no inline script (`public/floor.js` and `public/boot.js` are the classic scripts), so scripts need no
 `'unsafe-inline'`. Style attributes are allowed (`style-src-attr`), `<style>` elements are not.
 
 ## Gotchas

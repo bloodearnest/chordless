@@ -97,13 +97,9 @@ browser support
   your device" page below is the cheap part either way
 - No fallbacks or polyfills for what 17 has (nesting, dialog, :has, view transitions as an
   enhancement). Look through the code for workarounds the floor makes unnecessary
-- Below the floor the app has no message: a browser older than 17 gets whatever happens when
-  it meets syntax or APIs it lacks (first real case: an iPhone on 18.0.1 reported by the team,
-  which is above this floor but was asked to update to 27: check it works). Show a plain "Update
-  your device" page instead: a small classic script in index.html (it runs anywhere) that
-  feature-detects what the floor guarantees (e.g. CSS.supports for nesting or :has(), and
-  structuredClone) and replaces the page with the required versions. Find out first what an
-  older device actually shows
+- Below the floor the page says "Please update your device" (public/floor.js, with a "Try it anyway"
+  that is remembered). Not seen on a real old device: find out what one shows when the app's module
+  scripts cannot even parse (an iPhone on 18.0.1 was reported, which is above the floor: check it works)
 - Core is setlist navigation (reading and moving through the setlist, offline). The media player
   is optional and may be off on a device without Web Audio: it is not loaded when the device has
   none or it is switched off in Preferences (media-player-loader.ts), and a player that fails to
