@@ -50,8 +50,7 @@ say "No changes") and a check that the production Worker has its secrets (docs/E
 ## In CI
 
 `.github/workflows/terraform.yml` plans a change to `infra/` once it is on `main`, and applies it after
-the owner approves (docs/CI.md). So far only for the `github` stack: the others need credentials of
-their own first (a narrow Cloudflare token; Workload Identity Federation for Google).
+the owner approves (docs/CI.md). For the `github` and `cloudflare` stacks; the Google ones need Workload Identity Federation first.
 
 Its credentials are secrets of two GitHub environments, set by hand, never by Terraform: a secret's
 value in the state could be read with the plan job's read-only key, which would undo the separation.
@@ -59,8 +58,10 @@ value in the state could be read with the plan job's read-only key, which would 
 | Environment | Secret | What |
 |---|---|---|
 | `infra` (plans, drift) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | an R2 token, Object Read, this bucket only |
+| | `CLOUDFLARE_API_TOKEN` | for the `cloudflare` stack: read of Workers Scripts, R2 Storage, Workers Routes, DNS, Zone Settings, Zone and Email Routing Rules, on this account and the chordless.app zone |
 | | `GH_TERRAFORM_TOKEN` | a fine-grained token, this repository only: Administration and Environments, read |
 | `infra-apply` (applies, after approval) | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | an R2 token, Object Read & Write, this bucket only |
+| | `CLOUDFLARE_API_TOKEN` | the same, with edit |
 | | `GH_TERRAFORM_TOKEN` | the same, with read and write |
 
 Neither GitHub token needs Contents: write, though GitHub's REST API shows the repository's merge
@@ -69,7 +70,7 @@ settings (which merge buttons, auto-merge, deleting a merged branch) only to a t
 reads them over GraphQL (`infra/github/merge-settings.sh`, which a read-only token can) and fails the
 drift check when they are not the code's. Changing one is done in GitHub, then in `main.tf`.
 
-Each environment also has a variable, `R2_TOKEN_EXPIRES`. `just check-gh-secrets` checks all are there.
+Each of those two environments also has the variables `R2_TOKEN_EXPIRES` and `CLOUDFLARE_TOKEN_EXPIRES`. `just check-gh-secrets` checks all are there.
 
 **The deploy token** (`production` environment, not Terraform's): `CLOUDFLARE_API_TOKEN` is an account
 API token with Workers Scripts: Edit on this account and nothing else, and the variable
@@ -78,8 +79,9 @@ and `gh variable set CLOUDFLARE_ACCOUNT_ID --env production`. It has no expiry c
 year and put the date in the account token's name. A deploy (`docs/CI.md`) is how the Worker gets
 updated: Terraform never deploys it.
 
-**The R2 tokens** are the account's (Account API Tokens), made by `scripts/ci-tokens.sh create`, which
-puts each straight into its environment without showing it. It needs a throwaway account token that
+**The Cloudflare tokens** (the R2 ones and `CLOUDFLARE_API_TOKEN`) are the account's (Account API Tokens),
+made by `scripts/ci-tokens.sh create` (one that exists is left alone), which puts each straight into its
+environment without showing it. It needs a throwaway account token that
 can make tokens: in the dashboard, Account API Tokens, a custom token with Account API Tokens: Edit,
 your IP only, an hour's life; bare in `.cloudflare-bootstrap-token` (git-ignored). Delete it after.
 
@@ -89,9 +91,9 @@ terminal of your own, which prompts for it (not `!` in Claude Code, which has no
 
     gh secret set GH_TERRAFORM_TOKEN --env infra --repo bloodearnest/chordless
 
-**Expiry and rotation.** All four run out a year from when they were made, on the same day (the R2 ones
-on 2027-10-25), so they are rotated together. The Terraform jobs warn 30 days before and fail 7 days
-before. To rotate: `scripts/ci-tokens.sh rotate` (Cloudflare rolls each R2 token: the same token, a new
+**Expiry and rotation.** They run out a year from when they were made (the R2 ones on 2027-10-25), so
+they are rotated together. The Terraform jobs warn 30 days before and fail 7 days
+before. To rotate: `scripts/ci-tokens.sh rotate` (Cloudflare rolls each Cloudflare token: the same token, a new
 secret), and "Regenerate token" on each GitHub one, then `gh secret set` it again. Rotate at once,
 whatever the date, if one may have leaked.
 

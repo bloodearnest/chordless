@@ -5,26 +5,27 @@ import { execFileSync } from 'node:child_process'
 
 const REPOSITORY = 'bloodearnest/chordless'
 
-const terraform = (access: string) => ({
+const terraform = (access: string, cloudflare: string) => ({
   AWS_ACCESS_KEY_ID: `the R2 token (${access}) for the Terraform state: scripts/ci-tokens.sh makes it`,
   AWS_SECRET_ACCESS_KEY: 'its secret, which scripts/ci-tokens.sh sets with it',
   GH_TERRAFORM_TOKEN: `a fine-grained token, this repository only: Administration and Environments, ${access} (infra/README.md)`,
+  CLOUDFLARE_API_TOKEN: `the ${cloudflare} token for the cloudflare stack, which scripts/ci-tokens.sh makes`,
 })
 
 const NEEDED: Record<string, Record<string, string>> = {
-  infra: terraform('read'),
-  'infra-apply': terraform('read and write'),
+  infra: terraform('read', 'read'),
+  'infra-apply': terraform('read and write', 'edit'),
   production: {
     CLOUDFLARE_API_TOKEN:
       'an account API token for deploys: Workers Scripts: Edit, this account only (infra/README.md)',
   },
 }
 
-// Variables that are not secrets, by environment (the R2 tokens' expiry is each Terraform one's)
-const VARIABLES: Record<string, string> = {
-  infra: 'R2_TOKEN_EXPIRES',
-  'infra-apply': 'R2_TOKEN_EXPIRES',
-  production: 'CLOUDFLARE_ACCOUNT_ID',
+// Variables that are not secrets, by environment (the tokens' expiry, which scripts/ci-tokens.sh sets)
+const VARIABLES: Record<string, string[]> = {
+  infra: ['R2_TOKEN_EXPIRES', 'CLOUDFLARE_TOKEN_EXPIRES'],
+  'infra-apply': ['R2_TOKEN_EXPIRES', 'CLOUDFLARE_TOKEN_EXPIRES'],
+  production: ['CLOUDFLARE_ACCOUNT_ID'],
 }
 
 const listed = (environment: string, kind: 'secrets' | 'variables') =>
@@ -49,8 +50,10 @@ for (const [environment, secrets] of Object.entries(NEEDED)) {
     console.error(`${environment} lacks ${name}: ${about}`)
     missing++
   }
-  if (!listed(environment, 'variables').includes(VARIABLES[environment])) {
-    console.error(`${environment} lacks the variable ${VARIABLES[environment]} (infra/README.md)`)
+  const variables = listed(environment, 'variables')
+  for (const variable of VARIABLES[environment]) {
+    if (variables.includes(variable)) continue
+    console.error(`${environment} lacks the variable ${variable} (infra/README.md)`)
     missing++
   }
 }

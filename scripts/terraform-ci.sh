@@ -11,9 +11,9 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-# The stacks CI has credentials for. The others (cloudflare, google-*) join as theirs are made
-# (the TODO): until then they are planned and applied by hand, and checked by `just predeploy`.
-CI_STACKS=(github)
+# The stacks CI has credentials for. The others (google-*) join as theirs are made (the TODO): until
+# then they are planned and applied by hand, and checked by `just predeploy`.
+CI_STACKS=(github cloudflare)
 
 tf() { mise exec -- terraform "$@"; }
 summary() { if [ -n "${GITHUB_STEP_SUMMARY:-}" ]; then cat >>"$GITHUB_STEP_SUMMARY"; else cat >/dev/null; fi; }

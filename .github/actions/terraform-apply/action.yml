@@ -14,6 +14,9 @@ inputs:
   github-token:
     description: The fine-grained GitHub token (read and write)
     required: true
+  cloudflare-token:
+    description: The Cloudflare API token (edit) for the cloudflare stack
+    required: true
 
 runs:
   using: composite
@@ -30,3 +33,4 @@ runs:
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-token }}
