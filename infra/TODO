@@ -30,9 +30,3 @@ google
 github
 - agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
   required_approvals)
-- (the last step of the deploy work) a branch need not be up to date with main to merge: it costs
-  another CI run, and the checks on main after a merge, with the deploy waiting on them, catch what
-  slips in. Switched off by hand in the ruleset (Settings, Rules, Rulesets, main) on 2026-10-27; put it
-  in the code: `strict_required_status_checks_policy = false` in infra/github/main.tf, and "a branch up
-  to date with `main`" out of docs/CI.md's list of what a pull request needs. Until then the nightly
-  run reports the github stack as drifted

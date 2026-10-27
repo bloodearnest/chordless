@@ -10,9 +10,9 @@ so what CI runs can be run, and fixed, locally.
 2. Before asking for review: `git fetch && git rebase origin/main`, then `just ci`, then
    `git push --force-with-lease`. Open the pull request with `gh pr create` (a draft until `just ci`
    passes), using the template.
-3. The pull request needs `ci-ok` to pass, CodeQL's findings below the ruleset's thresholds, a
-   branch up to date with `main` (GitHub's "Update branch" rebases it), and the approvals the ruleset
-   asks for. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
+3. The pull request needs `ci-ok` to pass, CodeQL's findings below the ruleset's thresholds, and the
+   approvals the ruleset asks for. It need not be up to date with `main` (that would cost another run of
+   CI per merge): the checks on `main` after a merge, which the deploy waits for, catch what slips in. It is merged with **Rebase and merge**: no merge commits, no squash. "Enable auto-merge"
    on a pull request merges it when all that is so.
 4. Deploys are `.github/workflows/deploy.yml` (run by hand for now; below), or still `just deploy` from a laptop.
 
