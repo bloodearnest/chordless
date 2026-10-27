@@ -8,8 +8,9 @@
 # Run it from anywhere in the repository, in the user's own shell: a session confined to its
 # worktree cannot touch the primary checkout. It also installs the packages (npm ci) if the lock file is
 # newer than what is installed, which a pull that adds a dependency leaves behind. "Rebase and merge" gives a PR's commits new shas, so
-# a merged branch is found by its PR (gh), not by git's ancestry, and is only removed when its tip
-# is the commit the PR merged (nothing added since). Nothing is ever force-removed.
+# a merged branch is found by its PR (gh), not by git's ancestry, and is only removed when nothing
+# has been added since: its tip is the commit the PR merged, or every commit on it has a patch-equal
+# twin on origin/main (git cherry). Nothing is ever force-removed.
 set -euo pipefail
 
 prune=0
@@ -48,7 +49,9 @@ while read -r name; do
   number=$(jq -r .number <<<"$pr")
   head=$(jq -r .headRefOid <<<"$pr")
   tree=$(git worktree list --porcelain | awk -v b="refs/heads/$name" '/^worktree /{w=$2} $1=="branch" && $2==b {print w}')
-  if [[ "$(git rev-parse "$name")" != "$head" ]]; then
+  # "+" lines are commits with no patch-equal twin on origin/main (captured first: grep -q under pipefail can fail on SIGPIPE)
+  unmerged=$(git cherry origin/main "$name" | grep '^+' || true)
+  if [[ "$(git rev-parse "$name")" != "$head" && -n "$unmerged" ]]; then
     echo "  $name (#$number): has commits the merged pull request lacked: kept"
   elif [[ -n "$tree" && -n "$(git -C "$tree" status --porcelain)" ]]; then
     echo "  $name (#$number): its worktree $tree has uncommitted changes: kept"
