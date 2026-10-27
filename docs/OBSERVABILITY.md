@@ -6,8 +6,9 @@ refreshes, how a setlist session goes, how long a live update takes to reach a f
 environments and keys are Terraform (`infra/honeycomb/`); the Worker's secret is wrangler's, as ever
 (`infra/README.md`).
 
-**Status:** designed, being built in steps (below). Nothing on this page is in the app yet except
-what the "Built" notes say.
+**Status:** designed, being built in steps (below). Built so far: the Worker's own traces to Honeycomb
+(step 1, live since 2026-10-27) and the Worker's telemetry route (step 2). The page does not send
+anything yet.
 
 ## Decisions
 
@@ -104,18 +105,46 @@ Anonymous, and re-identifiable only when the user gives the id to us.
 
 ## The Worker route
 
-`worker/src/telemetry.ts`, `POST /api/otlp/v1/traces`. It is the small collector: authentication and
-abuse limits, redaction, forwarding.
+**Built** (`worker/src/telemetry.ts`, tested in `tests/telemetry.node.test.ts`), `POST /api/otlp/v1/traces`. It is
+the small collector: authentication and abuse limits, redaction, forwarding.
 
 - Same origin only (`isCrossOrigin`, `Sec-Fetch-Site: same-origin` for a beacon); `application/json`
-  only; a body size cap; a rate-limit binding by IP (`TELEMETRY`, repeated in `[env.dev]`).
-- **Redaction:** the capped body is parsed in memory and only allow-listed attribute keys are kept
-  (the `chordless.*` names here and the standard ones above), with caps on value length and the
-  number of attributes. A bug in the page cannot ship a title or a lyric. Never stored, never logged.
-  The sample-rate attribute is on the list from the start (see "If volume grows").
-- Forwards to `OTLP_ENDPOINT` with `OTLP_HEADERS`. No secret set (local development): it accepts and
-  drops.
-- Always answers 204, whatever upstream says.
+  only; a body size cap (256 KB, also when the sender does not say how big it is); a rate-limit
+  binding by address (`TELEMETRY`, 600 a minute: a band shares one wifi address; repeated in
+  `[env.dev]`). A refusal is 403 (another origin), 405, 413, 415, 400 (not JSON, or no span left) or 429;
+  a limit that cannot be asked about lets the batch through.
+- **Redaction:** the capped body is parsed in memory and **rebuilt field by field** from what we know
+  of OTLP/JSON: an unknown field does not pass, and an attribute passes only if its name is in
+  `ALLOWED_ATTRIBUTES` (the `chordless.*` names here and the standard ones above, exact names, not a
+  prefix), with a plain value (no list or map) of at most 512 characters (200 for an exception message), at
+  most 64 attributes a span, 500 spans a batch. A span's status keeps its code and loses its message, and a
+  scope keeps its name and version. A bug in the page cannot ship a title or a lyric: **a new
+  attribute is a change to that list and its test**, which also fails if a name looks like a title,
+  lyric, URL or email. Never stored, never logged. The sample-rate attribute is on the list from the
+  start (see "If volume grows").
+- Forwards, after answering, to `OTLP_ENDPOINT` (a variable in `wrangler.toml`, repeated in
+  `[env.dev.vars]`, https only) with `OTLP_HEADERS` (`name=value,name=value`, as
+  `OTEL_EXPORTER_OTLP_HEADERS` has it; an optional secret). No headers or endpoint (local development
+  without a key): the batch is accepted and dropped.
+- Answers 204 to a good batch, whatever upstream says; an upstream failure is logged as a status
+  or an error's name, never what was sent.
+- The secret: `wrangler secret put OTLP_HEADERS` is `x-honeycomb-team=<prod_ingest_key>` (and for
+  `npm run dev`, `OTLP_HEADERS=x-honeycomb-team=<dev_ingest_key>` in `.dev.vars`).
+
+## What the Worker's native export carries
+
+Checked in Honeycomb on 2026-10-27. The Worker's traces are in a dataset named `chordless` (the
+service name; `cloudflare-workers-observability` holds only the destination's test event). A request is a
+root `GET` or `POST` span, with an outbound `fetch` child where the Worker called out (the Google token
+exchange is a child of `/session/refresh`). Error statuses are traced too, but Cloudflare's own
+`status_code` stays unset for a 4xx and `cloudflare.outcome` is `ok` when the Worker ran: **failure is
+`http.response.status_code`**, so Worker triggers and SLOs filter on that (`>= 500`).
+
+This export does not go through the telemetry route, so **its attributes are not redacted**. It carries
+the geography of the sender (country, region, city) and the network (ASN) from the address, the parsed
+user agent, the Cloudflare ray id, and the URL as it came: `url.path` has the ids of spaces and shares
+(`/api/space/<id>/...`), which are identifiers, not content. There is no `http.route`, so group by
+path with care. The privacy text says all of this. (No client address is exported.)
 
 ## Context propagation
 

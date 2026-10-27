@@ -8,6 +8,7 @@ Two Google Cloud projects, so that development and tests never touch users' data
 | Used by | `npm run dev`, the tests, `just test-drive` | `vite build`, so what is deployed |
 | Page's client and Picker app id | `.env.development` | `.env.production` |
 | Worker's secrets | `.dev.vars` (`.dev.vars.example` names them) | Worker secrets, set with `wrangler secret put NAME` |
+| Honeycomb (traces, docs/OBSERVABILITY.md) | environment `chordless-dev`; its ingest key is `OTLP_HEADERS` in `.dev.vars` (optional) | environment `chordless-prod`; its ingest key is the Worker secret `OTLP_HEADERS` (`infra/honeycomb/`) |
 | Where the files are | the Drive of the test account(s) | users' own Drives |
 | Folder in My Drive | `Chordless-dev` (`VITE_DRIVE_ROOT_FOLDER` in `.env.development`) | `Chordless` (`.env.production`) |
 
