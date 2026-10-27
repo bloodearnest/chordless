@@ -15,6 +15,16 @@ preview_urls = false
 enabled = true
 invocation_logs = true
 
+# The Worker's own traces go to Honeycomb (docs/OBSERVABILITY.md): a destination made in the Cloudflare
+# dashboard (Observability > Destinations), which Terraform and wrangler cannot make. persist = false
+# sends them on without also keeping them in Cloudflare (which bills stored traces from 2026-12-01).
+# No sampling (1 is all). Traces only: the logs above stay in Cloudflare.
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = false
+destinations = ["honeycomb-traces"]
+
 # Limits on the emails the import address answers (worker/src/email.ts): an email over one is
 # dropped without a reply. Per sender, and overall (forged sender addresses get round the first).
 # period is 10 or 60 seconds. The namespace ids only have to be unique in the account.
@@ -71,6 +81,10 @@ new_sqlite_classes = ["ShareRoom"]
 # Local development settings: `npm run dev` runs `wrangler dev --env dev`.
 # Secrets still come from .dev.vars.
 [env.dev]
+# Not the production Honeycomb: the destination above has the production key
+[env.dev.observability.traces]
+enabled = false
+
 # Environments don't inherit ratelimits, so the email handler has them here too (same limits)
 [[env.dev.ratelimits]]
 name = "EMAIL_PER_SENDER"
