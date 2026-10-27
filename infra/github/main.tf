@@ -182,7 +182,9 @@ resource "github_repository_ruleset" "main" {
     }
 
     required_status_checks {
-      strict_required_status_checks_policy = true
+      # Not required: a branch need not be up to date with main to merge (it cost another CI run per
+      # merge; the checks on main after a merge, which the deploy waits for, catch what slips in)
+      strict_required_status_checks_policy = false
       required_check {
         context = "ci-ok"
         # GitHub Actions: a status of that name from anywhere else does not count
