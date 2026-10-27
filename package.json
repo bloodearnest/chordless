@@ -18,7 +18,7 @@
   "dependencies": {
     "@lit/context": "^1.1.6",
     "@lit/task": "^1.0.3",
-    "jose": "^6.2.12",
+    "jose": "^6.2.13",
     "lit": "^3.3.3",
     "minisearch": "^7.2.0",
     "oauth4webapi": "^3.8.8",
@@ -39,11 +39,11 @@
     "@web/test-runner": "^1.0.0",
     "@web/test-runner-commands": "^1.0.1",
     "@web/test-runner-playwright": "^1.0.0",
-    "knip": "^6.42.0",
+    "knip": "^6.42.1",
     "semver": "^7.8.5",
     "typescript": "^7.0.2",
     "vite": "^8.3.4",
-    "wrangler": "^4.151.1"
+    "wrangler": "^4.151.3"
   },
   "keywords": [],
   "author": "",
