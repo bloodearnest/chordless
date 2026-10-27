@@ -52,8 +52,9 @@ what the VM is for. `--no-rc` turns off Remote Control.
 
 ```
 GH_TOKEN=...                       # gh, and git's credential helper in the VM
-CLOUDFLARE_API_TOKEN=...           # wrangler, Terraform
-CLOUDSDK_AUTH_ACCESS_TOKEN=...     # gcloud, Terraform's Google provider
+CLOUDFLARE_API_TOKEN=...           # wrangler, Terraform's cloudflare stack (and its R2 state, infra/README.md)
+GOOGLE_OAUTH_ACCESS_TOKEN=...      # Terraform's Google stacks
+CLOUDSDK_AUTH_ACCESS_TOKEN=...     # gcloud (the same access token works for both)
 ```
 
 Each session gets them as `incus exec --env`, so they are not in Incus's configuration, the VM's disk or
@@ -65,9 +66,12 @@ missing file means a VM with no tokens. Scope them to this project:
   ruleset (`infra/github/`) whatever the token can do.
 - **Cloudflare**: an API token for this account and zone, with only the permissions `infra/` and
   `wrangler.toml` use. Not the token CI deploys with: its own, so that either can be revoked alone.
-- **Google**: an access token for a service account that has only the roles this project needs
-  (`gcloud auth print-access-token --impersonate-service-account=...` makes one that expires in an
-  hour), or a key for it.
+- **Google**: an access token for the service account `agent-vm@chordless-app.iam.gserviceaccount.com`,
+  which is in `infra/google-ci` (IAM is made by hand, never by CI). It is read-only on `chordless-app`
+  and `chordless-dev`: Viewer and API Keys Viewer, enough for `terraform plan` and `just dev-vars`. Add
+  roles there for an agent that is to change something. You (the owner) may impersonate it, and make a
+  token that expires in an hour:
+  `gcloud auth print-access-token --impersonate-service-account=agent-vm@chordless-app.iam.gserviceaccount.com`
 
 ## Limits
 

@@ -7,7 +7,8 @@
 #
 # THIS STACK IS NEVER IN CI: planned and applied by hand (`gcloud auth login`), so a change to the
 # code CI runs can never widen what CI may do. The first apply is the bootstrap for the rest.
-# It holds only this: the APIs the federation needs (the project's other APIs are google-chordless's).
+# It holds only this: the APIs the federation needs (the project's other APIs are google-chordless's),
+# and the read-only account agent VMs use (docs/AGENT_VMS.md), which is IAM too.
 terraform {
   required_version = ">= 1.10"
   required_providers {
@@ -139,6 +140,34 @@ resource "google_project_iam_member" "ci" {
   project  = each.value.project
   role     = each.value.role
   member   = google_service_account.ci[each.value.account].member
+}
+
+# The account an agent VM acts as (docs/AGENT_VMS.md): read-only on both projects, so `terraform plan`
+# and `just dev-vars` work. It has no key: the owner makes an hour's access token by impersonating it.
+# To let an agent change something, give it more roles here (by hand, like the rest of this stack).
+resource "google_service_account" "agent" {
+  project      = local.project
+  account_id   = "agent-vm"
+  display_name = "Agent VMs"
+  description  = "Chordless agent VMs (docs/AGENT_VMS.md): read-only, impersonated by the owner"
+
+  depends_on = [google_project_service.ci]
+}
+
+resource "google_project_iam_member" "agent" {
+  for_each = {
+    for pair in setproduct(["roles/viewer", "roles/serviceusage.apiKeysViewer"], local.projects) :
+    "${pair[0]}/${pair[1]}" => { role = pair[0], project = pair[1] }
+  }
+  project = each.value.project
+  role    = each.value.role
+  member  = google_service_account.agent.member
+}
+
+resource "google_service_account_iam_member" "agent_impersonation" {
+  service_account_id = google_service_account.agent.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "user:bloodearnest@gmail.com"
 }
 
 # For scripts/ci/google-auth.sh, which scripts/ci ties to these (no third-party action is allowed)
