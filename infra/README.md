@@ -10,7 +10,7 @@ own state, so a mistake in one cannot touch another. (Five now: `google-ci/` is 
 | `cloudflare/` | the R2 bucket that holds every stack's state, the Worker's custom domain `chordless.app`, Email Routing (`import@chordless.app` to the Worker), the TXT records we own (SPF, Google site verification), the TLS and HTTPS zone settings |
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
-| `google-ci/` | how CI signs in to Google: a Workload Identity pool and a GitHub OIDC provider in `chordless-app`, restricted to this repository's jobs on `main`, and two service accounts, `ci-plan` (the `infra` environment: reads both projects) and `ci-apply` (`infra-apply`: enables APIs and manages API keys in both, and the app project's service accounts). **Never in CI**: planned and applied by hand, so a change to what CI runs can never widen what CI may do |
+| `google-ci/` | how CI signs in to Google: a Workload Identity pool and a GitHub OIDC provider in `chordless-app`, restricted to this repository's jobs on `main`, and two service accounts, `ci-plan` (the `infra` environment: reads both projects) and `ci-apply` (`infra-apply`: enables APIs and manages API keys in both, and the app project's service accounts); also `agent-vm`, the read-only account agent VMs use ([docs/AGENT_VMS.md](../docs/AGENT_VMS.md)). **Never in CI**: planned and applied by hand, so a change to what CI runs can never widen what CI may do |
 | `github/` | the GitHub repository's settings (imported): merge by rebase only, the `main` ruleset (a pull request, `ci-ok` passing, linear history), what Actions may run (GitHub's own actions, pinned by SHA), the workflow token's permissions, the `production` and `infra` environments. See [docs/CI.md](../docs/CI.md) |
 
 ## Who owns what
@@ -153,18 +153,22 @@ is all `google-chordless/` and `google-dev/` hold.
 
 CI plans and applies the `github`, `cloudflare`, `google-chordless` and `google-dev` stacks (after the owner
 approves each apply), and deploys the Worker. So an ordinary change to any of them needs nothing local.
-These are what do, and why:
+**`google-ci/` is the one stack CI never plans or applies**, and **anything that sets IAM** (a role on a
+project, a grant on a service account) belongs in it, because `ci-apply` has no IAM rights. A change to
+either shows up in no CI run: the nightly drift check does not look at `google-ci/`, so remember to apply
+it. These are what needs doing by hand, and why:
 
 | What | When | How |
 |---|---|---|
-| `google-ci/`: the Workload Identity pool, the two CI service accounts and their roles | the first time (done 2026-10-27: 23 resources), and any change to it | `just tf google-ci plan -out /tmp/google-ci.plan`, read it, `just tf google-ci apply /tmp/google-ci.plan`, signed in to gcloud (`mise exec -- gcloud auth login`) as an owner of both projects. Never in CI on purpose: if CI could edit its own permissions, a bad change to `infra/` could widen what CI may do |
+| `google-ci/`: the Workload Identity pool, the two CI service accounts and their roles, and the `agent-vm` account with its roles and the owner's right to impersonate it | the first time (done 2026-10-27: 23 resources), and any change to it, **including a merged pull request that changes `infra/google-ci/`** | `just tf google-ci plan -out /tmp/google-ci.plan`, read it, `just tf google-ci apply /tmp/google-ci.plan`, signed in to gcloud (`mise exec -- gcloud auth login`) as an owner of both projects. Never in CI on purpose: if CI could edit its own permissions, a bad change to `infra/` could widen what CI may do |
 | A role CI's Google accounts lack | when a stack starts to manage something new, and CI's plan or apply fails naming the permission | add the role in `google-ci/` (the plan account `ci-plan` reads; the apply account `ci-apply` writes) and apply by hand, as above |
 | A permission the Cloudflare CI tokens lack | when the `cloudflare` stack starts to manage a new kind of thing | add its permission group in `scripts/ci-tokens.sh`, then `scripts/ci-tokens.sh bootstrap` (it makes new tokens only for names that do not exist yet: delete the old CI token in the dashboard first, or `rotate` does not add permissions) |
 | The Cloudflare CI tokens: the two R2 ones and the two `CLOUDFLARE_API_TOKEN`s | once a year (they run out 2027-10-25 and 2027-10-27; the Terraform jobs warn 30 days before and fail 7) | `scripts/ci-tokens.sh bootstrap rotate`: a throwaway account token that can make tokens, which only you can make in the dashboard (Cloudflare has no browser login for it) |
 | The GitHub fine-grained tokens (`GH_TERRAFORM_TOKEN`, one per environment) | once a year, with the above | "Regenerate token" in GitHub's settings, then `gh secret set` |
 | The deploy token (`CLOUDFLARE_API_TOKEN` in `production`) | once a year (it has no expiry check yet: `infra/TODO`) | a new Account API token in the dashboard, then `gh secret set` |
 | What Terraform cannot hold | when it changes | the Google OAuth consent screen and web client, API key values, service account keys, and the Worker's secrets (`wrangler secret put`) |
-| The Google projects themselves, and IAM | when it changes | by hand: `ci-apply` has no rights over a project's own settings or its IAM |
+| The Google projects themselves, and IAM | when it changes | by hand: `ci-apply` has no rights over a project's own settings or its IAM. A new role or grant goes in `google-ci/` (above), not in `google-chordless/` or `google-dev/`, where CI's apply would fail on it |
+| The tokens agent VMs are given (`~/.config/chordless/agent.env`: a GitHub fine-grained token, a Cloudflare API token, a Google access token) | when one is made, runs out or is revoked; a Google one is made from `agent-vm` for an hour each time | made by hand, each limited to this project (docs/AGENT_VMS.md); they are on the developer's computer only, never in GitHub or Terraform |
 
 So the routine local steps are the yearly token rotations. Google needs none of them: its sign-in is
 keyless (GitHub's OIDC token for each run), so there is no Google credential to expire or leak.
