@@ -1,0 +1,61 @@
+# Plan every stack CI looks after (scripts/terraform-ci.sh; docs/CI.md), or check for drift. Shared by
+# terraform.yml and deploy.yml. The job runs it in the `infra` environment and passes that
+# environment's secrets in: a reusable *workflow* does not get an environment's secrets from its
+# caller, which is why these are steps of a job, not a workflow that is called.
+name: Terraform plan
+description: Plan every stack (or check for drift) with the read-only credentials, and keep the plans
+
+inputs:
+  drift:
+    description: 'Check for drift (fail if anything differs) instead of planning for an apply ("true" or "false")'
+    default: "false"
+  aws-access-key-id:
+    description: The R2 token (Object Read) for the state
+    required: true
+  aws-secret-access-key:
+    description: Its secret
+    required: true
+  github-token:
+    description: The fine-grained GitHub token (read), for the github stack and its expiry
+    required: true
+  r2-token-expires:
+    description: When the R2 token runs out
+    required: true
+
+outputs:
+  changed:
+    description: Whether any stack would change (true or false)
+    value: ${{ steps.plan.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: scripts/ci/setup-tools.sh terraform
+    # (fails within a week of a credential running out: the nightly run tells the owner in time)
+    - shell: bash
+      run: scripts/ci/check-expiry.sh
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+        R2_TOKEN_EXPIRES: ${{ inputs.r2-token-expires }}
+    - id: plan
+      shell: bash
+      run: |
+        if [ "$DRIFT" = true ]; then
+          scripts/terraform-ci.sh drift
+        else
+          scripts/terraform-ci.sh plan | tee -a "$GITHUB_OUTPUT"
+        fi
+      env:
+        DRIFT: ${{ inputs.drift }}
+        AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
+        AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+    # The plans hold no secrets (Terraform is given none: infra/README.md), but artifacts of a public
+    # repository can be downloaded by anyone signed in to GitHub: kept for a day
+    - if: steps.plan.outputs.changed == 'true'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: terraform-plans
+        path: plans/*.tfplan
+        retention-days: 1
