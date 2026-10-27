@@ -21,6 +21,12 @@ inputs:
   r2-token-expires:
     description: When the R2 token runs out
     required: true
+  cloudflare-token:
+    description: The Cloudflare API token (read) for the cloudflare stack
+    required: true
+  cloudflare-token-expires:
+    description: When it runs out
+    required: true
 
 outputs:
   changed:
@@ -38,6 +44,7 @@ runs:
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
         R2_TOKEN_EXPIRES: ${{ inputs.r2-token-expires }}
+        CLOUDFLARE_TOKEN_EXPIRES: ${{ inputs.cloudflare-token-expires }}
     - id: plan
       shell: bash
       run: |
@@ -51,6 +58,7 @@ runs:
         AWS_ACCESS_KEY_ID: ${{ inputs.aws-access-key-id }}
         AWS_SECRET_ACCESS_KEY: ${{ inputs.aws-secret-access-key }}
         GITHUB_TOKEN: ${{ inputs.github-token }}
+        CLOUDFLARE_API_TOKEN: ${{ inputs.cloudflare-token }}
     # The plans hold no secrets (Terraform is given none: infra/README.md), but artifacts of a public
     # repository can be downloaded by anyone signed in to GitHub: kept for a day
     - if: steps.plan.outputs.changed == 'true'

@@ -46,6 +46,8 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}
           r2-token-expires: ${{ vars.R2_TOKEN_EXPIRES }}
+          cloudflare-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          cloudflare-token-expires: ${{ vars.CLOUDFLARE_TOKEN_EXPIRES }}
 
   apply:
     name: Apply
@@ -65,3 +67,4 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           github-token: ${{ secrets.GH_TERRAFORM_TOKEN }}
+          cloudflare-token: ${{ secrets.CLOUDFLARE_API_TOKEN }}

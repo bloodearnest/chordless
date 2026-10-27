@@ -1,23 +1,28 @@
 #!/usr/bin/env bash
-# The R2 credentials CI's Terraform jobs read the state with (infra/README.md, docs/CI.md):
-#   infra        Object Read            plans and the drift check
-#   infra-apply  Object Read & Write    applies, after approval
-# each a Cloudflare token limited to the state bucket, given to the GitHub environment as an S3 key
-# pair (AWS_ACCESS_KEY_ID: the token's id; AWS_SECRET_ACCESS_KEY: the SHA-256 of the token). No value
-# is shown or written to a file: each goes from Cloudflare's answer straight to `gh secret set`.
+# The Cloudflare credentials CI's Terraform jobs use (infra/README.md, docs/CI.md), per environment:
+#   infra        plans and the drift check          infra-apply  applies, after approval
+# 1. R2 credentials for the state: a token limited to the state bucket, Object Read (infra) or Object
+#    Read & Write (infra-apply), given as an S3 key pair (AWS_ACCESS_KEY_ID: the token's id;
+#    AWS_SECRET_ACCESS_KEY: the SHA-256 of the token).
+# 2. CLOUDFLARE_API_TOKEN, for the `cloudflare` stack: read (infra) or edit (infra-apply) of what that
+#    stack holds, and nothing else: Workers Scripts and R2 on the account, and Workers Routes, DNS,
+#    Zone Settings, Zone and Email Routing Rules on the chordless.app zone.
+# No value is shown or written to a file: each goes from Cloudflare's answer straight to `gh secret set`.
 #
 # The tokens are the account's (Account API Tokens), not a person's, so they outlive anyone's login.
 # It needs a throwaway account token that can make tokens (Account API Tokens: Edit; an hour's life,
 # your IP only), bare in the git-ignored .cloudflare-bootstrap-token: delete it in the dashboard
 # afterwards. And a gh login that can set the repository's secrets.
 #
-#   scripts/ci-tokens.sh create   make both tokens (expiring in a year) and set the secrets
-#   scripts/ci-tokens.sh rotate   give both tokens new values (Cloudflare "rolls" them: same id and
+#   scripts/ci-tokens.sh create   make the tokens (expiring in a year) and set the secrets; one that
+#                                 exists is left as it is
+#   scripts/ci-tokens.sh rotate   give the tokens new values (Cloudflare "rolls" them: same id and
 #                                 permissions) and set the secrets again
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 ACCOUNT=589e207ea16d7e9db96c2b3d2ae87833
+ZONE=03ecba88194d19b6e9998db7e04bd95d
 BUCKET=chordless-tfstate
 REPOSITORY=bloodearnest/chordless
 API=https://api.cloudflare.com/client/v4/accounts/$ACCOUNT
@@ -58,7 +63,7 @@ for environment in infra infra-apply; do
   id=$(jq -r --arg name "$name" '.result[] | select(.name == $name) | .id' <<<"$existing" | head -1)
   case $mode in
     create)
-      [ -z "$id" ] || { echo "\"$name\" already exists ($id): rotate it instead"; exit 1; }
+      [ -z "$id" ] || { echo "\"$name\" exists: left as it is (rotate gives it a new value)"; continue; }
       group=$(cf GET /tokens/permission_groups |
         jq -r --arg name "${PERMISSIONS[$environment]}" '.result[] | select(.name == $name) | .id')
       [ -n "$group" ] || { echo "No permission group \"${PERMISSIONS[$environment]}\""; exit 1; }
@@ -78,6 +83,51 @@ for environment in infra infra-apply; do
     rotate)
       [ -n "$id" ] || { echo "No token \"$name\": create it first"; exit 1; }
       cf PUT "/tokens/$id/value" '{}' | jq -r .result | set_secrets "$environment" "$id"
+      echo "  \"$name\" rolled"
+      ;;
+  esac
+done
+
+# The `cloudflare` stack's token: what it manages, read or edit. Names are Cloudflare's permission groups
+# (GET /tokens/permission_groups); one that is missing is named, to change here.
+declare -A CF_NAME=([infra]="chordless CI: Terraform cloudflare stack, read" [infra-apply]="chordless CI: Terraform cloudflare stack, edit")
+declare -A CF_VERB=([infra]="Read" [infra-apply]="Write")
+groups=$(cf GET /tokens/permission_groups)
+group_id() { jq -er --arg name "$1" '.result[] | select(.name == $name) | .id' <<<"$groups" | head -1 ||
+  { echo "No permission group \"$1\" (scripts/ci-tokens.sh)" >&2; return 1; }; }
+for environment in infra infra-apply; do
+  name=${CF_NAME[$environment]}
+  verb=${CF_VERB[$environment]}
+  id=$(jq -r --arg name "$name" '.result[] | select(.name == $name) | .id' <<<"$existing" | head -1)
+  case $mode in
+    create)
+      [ -z "$id" ] || { echo "\"$name\" exists: left as it is (rotate gives it a new value)"; continue; }
+      account_groups=$(jq -n --arg a "$(group_id "Workers Scripts $verb")" --arg b "$(group_id "Workers R2 Storage $verb")" \
+        '[{id: $a}, {id: $b}]')
+      zone_groups=$(jq -n --arg a "$(group_id "Workers Routes $verb")" --arg b "$(group_id "DNS $verb")" \
+        --arg c "$(group_id "Zone Settings $verb")" --arg d "$(group_id "Zone Read")" \
+        --arg e "$(group_id "Email Routing Rules $verb")" '[{id: $a}, {id: $b}, {id: $c}, {id: $d}, {id: $e}]')
+      # (a name not found comes out as an empty id, as the lookups run in substitutions)
+      jq -e 'all(.[]; .id != "")' <<<"$account_groups$zone_groups" >/dev/null || { echo "A permission group is missing: see above" >&2; exit 1; }
+      body=$(jq -n --arg name "$name" --argjson account "$account_groups" --argjson zone "$zone_groups" \
+        --arg account_resource "com.cloudflare.api.account.$ACCOUNT" \
+        --arg zone_resource "com.cloudflare.api.account.zone.$ZONE" \
+        --arg expires "$(date -u -d '+1 year' +%Y-%m-%dT%H:%M:%SZ)" '{
+          name: $name, expires_on: $expires,
+          policies: [
+            {effect: "allow", permission_groups: $account, resources: {($account_resource): "*"}},
+            {effect: "allow", permission_groups: $zone, resources: {($zone_resource): "*"}}
+          ]
+        }')
+      answer=$(cf POST /tokens "$body")
+      jq -r .result.value <<<"$answer" | gh secret set CLOUDFLARE_API_TOKEN --repo "$REPOSITORY" --env "$environment"
+      gh variable set CLOUDFLARE_TOKEN_EXPIRES --repo "$REPOSITORY" --env "$environment" \
+        --body "$(jq -r .result.expires_on <<<"$answer")"
+      echo "  \"$name\" made, expiring $(jq -r .result.expires_on <<<"$answer")"
+      ;;
+    rotate)
+      [ -n "$id" ] || { echo "No token \"$name\": create it first"; exit 1; }
+      cf PUT "/tokens/$id/value" '{}' | jq -r .result | gh secret set CLOUDFLARE_API_TOKEN --repo "$REPOSITORY" --env "$environment"
       echo "  \"$name\" rolled"
       ;;
   esac
