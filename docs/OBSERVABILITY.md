@@ -183,10 +183,11 @@ Worker then lists the destination:
     persist = false          # export only: do not also keep them in Cloudflare
     destinations = ["honeycomb-traces"]
 
-The `destinations` key is as Cloudflare's examples show it, but the page on tracing does not. Wrangler's
-dry-run (`scripts/lint-wrangler.sh`) accepts the block without a warning, but that does not check
-that the destination exists, so a first deploy is the test. Do not add the block before the
-destination exists (it is not in `wrangler.toml` yet). `persist = false` matters:
+The destination `honeycomb-traces` exists (made 2026-10-27, with the production ingest key), and the
+block is in `wrangler.toml`, with traces turned off for `[env.dev]` (the destination has the
+production key). The `destinations` key is as Cloudflare's examples show it, but their page on
+tracing does not. Wrangler's dry-run (`scripts/lint-wrangler.sh`) accepts the block without a
+warning, but that does not check the destination, so the first deploy is the test. `persist = false` matters:
 from 1 December 2026 Cloudflare bills the traces it stores. Whether an incoming `traceparent` is
 honoured is not documented, so the first thing to check is that a page's trace and the Worker's span
 share a trace id in Honeycomb.
