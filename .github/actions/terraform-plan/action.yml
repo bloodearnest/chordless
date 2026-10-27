@@ -39,6 +39,10 @@ runs:
     - shell: bash
       run: scripts/ci/setup-tools.sh terraform
     # (fails within a week of a credential running out: the nightly run tells the owner in time)
+    # Google: the job's OIDC token for ci-plan's (nothing stored; infra/README.md). The job needs
+    # `id-token: write`
+    - shell: bash
+      run: scripts/ci/google-auth.sh plan
     - shell: bash
       run: scripts/ci/check-expiry.sh
       env:
