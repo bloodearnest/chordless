@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "deploy": "vite build && wrangler deploy --config dist/chordless/wrangler.json",
+    "deploy": "vite build && node scripts/build-hash.ts && wrangler deploy --config dist/chordless/wrangler.json",
     "test:node": "node --test \"tests/*.node.test.{js,ts}\"",
     "test:web": "web-test-runner --config web-test-runner.config.js",
     "test:browser": "playwright test",
