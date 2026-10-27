@@ -149,6 +149,26 @@ has (they are not secret). The apply account cannot change the project itself, I
 those stay by hand. It can enable APIs, manage API keys and the app project's service accounts, which
 is all `google-chordless/` and `google-dev/` hold.
 
+## What stays by hand
+
+CI plans and applies the `github`, `cloudflare`, `google-chordless` and `google-dev` stacks (after the owner
+approves each apply), and deploys the Worker. So an ordinary change to any of them needs nothing local.
+These are what do, and why:
+
+| What | When | How |
+|---|---|---|
+| `google-ci/`: the Workload Identity pool, the two CI service accounts and their roles | the first time (done 2026-10-27: 23 resources), and any change to it | `just tf google-ci plan -out /tmp/google-ci.plan`, read it, `just tf google-ci apply /tmp/google-ci.plan`, signed in to gcloud (`mise exec -- gcloud auth login`) as an owner of both projects. Never in CI on purpose: if CI could edit its own permissions, a bad change to `infra/` could widen what CI may do |
+| A role CI's Google accounts lack | when a stack starts to manage something new, and CI's plan or apply fails naming the permission | add the role in `google-ci/` (the plan account `ci-plan` reads; the apply account `ci-apply` writes) and apply by hand, as above |
+| A permission the Cloudflare CI tokens lack | when the `cloudflare` stack starts to manage a new kind of thing | add its permission group in `scripts/ci-tokens.sh`, then `scripts/ci-tokens.sh bootstrap` (it makes new tokens only for names that do not exist yet: delete the old CI token in the dashboard first, or `rotate` does not add permissions) |
+| The Cloudflare CI tokens: the two R2 ones and the two `CLOUDFLARE_API_TOKEN`s | once a year (they run out 2027-10-25 and 2027-10-27; the Terraform jobs warn 30 days before and fail 7) | `scripts/ci-tokens.sh bootstrap rotate`: a throwaway account token that can make tokens, which only you can make in the dashboard (Cloudflare has no browser login for it) |
+| The GitHub fine-grained tokens (`GH_TERRAFORM_TOKEN`, one per environment) | once a year, with the above | "Regenerate token" in GitHub's settings, then `gh secret set` |
+| The deploy token (`CLOUDFLARE_API_TOKEN` in `production`) | once a year (it has no expiry check yet: `infra/TODO`) | a new Account API token in the dashboard, then `gh secret set` |
+| What Terraform cannot hold | when it changes | the Google OAuth consent screen and web client, API key values, service account keys, and the Worker's secrets (`wrangler secret put`) |
+| The Google projects themselves, and IAM | when it changes | by hand: `ci-apply` has no rights over a project's own settings or its IAM |
+
+So the routine local steps are the yearly token rotations. Google needs none of them: its sign-in is
+keyless (GitHub's OIDC token for each run), so there is no Google credential to expire or leak.
+
 ## The GitHub stack
 
 `GITHUB_TOKEN=$(gh auth token) mise exec -- terraform plan` in `github/`. Its token needs admin on the
