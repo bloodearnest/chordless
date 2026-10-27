@@ -37,3 +37,12 @@ google
 github
 - agents with a GitHub identity of their own, so a pull request can need an approval (infra/github's
   required_approvals)
+
+Honeycomb (docs/OBSERVABILITY.md)
+- infra/honeycomb is applied by hand: wire it into CI (a management key, `HONEYCOMB_KEY_ID` and
+  `HONEYCOMB_KEY_SECRET`, as secrets of `infra` and `infra-apply`; .github/workflows/terraform.yml, the
+  terraform-plan and terraform-apply actions, scripts/tf.sh, scripts/check-gh-secrets.ts), then drop the
+  skip in scripts/infra-check.sh
+- starter SLOs and triggers (sync failure rate, auth refresh failures, Worker 5xx) once a dataset exists;
+  they need a configuration key for each environment
+- set the datasets' retention, and say it in public/privacy.html
