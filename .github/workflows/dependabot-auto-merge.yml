@@ -1,6 +1,6 @@
 # Dependabot's pull requests merge themselves once their checks pass (docs/CI.md): this turns on
 # GitHub's auto-merge for them, by rebase, as for any pull request. What protects main is the same
-# as for any other: ci-ok, CodeQL, a branch up to date with main; and Dependabot's week of cooldown.
+# as for any other: ci-ok, CodeQL; and Dependabot's week of cooldown.
 name: Dependabot
 
 on:

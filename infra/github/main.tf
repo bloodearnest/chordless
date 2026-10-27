@@ -56,8 +56,8 @@ variable "required_approvals" {
 
 locals {
   merge_settings = {
-    # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch must be up to
-    # date with main to merge (the ruleset), and can be brought up to date from the pull request
+    # Linear history with no merge commits: GitHub's "Rebase and merge" only. A branch need not be up
+    # to date with main to merge (the ruleset), and can be brought up to date from the pull request
     allow_merge_commit  = false
     allow_squash_merge  = false
     allow_rebase_merge  = true
@@ -151,7 +151,7 @@ resource "github_repository_dependabot_security_updates" "chordless" {
   enabled    = true
 }
 
-# main: changed only by a pull request whose `ci-ok` passed on a branch up to date with it, and whose
+# main: changed only by a pull request whose `ci-ok` passed (it need not be up to date with main), and whose
 # CodeQL findings are below the thresholds, merged by rebase; never force-pushed or deleted. No one
 # bypasses it, the owner included.
 resource "github_repository_ruleset" "main" {

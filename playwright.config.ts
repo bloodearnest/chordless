@@ -58,8 +58,16 @@ export default defineConfig({
     Number(process.env.CHORDLESS_WORKERS) || Math.max(2, Math.floor(availableParallelism() / 2)),
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
-  // In CI, failures also annotate the PR's diff, and the HTML report is kept as an artifact
-  reporter: process.env.CI ? [['github'], ['list'], ['html', { open: 'never' }]] : 'list',
+  // In CI, failures also annotate the PR's diff, the HTML report is kept as an artifact, and the JSON
+  // one says which tests passed on a retry (scripts/flaky-summary.ts: the job's summary)
+  reporter: process.env.CI
+    ? [
+        ['github'],
+        ['list'],
+        ['html', { open: 'never' }],
+        ['json', { outputFile: 'test-results/results.json' }],
+      ]
+    : 'list',
 
   use: {
     baseURL: `http://localhost:${DEV_PORT}`,
