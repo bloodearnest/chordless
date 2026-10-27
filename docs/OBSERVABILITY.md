@@ -40,7 +40,8 @@ what the "Built" notes say.
 4. **One home for each fact.** An error is an `exception` event on the active span, not also a log
    line or a second span.
 5. **Cost is per span, attributes are free.** Hence the baseline attributes below.
-6. **Vendor neutral.** The route's destination is `OTLP_ENDPOINT` (a var) and `OTLP_HEADERS` (a
+6. **Vendor neutral.** The route's destination is `OTLP_ENDPOINT` (a var, `https://api.eu1.honeycomb.io/v1/traces`:
+   our Honeycomb team is on the **EU** instance, a different host from the US one) and `OTLP_HEADERS` (a
    secret, `x-honeycomb-team=<key>`): moving backend is configuration.
 
 ## What is traced
@@ -158,7 +159,8 @@ each leg:
 `infra/honeycomb/`: an environment for each of `chordless-prod` and `chordless-dev`, and an ingest
 key for each. Datasets are made by the first span (the key may create them). Starter SLOs and triggers
 come once there are datasets: they need a configuration key for the environment, apart from the
-management key the stack uses. The provider needs a **management key** (`HONEYCOMB_KEY_ID` and
+management key the stack uses. The provider is set to the EU host (`api_url` in `main.tf`: a US key or
+host gives "invalid API key"). It needs a **management key** (`HONEYCOMB_KEY_ID` and
 `HONEYCOMB_KEY_SECRET`) with the `environments:write` and `api-keys:write` scopes. The ingest
 key is set as the Worker's secret by hand (`infra/README.md`):
 
@@ -170,7 +172,7 @@ Retention is set explicitly, and is what the privacy text says.
 
 Cloudflare's native export sends the Worker's traces (handler, fetch, binding and Durable Object
 calls) to an OTLP destination. The destination is made **in the Cloudflare dashboard** (Observability,
-Destinations; type Traces, endpoint `https://api.honeycomb.io/v1/traces`, header `x-honeycomb-team`),
+Destinations; type Traces, endpoint `https://api.eu1.honeycomb.io/v1/traces`, header `x-honeycomb-team`),
 not in `wrangler.toml` or Terraform, so it is a by-hand step, like a secret. Cloudflare sends JSON,
 which Honeycomb accepts. It is in beta, and exports traces and logs separately and not metrics. The
 Worker then lists the destination:
