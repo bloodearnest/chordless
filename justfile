@@ -132,6 +132,11 @@ predeploy:
     scripts/infra-check.sh drift
     node scripts/check-prod-secrets.ts
 
+# Terraform on one stack of infra/ by hand, with its credentials (scripts/tf.sh; infra/README.md):
+# just tf google-ci plan
+tf stack *args:
+    scripts/tf.sh {{stack}} {{args}}
+
 deploy: predeploy
     npm run deploy
 
