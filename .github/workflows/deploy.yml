@@ -1,0 +1,146 @@
+# Deploy chordless.app (docs/CI.md). In order, so a deploy never runs before what it depends on:
+#   ci         the checks (ci.yml), on this commit
+#   infra      Terraform (terraform.yml): every stack planned, and applied once the owner approves, if
+#              anything differs. A rejected or failed apply stops the deploy
+#   build      with no secrets: the build and its hash (scripts/build-hash.ts), kept for the deploy
+#   deploy     in `production`, the only job with the Cloudflare token: skipped when the live site
+#              already runs this build; otherwise deployed, smoke tested, and rolled back on failure
+# Only wrangler deploys (infra/README.md): Terraform never touches the Worker, its assets or secrets.
+#
+# By hand for now (Actions, Deploy, Run workflow). To deploy on every merge to main: add
+# `push: branches: [main]` here, and remove the `push` trigger from terraform.yml, which this calls.
+# Do that once the cloudflare stack is in CI (infra/README.md), so a Cloudflare change a deploy
+# depends on is applied first, not by hand.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Deploy even if the live site already runs this build
+        type: boolean
+        default: false
+
+permissions: {}
+
+# One at a time, and none cancelled: a deploy must not be cut short. (Another run waiting is replaced
+# by a newer one, which is the one to deploy; deploy's guard below skips a run that is not the newest.)
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    name: CI
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      contents: read
+
+  infra:
+    name: Infrastructure
+    uses: ./.github/workflows/terraform.yml
+    permissions:
+      contents: read
+
+  build:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    outputs:
+      hash: ${{ steps.hash.outputs.hash }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          tools: node
+      - run: npx vite build
+      - id: hash
+        run: echo "hash=$(node scripts/build-hash.ts)" | tee -a "$GITHUB_OUTPUT"
+      # Public anyway (it is the site), but kept a day only: anyone signed in to GitHub can download it
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+
+  deploy:
+    name: Deploy
+    needs: [ci, infra, build]
+    # (infra succeeds when there was nothing to apply)
+    if: needs.ci.result == 'success' && needs.infra.result == 'success' && needs.build.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    permissions:
+      contents: read
+    env:
+      HASH: ${{ needs.build.outputs.hash }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Not the newest commit on main: a newer run will deploy it, and this one must not put an older
+      # build over it
+      - id: newest
+        env:
+          REPOSITORY: ${{ github.repository }}
+          SHA: ${{ github.sha }}
+        run: |
+          head=$(git ls-remote "https://github.com/$REPOSITORY" refs/heads/main | cut -f1)
+          if [ "$head" = "$SHA" ]; then
+            echo "deploy=true" >>"$GITHUB_OUTPUT"
+          else
+            echo "deploy=false" >>"$GITHUB_OUTPUT"
+            echo "::notice::main has moved on to ${head:0:7}: not deploying ${SHA:0:7}"
+          fi
+      # What the live site runs: the same build is not deployed again (a failed or rolled back deploy
+      # differs, so it is tried again)
+      - id: live
+        if: steps.newest.outputs.deploy == 'true'
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          live=$(scripts/ci/live-hash.sh)
+          if [ "$live" = "$HASH" ] && [ "$FORCE" != true ]; then
+            echo "deploy=false" >>"$GITHUB_OUTPUT"
+            echo "The live site already runs this build (${HASH:0:12}): nothing to deploy." | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "deploy=true" >>"$GITHUB_OUTPUT"
+            echo "Live: ${live:0:12}; deploying: ${HASH:0:12}"
+          fi
+      - if: steps.live.outputs.deploy == 'true'
+        run: scripts/ci/setup-tools.sh node
+      # (no cache: the job with the token runs what it installs itself)
+      - if: steps.live.outputs.deploy == 'true'
+        run: mise exec -- npm ci
+      - if: steps.live.outputs.deploy == 'true'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: dist
+          path: dist
+      - if: steps.live.outputs.deploy == 'true'
+        run: mise exec -- node scripts/check-prod-secrets.ts
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.live.outputs.deploy == 'true'
+        run: mise exec -- npx wrangler deploy --config dist/chordless/wrangler.json
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - id: smoke
+        if: steps.live.outputs.deploy == 'true'
+        run: scripts/ci/smoke.sh "$HASH"
+      # The previous version takes over again (Durable Object migrations are not undone: they only add)
+      - if: failure() && steps.smoke.conclusion == 'failure'
+        run: mise exec -- npx wrangler rollback --yes --message "smoke test failed for ${SHA:0:7}"
+        env:
+          SHA: ${{ github.sha }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      - if: steps.live.outputs.deploy == 'true' && steps.smoke.conclusion == 'success'
+        run: echo "Deployed ${HASH:0:12} (${GITHUB_SHA:0:7})." | tee -a "$GITHUB_STEP_SUMMARY"

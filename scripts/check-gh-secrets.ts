@@ -14,6 +14,17 @@ const terraform = (access: string) => ({
 const NEEDED: Record<string, Record<string, string>> = {
   infra: terraform('read'),
   'infra-apply': terraform('read and write'),
+  production: {
+    CLOUDFLARE_API_TOKEN:
+      'an account API token for deploys: Workers Scripts: Edit, this account only (infra/README.md)',
+  },
+}
+
+// Variables that are not secrets, by environment (the R2 tokens' expiry is each Terraform one's)
+const VARIABLES: Record<string, string> = {
+  infra: 'R2_TOKEN_EXPIRES',
+  'infra-apply': 'R2_TOKEN_EXPIRES',
+  production: 'CLOUDFLARE_ACCOUNT_ID',
 }
 
 const listed = (environment: string, kind: 'secrets' | 'variables') =>
@@ -38,10 +49,8 @@ for (const [environment, secrets] of Object.entries(NEEDED)) {
     console.error(`${environment} lacks ${name}: ${about}`)
     missing++
   }
-  if (!listed(environment, 'variables').includes('R2_TOKEN_EXPIRES')) {
-    console.error(
-      `${environment} lacks the variable R2_TOKEN_EXPIRES, which scripts/ci-tokens.sh sets`
-    )
+  if (!listed(environment, 'variables').includes(VARIABLES[environment])) {
+    console.error(`${environment} lacks the variable ${VARIABLES[environment]} (infra/README.md)`)
     missing++
   }
 }
