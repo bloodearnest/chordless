@@ -2,7 +2,7 @@
 
 The slow-changing setup around the app, captured as code on 2026-10-20 from what was already
 there: nothing was created, each resource is imported (`import` blocks). Four stacks, each with its
-own state, so a mistake in one cannot touch another. (Five now: `google-ci/` is below.) `google-chordless/` created what it holds;
+own state, so a mistake in one cannot touch another. (Six now: `google-ci/` and `honeycomb/` are below.) `google-chordless/` created what it holds;
 `cloudflare/` and `github/` (added 2026-10-25) only imported.
 
 | Stack | Holds |
@@ -11,6 +11,7 @@ own state, so a mistake in one cannot touch another. (Five now: `google-ci/` is 
 | `google-dev/` | the DEV project (`chordless-dev`, created here; the first project, `setalight`, was left behind): the Drive API, for the OAuth client the local app and the real-Drive suite use, apart from the app's own project so tests cannot use up its quota or touch its users' files. The consent screen and the OAuth client are by hand |
 | `google-chordless/` | the app project `chordless-app` (`chordless` was taken), created by Terraform: the Drive, Picker, API Keys and IAM APIs, the Team Key (`team-key`) and Sharing Key (`sharing-key`), the `team-storage` service account; it outputs the project number, the Picker app id. See [docs/CLOUD_MIGRATION.md](../docs/CLOUD_MIGRATION.md) |
 | `google-ci/` | how CI signs in to Google: a Workload Identity pool and a GitHub OIDC provider in `chordless-app`, restricted to this repository's jobs on `main`, and two service accounts, `ci-plan` (the `infra` environment: reads both projects) and `ci-apply` (`infra-apply`: enables APIs and manages API keys in both, and the app project's service accounts); also `agent-vm`, the read-only account agent VMs use ([docs/AGENT_VMS.md](../docs/AGENT_VMS.md)). **Never in CI**: planned and applied by hand, so a change to what CI runs can never widen what CI may do |
+| `honeycomb/` | Honeycomb (docs/OBSERVABILITY.md): an environment for production and one for dev, and an ingest key for each. Needs a Honeycomb management key (`HONEYCOMB_KEY_ID`, `HONEYCOMB_KEY_SECRET`; scopes `environments:write`, `api-keys:write`). **Not in CI yet**: planned and applied by hand (`just tf honeycomb plan`), and left out of the drift check unless those two are set |
 | `github/` | the GitHub repository's settings (imported): merge by rebase only, the `main` ruleset (a pull request, `ci-ok` passing, linear history), what Actions may run (GitHub's own actions, pinned by SHA), the workflow token's permissions, the `production` and `infra` environments. See [docs/CI.md](../docs/CI.md) |
 
 ## Who owns what

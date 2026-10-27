@@ -62,6 +62,11 @@ case "${1:-}" in
             echo "$name: no gcloud sign-in (gcloud auth login), or INFRA_DRIFT_SKIP=$name"; failed=1; continue
           }
           export GOOGLE_OAUTH_ACCESS_TOKEN;;
+        honeycomb)
+          # (not in CI yet: left out, without failing, where there is no management key)
+          if [ -z "${HONEYCOMB_KEY_ID:-}" ] || [ -z "${HONEYCOMB_KEY_SECRET:-}" ]; then
+            echo "skipping $name (no HONEYCOMB_KEY_ID and HONEYCOMB_KEY_SECRET)"; continue
+          fi;;
         github)
           if [ -z "${GITHUB_TOKEN:-}" ]; then
             GITHUB_TOKEN=$(gh auth token 2>/dev/null) || {
