@@ -1,82 +1,65 @@
 # Agent VMs
 
-A Claude Code agent can run in an [Incus](https://linuxcontainers.org/incus/) virtual machine of its own
-(`scripts/agent-vm.sh`, `just agent-*`), so that what it runs cannot reach the developer's computer:
-its files, its other credentials, its browser sessions. The agent has `sudo` in the VM and may do what
-it likes there.
+A Claude Code agent can run in an [Incus](https://linuxcontainers.org/incus/) virtual machine of its
+own, so that what it runs cannot reach the developer's computer: its files, its other credentials, its
+browser sessions. The agent has `sudo` in the VM and may do what it likes there.
 
-What the boundary is, and is not: the VM protects **the host**. What an agent can do to the
-**chordless repository, Google and Cloudflare** is bounded by the tokens it is given, so those are
-scoped to this project and no further (below). The VM has network access, and the tokens are in
-its environment, so a hostile program in it could use them: that is the trade for letting agents
-push and deploy.
+The tool is **`agent`**, a generic script kept by the developer outside this repository (it is not chordless's:
+it serves any project). This repository holds only what is chordless's: `.agent-vm/`, and the
+tokens below.
 
 ## Use
 
+In a checkout or worktree of this repository:
+
 ```
-just agent-create [NAME]          # a name is generated if none is given; takes a few minutes
-just agent-list
-just agent-claude [NAME]          # Claude Code in it, with Remote Control on
-just agent-shell [NAME] [-- CMD]
-just agent-destroy NAME
+agent claude            # Claude Code in this directory's VM (made on first use), Remote Control on
+agent shell             # a shell in it
+agent run -- just lint  # one command, no terminal
+agent stop | destroy    # this directory's VM
 ```
 
-NAME may be left out when there is one VM. A VM is made once and **reused**: `/clear` the agent, or
-stop and start the VM (`incus stop NAME`, started again by the next command), and its worktrees and
-installed tools are still there. Work in it as in any checkout (`CLAUDE.md`): the VM's clone of the
-repository is its primary checkout, and each topic is a worktree in `.claude/worktrees/`. It
-pushes over https with `GH_TOKEN`. Anything the agent needs to keep must be pushed: destroying the
-VM deletes its disk.
+There is one VM per directory (a worktree gets its own, with the repository's git directory mounted
+too, so `git` works), reused after the first time. The directory is the checkout itself, shared in, so
+the agent's changes are on the host: commit and push from either side. Run `agent` with no arguments for the rest.
 
-`just agent-claude NAME -- --dangerously-skip-permissions` passes the rest to Claude Code, which is
-what the VM is for. `--no-rc` turns off Remote Control.
+## `.agent-vm/`
 
-## What is in a VM
-
-- Ubuntu 24.04, 4 CPUs, 8 GiB, 40 GiB (`AGENT_CPU`, `AGENT_MEMORY`, `AGENT_DISK`), from the Incus
-  profile `chordless-agent`, which `create` writes (and rewrites, so a change reaches the next VM).
-- A user `agent` with the developer's uid, and passwordless `sudo`.
-- mise, and the tools in `mise.toml`; the repository cloned, `npm ci`, Playwright's Chromium and its
-  system libraries; `gh`; Claude Code, from npm (its own installer runs a binary from `~/.claude`,
-  which is a share, and a program cannot run from there).
-- `~/.claude`: a directory of the developer's computer, `~/.local/share/chordless/agents/NAME/claude`,
-  shared in. `create` copies `~/.claude/.credentials.json` into it, so the VM is signed in as the
-  developer (Remote Control needs a claude.ai login; `--no-auth` leaves it out, and `/login` in the
-  VM does it by hand). Nothing else from the developer's `~/.claude` is copied: its settings, hooks
-  and skills would run on the host the next time Claude Code starts there if the VM could write to
-  them. The directory is deleted with the VM.
+- `packages`: `gh`, for pull requests.
+- `setup.sh`: run once when the VM is made. `mise install` (the tools `mise.toml` pins), `npm ci`,
+  Playwright's Chromium and its system libraries, and git pushing over https with `GH_TOKEN` (the VM has no SSH key).
+- `env`: the names of the host environment variables that are passed in (below). Values never come from
+  the repository.
 
 ## Tokens
 
-`~/.config/chordless/agent.env` (`AGENT_ENV_FILE`), mode 600, one `KEY=VALUE` per line:
+The values go in `~/.config/agent/env` (mode 600, `KEY=VALUE` lines), or in the host's environment. Each
+session gets them as `incus exec --env`: they are not in Incus's configuration or on the VM's disk. They are
+in the environment of the agent and everything it runs, which is the point, so scope them to this project:
 
-```
-GH_TOKEN=...                       # gh, and git's credential helper in the VM
-CLOUDFLARE_API_TOKEN=...           # wrangler, Terraform's cloudflare stack (and its R2 state, infra/README.md)
-GOOGLE_OAUTH_ACCESS_TOKEN=...      # Terraform's Google stacks
-CLOUDSDK_AUTH_ACCESS_TOKEN=...     # gcloud (the same access token works for both)
-```
-
-Each session gets them as `incus exec --env`, so they are not in Incus's configuration, the VM's disk or
-its backups. They are in the environment of the agent and everything it runs, which is the point. A
-missing file means a VM with no tokens. Scope them to this project:
-
-- **GitHub**: a fine-grained token for this repository only: contents and pull requests (write), not
-  administration, and not workflows unless an agent is to change them. `main` is protected by the
+- `GH_TOKEN`: a fine-grained token for this repository only: Contents and Pull requests (read and write),
+  not Administration, and not Workflows unless an agent is to change them. `main` is protected by the
   ruleset (`infra/github/`) whatever the token can do.
-- **Cloudflare**: an API token for this account and zone, with only the permissions `infra/` and
-  `wrangler.toml` use. Not the token CI deploys with: its own, so that either can be revoked alone.
-- **Google**: an access token for the service account `agent-vm@chordless-app.iam.gserviceaccount.com`,
-  which is in `infra/google-ci` (IAM is made by hand, never by CI). It is read-only on `chordless-app`
-  and `chordless-dev`: Viewer and API Keys Viewer, enough for `terraform plan` and `just dev-vars`. Add
-  roles there for an agent that is to change something. You (the owner) may impersonate it, and make a
-  token that expires in an hour:
+- `CLOUDFLARE_API_TOKEN`: for this account and zone, with only the permissions `infra/` and `wrangler.toml`
+  use (Workers Scripts and R2 Storage: Edit at the account; Workers Routes, DNS, Zone Settings, Zone and
+  Email Routing Rules on `chordless.app`). Not CI's token: its own, so either can be revoked alone. Read-only
+  versions of those permissions allow a `terraform plan` but not `just deploy`.
+- `GOOGLE_OAUTH_ACCESS_TOKEN` and `CLOUDSDK_AUTH_ACCESS_TOKEN`: the same access token, for Terraform's Google
+  stacks and `gcloud`. Made for an hour from the service account `agent-vm@chordless-app.iam.gserviceaccount.com`
+  (`infra/google-ci`: read-only on both projects, Viewer and API Keys Viewer; add roles there for an agent that
+  is to change something), which only the owner may impersonate:
   `gcloud auth print-access-token --impersonate-service-account=agent-vm@chordless-app.iam.gserviceaccount.com`
+
+A token left out is just not passed in.
 
 ## Limits
 
-- A virtual machine is far stronger than a container, but it is on the host's network: it can reach
-  services the host listens on (`incusbr0`'s address is the host). Incus network ACLs can close that.
-- The VM is signed in with the developer's claude.ai account until `destroy` (or the login is revoked).
-  Two sessions that refresh the same login race, and one may need `/login` again.
-- Refresh tokens are copied once, at `create`.
+- The checkout is shared with the VM over virtiofs, and Ubuntu 24.04's stock 6.8 kernel cannot execute a
+  file from such a share (`Bad address`), which would break `just` (it runs `scripts/*.sh` directly) and
+  `node_modules/.bin`. The tool's base image installs the HWE kernel (6.11 or later) for that. If `just`
+  says "Bad address" in a VM, the base image has an old kernel: `agent build -f`.
+- A virtual machine is far stronger than a container, but it is on the host's network and can reach services the
+  host listens on. Incus network ACLs can close that.
+- `~/.claude` (and `~/.codex`) are shared in read-write, so sessions and memory carry over. The agent can
+  therefore change their settings and hooks, which run on the host the next time Claude Code starts there.
+- The VM is signed in with the developer's Claude account (through the shared `~/.claude`).

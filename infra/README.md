@@ -168,7 +168,7 @@ it. These are what needs doing by hand, and why:
 | The deploy token (`CLOUDFLARE_API_TOKEN` in `production`) | once a year (it has no expiry check yet: `infra/TODO`) | a new Account API token in the dashboard, then `gh secret set` |
 | What Terraform cannot hold | when it changes | the Google OAuth consent screen and web client, API key values, service account keys, and the Worker's secrets (`wrangler secret put`) |
 | The Google projects themselves, and IAM | when it changes | by hand: `ci-apply` has no rights over a project's own settings or its IAM. A new role or grant goes in `google-ci/` (above), not in `google-chordless/` or `google-dev/`, where CI's apply would fail on it |
-| The tokens agent VMs are given (`~/.config/chordless/agent.env`: a GitHub fine-grained token, a Cloudflare API token, a Google access token) | when one is made, runs out or is revoked; a Google one is made from `agent-vm` for an hour each time | made by hand, each limited to this project (docs/AGENT_VMS.md); they are on the developer's computer only, never in GitHub or Terraform |
+| The tokens agent VMs are given (`~/.config/agent/env`: a GitHub fine-grained token, a Cloudflare API token, a Google access token) | when one is made, runs out or is revoked; a Google one is made from `agent-vm` for an hour each time | made by hand, each limited to this project (docs/AGENT_VMS.md); they are on the developer's computer only, never in GitHub or Terraform |
 
 So the routine local steps are the yearly token rotations. Google needs none of them: its sign-in is
 keyless (GitHub's OIDC token for each run), so there is no Google credential to expire or leak.
