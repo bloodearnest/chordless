@@ -270,7 +270,9 @@ test.describe('Modals', () => {
 })
 
 test.describe('Account and Teams page', () => {
-  test('each space shows how many songs and setlists it holds', async ({ page }) => {
+  test('each space shows how many songs and setlists it holds', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await seedSong(page, { setlistId: 'summary-setlist' })
     await page.goto('/account')
     const card = page.locator('space-card').filter({ hasText: 'Current' })
@@ -279,7 +281,9 @@ test.describe('Account and Teams page', () => {
     await expect(card).toContainText('about')
   })
 
-  test('switching asks first, and no Team is made from the cards', async ({ page }) => {
+  test('switching asks first, and no Team is made from the cards', { tag: '@logic' }, async ({
+    page,
+  }) => {
     const dialogs: string[] = []
     page.on('dialog', dialog => {
       dialogs.push(dialog.message())
@@ -317,7 +321,7 @@ test.describe('Account and Teams page', () => {
     // app's reload when it takes over could land after the click)
     test.use({ serviceWorkers: 'block' })
 
-    test('says when signing in to Google fails', async ({ page }) => {
+    test('says when signing in to Google fails', { tag: '@logic' }, async ({ page }) => {
       // Without Google's sign-in script, signing in fails straight away
       await page.route('https://accounts.google.com/**', route => route.abort())
       await page.goto('/account')
@@ -332,9 +336,9 @@ test.describe('Account and Teams page', () => {
     })
   })
 
-  test('works signed out: a space is managed in a modal, and deleting one asks first', async ({
-    page,
-  }) => {
+  test('works signed out: a space is managed in a modal, and deleting one asks first', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'delete-test-setlist' })
     await page.evaluate(async () => {
       const { createSpace } = await import('/js/space.ts')
@@ -368,9 +372,9 @@ test.describe('Account and Teams page', () => {
   })
 })
 
-test('the development server is for the development Google project, not production', async ({
-  page,
-}) => {
+test('the development server is for the development Google project, not production', {
+  tag: '@logic',
+}, async ({ page }) => {
   const ids = (file: string) => readFileSync(file, 'utf8')
   const dev = ids('.env.development')
   const prod = ids('.env.production')

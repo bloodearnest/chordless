@@ -42,7 +42,9 @@ nothing shipped is made from them. (Other Markdown, such as the READMEs, may shi
 
 `ci-ok` is the one required check, so jobs can be renamed, split or skipped without touching the
 ruleset. The macOS and Windows end-to-end jobs are required too (they are in `ci-ok`'s `needs`): they are
-slow (4 to 6 minutes against Linux's 2), and what they run is to be trimmed (`TODO`).
+slow (4 to 6 minutes against Linux's 2) and their runners flaky, so they skip the tests tagged `@logic`
+(`--grep-invert @logic`): about half of them, the ones that do not depend on the browser or the platform
+(`docs/TESTING.md`). Linux runs every test, every time. The weekly run (Mondays, 06:00 UTC) and a run by hand run them all, so a break only they would catch is found within a week.
 
 `just ci` runs the Linux jobs' checks in order, and fails if they changed any file. CI never writes to
 the repository: it does not retake the Help pictures (fonts differ between machines), record stats or

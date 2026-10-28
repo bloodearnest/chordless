@@ -68,7 +68,7 @@ test.describe('Moving between views', () => {
     ['/songs', 'library-view', 'Song Library - Chordless'],
     ['/about', 'about-view', 'About - Chordless'],
   ]) {
-    test(`${path} opens ${tag}, titled ${title}`, async ({ page }) => {
+    test(`${path} opens ${tag}, titled ${title}`, { tag: '@logic' }, async ({ page }) => {
       await openApp(page, path)
       await expect(page.locator(tag)).toBeVisible()
       await expect(page).toHaveTitle(title)
@@ -83,9 +83,9 @@ test.describe('Moving between views', () => {
     ['/', 'Song Library', 'library-view', 'Song Library - Chordless'],
     ['/account', 'Setlists', 'home-view', 'Chordless'],
   ]) {
-    test(`the menu's ${link} link, from ${from}, shows ${tag} without loading a page`, async ({
-      page,
-    }) => {
+    test(`the menu's ${link} link, from ${from}, shows ${tag} without loading a page`, {
+      tag: '@logic',
+    }, async ({ page }) => {
       await openApp(page, from)
       await markDocument(page)
       await chooseFromMenu(page, link)
@@ -96,9 +96,9 @@ test.describe('Moving between views', () => {
     })
   }
 
-  test('opening a setlist from the home page shows it without loading the page', async ({
-    page,
-  }) => {
+  test('opening a setlist from the home page shows it without loading the page', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSetlist(page, { setlistId: 'link-setlist' })
     await openApp(page, '/')
     await markDocument(page)
@@ -140,7 +140,9 @@ test.describe('Moving between views', () => {
     await expect(player).toBeHidden()
   })
 
-  test('the page title reaches screen readers when the view changes', async ({ page }) => {
+  test('the page title reaches screen readers when the view changes', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await openApp(page, '/')
     await chooseFromMenu(page, 'Account and Teams')
     await expect(page.locator('#route-announcer')).toHaveText('Account and Teams - Chordless')
@@ -170,14 +172,18 @@ test.describe('The setlist view', () => {
     expect(await isSameDocument(page)).toBe(true)
   })
 
-  test('a song that is not in the setlist shows the overview', async ({ page }) => {
+  test('a song that is not in the setlist shows the overview', { tag: '@logic' }, async ({
+    page,
+  }) => {
     const url = await seedSetlist(page)
     await page.goto(`${url}/song/99`)
     await expect(page).toHaveURL(/\/setlist\/seeded-setlist$/)
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
   })
 
-  test('the menu lists the setlist songs only while on the setlist', async ({ page }) => {
+  test('the menu lists the setlist songs only while on the setlist', { tag: '@logic' }, async ({
+    page,
+  }) => {
     const url = await seedSetlist(page)
     await page.goto(url)
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
@@ -256,7 +262,7 @@ test.describe('The setlist view', () => {
     await expect(player).toBeVisible()
   })
 
-  test('a URL that is no page shows the not-found view', async ({ page }) => {
+  test('a URL that is no page shows the not-found view', { tag: '@logic' }, async ({ page }) => {
     await openApp(page, '/')
     await page.goto('/no/such/page')
     await expect(page.locator('not-found-view')).toBeVisible()
@@ -294,7 +300,9 @@ test.describe('Coming back to a view', () => {
     await expect(page.locator('song-list')).toContainText('No songs match your search')
   })
 
-  test('a link to a search fills the box and filters the list', async ({ page }) => {
+  test('a link to a search fills the box and filters the list', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await seedSong(page)
     await page.goto('/songs?q=info')
     await expect(page.locator('#song-search')).toHaveValue('info')
@@ -316,7 +324,7 @@ test.describe('Coming back to a view', () => {
     await expect(page.locator('home-view')).toBeVisible()
   })
 
-  test('clearing the search takes it out of the URL', async ({ page }) => {
+  test('clearing the search takes it out of the URL', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page)
     await page.goto('/songs?q=info')
     await expect(page.locator('#song-search')).toHaveValue('info')
@@ -324,7 +332,7 @@ test.describe('Coming back to a view', () => {
     await expect(page).toHaveURL(/\/songs$/)
   })
 
-  test('a new visit to the library starts with no search', async ({ page }) => {
+  test('a new visit to the library starts with no search', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page)
     await openApp(page, '/songs')
     await page.locator('#song-search').fill('info')
@@ -336,7 +344,7 @@ test.describe('Coming back to a view', () => {
     await expect(page.locator('#song-search')).toHaveValue('')
   })
 
-  test('the home page keeps the years that were opened', async ({ page }) => {
+  test('the home page keeps the years that were opened', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page, { setlistId: 'recent-setlist' })
     await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
@@ -406,7 +414,9 @@ test.describe('Coming back to a view', () => {
     await expect.poll(() => page.locator('#song-0').evaluate(e => e.scrollTop)).toBe(left)
   })
 
-  test('the home page keeps the years that were opened through a reload', async ({ page }) => {
+  test('the home page keeps the years that were opened through a reload', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'recent-setlist' })
     await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
@@ -435,7 +445,7 @@ test.describe('Coming back to a view', () => {
     await expect(old).toHaveAttribute('expanded', '')
   })
 
-  test('a setlist opened afresh starts at the top', async ({ page }) => {
+  test('a setlist opened afresh starts at the top', { tag: '@logic' }, async ({ page }) => {
     await page.setViewportSize({ width: 800, height: 500 })
     const url = `${await seedSetlist(page)}/song/0`
     await page.goto(url)
@@ -473,9 +483,9 @@ test.describe('The media player is optional', () => {
     expect(await playerDefined(page)).toBe(false)
   })
 
-  test('a player switched off in Preferences is not loaded, and loads when switched on', async ({
-    page,
-  }) => {
+  test('a player switched off in Preferences is not loaded, and loads when switched on', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page)
     await page.evaluate(() => {
       localStorage.setItem('media-settings', JSON.stringify({ mediaPlayerEnabled: false }))
@@ -494,7 +504,7 @@ test.describe('The media player is optional', () => {
     await page.waitForFunction(() => customElements.get('media-player'))
   })
 
-  test('with the player on, it is loaded as before', async ({ page }) => {
+  test('with the player on, it is loaded as before', { tag: '@logic' }, async ({ page }) => {
     await openApp(page, '/')
     await page.waitForFunction(() => customElements.get('media-player'))
   })

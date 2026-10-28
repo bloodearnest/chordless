@@ -148,7 +148,7 @@ test("the menu's About item opens the page", async ({ page }) => {
   await expect(page.locator('about-view')).toBeVisible()
 })
 
-test('the install panel says why installing is worth it', async ({ page }) => {
+test('the install panel says why installing is worth it', { tag: '@logic' }, async ({ page }) => {
   await openApp(page, '/about')
   const about = page.locator('app-about')
   await about.getByRole('button', { name: 'Why install?' }).click()
@@ -156,7 +156,9 @@ test('the install panel says why installing is worth it', async ({ page }) => {
   await expect(about.locator('why-install .why')).toContainText('Your songs stay put')
 })
 
-test('the dev server names the app so it is not mistaken for the real one', async ({ request }) => {
+test('the dev server names the app so it is not mistaken for the real one', {
+  tag: '@logic',
+}, async ({ request }) => {
   const manifest = await (await request.get('/manifest.webmanifest')).json()
   expect(manifest.name).toBe('Chordless (dev)')
   expect(manifest.theme_color).not.toBe('#2c3e50')

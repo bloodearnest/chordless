@@ -74,9 +74,9 @@ test.describe('Moving through a setlist', () => {
 })
 
 test.describe('Sections', () => {
-  test('showing a section as none or lyrics only applies in the setlist, and after a reload', async ({
-    page,
-  }) => {
+  test('showing a section as none or lyrics only applies in the setlist, and after a reload', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await openFirstSong(page)
     const header = page.locator('#app-header')
     const song = page.locator('#song-0')
@@ -113,7 +113,7 @@ test.describe('Sections', () => {
 })
 
 test.describe('Saved section states', () => {
-  test('older saves, in the flat format, still apply', async ({ page }) => {
+  test('older saves, in the flat format, still apply', { tag: '@logic' }, async ({ page }) => {
     const url = await seedSetlist(page)
     // Song 0's Chorus (section 1) hidden, as saved before the song models
     await page.evaluate(() =>
@@ -199,7 +199,9 @@ test.describe('Editing a setlist', () => {
     await expect.poll(() => storedOrder(page)).toEqual([ALPHA, CHARLIE].map(uuid))
   })
 
-  test("changing a song's key in the overview transposes it, and keeps it", async ({ page }) => {
+  test("changing a song's key in the overview transposes it, and keeps it", {
+    tag: '@logic',
+  }, async ({ page }) => {
     const url = await seedSetlist(page)
     await page.goto(url)
     const cards = page.locator('setlist-overview song-card')

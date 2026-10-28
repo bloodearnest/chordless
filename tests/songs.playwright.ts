@@ -24,9 +24,9 @@ test.describe('Song library', () => {
     }
   })
 
-  test('the reset button is there in edit mode only, and puts the song back in its key', async ({
-    page,
-  }) => {
+  test('the reset button is there in edit mode only, and puts the song back in its key', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page)
     await page.goto('/songs/info-test-song')
     await page.reload()
@@ -79,14 +79,18 @@ test.describe('Song library navigation', () => {
     await expect(heading).toContainText('Info Test Song')
   })
 
-  test('a song that does not exist sends you back to the list', async ({ page }) => {
+  test('a song that does not exist sends you back to the list', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await seedSong(page)
     await page.goto('/songs/no-such-song')
     await expect(page).toHaveURL(/\/songs$/)
     await expect(page.locator('#library-app-header')).toContainText('Song Library')
   })
 
-  test('leaving the library while in edit mode leaves edit mode', async ({ page }) => {
+  test('leaving the library while in edit mode leaves edit mode', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await seedSong(page)
     await page.goto('/songs/info-test-song')
     await page
@@ -128,7 +132,9 @@ test.describe('Song info', () => {
     await expect(page.locator('#library-song-info-dialog song-info')).toContainText('Key')
   })
 
-  test('info button on a setlist song opens the song info dialog', async ({ page }) => {
+  test('info button on a setlist song opens the song info dialog', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist/song/0')
@@ -143,7 +149,9 @@ test.describe('Song info', () => {
     await expect(page.locator('#song-info-dialog song-info')).toContainText('Ann')
   })
 
-  test('info button on the setlist overview opens the setlist info dialog', async ({ page }) => {
+  test('info button on the setlist overview opens the setlist info dialog', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'info-test-setlist' })
 
     await page.goto('/setlist/info-test-setlist')
@@ -158,7 +166,9 @@ test.describe('Song info', () => {
     await expect(info).toContainText('1 song')
   })
 
-  test('a leader entered when creating a setlist appears in its info', async ({ page }) => {
+  test('a leader entered when creating a setlist appears in its info', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await openApp(page)
 
     await page.getByRole('button', { name: 'Create new setlist' }).click()
@@ -223,7 +233,9 @@ test.describe('Song info', () => {
     })
   })
 
-  test('a setlist that is not in Drive can be deleted from its info dialog', async ({ page }) => {
+  test('a setlist that is not in Drive can be deleted from its info dialog', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'delete-test-setlist' })
     await page.goto('/setlist/delete-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
@@ -249,7 +261,7 @@ test.describe('Song info', () => {
     expect(left).toBeUndefined()
   })
 
-  test('a setlist that is in Drive cannot be deleted', async ({ page }) => {
+  test('a setlist that is in Drive cannot be deleted', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page, { setlistId: 'drive-test-setlist' })
     await page.evaluate(async () => {
       const { getCurrentDB } = await import('/js/db.ts')
@@ -267,7 +279,7 @@ test.describe('Song info', () => {
     await expect(dialog.getByRole('button', { name: 'Delete setlist' })).toHaveCount(0)
   })
 
-  test('cancelling a setlist details edit changes nothing', async ({ page }) => {
+  test('cancelling a setlist details edit changes nothing', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page, { setlistId: 'cancel-test-setlist' })
     await page.goto('/setlist/cancel-test-setlist')
     await expect(page.locator('#app-header')).toContainText(/Sun,? 11 Oct/)
@@ -326,7 +338,7 @@ test.describe('Song import', () => {
     expect(setlist.songs.map(s => s.songId)).toEqual(['title-firstsong', 'title-secondsong'])
   })
 
-  test('imports pasted ChordPro into an existing setlist', async ({ page }) => {
+  test('imports pasted ChordPro into an existing setlist', { tag: '@logic' }, async ({ page }) => {
     await seedSong(page, { setlistId: 'paste-test-setlist' })
     await page.goto('/import-song')
     const songImport = page.locator('song-import')

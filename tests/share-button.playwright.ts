@@ -29,7 +29,9 @@ test.describe('The share button', () => {
     await expect(button).toBeVisible()
   })
 
-  test('is lit when the setlist is shared, and the dialog has its link', async ({ page }) => {
+  test('is lit when the setlist is shared, and the dialog has its link', { tag: '@logic' }, async ({
+    page,
+  }) => {
     await openApp(page, '/')
     await seedSetlist(page)
     const setlist = await fromDB(page, 'getSetlist', 'seeded-setlist')

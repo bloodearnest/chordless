@@ -54,7 +54,9 @@ test.describe('Song settings', () => {
     ).toHaveAttribute('aria-pressed', 'true')
   })
 
-  test("the setlist's BPM survives a reload, over the library song's own", async ({ page }) => {
+  test("the setlist's BPM survives a reload, over the library song's own", {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'bpm-test-setlist' })
     // Give the library song a tempo of its own
     await page.evaluate(async () => {
@@ -95,9 +97,9 @@ test.describe('Song settings', () => {
       .toBe(73)
   })
 
-  test('the song settings show no capo, label or value, while the capo is off', async ({
-    page,
-  }) => {
+  test('the song settings show no capo, label or value, while the capo is off', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'no-capo-setlist' })
     await page.goto('/setlist/no-capo-setlist')
     await page.locator('setlist-overview song-card').first().click()
@@ -192,9 +194,9 @@ test.describe('Song settings', () => {
     await expect.poll(shown).toMatchObject({ key: 'G', bpm: 72, capo: 0 })
   })
 
-  test('asking to reset a song closes the settings popover, which would cover the question', async ({
-    page,
-  }) => {
+  test('asking to reset a song closes the settings popover, which would cover the question', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'reset-test-setlist' })
     await page.goto('/setlist/reset-test-setlist')
     await page.locator('setlist-overview song-card').first().click()
@@ -256,7 +258,9 @@ test.describe('Media player settings', () => {
     await expect(settings.getByRole('switch', { name: 'Stereo Split (L/R)' })).toBeDisabled()
   })
 
-  test('turning the media player off in preferences hides it on setlists', async ({ page }) => {
+  test('turning the media player off in preferences hides it on setlists', {
+    tag: '@logic',
+  }, async ({ page }) => {
     await seedSong(page, { setlistId: 'player-test-setlist' })
 
     await page.goto('/setlist/player-test-setlist')

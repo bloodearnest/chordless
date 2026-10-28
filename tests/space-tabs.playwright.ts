@@ -1,8 +1,8 @@
 import { expect, openApp, seedSetlist, test } from './fixtures.ts'
 
-test('a tab switches space without reloading the page, and shows only that space', async ({
-  page,
-}) => {
+test('a tab switches space without reloading the page, and shows only that space', {
+  tag: '@logic',
+}, async ({ page }) => {
   // Personal has the seeded setlist; a team has one of its own
   await seedSetlist(page, { setlistId: 'personal-setlist' })
   await page.evaluate(async () => {

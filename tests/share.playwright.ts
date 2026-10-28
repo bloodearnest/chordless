@@ -126,10 +126,9 @@ test.describe('A setlist shared by link', () => {
     await expect(page).toHaveURL(/\/s\/abcdefghijklmnop1234(#.*)?$/)
   })
 
-  test('opens again without the key in the URL, and asks whether anything changed', async ({
-    context,
-    page,
-  }) => {
+  test('opens again without the key in the URL, and asks whether anything changed', {
+    tag: '@logic',
+  }, async ({ context, page }) => {
     const key = generateShareKey()
     const requests = await serveShare(context, key)
 
@@ -156,10 +155,9 @@ test.describe('A setlist shared by link', () => {
     await expect(page.locator('setlist-overview')).toContainText('Amazing Grace (new)')
   })
 
-  test('says the share has ended, and keeps nothing, when it was stopped', async ({
-    context,
-    page,
-  }) => {
+  test('says the share has ended, and keeps nothing, when it was stopped', {
+    tag: '@logic',
+  }, async ({ context, page }) => {
     const key = generateShareKey()
     await serveShare(context, key)
     await openLink(page, key)
@@ -191,13 +189,16 @@ test.describe('A setlist shared by link', () => {
     expect(kept).toEqual({ setlists: 0, songs: 2 })
   })
 
-  test('says so when the link has lost its key', async ({ context, page }) => {
+  test('says so when the link has lost its key', { tag: '@logic' }, async ({ context, page }) => {
     await serveShare(context, generateShareKey())
     await page.goto(`/s/${FILE}`)
     await expect(page.locator('#share-status')).toHaveText('This link is incomplete')
   })
 
-  test('does not open a share that has already expired', async ({ context, page }) => {
+  test('does not open a share that has already expired', { tag: '@logic' }, async ({
+    context,
+    page,
+  }) => {
     const key = generateShareKey()
     await serveShare(context, key, { bundle: bundle({ expires: '2020-01-01' }) })
     await openLink(page, key)
@@ -261,7 +262,10 @@ test.describe('A setlist shared by link', () => {
     })
   })
 
-  test('its songs are in the song library, to read and to add to it', async ({ context, page }) => {
+  test('its songs are in the song library, to read and to add to it', { tag: '@logic' }, async ({
+    context,
+    page,
+  }) => {
     const key = generateShareKey()
     await serveShare(context, key)
     await openLink(page, key)
