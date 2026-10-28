@@ -436,6 +436,18 @@ describe('timedFetch', () => {
     expect(sent[2].get('traceparent')).to.match(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/)
   })
 
+  it('keeps the Cloudflare ray id of a response, the way to find the Worker’s span', async () => {
+    const fetcher = timedFetch(
+      'worker',
+      async () => new Response('{}', { headers: { 'cf-ray': 'a51c89e75a0635ca-LHR' } })
+    )
+    await fetcher('/api/spaces')
+    await timedFetch('drive', ok)('https://x.test/')
+    const [worker, drive] = finished()
+    expect(worker.attributes['cloudflare.ray_id']).to.equal('a51c89e75a0635ca')
+    expect(drive.attributes).to.not.have.property('cloudflare.ray_id')
+  })
+
   it('never sends a traceparent to Google', async () => {
     const sent: Headers[] = []
     await timedFetch('drive', async (_input, init) => {
