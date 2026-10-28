@@ -182,6 +182,39 @@ storage/sync
 - delete setlists (owner only, trashed in Drive on sync, removed on other devices):
   designed in docs/SYNC_ARCHITECTURE.md, not built
 - a durable offline write queue (the immediate push is built: a local save starts a sync after 2s, see docs/SYNC_ARCHITECTURE.md; a change made offline waits for the next sync once online)
+- a change made just before the app is closed may not reach Drive (found 2026-10-28; the person prepares
+  a setlist on the desktop, closes it, opens the tablet at church, and the desktop never synced). Nothing
+  syncs on close: a local save starts a sync after 2 s of quiet (`NUDGE_MS`), and only while the page is
+  visible and online (auto-sync.ts `#sync`); a hidden or closed page does not sync at all. Closing within
+  about 2 s of the last edit, plus the 1 to 2 s a sync takes, leaves the record "changed since last sync"
+  (its content hash differs from `syncedContentHash`): not lost, sent by the next sync, which is the next
+  time the desktop app is opened. Four ways to narrow it (1 and 4 first):
+  1. sync at once when the page is hidden (`visibilitychange` to hidden, which a tab switch, a minimised
+     window, an app switch and a closing lid all fire) and there are unsent changes: skip the 2 s wait and
+     the visible gate. `#unsent` is in memory only, so also ask the database if a record differs from
+     what was synced. A small change in auto-sync.ts, with tests in tests/auto-sync.test.ts
+  2. make the upload survive the page going: `fetch` with `keepalive` for the small JSON writes (a
+     setlist, a song file), which the browser may finish after the page is gone. No guarantee: a Drive
+     upload takes several requests and a token, a keepalive body is limited to 64 KB, and iPad Safari
+     is the weakest. Do it only if 1 is not enough
+  3. ask before closing with unsent changes: a `beforeunload` prompt while `#unsent` is true or a
+     record differs from what was synced. It is friction (the rule in CLAUDE.md: friction, not
+     prohibition), and the browser shows its own text; a backstop after 1
+  4. show it: a cue that there are changes not yet sent (and when it last synced), in the header or on
+     the Sync button, if the app has none yet (check what the Storage page and the space card already
+     show), so the person can see before closing
+  Nothing here is reliable on a page being torn down: 1 lowers the risk, and looking for "synced" before
+  closing removes it. To learn how often it happens: an attribute on the `chordless.setlist.leave` span
+  (docs/OBSERVABILITY.md) for whether changes were unsent when the page was left
+- the one-minute sync tick (`TICK_MS`, auto-sync.ts) is mainly for team members, who have no other way
+  to see a change while the app is open unless they are live (decided 2026-10-28, not built). A
+  personal space has one person on one device at a time (the desktop to prepare, the tablet to use it),
+  and opening or coming back to the app already syncs: a tick every 5 minutes there is enough, which
+  takes a device left awake on a charger from about 1,440 syncs a day to 290. Keep 1 minute for team
+  spaces. `runSync` already loads the space, so the timer can skip a tick until the interval for that
+  kind of space has passed. Do not slow it by what the last sync found (adaptive backoff): a quiet
+  sync says little about the next, and a team member's wait is the cost. For the telemetry side, the
+  ticks are to be head-sampled, 1 in 10, by a `chordless.sync.trigger` attribute (docs/OBSERVABILITY.md)
 - richer PWA install UI (Chrome's devtools manifest tab warns): add "screenshots" to
   public/manifest.webmanifest, at least one with form_factor "wide" (desktop) and one without it
   or "narrow" (mobile). Generate them with Playwright from seeded data, using a public-domain
