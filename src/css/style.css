@@ -1079,8 +1079,9 @@ body.edit-mode .key-selector:focus {
   scroll-snap-stop: always;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: var(--song-margin);
-  padding-bottom: 2rem;
+  /* Sides only: on a phone the header tucks away and the lyrics run to the screen's top and
+     bottom, so a margin there shows up as a band while scrolling */
+  padding: 0 var(--song-margin);
   box-sizing: border-box;
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
@@ -1091,10 +1092,12 @@ body.edit-mode .key-selector:focus {
   margin-left: 0 !important;
 }
 
-/* Larger padding on tablet/desktop */
+/* Tablet/desktop: the header stays, so the song has a margin on every side. The top and bottom
+   are on the page, not the scrolling section, so they stay put and the lyrics are cut at them
+   rather than running under the header */
 @media (min-width: 48rem) {
-  .section {
-    padding-bottom: 3rem;
+  #main-content {
+    padding-block: var(--song-margin);
   }
 
   .section > * {
@@ -1525,10 +1528,6 @@ body.edit-mode .key-selector:focus {
 
 /* Touch-friendly spacing */
 @media (max-width: 768px) {
-  #main-content {
-    padding: 1rem;
-  }
-
   .controls button {
     padding: 1rem 2rem;
     font-size: var(--font-ui);
