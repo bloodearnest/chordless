@@ -561,3 +561,74 @@ describe('what started a sync, for the reports', () => {
     expect(world.triggers).to.deep.equal(['resume', 'live', 'live'])
   })
 })
+
+describe('changes made here that have not been sent', () => {
+  const fire = (nudges: { fn: () => void; cancelled: boolean }[]) => {
+    for (const nudge of nudges.filter(n => !n.cancelled)) nudge.fn()
+  }
+
+  it('are none while nothing was changed, and from a save until a sync has sent it', async () => {
+    const { auto, world, win } = rig({ state: 'feed' })
+    auto.start()
+    await settle()
+    expect(auto.hasUnsent()).to.equal(false)
+
+    win.dispatchEvent(savedHere())
+    expect(auto.hasUnsent(), 'waiting for the quiet').to.equal(true)
+
+    world.hold = true
+    fire(world.nudges)
+    await settle()
+    expect(world.runs).to.equal(2)
+    expect(auto.hasUnsent(), 'on its way, in the sync running').to.equal(true)
+
+    world.hold = false
+    world.release?.()
+    await settle()
+    expect(auto.hasUnsent(), 'sent').to.equal(false)
+  })
+
+  it('are still unsent when the sync fails, or is skipped, or a change came while it ran', async () => {
+    const failing = rig({ state: 'feed' })
+    failing.auto.start()
+    await settle()
+    failing.win.dispatchEvent(savedHere())
+    failing.world.failNext = true
+    fire(failing.world.nudges)
+    await settle()
+    expect(failing.auto.hasUnsent(), 'failed').to.equal(true)
+
+    const skipped = rig({ state: 'feed' })
+    skipped.auto.start()
+    await settle()
+    skipped.win.dispatchEvent(savedHere())
+    skipped.world.skipNext = true
+    fire(skipped.world.nudges)
+    await settle()
+    expect(skipped.auto.hasUnsent(), 'skipped').to.equal(true)
+
+    const busy = rig({ state: 'feed' })
+    busy.auto.start()
+    await settle()
+    busy.win.dispatchEvent(savedHere())
+    busy.world.hold = true
+    fire(busy.world.nudges)
+    await settle()
+    busy.win.dispatchEvent(savedHere())
+    busy.world.hold = false
+    busy.world.release?.()
+    await settle()
+    expect(busy.auto.hasUnsent(), 'changed while it ran: another is waiting').to.equal(true)
+  })
+
+  it('are unsent for a storage with no feed, until it is opened or Sync is pressed', async () => {
+    const { auto, world, win } = rig({ state: 'no-feed', lastSync: 60_000 })
+    auto.start()
+    await settle()
+    win.dispatchEvent(savedHere())
+    fire(world.nudges)
+    await settle()
+    expect(world.runs).to.equal(0)
+    expect(auto.hasUnsent()).to.equal(true)
+  })
+})

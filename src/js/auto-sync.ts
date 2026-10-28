@@ -85,6 +85,8 @@ export class AutoSync {
   #changedWhileRunning = false
   /** Changes made here that no finished sync has sent yet */
   #unsent = false
+  /** The sync running now is carrying changes made here: they are on their way, not yet there */
+  #sending = false
   /** Another device said it changed something while a sync was running: that one may not have seen it */
   #pullAgain = false
 
@@ -178,6 +180,7 @@ export class AutoSync {
       if (state === 'unavailable' || (state === 'no-feed' && !everything)) return
       this.#lastAttempt = this.#deps.now()
       this.#running = true
+      this.#sending = carrying
       this.#changedWhileRunning = false
       this.#unsent = false
       const ran = await this.#deps.run(trigger)
@@ -189,6 +192,7 @@ export class AutoSync {
       console.warn('[AutoSync] Sync did not work:', error)
     } finally {
       this.#running = false
+      this.#sending = false
     }
     if (sent) this.#deps.win.dispatchEvent(new SyncPushedEvent())
     // A change made while it ran may have missed it: send that too
@@ -200,6 +204,15 @@ export class AutoSync {
       this.#pullAgain = false
       await this.#sync(true, 'live')
     }
+  }
+
+  /**
+   * Whether changes made in this tab have not reached the storage yet: waiting for the quiet
+   * (the nudge), left by a sync that did not finish, or on their way in the sync running now. In
+   * memory only: what an earlier visit left is the next sync's to find.
+   */
+  hasUnsent(): boolean {
+    return this.#unsent || this.#sending || this.#changedWhileRunning || this.#cancelNudge !== null
   }
 
   /**
@@ -238,6 +251,11 @@ let running: AutoSync | null = null
 /** Sync the space in use now, if the app is syncing by itself (see AutoSync.syncSoon) */
 export async function syncSoon(): Promise<void> {
   await running?.syncSoon()
+}
+
+/** Whether changes made in this tab have not been sent yet (see AutoSync.hasUnsent); false if the app is not syncing by itself */
+export function hasUnsentChanges(): boolean {
+  return running?.hasUnsent() ?? false
 }
 
 /** Start syncing the space in use while the app is open */

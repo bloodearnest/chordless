@@ -57,6 +57,7 @@ const opened = (overrides: Partial<SetlistOpened> = {}): SetlistOpened => ({
   ccli: ['22025', '7062207'],
   source: 'library',
   openMs: 123.4,
+  hasUnsent: () => false,
   ...overrides,
 })
 
@@ -179,5 +180,45 @@ describe('leaving a setlist', () => {
   it('is nothing when no setlist was opened', () => {
     endSetlistSession()
     expect(spans()).to.have.length(0)
+  })
+})
+
+describe('changes not yet sent, when a setlist is left', () => {
+  it('says there were none, and that the app carried on, when it moved to another page', () => {
+    startSetlistSession(opened())
+    endSetlistSession()
+    const [leave] = named('chordless.setlist.leave')
+    expect(leave.attributes).to.include({
+      'chordless.setlist.unsent_on_leave': false,
+      'chordless.setlist.left': 'navigation',
+    })
+  })
+
+  it('says there were some, as they are when the page is closed', () => {
+    let unsent = false
+    startSetlistSession(opened({ hasUnsent: () => unsent }))
+    unsent = true
+    window.dispatchEvent(new Event('pagehide'))
+    const [leave] = named('chordless.setlist.leave')
+    expect(leave.attributes).to.include({
+      'chordless.setlist.unsent_on_leave': true,
+      'chordless.setlist.left': 'page',
+    })
+  })
+
+  it('asks when the setlist is left, not before', () => {
+    let asked = 0
+    startSetlistSession(
+      opened({
+        hasUnsent: () => {
+          asked++
+          return false
+        },
+      })
+    )
+    songShown(song(0))
+    expect(asked).to.equal(0)
+    endSetlistSession()
+    expect(asked).to.equal(1)
   })
 })

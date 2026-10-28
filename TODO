@@ -204,8 +204,8 @@ storage/sync
      the Sync button, if the app has none yet (check what the Storage page and the space card already
      show), so the person can see before closing
   Nothing here is reliable on a page being torn down: 1 lowers the risk, and looking for "synced" before
-  closing removes it. To learn how often it happens: an attribute on the `chordless.setlist.leave` span
-  (docs/OBSERVABILITY.md) for whether changes were unsent when the page was left
+  closing removes it. To learn how often it happens: `chordless.setlist.unsent_on_leave` with
+  `chordless.setlist.left = page` on the leave span (built: docs/OBSERVABILITY.md)
 - the one-minute sync tick (`TICK_MS`, auto-sync.ts) is mainly for team members, who have no other way
   to see a change while the app is open unless they are live (decided 2026-10-28, not built). A
   personal space has one person on one device at a time (the desktop to prepare, the tablet to use it),
