@@ -1,10 +1,11 @@
 /**
  * The page's traces, on their way to Honeycomb (docs/OBSERVABILITY.md): `POST /api/otlp/v1/traces`.
- * The small collector we need, with none to run: it limits who may send, rebuilds the body from an
- * allow-list (so a bug in the page cannot ship a song's title or lyrics), and forwards it with the
- * key the browser cannot keep. The body is read into memory and passed on, never stored or logged.
- * The page is always answered 204 once its request is well formed, whatever upstream says: a
- * telemetry failure must never reach the app.
+ * The small collector we need, with none to run: it limits who may send, rebuilds the body from the
+ * fields we know (bounded in size and count), blanks out email addresses, and forwards it with the
+ * key the browser cannot keep. Lyric fragments and URLs may pass (Honeycomb keeps them for a
+ * limited time: docs/OBSERVABILITY.md); an email address never does. The body is read into memory
+ * and passed on, never stored or logged. The page is always answered 204 once its request is well
+ * formed, whatever upstream says: a telemetry failure must never reach the app.
  */
 
 import type { Env } from './env.ts'
@@ -18,88 +19,24 @@ const MAX_SPANS = 500
 const MAX_ATTRIBUTES = 64
 const MAX_EVENTS = 16
 const MAX_LINKS = 8
-const MAX_VALUE_LENGTH = 512
-const MAX_MESSAGE_LENGTH = 200
+const MAX_VALUE_LENGTH = 2048
+const MAX_KEY_LENGTH = 100
 const MAX_NAME_LENGTH = 100
 
-/** The standard names we use (docs/OBSERVABILITY.md, Conventions) */
-const STANDARD_ATTRIBUTES = [
-  'service.name',
-  'service.version',
-  'deployment.environment.name',
-  'session.id',
-  'enduser.pseudo.id',
-  'device.id',
-  'user_agent.original',
-  'http.request.method',
-  'http.response.status_code',
-  'http.route',
-  'error.type',
-  'exception.type',
-  'exception.message',
-  'telemetry.sdk.name',
-  'telemetry.sdk.language',
-  'telemetry.sdk.version',
-  // Honeycomb's sample rate, here before there is sampling so counts stay right the day there is
-  'SampleRate',
-]
-
-/** Ours, each starting with `chordless.` (docs/OBSERVABILITY.md, What is traced). No names of songs. */
-const CHORDLESS_ATTRIBUTES = [
-  'chordless.error',
-  'chordless.outcome',
-  'chordless.route',
-  'chordless.live',
-  'chordless.online',
-  'chordless.display_mode',
-  'chordless.space_kind',
-  'chordless.team.pseudo_id',
-  'chordless.sync.operation',
-  'chordless.sync.space_kind',
-  'chordless.sync.pulled',
-  'chordless.sync.pushed',
-  'chordless.sync.pull_ms',
-  'chordless.sync.push_ms',
-  'chordless.sync.drive_calls',
-  'chordless.sync.drive_ms_total',
-  'chordless.sync.drive_ms_max',
-  'chordless.sync.worker_calls',
-  'chordless.sync.errors',
-  'chordless.auth.refresh_ms',
-  'chordless.auth.outcome',
-  'chordless.setlist.id',
-  'chordless.setlist.date',
-  'chordless.setlist.songs',
-  'chordless.setlist.ccli',
-  'chordless.setlist.source',
-  'chordless.setlist.open_ms',
-  'chordless.setlist.songs_viewed',
-  'chordless.setlist.song_changes',
-  'chordless.setlist.transposes',
-  'chordless.setlist.edit_entries',
-  'chordless.song.id',
-  'chordless.song.ccli',
-  'chordless.song.index',
-  'chordless.song.key',
-  'chordless.live.publish_ms',
-  'chordless.live.sync_ms',
-  'chordless.live.attempt',
-  'chordless.live.found',
-  'chordless.live.transit_ms',
-  'chordless.live.up_ms',
-  'chordless.live.down_ms',
-  'chordless.live.clock_offset_ms',
-  'chordless.live.rtt_ms',
-]
-
 /**
- * The attribute names a span may carry. Anything else is dropped here, so a new one is a decision
- * made in this list (and tested), not an accident in the page: never a title, lyric, chart or key.
+ * An attribute name is lower-case words joined by dots (`chordless.sync.pull_ms`,
+ * `http.response.status_code`), or Honeycomb's `SampleRate`: what the conventions look like
+ * (docs/OBSERVABILITY.md). Not an id or a sentence, which would make a column of each.
  */
-export const ALLOWED_ATTRIBUTES: ReadonlySet<string> = new Set([
-  ...STANDARD_ATTRIBUTES,
-  ...CHORDLESS_ATTRIBUTES,
-])
+const ATTRIBUTE_NAME = /^([a-z][a-z0-9_]*(\.[a-z0-9_]+)*|SampleRate)$/
+
+/** An email address, written plainly or percent-encoded in a URL (`a%40b.com`) */
+const EMAIL = /[\w.+%-]+(?:@|%40)[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g
+
+/** The text with every email address in it blanked out: the one thing that never goes to Honeycomb */
+export function withoutEmails(text: string): string {
+  return text.replace(EMAIL, '[email]')
+}
 
 /** What the route needs of the outside world, replaceable in tests */
 export interface TelemetryDeps {
@@ -114,16 +51,21 @@ interface Attribute {
   value: Json
 }
 
-/** One attribute of OTLP/JSON, or null if it is not allowed or not a plain value */
+/** One attribute of OTLP/JSON, or null if its name is not a name or its value is not a plain one */
 function cleanAttribute(item: unknown): Attribute | null {
-  if (!isRecord(item) || typeof item.key !== 'string' || !ALLOWED_ATTRIBUTES.has(item.key)) {
+  if (
+    !isRecord(item) ||
+    typeof item.key !== 'string' ||
+    item.key.length > MAX_KEY_LENGTH ||
+    !ATTRIBUTE_NAME.test(item.key)
+  ) {
     return null
   }
   const value = item.value
   if (!isRecord(value)) return null
-  const limit = item.key === 'exception.message' ? MAX_MESSAGE_LENGTH : MAX_VALUE_LENGTH
   if (typeof value.stringValue === 'string') {
-    return { key: item.key, value: { stringValue: value.stringValue.slice(0, limit) } }
+    const text = withoutEmails(value.stringValue.slice(0, MAX_VALUE_LENGTH))
+    return { key: item.key, value: { stringValue: text } }
   }
   if (typeof value.boolValue === 'boolean')
     return { key: item.key, value: { boolValue: value.boolValue } }
@@ -134,7 +76,7 @@ function cleanAttribute(item: unknown): Attribute | null {
   if (typeof int === 'number' || (typeof int === 'string' && /^-?\d{1,19}$/.test(int))) {
     return { key: item.key, value: { intValue: int } }
   }
-  // (arrays, maps and bytes are not ours: a list could hide a lot)
+  // (arrays, maps and bytes are not ours)
   return null
 }
 
@@ -159,7 +101,7 @@ const small = (value: unknown, max: number): number | null =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= max ? value : null
 
 const text = (value: unknown, max = MAX_NAME_LENGTH): string | null =>
-  typeof value === 'string' ? value.slice(0, max) : null
+  typeof value === 'string' ? withoutEmails(value.slice(0, max)) : null
 
 function cleanEvents(list: unknown): Json[] {
   if (!Array.isArray(list)) return []
@@ -212,18 +154,20 @@ function cleanSpan(item: unknown): Json | null {
   if (parent !== null) span.parentSpanId = parent
   const kind = small(item.kind, 5)
   if (kind !== null) span.kind = kind
-  // (the status's message is free text: only its code is kept)
   if (isRecord(item.status)) {
     const code = small(item.status.code, 2)
-    if (code !== null) span.status = { code }
+    if (code !== null) {
+      const message = text(item.status.message, MAX_VALUE_LENGTH)
+      span.status = message ? { code, message } : { code }
+    }
   }
   return span
 }
 
 /**
- * The body rebuilt from what we know of OTLP/JSON, field by field: unknown fields do not pass,
- * attributes pass only by name (`ALLOWED_ATTRIBUTES`) with plain values of a bounded size, and a
- * span's status message and a scope's attributes are left out. Null when no span is left.
+ * The body rebuilt from what we know of OTLP/JSON, field by field: an unknown field does not pass,
+ * an attribute passes with a name that looks like one and a plain value of a bounded size, and every
+ * email address in any text is blanked out. A scope's attributes are left out. Null when no span is left.
  */
 export function redact(body: unknown): Json | null {
   if (!isRecord(body) || !Array.isArray(body.resourceSpans)) return null
