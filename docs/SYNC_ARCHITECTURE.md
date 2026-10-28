@@ -491,7 +491,7 @@ It can be an optional extra for a closed, installed app.
 | State | Sync |
 |---|---|
 | App opened, or the device back online after a few minutes offline | an **incremental sync** (below) |
-| App open | an incremental sync about every 60 s |
+| App open | an incremental sync about every 60 s in a team space, every 5 minutes in a personal one (`TICK_MS`, `PERSONAL_TICK_MS`: one person on one device at a time, and opening the app syncs) |
 | A setlist is **live** | the same tick, every 60 s. There is no faster poll for the live setlist: a late song within a minute is enough, and the fast way is the live channel (below) |
 | Tab hidden | stopped (live mode holds a wake lock, so it carries on) |
 | A live channel is up (built) | a device that has sent its changes says so over a WebSocket and the others sync at once (LIVE_SYNC.md); the poll stays as the fallback |
@@ -504,7 +504,10 @@ the sync when the device is back online (as if opened if it was offline over 5 m
 tick every 60 s while the app is on screen and online. Only for the space in use, and only where
 there is a feed: a storage with none is synced when the app opens or comes back, never on a tick.
 Each is an incremental sync that also pushes, and a local save starts one after 2 s (the immediate
-push, above). `sync-lock.ts` holds the Web Lock `chordless-sync`: a press of Sync waits
+push, above). When the page is hidden (`visibilitychange`: a tab switch, a minimised window, an app
+switch, a closing lid) with changes not yet sent, the sync starts at once, without the 2 s wait and
+though the page is not visible: as near as a page gets to knowing it is closing. Nothing is certain
+on a page being torn down; a dropped send is caught by the next sync. `sync-lock.ts` holds the Web Lock `chordless-sync`: a press of Sync waits
 for a running sync, and one the app starts is skipped if one is running. A failure is only logged.
 A sync that finishes records the time (the card's "Synced ..."). There is no date
 rule: a request to the feed costs the same whatever the age of the files, so every setlist and chart

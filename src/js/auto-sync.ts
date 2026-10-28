@@ -17,8 +17,13 @@ import { getCurrentSpace, getCurrentSpaceFull } from './space.ts'
 import { isTeamMember, storageFor } from './storage/space-storage.ts'
 import { createSyncOrchestrator, type SyncTrigger } from './sync-orchestrator.ts'
 
-/** How often the app syncs while it is on screen */
+/** How often the app syncs while it is on screen, in a team space, where a member has no other way to see a change */
 export const TICK_MS = 60_000
+/**
+ * ...and in a personal space: one person on one device at a time, and opening or coming back to
+ * the app already syncs, so the tick is only a backstop
+ */
+export const PERSONAL_TICK_MS = 5 * 60_000
 /** Opening the app, or coming back to it, after this long syncs whatever the storage can do */
 export const STALE_AFTER_MS = 15 * 60_000
 /** Coming back online after this long syncs as if the app had just been opened */
@@ -66,6 +71,8 @@ export interface AutoSyncDeps {
   /** Whether this device is live (live.ts) */
   live(): boolean
   state(): Promise<SyncState>
+  /** How often the tick syncs the space in use: `TICK_MS` or `PERSONAL_TICK_MS` */
+  tickMs(): Promise<number>
   /** The sync itself, for the space in use; false if it was skipped because another is running, and throws if it fails */
   run(trigger: SyncTrigger): Promise<boolean>
   /** Call `fn` every `ms` until the returned function is called */
@@ -101,7 +108,7 @@ export class AutoSync {
     win.addEventListener('online', this.#onOnline)
     win.addEventListener('offline', this.#onOffline)
     win.addEventListener(DataChangeEvent.type, this.#onDataChange)
-    const stopTimer = every(TICK_MS, () => void this.#sync(false, 'tick'))
+    const stopTimer = every(TICK_MS, () => void this.#tick())
     this.#stop = () => {
       doc.removeEventListener('visibilitychange', this.#onVisibility)
       win.removeEventListener('online', this.#onOnline)
@@ -129,10 +136,36 @@ export class AutoSync {
     await this.#sync(this.#stale(), 'resume')
   }
 
-  #onVisibility = (): void => {
-    if (this.#deps.visible() && this.#deps.now() - this.#lastAttempt >= TICK_MS) {
-      void this.#catchUp()
+  /**
+   * The timer fires every `TICK_MS`; the space says how many of those make a sync. (Half a tick
+   * of slack, so that a timer a little early is not read as one missed.)
+   */
+  async #tick(): Promise<void> {
+    let every = TICK_MS
+    try {
+      every = await this.#deps.tickMs()
+    } catch {
+      // (the space cannot be read: the tick of a team space, the faster)
     }
+    if (this.#deps.now() - this.#lastAttempt < every - TICK_MS / 2) return
+    await this.#sync(false, 'tick')
+  }
+
+  #onVisibility = (): void => {
+    if (this.#deps.visible()) {
+      if (this.#deps.now() - this.#lastAttempt >= TICK_MS) void this.#catchUp()
+    } else if (this.#unsent) {
+      // Hidden is as near as a page gets to telling that it is closing (a tab switch, a minimised
+      // window, an app switch, a closing lid): send what is waiting now, not after the quiet
+      this.#flush()
+    }
+  }
+
+  /** Send the changes made here at once, even if the page is hidden */
+  #flush(): void {
+    this.#cancelNudge?.()
+    this.#cancelNudge = null
+    void this.#sync(false, 'edit', true)
   }
 
   /**
@@ -148,6 +181,11 @@ export class AutoSync {
 
   #nudge(): void {
     if (this.#running) this.#changedWhileRunning = true
+    // A hidden page's timers are slowed or stopped, and it may not be there when they fire
+    if (!this.#deps.visible()) {
+      this.#flush()
+      return
+    }
     this.#cancelNudge?.()
     this.#cancelNudge = this.#deps.later(this.#deps.live() ? LIVE_NUDGE_MS : NUDGE_MS, () => {
       this.#cancelNudge = null
@@ -168,10 +206,11 @@ export class AutoSync {
 
   /**
    * Sync once if it can be done now. `everything` is for the app opening or coming back after a
-   * while: a storage with no feed is synced then too, not on a tick.
+   * while: a storage with no feed is synced then too, not on a tick. `hiddenToo` is for sending
+   * the changes of a page that is being left.
    */
-  async #sync(everything: boolean, trigger: SyncTrigger): Promise<void> {
-    if (!this.#deps.visible() || !this.#deps.online()) return
+  async #sync(everything: boolean, trigger: SyncTrigger, hiddenToo = false): Promise<void> {
+    if ((!hiddenToo && !this.#deps.visible()) || !this.#deps.online()) return
     // (what this sync carries: put back if it does not finish, so the next one tells of it)
     const carrying = this.#unsent
     let sent = false
@@ -272,6 +311,7 @@ export function startAutoSync(): AutoSync {
     },
     live: () => getLive() !== null,
     state: currentState,
+    tickMs: async () => ((await getCurrentSpaceFull()).team ? TICK_MS : PERSONAL_TICK_MS),
     run: runSync,
     every: (ms, fn) => {
       const id = setInterval(fn, ms)

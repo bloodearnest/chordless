@@ -5,6 +5,7 @@ import {
   LIVE_NUDGE_MS,
   NUDGE_MS,
   OFFLINE_LONG_MS,
+  PERSONAL_TICK_MS,
   STALE_AFTER_MS,
   SyncPushedEvent,
   type SyncState,
@@ -43,6 +44,7 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
     online: initial.online ?? true,
     live: false,
     state: (initial.state ?? 'feed') as SyncState,
+    tickMs: TICK_MS,
     lastSyncAgo: initial.lastSync === undefined ? 0 : initial.lastSync,
     runs: 0,
     /** What started each sync, in turn */
@@ -68,6 +70,7 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
       world.lastSyncAgo === null ? null : new Date(world.now - world.lastSyncAgo).toISOString(),
     live: () => world.live,
     state: async () => world.state,
+    tickMs: async () => world.tickMs,
     run: async trigger => {
       world.runs++
       world.triggers.push(trigger)
@@ -88,7 +91,11 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
       }
     },
     every: (_ms, fn) => {
-      world.tick = fn
+      // (a tick is a minute on: which ticks sync depends on the time since the last sync)
+      world.tick = () => {
+        world.now += TICK_MS
+        fn()
+      }
       return () => {
         world.stopped = true
       }
@@ -99,6 +106,77 @@ function rig(initial: { state?: SyncState; lastSync?: number | null; online?: bo
 }
 
 describe('Syncing by itself while the app is open', () => {
+  it('ticks every 5 minutes in a personal space, and every minute in a team space', async () => {
+    const solo = rig({ state: 'feed' })
+    solo.world.tickMs = PERSONAL_TICK_MS
+    solo.auto.start()
+    await settle()
+    for (let minute = 1; minute < 5; minute++) {
+      solo.world.tick?.()
+      await settle()
+    }
+    expect(solo.world.runs, 'four ticks short of five minutes').to.equal(1)
+    solo.world.tick?.()
+    await settle()
+    expect(solo.world.runs).to.equal(2)
+
+    const team = rig({ state: 'feed' })
+    team.auto.start()
+    await settle()
+    team.world.tick?.()
+    await settle()
+    expect(team.world.runs).to.equal(2)
+  })
+
+  describe('as the page is left', () => {
+    it('sends a change made here at once when the page is hidden, without the wait', async () => {
+      const { auto, world, win, doc } = rig()
+      auto.start()
+      await settle()
+      win.dispatchEvent(savedHere())
+      world.visible = false
+      doc.dispatchEvent(new Event('visibilitychange'))
+      await settle()
+      expect(world.runs).to.equal(2)
+      expect(world.nudges.at(-1)?.cancelled).to.equal(true)
+    })
+
+    it('does nothing when the page is hidden with no change waiting', async () => {
+      const { auto, world, doc } = rig()
+      auto.start()
+      await settle()
+      world.visible = false
+      doc.dispatchEvent(new Event('visibilitychange'))
+      await settle()
+      expect(world.runs).to.equal(1)
+    })
+
+    it('still sends a change that was made while a sync was running, once the page is hidden', async () => {
+      const { auto, world, win, doc } = rig()
+      world.hold = true
+      auto.start()
+      await settle()
+      win.dispatchEvent(savedHere())
+      world.visible = false
+      doc.dispatchEvent(new Event('visibilitychange'))
+      world.hold = false
+      world.release?.()
+      await settle()
+      await settle()
+      expect(world.runs).to.be.at.least(2)
+    })
+
+    it('does not send while offline: the change waits for the next sync', async () => {
+      const { auto, world, win, doc } = rig({ online: false })
+      auto.start()
+      win.dispatchEvent(savedHere())
+      world.visible = false
+      doc.dispatchEvent(new Event('visibilitychange'))
+      await settle()
+      expect(world.runs).to.equal(0)
+    })
+  })
+
   it('syncs when the app opens, if it never has or not for a while, whatever the storage can do', async () => {
     for (const lastSync of [null, STALE_AFTER_MS + 1000]) {
       for (const state of ['feed', 'no-feed'] as SyncState[]) {
@@ -288,7 +366,7 @@ describe('Syncing by itself while the app is open', () => {
       expect(world.nudges).to.have.length(0)
     })
 
-    it('does not list a whole space for an edit, and does nothing when it cannot sync', async () => {
+    it('does not list a whole space for an edit, and does nothing when it cannot sync, but sends one made on a hidden page', async () => {
       for (const setup of [
         { state: 'no-feed' as SyncState, lastSync: 0 },
         { state: 'unavailable' as SyncState, lastSync: 0 },
@@ -309,7 +387,8 @@ describe('Syncing by itself while the app is open', () => {
       win.dispatchEvent(savedHere())
       fire(world.nudges)
       await settle()
-      expect(world.runs).to.equal(1)
+      // (a change on a page that is hidden is sent at once: it may be on its way out)
+      expect(world.runs).to.equal(2)
     })
 
     it('sends a change made while a sync was running, which may have missed it', async () => {
